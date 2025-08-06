@@ -60,4 +60,37 @@ export default defineNuxtConfig({
       stylistic: true,
     },
   },
+
+  linkChecker: {
+    enabled: true,
+  },
+
+  ogImage: {
+    enabled: false,
+  },
+
+  robots: {
+    enabled: true,
+    blockNonSeoBots: true,
+  },
+
+  schemaOrg: {
+    enabled: true,
+    identity: {
+      type: 'Organization',
+      name: 'New Theatre',
+      url: 'https://newtheatre.org.uk',
+      description: 'We are the only entirely student-run theatre in England. Producing over thirty shows a year, they range from ‘A Midsummer Night’s Dream’ to contemporaries plays, as well as a host of original student written pieces.',
+    },
+  },
+
+  seo: {
+    // redirectToCanonicalSiteUrl: true,
+    automaticDefaults: true,
+  },
+
+  sitemap: {
+    enabled: true,
+    autoLastmod: true,
+  },
 })
