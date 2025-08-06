@@ -1,7 +1,17 @@
 import { PrismaClient } from '@prisma/client'
+import { PrismaD1 } from '@prisma/adapter-d1'
 
 const prismaClientSingleton = () => {
-  return new PrismaClient()
+  // In development, use SQLite directly without adapter
+  if (process.env.NODE_ENV !== 'production') {
+    return new PrismaClient()
+  }
+
+  // In production, use Cloudflare D1 with adapter
+  // @ts-expect-error - env is available in Cloudflare Workers runtime and adapter is supported
+  const adapter = new PrismaD1(env.DB)
+
+  return new PrismaClient({ adapter })
 }
 
 declare const globalThis: {

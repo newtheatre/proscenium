@@ -11,7 +11,41 @@ export default defineNuxtConfig({
   ],
 
   devtools: { enabled: true },
+
+  content: {
+    experimental: { sqliteConnector: 'native' },
+    database: {
+      type: 'd1',
+      bindingName: 'CF_BINDING_NAME',
+    },
+  },
   compatibilityDate: '2025-07-15',
+
+  nitro: {
+    cloudflare: {
+      wrangler: {
+        name: 'proscenium',
+        routes: [
+          {
+            pattern: 'proscenium.newtheatre.org.uk',
+            custom_domain: true,
+          },
+        ],
+        d1_databases: [
+          {
+            binding: 'DB',
+            database_name: 'proscenium',
+            database_id: '01a75263-87a9-452a-a4a0-b3b9db71dfe5',
+          },
+        ],
+        observability: {
+          logs: {
+            enabled: true,
+          },
+        },
+      },
+    },
+  },
 
   eslint: {
     config: {

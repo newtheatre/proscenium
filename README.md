@@ -2,6 +2,16 @@
 
 The Nottingham New Theatre "Proscenium" Project is our new comprehensive web platform. Built with Nuxt 4 and hosted on Cloudflare Workers, it will offer a streamlined experience to members, current and past.
 
+## Features
+
+- [ ] User authentication and management
+- [ ] Role-based access control
+- [ ] Event management system
+- [ ] Ticket booking and management
+- [ ] Content management system for news, updates, and a member's wiki
+- [ ] Member profiles and history
+- [ ] Responsive design for all devices
+
 ---
 
 ## Setup
