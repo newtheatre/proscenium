@@ -1,6 +1,8 @@
-# Nuxt Minimal Starter
+# New Theatre: Proscenium
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+The Nottingham New Theatre "Proscenium" Project is our new comprehensive web platform. Built with Nuxt 4 and hosted on Cloudflare Workers, it will offer a streamlined experience to members, current and past.
+
+---
 
 ## Setup
 
