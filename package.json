@@ -1,0 +1,27 @@
+{
+  "name": "proscenium",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@nuxt/content": "3.6.3",
+    "@nuxt/eslint": "1.8.0",
+    "@nuxt/fonts": "0.11.4",
+    "@nuxt/icon": "1.15.0",
+    "@nuxt/image": "1.11.0",
+    "@nuxtjs/seo": "3.1.0",
+    "@prisma/adapter-d1": "^6.13.0",
+    "@prisma/nuxt": "0.3.0",
+    "eslint": "^9.0.0",
+    "nuxt": "^4.0.1",
+    "vue": "^3.5.18",
+    "vue-router": "^4.5.1"
+  }
+}
