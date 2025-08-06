@@ -16,12 +16,15 @@ export default defineNuxtConfig({
     experimental: { sqliteConnector: 'native' },
     database: {
       type: 'd1',
-      bindingName: 'CF_BINDING_NAME',
+      bindingName: 'DB',
     },
   },
   compatibilityDate: '2025-07-15',
 
   nitro: {
+    experimental: {
+      wasm: true,
+    },
     cloudflare: {
       wrangler: {
         name: 'proscenium',
@@ -50,7 +53,7 @@ export default defineNuxtConfig({
   vite: {
     resolve: {
       alias: {
-        '.prisma/client/index-browser': './node_modules/.prisma/client/index-browser.js',
+        '.prisma/client/index-browser': './node_modules/.prisma/client/index-browser.js', // Ensure correct path for cloudflare builds
       },
     },
   },
