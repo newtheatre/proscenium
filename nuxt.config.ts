@@ -7,8 +7,13 @@ export default defineNuxtConfig({
     '@nuxt/icon',
     '@nuxt/image',
     '@nuxtjs/seo',
-    '@prisma/nuxt',
   ],
+
+  $development: {
+    modules: [
+      '@prisma/nuxt',
+    ],
+  },
 
   devtools: { enabled: true },
 

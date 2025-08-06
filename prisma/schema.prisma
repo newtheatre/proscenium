@@ -4,7 +4,6 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["driverAdapters"]
-  runtime         = "cloudflare"
 }
 
 datasource db {
