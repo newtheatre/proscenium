@@ -3,14 +3,12 @@
     novalidate
     @submit="onSubmit"
   >
-    <!-- Display form error if present -->
-    <div
+    <AppAlert
       v-if="props.error"
+      type="error"
     >
-      <p class="form-error">
-        {{ props.error }}
-      </p>
-    </div>
+      {{ props.error }}
+    </AppAlert>
 
     <slot />
   </form>
@@ -33,12 +31,3 @@ const onSubmit = (event: Event) => {
   emit('submit', event)
 }
 </script>
-
-<style scoped>
-.form-error {
-  color: #dc2626;
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
-  margin-bottom: 1rem;
-}
-</style>

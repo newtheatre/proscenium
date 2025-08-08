@@ -39,12 +39,12 @@ defineProps<Props>()
 
 .form-label {
   display: block;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
   font-weight: 500;
 }
 
 .form-error {
-  color: #dc2626;
+  color: var(--error, #dc2626);
   font-size: 0.875rem;
   margin-top: 0.25rem;
 }

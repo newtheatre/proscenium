@@ -6,24 +6,26 @@
     :touched="touched"
   >
     <template #default="{ id: fieldId, error: fieldError, touched: fieldTouched }">
-      <input
-        :id="fieldId"
-        :type="type"
-        :value="modelValue"
-        :placeholder="placeholder"
-        :disabled="disabled"
-        :required="required"
-        :autocomplete="autocomplete"
-        :aria-invalid="fieldError && fieldTouched ? 'true' : 'false'"
-        :aria-describedby="fieldError && fieldTouched ? `${fieldId}-error` : undefined"
-        :class="[
-          'form-input',
-          { 'form-input--error': fieldError && fieldTouched },
-        ]"
-        @input="onInput"
-        @blur="onBlur"
-        @focus="onFocus"
-      >
+      <div class="form-input">
+        <input
+          :id="fieldId"
+          :type="type"
+          :value="modelValue"
+          :placeholder="placeholder"
+          :disabled="disabled"
+          :required="required"
+          :autocomplete="autocomplete"
+          :aria-invalid="fieldError && fieldTouched ? 'true' : 'false'"
+          :aria-describedby="fieldError && fieldTouched ? `${fieldId}-error` : undefined"
+          :class="[
+            'form-input__field',
+            { 'form-input__field--error': fieldError && fieldTouched },
+          ]"
+          @input="onInput"
+          @blur="onBlur"
+          @focus="onFocus"
+        >
+      </div>
     </template>
   </FormField>
 </template>
@@ -65,24 +67,29 @@ const onFocus = () => emit('focus')
 
 <style scoped>
 .form-input {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.form-input__field {
+  width: 100%;
   padding: 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+  font-size: 1rem;
 }
 
-.form-input:focus {
+.form-input__field:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--nnt-purple, #6b46c1);
 }
 
-.form-input--error {
-  border-color: #dc2626;
+.form-input__field--error {
+  border-color: var(--error, #e53e3e);
 }
 
-.form-input--error:focus {
-  border-color: #dc2626;
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+.form-input__field:disabled {
+  background-color: #f2f2f2;
+  cursor: not-allowed;
 }
 </style>
