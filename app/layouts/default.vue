@@ -1,5 +1,21 @@
 <template>
   <div>
+    <AppHeader />
+    <main>
+      <slot />
+    </main>
+    <AppFooter />
+  </div>
+</template>
+
+<script lang="ts" setup>
+
+</script>
+
+<style></style>
+
+<!-- <template>
+  <div>
     <nav>
       <div>
         <div>
@@ -59,4 +75,4 @@ const { user, isLoggedIn, logout, hasRole } = useAuth()
 const handleLogout = async () => {
   await logout()
 }
-</script>
+</script> -->

@@ -1,0 +1,15 @@
+links:
+  - text: "About"
+    url: "/about"
+  - text: "Alumni"
+    url: "/alumni"
+  - text: "Technical"
+    url: "/technical"
+  - text: "Get Involved"
+    url: "/get-involved"
+    button: true
+    variant: "primary"
+  - text: "What's On"
+    url: "/whats-on"
+    button: true
+    variant: "secondary"
