@@ -8,12 +8,8 @@ const prismaClientSingleton = () => {
   }
 
   // In production, use Cloudflare D1 with adapter
-  console.log('Using PrismaD1 adapter for Cloudflare D1 database')
   // @ts-expect-error - env is available in Cloudflare Workers runtime and adapter is supported
-  const adapter = new PrismaD1(env.DB)
-
-  // @ts-expect-error - env is available in Cloudflare Workers runtime
-  console.log('PrismaD1 adapter initialized with binding:', env.DB)
+  const adapter = new PrismaD1(process.env.DB)
 
   return new PrismaClient({ adapter })
 }
