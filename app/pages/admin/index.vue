@@ -71,3 +71,22 @@ definePageMeta({
 
 const { user } = useAuth()
 </script>
+
+<!-- <template>
+  <div> -->
+    <!-- Admin homepage - links to options available for the user -->
+    <!-- <h1>Admin Dashboard</h1>
+
+    <NuxtLink to="/admin/users">Manage Users</NuxtLink>
+  </div>
+</template>
+
+<script lang="ts" setup>
+definePageMeta({
+  middleware: ['admin'],
+})
+</script>
+
+<style scoped>
+
+</style> -->
