@@ -57,7 +57,7 @@
           >UoNSU</a></p>
           <span class="app-footer__separator">&bull;</span>
           <p>Source on <a
-            href="https://github.com/newtheatre/website/"
+            href="https://github.com/newtheatre/proscenium/"
             class="app-footer__external-link"
           >GitHub</a></p>
         </span>
@@ -124,7 +124,7 @@ const { links, socials, legal } = data.value || { links: [], socials: [], copyri
   text-align: center;
   align-self: stretch;
   gap: 1rem;
-  margin: 0;
+  margin: 0 auto;
 }
 
 .app-footer__legal p {
