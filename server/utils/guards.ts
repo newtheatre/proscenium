@@ -1,0 +1,63 @@
+import type { RoleType } from '@prisma/client'
+import type { H3Event } from 'h3'
+
+interface AuthUser {
+  id: string
+  email: string
+  name: string | null
+  roles: RoleType[]
+}
+
+/**
+ * Guard to protect API routes that require authentication
+ */
+export async function requireAuth(event: H3Event): Promise<AuthUser> {
+  const session = await getUserSession(event)
+
+  if (!session?.user) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Authentication required',
+    })
+  }
+
+  return session.user as AuthUser
+}
+
+/**
+ * Guard to protect API routes that require specific roles
+ */
+export async function requireRole(event: H3Event, requiredRoles: RoleType | RoleType[]): Promise<AuthUser> {
+  const user = await requireAuth(event)
+  const rolesArray = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles]
+
+  const hasRequiredRole = user.roles.some((role: RoleType) => rolesArray.includes(role))
+
+  if (!hasRequiredRole) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Insufficient permissions',
+    })
+  }
+
+  return user
+}
+
+/**
+ * Guard to ensure user can only access their own data or has admin role
+ */
+export async function requireOwnershipOrAdmin(event: H3Event, resourceUserId: string): Promise<AuthUser> {
+  const user = await requireAuth(event)
+
+  const isOwner = user.id === resourceUserId
+  const isAdmin = user.roles.includes('ADMIN')
+
+  if (!isOwner && !isAdmin) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Access denied',
+    })
+  }
+
+  return user
+}
