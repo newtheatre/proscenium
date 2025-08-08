@@ -18,6 +18,8 @@ export default defineNuxtConfig({
 
   devtools: { enabled: true },
 
+  css: ['~/assets/styles/main.css', '~/assets/styles/typography.css', '~/assets/styles/variables.css'],
+
   content: {
     experimental: { sqliteConnector: 'native' },
     database: {

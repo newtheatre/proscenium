@@ -1,0 +1,28 @@
+:root {
+  --primary-bg-color: #1e1e1e;
+  --header-bg-color: #292b2e;
+  --primary-text-color: #f8f9fa;
+  --alt-text-color: #292b2e;
+  --link-color: var(--nnt-orange);
+
+  /* Brand colors */
+  --nnt-orange: #ffc425;
+  --nnt-orange-dark: #be8b00;
+  --nnt-orange-light: #ffd258;
+  --nnt-orange-lighter: #ffe08b;
+  --nnt-purple: #a54499;
+  --nnt-purple-dark: #5d2656;
+  --nnt-purple-light: #bd5fb1;
+  --nnt-purple-lighter: #cc83c3;
+  --nnt-alt: #2d9189;
+
+  /* Additional colors */
+  --error: #ff4d4d;
+  --warning: #ffcc00;
+  --success: #28a745;
+  --info: #17a2b8;
+
+  /* Page layout */
+  --page-max-width: 1140px;
+  --media-query-small: 768px;
+}
