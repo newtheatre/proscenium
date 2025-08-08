@@ -5,7 +5,9 @@ The Nottingham New Theatre "Proscenium" Project is our new comprehensive web pla
 ## Features
 
 - [ ] User authentication and management
-    - [ ] Email/password login
+    - [x] Email/password login
+    - [ ] Account creation
+    - [ ] Password reset
     - [ ] Committee SSO
 - [ ] Role-based access control
 - [ ] Event management system
