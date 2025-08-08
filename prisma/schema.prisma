@@ -12,17 +12,26 @@ datasource db {
 }
 
 model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
-  posts Post[]
+  id       String  @id @default(nanoid())
+  email    String  @unique
+  name     String?
+  password String
+
+  roles UserRole[]
 }
 
-model Post {
-  id        Int     @id @default(autoincrement())
-  title     String
-  content   String?
-  published Boolean @default(false)
-  author    User    @relation(fields: [authorId], references: [id])
-  authorId  Int
+model UserRole {
+  id     String   @id @default(nanoid())
+  userId String
+  role   RoleType
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+}
+
+enum RoleType {
+  ADMIN
+  MANAGER
+  TRAINER
 }
