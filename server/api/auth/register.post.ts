@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    const { email, password } = result.data
+    const { email, password, name } = result.data
 
     // Additional email validation
     if (!isValidEmail(email)) {
