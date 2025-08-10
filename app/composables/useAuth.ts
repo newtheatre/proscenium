@@ -30,13 +30,17 @@ export const useAuth = () => {
   const isLoggedIn = computed(() => !!user.value)
 
   const login = async (credentials: LoginCredentials) => {
-    const { user } = await $fetch<{ user: AuthUser }>('/api/auth/login', {
+    const { data, error } = await useFetch<{ user: AuthUser }>('/api/auth/login', {
       method: 'POST',
       body: credentials,
     })
 
+    if (error.value) {
+      throw error.value.data
+    }
+
     await refreshSession()
-    return user
+    return data.value!.user
   }
 
   const register = async (credentials: RegisterCredentials) => {

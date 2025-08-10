@@ -13,6 +13,36 @@
       <div
         class="login__content"
       >
+        <!-- Email verification error alert -->
+        <AppAlert
+          v-if="showEmailVerificationError"
+          type="error"
+        >
+          <div class="email-verification-error">
+            <p>Your email address has not been verified.</p>
+            <p>Please check your inbox for a verification link. If you didn't receive the email, you can request a new one.</p>
+            <div class="email-verification-error__actions">
+              <UIButton
+                type="button"
+                variant="ghost"
+                :loading="isResendingEmail"
+                full-width
+                @click="resendVerificationEmail"
+              >
+                {{ isResendingEmail ? 'Sending...' : 'Resend verification link' }}
+              </UIButton>
+            </div>
+          </div>
+        </AppAlert>
+
+        <!-- Email resend success alert -->
+        <AppAlert
+          v-if="showResendSuccess"
+          type="success"
+        >
+          Verification email sent! Please check your email for a new verification link.
+        </AppAlert>
+
         <Form
           :error="form.formError.value"
           @submit="form.handleSubmit"
@@ -67,6 +97,7 @@
               variant="ghost"
               :loading="form.isSubmitting.value"
               full-width
+              disabled
               @click="void 0"
             >
               <Icon
@@ -100,6 +131,12 @@ definePageMeta({
 
 const { login, isLoggedIn } = useAuth()
 
+// Email verification state
+const showEmailVerificationError = ref(false)
+const showResendSuccess = ref(false)
+const userEmail = ref('')
+const isResendingEmail = ref(false)
+
 const form = useForm({
   schema: loginSchema,
   initialValues: {
@@ -108,6 +145,10 @@ const form = useForm({
   },
   onSubmit: async (values) => {
     try {
+      // Reset email verification error state
+      showEmailVerificationError.value = false
+      showResendSuccess.value = false
+
       // Call your authentication API
       await login(values)
 
@@ -118,13 +159,28 @@ const form = useForm({
       // Handle errors - display user-friendly error message
       console.error('Login failed:', error)
 
+      // Check if this is an email verification error
+      if (error && typeof error === 'object' && 'data' in error && error.data && typeof error.data === 'object') {
+        if ('code' in error.data && error.data.code === 'EMAIL_NOT_VERIFIED') {
+          showEmailVerificationError.value = true
+          userEmail.value = values.email // Use the email from the form
+          return // Don't show generic error for this case
+        }
+      }
+
       // Extract error message for display
       let errorMessage = 'An unexpected error occurred. Please try again.'
 
       if (error && typeof error === 'object') {
-        if ('data' in error && error.data && typeof error.data === 'object' && 'message' in error.data) {
+        // Check for statusMessage first (from useFetch error response)
+        if ('statusMessage' in error && error.statusMessage) {
+          errorMessage = String(error.statusMessage)
+        }
+        // Fallback to nested data.message
+        else if ('data' in error && error.data && typeof error.data === 'object' && 'message' in error.data) {
           errorMessage = String(error.data.message)
         }
+        // Fallback to direct message property
         else if ('message' in error) {
           errorMessage = String(error.message)
         }
@@ -135,6 +191,33 @@ const form = useForm({
     }
   },
 })
+
+// Function to resend verification email
+const resendVerificationEmail = async () => {
+  if (!userEmail.value) return
+
+  isResendingEmail.value = true
+  showResendSuccess.value = false
+
+  try {
+    await $fetch('/api/auth/email/resend', {
+      method: 'POST',
+      body: { email: userEmail.value },
+    })
+
+    // Show success message
+    showResendSuccess.value = true
+    showEmailVerificationError.value = false
+    form.setFormError('') // Clear any existing errors
+  }
+  catch (error) {
+    console.error('Failed to resend verification email:', error)
+    form.setFormError('Failed to resend verification email. Please try again.')
+  }
+  finally {
+    isResendingEmail.value = false
+  }
+}
 
 // Ensure fields are properly initialized
 const email = form.register('email', '')
@@ -206,5 +289,13 @@ const password = form.register('password', '')
 
 .login__content {
   width: 100%;
+}
+
+.email-verification-error {
+  text-align: center;
+}
+
+.email-verification-error__actions {
+  margin-top: 1rem;
 }
 </style>

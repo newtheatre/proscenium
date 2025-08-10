@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { RoleType } from '@prisma/client'
 import prisma from '~~/lib/prisma'
 
 const verifyEmailSchema = z.object({
@@ -39,18 +40,83 @@ export default defineEventHandler(async (event) => {
     }
 
     // Update user as verified and clear verification token
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: user.id },
       data: {
         emailVerified: true,
         emailVerificationToken: null,
         emailVerificationExpires: null,
       },
+      select: {
+        id: true,
+        email: true,
+        emailVerified: true,
+        setupCompleted: true,
+        roles: {
+          select: {
+            role: true,
+          },
+        },
+        profile: {
+          select: {
+            name: true,
+            avatar: true,
+          },
+        },
+        membership: {
+          select: {
+            type: true,
+            expiry: true,
+          },
+        },
+      },
+    })
+
+    // Automatically log the user in
+    await setUserSession(event, {
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        emailVerified: updatedUser.emailVerified,
+        setupCompleted: updatedUser.setupCompleted,
+        roles: updatedUser.roles.map((r: { role: RoleType }) => r.role),
+        profile: updatedUser.profile
+          ? {
+              name: updatedUser.profile.name,
+              avatar: updatedUser.profile.avatar,
+            }
+          : null,
+        membership: updatedUser.membership
+          ? {
+              type: updatedUser.membership.type,
+              expiry: updatedUser.membership.expiry,
+            }
+          : null,
+      },
     })
 
     return {
-      message: 'Email verified successfully! You can now complete your account setup.',
+      message: 'Email verified successfully! You are now logged in.',
       success: true,
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        emailVerified: updatedUser.emailVerified,
+        setupCompleted: updatedUser.setupCompleted,
+        roles: updatedUser.roles.map((r: { role: RoleType }) => r.role),
+        profile: updatedUser.profile
+          ? {
+              name: updatedUser.profile.name,
+              avatar: updatedUser.profile.avatar,
+            }
+          : null,
+        membership: updatedUser.membership
+          ? {
+              type: updatedUser.membership.type,
+              expiry: updatedUser.membership.expiry,
+            }
+          : null,
+      },
     }
   }
   catch (error: unknown) {

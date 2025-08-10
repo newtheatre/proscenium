@@ -87,7 +87,6 @@ definePageMeta({
 })
 
 const route = useRoute()
-const router = useRouter()
 
 // Check if token is provided in query parameters
 const token = computed(() => route.query.token as string || '')
@@ -120,7 +119,7 @@ const resetForm = useForm({
 
       // Redirect to login after a short delay
       setTimeout(() => {
-        router.push('/login')
+        navigateTo('/login')
       }, 3000)
     }
     catch (error) {

@@ -68,6 +68,18 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    // Check if email is verified
+    if (!user.emailVerified) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Email not verified. Please check your email for a verification link.',
+        data: {
+          code: 'EMAIL_NOT_VERIFIED',
+          email: user.email,
+        },
+      })
+    }
+
     // TODO: Have missing fields (e.g. profile, membership) be created on login if they don't exist
 
     // Set user session

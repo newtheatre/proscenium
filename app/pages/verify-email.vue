@@ -10,7 +10,7 @@
           v-if="verificationStatus === 'success'"
           type="success"
         >
-          Email verified successfully! You can now complete your account setup.
+          Email verified successfully! You are now logged in and will be redirected to complete your account setup.
         </AppAlert>
 
         <AppAlert
@@ -25,20 +25,11 @@
         </AppAlert>
 
         <div
-          v-if="verificationStatus === 'success'"
-          class="verify-email__actions"
-        >
-          <UIButton @click="navigateTo('/profile/me/setup')">
-            Complete Account Setup
-          </UIButton>
-        </div>
-
-        <div
           v-if="verificationStatus === 'error'"
           class="verify-email__actions"
         >
-          <UIButton @click="navigateTo('/register')">
-            Back to Registration
+          <UIButton @click="navigateTo('/login')">
+            Return to Login
           </UIButton>
         </div>
       </div>
@@ -52,9 +43,11 @@ definePageMeta({
 })
 
 const route = useRoute()
+const { refresh } = useAuth()
 const verificationStatus = ref<'loading' | 'success' | 'error' | null>('loading')
 const errorMessage = ref('')
 
+// TODO: Consider doing the verification during SSR
 onMounted(async () => {
   const token = route.query.token as string
 
@@ -71,6 +64,14 @@ onMounted(async () => {
     })
 
     verificationStatus.value = 'success'
+
+    // Refresh the auth state to reflect the new login
+    await refresh()
+
+    // Redirect to setup page after a short delay
+    setTimeout(() => {
+      navigateTo('/profile/me/setup')
+    }, 2000)
   }
   catch (error: unknown) {
     verificationStatus.value = 'error'
@@ -92,16 +93,17 @@ onMounted(async () => {
 .verify-email {
   max-width: 500px;
   width: 100%;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: var(--nnt-orange) solid 2px;
 }
 
 .verify-email__title {
   text-align: center;
   margin-bottom: 2rem;
-  color: var(--color-primary);
+  color: var(--primary-text-color);
+  font-weight: 600;
 }
 
 .verify-email__content {
