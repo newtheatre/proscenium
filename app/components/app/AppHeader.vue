@@ -19,14 +19,14 @@
               :to="link.url"
               class="app-header__nav-link"
             >
-              <!-- <template v-if="link.button">
-                <UIBaseButton :variant="link.variant">
+              <template v-if="link.button">
+                <UIButton :variant="link.variant">
                   {{ link.text }}
-                </UIBaseButton>
+                </UIButton>
               </template>
-              <template v-else> -->
-              {{ link.text }}
-              <!-- </template> -->
+              <template v-else>
+                {{ link.text }}
+              </template>
             </NuxtLink>
           </li>
         </ul>
