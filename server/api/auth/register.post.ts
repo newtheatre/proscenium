@@ -62,15 +62,37 @@ export default defineEventHandler(async (event) => {
       data: {
         email,
         password: hashedPassword,
-        name,
+        profile: {
+          create: {
+            name: name || '',
+            avatar: '',
+          },
+        },
+        membership: {
+          create: {
+            type: 'UNKNOWN',
+            expiry: null,
+          },
+        },
       },
       select: {
         id: true,
         email: true,
-        name: true,
+        profile: {
+          select: {
+            name: true,
+            avatar: true,
+          },
+        },
         roles: {
           select: {
             role: true,
+          },
+        },
+        membership: {
+          select: {
+            type: true,
+            expiry: true,
           },
         },
       },
@@ -81,8 +103,15 @@ export default defineEventHandler(async (event) => {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
         roles: user.roles.map((r: { role: RoleType }) => r.role),
+        profile: {
+          name: user.profile!.name,
+          avatar: user.profile!.avatar,
+        },
+        membership: {
+          type: user.membership!.type,
+          expiry: user.membership!.expiry,
+        },
       },
     })
 
@@ -90,8 +119,15 @@ export default defineEventHandler(async (event) => {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
         roles: user.roles.map((r: { role: RoleType }) => r.role),
+        profile: {
+          name: user.profile!.name,
+          avatar: user.profile!.avatar,
+        },
+        membership: {
+          type: user.membership!.type,
+          expiry: user.membership!.expiry,
+        },
       },
     }
   }

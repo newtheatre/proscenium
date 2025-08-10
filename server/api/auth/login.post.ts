@@ -29,11 +29,22 @@ export default defineEventHandler(async (event) => {
       select: {
         id: true,
         email: true,
-        name: true,
         password: true,
         roles: {
           select: {
             role: true,
+          },
+        },
+        profile: {
+          select: {
+            name: true,
+            avatar: true,
+          },
+        },
+        membership: {
+          select: {
+            type: true,
+            expiry: true,
           },
         },
       },
@@ -55,13 +66,26 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    // TODO: Have missing fields (e.g. profile, membership) be created on login if they don't exist
+
     // Set user session
     await setUserSession(event, {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
         roles: user.roles.map((r: { role: RoleType }) => r.role),
+        profile: user.profile
+          ? {
+              name: user.profile.name,
+              avatar: user.profile.avatar,
+            }
+          : null,
+        membership: user.membership
+          ? {
+              type: user.membership.type,
+              expiry: user.membership.expiry,
+            }
+          : null,
       },
     })
 
@@ -69,8 +93,19 @@ export default defineEventHandler(async (event) => {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
         roles: user.roles.map((r: { role: RoleType }) => r.role),
+        profile: user.profile
+          ? {
+              name: user.profile.name,
+              avatar: user.profile.avatar,
+            }
+          : null,
+        membership: user.membership
+          ? {
+              type: user.membership.type,
+              expiry: user.membership.expiry,
+            }
+          : null,
       },
     }
   }

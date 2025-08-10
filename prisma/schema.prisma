@@ -15,7 +15,6 @@ model User {
   id        String  @id @default(nanoid())
   email     String  @unique
   studentId String? @unique
-  name      String?
   password  String
 
   roles      UserRole[]
@@ -48,7 +47,7 @@ enum RoleType {
 
 model Membership {
   id     String         @id @default(cuid())
-  type   MembershipType
+  type   MembershipType @default(UNKNOWN)
   expiry DateTime?
 
   // Relation to User
