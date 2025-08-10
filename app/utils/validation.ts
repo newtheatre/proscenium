@@ -28,6 +28,18 @@ export const createPasswordConfirmation = (data: { password: string, confirmPass
   return data
 }
 
+// Helper function for reset password confirmation validation
+export const updatePasswordConfirmation = (data: { newPassword: string, confirmPassword: string }) => {
+  if (data.newPassword !== data.confirmPassword) {
+    throw new z.ZodError([{
+      code: 'custom',
+      path: ['confirmPassword'],
+      message: 'Passwords do not match',
+    }])
+  }
+  return data
+}
+
 // Example schemas
 export const loginSchema = z.object({
   email: commonSchemas.email,
@@ -58,4 +70,16 @@ export const profileSchema = z.object({
   phone: commonSchemas.phone.optional(),
   website: commonSchemas.url.optional(),
   bio: commonSchemas.optionalString,
+})
+
+export const forgotPasswordEmailSchema = z.object({
+  email: commonSchemas.email,
+})
+
+export const resetPasswordSchema = z.object({
+  newPassword: commonSchemas.password,
+  confirmPassword: commonSchemas.required,
+}).refine(updatePasswordConfirmation, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 })

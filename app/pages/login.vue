@@ -43,6 +43,15 @@
             @blur="password.setTouched()"
           />
 
+          <div class="login-form__forgot-password">
+            <NuxtLink
+              to="/forgot-password"
+              class="login-form__link"
+            >
+              Forgot your password?
+            </NuxtLink>
+          </div>
+
           <div class="login-form__actions">
             <FormButton
               type="submit"
@@ -141,6 +150,11 @@ const password = form.register('password', '')
 .login-form__actions {
   display: flex;
   flex-direction: column;
+  margin-bottom: 1.5rem;
+}
+
+.login-form__forgot-password {
+  text-align: right;
   margin-bottom: 1.5rem;
 }
 

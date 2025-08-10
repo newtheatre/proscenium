@@ -1,12 +1,11 @@
 import { z } from 'zod'
-import type { RoleType } from '@prisma/client'
 import prisma from '~~/lib/prisma'
-import { isValidEmail, isValidPassword } from '~~/server/utils/auth'
+import { isValidEmail, isValidPassword, generateVerificationToken, sendVerificationEmail } from '~~/server/utils/auth'
 
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  name: z.string().optional(),
+  name: z.string().min(1),
 })
 
 export default defineEventHandler(async (event) => {
@@ -23,7 +22,7 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    const { email, password, name } = result.data
+    const { email, password } = result.data
 
     // Additional email validation
     if (!isValidEmail(email)) {
@@ -48,20 +47,31 @@ export default defineEventHandler(async (event) => {
     })
 
     if (existingUser) {
-      throw createError({
-        statusCode: 409,
-        statusMessage: 'User with this email already exists',
-      })
+      // throw createError({
+      //   statusCode: 409,
+      //   statusMessage: 'User with this email already exists',
+      // })
+
+      // Don't reveal if user exists or not for security
+      return {
+        message: 'If no account with this email exists, a verification email will be sent.',
+      }
     }
 
     // Hash password
     const hashedPassword = await hashPassword(password)
 
-    // Create user
-    const user = await prisma.user.create({
+    // Generate email verification token
+    const verificationToken = generateVerificationToken()
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+
+    // Create user (not verified yet, setup not completed)
+    await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
+        emailVerificationToken: verificationToken,
+        emailVerificationExpires: verificationExpires,
         profile: {
           create: {
             name: name || '',
@@ -74,61 +84,27 @@ export default defineEventHandler(async (event) => {
             expiry: null,
           },
         },
+
       },
       select: {
         id: true,
         email: true,
-        profile: {
-          select: {
-            name: true,
-            avatar: true,
-          },
-        },
-        roles: {
-          select: {
-            role: true,
-          },
-        },
-        membership: {
-          select: {
-            type: true,
-            expiry: true,
-          },
-        },
+        emailVerified: true,
+        setupCompleted: true,
       },
     })
 
-    // Set user session
-    await setUserSession(event, {
-      user: {
-        id: user.id,
-        email: user.email,
-        roles: user.roles.map((r: { role: RoleType }) => r.role),
-        profile: {
-          name: user.profile!.name,
-          avatar: user.profile!.avatar,
-        },
-        membership: {
-          type: user.membership!.type,
-          expiry: user.membership!.expiry,
-        },
-      },
-    })
+    // Send verification email
+    try {
+      await sendVerificationEmail(email, verificationToken)
+    }
+    catch (error) {
+      console.error('Failed to send verification email:', error)
+      // Don't fail registration if email sending fails
+    }
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        roles: user.roles.map((r: { role: RoleType }) => r.role),
-        profile: {
-          name: user.profile!.name,
-          avatar: user.profile!.avatar,
-        },
-        membership: {
-          type: user.membership!.type,
-          expiry: user.membership!.expiry,
-        },
-      },
+      message: 'If no account with this email exists, a verification email will be sent.',
     }
   }
   catch (error: unknown) {

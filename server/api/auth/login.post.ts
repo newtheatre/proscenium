@@ -30,6 +30,8 @@ export default defineEventHandler(async (event) => {
         id: true,
         email: true,
         password: true,
+        emailVerified: true,
+        setupCompleted: true,
         roles: {
           select: {
             role: true,
@@ -73,6 +75,8 @@ export default defineEventHandler(async (event) => {
       user: {
         id: user.id,
         email: user.email,
+        emailVerified: user.emailVerified,
+        setupCompleted: user.setupCompleted,
         roles: user.roles.map((r: { role: RoleType }) => r.role),
         profile: user.profile
           ? {
@@ -93,6 +97,8 @@ export default defineEventHandler(async (event) => {
       user: {
         id: user.id,
         email: user.email,
+        emailVerified: user.emailVerified,
+        setupCompleted: user.setupCompleted,
         roles: user.roles.map((r: { role: RoleType }) => r.role),
         profile: user.profile
           ? {

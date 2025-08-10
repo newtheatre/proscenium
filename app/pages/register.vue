@@ -10,10 +10,23 @@
         You are already logged in. Redirecting...
       </AppAlert>
 
-      <div
+      <AppAlert type="error">
+        Registration is currently disabled. Please check back later.
+      </AppAlert>
+
+      <DevOnly
         class="registration__content"
       >
+        <!-- Show success message after registration -->
+        <AppAlert
+          v-if="showSuccessMessage"
+          type="success"
+        >
+          Registration successful! Please check your email for a verification link.
+        </AppAlert>
+
         <Form
+          v-if="!showSuccessMessage"
           :error="form.formError.value"
           @submit="form.handleSubmit"
         >
@@ -84,7 +97,20 @@
             >Sign in</NuxtLink>
           </p>
         </Form>
-      </div>
+
+        <!-- Show login button when registration is successful -->
+        <div
+          v-if="showSuccessMessage"
+          class="registration__success-actions"
+        >
+          <UIButton
+            full-width
+            @click="navigateTo('/login')"
+          >
+            Go to Login
+          </UIButton>
+        </div>
+      </DevOnly>
     </div>
   </div>
 </template>
@@ -98,6 +124,9 @@ definePageMeta({
 
 const { register: createAccount, isLoggedIn } = useAuth()
 
+// Success state
+const showSuccessMessage = ref(false)
+
 const form = useForm({
   schema: registerSchema,
   initialValues: {
@@ -109,7 +138,9 @@ const form = useForm({
   onSubmit: async (values) => {
     try {
       await createAccount(values)
-      await navigateTo('/')
+
+      // Show success message instead of redirecting
+      showSuccessMessage.value = true
     }
     catch (error) {
       // Handle errors - display user-friendly error message
@@ -183,5 +214,10 @@ const confirmPassword = form.register('confirmPassword', '')
 
 .registration__content {
   width: 100%;
+}
+
+.registration__success-actions {
+  text-align: center;
+  margin-top: 1.5rem;
 }
 </style>

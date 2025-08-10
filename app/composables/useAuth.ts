@@ -3,8 +3,13 @@ import type { RoleType } from '@prisma/client'
 export interface AuthUser {
   id: string
   email: string
-  name: string | null
+  profile?: {
+    name: string
+    avatar: string | null
+  }
   roles: RoleType[]
+  emailVerified: boolean
+  setupCompleted: boolean
 }
 
 export interface LoginCredentials {
@@ -35,13 +40,13 @@ export const useAuth = () => {
   }
 
   const register = async (credentials: RegisterCredentials) => {
-    const { user } = await $fetch<{ user: AuthUser }>('/api/auth/register', {
+    const result = await $fetch<{ message: string, user: Partial<AuthUser> }>('/api/auth/register', {
       method: 'POST',
       body: credentials,
     })
 
-    await refreshSession()
-    return user
+    // Note: Don't refresh session here since user needs to verify email first
+    return result
   }
 
   const logout = async () => {

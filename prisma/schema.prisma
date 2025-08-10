@@ -17,6 +17,19 @@ model User {
   studentId String? @unique
   password  String
 
+  // Email verification
+  emailVerified            Boolean   @default(false)
+  emailVerificationToken   String?
+  emailVerificationExpires DateTime?
+
+  // Password reset
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
+
+  // Account setup tracking
+  setupCompleted   Boolean   @default(false)
+  setupCompletedAt DateTime?
+
   roles      UserRole[]
   membership Membership?
 
