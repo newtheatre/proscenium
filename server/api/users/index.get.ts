@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
     const skip = (page - 1) * limit
 
     // Validate and parse sorting parameters
-    const validSortFields = ['createdAt', 'updatedAt', 'lastLogin', 'email', 'name', 'studentId', 'isActive', 'membershipType', 'profileName']
+    const validSortFields = ['createdAt', 'updatedAt', 'lastLogin', 'email', 'studentId', 'isActive', 'membership.type', 'profile.name']
     const sortBy = (query.sortBy as string) || 'createdAt'
     const sortOrder = (query.sortOrder as string) === 'asc' ? 'asc' : 'desc'
 
@@ -138,10 +138,10 @@ export default defineEventHandler(async (event) => {
     // Build orderBy clause
     const orderBy: Prisma.UserOrderByWithRelationInput = {}
 
-    if (sortBy === 'membershipType') {
+    if (sortBy === 'membership.type') {
       orderBy.membership = { type: sortOrder }
     }
-    else if (sortBy === 'profileName') {
+    else if (sortBy === 'profile.name') {
       orderBy.profile = { name: sortOrder }
     }
     else {
