@@ -113,7 +113,7 @@ const filters: Filter[] = [
   },
   {
     key: 'isActive',
-    label: 'Status',
+    label: 'Active',
     type: 'boolean',
   },
 ]
