@@ -127,7 +127,7 @@ tbody {
 
 .data-cell {
   padding: 12px var(--spacing-md);
-  vertical-align: top;
+  vertical-align: middle;
   color: var(--primary-text-color);
 }
 

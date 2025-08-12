@@ -57,6 +57,7 @@
 <script setup lang="ts" generic="T extends TableRow">
 import { defineComponent, h, ref, computed, watch, onMounted, onUnmounted, readonly } from 'vue'
 import type { TableRow, Column, Filter, Pagination, ApiResponse, TableQueryParams } from './table/types'
+import FormCheckbox from './form/FormCheckbox.vue'
 
 interface Props {
   apiEndpoint: string
@@ -189,27 +190,30 @@ const computedColumns = computed(() => {
         value: { type: null, required: false },
       },
       setup(componentProps) {
-        const rowId = componentProps.row.id || componentProps.row.uid
-        const isSelected = computed(() => selectedRows.value.has(rowId))
+        const row = componentProps.row as T
+        const rowId = row.id
+        const isSelected = computed(() => rowId ? selectedRows.value.has(rowId) : false)
 
-        const toggleRow = () => {
-          if (isSelected.value) {
-            selectedRows.value.delete(rowId)
-          }
-          else {
+        const toggleRow = (checked: boolean) => {
+          if (rowId && checked) {
             selectedRows.value.add(rowId)
+          }
+          else if (rowId) {
+            selectedRows.value.delete(rowId)
           }
 
           // Update select all state
           selectAll.value = data.value.length > 0
-            && data.value.every(row => selectedRows.value.has(row.id || row.uid))
+            && data.value.every((row) => {
+              return row.id && selectedRows.value.has(row.id)
+            })
         }
 
-        return () => h('input', {
-          type: 'checkbox',
-          checked: isSelected.value,
-          onChange: toggleRow,
-          class: 'row-checkbox',
+        return () => h(FormCheckbox, {
+          'id': `row-checkbox-${rowId}`,
+          'modelValue': isSelected.value,
+          'onUpdate:modelValue': toggleRow,
+          'class': 'row-checkbox',
         })
       },
     }),
@@ -226,8 +230,7 @@ const toggleSelectAll = () => {
   }
   else {
     data.value.forEach((row) => {
-      const rowId = row.id || row.uid
-      if (rowId) selectedRows.value.add(rowId)
+      if (row.id) selectedRows.value.add(row.id)
     })
     selectAll.value = true
   }
@@ -244,7 +247,9 @@ watch(data, () => {
     selectAll.value = false
   }
   else {
-    selectAll.value = data.value.every(row => selectedRows.value.has(row.id || row.uid))
+    selectAll.value = data.value.every((row) => {
+      return row.id && selectedRows.value.has(row.id)
+    })
   }
 }, { deep: true })
 
@@ -373,10 +378,30 @@ watch(() => props.apiEndpoint, () => {
 :deep(.selection-column) {
   width: 40px;
   text-align: center;
+  vertical-align: middle;
 }
 
-:deep(.row-checkbox) {
+/* Override FormCheckbox styles for table usage */
+:deep(.selection-column .form-field) {
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+:deep(.selection-column .form-group) {
+  margin-bottom: 0;
+  justify-content: center;
+  align-items: center;
+  height: auto;
+}
+
+:deep(.selection-column .form-group label) {
+  display: none; /* Hide the label in table context */
+}
+
+:deep(.selection-column .form-group input[type="checkbox"]) {
   margin: 0;
-  cursor: pointer;
 }
 </style>

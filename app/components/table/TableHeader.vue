@@ -20,12 +20,12 @@
           v-if="column.key === '_selection'"
           class="selection-header-content"
         >
-          <input
-            type="checkbox"
-            :checked="selectAll"
+          <FormCheckbox
+            id="select-all-checkbox"
+            :model-value="selectAll"
             class="select-all-checkbox"
-            @change="$emit('toggle-select-all')"
-          >
+            @update:model-value="$emit('toggle-select-all')"
+          />
         </div>
         <div
           v-else
@@ -56,6 +56,7 @@
 
 <script setup lang="ts" generic="T extends TableRow">
 import type { TableRow, Column } from './types'
+import FormCheckbox from '../form/FormCheckbox.vue'
 
 interface Props {
   columns: Column<T>[]
@@ -93,6 +94,7 @@ th {
   font-weight: 600;
   color: var(--primary-text-color);
   border-bottom: 2px solid var(--border-color);
+  white-space: nowrap;
 }
 
 th.sortable {
@@ -145,16 +147,37 @@ th.sorted {
 .selection-header {
   width: 40px;
   text-align: center;
+  vertical-align: middle;
 }
 
 .selection-header-content {
   display: flex;
   justify-content: center;
   align-items: center;
+  height: 100%;
 }
 
-.select-all-checkbox {
+/* Override FormCheckbox styles for table header usage */
+:deep(.selection-header .form-field) {
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+:deep(.selection-header .form-group) {
+  margin-bottom: 0;
+  justify-content: center;
+  align-items: center;
+  height: auto;
+}
+
+:deep(.selection-header .form-group label) {
+  display: none; /* Hide the label in table header context */
+}
+
+:deep(.selection-header .form-group input[type="checkbox"]) {
   margin: 0;
-  cursor: pointer;
 }
 </style>
