@@ -25,6 +25,7 @@ import { CommonRenderers, CommonFilterOptions } from '~/components/table/types'
 // Require admin access
 definePageMeta({
   middleware: 'admin',
+  layout: 'admin',
 })
 
 // Define columns for the users table

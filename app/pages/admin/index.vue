@@ -1,92 +1,89 @@
 <template>
-  <div>
-    <div>
-      <div>
-        <div>
-          <h1>
-            Admin Dashboard
-          </h1>
+  <div class="admin-dashboard">
+    <header class="admin-dashboard__header">
+      <h1 class="admin-dashboard__title">
+        Admin Dashboard
+      </h1>
 
-          <div>
-            <h2>
-              Welcome, {{ user?.name || user?.email }}!
-            </h2>
-            <p>
-              You have admin access. Your roles: {{ user?.roles.join(', ') }}
-            </p>
-          </div>
+      <AdminWelcome :user="user" />
+    </header>
 
-          <div>
-            <div>
-              <h3>
-                User Management
-              </h3>
-              <p>
-                Manage system users and their roles.
-              </p>
-            </div>
-
-            <div>
-              <h3>
-                System Settings
-              </h3>
-              <p>
-                Configure application settings.
-              </p>
-            </div>
-
-            <div>
-              <h3>
-                Reports
-              </h3>
-              <p>
-                View system reports and analytics.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AdminSectionGrid :sections="adminSections" />
   </div>
 </template>
 
-<script
-    lang="ts"
-    setup
-  >
+<script setup lang="ts">
 definePageMeta({
-  middleware: [
-    'auth',
-    (_to, _from) => {
-      const { hasRole } = useAuth()
-      if (!hasRole('ADMIN')) {
-        throw createError({
-          statusCode: 403,
-          statusMessage: 'Admin access required',
-        })
-      }
-    },
-  ],
+  middleware: 'admin',
+  layout: 'admin',
 })
 
 const { user } = useAuth()
-</script>
 
-<!-- <template>
-  <div> -->
-    <!-- Admin homepage - links to options available for the user -->
-    <!-- <h1>Admin Dashboard</h1>
-
-    <NuxtLink to="/admin/users">Manage Users</NuxtLink>
-  </div>
-</template>
-
-<script lang="ts" setup>
-definePageMeta({
-  middleware: ['admin'],
-})
+// Admin sections configuration
+const adminSections = [
+  {
+    title: 'User Management',
+    description: 'Manage system users and their roles.',
+    path: '/admin/users',
+    icon: 'account',
+  },
+  {
+    title: 'Venues',
+    description: 'Manage theatre venues and spaces.',
+    path: '/admin/venues',
+    icon: 'settings',
+  },
+  {
+    title: 'Shows',
+    description: 'Manage productions and performances.',
+    path: '/admin/shows',
+    icon: 'menu',
+  },
+  {
+    title: 'Festivals',
+    description: 'Manage festival events and programming.',
+    path: '/admin/festivals',
+    icon: 'menu',
+  },
+  {
+    title: 'Tickets',
+    description: 'Manage ticketing and reservations.',
+    path: '/admin/tickets',
+    icon: 'email',
+  },
+  {
+    title: 'Front of House',
+    description: 'Manage FOH operations and staff.',
+    path: '/admin/foh',
+    icon: 'su',
+  },
+]
 </script>
 
 <style scoped>
+.admin-dashboard__header {
+  margin-bottom: var(--spacing-2xl);
+}
 
-</style> -->
+.admin-dashboard__title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--primary-text-color);
+  margin-bottom: var(--spacing-lg);
+  text-align: center;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .admin-dashboard__title {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-dashboard__title {
+    font-size: 1.75rem;
+  }
+}
+</style>
