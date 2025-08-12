@@ -1,7 +1,14 @@
 :root {
+  /* Base colors */
   --primary-bg-color: #1e1e1e;
+  --secondary-bg-color: #2a2a2a;
   --header-bg-color: #292b2e;
+  --border-color: #404040;
+  --border-color-light: #232323;
+
+  /* Text colors */
   --primary-text-color: #f8f9fa;
+  --secondary-text-color: #888;
   --alt-text-color: #292b2e;
   --link-color: var(--nnt-orange);
 
@@ -16,13 +23,29 @@
   --nnt-purple-lighter: #cc83c3;
   --nnt-alt: #2d9189;
 
-  /* Additional colors */
+  /* State colors */
   --error: #ff4d4d;
   --warning: #ffcc00;
   --success: #28a745;
   --info: #17a2b8;
 
-  /* Page layout */
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+
+  /* Layout */
   --page-max-width: 1140px;
+  --border-radius: 0.5rem;
+  --transition-fast: 0.2s ease;
+
+  /* Media queries */
   --media-query-small: 768px;
+
+  /* Focus styles */
+  --focus-ring-orange: 0 0 0 3px rgba(255, 196, 37, 0.1);
+  --focus-ring-error: 0 0 0 3px rgba(255, 77, 77, 0.1);
 }

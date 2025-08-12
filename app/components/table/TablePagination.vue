@@ -177,7 +177,7 @@ const handlePageJump = (value: string | number) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
+  padding: var(--spacing-lg) var(--spacing-xl);
   gap: 24px;
   flex-wrap: wrap;
   background-color: var(--header-bg-color);
@@ -238,7 +238,7 @@ const handlePageJump = (value: string | number) => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 16px;
+  padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid #404040;
   background-color: var(--primary-bg-color);
   color: var(--primary-text-color);
@@ -290,7 +290,7 @@ const handlePageJump = (value: string | number) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 12px;
+  padding: var(--spacing-sm) 12px;
   border: 1px solid #404040;
   background-color: var(--primary-bg-color);
   color: var(--primary-text-color);
@@ -330,7 +330,7 @@ const handlePageJump = (value: string | number) => {
     flex-direction: column;
     align-items: stretch;
     gap: 16px;
-    padding: 16px;
+    padding: var(--spacing-md);
   }
 
   .pagination-info {
@@ -369,7 +369,7 @@ const handlePageJump = (value: string | number) => {
 
   .pagination-button--nav {
     min-width: 44px;
-    padding: 10px;
+    padding: var(--spacing-sm);
   }
 
   .page-numbers {
@@ -377,7 +377,7 @@ const handlePageJump = (value: string | number) => {
     justify-content: center;
     margin: 0;
     overflow-x: auto;
-    padding: 0 4px;
+    padding: 0 var(--spacing-xs);
   }
 
   .per-page-selector,
@@ -408,12 +408,12 @@ const handlePageJump = (value: string | number) => {
   .page-number {
     min-width: 36px;
     height: 36px;
-    padding: 8px;
+    padding: var(--spacing-xs);
     font-size: 12px;
   }
 
   .pagination-button {
-    padding: 8px;
+    padding: var(--spacing-xs);
     font-size: 12px;
   }
 }

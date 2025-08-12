@@ -30,7 +30,7 @@ defineProps({
   top: 60%;
   width: 45%;
   height: 1px;
-  background-color: var(--primary-text-color);
+  background-color: var(--border-color);
 }
 
 .layout-divider::before {
@@ -42,9 +42,9 @@ defineProps({
 }
 
 .layout-divider--text {
-  padding: 0 10px;
+  padding: 0 var(--spacing-sm);
   color: var(--primary-text-color);
-  background-color: var(--nnt-white);
+  background-color: var(--primary-bg-color);
   position: relative;
   z-index: 1;
 }

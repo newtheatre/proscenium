@@ -47,13 +47,13 @@ const { links } = data.value || { links: [] }
 <style scoped>
 .app-header {
   background-color: var(--header-bg-color);
-  border-bottom: 1px solid #232323;
+  border-bottom: 1px solid var(--border-color-light);
 }
 
 .app-header__nav {
   max-width: var(--page-max-width);
   display: flex;
-  padding: 1.2rem 3rem;
+  padding: 1.2rem var(--spacing-2xl);
   margin: 0 auto;
   justify-content: space-between;
   align-items: center;
@@ -62,7 +62,7 @@ const { links } = data.value || { links: [] }
 
 .app-header__nav-container {
   display: flex;
-  gap: 1rem;
+  gap: var(--spacing-md);
   align-items: center;
   justify-content: right;
 }
@@ -71,7 +71,7 @@ const { links } = data.value || { links: [] }
   list-style: none;
   display: flex;
   justify-content: right;
-  gap: 1rem;
+  gap: var(--spacing-md);
   padding: 0;
   align-items: center;
 }
@@ -91,7 +91,7 @@ const { links } = data.value || { links: [] }
   display: none;
 }
 
-/* Can be modified as needed for different screen sizes */
+/* Mobile responsive styles */
 @media (max-width: 768px) {
   .app-header--wide {
     display: none;
@@ -120,7 +120,7 @@ const { links } = data.value || { links: [] }
   .app-header--narrow .app-header__nav-list {
     display: none;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--spacing-md);
     padding: 4rem 0;
     width: 100%;
   }

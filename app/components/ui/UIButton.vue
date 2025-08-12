@@ -59,16 +59,16 @@ const onClick = (event: MouseEvent) => {
 <style scoped>
 .button {
   display: flex;
-  padding: 0.5rem 0.75rem;
+  padding: var(--spacing-sm) 0.75rem;
   justify-content: center;
   align-items: center;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: var(--border-radius);
   cursor: pointer;
   font-size: 1em;
   position: relative;
   width: v-bind('fullWidth ? "100%" : "fit-content"');
-  transition: background-color 0.2s ease, filter 0.2s ease;
+  transition: background-color var(--transition-fast), filter var(--transition-fast);
 }
 
 .button--primary {

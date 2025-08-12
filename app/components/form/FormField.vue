@@ -34,18 +34,18 @@ defineProps<Props>()
 
 <style scoped>
 .form-field {
-  margin-bottom: 1rem;
+  margin-bottom: var(--spacing-md);
 }
 
 .form-label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--spacing-sm);
   font-weight: 500;
 }
 
 .form-error {
-  color: var(--error, #dc2626);
+  color: var(--error);
   font-size: 0.875rem;
-  margin-top: 0.25rem;
+  margin-top: var(--spacing-xs);
 }
 </style>

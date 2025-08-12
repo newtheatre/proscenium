@@ -18,8 +18,8 @@
           :aria-invalid="fieldError && fieldTouched ? 'true' : 'false'"
           :aria-describedby="fieldError && fieldTouched ? `${fieldId}-error` : undefined"
           :class="[
-            'form-input__field',
-            { 'form-input__field--error': fieldError && fieldTouched },
+            'form-control',
+            { 'form-control--error': fieldError && fieldTouched },
           ]"
           @input="onInput"
           @blur="onBlur"
@@ -68,39 +68,6 @@ const onFocus = () => emit('focus')
 <style scoped>
 .form-input {
   width: 100%;
-  margin-bottom: 0.5rem;
-}
-
-.form-input__field {
-  width: 100%;
-  padding: 0.5rem;
-  background-color: var(--primary-bg-color);
-  color: var(--primary-text-color);
-  border: 1px solid #404040;
-  border-radius: 0.5rem;
-  font-size: 1rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.form-input__field::placeholder {
-  color: #888;
-}
-
-.form-input__field:focus {
-  outline: none;
-  border-color: var(--nnt-orange);
-  box-shadow: 0 0 0 3px rgba(255, 196, 37, 0.1);
-}
-
-.form-input__field--error {
-  border-color: var(--error);
-  box-shadow: 0 0 0 3px rgba(255, 77, 77, 0.1);
-}
-
-.form-input__field:disabled {
-  background-color: #2a2a2a;
-  color: #888;
-  cursor: not-allowed;
-  opacity: 0.6;
+  margin-bottom: var(--spacing-sm);
 }
 </style>

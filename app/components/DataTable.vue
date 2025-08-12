@@ -195,27 +195,27 @@ watch(() => props.apiEndpoint, () => {
 .data-table {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--spacing-md);
   width: 100%;
 }
 
 .table-controls {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--spacing-md);
 }
 
 .table-controls__top {
   display: flex;
   flex-direction: row;
-  gap: 16px;
-  align-items: flex-end;
+  gap: var(--spacing-md);
+  align-items: flex-start;
   flex-wrap: wrap;
 }
 
 .table-container {
-  border: 1px solid #404040;
-  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
   background-color: var(--primary-bg-color);
   overflow: hidden;
 }

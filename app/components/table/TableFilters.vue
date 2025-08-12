@@ -174,7 +174,7 @@ const clearFilters = () => {
 .filter-actions :deep(.ui-button) {
   min-width: auto;
   width: auto;
-  padding: 8px 12px;
+  padding: var(--spacing-xs) 12px;
   font-size: 12px;
 }
 

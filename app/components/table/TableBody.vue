@@ -109,8 +109,8 @@ tbody {
 }
 
 .data-row {
-  border-bottom: 1px solid #404040;
-  transition: background-color 0.2s;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color var(--transition-fast);
 }
 
 .data-row:hover {
@@ -118,7 +118,7 @@ tbody {
 }
 
 .data-cell {
-  padding: 12px 16px;
+  padding: 12px var(--spacing-md);
   vertical-align: top;
   color: var(--primary-text-color);
 }
@@ -130,9 +130,9 @@ tbody {
 
 .loading-cell,
 .empty-cell {
-  padding: 40px 16px;
+  padding: 40px var(--spacing-md);
   text-align: center;
-  color: #888;
+  color: var(--secondary-text-color);
 }
 
 .loading-spinner {
@@ -145,7 +145,7 @@ tbody {
 .spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid #404040;
+  border: 2px solid var(--border-color);
   border-top: 2px solid var(--nnt-orange);
   border-radius: 50%;
   animation: spin 1s linear infinite;

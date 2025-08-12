@@ -19,10 +19,10 @@ defineProps({
 
 <style scoped>
 .alert {
-  padding: 1rem;
-  margin-bottom: 1rem;
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
   border: 2px solid transparent;
-  border-radius: 0.5rem;
+  border-radius: var(--border-radius);
   width: 100%;
 }
 

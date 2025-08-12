@@ -1,6 +1,6 @@
 <template>
   <div class="loading-spinner">
-    <span class="loading-spinner__sr-only">Loading...</span>
+    <span class="sr-only">Loading...</span>
     <div class="loading-spinner__circle" />
   </div>
 </template>
@@ -30,16 +30,5 @@
   to {
     transform: rotate(360deg);
   }
-}
-
-.loading-spinner__sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
 }
 </style>

@@ -65,11 +65,11 @@ thead {
 }
 
 th {
-  padding: 12px 16px;
+  padding: 12px var(--spacing-md);
   text-align: left;
   font-weight: 600;
   color: var(--primary-text-color);
-  border-bottom: 2px solid #404040;
+  border-bottom: 2px solid var(--border-color);
 }
 
 th.sortable {
@@ -85,14 +85,14 @@ th.sortable:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--spacing-xs);
 }
 
 .sort-indicator {
   display: flex;
   flex-direction: column;
   opacity: 0.3;
-  transition: opacity 0.2s;
+  transition: opacity var(--transition-fast);
 }
 
 .sort-indicator.active {
@@ -106,8 +106,8 @@ th.sortable:hover {
 .sort-arrow {
   font-size: 12px;
   line-height: 1;
-  color: #888;
-  transition: color 0.2s;
+  color: var(--secondary-text-color);
+  transition: color var(--transition-fast);
 }
 
 .sort-arrow.active {
