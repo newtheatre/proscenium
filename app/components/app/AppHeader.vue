@@ -58,7 +58,7 @@ const { links } = data.value || { links: [] }
 .app-header__nav {
   max-width: var(--page-max-width);
   display: flex;
-  padding: 1.2rem var(--spacing-2xl);
+  padding: 1.2rem;
   margin: 0 auto;
   justify-content: space-between;
   align-items: center;
