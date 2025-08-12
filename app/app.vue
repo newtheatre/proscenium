@@ -6,3 +6,9 @@
     </NuxtLayout>
   </div>
 </template>
+
+<script setup lang="ts">
+useHead({
+  titleTemplate: '%s - New Theatre',
+})
+</script>
