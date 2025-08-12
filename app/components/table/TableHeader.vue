@@ -11,11 +11,26 @@
             'sorted': sortBy === column.key,
             'sorted-asc': sortBy === column.key && sortOrder === 'asc',
             'sorted-desc': sortBy === column.key && sortOrder === 'desc',
+            'selection-header': column.key === '_selection',
           },
         ]"
         @click="column.sortable && handleSort(column.key)"
       >
-        <div class="header-content">
+        <div
+          v-if="column.key === '_selection'"
+          class="selection-header-content"
+        >
+          <input
+            type="checkbox"
+            :checked="selectAll"
+            class="select-all-checkbox"
+            @change="$emit('toggle-select-all')"
+          >
+        </div>
+        <div
+          v-else
+          class="header-content"
+        >
           <span>{{ column.label }}</span>
           <span
             v-if="column.sortable"
@@ -46,13 +61,21 @@ interface Props {
   columns: Column<T>[]
   sortBy: string
   sortOrder: 'asc' | 'desc'
+  enableSelection?: boolean
+  selectAll?: boolean
 }
 
-defineProps<Props>()
+interface Emits {
+  'sort': [column: string]
+  'toggle-select-all': []
+}
 
-const emit = defineEmits<{
-  sort: [column: string]
-}>()
+withDefaults(defineProps<Props>(), {
+  enableSelection: false,
+  selectAll: false,
+})
+
+const emit = defineEmits<Emits>()
 
 const handleSort = (column: string) => {
   emit('sort', column)
@@ -116,5 +139,22 @@ th.sortable:hover {
 
 th.sorted {
   background-color: rgba(255, 196, 37, 0.1);
+}
+
+/* Selection column styles */
+.selection-header {
+  width: 40px;
+  text-align: center;
+}
+
+.selection-header-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.select-all-checkbox {
+  margin: 0;
+  cursor: pointer;
 }
 </style>

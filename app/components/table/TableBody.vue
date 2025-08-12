@@ -42,7 +42,15 @@
         :class="column.class"
         class="data-cell"
       >
-        <div>{{ getCellContent(row, column) }}</div>
+        <component
+          :is="column.component"
+          v-if="column.component"
+          :row="row"
+          :value="getNestedValue(row, column.key)"
+        />
+        <div v-else>
+          {{ getCellContent(row, column) }}
+        </div>
       </td>
     </tr>
   </tbody>

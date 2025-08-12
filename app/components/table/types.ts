@@ -1,6 +1,16 @@
+import type { Component } from 'vue'
+
 export interface TableRow {
   id?: string | number
   [key: string]: unknown
+}
+
+export interface TableAction {
+  key: string
+  label: string
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outlined'
+  path?: string
+  handler?: (row: Record<string, unknown>) => void
 }
 
 export interface Column<T extends TableRow = TableRow> {
@@ -9,6 +19,7 @@ export interface Column<T extends TableRow = TableRow> {
   sortable?: boolean
   searchable?: boolean
   render?: (value: unknown, row: T) => string
+  component?: Component // Vue component for custom rendering
   class?: string
 }
 
@@ -55,6 +66,7 @@ export interface TableProps<T extends TableRow = TableRow> {
   defaultSortBy?: string
   defaultSortOrder?: 'asc' | 'desc'
   defaultPerPage?: number
+  enableSelection?: boolean // Enable checkbox column for bulk actions
 }
 
 // Common filter options that can be reused

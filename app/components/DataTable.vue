@@ -23,15 +23,18 @@
     <div class="table-container">
       <table class="table">
         <TableHeader
-          :columns="columns"
+          :columns="computedColumns"
           :sort-by="sortBy"
           :sort-order="sortOrder"
+          :enable-selection="enableSelection"
+          :select-all="selectAll"
           @sort="handleSort"
+          @toggle-select-all="toggleSelectAll"
         />
 
         <TableBody
           :data="data"
-          :columns="columns"
+          :columns="computedColumns"
           :loading="loading"
           :empty-message="emptyMessage"
         />
@@ -52,6 +55,7 @@
 </template>
 
 <script setup lang="ts" generic="T extends TableRow">
+import { defineComponent, h, ref, computed, watch, onMounted, onUnmounted, readonly } from 'vue'
 import type { TableRow, Column, Filter, Pagination, ApiResponse, TableQueryParams } from './table/types'
 
 interface Props {
@@ -63,6 +67,7 @@ interface Props {
   defaultSortBy?: string
   defaultSortOrder?: 'asc' | 'desc'
   defaultPerPage?: number
+  enableSelection?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -72,12 +77,69 @@ const props = withDefaults(defineProps<Props>(), {
   defaultSortBy: 'createdAt',
   defaultSortOrder: 'desc',
   defaultPerPage: 10,
+  enableSelection: false,
 })
 
 // Reactive state
 const data = ref<T[]>([]) as Ref<T[]>
 const loading = ref(false)
 const pagination = ref<Pagination | null>(null)
+
+// Selection state
+const selectedRows = ref<Set<string | number>>(new Set())
+const selectAll = ref(false)
+
+// Loading delay to prevent flicker for fast API calls
+// - Standard operations (search, filters): 150ms delay
+// - Fast operations (sort, pagination): 50ms delay
+// - If the request completes before the delay, loading state never shows
+let loadingTimeout: ReturnType<typeof setTimeout> | null = null
+
+// Methods
+const fetchData = async (showLoading = true, loadingDelay = 150) => {
+  // Clear any existing timeout
+  if (loadingTimeout) {
+    clearTimeout(loadingTimeout)
+    loadingTimeout = null
+  }
+
+  // Set loading with delay to prevent flicker for fast requests
+  if (showLoading) {
+    loadingTimeout = setTimeout(() => {
+      loading.value = true
+      loadingTimeout = null
+    }, loadingDelay)
+  }
+
+  try {
+    const response = await $fetch<ApiResponse<T>>(props.apiEndpoint, {
+      query: queryParams.value,
+    })
+
+    if (response.success) {
+      data.value = response.data as T[]
+      pagination.value = response.meta
+    }
+    else {
+      console.error('API returned success: false')
+      data.value = []
+      pagination.value = null
+    }
+  }
+  catch (error) {
+    console.error('Failed to fetch data:', error)
+    data.value = []
+    pagination.value = null
+  }
+  finally {
+    // Clear timeout and loading state
+    if (loadingTimeout) {
+      clearTimeout(loadingTimeout)
+      loadingTimeout = null
+    }
+    loading.value = false
+  }
+}
 
 // Query parameters
 const searchQuery = ref('')
@@ -110,34 +172,89 @@ const queryParams = computed((): TableQueryParams => {
   return params
 })
 
-// Methods
-const fetchData = async () => {
-  loading.value = true
+// Computed columns with optional selection column
+const computedColumns = computed(() => {
+  if (!props.enableSelection) {
+    return props.columns
+  }
 
-  try {
-    const response = await $fetch<ApiResponse<T>>(props.apiEndpoint, {
-      query: queryParams.value,
+  const selectionColumn: Column<T> = {
+    key: '_selection',
+    label: '',
+    sortable: false,
+    class: 'selection-column',
+    component: defineComponent({
+      props: {
+        row: { type: Object, required: true },
+        value: { type: null, required: false },
+      },
+      setup(componentProps) {
+        const rowId = componentProps.row.id || componentProps.row.uid
+        const isSelected = computed(() => selectedRows.value.has(rowId))
+
+        const toggleRow = () => {
+          if (isSelected.value) {
+            selectedRows.value.delete(rowId)
+          }
+          else {
+            selectedRows.value.add(rowId)
+          }
+
+          // Update select all state
+          selectAll.value = data.value.length > 0
+            && data.value.every(row => selectedRows.value.has(row.id || row.uid))
+        }
+
+        return () => h('input', {
+          type: 'checkbox',
+          checked: isSelected.value,
+          onChange: toggleRow,
+          class: 'row-checkbox',
+        })
+      },
+    }),
+  }
+
+  return [selectionColumn, ...props.columns]
+})
+
+// Selection methods
+const toggleSelectAll = () => {
+  if (selectAll.value) {
+    selectedRows.value.clear()
+    selectAll.value = false
+  }
+  else {
+    data.value.forEach((row) => {
+      const rowId = row.id || row.uid
+      if (rowId) selectedRows.value.add(rowId)
     })
-
-    if (response.success) {
-      data.value = response.data as T[]
-      pagination.value = response.meta
-    }
-    else {
-      console.error('API returned success: false')
-      data.value = []
-      pagination.value = null
-    }
-  }
-  catch (error) {
-    console.error('Failed to fetch data:', error)
-    data.value = []
-    pagination.value = null
-  }
-  finally {
-    loading.value = false
+    selectAll.value = true
   }
 }
+
+const clearSelection = () => {
+  selectedRows.value.clear()
+  selectAll.value = false
+}
+
+// Watch for data changes to update select all state
+watch(data, () => {
+  if (data.value.length === 0) {
+    selectAll.value = false
+  }
+  else {
+    selectAll.value = data.value.every(row => selectedRows.value.has(row.id || row.uid))
+  }
+}, { deep: true })
+
+// Expose selection methods and state for parent components
+defineExpose({
+  selectedRows: readonly(selectedRows),
+  clearSelection,
+  selectAll: readonly(selectAll),
+  toggleSelectAll,
+})
 
 const handleSearch = (query: string) => {
   searchQuery.value = query
@@ -154,12 +271,14 @@ const handleSort = (column: string) => {
     sortOrder.value = 'asc'
   }
   currentPage.value = 1
-  fetchData()
+  // Use shorter delay for sorting since it's typically fast
+  fetchData(true, 50)
 }
 
 const handlePageChange = (page: number) => {
   currentPage.value = page
-  fetchData()
+  // Use shorter delay for pagination since it's typically fast
+  fetchData(true, 50)
 }
 
 const handlePerPageChange = (newPerPage: number) => {
@@ -183,6 +302,14 @@ const handleFiltersClear = () => {
 // Initialize
 onMounted(() => {
   fetchData()
+})
+
+// Cleanup
+onUnmounted(() => {
+  if (loadingTimeout) {
+    clearTimeout(loadingTimeout)
+    loadingTimeout = null
+  }
 })
 
 // Watch for prop changes
@@ -240,5 +367,16 @@ watch(() => props.apiEndpoint, () => {
   .table-container {
     overflow-x: auto;
   }
+}
+
+/* Selection styles */
+:deep(.selection-column) {
+  width: 40px;
+  text-align: center;
+}
+
+:deep(.row-checkbox) {
+  margin: 0;
+  cursor: pointer;
 }
 </style>

@@ -5,6 +5,7 @@
     </h1>
 
     <DataTable
+      ref="dataTable"
       api-endpoint="/api/users"
       :columns="columns"
       :filters="filters"
@@ -12,15 +13,24 @@
       empty-message="No users found"
       default-sort-by="createdAt"
       default-sort-order="desc"
-      :default-per-page="5"
+      :default-per-page="10"
+      enable-selection
     />
-    <!-- TODO: make the default per-page larger -->
+    <!--
+      For bulk actions, access the selected rows with:
+      const selectedRows = dataTable.value?.selectedRows
+      const clearSelection = dataTable.value?.clearSelection
+      const selectAll = dataTable.value?.selectAll
+      const toggleSelectAll = dataTable.value?.toggleSelectAll
+    -->
   </div>
 </template>
 
 <script setup lang="ts">
+import { defineComponent, h } from 'vue'
 import type { Column, Filter } from '~/components/table/types'
 import { CommonRenderers, CommonFilterOptions } from '~/components/table/types'
+import TableActions from '~/components/table/TableActions.vue'
 
 // Require admin access
 definePageMeta({
@@ -70,25 +80,43 @@ const columns: Column[] = [
     },
   },
   {
-    key: 'isActive',
-    label: 'Status',
-    sortable: true,
-    render: CommonRenderers.status,
-  },
-  {
-    key: 'lastLogin',
-    label: 'Last Login',
-    sortable: true,
-    render: (value): string => {
-      if (!value) return 'Never'
-      return CommonRenderers.date(value)
-    },
-  },
-  {
-    key: 'createdAt',
-    label: 'Created',
-    sortable: true,
-    render: CommonRenderers.date,
+    key: 'actions',
+    label: 'Actions',
+    sortable: false,
+    component: defineComponent({
+      props: {
+        row: {
+          type: Object,
+          required: true,
+        },
+        value: {
+          type: null,
+          required: false,
+        },
+      },
+      setup(props) {
+        const userActions = [
+          {
+            key: 'view',
+            label: 'View',
+            variant: 'primary' as const,
+            path: '/admin/users/{id}',
+          },
+          {
+            key: 'edit',
+            label: 'Edit',
+            variant: 'secondary' as const,
+            path: '/admin/users/{id}/edit',
+          },
+        ]
+
+        return () => h(TableActions, {
+          row: props.row,
+          value: props.value,
+          actions: userActions,
+        })
+      },
+    }),
   },
 ]
 
@@ -112,11 +140,12 @@ const filters: Filter[] = [
       label: membership.label,
     })),
   },
-  {
-    key: 'isActive',
-    label: 'Active',
-    type: 'boolean',
-  },
+  // TODO: Consider enabling again when users can be soft-deleted
+  // {
+  //   key: 'isActive',
+  //   label: 'Active',
+  //   type: 'boolean',
+  // },
 ]
 </script>
 
