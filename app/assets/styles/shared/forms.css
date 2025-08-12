@@ -1,0 +1,75 @@
+/* Form Elements - Additional styles for checkboxes and radio buttons */
+input[type="checkbox"],
+input[type="radio"] {
+  appearance: none;
+  width: 1.2rem;
+  height: 1.2rem;
+  border: 2px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background-color: var(--primary-bg-color);
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition-fast);
+  margin-right: var(--spacing-sm);
+}
+
+input[type="radio"] {
+  border-radius: 50%;
+}
+
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  background-color: var(--nnt-orange);
+  border-color: var(--nnt-orange);
+}
+
+input[type="checkbox"]:checked::after {
+  content: "✓";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--alt-text-color);
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+input[type="radio"]:checked::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--alt-text-color);
+}
+
+input[type="checkbox"]:focus,
+input[type="radio"]:focus {
+  outline: none;
+  box-shadow: var(--focus-ring-orange);
+}
+
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled {
+  background-color: var(--secondary-bg-color);
+  border-color: var(--secondary-text-color);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Form group layouts for radio and checkbox */
+.form-group {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.form-group label {
+  margin-bottom: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}

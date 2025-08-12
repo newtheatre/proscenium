@@ -13,6 +13,7 @@
         <div
           v-for="option in options"
           :key="getOptionValue(option)"
+          class="form-group"
         >
           <input
             :id="`${name}-${getOptionValue(option)}`"
@@ -76,3 +77,11 @@ const onChange = (event: Event) => {
 const onBlur = () => emit('blur')
 const onFocus = () => emit('focus')
 </script>
+
+<style scoped>
+div[role="radiogroup"] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+</style>
