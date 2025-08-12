@@ -1,7 +1,7 @@
 <template>
-  <div>
+  <div class="layout">
     <AppHeader />
-    <main>
+    <main class="layout__main">
       <slot />
     </main>
     <AppFooter />
@@ -12,7 +12,20 @@
 
 </script>
 
-<style></style>
+<style scoped>
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.layout__main {
+  flex: 1;
+  padding-top: var(--spacing-lg);
+  /* Account for any content that might be hidden behind the sticky header */
+  scroll-margin-top: 80px;
+}
+</style>
 
 <!-- <template>
   <div>

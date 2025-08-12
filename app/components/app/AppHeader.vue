@@ -48,6 +48,11 @@ const { links } = data.value || { links: [] }
 .app-header {
   background-color: var(--header-bg-color);
   border-bottom: 1px solid var(--border-color-light);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .app-header__nav {
@@ -64,16 +69,17 @@ const { links } = data.value || { links: [] }
   display: flex;
   gap: var(--spacing-md);
   align-items: center;
-  justify-content: right;
+  justify-content: flex-end;
 }
 
 .app-header__nav-list {
   list-style: none;
   display: flex;
-  justify-content: right;
+  justify-content: flex-end;
   gap: var(--spacing-md);
   padding: 0;
   align-items: center;
+  margin: 0;
 }
 
 .app-header__nav-link {
@@ -93,6 +99,10 @@ const { links } = data.value || { links: [] }
 
 /* Mobile responsive styles */
 @media (max-width: 768px) {
+  .app-header__nav {
+    padding: 1rem var(--spacing-lg);
+  }
+
   .app-header--wide {
     display: none;
   }
@@ -127,6 +137,13 @@ const { links } = data.value || { links: [] }
 
   .app-header--narrow .app-header__nav-list--open {
     display: flex;
+  }
+}
+
+/* Ensure auth status is properly sized on mobile */
+@media (max-width: 480px) {
+  .app-header__nav-container {
+    gap: var(--spacing-sm);
   }
 }
 </style>

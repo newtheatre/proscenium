@@ -9,11 +9,13 @@
         <NuxtLink
           v-else
           to="/login"
-          class="auth-status__login-link"
+          class="auth-status__login-button"
+          aria-label="Log in to your account"
         >
           <Icon
-            class="auth-status__icon"
+            class="auth-status__login-icon"
             name="icon:login"
+            size="20"
           />
         </NuxtLink>
       </template>
@@ -26,25 +28,42 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.2rem;
-  height: 2.2rem;
-  margin: 0;
+  width: 2.5rem;
+  height: 2.5rem;
 }
 
-.auth-status__login-link {
-  text-decoration: none;
+.auth-status__login-button {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  transition: all var(--transition-fast);
+  position: relative;
+  overflow: hidden;
 }
 
-.auth-status__icon {
-  transition: color 0.2s;
+.auth-status__login-button:hover,
+.auth-status__login-button:focus-within {
+  border-color: var(--nnt-orange);
+  outline: none;
+}
+
+.auth-status__login-icon {
   color: var(--primary-text-color);
+  transition: color var(--transition-fast);
 }
 
-.auth-status__icon:hover,
-.auth-status__icon:focus,
-.auth-status__icon:active {
-  color: var(--link-color);
+.auth-status__login-button:hover .auth-status__login-icon,
+.auth-status__login-button:focus .auth-status__login-icon {
+  color: var(--nnt-orange);
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+  .auth-status {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
 }
 </style>
