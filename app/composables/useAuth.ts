@@ -55,7 +55,7 @@ export const useAuth = () => {
 
   const hasAnyRole = (roles: RoleType[]): boolean => {
     if (!user.value) return false
-    return user.value.roles.some(userRole => roles.includes(userRole))
+    return user.value.roles.some(userRole => roles.includes(userRole as RoleType))
   }
 
   const hasAllRoles = (roles: RoleType[]): boolean => {

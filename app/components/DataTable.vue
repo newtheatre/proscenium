@@ -349,7 +349,7 @@ watch(() => props.apiEndpoint, () => {
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   background-color: var(--primary-bg-color);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .table {
@@ -367,10 +367,6 @@ watch(() => props.apiEndpoint, () => {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
-  }
-
-  .table-container {
-    overflow-x: auto;
   }
 }
 
