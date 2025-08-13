@@ -1,8 +1,4 @@
 import prisma from '~~/lib/prisma'
-import { paginatedResponse, handleApiError } from '../../../utils/responses'
-import { requireAuth } from '../../../utils/guards'
-import { validateSort, validatePagination } from '../../../utils/validation'
-import { venueFeatureSelectQuery } from '../../../utils/database/venue'
 
 /**
  * GET /api/venues/features

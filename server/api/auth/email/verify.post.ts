@@ -1,7 +1,4 @@
-import { emailVerificationSchema } from '../../../utils/validation'
-import { dbErrors, userSelectQuery } from '../../../utils/database'
-import { successResponse, handleApiError, safeUserData, sessionUserData } from '../../../utils/responses'
-import prisma from '../../../../lib/prisma'
+import prisma from '~~/lib/prisma'
 
 /**
  * POST /api/auth/email/verify

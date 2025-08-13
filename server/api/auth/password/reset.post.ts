@@ -1,8 +1,4 @@
-import { passwordResetInitiateSchema, passwordResetCompleteSchema } from '../../../utils/validation'
-import { dbErrors } from '../../../utils/database'
-import { successResponse, handleApiError } from '../../../utils/responses'
-import { isValidPassword, generateVerificationToken, sendPasswordResetEmail } from '../../../utils/auth'
-import prisma from '../../../../lib/prisma'
+import prisma from '~~/lib/prisma'
 
 /**
  * POST /api/auth/password/reset

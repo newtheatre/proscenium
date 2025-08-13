@@ -1,8 +1,4 @@
-import { emailSchema } from '../../../utils/validation'
-import { dbErrors } from '../../../utils/database'
-import { successResponse, handleApiError } from '../../../utils/responses'
-import { generateVerificationToken, sendVerificationEmail } from '../../../utils/auth'
-import prisma from '../../../../lib/prisma'
+import prisma from '~~/lib/prisma'
 
 /**
  * POST /api/auth/email/resend

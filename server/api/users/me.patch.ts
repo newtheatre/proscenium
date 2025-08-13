@@ -1,8 +1,3 @@
-import { userSetupSchema, userUpdateSchema } from '~~/server/utils/validation'
-import { dbErrors, updateUserWithRelations, emailExistsForOtherUser, studentIdExistsForOtherUser } from '~~/server/utils/database'
-import { successResponse, handleApiError, cleanUserData } from '~~/server/utils/responses'
-import { generateVerificationToken } from '~~/server/utils/auth'
-
 /**
  * PATCH /api/users/me
  *

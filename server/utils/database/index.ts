@@ -41,32 +41,4 @@ export const dbErrors = {
   }),
 }
 
-// Re-export all user-related utilities
-export {
-  userSelectQuery,
-  type UserWithRelationsRaw,
-  createUserWithRelations,
-  getUserWithRelations,
-  updateUserWithRelations,
-  emailExistsForOtherUser,
-  studentIdExistsForOtherUser,
-} from './user'
-
-// Re-export all venue-related utilities
-export {
-  venueSelectQuery,
-  venueFeatureSelectQuery,
-  type VenueWithRelationsRaw,
-  type VenueFeatureRaw,
-  getVenueWithRelations,
-  createVenueWithFeatures,
-  updateVenueWithFeatures,
-  venueNameExistsForOther,
-  getVenueFeatureWithVenues,
-  createVenueFeature,
-  updateVenueFeature,
-  venueFeatureNameExistsForOther,
-} from './venue'
-
 // Shared database utilities that don't belong in specific modules go here
-// (none at the moment)

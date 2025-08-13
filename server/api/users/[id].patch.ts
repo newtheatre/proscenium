@@ -1,8 +1,3 @@
-import { adminUserUpdateSchema } from '../../utils/validation'
-import { updateUserWithRelations, dbErrors, getUserWithRelations, emailExistsForOtherUser, studentIdExistsForOtherUser } from '../../utils/database'
-import { successResponse, handleApiError, safeUserData } from '../../utils/responses'
-import { requireRole } from '../../utils/guards'
-
 /**
  * PATCH /api/users/[id]
  *

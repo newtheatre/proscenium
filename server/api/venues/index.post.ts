@@ -1,7 +1,5 @@
 import { successResponse, handleApiError } from '../../utils/responses'
 import { requireRole } from '../../utils/guards'
-import { createVenueWithFeatures } from '../../utils/database/venue'
-import { venueCreateSchema } from '../../utils/validation'
 
 /**
  * POST /api/venues

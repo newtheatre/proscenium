@@ -1,7 +1,3 @@
-import { successResponse, handleApiError, safeUserData, cleanUserData, restrictedUserData } from '../../utils/responses'
-import { dbErrors } from '../../utils/database'
-import { requireAuth } from '../../utils/guards'
-
 /**
  * GET /api/users/[id]
  *

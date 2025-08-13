@@ -1,7 +1,3 @@
-import { registerSchema } from '~~/server/utils/validation'
-import { dbErrors, emailExistsForOtherUser } from '~~/server/utils/database'
-import { successResponse, handleApiError } from '~~/server/utils/responses'
-import { isValidEmail, isValidPassword, generateVerificationToken, sendVerificationEmail } from '~~/server/utils/auth'
 import prisma from '~~/lib/prisma'
 
 /**

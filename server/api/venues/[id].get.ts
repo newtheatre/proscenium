@@ -1,7 +1,3 @@
-import { successResponse, handleApiError } from '../../utils/responses'
-import { requireAuth } from '../../utils/guards'
-import { getVenueWithRelations } from '../../utils/database/venue'
-
 /**
  * GET /api/venues/[id]
  *

@@ -1,9 +1,5 @@
 import prisma from '~~/lib/prisma'
-import { userSelectQuery, dbErrors } from '../../utils/database'
-import { paginatedResponse, handleApiError, safeUserData } from '../../utils/responses'
-import { requireRole } from '../../utils/guards'
 import type { MembershipType, RoleType, Prisma } from '@prisma/client'
-import { validateSort } from '~~/server/utils/validation'
 
 /**
  * GET /api/users

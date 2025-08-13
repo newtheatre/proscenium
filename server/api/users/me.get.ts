@@ -1,6 +1,3 @@
-import { successResponse, handleApiError, safeUserData } from '../../utils/responses'
-import { requireAuth } from '../../utils/guards'
-
 /**
  * GET /api/users/me
  *

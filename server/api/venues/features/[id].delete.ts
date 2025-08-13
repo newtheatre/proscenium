@@ -1,7 +1,3 @@
-import { successResponse, handleApiError } from '../../../utils/responses'
-import { requireRole } from '../../../utils/guards'
-import { updateVenueFeature } from '../../../utils/database/venue'
-
 /**
  * DELETE /api/venues/features/[id]
  *

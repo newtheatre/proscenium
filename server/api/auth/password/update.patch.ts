@@ -1,9 +1,4 @@
-import { passwordUpdateSchema } from '../../../utils/validation'
-import { dbErrors } from '../../../utils/database'
-import { successResponse, handleApiError } from '../../../utils/responses'
-import { isValidPassword } from '../../../utils/auth'
-import { requireAuth } from '../../../utils/guards'
-import prisma from '../../../../lib/prisma'
+import prisma from '~~/lib/prisma'
 
 /**
  * PATCH /api/auth/password/update

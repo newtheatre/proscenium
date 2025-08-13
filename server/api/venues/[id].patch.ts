@@ -1,8 +1,3 @@
-import { successResponse, handleApiError } from '../../utils/responses'
-import { requireRole } from '../../utils/guards'
-import { updateVenueWithFeatures } from '../../utils/database/venue'
-import { venueUpdateSchema } from '../../utils/validation'
-
 /**
  * PATCH /api/venues/[id]
  *

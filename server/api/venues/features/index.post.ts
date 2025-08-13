@@ -1,8 +1,3 @@
-import { successResponse, handleApiError } from '../../../utils/responses'
-import { requireRole } from '../../../utils/guards'
-import { createVenueFeature } from '../../../utils/database/venue'
-import { venueFeatureCreateSchema } from '../../../utils/validation'
-
 /**
  * POST /api/venues/features
  *

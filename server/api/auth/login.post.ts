@@ -1,6 +1,3 @@
-import { loginSchema } from '~~/server/utils/validation'
-import { dbErrors, userSelectQuery } from '~~/server/utils/database'
-import { successResponse, handleApiError, safeUserData, sessionUserData } from '~~/server/utils/responses'
 import prisma from '~~/lib/prisma'
 
 /**
