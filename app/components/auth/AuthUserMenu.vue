@@ -236,7 +236,9 @@ onUnmounted(() => {
 .user-menu__email {
   font-size: 0.875rem;
   color: var(--secondary-text-color);
-  word-break: break-word;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .user-menu__name {

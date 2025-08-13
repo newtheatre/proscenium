@@ -115,12 +115,23 @@ export function cleanUserData(user: Record<string, unknown> | null | undefined) 
 export function sessionUserData(user: Record<string, unknown> | null | undefined) {
   if (!user) return null
 
+  const userProfile = user.profile as { name?: string, avatar?: string } | undefined
+
   // Only include essential fields for session identification
   const sessionData: Record<string, unknown> = {
     id: user.id,
     email: user.email,
     emailVerified: user.emailVerified,
     setupCompleted: user.setupCompleted,
+    profile: {
+      name: userProfile?.name
+        ? userProfile.name
+        : undefined,
+      avatar: userProfile?.avatar
+        ? userProfile.avatar
+        : undefined,
+    },
+    roles: [],
   }
 
   // Transform roles if they exist

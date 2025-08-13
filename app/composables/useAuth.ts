@@ -1,17 +1,5 @@
 import type { RoleType } from '@prisma/client'
 
-export interface AuthUser {
-  id: string
-  email: string
-  profile?: {
-    name: string
-    avatar: string | null
-  }
-  roles: RoleType[]
-  emailVerified: boolean
-  setupCompleted: boolean
-}
-
 export interface LoginCredentials {
   email: string
   password: string
@@ -26,25 +14,23 @@ export interface RegisterCredentials {
 export const useAuth = () => {
   const { session, fetch: refreshSession } = useUserSession()
 
-  const user = computed(() => session.value?.user as AuthUser | undefined)
+  const user = computed(() => session.value?.user)
   const isLoggedIn = computed(() => !!user.value)
 
   const login = async (credentials: LoginCredentials) => {
-    const { data, error } = await useFetch<{ user: AuthUser }>('/api/auth/login', {
+    const response = await $fetch('/api/auth/login', {
       method: 'POST',
       body: credentials,
     })
 
-    if (error.value) {
-      throw error.value.data
-    }
+    console.log('Login response:', response)
 
     await refreshSession()
-    return data.value!.user
+    return response.data!.user
   }
 
   const register = async (credentials: RegisterCredentials) => {
-    const result = await $fetch<{ message: string, user: Partial<AuthUser> }>('/api/auth/register', {
+    const result = await $fetch('/api/auth/register', {
       method: 'POST',
       body: credentials,
     })

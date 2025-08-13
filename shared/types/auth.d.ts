@@ -6,6 +6,10 @@ declare module '#auth-utils' {
     emailVerified: boolean
     setupCompleted: boolean
     roles: string[]
+    profile?: {
+      name?: string
+      avatar?: string
+    }
   }
 
   interface UserSession {
