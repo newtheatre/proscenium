@@ -2,20 +2,33 @@
   <span
     :class="[
       'status-badge',
-      `status-badge--${variant}`,
+      `status-badge--${safeVariant}`,
     ]"
   >
-    {{ label }}
+    {{ safeLabel }}
   </span>
 </template>
 
 <script lang="ts" setup>
 interface Props {
-  variant: 'success' | 'warning' | 'error' | 'info'
-  label: string
+  variant?: 'success' | 'warning' | 'error' | 'info' | string
+  label?: string
 }
 
-defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  variant: 'info',
+  label: 'Unknown',
+})
+
+// Computed properties to ensure safe values
+const safeVariant = computed(() => {
+  const validVariants = ['success', 'warning', 'error', 'info']
+  return validVariants.includes(props.variant) ? props.variant : 'info'
+})
+
+const safeLabel = computed(() => {
+  return props.label || 'Unknown'
+})
 </script>
 
 <style scoped>
