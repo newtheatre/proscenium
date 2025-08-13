@@ -40,7 +40,7 @@
           v-if="showResendSuccess"
           type="success"
         >
-          Verification email sent! Please check your email for a new verification link.
+          Verification email sent! Please check your inbox for a new verification link.
         </AppAlert>
 
         <Form
@@ -160,8 +160,9 @@ const form = useForm({
       console.error('Login failed:', error)
 
       // Check if this is an email verification error
-      if (error && typeof error === 'object' && 'data' in error && error.data && typeof error.data === 'object') {
-        if ('code' in error.data && error.data.code === 'EMAIL_NOT_VERIFIED') {
+      if (error && typeof error === 'object') {
+        // Check statusMessage first (from API error response)
+        if ('statusMessage' in error && typeof error.statusMessage === 'string' && error.statusMessage.includes('Email not verified')) {
           showEmailVerificationError.value = true
           userEmail.value = values.email // Use the email from the form
           return // Don't show generic error for this case
@@ -289,10 +290,6 @@ const password = form.register('password', '')
 
 .login__content {
   width: 100%;
-}
-
-.email-verification-error {
-  text-align: center;
 }
 
 .email-verification-error__actions {
