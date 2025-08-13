@@ -1,0 +1,29 @@
+model Venue {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  address  String?
+  capacity Int? // Default seating capacity, can be overridden at Performance level
+  imageUrl String?
+  notes    String?
+
+  // metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
+
+  // performances  Performance[]
+  venueFeatures VenueFeature[]
+}
+
+model VenueFeature {
+  id          String  @id @default(cuid())
+  name        String  @unique // e.g., "Wheelchair Accessible", "Hearing Loop", "Parking Available"
+  description String? // Additional details about the feature
+  icon        String? // e.g., an emoji or an icon class name
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
+
+  venues Venue[]
+}
