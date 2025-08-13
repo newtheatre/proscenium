@@ -37,7 +37,7 @@ import { generateVerificationToken } from '~~/server/utils/auth'
  * @param {object} [socialLinks] - Social media links (same structure as setup)
  * @param {string} [studentId] - Student ID (max 20 characters)
  * @param {string} [email] - New email address (will trigger email re-verification)
- * @param {string} [newPassword] - New password (min 8 characters with complexity requirements)
+ * @param {string} [newPassword] - New password (min 8 characters with complexity requirements) // TODO: require previous password too
  *
  * Response:
  * {
@@ -107,6 +107,11 @@ export default defineEventHandler(async (event) => {
       }
     }
 
+    // Check setup hasn't been completed yet
+    if (isSetup && user.setupCompleted) {
+      throw dbErrors.validation('Setup already completed')
+    }
+
     // Prepare update data
     const updates: Parameters<typeof updateUserWithRelations>[1] = {}
 
@@ -133,6 +138,12 @@ export default defineEventHandler(async (event) => {
     if (isSetup) {
       userUpdates.setupCompleted = true
       userUpdates.setupCompletedAt = new Date()
+
+      await setUserSession(event, {
+        user: {
+          setupCompleted: true,
+        },
+      })
     }
 
     if (Object.keys(userUpdates).length > 0) {

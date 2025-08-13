@@ -15,7 +15,7 @@
           :value="user.studentId"
         />
         <UIDetailItem label="Roles">
-          <RoleBadges :roles="user.roles" />
+          <ProfileRoleBadges :roles="user.roles" />
         </UIDetailItem>
         <UIDetailItem
           v-if="user.profile?.bio"
@@ -35,7 +35,7 @@
         />
       </UIDetailGrid>
 
-      <UISocialLinks
+      <ProfileSocialLinks
         v-if="user.profile?.socialLinks"
         :social-links="user.profile.socialLinks"
       />

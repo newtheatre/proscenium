@@ -1,17 +1,10 @@
 import type { RoleType } from '@prisma/client'
 import type { H3Event } from 'h3'
 
-interface AuthUser {
-  id: string
-  email: string
-  name: string | null
-  roles: RoleType[]
-}
-
 /**
  * Guard to protect API routes that require authentication
  */
-export async function requireAuth(event: H3Event): Promise<AuthUser> {
+export async function requireAuth(event: H3Event) {
   const session = await getUserSession(event)
 
   if (!session?.user) {
@@ -21,17 +14,17 @@ export async function requireAuth(event: H3Event): Promise<AuthUser> {
     })
   }
 
-  return session.user as AuthUser
+  return session.user
 }
 
 /**
  * Guard to protect API routes that require specific roles
  */
-export async function requireRole(event: H3Event, requiredRoles: RoleType | RoleType[]): Promise<AuthUser> {
+export async function requireRole(event: H3Event, requiredRoles: RoleType | RoleType[]) {
   const user = await requireAuth(event)
   const rolesArray = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles]
 
-  const hasRequiredRole = user.roles.some((role: RoleType) => rolesArray.includes(role))
+  const hasRequiredRole = user.roles.some(userRole => rolesArray.includes(userRole as RoleType))
 
   if (!hasRequiredRole) {
     throw createError({
@@ -46,7 +39,7 @@ export async function requireRole(event: H3Event, requiredRoles: RoleType | Role
 /**
  * Guard to ensure user can only access their own data or has admin role
  */
-export async function requireOwnershipOrAdmin(event: H3Event, resourceUserId: string): Promise<AuthUser> {
+export async function requireOwnershipOrAdmin(event: H3Event, resourceUserId: string) {
   const user = await requireAuth(event)
 
   const isOwner = user.id === resourceUserId

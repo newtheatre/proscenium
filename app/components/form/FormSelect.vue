@@ -24,7 +24,7 @@
         >
           <option
             v-if="placeholder"
-            value=""
+            :value="placeholderValue || ''"
           >
             {{ placeholder }}
           </option>
@@ -50,6 +50,7 @@ interface Props {
   label?: string
   options: Option[]
   placeholder?: string
+  placeholderValue?: string | number
   disabled?: boolean
   required?: boolean
   error?: string
