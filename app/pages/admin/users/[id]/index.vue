@@ -112,7 +112,7 @@
               :value="user.studentId"
             />
             <UIDetailItem label="Roles">
-              <RoleBadges :roles="user.roles" />
+              <ProfileRoleBadges :roles="user.roles" />
             </UIDetailItem>
           </UIDetailGrid>
         </UIDetailSection>
