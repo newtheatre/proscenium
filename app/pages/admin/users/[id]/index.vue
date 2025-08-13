@@ -145,7 +145,7 @@
             />
           </UIDetailGrid>
 
-          <UISocialLinks :social-links="user.profile.socialLinks" />
+          <ProfileSocialLinks :social-links="user.profile.socialLinks" />
         </UIDetailSection>
 
         <!-- Account Actions -->

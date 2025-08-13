@@ -235,7 +235,7 @@
               <FormInput
                 id="socialDiscord"
                 v-model="formData.profile.socialLinks.discord"
-                label="Discord Handle"
+                label="Discord Username"
                 :error="validationErrors['profile.socialLinks.discord']"
                 :touched="touchedFields['profile.socialLinks.discord']"
               />

@@ -158,7 +158,15 @@ export default defineEventHandler(async (event) => {
 
     // Profile updates
     if (profile) {
-      updates.profile = profile
+      const { socialLinks, ...profileData } = profile
+
+      if (Object.keys(profileData).length > 0) {
+        updates.profile = profileData
+      }
+
+      if (socialLinks) {
+        updates.socialLinks = socialLinks
+      }
     }
 
     // Update user with all relations
