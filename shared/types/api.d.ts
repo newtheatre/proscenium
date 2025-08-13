@@ -63,6 +63,50 @@ export interface ApiResponse<T = unknown> {
 export type UserResponse = ApiResponse<{ user: UserWithRelations }>
 
 /**
+ * Venue types
+ */
+export interface VenueFeature {
+  id: string
+  name: string
+  description?: string | null
+  icon?: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  venues?: AssociatedVenue[]
+}
+
+export interface AssociatedVenue {
+  id: string
+  name: string
+  address?: string | null
+  capacity?: number | null
+  isActive: boolean
+}
+
+export interface Venue {
+  id: string
+  name: string
+  address?: string | null
+  capacity?: number | null
+  imageUrl?: string | null
+  notes?: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  features?: VenueFeature[]
+}
+
+export interface VenueWithRelations extends Venue {
+  features: VenueFeature[]
+}
+
+export type VenueResponse = ApiResponse<{ venue: VenueWithRelations }>
+export type VenuesResponse = ApiResponse<{ venues: Venue[] }>
+export type VenueFeatureResponse = ApiResponse<{ feature: VenueFeature }>
+export type VenueFeaturesResponse = ApiResponse<{ features: VenueFeature[] }>
+
+/**
  * Form data types
  */
 export interface UserUpdateData {
@@ -78,4 +122,36 @@ export interface UserUpdateData {
     expiry?: string | null
   }
   profile?: Partial<Profile>
+}
+
+export interface VenueCreatePayload {
+  name: string
+  address?: string
+  capacity?: number
+  imageUrl?: string
+  notes?: string
+  featureIds?: string[]
+}
+
+export interface VenueUpdatePayload {
+  name?: string
+  address?: string
+  capacity?: number | null
+  imageUrl?: string
+  notes?: string
+  isActive?: boolean
+  featureIds?: string[]
+}
+
+export interface VenueFeatureCreatePayload {
+  name: string
+  description?: string
+  icon?: string
+}
+
+export interface VenueFeatureUpdatePayload {
+  name?: string
+  description?: string
+  icon?: string
+  isActive?: boolean
 }

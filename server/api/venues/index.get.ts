@@ -70,9 +70,9 @@ export default defineEventHandler(async (event) => {
     // Search filter
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { address: { contains: search, mode: 'insensitive' } },
-        { notes: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search } },
+        { address: { contains: search } },
+        { notes: { contains: search } },
       ]
     }
 
@@ -80,7 +80,7 @@ export default defineEventHandler(async (event) => {
     if (feature) {
       where.venueFeatures = {
         some: {
-          name: { contains: feature, mode: 'insensitive' },
+          name: { contains: feature },
           isActive: true,
         },
       }

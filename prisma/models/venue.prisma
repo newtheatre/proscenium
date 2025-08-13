@@ -12,7 +12,7 @@ model Venue {
   isActive  Boolean  @default(true)
 
   // performances  Performance[]
-  venueFeatures VenueFeature[]
+  features VenueFeature[]
 }
 
 model VenueFeature {

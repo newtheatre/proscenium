@@ -50,7 +50,7 @@ export const venueSelectQuery = {
   createdAt: true,
   updatedAt: true,
   isActive: true,
-  venueFeatures: {
+  features: {
     select: {
       id: true,
       name: true,
@@ -149,7 +149,7 @@ export async function createVenueWithFeatures(venueData: {
       capacity: venueData.capacity,
       imageUrl: venueData.imageUrl,
       notes: venueData.notes,
-      venueFeatures: venueData.featureIds
+      features: venueData.featureIds
         ? {
             connect: venueData.featureIds.map(id => ({ id })),
           }
