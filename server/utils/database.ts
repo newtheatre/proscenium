@@ -247,7 +247,7 @@ export async function updateUserWithRelations(
   if (updates.user && Object.keys(updates.user).length > 0) {
     operations.push(
       prisma.user.update({
-        where: { id: userId, emailVerified: true },
+        where: { id: userId },
         data: updates.user,
       }),
     )
