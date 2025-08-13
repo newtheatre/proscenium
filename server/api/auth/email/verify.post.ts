@@ -1,27 +1,57 @@
-import { z } from 'zod'
-import type { RoleType } from '@prisma/client'
-import prisma from '~~/lib/prisma'
+import { emailVerificationSchema } from '../../../utils/validation'
+import { dbErrors, userSelectQuery } from '../../../utils/database'
+import { successResponse, handleApiError, safeUserData, sessionUserData } from '../../../utils/responses'
+import prisma from '../../../../lib/prisma'
 
-const verifyEmailSchema = z.object({
-  token: z.string().min(1),
-})
-
+/**
+ * POST /api/auth/email/verify
+ *
+ * Verifies a user's email address using a verification token.
+ *
+ * Request Body:
+ * @param {string} token - Email verification token
+ *
+ * Response:
+ * {
+ *   success: boolean,
+ *   data: {
+ *     user: {
+ *       id: string,
+ *       email: string,
+ *       emailVerified: boolean,
+ *       setupCompleted: boolean,
+ *       roles: RoleType[],
+ *       profile: Profile | null,
+ *       membership: Membership | null
+ *     }
+ *   },
+ *   message: string
+ * }
+ *
+ * Process:
+ * 1. Validates token format
+ * 2. Finds user with valid, non-expired verification token
+ * 3. Updates user as verified and clears token using single operation (D1 compatible)
+ * 4. Creates user session
+ * 5. Returns verified user data
+ *
+ * Error Responses:
+ * - 400: Invalid token format or expired/invalid verification token
+ * - 500: Internal server error
+ */
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event)
 
     // Validate input
-    const result = verifyEmailSchema.safeParse(body)
+    const result = emailVerificationSchema.safeParse(body)
     if (!result.success) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid token',
-      })
+      throw dbErrors.validation('Invalid token format')
     }
 
     const { token } = result.data
 
-    // Find user with this verification token
+    // Find user with valid verification token
     const user = await prisma.user.findFirst({
       where: {
         emailVerificationToken: token,
@@ -30,104 +60,53 @@ export default defineEventHandler(async (event) => {
         },
         emailVerified: false, // Not already verified
       },
+      select: {
+        id: true,
+        email: true,
+      },
     })
 
     if (!user) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid or expired verification token',
-      })
+      throw dbErrors.validation('Invalid or expired verification token')
     }
 
     // Update user as verified and clear verification token
-    const updatedUser = await prisma.user.update({
+    await prisma.user.update({
       where: { id: user.id },
       data: {
         emailVerified: true,
         emailVerificationToken: null,
         emailVerificationExpires: null,
       },
-      select: {
-        id: true,
-        email: true,
-        emailVerified: true,
-        setupCompleted: true,
-        roles: {
-          select: {
-            role: true,
-          },
-        },
-        profile: {
-          select: {
-            name: true,
-            avatar: true,
-          },
-        },
-        membership: {
-          select: {
-            type: true,
-            expiry: true,
-          },
-        },
-      },
     })
 
-    // Automatically log the user in
-    await setUserSession(event, {
-      user: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        emailVerified: updatedUser.emailVerified,
-        setupCompleted: updatedUser.setupCompleted,
-        roles: updatedUser.roles.map((r: { role: RoleType }) => r.role),
-        profile: updatedUser.profile
-          ? {
-              name: updatedUser.profile.name,
-              avatar: updatedUser.profile.avatar,
-            }
-          : null,
-        membership: updatedUser.membership
-          ? {
-              type: updatedUser.membership.type,
-              expiry: updatedUser.membership.expiry,
-            }
-          : null,
-      },
+    // Get updated user with all relations for session
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: userSelectQuery,
     })
 
-    return {
-      message: 'Email verified successfully! You are now logged in.',
-      success: true,
-      user: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        emailVerified: updatedUser.emailVerified,
-        setupCompleted: updatedUser.setupCompleted,
-        roles: updatedUser.roles.map((r: { role: RoleType }) => r.role),
-        profile: updatedUser.profile
-          ? {
-              name: updatedUser.profile.name,
-              avatar: updatedUser.profile.avatar,
-            }
-          : null,
-        membership: updatedUser.membership
-          ? {
-              type: updatedUser.membership.type,
-              expiry: updatedUser.membership.expiry,
-            }
-          : null,
-      },
+    if (!updatedUser) {
+      throw dbErrors.notFound('User')
     }
+
+    // Prepare user data for session (minimal data for cookie size)
+    const sessionUser = sessionUserData(updatedUser)
+
+    // Set user session
+    await setUserSession(event, {
+      user: sessionUser,
+      loggedInAt: new Date(),
+    })
+
+    return successResponse(
+      {
+        user: safeUserData(updatedUser),
+      },
+      'Email verified successfully',
+    )
   }
   catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      throw error
-    }
-
-    console.error('Email verification error:', error)
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Internal server error',
-    })
+    return handleApiError(error, 'Email verification')
   }
 })

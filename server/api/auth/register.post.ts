@@ -1,13 +1,37 @@
-import { z } from 'zod'
-import prisma from '~~/lib/prisma'
+import { registerSchema } from '~~/server/utils/validation'
+import { dbErrors, emailExistsForOtherUser } from '~~/server/utils/database'
+import { successResponse, handleApiError } from '~~/server/utils/responses'
 import { isValidEmail, isValidPassword, generateVerificationToken, sendVerificationEmail } from '~~/server/utils/auth'
+import prisma from '~~/lib/prisma'
 
-const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  name: z.string().min(1),
-})
-
+/**
+ * POST /api/auth/register
+ *
+ * Register a new user account with email verification.
+ *
+ * Request Body:
+ * @param {string} email - User's email address (must be valid email format)
+ * @param {string} password - User's password (min 8 characters, must contain uppercase, lowercase, and number)
+ * @param {string} name - User's full name (min 1 character, max 100 characters)
+ *
+ * Response:
+ * {
+ *   success: boolean,
+ *   message: string
+ * }
+ *
+ * Process:
+ * 1. Validates input data
+ * 2. Checks if email already exists (returns success message regardless for security)
+ * 3. Hashes password
+ * 4. Creates user with unverified email status
+ * 5. Creates associated profile and membership records using batch transaction
+ * 6. Sends verification email
+ *
+ * Error Responses:
+ * - 400: Invalid input data (validation errors)
+ * - 500: Internal server error
+ */
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event)
@@ -15,47 +39,26 @@ export default defineEventHandler(async (event) => {
     // Validate input
     const result = registerSchema.safeParse(body)
     if (!result.success) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid input data',
-        data: result.error.issues,
-      })
+      throw dbErrors.validation('Invalid input data', result.error.issues)
     }
 
     const { email, password, name } = result.data
 
     // Additional email validation
     if (!isValidEmail(email)) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid email format',
-      })
+      throw dbErrors.validation('Invalid email format')
     }
 
     // Password strength validation
     const passwordValidation = isValidPassword(password)
     if (!passwordValidation.valid) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: passwordValidation.message,
-      })
+      throw dbErrors.validation(passwordValidation.message!)
     }
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    })
-
-    if (existingUser) {
-      // throw createError({
-      //   statusCode: 409,
-      //   statusMessage: 'User with this email already exists',
-      // })
-
-      // Don't reveal if user exists or not for security
-      return {
-        message: 'If no account with this email exists, a verification email will be sent.',
-      }
+    // Check if user already exists (don't reveal if user exists for security)
+    const userExists = await emailExistsForOtherUser(email)
+    if (userExists) {
+      return successResponse(undefined, 'If no account with this email exists, a verification email will be sent.')
     }
 
     // Hash password
@@ -65,57 +68,54 @@ export default defineEventHandler(async (event) => {
     const verificationToken = generateVerificationToken()
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
 
-    // Create user (not verified yet, setup not completed)
-    await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        emailVerificationToken: verificationToken,
-        emailVerificationExpires: verificationExpires,
-        profile: {
-          create: {
-            name: name || '',
-            avatar: '',
-          },
+    // Create user and related records using batch transaction
+    const operations = [
+      prisma.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          emailVerificationToken: verificationToken,
+          emailVerificationExpires: verificationExpires,
         },
-        membership: {
-          create: {
-            type: 'UNKNOWN',
-            expiry: null,
-          },
+        select: { id: true },
+      }),
+    ]
+
+    const results = await prisma.$transaction(operations)
+    const user = results[0] as { id: string }
+
+    // Create profile and membership in second batch
+    const relatedOps = [
+      prisma.profile.create({
+        data: {
+          userId: user.id,
+          name,
+          avatar: '',
         },
+      }),
+      prisma.membership.create({
+        data: {
+          userId: user.id,
+          type: 'UNKNOWN',
+          expiry: null,
+        },
+      }),
+    ]
 
-      },
-      select: {
-        id: true,
-        email: true,
-        emailVerified: true,
-        setupCompleted: true,
-      },
-    })
+    await prisma.$transaction(relatedOps)
 
-    // Send verification email
+    // Send verification email (don't fail registration if email sending fails)
     try {
       await sendVerificationEmail(email, verificationToken)
     }
     catch (error) {
       console.error('Failed to send verification email:', error)
-      // Don't fail registration if email sending fails
+      // Continue with success response
     }
 
-    return {
-      message: 'If no account with this email exists, a verification email will be sent.',
-    }
+    return successResponse(undefined, 'If no account with this email exists, a verification email will be sent.')
   }
   catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      throw error
-    }
-
-    console.error('Registration error:', error)
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Internal server error',
-    })
+    return handleApiError(error, 'User registration')
   }
 })

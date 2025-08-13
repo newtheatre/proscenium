@@ -1,6 +1,8 @@
-import { z } from 'zod'
-import prisma from '~~/lib/prisma'
-import { isValidPassword, generateVerificationToken, sendPasswordResetEmail } from '~~/server/utils/auth'
+import { passwordResetInitiateSchema, passwordResetCompleteSchema } from '../../../utils/validation'
+import { dbErrors } from '../../../utils/database'
+import { successResponse, handleApiError } from '../../../utils/responses'
+import { isValidPassword, generateVerificationToken, sendPasswordResetEmail } from '../../../utils/auth'
+import prisma from '../../../../lib/prisma'
 
 /**
  * POST /api/auth/password/reset
@@ -12,7 +14,7 @@ import { isValidPassword, generateVerificationToken, sendPasswordResetEmail } fr
  *
  * Request Body (for completing reset):
  * @param {string} token - Password reset token
- * @param {string} newPassword - New password (min 8 characters)
+ * @param {string} newPassword - New password (min 8 characters with complexity requirements)
  *
  * Response:
  * {
@@ -20,21 +22,25 @@ import { isValidPassword, generateVerificationToken, sendPasswordResetEmail } fr
  *   message: string
  * }
  *
+ * Process:
+ * For initiation:
+ * 1. Validates email format
+ * 2. Finds user by email (returns success regardless for security)
+ * 3. Generates reset token and expiry
+ * 4. Updates user with reset token using single operation
+ * 5. Sends reset email
+ *
+ * For completion:
+ * 1. Validates token and new password
+ * 2. Finds user by valid reset token
+ * 3. Validates password strength
+ * 4. Updates password and clears reset token using batch transaction
+ *
  * Error Responses:
  * - 400: Invalid input data or expired/invalid token
  * - 404: User not found (only when completing reset with token)
  * - 500: Internal server error
  */
-
-const initiateResetSchema = z.object({
-  email: z.string().email('Invalid email format'),
-})
-
-const completeResetSchema = z.object({
-  token: z.string().min(1, 'Reset token is required'),
-  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
-})
-
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event)
@@ -42,130 +48,99 @@ export default defineEventHandler(async (event) => {
     // Check if this is a token-based reset completion or email-based reset initiation
     if ('token' in body && 'newPassword' in body) {
       // Complete password reset with token
-      const result = completeResetSchema.safeParse(body)
+      const result = passwordResetCompleteSchema.safeParse(body)
       if (!result.success) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: 'Invalid input data',
-          data: result.error.issues,
-        })
+        throw dbErrors.validation('Invalid input data', result.error.issues)
       }
 
       const { token, newPassword } = result.data
-
-      // Validate new password strength
-      const passwordValidation = isValidPassword(newPassword)
-      if (!passwordValidation.valid) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: passwordValidation.message,
-        })
-      }
 
       // Find user with valid reset token
       const user = await prisma.user.findFirst({
         where: {
           passwordResetToken: token,
           passwordResetExpires: {
-            gt: new Date(), // Token not expired
+            gt: new Date(),
           },
+        },
+        select: {
+          id: true,
+          email: true,
         },
       })
 
       if (!user) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: 'Invalid or expired reset token',
-        })
+        throw dbErrors.validation('Invalid or expired reset token')
       }
 
-      // Hash new password
+      // Validate password strength
+      const passwordValidation = isValidPassword(newPassword)
+      if (!passwordValidation.valid) {
+        throw dbErrors.validation(passwordValidation.message!)
+      }
+
+      // Hash the new password
       const hashedNewPassword = await hashPassword(newPassword)
 
-      // Update password and clear reset token
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          password: hashedNewPassword,
-          passwordResetToken: null,
-          passwordResetExpires: null,
-        },
-      })
+      // Update password and clear reset token using batch transaction
+      const operations = [
+        prisma.user.update({
+          where: { id: user.id },
+          data: {
+            password: hashedNewPassword,
+            passwordResetToken: null,
+            passwordResetExpires: null,
+          },
+        }),
+      ]
 
-      return {
-        success: true,
-        message: 'Password reset successfully',
-      }
+      await prisma.$transaction(operations)
+
+      return successResponse(undefined, 'Password reset successfully')
     }
-    else if ('email' in body) {
-      // Initiate password reset
-      const result = initiateResetSchema.safeParse(body)
+    else {
+      // Initiate password reset with email
+      const result = passwordResetInitiateSchema.safeParse(body)
       if (!result.success) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: 'Invalid input data',
-          data: result.error.issues,
-        })
+        throw dbErrors.validation('Invalid input data', result.error.issues)
       }
 
       const { email } = result.data
 
-      // Find user by email
+      // Check if user exists (don't reveal if user exists for security)
       const user = await prisma.user.findUnique({
         where: { email },
+        select: { id: true, email: true },
       })
 
-      // Always return success message for security (don't reveal if email exists)
-      if (!user) {
-        return {
-          success: true,
-          message: 'If an account with this email exists, a password reset link has been sent.',
+      if (user) {
+        // Generate reset token
+        const resetToken = generateVerificationToken()
+        const resetExpires = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+
+        // Update user with reset token
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            passwordResetToken: resetToken,
+            passwordResetExpires: resetExpires,
+          },
+        })
+
+        // Send reset email (don't fail if email sending fails)
+        try {
+          await sendPasswordResetEmail(email, resetToken)
+        }
+        catch (error) {
+          console.error('Failed to send password reset email:', error)
+          // Continue with success response
         }
       }
 
-      // Generate reset token
-      const resetToken = generateVerificationToken()
-      const resetExpires = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
-
-      // Save reset token to database
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          passwordResetToken: resetToken,
-          passwordResetExpires: resetExpires,
-        },
-      })
-
-      // Send reset email
-      try {
-        await sendPasswordResetEmail(email, resetToken)
-      }
-      catch (emailError) {
-        console.error('Failed to send password reset email:', emailError)
-        // Don't throw error to user, but log it
-      }
-
-      return {
-        success: true,
-        message: 'If an account with this email exists, a password reset link has been sent.',
-      }
-    }
-    else {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid request. Either provide email to initiate reset, or token and newPassword to complete reset.',
-      })
+      return successResponse(undefined, 'If an account with this email exists, a password reset link will be sent.')
     }
   }
   catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      throw error
-    }
-
-    console.error('Password reset error:', error)
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Internal server error',
-    })
+    return handleApiError(error, 'Password reset')
   }
 })

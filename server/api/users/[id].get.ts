@@ -1,103 +1,72 @@
-import prisma from '../../../lib/prisma'
+import { successResponse, handleApiError, safeUserData, cleanUserData, restrictedUserData } from '../../utils/responses'
+import { dbErrors } from '../../utils/database'
 import { requireAuth } from '../../utils/guards'
-import type { RoleType } from '@prisma/client'
 
+/**
+ * GET /api/users/[id]
+ *
+ * Retrieves a specific user's information based on permissions.
+ *
+ * Path Parameters:
+ * @param {string} id - User ID to retrieve
+ *
+ * Response:
+ * {
+ *   success: boolean,
+ *   data: {
+ *     user: User // Full user data for admin/owner, limited for others
+ *   }
+ * }
+ *
+ * Access Control:
+ * - Admin: Full user information including sensitive data
+ * - Owner: Full personal information (excluding admin-only fields)
+ * - Others: Public profile information only
+ *
+ * Error Responses:
+ * - 400: Missing user ID
+ * - 401: Authentication required
+ * - 404: User not found
+ * - 500: Internal server error
+ */
 export default defineEventHandler(async (event) => {
-  const currentUser = await requireAuth(event)
-  const userId = getRouterParam(event, 'id')
+  try {
+    const currentUser = await requireAuth(event)
+    const userId = getRouterParam(event, 'id')
+    if (!userId) {
+      // Should never happen due to route, but handle gracefully
+      throw dbErrors.validation('User ID is required')
+    }
 
-  if (!userId) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'User ID is required',
-    })
-  }
+    // Get user with all relations
+    const targetUser = await getUserWithRelations(userId)
 
-  // Check if user exists
-  const targetUser = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      roles: true,
-      membership: true,
-      profile: {
-        include: {
-          socialLinks: true,
-        },
-      },
-    },
-  })
+    // Check permissions
+    const isAdmin = currentUser.roles.includes('ADMIN')
+    const isOwner = currentUser.id === userId
 
-  if (!targetUser) {
-    throw createError({
-      statusCode: 404,
-      statusMessage: 'User not found',
-    })
-  }
+    console.log(`User retrieval: ${currentUser.id} accessing ${userId} - Admin: ${isAdmin}, Owner: ${isOwner}`)
 
-  // Check if current user is admin or requesting their own data
-  const isAdmin = currentUser.roles.includes('ADMIN')
-  const isOwner = currentUser.id === userId
-
-  if (isAdmin) {
-    // Admin gets full user information
-    return {
-      user: {
-        id: targetUser.id,
-        email: targetUser.email,
-        studentId: targetUser.studentId,
-        emailVerified: targetUser.emailVerified,
-        setupCompleted: targetUser.setupCompleted,
-        setupCompletedAt: targetUser.setupCompletedAt,
-        roles: targetUser.roles.map((r: { role: RoleType }) => r.role),
-        membership: targetUser.membership,
-        profile: targetUser.profile,
-        createdAt: targetUser.createdAt,
-        updatedAt: targetUser.updatedAt,
-        lastLogin: targetUser.lastLogin,
-        isActive: targetUser.isActive,
-      },
+    if (isAdmin) {
+      // Admin gets full user information
+      return successResponse({
+        user: safeUserData(targetUser),
+      })
+    }
+    else if (isOwner) {
+      // User gets their own full information
+      return successResponse({
+        user: cleanUserData(targetUser),
+      })
+    }
+    else {
+      // Regular users get only public information
+      return successResponse({
+        user: restrictedUserData(targetUser),
+      })
     }
   }
-  else if (isOwner) {
-    // User gets their own full information (but not sensitive admin fields)
-    return {
-      user: {
-        id: targetUser.id,
-        email: targetUser.email,
-        studentId: targetUser.studentId,
-        emailVerified: targetUser.emailVerified,
-        setupCompleted: targetUser.setupCompleted,
-        setupCompletedAt: targetUser.setupCompletedAt,
-        roles: targetUser.roles.map((r: { role: RoleType }) => r.role),
-        membership: targetUser.membership,
-        profile: targetUser.profile,
-        createdAt: targetUser.createdAt,
-        updatedAt: targetUser.updatedAt,
-        isActive: targetUser.isActive,
-      },
-    }
-  }
-  else {
-    // Regular users get only public information
-    return {
-      user: {
-        id: targetUser.id,
-        profile: targetUser.profile
-          ? {
-              name: targetUser.profile.name,
-              bio: targetUser.profile.bio,
-              avatar: targetUser.profile.avatar,
-              gradYear: targetUser.profile.gradYear,
-              course: targetUser.profile.course,
-              socialLinks: targetUser.profile.socialLinks,
-            }
-          : null,
-        membership: targetUser.membership
-          ? {
-              type: targetUser.membership.type,
-            }
-          : null,
-      },
-    }
+  catch (error: unknown) {
+    return handleApiError(error, 'User retrieval')
   }
 })

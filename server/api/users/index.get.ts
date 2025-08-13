@@ -1,5 +1,9 @@
 import prisma from '~~/lib/prisma'
+import { userSelectQuery, dbErrors } from '../../utils/database'
+import { paginatedResponse, handleApiError, safeUserData } from '../../utils/responses'
+import { requireRole } from '../../utils/guards'
 import type { MembershipType, RoleType, Prisma } from '@prisma/client'
+import { validateSort } from '~~/server/utils/validation'
 
 /**
  * GET /api/users
@@ -28,8 +32,10 @@ import type { MembershipType, RoleType, Prisma } from '@prisma/client'
  *   pagination: {
  *     page: number,
  *     total: number,
- *     pages: number
- *   }
+ *     pages: number,
+ *     limit: number
+ *   },
+ *   message?: string
  * }
  *
  * Error Responses:
@@ -45,29 +51,11 @@ export default defineEventHandler(async (event) => {
     const query = getQuery(event)
 
     // Validate and parse pagination parameters
-    const page = Math.max(1, parseInt(query.page as string) || 1)
-    const limit = Math.min(100, Math.max(1, parseInt(query.limit as string) || 10))
-
-    if (isNaN(page) || isNaN(limit)) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid pagination parameters. Page and limit must be valid numbers.',
-      })
-    }
-
-    const skip = (page - 1) * limit
+    const { page, limit, skip } = validatePagination(query)
 
     // Validate and parse sorting parameters
     const validSortFields = ['createdAt', 'updatedAt', 'lastLogin', 'email', 'studentId', 'isActive', 'membership.type', 'profile.name']
-    const sortBy = (query.sortBy as string) || 'createdAt'
-    const sortOrder = (query.sortOrder as string) === 'asc' ? 'asc' : 'desc'
-
-    if (!validSortFields.includes(sortBy)) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: `Invalid sortBy field. Must be one of: ${validSortFields.join(', ')}`,
-      })
-    }
+    const { sortBy, sortOrder } = validateSort(query, validSortFields)
 
     // Validate filtering parameters
     const search = query.search as string
@@ -77,19 +65,13 @@ export default defineEventHandler(async (event) => {
     // Validate role if provided
     const validRoles = ['ADMIN', 'MANAGER', 'TRAINER']
     if (role && !validRoles.includes(role)) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: `Invalid role. Must be one of: ${validRoles.join(', ')}`,
-      })
+      throw dbErrors.validation(`Invalid role. Must be one of: ${validRoles.join(', ')}`)
     }
 
     // Validate membership type if provided
     const validMembershipTypes = ['FULL', 'ASSOCIATE', 'FELLOW', 'ALUMNI', 'GUEST', 'UNKNOWN']
     if (membershipType && !validMembershipTypes.includes(membershipType)) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: `Invalid membershipType. Must be one of: ${validMembershipTypes.join(', ')}`,
-      })
+      throw dbErrors.validation(`Invalid membershipType. Must be one of: ${validMembershipTypes.join(', ')}`)
     }
 
     // Parse isActive parameter
@@ -101,10 +83,7 @@ export default defineEventHandler(async (event) => {
       isActive = false
     }
     else if (query.isActive !== undefined) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid isActive parameter. Must be "true" or "false".',
-      })
+      throw dbErrors.validation('Invalid isActive parameter. Must be "true" or "false".')
     }
     // Build where clause for filtering
     const where: Prisma.UserWhereInput = {}
@@ -155,61 +134,25 @@ export default defineEventHandler(async (event) => {
         orderBy,
         skip,
         take: limit,
-        include: {
-          roles: true,
-          membership: true,
-          profile: {
-            include: {
-              socialLinks: true,
-            },
-          },
-        },
-        omit: {
-          password: true,
-        },
+        select: userSelectQuery,
       }),
       prisma.user.count({ where }),
     ])
 
-    // Calculate pagination metadata
-    const totalPages = Math.ceil(totalCount / limit)
+    // Transform users to safe format
+    const safeUsers = users.map(user => safeUserData(user))
 
-    return {
-      success: true,
-      data: users,
-      meta: {
+    return paginatedResponse(
+      safeUsers,
+      {
         page,
-        pages: totalPages,
-        count: totalCount,
+        total: totalCount,
+        limit,
       },
-    }
+      'Users retrieved successfully',
+    )
   }
-  catch (error) {
-    // Handle known errors
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      throw error
-    }
-
-    // Handle Prisma-specific errors
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2025') {
-      throw createError({
-        statusCode: 404,
-        statusMessage: 'Resource not found',
-      })
-    }
-
-    if (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' && error.code.startsWith('P2')) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Database query error. Please check your parameters.',
-      })
-    }
-
-    // Handle unexpected errors
-    console.error('Unexpected error in /api/users:', error)
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'An unexpected error occurred while fetching users',
-    })
+  catch (error: unknown) {
+    return handleApiError(error, 'Users list retrieval')
   }
 })

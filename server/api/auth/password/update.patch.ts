@@ -1,7 +1,9 @@
-import { z } from 'zod'
-import prisma from '~~/lib/prisma'
-import { requireAuth } from '~~/server/utils/guards'
-import { isValidPassword } from '~~/server/utils/auth'
+import { passwordUpdateSchema } from '../../../utils/validation'
+import { dbErrors } from '../../../utils/database'
+import { successResponse, handleApiError } from '../../../utils/responses'
+import { isValidPassword } from '../../../utils/auth'
+import { requireAuth } from '../../../utils/guards'
+import prisma from '../../../../lib/prisma'
 
 /**
  * PATCH /api/auth/password/update
@@ -10,7 +12,7 @@ import { isValidPassword } from '~~/server/utils/auth'
  *
  * Request Body:
  * @param {string} currentPassword - User's current password for verification
- * @param {string} newPassword - New password (min 8 characters)
+ * @param {string} newPassword - New password (min 8 characters with complexity requirements)
  *
  * Response:
  * {
@@ -18,17 +20,20 @@ import { isValidPassword } from '~~/server/utils/auth'
  *   message: string
  * }
  *
+ * Process:
+ * 1. Validates authentication
+ * 2. Validates input data (current and new passwords)
+ * 3. Retrieves user with current password
+ * 4. Verifies current password
+ * 5. Validates new password strength
+ * 6. Updates password using single operation (D1 compatible)
+ *
  * Error Responses:
  * - 401: Unauthorized (if user is not authenticated)
  * - 400: Invalid input data or current password incorrect
+ * - 404: User not found
  * - 500: Internal server error
  */
-
-const updatePasswordSchema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
-})
-
 export default defineEventHandler(async (event) => {
   try {
     // Ensure user is authenticated
@@ -37,13 +42,9 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event)
 
     // Validate input
-    const result = updatePasswordSchema.safeParse(body)
+    const result = passwordUpdateSchema.safeParse(body)
     if (!result.success) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid input data',
-        data: result.error.issues,
-      })
+      throw dbErrors.validation('Invalid input data', result.error.issues)
     }
 
     const { currentPassword, newPassword } = result.data
@@ -51,57 +52,42 @@ export default defineEventHandler(async (event) => {
     // Validate new password strength
     const passwordValidation = isValidPassword(newPassword)
     if (!passwordValidation.valid) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: passwordValidation.message,
-      })
+      throw dbErrors.validation(passwordValidation.message!)
     }
 
-    // Get user's current password hash
+    // Get user with password for verification
     const userWithPassword = await prisma.user.findUnique({
       where: { id: user.id },
-      select: { password: true },
+      select: {
+        id: true,
+        password: true,
+      },
     })
 
     if (!userWithPassword) {
-      throw createError({
-        statusCode: 404,
-        statusMessage: 'User not found',
-      })
+      throw dbErrors.notFound('User')
     }
 
     // Verify current password
     const isCurrentPasswordValid = await verifyPassword(userWithPassword.password, currentPassword)
     if (!isCurrentPasswordValid) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Current password is incorrect',
-      })
+      throw dbErrors.validation('Current password is incorrect')
     }
 
-    // Hash new password
+    // Hash the new password
     const hashedNewPassword = await hashPassword(newPassword)
 
-    // Update password in database
+    // Update password using single operation (D1 compatible)
     await prisma.user.update({
       where: { id: user.id },
-      data: { password: hashedNewPassword },
+      data: {
+        password: hashedNewPassword,
+      },
     })
 
-    return {
-      success: true,
-      message: 'Password updated successfully',
-    }
+    return successResponse(undefined, 'Password updated successfully')
   }
   catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      throw error
-    }
-
-    console.error('Password update error:', error)
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Internal server error',
-    })
+    return handleApiError(error, 'Password update')
   }
 })

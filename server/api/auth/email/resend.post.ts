@@ -1,83 +1,84 @@
-import { z } from 'zod'
-import prisma from '~~/lib/prisma'
-import { generateVerificationToken, sendVerificationEmail } from '~~/server/utils/auth'
+import { emailSchema } from '../../../utils/validation'
+import { dbErrors } from '../../../utils/database'
+import { successResponse, handleApiError } from '../../../utils/responses'
+import { generateVerificationToken, sendVerificationEmail } from '../../../utils/auth'
+import prisma from '../../../../lib/prisma'
 
-const resendSchema = z.object({
-  email: z.string().email(),
-})
-
+/**
+ * POST /api/auth/email/resend
+ *
+ * Resends email verification for unverified users.
+ *
+ * Request Body:
+ * @param {string} email - User's email address
+ *
+ * Response:
+ * {
+ *   success: boolean,
+ *   message: string
+ * }
+ *
+ * Process:
+ * 1. Validates email format
+ * 2. Finds user by email (returns success regardless for security)
+ * 3. Checks if email is already verified
+ * 4. Generates new verification token
+ * 5. Updates user with new token using single operation (D1 compatible)
+ * 6. Sends verification email
+ *
+ * Error Responses:
+ * - 400: Invalid email format
+ * - 500: Internal server error
+ */
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event)
 
     // Validate input
-    const result = resendSchema.safeParse(body)
+    const result = emailSchema.safeParse(body.email)
     if (!result.success) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid email',
-      })
+      throw dbErrors.validation('Invalid email format')
     }
 
-    const { email } = result.data
+    const email = result.data
 
-    // Find user
+    // Find user (don't reveal if user exists for security)
     const user = await prisma.user.findUnique({
       where: { email },
-    })
-
-    if (!user) {
-      // Don't reveal if user exists or not for security
-      return {
-        message: 'If an account with this email exists, a verification email will be sent.',
-      }
-    }
-
-    if (user.emailVerified) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Email is already verified',
-      })
-    }
-
-    // Generate new token
-    const verificationToken = generateVerificationToken()
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-
-    // Update user with new token
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        emailVerificationToken: verificationToken,
-        emailVerificationExpires: verificationExpires,
+      select: {
+        id: true,
+        email: true,
+        emailVerified: true,
       },
     })
 
-    // Send verification email
-    try {
-      await sendVerificationEmail(email, verificationToken)
-    }
-    catch (error) {
-      console.error('Failed to send verification email:', error)
-      throw createError({
-        statusCode: 500,
-        statusMessage: 'Failed to send verification email',
+    if (user && !user.emailVerified) {
+      // Generate new verification token
+      const verificationToken = generateVerificationToken()
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+
+      // Update user with new verification token (D1 compatible single operation)
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerificationToken: verificationToken,
+          emailVerificationExpires: verificationExpires,
+        },
       })
+
+      // Send verification email (don't fail if email sending fails)
+      try {
+        await sendVerificationEmail(email, verificationToken)
+      }
+      catch (error) {
+        console.error('Failed to send verification email:', error)
+        // Continue with success response
+      }
     }
 
-    return {
-      message: 'Verification email sent successfully.',
-    }
+    return successResponse(undefined, 'If an unverified account with this email exists, a verification email will be sent.')
   }
   catch (error: unknown) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      throw error
-    }
-
-    console.error('Resend verification error:', error)
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Internal server error',
-    })
+    return handleApiError(error, 'Email verification resend')
   }
 })
