@@ -45,8 +45,6 @@ export default defineEventHandler(async (event) => {
     const isAdmin = currentUser.roles.includes('ADMIN')
     const isOwner = currentUser.id === userId
 
-    console.log(`User retrieval: ${currentUser.id} accessing ${userId} - Admin: ${isAdmin}, Owner: ${isOwner}`)
-
     if (isAdmin) {
       // Admin gets full user information
       return successResponse({
