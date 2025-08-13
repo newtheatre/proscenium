@@ -5,12 +5,12 @@
       :user="user.data.value.data.user"
     />
 
-    <UIAlert
+    <AppAlert
       v-else-if="user.error.value"
       type="error"
     >
       {{ user.error.value.statusMessage || 'Failed to load profile' }}
-    </UIAlert>
+    </AppAlert>
 
     <div
       v-else-if="user.pending.value"
@@ -19,13 +19,13 @@
       <LoadingSpinner />
     </div>
 
-    <UIAlert
+    <AppAlert
       v-else
       type="error"
     >
       <!-- In theory this should never be displayed -->
       You are not logged in
-    </UIAlert>
+    </AppAlert>
   </div>
 </template>
 
