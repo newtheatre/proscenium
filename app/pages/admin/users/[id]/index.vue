@@ -51,21 +51,24 @@
           <div class="status-card__content">
             <div class="status-item">
               <span class="status-item__label">Active:</span>
-              <span :class="['status-badge', user.isActive ? 'status-badge--success' : 'status-badge--error']">
-                {{ user.isActive ? 'Yes' : 'No' }}
-              </span>
+              <UIStatusBadge
+                :variant="userStatus?.active.variant"
+                :label="userStatus?.active.label"
+              />
             </div>
             <div class="status-item">
               <span class="status-item__label">Email Verified:</span>
-              <span :class="['status-badge', user.emailVerified ? 'status-badge--success' : 'status-badge--warning']">
-                {{ user.emailVerified ? 'Yes' : 'No' }}
-              </span>
+              <UIStatusBadge
+                :variant="userStatus?.emailVerified.variant"
+                :label="userStatus?.emailVerified.label"
+              />
             </div>
             <div class="status-item">
               <span class="status-item__label">Setup Complete:</span>
-              <span :class="['status-badge', user.setupCompleted ? 'status-badge--success' : 'status-badge--warning']">
-                {{ user.setupCompleted ? 'Yes' : 'No' }}
-              </span>
+              <UIStatusBadge
+                :variant="userStatus?.setupCompleted.variant"
+                :label="userStatus?.setupCompleted.label"
+              />
             </div>
           </div>
         </div>
@@ -77,9 +80,10 @@
           <div class="status-card__content">
             <div class="status-item">
               <span class="status-item__label">Type:</span>
-              <span class="status-badge status-badge--info">
-                {{ formatMembershipType(user.membership?.type) }}
-              </span>
+              <UIStatusBadge
+                variant="info"
+                :label="formatMembershipType(user.membership?.type)"
+              />
             </div>
             <div
               v-if="user.membership?.expiry"
@@ -97,246 +101,96 @@
       <!-- User Information -->
       <div class="user-detail__sections">
         <!-- Basic Information -->
-        <section class="detail-section">
-          <h2 class="detail-section__title">
-            Basic Information
-          </h2>
-          <div class="detail-section__content">
-            <div class="detail-grid">
-              <div class="detail-item">
-                <label class="detail-label">Email</label>
-                <div class="detail-value">
-                  {{ user.email }}
-                </div>
-              </div>
-              <div class="detail-item">
-                <label class="detail-label">Student ID</label>
-                <div class="detail-value">
-                  {{ user.studentId || 'Not set' }}
-                </div>
-              </div>
-              <div class="detail-item">
-                <label class="detail-label">Roles</label>
-                <div class="detail-value">
-                  <span
-                    v-if="user.roles.length === 0"
-                    class="text-muted"
-                  >User</span>
-                  <div
-                    v-else
-                    class="role-badges"
-                  >
-                    <span
-                      v-for="role in user.roles"
-                      :key="role"
-                      class="role-badge"
-                    >
-                      {{ role }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        <UIDetailSection title="Basic Information">
+          <UIDetailGrid>
+            <UIDetailItem
+              label="Email"
+              :value="user.email"
+            />
+            <UIDetailItem
+              label="Student ID"
+              :value="user.studentId"
+            />
+            <UIDetailItem label="Roles">
+              <RoleBadges :roles="user.roles" />
+            </UIDetailItem>
+          </UIDetailGrid>
+        </UIDetailSection>
 
         <!-- Profile Information -->
-        <section
+        <UIDetailSection
           v-if="user.profile"
-          class="detail-section"
+          title="Profile Information"
         >
-          <h2 class="detail-section__title">
-            Profile Information
-          </h2>
-          <div class="detail-section__content">
-            <div class="detail-grid">
-              <div class="detail-item">
-                <label class="detail-label">Name</label>
-                <div class="detail-value">
-                  {{ user.profile.name }}
-                </div>
-              </div>
-              <div
-                v-if="user.profile.bio"
-                class="detail-item detail-item--full"
-              >
-                <label class="detail-label">Bio</label>
-                <div class="detail-value">
-                  {{ user.profile.bio }}
-                </div>
-              </div>
-              <div
-                v-if="user.profile.gradYear"
-                class="detail-item"
-              >
-                <label class="detail-label">Graduation Year</label>
-                <div class="detail-value">
-                  {{ user.profile.gradYear }}
-                </div>
-              </div>
-              <div
-                v-if="user.profile.course"
-                class="detail-item"
-              >
-                <label class="detail-label">Course</label>
-                <div class="detail-value">
-                  {{ user.profile.course }}
-                </div>
-              </div>
-            </div>
+          <UIDetailGrid>
+            <UIDetailItem
+              label="Name"
+              :value="user.profile.name"
+            />
+            <UIDetailItem
+              v-if="user.profile.bio"
+              label="Bio"
+              :value="user.profile.bio"
+              full-width
+            />
+            <UIDetailItem
+              v-if="user.profile.gradYear"
+              label="Graduation Year"
+              :value="user.profile.gradYear"
+            />
+            <UIDetailItem
+              v-if="user.profile.course"
+              label="Course"
+              :value="user.profile.course"
+            />
+          </UIDetailGrid>
 
-            <!-- Social Links -->
-            <div
-              v-if="user.profile.socialLinks && hasSocialLinks(user.profile.socialLinks)"
-              class="social-links"
-            >
-              <h3 class="social-links__title">
-                Social Links
-              </h3>
-              <div class="social-links__grid">
-                <a
-                  v-if="user.profile.socialLinks.github"
-                  :href="user.profile.socialLinks.github"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="social-link"
-                >
-                  GitHub
-                </a>
-                <a
-                  v-if="user.profile.socialLinks.linkedin"
-                  :href="user.profile.socialLinks.linkedin"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="social-link"
-                >
-                  LinkedIn
-                </a>
-                <a
-                  v-if="user.profile.socialLinks.facebook"
-                  :href="user.profile.socialLinks.facebook"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="social-link"
-                >
-                  Facebook
-                </a>
-                <span
-                  v-if="user.profile.socialLinks.discord"
-                  class="social-link social-link--text"
-                >
-                  Discord: {{ user.profile.socialLinks.discord }}
-                </span>
-                <span
-                  v-if="user.profile.socialLinks.instagram"
-                  class="social-link social-link--text"
-                >
-                  Instagram: {{ user.profile.socialLinks.instagram }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
+          <UISocialLinks :social-links="user.profile.socialLinks" />
+        </UIDetailSection>
 
         <!-- Account Actions -->
-        <section class="detail-section">
-          <h2 class="detail-section__title">
-            Account Actions
-          </h2>
-          <div class="detail-section__content">
-            <div class="action-buttons">
-              <UIButton
-                variant="outlined"
-                :loading="sendingPasswordReset"
-                @click="sendPasswordReset"
-              >
-                Send Password Reset Email
-              </UIButton>
-            </div>
+        <UIDetailSection title="Account Actions">
+          <div class="action-buttons">
+            <UIButton
+              variant="outlined"
+              :loading="sendingPasswordReset"
+              @click="sendPasswordReset"
+            >
+              Send Password Reset Email
+            </UIButton>
           </div>
-        </section>
+        </UIDetailSection>
 
         <!-- Metadata -->
-        <section class="detail-section">
-          <h2 class="detail-section__title">
-            Metadata
-          </h2>
-          <div class="detail-section__content">
-            <div class="detail-grid">
-              <div class="detail-item">
-                <label class="detail-label">Created</label>
-                <div class="detail-value">
-                  {{ formatDateTime(user.createdAt) }}
-                </div>
-              </div>
-              <div class="detail-item">
-                <label class="detail-label">Last Updated</label>
-                <div class="detail-value">
-                  {{ formatDateTime(user.updatedAt) }}
-                </div>
-              </div>
-              <div
-                v-if="user.lastLogin"
-                class="detail-item"
-              >
-                <label class="detail-label">Last Login</label>
-                <div class="detail-value">
-                  {{ formatDateTime(user.lastLogin) }}
-                </div>
-              </div>
-              <div
-                v-if="user.setupCompletedAt"
-                class="detail-item"
-              >
-                <label class="detail-label">Setup Completed</label>
-                <div class="detail-value">
-                  {{ formatDateTime(user.setupCompletedAt) }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        <UIDetailSection title="Metadata">
+          <UIDetailGrid>
+            <UIDetailItem
+              label="Created"
+              :value="formatDateTime(user.createdAt)"
+            />
+            <UIDetailItem
+              label="Last Updated"
+              :value="formatDateTime(user.updatedAt)"
+            />
+            <UIDetailItem
+              v-if="user.lastLogin"
+              label="Last Login"
+              :value="formatDateTime(user.lastLogin)"
+            />
+            <UIDetailItem
+              v-if="user.setupCompletedAt"
+              label="Setup Completed"
+              :value="formatDateTime(user.setupCompletedAt)"
+            />
+          </UIDetailGrid>
+        </UIDetailSection>
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import type { MembershipType } from '@prisma/client'
-
-interface UserResponse {
-  user: {
-    id: string
-    email: string
-    studentId?: string
-    emailVerified: boolean
-    setupCompleted: boolean
-    isActive: boolean
-    roles: string[]
-    membership?: {
-      type: MembershipType
-      expiry?: string
-    }
-    profile?: {
-      name: string
-      bio?: string
-      avatar?: string
-      gradYear?: number
-      course?: string
-      socialLinks?: {
-        github?: string
-        linkedin?: string
-        facebook?: string
-        discord?: string
-        instagram?: string
-      }
-    }
-    createdAt: string
-    updatedAt: string
-    lastLogin?: string
-    setupCompletedAt?: string
-  }
-}
+import type { UserResponse } from '../../../../../shared/types/api'
 
 definePageMeta({
   middleware: ['admin'],
@@ -347,9 +201,10 @@ const route = useRoute()
 const userId = route.params.id as string
 
 // Fetch user data
-const { data: user, pending, error } = await useFetch(`/api/users/${userId}`, {
-  transform: (data: UserResponse) => data.user,
-})
+const { data: response, pending, error } = await useFetch<UserResponse>(`/api/users/${userId}`)
+
+// Extract user from response
+const user = computed(() => response.value?.data?.user)
 
 // Password reset functionality
 const sendingPasswordReset = ref(false)
@@ -377,34 +232,25 @@ const sendPasswordReset = async () => {
   }
 }
 
-// Utility functions
-const formatMembershipType = (type?: MembershipType) => {
-  if (!type || type === 'UNKNOWN') return 'Not Set'
-  return type.charAt(0) + type.slice(1).toLowerCase()
-}
+// Use shared formatters
+const { formatMembershipType, formatDate, formatDateTime, formatUserStatus } = useFormatters()
 
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString()
-}
-
-const formatDateTime = (dateString: string) => {
-  return new Date(dateString).toLocaleString()
-}
-
-const hasSocialLinks = (socialLinks: Record<string, string | null>) => {
-  return Object.values(socialLinks).some(link => link)
-}
+// Computed status for badges
+const userStatus = computed(() => {
+  if (!user.value) return null
+  return formatUserStatus(user.value)
+})
 </script>
 
 <style scoped>
 .user-detail {
-  padding: 24px;
   max-width: 1200px;
   margin: 0 auto;
+  padding: var(--spacing-lg);
 }
 
 .user-detail__header {
-  margin-bottom: 32px;
+  margin-bottom: var(--spacing-xl);
 }
 
 .user-detail__title-section {
@@ -412,11 +258,11 @@ const hasSocialLinks = (socialLinks: Record<string, string | null>) => {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--spacing-md);
 }
 
 .user-detail__title {
-  font-size: 28px;
+  font-size: var(--font-size-xl);
   font-weight: 600;
   color: var(--primary-text-color);
   margin: 0;
@@ -424,7 +270,7 @@ const hasSocialLinks = (socialLinks: Record<string, string | null>) => {
 
 .user-detail__actions {
   display: flex;
-  gap: 12px;
+  gap: var(--spacing-sm);
   flex-wrap: wrap;
 }
 
@@ -439,28 +285,28 @@ const hasSocialLinks = (socialLinks: Record<string, string | null>) => {
 .user-detail__status-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 24px;
-  margin-bottom: 32px;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
 }
 
 .status-card {
-  background: var(--surface-color);
+  background: var(--secondary-bg-color);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 20px;
+  border-radius: var(--border-radius);
+  padding: var(--spacing-md);
 }
 
 .status-card__title {
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--primary-text-color);
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--spacing-md) 0;
 }
 
 .status-card__content {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacing-sm);
 }
 
 .status-item {
@@ -471,168 +317,33 @@ const hasSocialLinks = (socialLinks: Record<string, string | null>) => {
 
 .status-item__label {
   font-weight: 500;
-  color: var(--secondary-text-color);
+  color: var(--text-muted);
 }
 
 .status-item__value {
   color: var(--primary-text-color);
 }
 
-.status-badge {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.status-badge--success {
-  background: #d4edda;
-  color: #155724;
-}
-
-.status-badge--warning {
-  background: #fff3cd;
-  color: #856404;
-}
-
-.status-badge--error {
-  background: #f8d7da;
-  color: #721c24;
-}
-
-.status-badge--info {
-  background: #d1ecf1;
-  color: #0c5460;
-}
-
 .user-detail__sections {
   display: flex;
   flex-direction: column;
-  gap: 32px;
-}
-
-.detail-section {
-  background: var(--surface-color);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 24px;
-}
-
-.detail-section__title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--primary-text-color);
-  margin: 0 0 20px 0;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.detail-section__content {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 16px;
-}
-
-.detail-item--full {
-  grid-column: 1 / -1;
-}
-
-.detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.detail-label {
-  font-weight: 600;
-  color: var(--secondary-text-color);
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.detail-value {
-  color: var(--primary-text-color);
-  font-size: 16px;
+  gap: var(--spacing-xl);
 }
 
 .text-muted {
-  color: var(--muted-text-color);
+  color: var(--text-muted);
   font-style: italic;
-}
-
-.role-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.role-badge {
-  background: var(--primary-color);
-  color: white;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.social-links {
-  margin-top: 20px;
-}
-
-.social-links__title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--primary-text-color);
-  margin: 0 0 12px 0;
-}
-
-.social-links__grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.social-link {
-  color: var(--primary-color);
-  text-decoration: none;
-  padding: 6px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 14px;
-  transition: all 0.2s ease;
-}
-
-.social-link:hover {
-  background: var(--primary-color);
-  color: white;
-  text-decoration: none;
-}
-
-.social-link--text {
-  color: var(--primary-text-color);
-  pointer-events: none;
 }
 
 .action-buttons {
   display: flex;
-  gap: 12px;
+  gap: var(--spacing-sm);
   flex-wrap: wrap;
 }
 
 @media (max-width: 768px) {
   .user-detail {
-    padding: 16px;
+    padding: var(--spacing-md);
   }
 
   .user-detail__title-section {
@@ -641,10 +352,6 @@ const hasSocialLinks = (socialLinks: Record<string, string | null>) => {
   }
 
   .user-detail__status-cards {
-    grid-template-columns: 1fr;
-  }
-
-  .detail-grid {
     grid-template-columns: 1fr;
   }
 }

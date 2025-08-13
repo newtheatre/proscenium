@@ -19,7 +19,7 @@
             <h3>
               Profile Information
             </h3>
-            <p><strong>Name:</strong> {{ user?.name || 'Not provided' }}</p>
+            <p><strong>Name:</strong> {{ user?.profile?.name || 'Not provided' }}</p>
             <p><strong>Email:</strong> {{ user?.email }}</p>
             <p><strong>Roles:</strong> {{ user?.roles.join(', ') || 'None' }}</p>
           </div>
@@ -29,15 +29,15 @@
               Quick Actions
             </h3>
             <div>
-              <button @click="testProtectedApi">
+              <UIButton @click="testProtectedApi">
                 Test Protected API
-              </button>
-              <button
+              </UIButton>
+              <UIButton
                 v-if="hasRole('ADMIN')"
                 @click="testAdminApi"
               >
                 Test Admin API
-              </button>
+              </UIButton>
               <NuxtLink
                 v-if="hasRole('ADMIN')"
                 to="/admin"
@@ -77,15 +77,17 @@
 </template>
 
 <script
-    lang="ts"
-    setup
-  >
+  lang="ts"
+  setup
+>
+import type { UserResponse } from '../../shared/types/api'
+
 const { user, isLoggedIn, hasRole } = useAuth()
 const apiResponse = ref<unknown>(null)
 
 const testProtectedApi = async () => {
   try {
-    const response = await $fetch('/api/users/me')
+    const response = await $fetch<UserResponse>('/api/users/me')
     apiResponse.value = response
   }
   catch {

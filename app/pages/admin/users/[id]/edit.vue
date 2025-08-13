@@ -274,40 +274,7 @@
 
 <script lang="ts" setup>
 import type { MembershipType, RoleType } from '@prisma/client'
-
-interface UserResponse {
-  user: {
-    id: string
-    email: string
-    studentId?: string
-    emailVerified: boolean
-    setupCompleted: boolean
-    isActive: boolean
-    roles: string[]
-    membership?: {
-      type: MembershipType
-      expiry?: string
-    }
-    profile?: {
-      name: string
-      bio?: string
-      avatar?: string
-      gradYear?: number
-      course?: string
-      socialLinks?: {
-        github?: string
-        linkedin?: string
-        facebook?: string
-        discord?: string
-        instagram?: string
-      }
-    }
-    createdAt: string
-    updatedAt: string
-    lastLogin?: string
-    setupCompletedAt?: string
-  }
-}
+import type { UserResponse } from '../../../../../shared/types/api'
 
 definePageMeta({
   middleware: ['admin'],
@@ -329,9 +296,10 @@ const membershipOptions = [
 ]
 
 // Fetch user data
-const { data: user, pending, error: fetchError } = await useFetch(`/api/users/${userId}`, {
-  transform: (data: UserResponse) => data.user,
-})
+const { data: response, pending, error: fetchError } = await useFetch<UserResponse>(`/api/users/${userId}`)
+
+// Extract user from response
+const user = computed(() => response.value?.data?.user)
 
 // Form state
 const formData = ref({

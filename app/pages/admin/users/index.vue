@@ -67,7 +67,8 @@ const columns: Column[] = [
     sortable: false,
     render: (value): string => {
       if (!value || !Array.isArray(value) || value.length === 0) return 'User'
-      return value.map((role: { role: string }) => role.role).join(', ')
+      // Handle the flattened role structure from API response
+      return value.map(role => role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()).join(', ')
     },
   },
   {
