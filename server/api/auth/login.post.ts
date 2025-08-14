@@ -41,7 +41,7 @@ import prisma from '~~/lib/prisma'
  *
  * Error Responses:
  * - 400: Invalid input data
- * - 401: Invalid credentials (wrong email/password)
+ * - 401: Invalid email or password
  * - 403: Email not verified
  * - 500: Internal server error
  */
@@ -67,13 +67,19 @@ export default defineEventHandler(async (event) => {
     })
 
     if (!user) {
-      throw dbErrors.unauthorized()
+      throw createError({
+        statusCode: 401,
+        statusMessage: 'Invalid email or password',
+      })
     }
 
     // Verify password
     const isPasswordValid = await verifyPassword(user.password, password)
     if (!isPasswordValid) {
-      throw dbErrors.unauthorized()
+      throw createError({
+        statusCode: 401,
+        statusMessage: 'Invalid email or password',
+      })
     }
 
     // Check if email is verified
