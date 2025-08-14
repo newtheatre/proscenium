@@ -11,6 +11,7 @@ import prisma from '~~/lib/prisma'
  * @param {string} search - Search term for venue name, address, or notes
  * @param {boolean} isActive - Filter by active status (true/false)
  * @param {boolean} hasCapacity - Filter venues that have capacity defined
+ * @param {number} minCapacity - Filter venues with capacity greater than or equal to this number
  * @param {string} feature - Filter by venue feature name
  * @param {string} sortBy - Field to sort by (default: createdAt)
  * @param {string} sortOrder - Sort direction: asc or desc (default: desc)
@@ -48,7 +49,16 @@ export default defineEventHandler(async (event) => {
     const search = query.search as string || ''
     const isActive = query.isActive === undefined ? undefined : query.isActive === 'true'
     const hasCapacity = query.hasCapacity === undefined ? undefined : query.hasCapacity === 'true'
+    const minCapacity = query.minCapacity ? parseInt(query.minCapacity as string, 10) : undefined
     const feature = query.feature as string || ''
+
+    // Validate minCapacity if provided
+    if (minCapacity !== undefined && (isNaN(minCapacity) || minCapacity < 1)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'minCapacity must be a positive integer',
+      })
+    }
 
     // Validate and set sorting
     const allowedSortFields = ['createdAt', 'updatedAt', 'name', 'capacity', 'address']
@@ -62,9 +72,16 @@ export default defineEventHandler(async (event) => {
       where.isActive = isActive
     }
 
-    // Capacity filter
+    // Capacity filters
     if (hasCapacity !== undefined) {
       where.capacity = hasCapacity ? { not: null } : null
+    }
+
+    if (minCapacity !== undefined) {
+      where.capacity = {
+        ...(where.capacity as object || {}),
+        gte: minCapacity,
+      }
     }
 
     // Search filter

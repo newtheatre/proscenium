@@ -146,13 +146,9 @@ const filters: Filter[] = [
     ],
   },
   {
-    key: 'hasCapacity',
-    label: 'Capacity',
-    type: 'select',
-    options: [
-      { value: 'true', label: 'Capacity Set' },
-      { value: 'false', label: 'No Capacity' },
-    ],
+    key: 'minCapacity',
+    label: 'Minimum Capacity',
+    type: 'number',
   },
 ]
 </script>

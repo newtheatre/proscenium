@@ -205,7 +205,9 @@ const venueId = computed(() => route.params.id as string)
 
 // Fetch venue data and available features
 const { data: venueResponse, pending, error } = await useFetch<VenueResponse>(`/api/venues/${venueId.value}`)
-const { data: featuresResponse, pending: featuresLoading, error: featuresError } = await useFetch('/api/venues/features')
+const { data: featuresResponse, pending: featuresLoading, error: featuresError } = await useFetch('/api/venues/features', {
+  query: { isActive: 'true' },
+})
 
 // Extract data from responses
 const venue = computed(() => venueResponse.value?.data?.venue)

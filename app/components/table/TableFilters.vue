@@ -38,6 +38,17 @@
           :placeholder="`Filter by ${filter.label.toLowerCase()}`"
           @update:model-value="(value) => updateFilterValue(filter.key, value)"
         />
+
+        <!-- Number Filter -->
+        <FormInput
+          v-else-if="filter.type === 'number'"
+          :id="`filter-${filter.key}`"
+          :model-value="String(filterValues[filter.key] ?? '')"
+          :label="filter.label"
+          type="number"
+          :placeholder="`Enter ${filter.label.toLowerCase()}`"
+          @update:model-value="(value) => updateFilterValue(filter.key, value && Number(value) > 0 ? Number(value) : null)"
+        />
       </div>
     </div>
 
@@ -68,7 +79,7 @@ interface FilterOption {
 interface Filter {
   key: string
   label: string
-  type: 'select' | 'boolean' | 'text'
+  type: 'select' | 'boolean' | 'text' | 'number'
   options?: FilterOption[]
 }
 
@@ -112,7 +123,7 @@ const getSelectOptions = (filter: Filter) => {
   }))
 }
 
-const updateFilterValue = (key: string, value: string | number) => {
+const updateFilterValue = (key: string, value: string | number | null) => {
   if (value === '' || value === null || value === undefined) {
     filterValues.value[key] = null
   }

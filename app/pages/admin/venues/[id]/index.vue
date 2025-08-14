@@ -92,7 +92,16 @@
           </div>
           <div class="info-item">
             <span class="info-label">Address:</span>
-            <span class="info-value">{{ venue.address || 'No address provided' }}</span>
+            <div
+              v-if="venue.address"
+              class="info-value info-value--multiline"
+            >
+              {{ venue.address }}
+            </div>
+            <span
+              v-else
+              class="info-value"
+            >No address provided</span>
           </div>
           <div class="info-item">
             <span class="info-label">Capacity:</span>
@@ -464,6 +473,10 @@ const handleDeleteVenue = async () => {
 .notes-content {
   color: var(--primary-text-color);
   line-height: 1.6;
+}
+
+.info-value--multiline {
+  white-space: pre-line;
 }
 
 @media (max-width: 768px) {

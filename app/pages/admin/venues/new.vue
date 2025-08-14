@@ -170,7 +170,9 @@ definePageMeta({
 })
 
 // Fetch available features
-const { data: featuresResponse, pending: featuresLoading, error: featuresError } = await useFetch('/api/venues/features')
+const { data: featuresResponse, pending: featuresLoading, error: featuresError } = await useFetch('/api/venues/features', {
+  query: { isActive: 'true' },
+})
 
 // Extract features from paginated response
 const availableFeatures = computed(() => featuresResponse.value?.data || [])

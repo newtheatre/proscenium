@@ -31,7 +31,7 @@ export interface FilterOption {
 export interface Filter {
   key: string
   label: string
-  type: 'select' | 'boolean' | 'text'
+  type: 'select' | 'boolean' | 'text' | 'number'
   options?: FilterOption[]
 }
 

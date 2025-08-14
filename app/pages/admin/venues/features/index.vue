@@ -71,12 +71,13 @@ const columns: Column[] = [
     },
   },
   {
-    key: 'venues',
+    key: '_count',
     label: 'Used by Venues',
     sortable: false,
     render: (value): string => {
-      if (!value || !Array.isArray(value) || value.length === 0) return 'No venues'
-      return `${value.length} venue${value.length === 1 ? '' : 's'}`
+      if (!value || typeof value !== 'object' || !('venues' in value)) return 'No venues'
+      const count = value.venues as number
+      return count === 0 ? 'No venues' : `${count} venue${count === 1 ? '' : 's'}`
     },
   },
   {
