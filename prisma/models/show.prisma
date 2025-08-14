@@ -1,0 +1,90 @@
+model Show {
+  id             String     @id @default(cuid())
+  title          String
+  slug           String     @unique // URL-friendly identifier
+  description    String
+  status         ShowStatus @default(PLANNING)
+  showType       ShowType // e.g., IN_HOUSE, STUDIO, FESTIVAL
+  posterImageUrl String?
+  programmeUrl   String? // URL to a PDF or webpage with the show programme
+  ageRating      String? // e.g., "12A", "18+", etc.
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true) // Added for soft delete
+
+  // Relations
+  // festivalId String?
+  // festival   Festival? @relation(fields: [festivalId], references: [id], onDelete: SetNull)
+
+  induction        ShowInduction?
+  performances     Performance[]
+  contentWarnings  ShowContentWarning[]
+  showTicketPrices ShowTicketPrice[]
+}
+
+model ContentWarning {
+  id          String  @id @default(cuid())
+  name        String  @unique // e.g., "Strobe Lighting", "Strong Language", "Haze"
+  description String?
+  icon        String? // e.g., an emoji or an icon class name
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
+
+  shows ShowContentWarning[]
+}
+
+model ShowContentWarning {
+  showId           String
+  contentWarningId String
+  notes            String? // Specific notes for this warning on this particular show, e.g., "Brief use in Act 2"
+
+  createdAt DateTime @default(now())
+
+  show           Show           @relation(fields: [showId], references: [id], onDelete: Cascade)
+  contentWarning ContentWarning @relation(fields: [contentWarningId], references: [id], onDelete: Cascade) // If a warning definition is deleted, remove its links
+
+  @@id([showId, contentWarningId])
+}
+
+model ShowInduction {
+  id                      String  @id @default(cuid())
+  technicalRequirements   String?
+  riskAssessmentCompleted Boolean @default(false)
+  riskAssessmentLink      String?
+  companyContactName      String?
+  companyContactEmail     String?
+  companyContactPhone     String?
+  inductionNotes          String?
+  inductionCompleted      Boolean @default(false)
+
+  // Relation to Show (one-to-one)
+  showId String @unique
+  show   Show   @relation(fields: [showId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // isActive for ShowInduction is implicitly handled by Show.isActive
+}
+
+// TODO: Maybe allow users to create custom statuses and show types?
+enum ShowStatus {
+  PLANNING
+  UPCOMING
+  RUNNING
+  PAST
+  CANCELLED
+  DRAFT
+}
+
+enum ShowType {
+  IN_HOUSE
+  STUDIO
+  FESTIVAL
+  EXTERNAL_HIRE
+  WORKSHOP
+  OTHER
+}

@@ -27,6 +27,8 @@ model User {
   updatedAt DateTime  @default(now()) @updatedAt
   lastLogin DateTime?
   isActive  Boolean   @default(true)
+
+  reservations Reservation[]
 }
 
 model UserRole {

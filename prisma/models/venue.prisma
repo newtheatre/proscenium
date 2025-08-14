@@ -11,8 +11,8 @@ model Venue {
   updatedAt DateTime @updatedAt
   isActive  Boolean  @default(true)
 
-  // performances  Performance[]
-  features VenueFeature[]
+  performances Performance[]
+  features     VenueFeature[]
 }
 
 model VenueFeature {

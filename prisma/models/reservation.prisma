@@ -1,0 +1,62 @@
+model Reservation {
+  id                  String            @id @default(cuid())
+  reservationCode     String            @unique @default(cuid()) // Public-facing unique code for the reservation
+  totalPrice          Float // Total price calculated at the time of reservation
+  reservationDateTime DateTime          @default(now())
+  status              ReservationStatus @default(PENDING_COLLECTION)
+  notes               String? // Notes from the customer
+  adminNotes          String? // Internal notes for staff
+  collectionDeadline  DateTime? // Optional: time by which tickets must be collected/paid
+
+  // Customer details (essential for tracking, especially for guest reservations)
+  customerName  String
+  customerEmail String
+  customerPhone String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // isActive is managed by the 'status' field (e.g., CANCELLED_BY_ADMIN, EXPIRED)
+
+  performanceId String
+  performance   Performance @relation(fields: [performanceId], references: [id], onDelete: Restrict) // Prevent deleting performance if it has reservations
+
+  userId String? // Optional: link to a registered User account
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull) // If user deleted, keep reservation but unlink
+
+  reservedTickets ReservedTicket[]
+}
+
+model ReservedTicket {
+  id                          String @id @default(cuid())
+  quantity                    Int
+  pricePerItemAtReservation   Float // Price per single ticket of this type at the time of reservation
+  ticketTypeNameAtReservation String // Denormalised name for historical accuracy on receipts/reports
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade) // Items are part of a reservation
+
+  ticketTypeId String
+  ticketType   TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict) // Don't delete TicketType if it's part of placed orders
+
+  // Optional: Link to the specific price rule that was applied for this item for auditing
+  performanceTicketPriceId String?
+  performanceTicketPrice   PerformanceTicketPrice? @relation(fields: [performanceTicketPriceId], references: [id], onDelete: SetNull)
+
+  showTicketPriceId String?
+  showTicketPrice   ShowTicketPrice? @relation(fields: [showTicketPriceId], references: [id], onDelete: SetNull)
+
+  // You would typically link to either performanceTicketPriceId OR showTicketPriceId, or neither if defaultPrice was used.
+  // Application logic handles which price was chosen.
+}
+
+enum ReservationStatus {
+  PENDING_COLLECTION // Reserved online, awaiting in-person payment & collection
+  COLLECTED // Paid and tickets issued
+  CANCELLED_BY_CUSTOMER
+  CANCELLED_BY_ADMIN // Staff cancelled (e.g., due to no payment, operational reasons)
+  NO_SHOW // Customer did not attend
+  EXPIRED // Reservation held for a limited time and expired before collection
+}

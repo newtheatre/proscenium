@@ -1,0 +1,56 @@
+model Performance {
+  id            String   @id @default(cuid())
+  title         String
+  startDateTime DateTime // Start date and time of the performance/event
+  endDateTime   DateTime // End date and time
+
+  type                    PerformanceType
+  details                 String? // Additional details about the performance (or the event description)
+  status                  PerformanceBookingStatus @default(SCHEDULED)
+  maxCapacity             Int // Specific capacity for this performance (might differ from Venue.capacity due to staging, etc.) // Can be set to -1 for unlimited capacity
+  reservationsOpen        Boolean                  @default(true)
+  reservationInstructions String? // Special instructions for booking this performance
+  externalBookingLink     String? // URL for booking via an external platform e.g. SU Website
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true) // Soft delete for the performance itself
+
+  showId String?
+  show   Show?   @relation(fields: [showId], references: [id], onDelete: Cascade) // Performance must belong to a Show
+
+  venueId String?
+  venue   Venue?  @relation(fields: [venueId], references: [id], onDelete: SetNull)
+
+  // Relations for pricing, booking, and reporting
+  ticketPrices PerformanceTicketPrice[]
+  reservations Reservation[]
+  // showReport   ShowReport?
+  // fohReport    FohReport?
+}
+
+enum PerformanceType {
+  PERFORMANCE
+
+  RELAXED_PERFORMANCE
+  SIGNED_PERFORMANCE
+  AUDIO_DESCRIBED_PERFORMANCE
+  CAPTIONED_PERFORMANCE
+
+  DRESS_REHEARSAL
+  TECHNICAL_RUN
+  PREVIEW
+
+  EVENT // e.g. Oscars, Boat Party, etc.
+  WORKSHOP // e.g. Stagecraft "Masterclass"
+}
+
+enum PerformanceBookingStatus {
+  SCHEDULED // Planned, but not yet open for any bookings
+  ON_SALE // General booking is open (displays on the website)
+  RESTRICTED // Booking is open, but a direct link is required (e.g., for members only)
+  CLOSED // No longer available for booking (e.g., too close to the start time)
+  SOLD_OUT
+  CANCELLED // This status can also indicate a form of "inactive" for bookings
+  PAST // The performance/event has already occurred
+}

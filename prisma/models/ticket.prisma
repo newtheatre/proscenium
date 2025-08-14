@@ -1,0 +1,61 @@
+model TicketType {
+  id           String  @id @default(cuid())
+  name         String  @unique // e.g., "Adult", "Child", "Concession", "Member Early Bird"
+  description  String?
+  defaultPrice Float // Default price in GBP (or your theatre's currency)
+  sortOrder    Int? // For display order in lists
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true) // If this ticket type is generally available
+
+  // Relations
+  showPrices        ShowTicketPrice[]
+  performancePrices PerformanceTicketPrice[]
+  reservedTickets   ReservedTicket[]
+  // fohCollectedSummaries FohCollectedTicketTypeSummary[]
+}
+
+// For setting a specific price for a ticket type at the SHOW level.
+// This acts as a default for all performances of that show, unless overridden by PerformanceTicketPrice.
+model ShowTicketPrice {
+  id    String  @id @default(cuid())
+  price Float // Price for this ticket type for this show
+  notes String? // e.g., "Weekend Show Price"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
+
+  showId String
+  show   Show   @relation(fields: [showId], references: [id], onDelete: Cascade)
+
+  ticketTypeId String
+  ticketType   TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict) // Don't delete TicketType if used in a price rule
+
+  reservedTickets ReservedTicket[]
+
+  @@unique([showId, ticketTypeId])
+}
+
+// For setting a specific price for a ticket type at the PERFORMANCE level.
+// This overrides any ShowTicketPrice and TicketType.defaultPrice.
+model PerformanceTicketPrice {
+  id    String  @id @default(cuid())
+  price Float // Price for this ticket type for this specific performance
+  notes String? // e.g., "Opening Night Special", "Limited View Discount"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true) // Allows disabling this specific price without deleting
+
+  performanceId String
+  performance   Performance @relation(fields: [performanceId], references: [id], onDelete: Cascade)
+
+  ticketTypeId String
+  ticketType   TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+
+  reservedTickets ReservedTicket[]
+
+  @@unique([performanceId, ticketTypeId])
+}
