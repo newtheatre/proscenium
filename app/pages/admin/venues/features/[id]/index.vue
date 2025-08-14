@@ -18,6 +18,14 @@
           >
             Edit Feature
           </UIButton>
+          <UIButton
+            v-if="feature?.isActive"
+            variant="secondary"
+            :class="{ 'button--danger': true }"
+            @click="showDeleteModal = true"
+          >
+            Delete Feature
+          </UIButton>
         </div>
       </div>
     </header>
@@ -155,6 +163,21 @@
         </div>
       </div>
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <UIConfirmModal
+      :show="showDeleteModal"
+      title="Delete Feature"
+      :message="`Are you sure you want to delete the feature '${feature?.name}'?`"
+      details="This action will deactivate the feature and it will no longer be available for assignment to venues. This action can be reversed by editing the feature and setting it to active again."
+      confirm-text="Delete Feature"
+      cancel-text="Cancel"
+      loading-text="Deleting..."
+      :loading="isDeleting"
+      is-danger
+      @confirm="handleDeleteFeature"
+      @cancel="showDeleteModal = false"
+    />
   </div>
 </template>
 
@@ -199,6 +222,33 @@ const formatDate = (dateString: string) => {
     minute: '2-digit',
   })
 }
+
+// Delete functionality
+const showDeleteModal = ref(false)
+const isDeleting = ref(false)
+
+const handleDeleteFeature = async () => {
+  if (!feature.value) return
+
+  isDeleting.value = true
+
+  try {
+    await $fetch(`/api/venues/features/${featureId.value}`, {
+      method: 'DELETE' as const,
+    })
+
+    // Show success message and redirect
+    await navigateTo('/admin/venues/features')
+  }
+  catch (error) {
+    console.error('Failed to delete feature:', error)
+    // TODO: Show error message to user
+    showDeleteModal.value = false
+  }
+  finally {
+    isDeleting.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -229,6 +279,24 @@ const formatDate = (dateString: string) => {
 .feature-detail__actions {
   display: flex;
   gap: 12px;
+}
+
+/* Danger button styling */
+:deep(.button--danger) {
+  background-color: var(--error);
+  border-color: var(--error);
+  color: white;
+}
+
+:deep(.button--danger:hover) {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+:deep(.button--danger:disabled) {
+  background-color: #fca5a5;
+  border-color: #fca5a5;
+  cursor: not-allowed;
 }
 
 .feature-detail__loading,

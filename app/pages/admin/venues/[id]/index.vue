@@ -18,6 +18,14 @@
           >
             Edit Venue
           </UIButton>
+          <UIButton
+            v-if="venue?.isActive"
+            variant="secondary"
+            :class="{ 'button--danger': true }"
+            @click="showDeleteModal = true"
+          >
+            Delete Venue
+          </UIButton>
         </div>
       </div>
     </header>
@@ -170,6 +178,21 @@
         </div>
       </div>
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <UIConfirmModal
+      :show="showDeleteModal"
+      title="Delete Venue"
+      :message="`Are you sure you want to delete the venue '${venue?.name}'?`"
+      details="This action will deactivate the venue and it will no longer be available for use. This action can be reversed by editing the venue and setting it to active again."
+      confirm-text="Delete Venue"
+      cancel-text="Cancel"
+      loading-text="Deleting..."
+      :loading="isDeleting"
+      is-danger
+      @confirm="handleDeleteVenue"
+      @cancel="showDeleteModal = false"
+    />
   </div>
 </template>
 
@@ -214,6 +237,33 @@ const formatDate = (dateString: string) => {
     minute: '2-digit',
   })
 }
+
+// Delete functionality
+const showDeleteModal = ref(false)
+const isDeleting = ref(false)
+
+const handleDeleteVenue = async () => {
+  if (!venue.value) return
+
+  isDeleting.value = true
+
+  try {
+    await $fetch(`/api/venues/${venueId.value}`, {
+      method: 'DELETE' as const,
+    })
+
+    // Show success message and redirect
+    await navigateTo('/admin/venues')
+  }
+  catch (error) {
+    console.error('Failed to delete venue:', error)
+    // TODO: Show error message to user
+    showDeleteModal.value = false
+  }
+  finally {
+    isDeleting.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -244,6 +294,24 @@ const formatDate = (dateString: string) => {
 .venue-detail__actions {
   display: flex;
   gap: 12px;
+}
+
+/* Danger button styling */
+:deep(.button--danger) {
+  background-color: var(--error);
+  border-color: var(--error);
+  color: white;
+}
+
+:deep(.button--danger:hover) {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+:deep(.button--danger:disabled) {
+  background-color: #fca5a5;
+  border-color: #fca5a5;
+  cursor: not-allowed;
 }
 
 .venue-detail__loading,
