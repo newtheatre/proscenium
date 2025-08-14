@@ -35,19 +35,6 @@ export interface Filter {
   options?: FilterOption[]
 }
 
-export interface Pagination {
-  page: number
-  pages: number
-  count: number
-}
-
-export interface ApiResponse<T extends TableRow = TableRow> {
-  success: boolean
-  data: T[]
-  meta: Pagination
-  error?: string
-}
-
 export interface TableQueryParams {
   page?: number
   limit?: number

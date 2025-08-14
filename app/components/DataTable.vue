@@ -45,7 +45,7 @@
         v-if="pagination && pagination.pages > 1"
         :current-page="pagination.page"
         :total-pages="pagination.pages"
-        :total-count="pagination.count"
+        :total-count="pagination.total"
         :per-page="perPage"
         @page-change="handlePageChange"
         @per-page-change="handlePerPageChange"
@@ -56,7 +56,7 @@
 
 <script setup lang="ts" generic="T extends TableRow">
 import { defineComponent, h, ref, computed, watch, onMounted, onUnmounted, readonly } from 'vue'
-import type { TableRow, Column, Filter, Pagination, ApiResponse, TableQueryParams } from './table/types'
+import type { TableRow, Column, Filter, TableQueryParams } from './table/types'
 import FormCheckbox from './form/FormCheckbox.vue'
 
 interface Props {
@@ -113,13 +113,13 @@ const fetchData = async (showLoading = true, loadingDelay = 150) => {
   }
 
   try {
-    const response = await $fetch<ApiResponse<T>>(props.apiEndpoint, {
+    const response = await $fetch<ApiResponse<TableRow[]>>(props.apiEndpoint, {
       query: queryParams.value,
     })
 
     if (response.success) {
       data.value = response.data as T[]
-      pagination.value = response.meta
+      pagination.value = response.pagination || null
     }
     else {
       console.error('API returned success: false')

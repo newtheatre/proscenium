@@ -48,16 +48,18 @@ export interface UserWithRelations extends User {
 /**
  * API Response types
  */
+export interface Pagination {
+  page: number
+  total: number
+  pages: number
+  limit: number
+}
+
 export interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
   message?: string
-  pagination?: {
-    page: number
-    total: number
-    pages: number
-    limit: number
-  }
+  pagination?: Pagination
 }
 
 export type UserResponse = ApiResponse<{ user: UserWithRelations }>

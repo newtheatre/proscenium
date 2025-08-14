@@ -249,7 +249,7 @@ const handleDeleteVenue = async () => {
 
   try {
     await $fetch(`/api/venues/${venueId.value}`, {
-      method: 'DELETE' as const,
+      method: 'DELETE',
     })
 
     // Show success message and redirect

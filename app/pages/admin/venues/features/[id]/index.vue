@@ -234,7 +234,7 @@ const handleDeleteFeature = async () => {
 
   try {
     await $fetch(`/api/venues/features/${featureId.value}`, {
-      method: 'DELETE' as const,
+      method: 'DELETE',
     })
 
     // Show success message and redirect
