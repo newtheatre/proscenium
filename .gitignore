@@ -30,3 +30,5 @@ logs
 # Prisma client (Not currently used)
 /lib/generated/prisma
 
+# VSCode
+.vscode/
