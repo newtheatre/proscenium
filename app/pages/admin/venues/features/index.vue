@@ -1,33 +1,33 @@
 <template>
-  <div class="venues-table-container">
+  <div class="venue-features-container">
     <div class="page-header">
       <h1 class="page-title">
-        Venues Management
+        Venue Features Management
       </h1>
       <div class="page-actions">
         <UIButton
-          variant="primary"
-          @click="navigateTo('/admin/venues/new')"
+          variant="secondary"
+          @click="navigateTo('/admin/venues')"
         >
-          Add New Venue
+          Back to Venues
         </UIButton>
         <UIButton
-          variant="secondary"
-          @click="navigateTo('/admin/venues/features')"
+          variant="primary"
+          @click="navigateTo('/admin/venues/features/new')"
         >
-          Manage Features
+          Add New Feature
         </UIButton>
       </div>
     </div>
 
     <DataTable
       ref="dataTable"
-      api-endpoint="/api/venues"
+      api-endpoint="/api/venues/features"
       :columns="columns"
       :filters="filters"
-      search-placeholder="Search venues by name or address..."
-      empty-message="No venues found"
-      default-sort-by="createdAt"
+      search-placeholder="Search features by name or description..."
+      empty-message="No venue features found"
+      default-sort-by="name"
       default-sort-order="desc"
       :default-per-page="10"
       enable-selection
@@ -47,7 +47,7 @@ definePageMeta({
   layout: 'admin',
 })
 
-// Define columns for the venues table
+// Define columns for the venue features table
 const columns: Column[] = [
   {
     key: 'name',
@@ -55,28 +55,28 @@ const columns: Column[] = [
     sortable: true,
   },
   {
-    key: 'address',
-    label: 'Address',
+    key: 'description',
+    label: 'Description',
     sortable: false,
     render: (value): string => {
-      return String(value || 'No address provided')
+      return String(value || 'No description provided')
     },
   },
   {
-    key: 'capacity',
-    label: 'Capacity',
-    sortable: true,
+    key: 'icon',
+    label: 'Icon',
+    sortable: false,
     render: (value): string => {
-      return value ? `${value} people` : 'Not specified'
+      return String(value || 'No icon')
     },
   },
   {
-    key: 'features',
-    label: 'Features',
+    key: 'venues',
+    label: 'Used by Venues',
     sortable: false,
     render: (value): string => {
-      if (!value || !Array.isArray(value) || value.length === 0) return 'No features'
-      return value.map(feature => feature.name).join(', ')
+      if (!value || !Array.isArray(value) || value.length === 0) return 'No venues'
+      return `${value.length} venue${value.length === 1 ? '' : 's'}`
     },
   },
   {
@@ -109,32 +109,32 @@ const columns: Column[] = [
         },
       },
       setup(props) {
-        const venueActions = [
+        const featureActions = [
           {
             key: 'view',
             label: 'View',
             variant: 'primary' as const,
-            path: '/admin/venues/{id}',
+            path: '/admin/venues/features/{id}',
           },
           {
             key: 'edit',
             label: 'Edit',
             variant: 'secondary' as const,
-            path: '/admin/venues/{id}/edit',
+            path: '/admin/venues/features/{id}/edit',
           },
         ]
 
         return () => h(TableActions, {
           row: props.row,
           value: props.value,
-          actions: venueActions,
+          actions: featureActions,
         })
       },
     }),
   },
 ]
 
-// Define filters for the venues table
+// Define filters for the venue features table
 const filters: Filter[] = [
   {
     key: 'isActive',
@@ -145,20 +145,11 @@ const filters: Filter[] = [
       { value: 'false', label: 'Inactive' },
     ],
   },
-  {
-    key: 'hasCapacity',
-    label: 'Capacity',
-    type: 'select',
-    options: [
-      { value: 'true', label: 'Capacity Set' },
-      { value: 'false', label: 'No Capacity' },
-    ],
-  },
 ]
 </script>
 
 <style scoped>
-.venues-table-container {
+.venue-features-container {
   padding: 24px;
   max-width: 100%;
 }
@@ -184,7 +175,7 @@ const filters: Filter[] = [
 }
 
 @media (max-width: 768px) {
-  .venues-table-container {
+  .venue-features-container {
     padding: 16px;
   }
 
@@ -196,31 +187,6 @@ const filters: Filter[] = [
   .page-actions {
     width: 100%;
     flex-direction: column;
-  }
-}
-
-/* Mobile responsiveness */
-@media (max-width: 768px) {
-  .admin-page__title {
-    font-size: 2rem;
-  }
-
-  .admin-page__subtitle {
-    font-size: 1rem;
-  }
-
-  .admin-page__content {
-    padding: var(--spacing-lg);
-  }
-}
-
-@media (max-width: 480px) {
-  .admin-page__title {
-    font-size: 1.75rem;
-  }
-
-  .admin-page__subtitle {
-    font-size: 0.9rem;
   }
 }
 </style>

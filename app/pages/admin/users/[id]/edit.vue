@@ -274,7 +274,7 @@
 
 <script lang="ts" setup>
 import type { MembershipType, RoleType } from '@prisma/client'
-import type { UserResponse } from '../../../../../shared/types/api'
+import type { UserResponse } from '~~/shared/types/api'
 
 definePageMeta({
   middleware: ['admin'],

@@ -226,7 +226,7 @@ export async function updateVenueWithFeatures(
   // Handle venue features update
   if (updates.featureIds !== undefined) {
     // Replace all existing features with new ones
-    updateData.venueFeatures = {
+    updateData.features = {
       set: updates.featureIds.map(id => ({ id })),
     }
   }

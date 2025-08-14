@@ -190,8 +190,6 @@
 </template>
 
 <script lang="ts" setup>
-import type { UserResponse } from '../../../../../shared/types/api'
-
 definePageMeta({
   middleware: ['admin'],
   layout: 'admin',
