@@ -45,6 +45,7 @@ import TableActions from '~/components/table/TableActions.vue'
 definePageMeta({
   middleware: 'admin',
   layout: 'admin',
+  title: 'Venues',
 })
 
 // Define columns for the venues table

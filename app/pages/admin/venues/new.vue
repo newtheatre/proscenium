@@ -28,63 +28,50 @@
 
             <FormInput
               id="name"
-              :model-value="name.value.value"
+              v-model="nameField"
               label="Venue Name"
               placeholder="Enter venue name"
-              :error="name.error.value"
-              :touched="name.touched.value"
               required
-              @update:model-value="name.setValue"
-              @blur="name.setTouched()"
             />
 
             <FormTextarea
               id="address"
-              :model-value="address.value.value"
+              v-model="addressField"
               label="Address"
               placeholder="Enter venue address"
-              :error="address.error.value"
-              :touched="address.touched.value"
               :rows="3"
-              @update:model-value="address.setValue"
-              @blur="address.setTouched()"
             />
 
             <FormInput
               id="capacity"
-              :model-value="capacity.value.value"
+              v-model="capacityField"
               label="Capacity"
               type="number"
               placeholder="Enter venue capacity"
-              :error="capacity.error.value"
-              :touched="capacity.touched.value"
               min="1"
-              @update:model-value="capacity.setValue"
-              @blur="capacity.setTouched()"
             />
 
             <FormInput
               id="imageUrl"
-              :model-value="imageUrl.value.value"
+              v-model="imageUrlField"
               label="Image URL"
               type="url"
               placeholder="Enter image URL"
-              :error="imageUrl.error.value"
-              :touched="imageUrl.touched.value"
-              @update:model-value="imageUrl.setValue"
-              @blur="imageUrl.setTouched()"
             />
 
             <FormTextarea
               id="notes"
-              :model-value="notes.value.value"
+              v-model="notesField"
               label="Notes"
               placeholder="Enter any additional notes about the venue"
-              :error="notes.error.value"
-              :touched="notes.touched.value"
               :rows="4"
-              @update:model-value="notes.setValue"
-              @blur="notes.setTouched()"
+            />
+
+            <FormCheckbox
+              id="isActive"
+              v-model="isActiveField"
+              label="Active"
+              description="Whether this venue is currently active and available for use"
             />
           </div>
 
@@ -111,17 +98,20 @@
             </div>
 
             <div
-              v-else-if="availableFeatures && availableFeatures.length > 0"
+              v-if="availableFeatures && availableFeatures.length > 0"
               class="features-grid"
             >
               <FormCheckbox
                 v-for="feature in availableFeatures"
                 :id="`feature-${feature.id}`"
                 :key="feature.id"
-                :model-value="selectedFeatures.includes(feature.id)"
+                :model-value="featureFields[feature.id]?.value"
                 :label="feature.name"
                 :description="feature.description"
-                @update:model-value="toggleFeature(feature.id, $event)"
+                @update:model-value="(value: boolean) => {
+                  const field = featureFields[feature.id]
+                  if (field) field.value = value
+                }"
               />
             </div>
 
@@ -129,13 +119,17 @@
               v-else
               class="no-features"
             >
-              <p>No features available. You can create features first and then assign them to venues.</p>
+              <p>No features available.</p>
+            </div>
+
+            <!-- Always show Create Feature button -->
+            <div class="create-feature-section">
               <UIButton
                 variant="secondary"
                 size="sm"
-                @click="navigateTo('/admin/venues/features/new')"
+                @click="showCreateFeatureModal = true"
               >
-                Create Feature
+                Create New Feature
               </UIButton>
             </div>
           </div>
@@ -159,14 +153,28 @@
         </div>
       </Form>
     </div>
+
+    <!-- Create Feature Warning Modal -->
+    <UIConfirmModal
+      :show="showCreateFeatureModal"
+      title="Create New Feature"
+      message="Creating a new feature will take you to a different page and your current venue will not be saved. Are you sure you want to continue?"
+      confirm-text="Continue"
+      cancel-text="Cancel"
+      @confirm="handleCreateFeature"
+      @cancel="showCreateFeatureModal = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import { venueCreateFormSchema } from '~/utils/validation'
+
 // Require admin access
 definePageMeta({
   middleware: 'admin',
   layout: 'admin',
+  title: 'Create Venue',
 })
 
 // Fetch available features
@@ -177,67 +185,91 @@ const { data: featuresResponse, pending: featuresLoading, error: featuresError }
 // Extract features from paginated response
 const availableFeatures = computed(() => featuresResponse.value?.data || [])
 
-// Selected features state
-const selectedFeatures = ref<string[]>([])
+// Initialize form with empty defaults
+const defaultFormData = {
+  name: '',
+  address: '',
+  capacity: '',
+  imageUrl: '',
+  notes: '',
+  isActive: true,
+}
 
-// Form setup using useForm composable
+// Form submission handler
+const handleFormSubmit = async (values: typeof defaultFormData) => {
+  console.log('Creating new venue with data:', values)
+  console.log('Selected features:', selectedFeatures.value)
+
+  // Transform the data for API
+  const createData: Record<string, unknown> = {
+    name: values.name,
+    address: values.address || undefined,
+    capacity: values.capacity ? Number(values.capacity) : undefined,
+    imageUrl: values.imageUrl || undefined,
+    notes: values.notes || undefined,
+    isActive: values.isActive,
+    featureIds: selectedFeatures.value,
+  }
+
+  console.log('Sending API create with data:', createData)
+
+  const response = await $fetch<{ success: boolean, data: { venue: { id: string } } }>('/api/venues', {
+    method: 'POST' as const,
+    body: createData,
+  })
+
+  // Navigate to the new venue's detail page
+  await navigateTo(`/admin/venues/${response.data.venue.id}`)
+}
+
+// Initialize useForm
 const form = useForm({
-  initialValues: {
-    name: '',
-    address: '',
-    capacity: '',
-    imageUrl: '',
-    notes: '',
-  },
-  onSubmit: async (values) => {
-    try {
-      const payload: VenueCreatePayload = {
-        name: values.name,
-        address: values.address || undefined,
-        capacity: values.capacity ? Number(values.capacity) : undefined,
-        imageUrl: values.imageUrl || undefined,
-        notes: values.notes || undefined,
-        featureIds: selectedFeatures.value,
-      }
-
-      const response = await $fetch<{ success: boolean, data: { venue: { id: string } } }>('/api/venues', {
-        method: 'POST',
-        body: payload,
-      })
-
-      // Navigate to the new venue's detail page
-      await navigateTo(`/admin/venues/${response.data.venue.id}`)
-    }
-    catch (error: unknown) {
-      let errorMessage = 'Failed to create venue'
-      if (error && typeof error === 'object' && 'data' in error && error.data && typeof error.data === 'object' && 'message' in error.data) {
-        errorMessage = String(error.data.message)
-      }
-      form.setFormError(errorMessage)
-    }
-  },
+  initialValues: defaultFormData,
+  onSubmit: handleFormSubmit,
+  schema: venueCreateFormSchema,
 })
 
-// Individual field controls
-const name = form.register('name', '')
-const address = form.register('address', '')
-const capacity = form.register('capacity', '')
-const imageUrl = form.register('imageUrl', '')
-const notes = form.register('notes', '')
+// Individual reactive form fields
+const nameField = form.reactiveField('name')
+const addressField = form.reactiveField('address')
+const capacityField = form.reactiveField('capacity')
+const imageUrlField = form.reactiveField('imageUrl')
+const notesField = form.reactiveField('notes')
+const isActiveField = form.reactiveField<boolean>('isActive', true)
 
-// Feature selection handler
-const toggleFeature = (featureId: string, selected: boolean) => {
-  if (selected) {
-    if (!selectedFeatures.value.includes(featureId)) {
-      selectedFeatures.value.push(featureId)
-    }
-  }
-  else {
-    const index = selectedFeatures.value.indexOf(featureId)
-    if (index > -1) {
-      selectedFeatures.value.splice(index, 1)
-    }
-  }
+// Selected features reactive state
+const selectedFeatures = ref<string[]>([])
+
+// Modal state for create feature warning
+const showCreateFeatureModal = ref(false)
+
+// Feature selection handler - using modern approach similar to edit page
+const featureFields = computed(() => {
+  return availableFeatures.value.reduce((fields, feature) => {
+    fields[feature.id] = computed({
+      get: () => selectedFeatures.value.includes(feature.id),
+      set: (checked: boolean) => {
+        if (checked) {
+          if (!selectedFeatures.value.includes(feature.id)) {
+            selectedFeatures.value.push(feature.id)
+          }
+        }
+        else {
+          const index = selectedFeatures.value.indexOf(feature.id)
+          if (index > -1) {
+            selectedFeatures.value.splice(index, 1)
+          }
+        }
+      },
+    })
+    return fields
+  }, {} as Record<string, WritableComputedRef<boolean>>)
+})
+
+// Create feature modal handler
+const handleCreateFeature = () => {
+  showCreateFeatureModal.value = false
+  navigateTo('/admin/venues/features/new')
 }
 </script>
 
@@ -317,6 +349,14 @@ const toggleFeature = (featureId: string, selected: boolean) => {
 
 .no-features p {
   margin: 0 0 16px 0;
+}
+
+.create-feature-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: center;
 }
 
 .form-actions {

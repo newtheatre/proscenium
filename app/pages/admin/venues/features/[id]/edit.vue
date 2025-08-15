@@ -105,11 +105,13 @@
 
 <script setup lang="ts">
 import type { VenueFeatureResponse } from '~~/shared/types/api'
+import { venueFeatureEditFormSchema } from '~/utils/validation'
 
 // Require admin access
 definePageMeta({
   middleware: 'admin',
   layout: 'admin',
+  title: 'Edit Venue Feature',
 })
 
 // Get feature ID from route params
@@ -150,7 +152,7 @@ const handleFormSubmit = async (values: typeof defaultFormData, changedValues?: 
   })
 
   await $fetch(`/api/venues/features/${featureId}`, {
-    method: 'PATCH',
+    method: 'PATCH' as const,
     body: updateData,
   })
 
@@ -162,6 +164,7 @@ const handleFormSubmit = async (values: typeof defaultFormData, changedValues?: 
 const form = useForm({
   initialValues: defaultFormData,
   onSubmit: handleFormSubmit,
+  schema: venueFeatureEditFormSchema,
 })
 
 // Individual reactive form fields

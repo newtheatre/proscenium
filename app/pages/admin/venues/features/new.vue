@@ -26,37 +26,32 @@
 
           <FormInput
             id="name"
-            :model-value="name.value.value"
+            v-model="nameField"
             label="Feature Name"
             placeholder="Enter feature name"
-            :error="name.error.value"
-            :touched="name.touched.value"
             required
-            @update:model-value="name.setValue"
-            @blur="name.setTouched()"
           />
 
           <FormTextarea
             id="description"
-            :model-value="description.value.value"
+            v-model="descriptionField"
             label="Description"
             placeholder="Enter feature description"
-            :error="description.error.value"
-            :touched="description.touched.value"
             :rows="3"
-            @update:model-value="description.setValue"
-            @blur="description.setTouched()"
           />
 
           <FormInput
             id="icon"
-            :model-value="icon.value.value"
+            v-model="iconField"
             label="Icon"
             placeholder="Enter icon (emoji or short text)"
-            :error="icon.error.value"
-            :touched="icon.touched.value"
-            @update:model-value="icon.setValue"
-            @blur="icon.setTouched()"
+          />
+
+          <FormCheckbox
+            id="isActive"
+            v-model="isActiveField"
+            label="Active"
+            description="Whether this feature is currently active and available for assignment"
           />
         </div>
 
@@ -82,51 +77,58 @@
 </template>
 
 <script setup lang="ts">
-import type { VenueFeatureCreatePayload } from '~~/shared/types/api'
+import { venueFeatureCreateFormSchema } from '~/utils/validation'
 
 // Require admin access
 definePageMeta({
   middleware: 'admin',
   layout: 'admin',
+  title: 'Create Venue Feature',
 })
 
-// Form setup using useForm composable
+// Initialize form with empty defaults
+const defaultFormData = {
+  name: '',
+  description: '',
+  icon: '',
+  isActive: true,
+}
+
+// Form submission handler
+const handleFormSubmit = async (values: typeof defaultFormData) => {
+  console.log('Creating new venue feature with data:', values)
+
+  // Transform the data for API - only include non-empty values
+  const createData: Record<string, unknown> = {
+    name: values.name,
+    description: values.description || undefined,
+    icon: values.icon || undefined,
+    isActive: values.isActive,
+  }
+
+  console.log('Sending API create with data:', createData)
+
+  const response = await $fetch<{ success: boolean, data: { feature: { id: string } } }>('/api/venues/features', {
+    method: 'POST' as const,
+    body: createData,
+  })
+
+  // Navigate to the new feature's detail page
+  await navigateTo(`/admin/venues/features/${response.data.feature.id}`)
+}
+
+// Initialize useForm
 const form = useForm({
-  initialValues: {
-    name: '',
-    description: '',
-    icon: '',
-  },
-  onSubmit: async (values) => {
-    try {
-      const payload: VenueFeatureCreatePayload = {
-        name: values.name,
-        description: values.description || undefined,
-        icon: values.icon || undefined,
-      }
-
-      const response = await $fetch<{ success: boolean, data: { feature: { id: string } } }>('/api/venues/features', {
-        method: 'POST',
-        body: payload,
-      })
-
-      // Navigate to the new feature's detail page
-      await navigateTo(`/admin/venues/features/${response.data.feature.id}`)
-    }
-    catch (error: unknown) {
-      let errorMessage = 'Failed to create venue feature'
-      if (error && typeof error === 'object' && 'data' in error && error.data && typeof error.data === 'object' && 'message' in error.data) {
-        errorMessage = String(error.data.message)
-      }
-      form.setFormError(errorMessage)
-    }
-  },
+  initialValues: defaultFormData,
+  onSubmit: handleFormSubmit,
+  schema: venueFeatureCreateFormSchema,
 })
 
-// Individual field controls
-const name = form.register('name', '')
-const description = form.register('description', '')
-const icon = form.register('icon', '')
+// Individual reactive form fields
+const nameField = form.reactiveField('name')
+const descriptionField = form.reactiveField('description')
+const iconField = form.reactiveField('icon')
+const isActiveField = form.reactiveField<boolean>('isActive', true)
 </script>
 
 <style scoped>

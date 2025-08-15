@@ -212,6 +212,7 @@ import type { VenueResponse } from '~~/shared/types/api'
 definePageMeta({
   middleware: 'admin',
   layout: 'admin',
+  title: 'Venue Details',
 })
 
 // Get venue ID from route params

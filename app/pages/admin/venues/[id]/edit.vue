@@ -148,6 +148,17 @@
             >
               <p>No features available.</p>
             </div>
+
+            <!-- Always show Create Feature button -->
+            <div class="create-feature-section">
+              <UIButton
+                variant="secondary"
+                size="sm"
+                @click="showCreateFeatureModal = true"
+              >
+                Create New Feature
+              </UIButton>
+            </div>
           </div>
         </div>
 
@@ -169,16 +180,29 @@
         </div>
       </Form>
     </div>
+
+    <!-- Create Feature Warning Modal -->
+    <UIConfirmModal
+      :show="showCreateFeatureModal"
+      title="Create New Feature"
+      message="Creating a new feature will take you to a different page and your current venue changes will not be saved. Are you sure you want to continue?"
+      confirm-text="Continue"
+      cancel-text="Cancel"
+      @confirm="handleCreateFeature"
+      @cancel="showCreateFeatureModal = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import type { VenueResponse } from '~~/shared/types/api'
+import { venueEditFormSchema } from '~/utils/validation'
 
 // Require admin access
 definePageMeta({
   middleware: 'admin',
   layout: 'admin',
+  title: 'Edit Venue',
 })
 
 // Get venue ID from route params
@@ -245,7 +269,7 @@ const handleFormSubmit = async (values: typeof defaultFormData, changedValues?: 
   console.log('Sending API update with data:', updateData)
 
   await $fetch(`/api/venues/${venueId}`, {
-    method: 'PATCH',
+    method: 'PATCH' as const,
     body: updateData,
   })
 
@@ -257,6 +281,7 @@ const handleFormSubmit = async (values: typeof defaultFormData, changedValues?: 
 const form = useForm({
   initialValues: defaultFormData,
   onSubmit: handleFormSubmit,
+  schema: venueEditFormSchema,
 })
 
 // Individual reactive form fields
@@ -269,6 +294,9 @@ const isActiveField = form.reactiveField<boolean>('isActive', true)
 
 // Selected features reactive state
 const selectedFeatures = ref<string[]>(venue.value?.features.map(f => f.id) || [])
+
+// Modal state for create feature warning
+const showCreateFeatureModal = ref(false)
 
 // Feature selection handler - using modern approach similar to roles
 const featureFields = computed(() => {
@@ -299,6 +327,12 @@ watch(venue, (newVenue) => {
     selectedFeatures.value = newVenue.features.map(f => f.id) || []
   }
 }, { immediate: true })
+
+// Create feature modal handler
+const handleCreateFeature = () => {
+  showCreateFeatureModal.value = false
+  navigateTo('/admin/venues/features/new')
+}
 </script>
 
 <style scoped>
@@ -386,6 +420,14 @@ watch(venue, (newVenue) => {
   text-align: center;
   color: var(--secondary-text-color);
   padding: 32px 0;
+}
+
+.create-feature-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: center;
 }
 
 .form-actions {

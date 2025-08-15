@@ -188,6 +188,7 @@ import type { VenueFeatureResponse } from '~~/shared/types/api'
 definePageMeta({
   middleware: 'admin',
   layout: 'admin',
+  title: 'Venue Feature Details',
 })
 
 // Get feature ID from route params
