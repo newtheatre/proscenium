@@ -1,10 +1,125 @@
 import { z } from 'zod'
 import type { ZodSchema } from 'zod'
+import type { ReactiveFormField } from '~/components/form/types'
 
 interface UseFormOptions<T extends Record<string, unknown>> {
   schema?: ZodSchema<T>
   initialValues?: Partial<T>
-  onSubmit?: (values: T) => void | Promise<void>
+  onSubmit?: (values: T, changedValues?: Partial<T>) => void | Promise<void>
+}
+
+// Helper function to deeply clone objects
+function deepClone<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj
+  }
+
+  if (obj instanceof Date) {
+    return new Date(obj.getTime()) as T
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => deepClone(item)) as T
+  }
+
+  const cloned = {} as T
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      cloned[key] = deepClone(obj[key])
+    }
+  }
+  return cloned
+}
+
+// Helper function to get value at nested path
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  return path.split('.').reduce((current: unknown, key: string) => {
+    return current && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined
+  }, obj as unknown)
+}
+
+// Helper function to set value at nested path
+function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
+  const keys = path.split('.')
+  const lastKey = keys.pop()!
+  const target = keys.reduce((current, key) => {
+    if (!current[key] || typeof current[key] !== 'object') {
+      current[key] = {}
+    }
+    return current[key] as Record<string, unknown>
+  }, obj)
+  target[lastKey] = value
+}
+
+// Helper function to check if two values are deeply equal
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+
+  if (a instanceof Date && b instanceof Date) {
+    return a.getTime() === b.getTime()
+  }
+
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') {
+    return false
+  }
+
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false
+    return a.every((item, index) => deepEqual(item, b[index]))
+  }
+
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return false
+  }
+
+  const keysA = Object.keys(a as Record<string, unknown>)
+  const keysB = Object.keys(b as Record<string, unknown>)
+
+  if (keysA.length !== keysB.length) return false
+
+  return keysA.every(key => deepEqual(
+    (a as Record<string, unknown>)[key],
+    (b as Record<string, unknown>)[key],
+  ))
+}
+
+// Helper function to get changed values
+function getChangedValuesHelper<T extends Record<string, unknown>>(
+  current: T,
+  original: T,
+  excludeFields: string[] = [],
+): Partial<T> {
+  const changes: Partial<T> = {}
+
+  function compareObjects(currentObj: Record<string, unknown>, originalObj: Record<string, unknown>, prefix = '') {
+    for (const key in currentObj) {
+      const fullPath = prefix ? `${prefix}.${key}` : key
+
+      if (excludeFields.includes(fullPath)) {
+        continue
+      }
+
+      const currentValue = currentObj[key]
+      const originalValue = originalObj[key]
+
+      if (!deepEqual(currentValue, originalValue)) {
+        if (prefix) {
+          // For nested objects, set the entire parent object
+          const parentKey = prefix.split('.')[0]
+          if (parentKey && !changes[parentKey as keyof T]) {
+            const nestedValue = getNestedValue(current, parentKey)
+            changes[parentKey as keyof T] = deepClone(nestedValue) as T[keyof T]
+          }
+        }
+        else {
+          changes[key as keyof T] = currentValue as T[keyof T]
+        }
+      }
+    }
+  }
+
+  compareObjects(current, original)
+  return changes
 }
 
 export function useForm<T extends Record<string, unknown>>(options: UseFormOptions<T> = {}) {
@@ -16,31 +131,83 @@ export function useForm<T extends Record<string, unknown>>(options: UseFormOptio
   const isSubmitting = ref(false)
   const submitCount = ref(0)
   const formError = ref<string | undefined>(undefined)
+  const _originalValues = ref<T | null>(null)
 
-  // Initialize form data
-  Object.entries(initialValues).forEach(([key, value]) => {
-    formData[key] = value
-    errors[key] = undefined
-    touched[key] = false
-  })
+  // Initialize form data with deep cloning for nested objects
+  const initializeForm = (values: Partial<T>) => {
+    const clonedValues = deepClone(values)
+    Object.entries(clonedValues).forEach(([key, value]) => {
+      formData[key] = value
+      errors[key] = undefined
+      touched[key] = false
+    })
+
+    // Store original values for change detection
+    _originalValues.value = deepClone(clonedValues) as T
+  }
+
+  // Initialize with initial values
+  initializeForm(initialValues)
 
   // Get current form values
   const getValues = (): T => {
     return { ...formData } as T
   }
 
-  // Set field value
+  // Update form with new values (useful for loading data from API)
+  const setValues = (values: Partial<T>, markAsOriginal = true) => {
+    Object.entries(values).forEach(([key, value]) => {
+      formData[key] = value
+    })
+
+    if (markAsOriginal) {
+      _originalValues.value = deepClone(values) as T
+    }
+  }
+
+  // Get changed values compared to original
+  const getChangedValues = (excludeFields: string[] = ['password']): Partial<T> => {
+    if (!_originalValues.value) {
+      return getValues()
+    }
+
+    return getChangedValuesHelper(getValues(), _originalValues.value, excludeFields)
+  }
+
+  // Set field value with support for nested paths
   const setValue = (name: string, value: unknown) => {
-    formData[name] = value
+    if (name.includes('.')) {
+      setNestedValue(formData, name, value)
+    }
+    else {
+      formData[name] = value
+    }
+
     // Validate field if it has been touched
     if (touched[name]) {
       validateField(name)
     }
   }
 
+  // Get field value with support for nested paths
+  const getValue = (name: string): unknown => {
+    if (name.includes('.')) {
+      return getNestedValue(formData, name)
+    }
+    return formData[name]
+  }
+
   // Set field error
   const setError = (name: string, error?: string) => {
     errors[name] = error
+  }
+
+  // Set multiple errors (useful for API validation responses)
+  const setErrors = (errorMap: Record<string, string>) => {
+    Object.entries(errorMap).forEach(([name, error]) => {
+      errors[name] = error
+      touched[name] = true
+    })
   }
 
   // Set field touched
@@ -62,6 +229,14 @@ export function useForm<T extends Record<string, unknown>>(options: UseFormOptio
     formError.value = undefined
   }
 
+  // Clear all errors
+  const clearErrors = () => {
+    Object.keys(errors).forEach((key) => {
+      errors[key] = undefined
+    })
+    clearFormError()
+  }
+
   // Validate a single field
   const validateField = (name: string): boolean => {
     if (!schema) return true
@@ -74,7 +249,7 @@ export function useForm<T extends Record<string, unknown>>(options: UseFormOptio
     }
     catch (error) {
       if (error instanceof z.ZodError) {
-        const fieldError = error.errors.find(e => e.path[0] === name)
+        const fieldError = error.errors.find(e => e.path.join('.') === name)
         setError(name, fieldError?.message)
         return !fieldError
       }
@@ -91,24 +266,20 @@ export function useForm<T extends Record<string, unknown>>(options: UseFormOptio
       schema.parse(values)
 
       // Clear all errors
-      Object.keys(formData).forEach((name) => {
-        setError(name, undefined)
-      })
-
+      clearErrors()
       return true
     }
     catch (error) {
       if (error instanceof z.ZodError) {
         // Clear all errors first
-        Object.keys(formData).forEach((name) => {
-          setError(name, undefined)
-        })
+        clearErrors()
 
         // Set specific errors
         error.errors.forEach((err) => {
-          const fieldName = err.path[0] as string
+          const fieldName = err.path.join('.')
           if (fieldName) {
             setError(fieldName, err.message)
+            setTouched(fieldName, true)
           }
         })
       }
@@ -139,7 +310,9 @@ export function useForm<T extends Record<string, unknown>>(options: UseFormOptio
     if (onSubmit) {
       isSubmitting.value = true
       try {
-        await onSubmit(getValues())
+        const currentValues = getValues()
+        const changedValues = _originalValues.value ? getChangedValues(['password']) : currentValues
+        await onSubmit(currentValues, changedValues)
       }
       finally {
         isSubmitting.value = false
@@ -149,11 +322,7 @@ export function useForm<T extends Record<string, unknown>>(options: UseFormOptio
 
   // Reset form
   const reset = () => {
-    Object.entries(initialValues).forEach(([name, value]) => {
-      formData[name] = value || ''
-      errors[name] = undefined
-      touched[name] = false
-    })
+    initializeForm(initialValues)
     submitCount.value = 0
     clearFormError()
   }
@@ -170,18 +339,83 @@ export function useForm<T extends Record<string, unknown>>(options: UseFormOptio
 
   // Check if form is dirty (has changes)
   const isDirty = computed(() => {
-    return Object.entries(formData).some(([name, value]) => {
-      const initialValue = (initialValues as Record<string, unknown>)[name]
-      return value !== (initialValue || '')
-    })
+    if (!_originalValues.value) return false
+    return !deepEqual(getValues(), _originalValues.value)
   })
 
-  // Register field - returns reactive field object
+  // Create a field helper that returns a simple reactive ref with nested path support
+  const field = <V = string>(name: keyof T | string, defaultValue?: V): WritableComputedRef<V> => {
+    const fieldName = String(name)
+
+    // Initialize field if it doesn't exist
+    if (fieldName.includes('.')) {
+      if (getNestedValue(formData, fieldName) === undefined) {
+        const initialValue = defaultValue ?? getNestedValue(initialValues as Record<string, unknown>, fieldName) ?? ('' as V)
+        setNestedValue(formData, fieldName, initialValue)
+        errors[fieldName] = undefined
+        touched[fieldName] = false
+      }
+    }
+    else if (!(fieldName in formData)) {
+      const initialValue = defaultValue ?? (initialValues as Record<string, unknown>)[fieldName] ?? ('' as V)
+      formData[fieldName] = initialValue
+      errors[fieldName] = undefined
+      touched[fieldName] = false
+    }
+
+    return computed({
+      get: () => {
+        if (fieldName.includes('.')) {
+          return getNestedValue(formData, fieldName) as V
+        }
+        return formData[fieldName] as V
+      },
+      set: (value: V) => setValue(fieldName, value),
+    })
+  }
+
+  // Create a reactive form field with all handlers (recommended approach)
+  // Supports both top-level keys and nested paths like 'profile.name'
+  const reactiveField = <V = string>(name: keyof T | string, defaultValue?: V): ReactiveFormField<V> => {
+    const fieldName = String(name)
+
+    // Use the enhanced field method to get the reactive value
+    const fieldRef = field(name, defaultValue)
+
+    return {
+      // The reactive value for v-model
+      value: fieldRef,
+
+      // Event handlers
+      onBlur: () => setTouched(fieldName, true),
+      onFocus: () => {
+        // Could be used for analytics or other focus-based logic
+      },
+
+      // Field state
+      error: computed(() => errors[fieldName]),
+      touched: computed(() => Boolean(touched[fieldName])),
+
+      // Field methods
+      setError: (error?: string) => setError(fieldName, error),
+      setTouched: (isTouched = true) => setTouched(fieldName, isTouched),
+      validate: () => validateField(fieldName),
+    }
+  }
+
+  // Register field - returns reactive field object (for backward compatibility)
   const register = (name: string, defaultValue?: unknown) => {
-    const initialValue = defaultValue ?? (initialValues as Record<string, unknown>)[name] ?? ''
+    const initialValue = defaultValue ?? getNestedValue(initialValues as Record<string, unknown>, name) ?? ''
 
     // Initialize field if not exists
-    if (!(name in formData)) {
+    if (name.includes('.')) {
+      if (getNestedValue(formData, name) === undefined) {
+        setNestedValue(formData, name, initialValue)
+        errors[name] = undefined
+        touched[name] = false
+      }
+    }
+    else if (!(name in formData)) {
       formData[name] = initialValue
       errors[name] = undefined
       touched[name] = false
@@ -189,11 +423,17 @@ export function useForm<T extends Record<string, unknown>>(options: UseFormOptio
 
     return {
       value: computed({
-        get: () => (formData[name] ?? '') as string,
-        set: (value: string) => setValue(name, value),
+        get: () => {
+          if (name.includes('.')) {
+            const value = getNestedValue(formData, name)
+            return value ?? (typeof initialValue === 'string' ? '' : initialValue)
+          }
+          return formData[name] ?? (typeof initialValue === 'string' ? '' : initialValue)
+        },
+        set: (value: unknown) => setValue(name, value),
       }),
-      error: computed(() => errors[name]),
-      touched: computed(() => touched[name] || false),
+      error: computed(() => errors[name] || undefined),
+      touched: computed(() => Boolean(touched[name])),
       setValue: (value: unknown) => setValue(name, value),
       setError: (error?: string) => setError(name, error),
       setTouched: (isTouched = true) => setTouched(name, isTouched),
@@ -202,22 +442,37 @@ export function useForm<T extends Record<string, unknown>>(options: UseFormOptio
   }
 
   return {
+    // State
     isSubmitting: readonly(isSubmitting),
     isValid,
     isTouched,
     isDirty,
     submitCount: readonly(submitCount),
     formError: readonly(formError),
-    register,
+
+    // Form data
+    formData: readonly(formData),
+    errors: readonly(errors),
+    touched: readonly(touched),
+
+    // Methods
     getValues,
+    setValues,
+    getChangedValues,
     setValue,
+    getValue,
     setError,
+    setErrors,
     setTouched,
     setFormError,
     clearFormError,
+    clearErrors,
     validate,
     validateField,
     handleSubmit,
     reset,
+    register,
+    field,
+    reactiveField,
   }
 }

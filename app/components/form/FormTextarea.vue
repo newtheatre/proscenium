@@ -2,13 +2,13 @@
   <FormField
     :id="id"
     :label="label"
-    :error="error"
-    :touched="touched"
+    :error="computedError"
+    :touched="computedTouched"
   >
     <template #default="{ id: fieldId, error: fieldError, touched: fieldTouched }">
       <textarea
         :id="fieldId"
-        :value="modelValue"
+        :value="computedValue"
         :placeholder="placeholder"
         :disabled="disabled"
         :required="required"
@@ -29,9 +29,11 @@
 </template>
 
 <script setup lang="ts">
+import type { ReactiveFormField } from './types'
+
 interface Props {
   id: string
-  modelValue?: string
+  modelValue?: string | ReactiveFormField<string>
   label?: string
   placeholder?: string
   disabled?: boolean
@@ -48,16 +50,74 @@ interface Emits {
   'focus': []
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+
+// Check if modelValue is a reactive form field
+const isReactiveField = computed(() => {
+  return props.modelValue
+    && typeof props.modelValue === 'object'
+    && 'value' in props.modelValue
+    && 'onBlur' in props.modelValue
+})
+
+// Computed properties that work with both string values and reactive fields
+const computedValue = computed(() => {
+  if (isReactiveField.value) {
+    const field = props.modelValue as ReactiveFormField<string>
+    return field.value.value
+  }
+  return props.modelValue as string || ''
+})
+
+const computedError = computed(() => {
+  if (isReactiveField.value) {
+    const field = props.modelValue as ReactiveFormField<string>
+    return field.error?.value
+  }
+  return props.error
+})
+
+const computedTouched = computed(() => {
+  if (isReactiveField.value) {
+    const field = props.modelValue as ReactiveFormField<string>
+    return field.touched?.value
+  }
+  return props.touched
+})
 
 const onInput = (event: Event) => {
   const target = event.target as HTMLTextAreaElement
-  emit('update:modelValue', target.value)
+  const value = target.value
+
+  if (isReactiveField.value) {
+    const field = props.modelValue as ReactiveFormField<string>
+    field.value.value = value
+  }
+  else {
+    emit('update:modelValue', value)
+  }
 }
 
-const onBlur = () => emit('blur')
-const onFocus = () => emit('focus')
+const onBlur = () => {
+  if (isReactiveField.value) {
+    const field = props.modelValue as ReactiveFormField<string>
+    if (field.onBlur) {
+      field.onBlur()
+    }
+  }
+  emit('blur')
+}
+
+const onFocus = () => {
+  if (isReactiveField.value) {
+    const field = props.modelValue as ReactiveFormField<string>
+    if (field.onFocus) {
+      field.onFocus()
+    }
+  }
+  emit('focus')
+}
 </script>
 
 <style scoped>
