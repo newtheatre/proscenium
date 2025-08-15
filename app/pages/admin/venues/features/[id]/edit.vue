@@ -30,11 +30,11 @@
     </div>
 
     <div
-      v-else-if="error"
+      v-else-if="fetchError"
       class="feature-edit__error"
     >
       <AppAlert type="error">
-        {{ error.statusMessage || 'Failed to load feature details' }}
+        {{ fetchError.statusMessage || 'Failed to load feature details' }}
       </AppAlert>
     </div>
 
@@ -53,45 +53,32 @@
 
           <FormInput
             id="name"
-            :model-value="name.value.value"
+            v-model="nameField"
             label="Feature Name"
             placeholder="Enter feature name"
-            :error="name.error.value"
-            :touched="name.touched.value"
             required
-            @update:model-value="name.setValue"
-            @blur="name.setTouched()"
           />
 
           <FormTextarea
             id="description"
-            :model-value="description.value.value"
+            v-model="descriptionField"
             label="Description"
             placeholder="Enter feature description"
-            :error="description.error.value"
-            :touched="description.touched.value"
             :rows="3"
-            @update:model-value="description.setValue"
-            @blur="description.setTouched()"
           />
 
           <FormInput
             id="icon"
-            :model-value="icon.value.value"
+            v-model="iconField"
             label="Icon"
             placeholder="Enter icon (emoji or short text)"
-            :error="icon.error.value"
-            :touched="icon.touched.value"
-            @update:model-value="icon.setValue"
-            @blur="icon.setTouched()"
           />
 
           <FormCheckbox
             id="isActive"
-            :model-value="Boolean(isActive.value.value)"
+            v-model="isActiveField"
             label="Active"
             description="Whether this feature is currently active and available for assignment"
-            @update:model-value="isActive.setValue"
           />
         </div>
 
@@ -117,7 +104,7 @@
 </template>
 
 <script setup lang="ts">
-import type { VenueFeatureResponse, VenueFeatureUpdatePayload } from '~~/shared/types/api'
+import type { VenueFeatureResponse } from '~~/shared/types/api'
 
 // Require admin access
 definePageMeta({
@@ -127,54 +114,61 @@ definePageMeta({
 
 // Get feature ID from route params
 const route = useRoute()
-const featureId = computed(() => route.params.id as string)
+const featureId = route.params.id as string
 
 // Fetch feature data
-const { data: featureResponse, pending, error } = await useFetch<VenueFeatureResponse>(`/api/venues/features/${featureId.value}`)
+const { data: featureResponse, pending, error: fetchError } = await useFetch<VenueFeatureResponse>(`/api/venues/features/${featureId}`)
 
 // Extract feature from the response
 const feature = computed(() => featureResponse.value?.data?.feature)
 
-// Form setup using useForm composable
+// Initialize form with default values from the response
+const defaultFormData = {
+  name: feature.value?.name || '',
+  description: feature.value?.description || '',
+  icon: feature.value?.icon || '',
+  isActive: feature.value?.isActive ?? true,
+}
+
+// Form submission handler
+const handleFormSubmit = async (values: typeof defaultFormData, changedValues?: Partial<typeof defaultFormData>) => {
+  const changes = changedValues || {}
+
+  // Only make API call if there are actual changes
+  if (Object.keys(changes).length === 0) {
+    await navigateTo(`/admin/venues/features/${featureId}`)
+    return
+  }
+
+  // Transform the data for API - only include changed fields
+  const updateData: Record<string, unknown> = {}
+
+  Object.entries(changes).forEach(([key, value]) => {
+    if (value !== undefined) {
+      updateData[key] = value
+    }
+  })
+
+  await $fetch(`/api/venues/features/${featureId}`, {
+    method: 'PATCH',
+    body: updateData,
+  })
+
+  // Navigate back to feature detail page
+  await navigateTo(`/admin/venues/features/${featureId}`)
+}
+
+// Initialize useForm
 const form = useForm({
-  initialValues: {
-    name: feature.value?.name || '',
-    description: feature.value?.description || '',
-    icon: feature.value?.icon || '',
-    isActive: feature.value?.isActive ?? true,
-  },
-  onSubmit: async (values) => {
-    try {
-      const payload: VenueFeatureUpdatePayload = {
-        name: values.name,
-        description: values.description || undefined,
-        icon: values.icon || undefined,
-        isActive: values.isActive,
-      }
-
-      await $fetch(`/api/venues/features/${featureId.value}`, {
-        method: 'PATCH',
-        body: payload,
-      })
-
-      // Navigate back to feature detail page
-      await navigateTo(`/admin/venues/features/${featureId.value}`)
-    }
-    catch (error: unknown) {
-      let errorMessage = 'Failed to update venue feature'
-      if (error && typeof error === 'object' && 'data' in error && error.data && typeof error.data === 'object' && 'message' in error.data) {
-        errorMessage = String(error.data.message)
-      }
-      form.setFormError(errorMessage)
-    }
-  },
+  initialValues: defaultFormData,
+  onSubmit: handleFormSubmit,
 })
 
-// Individual field controls
-const name = form.register('name', feature.value?.name || '')
-const description = form.register('description', feature.value?.description || '')
-const icon = form.register('icon', feature.value?.icon || '')
-const isActive = form.register('isActive', feature.value?.isActive ?? true)
+// Individual reactive form fields
+const nameField = form.reactiveField('name')
+const descriptionField = form.reactiveField('description')
+const iconField = form.reactiveField('icon')
+const isActiveField = form.reactiveField<boolean>('isActive', true)
 </script>
 
 <style scoped>

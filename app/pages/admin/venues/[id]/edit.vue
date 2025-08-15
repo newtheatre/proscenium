@@ -30,11 +30,11 @@
     </div>
 
     <div
-      v-else-if="error"
+      v-else-if="fetchError"
       class="venue-edit__error"
     >
       <AppAlert type="error">
-        {{ error.statusMessage || 'Failed to load venue details' }}
+        {{ fetchError.statusMessage || 'Failed to load venue details' }}
       </AppAlert>
     </div>
 
@@ -55,71 +55,50 @@
 
             <FormInput
               id="name"
-              :model-value="name.value.value"
+              v-model="nameField"
               label="Venue Name"
               placeholder="Enter venue name"
-              :error="name.error.value"
-              :touched="name.touched.value"
               required
-              @update:model-value="name.setValue"
-              @blur="name.setTouched()"
             />
 
             <FormTextarea
               id="address"
-              :model-value="address.value.value"
+              v-model="addressField"
               label="Address"
               placeholder="Enter venue address"
-              :error="address.error.value"
-              :touched="address.touched.value"
               :rows="3"
-              @update:model-value="address.setValue"
-              @blur="address.setTouched()"
             />
 
             <FormInput
               id="capacity"
-              :model-value="capacity.value.value"
+              v-model="capacityField"
               label="Capacity"
               type="number"
               placeholder="Enter venue capacity"
-              :error="capacity.error.value"
-              :touched="capacity.touched.value"
               min="1"
-              @update:model-value="capacity.setValue"
-              @blur="capacity.setTouched()"
             />
 
             <FormInput
               id="imageUrl"
-              :model-value="imageUrl.value.value"
+              v-model="imageUrlField"
               label="Image URL"
               type="url"
               placeholder="Enter image URL"
-              :error="imageUrl.error.value"
-              :touched="imageUrl.touched.value"
-              @update:model-value="imageUrl.setValue"
-              @blur="imageUrl.setTouched()"
             />
 
             <FormTextarea
               id="notes"
-              :model-value="notes.value.value"
+              v-model="notesField"
               label="Notes"
               placeholder="Enter any additional notes about the venue"
-              :error="notes.error.value"
-              :touched="notes.touched.value"
               :rows="4"
-              @update:model-value="notes.setValue"
-              @blur="notes.setTouched()"
             />
 
             <FormCheckbox
               id="isActive"
-              :model-value="Boolean(isActive.value.value)"
+              v-model="isActiveField"
               label="Active"
               description="Whether this venue is currently active and available for use"
-              @update:model-value="isActive.setValue"
             />
           </div>
 
@@ -153,10 +132,13 @@
                 v-for="feature in availableFeatures"
                 :id="`feature-${feature.id}`"
                 :key="feature.id"
-                :model-value="selectedFeatures.includes(feature.id)"
+                :model-value="featureFields[feature.id]?.value"
                 :label="feature.name"
                 :description="feature.description"
-                @update:model-value="toggleFeature(feature.id, $event)"
+                @update:model-value="(value: boolean) => {
+                  const field = featureFields[feature.id]
+                  if (field) field.value = value
+                }"
               />
             </div>
 
@@ -191,7 +173,7 @@
 </template>
 
 <script setup lang="ts">
-import type { VenueResponse, VenueUpdatePayload } from '~~/shared/types/api'
+import type { VenueResponse } from '~~/shared/types/api'
 
 // Require admin access
 definePageMeta({
@@ -201,10 +183,10 @@ definePageMeta({
 
 // Get venue ID from route params
 const route = useRoute()
-const venueId = computed(() => route.params.id as string)
+const venueId = route.params.id as string
 
 // Fetch venue data and available features
-const { data: venueResponse, pending, error } = await useFetch<VenueResponse>(`/api/venues/${venueId.value}`)
+const { data: venueResponse, pending, error: fetchError } = await useFetch<VenueResponse>(`/api/venues/${venueId}`)
 const { data: featuresResponse, pending: featuresLoading, error: featuresError } = await useFetch('/api/venues/features', {
   query: { isActive: 'true' },
 })
@@ -213,71 +195,110 @@ const { data: featuresResponse, pending: featuresLoading, error: featuresError }
 const venue = computed(() => venueResponse.value?.data?.venue)
 const availableFeatures = computed(() => featuresResponse.value?.data || [])
 
-// Selected features state
-const selectedFeatures = venue.value?.features.map(f => f.id) || []
+// Initialize form with default values from the response
+const defaultFormData = {
+  name: venue.value?.name || '',
+  address: venue.value?.address || '',
+  capacity: venue.value?.capacity?.toString() || '',
+  imageUrl: venue.value?.imageUrl || '',
+  notes: venue.value?.notes || '',
+  isActive: venue.value?.isActive ?? true,
+  featureIds: venue.value?.features.map(f => f.id) || [],
+}
 
-// Form setup using useForm composable
+// Form submission handler
+const handleFormSubmit = async (values: typeof defaultFormData, changedValues?: Partial<typeof defaultFormData>) => {
+  const changes = changedValues || {}
+
+  console.log('Submitting venue update (only changed fields):', changes)
+  console.log('Changes detected:', Object.keys(changes).length, 'fields changed')
+
+  // Check if features have changed separately since they're managed outside form state
+  const originalFeatureIds = venue.value?.features.map(f => f.id) || []
+  const currentFeatureIds = selectedFeatures.value
+  const featuresChanged = JSON.stringify(originalFeatureIds.sort()) !== JSON.stringify(currentFeatureIds.sort())
+
+  console.log('Features changed:', featuresChanged)
+  console.log('Original features:', originalFeatureIds)
+  console.log('Current features:', currentFeatureIds)
+
+  // Only make API call if there are actual changes to form fields OR features
+  if (Object.keys(changes).length === 0 && !featuresChanged) {
+    console.log('No changes detected, navigating back without API call')
+    await navigateTo(`/admin/venues/${venueId}`)
+    return
+  }
+
+  // Transform the data for API
+  const updateData: Record<string, unknown> = { ...changes }
+
+  // Convert capacity to number if it's included in changes
+  if ('capacity' in changes && changes.capacity !== undefined) {
+    updateData.capacity = changes.capacity ? Number(changes.capacity) : null
+  }
+
+  // Always include feature IDs if they changed, or if other fields changed
+  if (featuresChanged || Object.keys(changes).length > 0) {
+    updateData.featureIds = selectedFeatures.value
+  }
+
+  console.log('Sending API update with data:', updateData)
+
+  await $fetch(`/api/venues/${venueId}`, {
+    method: 'PATCH',
+    body: updateData,
+  })
+
+  // Navigate back to venue detail page
+  await navigateTo(`/admin/venues/${venueId}`)
+}
+
+// Initialize useForm
 const form = useForm({
-  initialValues: {
-    name: venue.value?.name || '',
-    address: venue.value?.address || '',
-    capacity: venue.value?.capacity?.toString() || '',
-    imageUrl: venue.value?.imageUrl || '',
-    notes: venue.value?.notes || '',
-    isActive: venue.value?.isActive ?? true,
-  },
-  onSubmit: async (values) => {
-    try {
-      const payload: VenueUpdatePayload = {
-        name: values.name,
-        address: values.address || undefined,
-        capacity: values.capacity ? Number(values.capacity) : null,
-        imageUrl: values.imageUrl || undefined,
-        notes: values.notes || undefined,
-        isActive: values.isActive,
-        featureIds: selectedFeatures,
-      }
-
-      await $fetch(`/api/venues/${venueId.value}`, {
-        method: 'PATCH',
-        body: payload,
-      })
-
-      // Navigate back to venue detail page
-      await navigateTo(`/admin/venues/${venueId.value}`)
-    }
-    catch (error: unknown) {
-      let errorMessage = 'Failed to update venue'
-      if (error && typeof error === 'object' && 'data' in error && error.data && typeof error.data === 'object' && 'message' in error.data) {
-        errorMessage = String(error.data.message)
-      }
-      form.setFormError(errorMessage)
-    }
-  },
+  initialValues: defaultFormData,
+  onSubmit: handleFormSubmit,
 })
 
-// Individual field controls
-const name = form.register('name', venue.value?.name || '')
-const address = form.register('address', venue.value?.address || '')
-const capacity = form.register('capacity', venue.value?.capacity?.toString() || '')
-const imageUrl = form.register('imageUrl', venue.value?.imageUrl || '')
-const notes = form.register('notes', venue.value?.notes || '')
-const isActive = form.register('isActive', venue.value?.isActive ?? true)
+// Individual reactive form fields
+const nameField = form.reactiveField('name')
+const addressField = form.reactiveField('address')
+const capacityField = form.reactiveField('capacity')
+const imageUrlField = form.reactiveField('imageUrl')
+const notesField = form.reactiveField('notes')
+const isActiveField = form.reactiveField<boolean>('isActive', true)
 
-// Feature selection handler
-const toggleFeature = (featureId: string, selected: boolean) => {
-  if (selected) {
-    if (!selectedFeatures.includes(featureId)) {
-      selectedFeatures.push(featureId)
-    }
+// Selected features reactive state
+const selectedFeatures = ref<string[]>(venue.value?.features.map(f => f.id) || [])
+
+// Feature selection handler - using modern approach similar to roles
+const featureFields = computed(() => {
+  return availableFeatures.value.reduce((fields, feature) => {
+    fields[feature.id] = computed({
+      get: () => selectedFeatures.value.includes(feature.id),
+      set: (checked: boolean) => {
+        if (checked) {
+          if (!selectedFeatures.value.includes(feature.id)) {
+            selectedFeatures.value.push(feature.id)
+          }
+        }
+        else {
+          const index = selectedFeatures.value.indexOf(feature.id)
+          if (index > -1) {
+            selectedFeatures.value.splice(index, 1)
+          }
+        }
+      },
+    })
+    return fields
+  }, {} as Record<string, WritableComputedRef<boolean>>)
+})
+
+// Update selectedFeatures when venue data loads
+watch(venue, (newVenue) => {
+  if (newVenue) {
+    selectedFeatures.value = newVenue.features.map(f => f.id) || []
   }
-  else {
-    const index = selectedFeatures.indexOf(featureId)
-    if (index > -1) {
-      selectedFeatures.splice(index, 1)
-    }
-  }
-}
+}, { immediate: true })
 </script>
 
 <style scoped>
