@@ -83,3 +83,51 @@ export const resetPasswordSchema = z.object({
   message: 'Passwords do not match',
   path: ['confirmPassword'],
 })
+
+// Admin user edit form validation schema
+// This validates the complete form structure but allows for partial updates
+export const adminUserEditFormSchema = z.object({
+  email: commonSchemas.email,
+  studentId: z.string().refine(val => val === '' || /^\d+$/.test(val), {
+    message: 'Student ID must contain only numbers',
+  }),
+  password: z.string().refine(val => val === '' || val.length >= 8, {
+    message: 'Password must be at least 8 characters when provided',
+  }),
+  emailVerified: commonSchemas.boolean,
+  setupCompleted: commonSchemas.boolean,
+  isActive: commonSchemas.boolean,
+  roles: z.array(z.enum(['ADMIN', 'MANAGER', 'TRAINER'])),
+  membership: z.object({
+    type: z.enum(['FULL', 'ASSOCIATE', 'FELLOW', 'ALUMNI', 'GUEST', 'UNKNOWN']),
+    expiry: z.date().nullable(),
+  }),
+  profile: z.object({
+    name: z.string(),
+    bio: z.string(),
+    avatar: z.string().refine(val => val === '' || z.string().url().safeParse(val).success, {
+      message: 'Must be a valid URL when provided',
+    }),
+    gradYear: z.string().refine((val) => {
+      if (val === '') return true
+      const num = parseInt(val)
+      return !isNaN(num) && num >= 1900 && num <= 2100
+    }, {
+      message: 'Must be a valid year between 1900 and 2100',
+    }),
+    course: z.string(),
+    socialLinks: z.object({
+      github: z.string().refine(val => val === '' || z.string().url().safeParse(val).success, {
+        message: 'Must be a valid URL when provided',
+      }),
+      linkedin: z.string().refine(val => val === '' || z.string().url().safeParse(val).success, {
+        message: 'Must be a valid URL when provided',
+      }),
+      facebook: z.string().refine(val => val === '' || z.string().url().safeParse(val).success, {
+        message: 'Must be a valid URL when provided',
+      }),
+      discord: z.string(),
+      instagram: z.string(),
+    }),
+  }),
+})

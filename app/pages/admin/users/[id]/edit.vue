@@ -37,8 +37,8 @@
       class="user-edit__content"
     >
       <Form
-        :error="submitError"
-        @submit="handleSubmit"
+        :error="form.formError.value"
+        @submit="form.handleSubmit"
       >
         <div class="form-sections">
           <!-- Basic Information -->
@@ -49,30 +49,26 @@
             <div class="form-grid">
               <FormInput
                 id="email"
-                v-model="formData.email"
+                v-model="emailField"
                 label="Email"
                 type="email"
-                :error="validationErrors.email"
-                :touched="touchedFields.email"
+                autocomplete="off"
                 required
               />
 
               <FormInput
                 id="studentId"
-                v-model="formData.studentId"
+                v-model="studentIdField"
                 label="Student ID"
-                :error="validationErrors.studentId"
-                :touched="touchedFields.studentId"
               />
 
               <FormInput
                 id="password"
-                v-model="formData.password"
+                v-model="passwordField"
                 label="New Password"
                 type="password"
+                autocomplete="new-password"
                 placeholder="Leave empty to keep current password"
-                :error="validationErrors.password"
-                :touched="touchedFields.password"
               />
             </div>
           </section>
@@ -85,23 +81,20 @@
             <div class="form-grid">
               <FormCheckbox
                 id="emailVerified"
-                v-model="formData.emailVerified"
+                v-model="emailVerifiedField"
                 label="Email Verified"
-                :touched="touchedFields.emailVerified"
               />
 
               <FormCheckbox
                 id="setupCompleted"
-                v-model="formData.setupCompleted"
+                v-model="setupCompletedField"
                 label="Setup Completed"
-                :touched="touchedFields.setupCompleted"
               />
 
               <FormCheckbox
                 id="isActive"
-                v-model="formData.isActive"
+                v-model="isActiveField"
                 label="Account Active"
-                :touched="touchedFields.isActive"
               />
             </div>
           </section>
@@ -111,14 +104,14 @@
             <h2 class="form-section__title">
               Roles
             </h2>
-            <div class="role-checkboxes">
+            <div class="form-grid">
               <FormCheckbox
                 v-for="role in availableRoles"
                 :id="`role-${role}`"
                 :key="role"
-                :model-value="formData.roles.includes(role)"
+                :model-value="roleFields[role].value"
                 :label="role"
-                @update:model-value="toggleRole(role, $event)"
+                @update:model-value="(value: boolean) => roleFields[role].value = value"
               />
             </div>
           </section>
@@ -131,19 +124,15 @@
             <div class="form-grid">
               <FormSelect
                 id="membershipType"
-                v-model="formData.membership.type"
+                v-model="membershipTypeField"
                 label="Membership Type"
                 :options="membershipOptions"
-                :error="validationErrors['membership.type']"
-                :touched="touchedFields['membership.type']"
               />
 
               <FormDate
                 id="membershipExpiry"
-                v-model="formData.membership.expiry"
+                v-model="membershipExpiryField"
                 label="Membership Expiry"
-                :error="validationErrors['membership.expiry']"
-                :touched="touchedFields['membership.expiry']"
               />
             </div>
           </section>
@@ -156,45 +145,35 @@
             <div class="form-grid">
               <FormInput
                 id="profileName"
-                v-model="formData.profile.name"
+                v-model="profileNameField"
                 label="Full Name"
-                :error="validationErrors['profile.name']"
-                :touched="touchedFields['profile.name']"
               />
 
               <FormInput
                 id="profileCourse"
-                v-model="formData.profile.course"
+                v-model="profileCourseField"
                 label="Course"
-                :error="validationErrors['profile.course']"
-                :touched="touchedFields['profile.course']"
               />
 
               <FormInput
                 id="profileGradYear"
-                v-model="formData.profile.gradYear"
+                v-model="profileGradYearField"
                 label="Graduation Year"
                 type="number"
-                :error="validationErrors['profile.gradYear']"
-                :touched="touchedFields['profile.gradYear']"
               />
 
               <FormInput
                 id="profileAvatar"
-                v-model="formData.profile.avatar"
+                v-model="profileAvatarField"
                 label="Avatar URL"
                 type="url"
-                :error="validationErrors['profile.avatar']"
-                :touched="touchedFields['profile.avatar']"
               />
             </div>
 
             <FormTextarea
               id="profileBio"
-              v-model="formData.profile.bio"
+              v-model="profileBioField"
               label="Bio"
-              :error="validationErrors['profile.bio']"
-              :touched="touchedFields['profile.bio']"
               :rows="4"
             />
           </section>
@@ -207,45 +186,35 @@
             <div class="form-grid">
               <FormInput
                 id="socialGithub"
-                v-model="formData.profile.socialLinks.github"
+                v-model="socialGithubField"
                 label="GitHub URL"
                 type="url"
-                :error="validationErrors['profile.socialLinks.github']"
-                :touched="touchedFields['profile.socialLinks.github']"
               />
 
               <FormInput
                 id="socialLinkedin"
-                v-model="formData.profile.socialLinks.linkedin"
+                v-model="socialLinkedinField"
                 label="LinkedIn URL"
                 type="url"
-                :error="validationErrors['profile.socialLinks.linkedin']"
-                :touched="touchedFields['profile.socialLinks.linkedin']"
               />
 
               <FormInput
                 id="socialFacebook"
-                v-model="formData.profile.socialLinks.facebook"
+                v-model="socialFacebookField"
                 label="Facebook URL"
                 type="url"
-                :error="validationErrors['profile.socialLinks.facebook']"
-                :touched="touchedFields['profile.socialLinks.facebook']"
               />
 
               <FormInput
                 id="socialDiscord"
-                v-model="formData.profile.socialLinks.discord"
+                v-model="socialDiscordField"
                 label="Discord Username"
-                :error="validationErrors['profile.socialLinks.discord']"
-                :touched="touchedFields['profile.socialLinks.discord']"
               />
 
               <FormInput
                 id="socialInstagram"
-                v-model="formData.profile.socialLinks.instagram"
+                v-model="socialInstagramField"
                 label="Instagram Handle"
-                :error="validationErrors['profile.socialLinks.instagram']"
-                :touched="touchedFields['profile.socialLinks.instagram']"
               />
             </div>
           </section>
@@ -255,7 +224,7 @@
           <UIButton
             type="submit"
             variant="primary"
-            :loading="submitting"
+            :loading="form.isSubmitting.value"
           >
             Save Changes
           </UIButton>
@@ -273,8 +242,9 @@
 </template>
 
 <script lang="ts" setup>
-import type { MembershipType, RoleType } from '@prisma/client'
+import type { RoleType } from '@prisma/client'
 import type { UserResponse } from '~~/shared/types/api'
+import { parseDateFromApi, formatDateForApi } from '~/utils/dates'
 
 definePageMeta({
   middleware: ['admin'],
@@ -284,7 +254,7 @@ definePageMeta({
 const route = useRoute()
 const userId = route.params.id as string
 
-// Available options
+// Available options - dynamic roles from Prisma schema
 const availableRoles: RoleType[] = ['ADMIN', 'MANAGER', 'TRAINER']
 const membershipOptions = [
   { label: 'Full', value: 'FULL' },
@@ -301,293 +271,125 @@ const { data: response, pending, error: fetchError } = await useFetch<UserRespon
 // Extract user from response
 const user = computed(() => response.value?.data?.user)
 
-// Form state
-const formData = ref({
-  email: '',
-  studentId: '',
+// Initialize form with default values
+const defaultFormData = {
+  email: response.value?.data?.user?.email || '',
+  studentId: response.value?.data?.user?.studentId || '',
   password: '',
-  emailVerified: false,
-  setupCompleted: false,
-  isActive: true,
-  roles: [] as RoleType[],
+  emailVerified: response.value?.data?.user?.emailVerified || false,
+  setupCompleted: response.value?.data?.user?.setupCompleted || false,
+  isActive: response.value?.data?.user?.isActive ?? true,
+  roles: response.value?.data?.user?.roles || [],
   membership: {
-    type: 'UNKNOWN' as MembershipType,
-    expiry: '',
+    type: response.value?.data?.user?.membership?.type || 'UNKNOWN',
+    expiry: parseDateFromApi(response.value?.data?.user?.membership?.expiry),
   },
   profile: {
-    name: '',
-    bio: '',
-    avatar: '',
-    gradYear: '',
-    course: '',
+    name: response.value?.data?.user?.profile?.name || '',
+    bio: response.value?.data?.user?.profile?.bio || '',
+    avatar: response.value?.data?.user?.profile?.avatar || '',
+    gradYear: response.value?.data?.user?.profile?.gradYear?.toString() || '',
+    course: response.value?.data?.user?.profile?.course || '',
     socialLinks: {
-      github: '',
-      linkedin: '',
-      facebook: '',
-      discord: '',
-      instagram: '',
+      github: response.value?.data?.user?.profile?.socialLinks?.github || '',
+      linkedin: response.value?.data?.user?.profile?.socialLinks?.linkedin || '',
+      facebook: response.value?.data?.user?.profile?.socialLinks?.facebook || '',
+      discord: response.value?.data?.user?.profile?.socialLinks?.discord || '',
+      instagram: response.value?.data?.user?.profile?.socialLinks?.instagram || '',
     },
   },
-})
-
-const touchedFields = ref<Record<string, boolean>>({})
-const validationErrors = ref<Record<string, string>>({})
-const submitError = ref('')
-const submitting = ref(false)
-
-// Store original user data for change detection
-const originalData = ref<typeof formData.value | null>(null)
-
-// Initialize form data when user is loaded
-watch(user, (newUser) => {
-  if (newUser) {
-    const userData = {
-      email: newUser.email || '',
-      studentId: newUser.studentId || '',
-      password: '',
-      emailVerified: newUser.emailVerified || false,
-      setupCompleted: newUser.setupCompleted || false,
-      isActive: newUser.isActive ?? true,
-      roles: (newUser.roles || []) as RoleType[],
-      membership: {
-        type: newUser.membership?.type || 'UNKNOWN',
-        expiry: newUser.membership?.expiry || '',
-      },
-      profile: {
-        name: newUser.profile?.name || '',
-        bio: newUser.profile?.bio || '',
-        avatar: newUser.profile?.avatar || '',
-        gradYear: newUser.profile?.gradYear?.toString() || '',
-        course: newUser.profile?.course || '',
-        socialLinks: {
-          github: newUser.profile?.socialLinks?.github || '',
-          linkedin: newUser.profile?.socialLinks?.linkedin || '',
-          facebook: newUser.profile?.socialLinks?.facebook || '',
-          discord: newUser.profile?.socialLinks?.discord || '',
-          instagram: newUser.profile?.socialLinks?.instagram || '',
-        },
-      },
-    }
-
-    formData.value = { ...userData }
-    // Store original data for change detection with deep copy and null/empty string normalization
-    const normalizedUserData = JSON.parse(JSON.stringify({ ...userData, password: '' }))
-    // Convert null values to empty strings for form display consistency
-    if (normalizedUserData.profile) {
-      normalizedUserData.profile.bio = normalizedUserData.profile.bio ?? ''
-      normalizedUserData.profile.avatar = normalizedUserData.profile.avatar ?? ''
-      normalizedUserData.profile.course = normalizedUserData.profile.course ?? ''
-    }
-    if (normalizedUserData.socialLinks) {
-      Object.keys(normalizedUserData.socialLinks).forEach((key) => {
-        if (normalizedUserData.socialLinks[key] === null) {
-          normalizedUserData.socialLinks[key] = ''
-        }
-      })
-    }
-    originalData.value = normalizedUserData
-  }
-}, { immediate: true })
-
-// Role management
-const toggleRole = (role: RoleType, checked: boolean) => {
-  if (checked) {
-    if (!formData.value.roles.includes(role)) {
-      formData.value.roles.push(role)
-    }
-  }
-  else {
-    const index = formData.value.roles.indexOf(role)
-    if (index > -1) {
-      formData.value.roles.splice(index, 1)
-    }
-  }
 }
 
-// Form submission
-const handleSubmit = async () => {
-  submitting.value = true
-  submitError.value = ''
-  validationErrors.value = {}
+// Form submission handler
+const handleFormSubmit = async (_values: typeof defaultFormData, changedValues?: Partial<typeof defaultFormData>) => {
+  const changes = changedValues || {}
 
-  try {
-    // Only proceed if we have original data to compare against
-    if (!originalData.value) {
-      throw new Error('Original user data not available')
-    }
+  console.log('Submitting user update (only changed fields):', changes)
+  console.log('Changes detected:', Object.keys(changes).length, 'fields changed')
 
-    const updateData: Record<string, unknown> = {}
-    const current = formData.value
-    const original = originalData.value
-
-    // Check for changes in basic fields
-    if (current.email !== original.email) {
-      updateData.email = current.email
-    }
-    if (current.studentId !== original.studentId) {
-      updateData.studentId = current.studentId || null
-    }
-    if (current.emailVerified !== original.emailVerified) {
-      updateData.emailVerified = current.emailVerified
-    }
-    if (current.setupCompleted !== original.setupCompleted) {
-      updateData.setupCompleted = current.setupCompleted
-    }
-    if (current.isActive !== original.isActive) {
-      updateData.isActive = current.isActive
-    }
-
-    // Check for changes in roles (compare arrays)
-    if (JSON.stringify(current.roles.sort()) !== JSON.stringify(original.roles.sort())) {
-      updateData.roles = current.roles
-    }
-
-    // Always include password if provided (it's not in original data)
-    if (current.password) {
-      updateData.password = current.password
-    }
-
-    // Check for changes in membership
-    if (current.membership.type !== original.membership.type
-      || current.membership.expiry !== original.membership.expiry) {
-      const membershipUpdate: Record<string, unknown> = {
-        type: current.membership.type,
-      }
-
-      if (current.membership.expiry) {
-        // Convert YYYY-MM-DD to ISO datetime string
-        const expiryDate = new Date(current.membership.expiry + 'T23:59:59.999Z')
-        membershipUpdate.expiry = expiryDate.toISOString()
-      }
-      else {
-        membershipUpdate.expiry = null
-      }
-
-      updateData.membership = membershipUpdate
-    }
-
-    // Check for changes in profile
-    const profileChanges: Record<string, unknown> = {}
-
-    if (current.profile.name !== original.profile.name) {
-      profileChanges.name = current.profile.name
-    }
-    if (current.profile.bio !== original.profile.bio) {
-      profileChanges.bio = current.profile.bio
-    }
-    if (current.profile.avatar !== original.profile.avatar) {
-      profileChanges.avatar = current.profile.avatar
-    }
-    if (current.profile.gradYear !== original.profile.gradYear) {
-      profileChanges.gradYear = current.profile.gradYear ? parseInt(current.profile.gradYear) : null
-    }
-    if (current.profile.course !== original.profile.course) {
-      profileChanges.course = current.profile.course
-    }
-
-    // Check for changes in social links
-    const socialLinksChanges: Record<string, string | null> = {}
-    const currentSocial = current.profile.socialLinks
-    const originalSocial = original.profile.socialLinks
-
-    if (currentSocial.github !== originalSocial.github) {
-      socialLinksChanges.github = currentSocial.github
-    }
-    if (currentSocial.linkedin !== originalSocial.linkedin) {
-      socialLinksChanges.linkedin = currentSocial.linkedin
-    }
-    if (currentSocial.facebook !== originalSocial.facebook) {
-      socialLinksChanges.facebook = currentSocial.facebook
-    }
-    if (currentSocial.discord !== originalSocial.discord) {
-      socialLinksChanges.discord = currentSocial.discord
-    }
-    if (currentSocial.instagram !== originalSocial.instagram) {
-      socialLinksChanges.instagram = currentSocial.instagram
-    }
-
-    if (Object.keys(socialLinksChanges).length > 0) {
-      profileChanges.socialLinks = socialLinksChanges
-    }
-
-    if (Object.keys(profileChanges).length > 0) {
-      updateData.profile = profileChanges
-    }
-
-    console.log('Submitting user update (only changed fields):', updateData)
-    console.log('Changes detected:', Object.keys(updateData).length, 'fields changed')
-
-    // Only make API call if there are actual changes
-    if (Object.keys(updateData).length === 0) {
-      await navigateTo(`/admin/users/${userId}`)
-      return
-    }
-
-    await $fetch(`/api/users/${userId}`, {
-      method: 'PATCH',
-      body: updateData,
-    })
-
-    // Navigate back to user detail page on success
+  // Only make API call if there are actual changes
+  if (Object.keys(changes).length === 0) {
     await navigateTo(`/admin/users/${userId}`)
+    return
   }
-  catch (error: unknown) {
-    console.error('Failed to update user:', error)
 
-    if (error && typeof error === 'object' && 'data' in error) {
-      console.error('Error data:', error.data)
-      console.error('Full error object:', JSON.stringify(error, null, 2))
+  // Transform the data for API
+  const updateData: Record<string, unknown> = {}
 
-      const errorWithData = error as {
-        data?: {
-          data?: Array<{ path: string[], message: string }>
-          statusMessage?: string
-        }
+  Object.entries(changes).forEach(([key, value]) => {
+    if (key === 'membership' && value) {
+      const membership = value as typeof defaultFormData['membership']
+      updateData.membership = {
+        type: membership.type,
+        expiry: formatDateForApi(membership.expiry),
       }
-      if (errorWithData.data?.data) {
-        // Handle Zod validation errors
-        const issues = errorWithData.data.data
-        const errors: Record<string, string> = {}
-        const touched: Record<string, boolean> = {}
-
-        console.log('Validation errors from API:', issues)
-
-        for (const issue of issues) {
-          const path = issue.path.join('.')
-          errors[path] = issue.message
-          touched[path] = true
-          console.log(`Validation error for ${path}: ${issue.message}`)
-        }
-
-        validationErrors.value = errors
-        // Mark fields with errors as touched so they display
-        touchedFields.value = { ...touchedFields.value, ...touched }
-
-        console.log('Updated validationErrors:', validationErrors.value)
-        console.log('Updated touchedFields:', touchedFields.value)
-
-        // Scroll to first error field
-        setTimeout(() => {
-          const firstErrorField = document.querySelector('.form-input--error, .form-select--error, .form-date--error')
-          if (firstErrorField) {
-            firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          }
-        }, 100)
+    }
+    else if (key === 'profile' && value) {
+      const profile = value as typeof defaultFormData['profile']
+      const profileUpdate: Record<string, unknown> = { ...profile }
+      if (profile.gradYear) {
+        profileUpdate.gradYear = parseInt(profile.gradYear)
       }
-      else {
-        submitError.value = errorWithData.data?.statusMessage || 'Failed to update user. Please try again.'
-        console.log('Setting submit error:', submitError.value)
-      }
+      updateData.profile = profileUpdate
     }
     else {
-      submitError.value = 'Failed to update user. Please try again.'
-      console.log('Setting generic submit error:', submitError.value)
+      updateData[key] = value
     }
-  }
-  finally {
-    submitting.value = false
-  }
+  })
+
+  await $fetch(`/api/users/${userId}`, {
+    method: 'PATCH',
+    body: updateData,
+  })
+
+  // Navigate back to user detail page on success
+  await navigateTo(`/admin/users/${userId}`)
 }
+
+// Initialize useForm
+const form = useForm({
+  schema: adminUserEditFormSchema,
+  initialValues: defaultFormData,
+  onSubmit: handleFormSubmit,
+})
+
+// Create reactive form fields (including nested paths)
+const emailField = form.reactiveField('email')
+const studentIdField = form.reactiveField('studentId')
+const passwordField = form.reactiveField('password')
+const emailVerifiedField = form.reactiveField<boolean>('emailVerified')
+const setupCompletedField = form.reactiveField<boolean>('setupCompleted')
+const isActiveField = form.reactiveField<boolean>('isActive')
+const rolesField = form.reactiveField<RoleType[]>('roles', [])
+const membershipTypeField = form.reactiveField('membership.type')
+const membershipExpiryField = form.reactiveField<Date | null>('membership.expiry', null)
+const profileNameField = form.reactiveField('profile.name')
+const profileBioField = form.reactiveField('profile.bio')
+const profileAvatarField = form.reactiveField('profile.avatar')
+const profileGradYearField = form.reactiveField('profile.gradYear')
+const profileCourseField = form.reactiveField('profile.course')
+const socialGithubField = form.reactiveField('profile.socialLinks.github')
+const socialLinkedinField = form.reactiveField('profile.socialLinks.linkedin')
+const socialFacebookField = form.reactiveField('profile.socialLinks.facebook')
+const socialDiscordField = form.reactiveField('profile.socialLinks.discord')
+const socialInstagramField = form.reactiveField('profile.socialLinks.instagram')
+
+// Dynamic role field creation - creates computed v-model compatible fields for each role
+const roleFields = availableRoles.reduce((fields, role) => {
+  fields[role] = computed({
+    get: () => (rolesField.value.value || []).includes(role),
+    set: (checked: boolean) => {
+      const currentRoles = rolesField.value.value || []
+      if (checked) {
+        rolesField.value.value = currentRoles.includes(role) ? currentRoles : [...currentRoles, role]
+      }
+      else {
+        rolesField.value.value = currentRoles.filter(r => r !== role)
+      }
+    },
+  })
+  return fields
+}, {} as Record<RoleType, WritableComputedRef<boolean>>)
 </script>
 
 <style scoped>

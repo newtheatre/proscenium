@@ -32,54 +32,38 @@
         >
           <FormInput
             id="name"
-            :model-value="name.value.value"
+            v-model="name"
             label="Name"
             type="text"
             autocomplete="name"
             placeholder="Enter your name"
-            :error="name.error.value"
-            :touched="name.touched.value"
-            @update:model-value="name.setValue"
-            @blur="name.setTouched()"
           />
 
           <FormInput
             id="email"
-            :model-value="email.value.value"
+            v-model="email"
             label="Email"
             type="email"
             autocomplete="email"
             placeholder="Enter your email"
-            :error="email.error.value"
-            :touched="email.touched.value"
-            @update:model-value="email.setValue"
-            @blur="email.setTouched()"
           />
 
           <FormInput
             id="password"
-            :model-value="password.value.value"
+            v-model="password"
             label="Password"
             type="password"
             autocomplete="new-password"
             placeholder="Enter your password"
-            :error="password.error.value"
-            :touched="password.touched.value"
-            @update:model-value="password.setValue"
-            @blur="password.setTouched()"
           />
 
           <FormInput
             id="confirmPassword"
-            :model-value="confirmPassword.value.value"
+            v-model="confirmPassword"
             label="Confirm Password"
             type="password"
             autocomplete="new-password"
             placeholder="Confirm your password"
-            :error="confirmPassword.error.value"
-            :touched="confirmPassword.touched.value"
-            @update:model-value="confirmPassword.setValue"
-            @blur="confirmPassword.setTouched()"
           />
 
           <FormButton
@@ -164,10 +148,10 @@ const form = useForm({
   },
 })
 
-const name = form.register('name', '')
-const email = form.register('email', '')
-const password = form.register('password', '')
-const confirmPassword = form.register('confirmPassword', '')
+const name = form.reactiveField('name')
+const email = form.reactiveField('email')
+const password = form.reactiveField('password')
+const confirmPassword = form.reactiveField('confirmPassword')
 </script>
 
 <style scoped>

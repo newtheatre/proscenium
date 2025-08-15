@@ -38,7 +38,15 @@ export const socialLinksSchema = z.object({
  */
 export const membershipSchema = z.object({
   type: z.nativeEnum(MembershipType),
-  expiry: z.string().datetime().nullable().optional(),
+  expiry: z.union([
+    z.string().datetime(),
+    z.date(),
+    z.null(),
+  ]).optional().transform((val) => {
+    if (!val) return null
+    if (val instanceof Date) return val.toISOString()
+    return val
+  }),
 })
 
 /**

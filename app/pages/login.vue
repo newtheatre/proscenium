@@ -49,28 +49,20 @@
         >
           <FormInput
             id="email"
-            :model-value="email.value.value"
+            v-model="email"
             label="Email"
             type="email"
             autocomplete="email"
             placeholder="Enter your email"
-            :error="email.error.value"
-            :touched="email.touched.value"
-            @update:model-value="email.setValue"
-            @blur="email.setTouched()"
           />
 
           <FormInput
             id="password"
-            :model-value="password.value.value"
+            v-model="password"
             label="Password"
             type="password"
             autocomplete="current-password"
             placeholder="Enter your password"
-            :error="password.error.value"
-            :touched="password.touched.value"
-            @update:model-value="password.setValue"
-            @blur="password.setTouched()"
           />
 
           <div class="login-form__forgot-password">
@@ -220,9 +212,9 @@ const resendVerificationEmail = async () => {
   }
 }
 
-// Ensure fields are properly initialized
-const email = form.register('email', '')
-const password = form.register('password', '')
+// Use reactive fields that automatically handle blur/touch events
+const email = form.reactiveField('email')
+const password = form.reactiveField('password')
 </script>
 
 <style scoped>
