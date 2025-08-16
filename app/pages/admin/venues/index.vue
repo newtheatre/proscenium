@@ -22,7 +22,7 @@
 
     <DataTable
       ref="dataTable"
-      api-endpoint="/api/venues"
+      api-endpoint="/api/admin/venues"
       :columns="columns"
       :filters="filters"
       search-placeholder="Search venues by name or address..."
@@ -36,7 +36,6 @@
 </template>
 
 <script setup lang="ts">
-import { defineComponent, h } from 'vue'
 import type { Column, Filter } from '~/components/table/types'
 import { CommonRenderers } from '~/components/table/types'
 import TableActions from '~/components/table/TableActions.vue'

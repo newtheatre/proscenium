@@ -119,7 +119,7 @@ const route = useRoute()
 const featureId = route.params.id as string
 
 // Fetch feature data
-const { data: featureResponse, pending, error: fetchError } = await useFetch<VenueFeatureResponse>(`/api/venues/features/${featureId}`)
+const { data: featureResponse, pending, error: fetchError } = await useFetch<VenueFeatureResponse>(`/api/admin/venue-features/${featureId}`)
 
 // Extract feature from the response
 const feature = computed(() => featureResponse.value?.data?.feature)
@@ -151,8 +151,8 @@ const handleFormSubmit = async (values: typeof defaultFormData, changedValues?: 
     }
   })
 
-  await $fetch(`/api/venues/features/${featureId}`, {
-    method: 'PATCH' as const,
+  await $fetch(`/api/venue-features/${featureId}`, {
+    method: 'PATCH',
     body: updateData,
   })
 

@@ -220,7 +220,7 @@ const route = useRoute()
 const venueId = computed(() => route.params.id as string)
 
 // Fetch venue data
-const { data: venueResponse, pending, error } = await useFetch<VenueResponse>(`/api/venues/${venueId.value}`)
+const { data: venueResponse, pending, error } = await useFetch<VenueResponse>(`/api/admin/venues/${venueId.value}`)
 
 // Extract venue from the response
 const venue = computed(() => venueResponse.value?.data?.venue)
@@ -258,7 +258,7 @@ const handleDeleteVenue = async () => {
   isDeleting.value = true
 
   try {
-    await $fetch(`/api/venues/${venueId.value}`, {
+    await $fetch(`/api/admin/venues/${venueId.value}`, {
       method: 'DELETE',
     })
 

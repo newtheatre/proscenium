@@ -210,8 +210,8 @@ const route = useRoute()
 const venueId = route.params.id as string
 
 // Fetch venue data and available features
-const { data: venueResponse, pending, error: fetchError } = await useFetch<VenueResponse>(`/api/venues/${venueId}`)
-const { data: featuresResponse, pending: featuresLoading, error: featuresError } = await useFetch('/api/venues/features', {
+const { data: venueResponse, pending, error: fetchError } = await useFetch<VenueResponse>(`/api/admin/venues/${venueId}`)
+const { data: featuresResponse, pending: featuresLoading, error: featuresError } = await useFetch('/api/admin/venue-features', {
   query: { isActive: 'true' },
 })
 
@@ -268,7 +268,7 @@ const handleFormSubmit = async (values: typeof defaultFormData, changedValues?: 
 
   console.log('Sending API update with data:', updateData)
 
-  await $fetch(`/api/venues/${venueId}`, {
+  await $fetch(`/api/admin/venues/${venueId}`, {
     method: 'PATCH',
     body: updateData,
   })

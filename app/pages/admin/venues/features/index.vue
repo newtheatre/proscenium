@@ -22,7 +22,7 @@
 
     <DataTable
       ref="dataTable"
-      api-endpoint="/api/venues/features"
+      api-endpoint="/api/admin/venue-features"
       :columns="columns"
       :filters="filters"
       search-placeholder="Search features by name or description..."

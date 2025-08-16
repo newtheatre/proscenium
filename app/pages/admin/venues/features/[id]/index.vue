@@ -196,7 +196,7 @@ const route = useRoute()
 const featureId = computed(() => route.params.id as string)
 
 // Fetch feature data
-const { data: featureResponse, pending, error } = await useFetch<VenueFeatureResponse>(`/api/venues/features/${featureId.value}`)
+const { data: featureResponse, pending, error } = await useFetch<VenueFeatureResponse>(`/api/admin/venue-features/${featureId.value}`)
 
 // Extract feature from the response
 const feature = computed(() => featureResponse.value?.data?.feature)
@@ -234,7 +234,7 @@ const handleDeleteFeature = async () => {
   isDeleting.value = true
 
   try {
-    await $fetch(`/api/venues/features/${featureId.value}`, {
+    await $fetch(`/api/admin/venue-features/${featureId.value}`, {
       method: 'DELETE',
     })
 
