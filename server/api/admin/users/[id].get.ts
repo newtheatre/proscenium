@@ -14,7 +14,7 @@
  *   }
  * }
  *
- * Access Control:
+ * Access Control: TODO: Modify to remove public access
  * - Admin: Full user information including sensitive data
  * - Owner: Full personal information (excluding admin-only fields)
  * - Others: Public profile information only
