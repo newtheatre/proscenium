@@ -1,7 +1,5 @@
 import prisma from '~~/lib/prisma'
 
-// TODO: Modify to be a public-facing route
-
 /**
  * GET /api/venues
  *

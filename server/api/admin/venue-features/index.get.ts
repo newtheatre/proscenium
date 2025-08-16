@@ -1,7 +1,7 @@
 import prisma from '~~/lib/prisma'
 
 /**
- * GET /api/venues/features
+ * GET /api/venue-features
  *
  * Retrieves a paginated list of venue features with support for filtering, searching, and sorting.
  *

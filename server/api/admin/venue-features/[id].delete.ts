@@ -1,5 +1,5 @@
 /**
- * DELETE /api/venues/features/[id]
+ * DELETE /api/venue-features/[id]
  *
  * Admin-only endpoint to deactivate a venue feature (soft delete).
  * This sets the feature's isActive status to false rather than permanently deleting it.

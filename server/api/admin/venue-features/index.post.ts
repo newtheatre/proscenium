@@ -1,5 +1,5 @@
 /**
- * POST /api/venues/features
+ * POST /api/venue-features
  *
  * Creates a new venue feature.
  *

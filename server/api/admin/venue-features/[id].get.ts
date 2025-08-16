@@ -1,5 +1,5 @@
 /**
- * GET /api/venues/features/[id]
+ * GET /api/venue-features/[id]
  *
  * Retrieves a specific venue feature's information.
  *

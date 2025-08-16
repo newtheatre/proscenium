@@ -1,5 +1,5 @@
 /**
- * PATCH /api/venues/features/[id]
+ * PATCH /api/venue-features/[id]
  *
  * Admin-only endpoint to update venue feature information.
  *
