@@ -48,6 +48,14 @@ export const useFormatters = () => {
     }
   }
 
+  const formatCurrency = (pence: number) => {
+    const pounds = pence / 100
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP',
+    }).format(pounds)
+  }
+
   return {
     formatMembershipType,
     formatDate,
@@ -55,5 +63,6 @@ export const useFormatters = () => {
     formatRole,
     hasSocialLinks,
     formatUserStatus,
+    formatCurrency,
   }
 }
