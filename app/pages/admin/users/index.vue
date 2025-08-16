@@ -6,7 +6,7 @@
 
     <DataTable
       ref="dataTable"
-      api-endpoint="/api/users"
+      api-endpoint="/api/admin/users"
       :columns="columns"
       :filters="filters"
       search-placeholder="Search users by email, name, or student ID..."

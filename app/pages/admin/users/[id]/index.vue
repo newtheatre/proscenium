@@ -199,7 +199,7 @@ const route = useRoute()
 const userId = route.params.id as string
 
 // Fetch user data
-const { data: response, pending, error } = await useFetch<UserResponse>(`/api/users/${userId}`)
+const { data: response, pending, error } = await useFetch<UserResponse>(`/api/admin/users/${userId}`)
 
 // Extract user from response
 const user = computed(() => response.value?.data?.user)
