@@ -55,6 +55,7 @@ model ReservedTicket {
 enum ReservationStatus {
   PENDING_COLLECTION // Reserved online, awaiting in-person payment & collection
   COLLECTED // Paid and tickets issued
+  PURCHASED_ON_DOOR // Tickets purchased at the venue without prior reservation
   CANCELLED_BY_CUSTOMER
   CANCELLED_BY_ADMIN // Staff cancelled (e.g., due to no payment, operational reasons)
   NO_SHOW // Customer did not attend

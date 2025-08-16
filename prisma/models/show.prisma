@@ -3,7 +3,7 @@ model Show {
   title          String
   slug           String     @unique // URL-friendly identifier
   description    String
-  status         ShowStatus @default(PLANNING)
+  status         ShowStatus @default(DRAFT)
   showType       ShowType // e.g., IN_HOUSE, STUDIO, FESTIVAL
   posterImageUrl String?
   programmeUrl   String? // URL to a PDF or webpage with the show programme
@@ -72,12 +72,9 @@ model ShowInduction {
 
 // TODO: Maybe allow users to create custom statuses and show types?
 enum ShowStatus {
-  PLANNING
-  UPCOMING
-  RUNNING
-  PAST
   CANCELLED
   DRAFT
+  PUBLISHED
 }
 
 enum ShowType {
