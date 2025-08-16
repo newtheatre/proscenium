@@ -8,8 +8,8 @@ declare module '#auth-utils' {
     roles: string[]
     profile?: {
       name?: string
-      avatar?: string
-    }
+      avatar?: string | null
+    } | null
   }
 
   interface UserSession {

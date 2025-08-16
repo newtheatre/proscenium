@@ -1,159 +1,107 @@
-import type { MembershipType, RoleType } from '@prisma/client'
+import type {
+  ValidationError,
+  HttpStatusCode,
+} from './base'
 
 /**
- * Shared type definitions for API responses and data structures
+ * General API patterns and utilities
  */
 
-export interface User {
-  id: string
-  email: string
-  studentId?: string | null
-  emailVerified: boolean
-  setupCompleted: boolean
-  setupCompletedAt?: string | null
-  isActive: boolean
-  roles: RoleType[]
-  createdAt: string
-  updatedAt: string
-  lastLogin?: string | null
-}
-
-export interface Profile {
-  name: string
-  bio?: string | null
-  avatar?: string | null
-  gradYear?: number | null
-  course?: string | null
-  socialLinks?: SocialLinks | null
-}
-
-export interface SocialLinks {
-  github?: string | null
-  linkedin?: string | null
-  facebook?: string | null
-  discord?: string | null
-  instagram?: string | null
-}
-
-export interface Membership {
-  type: MembershipType
-  expiry?: string | null
-}
-
-export interface UserWithRelations extends User {
-  profile?: Profile | null
-  membership?: Membership | null
-}
-
-/**
- * API Response types
- */
-export interface Pagination {
-  page: number
-  total: number
-  pages: number
-  limit: number
-}
-
+// Generic API response wrapper
 export interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
   message?: string
-  pagination?: Pagination
+  errors?: string[]
+  pagination?: PaginationInfo
 }
 
-export type UserResponse = ApiResponse<{ user: UserWithRelations }>
+// Success response shorthand
+export type SuccessResponse<T> = ApiResponse<T> & { success: true, data: T }
 
-/**
- * Venue types
- */
-export interface VenueFeature {
-  id: string
-  name: string
-  description?: string | null
-  icon?: string | null
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
-  venues?: AssociatedVenue[]
+// Error response shorthand
+export type ErrorResponse = ApiResponse<never> & {
+  success: false
+  message: string
+  errors?: string[]
 }
 
-export interface AssociatedVenue {
-  id: string
-  name: string
-  address?: string | null
-  capacity?: number | null
-  isActive: boolean
+// Generic list response
+export interface ListResponse<T> {
+  items: T[]
+  pagination: PaginationInfo
 }
 
-export interface Venue {
-  id: string
-  name: string
-  address?: string | null
-  capacity?: number | null
-  imageUrl?: string | null
-  notes?: string | null
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
-  features?: VenueFeature[]
+// Common sort options
+export type SortOrder = 'asc' | 'desc'
+export type SortField<T> = keyof T | string
+
+export interface SortOptions<T = Record<string, unknown>> {
+  field: SortField<T>
+  order: SortOrder
 }
 
-export interface VenueWithRelations extends Venue {
-  features: VenueFeature[]
+// Generic query builder types
+export interface QueryOptions<T = Record<string, unknown>> {
+  select?: (keyof T)[]
+  include?: string[]
+  where?: Record<string, unknown>
+  orderBy?: SortOptions<T>[]
+  take?: number
+  skip?: number
 }
 
-export type VenueResponse = ApiResponse<{ venue: VenueWithRelations }>
-export type VenuesResponse = ApiResponse<{ venues: Venue[] }>
-export type VenueFeatureResponse = ApiResponse<{ feature: VenueFeature }>
-export type VenueFeaturesResponse = ApiResponse<{ features: VenueFeature[] }>
+// Common HTTP status codes for API responses
+export enum HttpStatusCode {
+  OK = 200,
+  CREATED = 201,
+  NO_CONTENT = 204,
+  BAD_REQUEST = 400,
+  UNAUTHORIZED = 401,
+  FORBIDDEN = 403,
+  NOT_FOUND = 404,
+  CONFLICT = 409,
+  UNPROCESSABLE_ENTITY = 422,
+  INTERNAL_SERVER_ERROR = 500,
+}
 
-/**
- * Form data types
- */
-export interface UserUpdateData {
-  email?: string
-  studentId?: string | null
-  password?: string
-  emailVerified?: boolean
-  setupCompleted?: boolean
-  isActive?: boolean
-  roles?: RoleType[]
-  membership?: {
-    type: MembershipType
-    expiry?: string | null
+// Generic error types
+export interface ApiError {
+  code: string
+  message: string
+  statusCode: HttpStatusCode
+  details?: Record<string, unknown>
+}
+
+export interface FieldError {
+  field: string
+  value: unknown
+  message: string
+  code: string
+}
+
+// Common API error responses
+export interface ApiErrorResponse {
+  success: false
+  message: string
+  code?: string
+  statusCode: HttpStatusCode
+  errors?: ValidationError[]
+  timestamp: string
+}
+
+// API health check response
+export interface HealthCheckResponse {
+  status: 'healthy' | 'degraded' | 'unhealthy'
+  timestamp: string
+  version: string
+  uptime: number
+  database: {
+    status: 'connected' | 'disconnected'
+    responseTime: number
   }
-  profile?: Partial<Profile>
-}
-
-export interface VenueCreatePayload {
-  name: string
-  address?: string
-  capacity?: number
-  imageUrl?: string
-  notes?: string
-  featureIds?: string[]
-}
-
-export interface VenueUpdatePayload {
-  name?: string
-  address?: string
-  capacity?: number | null
-  imageUrl?: string
-  notes?: string
-  isActive?: boolean
-  featureIds?: string[]
-}
-
-export interface VenueFeatureCreatePayload {
-  name: string
-  description?: string
-  icon?: string
-}
-
-export interface VenueFeatureUpdatePayload {
-  name?: string
-  description?: string
-  icon?: string
-  isActive?: boolean
+  services: Record<string, {
+    status: 'available' | 'unavailable'
+    responseTime?: number
+  }>
 }
