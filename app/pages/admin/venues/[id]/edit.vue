@@ -269,7 +269,7 @@ const handleFormSubmit = async (values: typeof defaultFormData, changedValues?: 
   console.log('Sending API update with data:', updateData)
 
   await $fetch(`/api/venues/${venueId}`, {
-    method: 'PATCH' as const,
+    method: 'PATCH',
     body: updateData,
   })
 

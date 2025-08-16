@@ -131,3 +131,40 @@ export const adminUserEditFormSchema = z.object({
     }),
   }),
 })
+
+// Venue form validation schemas
+export const venueCreateFormSchema = z.object({
+  name: commonSchemas.required,
+  address: z.string(),
+  capacity: z.string().refine(val => val === '' || /^\d+$/.test(val), {
+    message: 'Capacity must be a valid number',
+  }),
+  imageUrl: z.string().refine(val => val === '' || z.string().url().safeParse(val).success, {
+    message: 'Must be a valid URL when provided',
+  }),
+  notes: z.string(),
+  isActive: commonSchemas.boolean,
+})
+
+export const venueEditFormSchema = z.object({
+  name: commonSchemas.required,
+  address: z.string(),
+  capacity: z.string().refine(val => val === '' || /^\d+$/.test(val), {
+    message: 'Capacity must be a valid number',
+  }),
+  imageUrl: z.string().refine(val => val === '' || z.string().url().safeParse(val).success, {
+    message: 'Must be a valid URL when provided',
+  }),
+  notes: z.string(),
+  isActive: commonSchemas.boolean,
+  featureIds: z.array(z.string()),
+})
+
+export const venueFeatureCreateFormSchema = z.object({
+  name: commonSchemas.required,
+  description: z.string(),
+  icon: z.string(),
+  isActive: commonSchemas.boolean,
+})
+
+export const venueFeatureEditFormSchema = venueFeatureCreateFormSchema
