@@ -1,5 +1,5 @@
 model Venue {
-  id       String  @id @default(cuid())
+  id       String  @id @default(nanoid())
   name     String  @unique
   address  String?
   capacity Int? // Default seating capacity, can be overridden at Performance level
@@ -16,7 +16,7 @@ model Venue {
 }
 
 model VenueFeature {
-  id          String  @id @default(cuid())
+  id          String  @id @default(nanoid())
   name        String  @unique // e.g., "Wheelchair Accessible", "Hearing Loop", "Parking Available"
   description String? // Additional details about the feature
   icon        String? // e.g., an emoji or an icon class name

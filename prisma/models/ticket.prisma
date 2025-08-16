@@ -1,5 +1,5 @@
 model TicketType {
-  id           String  @id @default(cuid())
+  id           String  @id @default(nanoid())
   name         String  @unique // e.g., "Adult", "Child", "Concession", "Member Early Bird"
   description  String?
   defaultPrice Float // Default price in GBP (or your theatre's currency)
@@ -19,7 +19,7 @@ model TicketType {
 // For setting a specific price for a ticket type at the SHOW level.
 // This acts as a default for all performances of that show, unless overridden by PerformanceTicketPrice.
 model ShowTicketPrice {
-  id    String  @id @default(cuid())
+  id    String  @id @default(nanoid())
   price Float // Price for this ticket type for this show
   notes String? // e.g., "Weekend Show Price"
 
@@ -41,7 +41,7 @@ model ShowTicketPrice {
 // For setting a specific price for a ticket type at the PERFORMANCE level.
 // This overrides any ShowTicketPrice and TicketType.defaultPrice.
 model PerformanceTicketPrice {
-  id    String  @id @default(cuid())
+  id    String  @id @default(nanoid())
   price Float // Price for this ticket type for this specific performance
   notes String? // e.g., "Opening Night Special", "Limited View Discount"
 

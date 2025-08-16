@@ -1,6 +1,6 @@
 model Reservation {
-  id                  String            @id @default(cuid())
-  reservationCode     String            @unique @default(cuid()) // Public-facing unique code for the reservation
+  id                  String            @id @default(nanoid())
+  reservationCode     String            @unique @default(nanoid()) // Public-facing unique code for the reservation
   totalPrice          Float // Total price calculated at the time of reservation
   reservationDateTime DateTime          @default(now())
   status              ReservationStatus @default(PENDING_COLLECTION)
@@ -27,7 +27,7 @@ model Reservation {
 }
 
 model ReservedTicket {
-  id                          String @id @default(cuid())
+  id                          String @id @default(nanoid())
   quantity                    Int
   pricePerItemAtReservation   Float // Price per single ticket of this type at the time of reservation
   ticketTypeNameAtReservation String // Denormalised name for historical accuracy on receipts/reports

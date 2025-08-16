@@ -48,7 +48,7 @@ enum RoleType {
 }
 
 model Membership {
-  id     String         @id @default(cuid())
+  id     String         @id @default(nanoid())
   type   MembershipType @default(UNKNOWN)
   expiry DateTime?
 
@@ -67,7 +67,7 @@ enum MembershipType {
 }
 
 model Profile {
-  id          String       @id @default(cuid())
+  id          String       @id @default(nanoid())
   name        String
   bio         String?
   avatar      String?
@@ -81,7 +81,7 @@ model Profile {
 }
 
 model SocialLinks {
-  id        String  @id @default(cuid())
+  id        String  @id @default(nanoid())
   github    String?
   linkedin  String?
   facebook  String?

@@ -1,5 +1,5 @@
 model Show {
-  id             String     @id @default(cuid())
+  id             String     @id @default(nanoid())
   title          String
   slug           String     @unique // URL-friendly identifier
   description    String
@@ -25,7 +25,7 @@ model Show {
 }
 
 model ContentWarning {
-  id          String  @id @default(cuid())
+  id          String  @id @default(nanoid())
   name        String  @unique // e.g., "Strobe Lighting", "Strong Language", "Haze"
   description String?
   icon        String? // e.g., an emoji or an icon class name
@@ -51,7 +51,7 @@ model ShowContentWarning {
 }
 
 model ShowInduction {
-  id                      String  @id @default(cuid())
+  id                      String  @id @default(nanoid())
   technicalRequirements   String?
   riskAssessmentCompleted Boolean @default(false)
   riskAssessmentLink      String?

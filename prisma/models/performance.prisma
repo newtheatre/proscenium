@@ -1,5 +1,5 @@
 model Performance {
-  id            String   @id @default(cuid())
+  id            String   @id @default(nanoid())
   title         String
   startDateTime DateTime // Start date and time of the performance/event
   endDateTime   DateTime // End date and time
