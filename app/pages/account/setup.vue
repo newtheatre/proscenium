@@ -21,27 +21,20 @@
 
             <FormInput
               id="name"
-              :model-value="name.value.value"
+              v-model="nameField"
               label="Full Name"
               type="text"
               autocomplete="name"
               placeholder="Enter your full name"
-              :error="name.error.value"
-              :touched="name.touched.value"
-              @update:model-value="name.setValue"
-              @blur="name.setTouched()"
+              required
             />
 
             <FormTextarea
               id="bio"
-              :model-value="bio.value.value"
+              v-model="profileBioField"
               label="Bio (Optional)"
               placeholder="Tell us about yourself..."
-              :error="bio.error.value"
-              :touched="bio.touched.value"
               :rows="3"
-              @update:model-value="bio.setValue"
-              @blur="bio.setTouched()"
             />
           </div>
 
@@ -53,58 +46,43 @@
 
             <FormSelect
               id="membershipType"
-              :model-value="membershipType.value.value"
+              v-model="membershipTypeField"
               label="Membership Type"
               placeholder="Select your membership type"
               placeholder-value="UNKNOWN"
               :options="membershipOptions"
-              :error="membershipType.error.value"
-              :touched="membershipType.touched.value"
-              @update:model-value="membershipType.setValue"
-              @blur="membershipType.setTouched()"
+              required
             />
 
             <!-- Student ID - only for non-guest members -->
             <FormInput
               v-if="showStudentId"
               id="studentId"
-              :model-value="studentId.value.value"
+              v-model="studentIdField"
               label="Student ID"
               type="text"
               placeholder="Enter your student ID"
-              :error="studentId.error.value"
-              :touched="studentId.touched.value"
-              @update:model-value="studentId.setValue"
-              @blur="studentId.setTouched()"
             />
 
             <!-- Course and Graduation Year - not required for guests -->
             <FormInput
               v-if="showCourseAndGradYear"
               id="course"
-              :model-value="course.value.value"
+              v-model="profileCourseField"
               label="Course/Degree (Optional)"
               type="text"
               placeholder="e.g. Computer Science"
-              :error="course.error.value"
-              :touched="course.touched.value"
-              @update:model-value="course.setValue"
-              @blur="course.setTouched()"
             />
 
             <FormInput
               v-if="showCourseAndGradYear"
               id="gradYear"
-              :model-value="gradYear.value.value"
+              v-model="profileGradYearField"
               :label="gradYearLabel"
               type="number"
               :placeholder="gradYearPlaceholder"
               :min="gradYearMin"
               :max="gradYearMax"
-              :error="gradYear.error.value"
-              :touched="gradYear.touched.value"
-              @update:model-value="gradYear.setValue"
-              @blur="gradYear.setTouched()"
             />
           </div>
 
@@ -115,62 +93,42 @@
           >
             <FormInput
               id="facebook"
-              :model-value="facebook.value.value"
+              v-model="socialFacebookField"
               label="Facebook"
               type="url"
               placeholder="https://facebook.com/username"
-              :error="facebook.error.value"
-              :touched="facebook.touched.value"
-              @update:model-value="facebook.setValue"
-              @blur="facebook.setTouched()"
             />
 
             <FormInput
               id="instagram"
-              :model-value="instagram.value.value"
+              v-model="socialInstagramField"
               label="Instagram Handle"
               type="text"
               placeholder="@username"
-              :error="instagram.error.value"
-              :touched="instagram.touched.value"
-              @update:model-value="instagram.setValue"
-              @blur="instagram.setTouched()"
             />
 
             <FormInput
               id="linkedin"
-              :model-value="linkedin.value.value"
+              v-model="socialLinkedinField"
               label="LinkedIn"
               type="url"
               placeholder="https://linkedin.com/in/username"
-              :error="linkedin.error.value"
-              :touched="linkedin.touched.value"
-              @update:model-value="linkedin.setValue"
-              @blur="linkedin.setTouched()"
             />
 
             <FormInput
               id="github"
-              :model-value="github.value.value"
+              v-model="socialGithubField"
               label="GitHub"
               type="url"
               placeholder="https://github.com/username"
-              :error="github.error.value"
-              :touched="github.touched.value"
-              @update:model-value="github.setValue"
-              @blur="github.setTouched()"
             />
 
             <FormInput
               id="discord"
-              :model-value="discord.value.value"
+              v-model="socialDiscordField"
               label="Discord Username"
               type="text"
               placeholder="@username"
-              :error="discord.error.value"
-              :touched="discord.touched.value"
-              @update:model-value="discord.setValue"
-              @blur="discord.setTouched()"
             />
           </UIExpandableSection>
 
@@ -215,7 +173,7 @@ definePageMeta({
 const currentYear = new Date().getFullYear()
 
 // Load existing user data
-const { data: userData } = await useFetch('/api/users/me')
+const { data: userData } = await useFetch('/api/account')
 
 // Extract initial values from user data
 const getInitialValues = () => {
@@ -267,6 +225,7 @@ const membershipOptions = [
 ]
 
 // Setup schema with conditional validation
+// TODO: Move this to shared/schemas
 const setupSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
   bio: z.string().max(500, 'Bio too long').optional(),
@@ -348,32 +307,35 @@ const form = useForm({
   },
 })
 
-// Register form fields
-const name = form.register('name', '')
-const bio = form.register('bio', '')
-const membershipType = form.register('membershipType', '')
-const studentId = form.register('studentId', '')
-const gradYear = form.register('gradYear', '')
-const course = form.register('course', '')
-const github = form.register('github', '')
-const linkedin = form.register('linkedin', '')
-const facebook = form.register('facebook', '')
-const instagram = form.register('instagram', '')
-const discord = form.register('discord', '')
+// Register form fields using reactiveField
+const nameField = form.reactiveField('name')
+const studentIdField = form.reactiveField('studentId')
+const membershipTypeField = form.reactiveField('membership.type')
+const membershipExpiryField = form.reactiveField<Date | null>('membership.expiry', null)
+const profileNameField = form.reactiveField('profile.name')
+const profileBioField = form.reactiveField('profile.bio')
+const profileAvatarField = form.reactiveField('profile.avatar')
+const profileGradYearField = form.reactiveField('profile.gradYear')
+const profileCourseField = form.reactiveField('profile.course')
+const socialGithubField = form.reactiveField('profile.socialLinks.github')
+const socialLinkedinField = form.reactiveField('profile.socialLinks.linkedin')
+const socialFacebookField = form.reactiveField('profile.socialLinks.facebook')
+const socialDiscordField = form.reactiveField('profile.socialLinks.discord')
+const socialInstagramField = form.reactiveField('profile.socialLinks.instagram')
 
 // Computed properties for conditional rendering and validation
 const showStudentId = computed(() => {
-  const membershipTypeValue = membershipType.value.value
+  const membershipTypeValue = membershipTypeField.value.value
   return membershipTypeValue && membershipTypeValue !== 'GUEST' && membershipTypeValue !== 'UNKNOWN'
 })
 
 const showCourseAndGradYear = computed(() => {
-  const membershipTypeValue = membershipType.value.value
+  const membershipTypeValue = membershipTypeField.value.value
   return membershipTypeValue && membershipTypeValue !== 'GUEST' && membershipTypeValue !== 'UNKNOWN'
 })
 
 const gradYearLabel = computed(() => {
-  const membershipTypeValue = membershipType.value.value
+  const membershipTypeValue = membershipTypeField.value.value
   switch (membershipTypeValue) {
     case 'ALUMNI':
       return 'Graduation Year'
@@ -387,7 +349,7 @@ const gradYearLabel = computed(() => {
 })
 
 const gradYearPlaceholder = computed(() => {
-  const membershipTypeValue = membershipType.value.value
+  const membershipTypeValue = membershipTypeField.value.value
   switch (membershipTypeValue) {
     case 'ALUMNI':
     case 'FELLOW':
@@ -400,15 +362,10 @@ const gradYearPlaceholder = computed(() => {
   }
 })
 
-const gradYearMin = computed(() => {
-  return 1900
-})
-
+const gradYearMin = computed(() => 1900)
 const gradYearMax = computed(() => {
-  const membershipTypeValue = membershipType.value.value
-  if (membershipTypeValue === 'ALUMNI') {
-    return currentYear
-  }
+  const membershipTypeValue = membershipTypeField.value.value
+  if (membershipTypeValue === 'ALUMNI') return currentYear
   return currentYear + 5
 })
 </script>

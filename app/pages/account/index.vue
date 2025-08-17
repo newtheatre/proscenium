@@ -30,7 +30,7 @@
 </template>
 
 <script lang="ts" setup>
-const user = await useFetch<UserResponse>('/api/users/me')
+const user = await useFetch<UserResponse>('/api/account')
 
 definePageMeta({
   middleware: ['auth'],
