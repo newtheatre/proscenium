@@ -403,34 +403,28 @@ const { data: performance } = await useFetch<Performance>(
   },
 )
 
-// Fetch available ticket types for this performance from v1 API (client-side only)
-const ticketTypes = ref<TicketType[]>([])
-
-onMounted(async () => {
-  try {
-    const response = await $fetch<{
-      data: {
-        ticketTypes: Array<{
-          id: string
-          price: number
-          ticketType: {
-            id: string
-            name: string
-            description?: string
-          }
-        }>
-      }
-    }>(`/api/v1/performances/${performanceId}/tickets`)
-
-    ticketTypes.value = response.data.ticketTypes.map(tt => ({
-      id: tt.ticketType.id,
-      name: tt.ticketType.name,
-      price: tt.price,
-    }))
+// Fetch available ticket types for this performance from v2 API (SSR)
+const { data: ticketTypesData } = await useFetch<Array<{
+  ticketType: {
+    id: string
+    name: string
+    description?: string
+    defaultPrice: number
+    sortOrder: number | null
   }
-  catch (error) {
-    console.error('Failed to load ticket types:', error)
-  }
+  price: number
+  notes: string | null
+  priceSource: string
+}>>(`/api/v2/performances/${performanceId}/tickets`)
+
+const ticketTypes = computed<TicketType[]>(() => {
+  if (!ticketTypesData.value) return []
+
+  return ticketTypesData.value.map(tt => ({
+    id: tt.ticketType.id,
+    name: tt.ticketType.name,
+    price: tt.price,
+  }))
 })
 
 // Fetch reservations
