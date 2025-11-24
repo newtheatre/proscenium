@@ -13,12 +13,21 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Verify the performance exists and get its show ID
+  // Verify the performance exists, is active, and get its show ID
   const performance = await prisma.performance.findUnique({
-    where: { id: performanceId },
+    where: {
+      id: performanceId,
+      isActive: true,
+    },
     select: {
       id: true,
       showId: true,
+      maxCapacity: true,
+      show: {
+        select: {
+          status: true,
+        },
+      },
     },
   })
 
@@ -28,6 +37,32 @@ export default defineEventHandler(async (event) => {
       message: 'Performance not found',
     })
   }
+
+  // Check if show is published (if linked to a show)
+  if (performance.show && performance.show.status !== 'PUBLISHED') {
+    throw createError({
+      statusCode: 404,
+      message: 'Performance not available',
+    })
+  }
+
+  // Calculate availability
+  const reservationStats = await prisma.reservedTicket.aggregate({
+    where: {
+      reservation: {
+        performanceId,
+        status: { notIn: ['CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_ADMIN'] },
+      },
+    },
+    _sum: {
+      quantity: true,
+    },
+  })
+
+  const totalSold = reservationStats._sum.quantity ?? 0
+  const isUnlimited = performance.maxCapacity === -1
+  const remainingCapacity = isUnlimited ? 9999 : Math.max(0, performance.maxCapacity - totalSold)
+  const isSoldOut = !isUnlimited && remainingCapacity <= 0
 
   // Get all active ticket types
   const allTicketTypes = await prisma.ticketType.findMany({
@@ -79,7 +114,7 @@ export default defineEventHandler(async (event) => {
   )
 
   // Build the response with correct pricing hierarchy
-  const ticketPrices = allTicketTypes.map((ticketType) => {
+  const ticketTypes = allTicketTypes.map((ticketType) => {
     const performancePrice = performancePriceMap.get(ticketType.id)
     const showPrice = showPriceMap.get(ticketType.id)
 
@@ -89,18 +124,26 @@ export default defineEventHandler(async (event) => {
     const priceSource = performancePrice ? 'performance' : showPrice ? 'show' : 'default'
 
     return {
-      ticketType: {
-        id: ticketType.id,
-        name: ticketType.name,
-        description: ticketType.description,
-        defaultPrice: ticketType.defaultPrice,
-        sortOrder: ticketType.sortOrder,
-      },
+      id: ticketType.id,
+      name: ticketType.name,
+      description: ticketType.description,
       price,
       notes,
-      priceSource, // Helpful for debugging/understanding where the price comes from
+      priceSource,
     }
   })
 
-  return ticketPrices
+  return {
+    performance: {
+      id: performance.id,
+    },
+    availability: {
+      total: performance.maxCapacity,
+      sold: totalSold,
+      remaining: remainingCapacity,
+      isSoldOut,
+      isUnlimited,
+    },
+    ticketTypes,
+  }
 })

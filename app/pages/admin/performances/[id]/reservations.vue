@@ -404,25 +404,14 @@ const { data: performance } = await useFetch<Performance>(
 )
 
 // Fetch available ticket types for this performance from v2 API (SSR)
-const { data: ticketTypesData } = await useFetch<Array<{
-  ticketType: {
-    id: string
-    name: string
-    description?: string
-    defaultPrice: number
-    sortOrder: number | null
-  }
-  price: number
-  notes: string | null
-  priceSource: string
-}>>(`/api/v2/performances/${performanceId}/tickets`)
+const { data: ticketTypesResponse } = await useFetch(`/api/v2/performances/${performanceId}/tickets`)
 
 const ticketTypes = computed<TicketType[]>(() => {
-  if (!ticketTypesData.value) return []
+  if (!ticketTypesResponse.value?.ticketTypes) return []
 
-  return ticketTypesData.value.map(tt => ({
-    id: tt.ticketType.id,
-    name: tt.ticketType.name,
+  return ticketTypesResponse.value.ticketTypes.map(tt => ({
+    id: tt.id,
+    name: tt.name,
     price: tt.price,
   }))
 })
