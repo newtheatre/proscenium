@@ -9,7 +9,7 @@
 
 import type { H3Event } from 'h3'
 import type { User } from '#auth-utils'
-import type { RoleType } from '@prisma/client'
+import type { RoleType } from '~~/prisma/generated/client'
 
 /**
  * Requires user to be authenticated

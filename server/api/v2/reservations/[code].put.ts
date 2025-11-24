@@ -1,5 +1,5 @@
 import z from 'zod'
-import type { ReservationStatus } from '@prisma/client'
+import type { ReservationStatus } from '~~/prisma/generated/client'
 import prisma from '~~/server/database'
 
 const bodySchema = z.object({

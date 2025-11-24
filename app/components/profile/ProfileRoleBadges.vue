@@ -18,7 +18,7 @@
 </template>
 
 <script lang="ts" setup>
-import type { RoleType } from '@prisma/client'
+import type { RoleType } from '~~/prisma/generated/client'
 
 interface Props {
   roles: RoleType[]

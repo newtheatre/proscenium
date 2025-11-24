@@ -28,7 +28,7 @@ logs
 *.sqlite
 
 # Prisma client (Not currently used)
-/lib/generated/prisma
+/prisma/generated/
 
 # VSCode
 .vscode/

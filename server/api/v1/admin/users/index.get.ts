@@ -1,5 +1,5 @@
 import prisma from '~~/server/database'
-import type { MembershipType, RoleType, Prisma } from '@prisma/client'
+import type { MembershipType, RoleType, Prisma } from '~~/prisma/generated/client'
 
 /**
  * GET /api/v1/users

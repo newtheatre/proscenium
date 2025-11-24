@@ -1,4 +1,4 @@
-import { RoleType, MembershipType } from '@prisma/client'
+import { RoleType, MembershipType } from '~~/prisma/generated/client'
 import z from 'zod'
 import prisma from '~~/server/database'
 

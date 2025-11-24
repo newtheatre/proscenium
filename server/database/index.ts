@@ -1,10 +1,13 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '~~/prisma/generated/client'
 import { PrismaD1 } from '@prisma/adapter-d1'
+import { PrismaLibSql } from '@prisma/adapter-libsql'
 
 const prismaClientSingleton = () => {
   // In development, use SQLite directly without adapter
   if (process.env.NODE_ENV !== 'production') {
-    return new PrismaClient()
+    const adapter = new PrismaLibSql({ url: process.env.DATABASE_URL ?? '' })
+
+    return new PrismaClient({ adapter })
   }
 
   // In production, use Cloudflare D1 with adapter

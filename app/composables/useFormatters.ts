@@ -1,4 +1,4 @@
-import type { MembershipType } from '@prisma/client'
+import type { MembershipType } from '~~/prisma/generated/client'
 import type { SocialLinks } from '../../shared/types/api'
 
 /**

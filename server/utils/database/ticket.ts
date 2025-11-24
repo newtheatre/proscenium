@@ -1,5 +1,5 @@
 import prisma from '~~/server/database'
-import type { Prisma } from '@prisma/client'
+import type { Prisma } from '~~/prisma/generated/client'
 import { dbErrors } from './index'
 
 /**

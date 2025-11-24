@@ -242,7 +242,7 @@
 </template>
 
 <script lang="ts" setup>
-import type { RoleType } from '@prisma/client'
+import type { RoleType } from '~~/prisma/generated/client'
 import { parseDateFromApi, formatDateForApi } from '~/utils/dates'
 
 definePageMeta({

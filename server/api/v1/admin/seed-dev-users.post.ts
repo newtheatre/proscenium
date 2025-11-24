@@ -1,5 +1,5 @@
 import prisma from '~~/server/database'
-import type { RoleType, MembershipType } from '@prisma/client'
+import type { RoleType, MembershipType } from '~~/prisma/generated/client'
 
 /**
  * POST /api/v1/admin/seed-dev-users
