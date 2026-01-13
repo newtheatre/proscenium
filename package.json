@@ -16,7 +16,7 @@
     "@nuxt/eslint": "1.12.1",
     "@nuxt/hints": "1.0.0-alpha.5",
     "@nuxt/image": "2.0.0",
-    "@nuxt/ui": "4.3.0",
+    "@nuxt/ui": "4.2.1",
     "@nuxthub/core": "0.10.4",
     "@nuxtjs/seo": "3.3.0",
     "better-sqlite3": "^12.6.0",
@@ -24,29 +24,11 @@
     "drizzle-orm": "^0.45.1",
     "eslint": "^9.0.0",
     "nuxt": "^4.2.2",
-    "nuxt-studio": "1.0.0",
     "typescript": "^5.6.3",
     "vue": "^3.5.26",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "wrangler": "^3.90.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "@tiptap/core": "^3.15.3",
-      "@tiptap/pm": "^3.15.3",
-      "@tiptap/starter-kit": "^3.15.3"
-    }
-  },
-  "overrides": {
-    "@tiptap/core": "^3.15.3",
-    "@tiptap/pm": "^3.15.3",
-    "@tiptap/starter-kit": "^3.15.3"
-  },
-  "resolutions": {
-    "@tiptap/core": "^3.15.3",
-    "@tiptap/pm": "^3.15.3",
-    "@tiptap/starter-kit": "^3.15.3"
+    "wrangler": "^4.59.0"
   }
 }
