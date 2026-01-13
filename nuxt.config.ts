@@ -31,7 +31,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
 
   nitro: {
-    preset: 'cloudflare_module',
+    // preset: 'cloudflare_module', // TODO: enable when deploying
     cloudflare: {
       deployConfig: true,
       nodeCompat: true,
@@ -41,7 +41,7 @@ export default defineNuxtConfig({
   hub: {
     db: {
       dialect: 'sqlite',
-      driver: 'd1', // FIXME: https://github.com/nuxt-hub/core/pull/775
+      driver: 'libsql', // FIXME: https://github.com/nuxt-hub/core/pull/775
       connection: { databaseId: 'c4200074-3ce8-411d-b428-811277057e6b' },
     },
     // KV namespace (binding defaults to 'KV')
