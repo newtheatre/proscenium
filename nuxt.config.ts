@@ -10,6 +10,8 @@ export default defineNuxtConfig({
     '@nuxt/ui',
     '@nuxtjs/seo',
     '@nuxthub/core',
+    'nuxt-authorization',
+    'nuxt-auth-utils',
   ],
 
   $production: {
