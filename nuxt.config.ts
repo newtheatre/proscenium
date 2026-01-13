@@ -57,6 +57,9 @@ export default defineNuxtConfig({
 
   nitro: {
     // preset: 'cloudflare_module', // TODO: enable when deploying
+    experimental: {
+      tasks: true,
+    },
     cloudflare: {
       deployConfig: true,
       nodeCompat: true,
