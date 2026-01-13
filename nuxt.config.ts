@@ -45,6 +45,8 @@ export default defineNuxtConfig({
   },
   devtools: { enabled: true },
 
+  css: ['~/assets/css/main.css'],
+
   content: {
     database: {
       type: 'd1',
