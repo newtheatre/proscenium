@@ -7,15 +7,7 @@ export const users = sqliteTable('users', {
   email: text('email').notNull().unique(),
   password: text('password'), // Nullable for guest bookings
   fullName: text('full_name').notNull(),
-
-  // Email verification
   emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
-  emailVerificationToken: text('email_verification_token'),
-  emailVerificationExpires: integer('email_verification_expires', { mode: 'timestamp' }),
-
-  // Password reset
-  passwordResetToken: text('password_reset_token'),
-  passwordResetExpires: integer('password_reset_expires', { mode: 'timestamp' }),
 
   // Metadata
   createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
@@ -33,4 +25,26 @@ export const userRoles = sqliteTable('user_roles', {
 }, table => [
   index('user_roles_user_id_idx').on(table.userId),
   uniqueIndex('user_roles_user_id_role_unique').on(table.userId, table.role),
+])
+
+export const emailVerifications = sqliteTable('email_verifications', {
+  id: text('id').primaryKey().$defaultFn(() => nanoid()),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: text('token').notNull().unique(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
+}, table => [
+  index('email_verifications_user_id_idx').on(table.userId),
+  index('email_verifications_token_idx').on(table.token),
+])
+
+export const passwordResets = sqliteTable('password_resets', {
+  id: text('id').primaryKey().$defaultFn(() => nanoid()),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: text('token').notNull().unique(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
+}, table => [
+  index('password_resets_user_id_idx').on(table.userId),
+  index('password_resets_token_idx').on(table.token),
 ])

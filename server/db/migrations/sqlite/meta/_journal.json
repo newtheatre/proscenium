@@ -8,6 +8,13 @@
       "when": 1768235438653,
       "tag": "0000_shallow_typhoid_mary",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1768330778079,
+      "tag": "0001_peaceful_vulcan",
+      "breakpoints": true
     }
   ]
 }
