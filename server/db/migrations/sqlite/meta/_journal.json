@@ -15,6 +15,13 @@
       "when": 1768330778079,
       "tag": "0001_peaceful_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1768331928938,
+      "tag": "0002_gorgeous_reptil",
+      "breakpoints": true
     }
   ]
 }

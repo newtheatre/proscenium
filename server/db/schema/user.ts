@@ -6,14 +6,13 @@ export const users = sqliteTable('users', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   email: text('email').notNull().unique(),
   password: text('password'), // Nullable for guest bookings
-  fullName: text('full_name').notNull(),
-  emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
+  name: text('name').notNull(),
+  verified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
 
   // Metadata
   createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
   updatedAt: text('updated_at').notNull().$onUpdate(() => sql`(current_timestamp)`),
   lastLogin: text('last_login'),
-  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
 }, table => [
   index('users_email_idx').on(table.email),
 ])
