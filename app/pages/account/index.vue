@@ -93,7 +93,10 @@ async function requestVerification() {
   verificationLoading.value = true
 
   try {
-    await $fetch('/api/auth/email/request', { method: 'POST' })
+    await $fetch('/api/auth/email/request', {
+      method: 'POST',
+      body: { email: user.value?.email },
+    })
     toast.add({
       title: 'Verification email sent',
       description: 'Please check your inbox for the verification link.',

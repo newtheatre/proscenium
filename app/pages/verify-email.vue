@@ -87,12 +87,14 @@ const message = computed(() => {
 
 const showLoginButton = computed(() => !user.value && (success.value || isAlreadyVerified.value))
 
+onMounted(async () => {
 // Handle redirects
-if (success.value) {
-  await refreshSession()
-  setTimeout(() => navigateTo(user.value ? '/' : '/login'), 2000)
-}
-else if (isAlreadyVerified.value) {
-  setTimeout(() => navigateTo(user.value ? '/' : '/login'), 2000)
-}
+  if (success.value) {
+    await refreshSession()
+    setTimeout(() => navigateTo(user.value ? '/' : '/login'), 2000)
+  }
+  else if (isAlreadyVerified.value) {
+    setTimeout(() => navigateTo(user.value ? '/' : '/login'), 2000)
+  }
+})
 </script>
