@@ -115,9 +115,20 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Failed to retrieve updated user' })
   }
 
-  return {
-    ...updatedUser,
+  const { userRoles: _, ...userWithoutRoles } = updatedUser
+  const result = {
+    ...userWithoutRoles,
     roles: updatedUser.userRoles.map(r => r.role),
-    userRoles: undefined,
   }
+
+  // Update session if user is updating their own profile
+  const { user: currentUser } = await getUserSession(event)
+  if (currentUser && currentUser.id === userId) {
+    await replaceUserSession(event, {
+      user: result,
+      loggedInAt: new Date(),
+    })
+  }
+
+  return result
 })
