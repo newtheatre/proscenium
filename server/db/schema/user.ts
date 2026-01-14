@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
-import { sql } from 'drizzle-orm'
+import { sql, relations } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 
 export const users = sqliteTable('users', {
@@ -17,6 +17,12 @@ export const users = sqliteTable('users', {
   index('users_email_idx').on(table.email),
 ])
 
+export const usersRelations = relations(users, ({ many }) => ({
+  userRoles: many(userRoles),
+  emailVerifications: many(emailVerifications),
+  passwordResets: many(passwordResets),
+}))
+
 export const userRoles = sqliteTable('user_roles', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -25,6 +31,13 @@ export const userRoles = sqliteTable('user_roles', {
   index('user_roles_user_id_idx').on(table.userId),
   uniqueIndex('user_roles_user_id_role_unique').on(table.userId, table.role),
 ])
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+  user: one(users, {
+    fields: [userRoles.userId],
+    references: [users.id],
+  }),
+}))
 
 export const emailVerifications = sqliteTable('email_verifications', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -37,6 +50,13 @@ export const emailVerifications = sqliteTable('email_verifications', {
   index('email_verifications_token_idx').on(table.token),
 ])
 
+export const emailVerificationsRelations = relations(emailVerifications, ({ one }) => ({
+  user: one(users, {
+    fields: [emailVerifications.userId],
+    references: [users.id],
+  }),
+}))
+
 export const passwordResets = sqliteTable('password_resets', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -47,3 +67,10 @@ export const passwordResets = sqliteTable('password_resets', {
   index('password_resets_user_id_idx').on(table.userId),
   index('password_resets_token_idx').on(table.token),
 ])
+
+export const passwordResetsRelations = relations(passwordResets, ({ one }) => ({
+  user: one(users, {
+    fields: [passwordResets.userId],
+    references: [users.id],
+  }),
+}))
