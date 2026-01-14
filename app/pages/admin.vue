@@ -12,6 +12,7 @@
 <script lang="ts" setup>
 definePageMeta({
   layout: 'admin',
+  middleware: 'admin',
   title: 'Admin Dashboard',
 })
 </script>
