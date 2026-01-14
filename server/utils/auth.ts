@@ -49,7 +49,7 @@ export async function sendVerificationEmail(email: string, token: string): Promi
 export async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
   // TODO: Implement an email service
   console.log(`Password reset for ${email} with token: ${token}`)
-  console.log(`Reset URL: ${process.env.NUXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/password-reset?token=${token}`)
+  console.log(`Reset URL: ${process.env.NUXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/reset-password?token=${token}`)
 
   // For now, just log to console. Replace with actual email sending logic
   // Example with Resend:
@@ -57,6 +57,6 @@ export async function sendPasswordResetEmail(email: string, token: string): Prom
   //   from: 'noreply@newtheatre.org.uk',
   //   to: email,
   //   subject: 'Reset your password',
-  //   html: `<a href="${process.env.NUXT_PUBLIC_BASE_URL}/password-reset?token=${token}">Click here to reset your password</a>`
+  //   html: `<a href="${process.env.NUXT_PUBLIC_BASE_URL}/reset-password?token=${token}">Click here to reset your password</a>`
   // })
 }

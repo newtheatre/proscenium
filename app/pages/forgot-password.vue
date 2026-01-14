@@ -6,22 +6,14 @@
       highlight-color="secondary"
     >
       <UAuthForm
+        v-if="!successMessage"
         :schema="schema"
         :fields="fields"
-        title="Login"
-        icon="i-lucide-circle-user-round"
+        title="Forgot Password"
+        description="Enter your email address and we'll send you a link to reset your password."
+        icon="i-lucide-key-round"
         @submit="onSubmit"
       >
-        <template #password-hint>
-          <ULink
-            to="/forgot-password"
-            class="text-primary font-medium"
-            tabindex="-1"
-          >
-            Forgot password?
-          </ULink>
-        </template>
-
         <template #validation>
           <UAlert
             v-if="errorMessage"
@@ -32,15 +24,40 @@
         </template>
 
         <template #footer>
-          Don't have an account?
+          Remember your password?
           <ULink
-            to="/register"
+            to="/login"
             class="text-primary font-medium"
           >
-            Sign up
+            Sign in
           </ULink>
         </template>
       </UAuthForm>
+
+      <div
+        v-else
+        class="flex flex-col items-center gap-6 p-6"
+      >
+        <UIcon
+          name="i-lucide-circle-check"
+          class="size-16 text-success"
+        />
+
+        <div class="text-center space-y-2">
+          <h1 class="text-2xl font-bold">
+            Check your email
+          </h1>
+          <p class="text-muted">
+            {{ successMessage }}
+          </p>
+        </div>
+
+        <UButton
+          label="Back to Login"
+          to="/login"
+          block
+        />
+      </div>
     </UPageCard>
   </UContainer>
 </template>
@@ -49,23 +66,17 @@
 import z from 'zod/v4'
 import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
 
-const { fetch: refreshSession } = useUserSession()
-
 definePageMeta({
   middleware: 'guest',
-  title: 'Login',
-  description: 'Sign in to your account',
+  title: 'Forgot Password',
+  description: 'Reset your password',
 })
 
-const errorMessage = useState('login-error-message', () => '')
+const errorMessage = ref<string>('')
+const successMessage = ref<string>('')
 
 const schema = z.object({
-  email: z
-    .email('Please enter a valid email address'),
-  password: z
-    .string('Password is required')
-    .min(8, 'Password must be at least 8 characters'),
-  // remember: z.boolean().optional(),
+  email: z.email('Please enter a valid email address'),
 })
 
 type Schema = z.output<typeof schema>
@@ -73,37 +84,27 @@ type Schema = z.output<typeof schema>
 const fields: AuthFormField[] = [
   {
     name: 'email',
-    type: 'text' as const,
+    type: 'email' as const,
     label: 'Email',
     placeholder: 'Enter your email address',
     required: true,
     autocomplete: 'email',
   },
-  {
-    name: 'password',
-    type: 'password' as const,
-    label: 'Password',
-    placeholder: 'Enter your password',
-    required: true,
-    autocomplete: 'current-password',
-  },
-  // {
-  //   name: 'remember',
-  //   type: 'checkbox' as const,
-  //   label: 'Remember me',
-  // },
 ]
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   errorMessage.value = ''
+  successMessage.value = ''
 
   try {
-    await $fetch('/api/auth/login', {
+    const response = await $fetch('/api/auth/password/forgot', {
       method: 'POST',
-      body: event.data,
+      body: {
+        email: event.data.email,
+      },
     })
-    await refreshSession()
-    await navigateTo('/')
+
+    successMessage.value = response.message || 'Password reset email sent! Please check your inbox.'
   }
   catch (error) {
     if (error instanceof Error) {
@@ -115,7 +116,3 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   }
 }
 </script>
-
-<style>
-
-</style>
