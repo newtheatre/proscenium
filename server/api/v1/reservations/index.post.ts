@@ -163,7 +163,8 @@ export default defineEventHandler(async (event) => {
       let showTicketPriceId = null
       const performanceTicketPriceId = performancePrice?.id || null
 
-      if (!ticketPrice) {
+      // Check if price is undefined/null (allows 0)
+      if (ticketPrice === undefined || ticketPrice === null) {
         const showPrice = await prisma.showTicketPrice.findUnique({
           where: {
             showId_ticketTypeId: {
@@ -191,11 +192,13 @@ export default defineEventHandler(async (event) => {
         })
       }
 
-      if (!ticketPrice) {
+      // Fallback to default price if still undefined/null
+      if (ticketPrice === undefined || ticketPrice === null) {
         ticketPrice = ticketType.defaultPrice
       }
 
-      if (!ticketPrice) {
+      // Final validation (ensure price is defined, even if 0)
+      if (ticketPrice === undefined || ticketPrice === null) {
         throw createError({
           statusCode: 400,
           statusMessage: `Ticket type has no price configured: ${ticketRequest.ticketTypeId}`,
