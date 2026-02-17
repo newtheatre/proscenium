@@ -34,7 +34,7 @@
         <template #footer>
           Don't have an account?
           <ULink
-            to="/register"
+            :to="redirectPath ? `/register?redirect=${encodeURIComponent(redirectPath)}` : '/register'"
             class="text-primary font-medium"
           >
             Sign up
@@ -50,12 +50,15 @@ import z from 'zod/v4'
 import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
 
 const { fetch: refreshSession } = useUserSession()
+const route = useRoute()
 
 definePageMeta({
   middleware: 'guest',
   title: 'Login',
   description: 'Sign in to your account',
 })
+
+const redirectPath = computed(() => route.query.redirect as string | undefined)
 
 const errorMessage = useState('login-error-message', () => '')
 
@@ -103,7 +106,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       body: event.data,
     })
     await refreshSession()
-    await navigateTo('/')
+    await navigateTo(redirectPath.value || '/')
   }
   catch (error) {
     errorMessage.value = getErrorMessage(error, 'An unexpected error occurred. Please try again.')

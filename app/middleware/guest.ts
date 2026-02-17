@@ -1,7 +1,8 @@
-export default defineNuxtRouteMiddleware(() => {
+export default defineNuxtRouteMiddleware((to) => {
   const { loggedIn } = useUserSession()
 
   if (loggedIn.value) {
-    return navigateTo('/')
+    const redirect = to.query.redirect as string | undefined
+    return navigateTo(redirect || '/')
   }
 })
