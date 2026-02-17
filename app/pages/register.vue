@@ -112,12 +112,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     await navigateTo('/')
   }
   catch (error) {
-    if (error instanceof Error) {
-      errorMessage.value = error.message
-    }
-    else {
-      errorMessage.value = 'An unexpected error occurred. Please try again.'
-    }
+    errorMessage.value = getErrorMessage(error, 'An unexpected error occurred. Please try again.')
   }
 }
 </script>

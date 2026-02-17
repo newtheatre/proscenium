@@ -5,96 +5,218 @@
       highlight
       highlight-color="secondary"
     >
-      <div class="p-6">
+      <div
+        v-if="status === 'loading'"
+        class="flex flex-col items-center gap-6 p-6 text-center"
+      >
         <UIcon
-          :name="iconName"
-          :class="['size-16', iconClass]"
+          name="i-lucide-loader-circle"
+          class="size-12 animate-spin text-primary"
         />
 
-        <div class="text-center space-y-2">
+        <div class="space-y-2">
           <h1 class="text-2xl font-bold">
-            {{ title }}
+            Verifying your email
           </h1>
           <p class="text-muted">
-            {{ message }}
+            Please wait while we confirm your address.
+          </p>
+        </div>
+      </div>
+
+      <div
+        v-else-if="status === 'success'"
+        class="flex flex-col items-center gap-6 p-6 text-center"
+      >
+        <UIcon
+          name="i-lucide-circle-check"
+          class="size-16 text-success"
+        />
+
+        <div class="space-y-2">
+          <h1 class="text-2xl font-bold">
+            Email verified
+          </h1>
+          <p class="text-muted">
+            {{ statusMessage || 'Your email has been verified successfully.' }}
           </p>
         </div>
 
         <UButton
-          v-if="showLoginButton"
-          label="Go to Login"
+          v-if="loggedIn"
+          label="Go to account"
+          to="/account"
+          block
+        />
+        <UButton
+          v-else
+          label="Go to login"
           to="/login"
           block
         />
       </div>
+
+      <template v-else>
+        <UAlert
+          v-if="status === 'error'"
+          color="error"
+          icon="i-lucide-alert-circle"
+          :title="statusMessage"
+        />
+
+        <UAuthForm
+          :schema="requestSchema"
+          :fields="requestFields"
+          title="Resend verification email"
+          :description="requestDescription"
+          icon="i-lucide-mail-check"
+          @submit="onRequestSubmit"
+        >
+          <template #validation>
+            <UAlert
+              v-if="requestSuccessMessage"
+              color="success"
+              icon="i-lucide-circle-check"
+              :title="requestSuccessMessage"
+            />
+            <UAlert
+              v-else-if="requestErrorMessage"
+              color="error"
+              icon="i-lucide-alert-circle"
+              :title="requestErrorMessage"
+            />
+          </template>
+
+          <template #submit="{ loading }">
+            <UButton
+              type="submit"
+              label="Send verification link"
+              :loading="loading"
+              block
+            />
+          </template>
+
+          <template #footer>
+            Already verified?
+            <ULink
+              to="/login"
+              class="text-primary font-medium"
+            >
+              Sign in
+            </ULink>
+          </template>
+        </UAuthForm>
+      </template>
     </UPageCard>
   </UContainer>
 </template>
 
 <script lang="ts" setup>
+import z from 'zod/v4'
+import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
+
 definePageMeta({
   title: 'Verify Email',
   description: 'Verify your email address',
 })
 
 const route = useRoute()
-const { user, fetch: refreshSession } = useUserSession()
+const { loggedIn, fetch: refreshSession } = useUserSession()
 
-const token = route.query.token as string
+const token = computed(() => {
+  const value = route.query.token
+  return typeof value === 'string' && value.length ? value : undefined
+})
 
-const { data, error } = await useAsyncData('verify-email', async () => {
-  if (!token) {
-    throw createError({ statusCode: 400, statusMessage: 'No verification token provided' })
+const status = useState<'idle' | 'loading' | 'success' | 'error'>('verify-email-status', () => token.value ? 'loading' : 'idle')
+const statusMessage = useState<string>('verify-email-message', () => '')
+
+const requestErrorMessage = useState<string>('verify-email-request-error', () => '')
+const requestSuccessMessage = useState<string>('verify-email-request-success', () => '')
+
+const requestSchema = z.object({
+  email: z.email('Please enter a valid email address'),
+})
+
+type RequestSchema = z.output<typeof requestSchema>
+
+const requestFields: AuthFormField[] = [
+  {
+    name: 'email',
+    type: 'email' as const,
+    label: 'Email',
+    placeholder: 'Enter your email address',
+    required: true,
+    autocomplete: 'email',
+  },
+]
+
+const requestDescription = computed(() => {
+  if (status.value === 'error') {
+    return 'Enter your email address and we will send a new verification link.'
   }
-  return $fetch('/api/auth/email/verify', {
-    method: 'POST',
-    body: { token },
-  })
+
+  return 'Need a new verification link? We can send another email.'
 })
 
-const success = computed(() => !!data.value && !error.value)
-const errorMessage = computed(() => (error.value?.data as { message?: string })?.message || '')
-const isExpired = computed(() => errorMessage.value.includes('new one has been sent'))
-const isAlreadyVerified = computed(() => errorMessage.value.includes('already verified'))
-
-const iconName = computed(() => {
-  if (success.value || isAlreadyVerified.value) return 'i-lucide-circle-check'
-  return 'i-lucide-circle-x'
-})
-
-const iconClass = computed(() => {
-  if (success.value || isAlreadyVerified.value) return 'text-success'
-  return 'text-error'
-})
-
-const title = computed(() => {
-  if (success.value) return 'Email Verified!'
-  if (isAlreadyVerified.value) return 'Already Verified'
-  if (isExpired.value) return 'Link Expired'
-  return 'Verification Failed'
-})
-
-const message = computed(() => {
-  if (success.value) {
-    return user.value
-      ? 'Your email has been verified. Redirecting...'
-      : 'Your email has been verified. You can now log in.'
+async function verifyEmail() {
+  if (!token.value) {
+    status.value = 'idle'
+    return
   }
-  if (isAlreadyVerified.value) return 'This email is already verified.'
-  if (isExpired.value) return 'We\'ve sent a new verification link to your email.'
-  return errorMessage.value || 'Something went wrong. Please try again.'
-})
 
-const showLoginButton = computed(() => !user.value && (success.value || isAlreadyVerified.value))
+  status.value = 'loading'
+  statusMessage.value = ''
 
-onMounted(async () => {
-// Handle redirects
-  if (success.value) {
+  try {
+    const response = await $fetch<{ message?: string }>('/api/auth/email/verify', {
+      method: 'POST',
+      body: { token: token.value },
+    })
+
+    status.value = 'success'
+    statusMessage.value = response.message || 'Your email has been verified successfully.'
+  }
+  catch (error) {
+    const message = getErrorMessage(error, 'Verification failed. Please request a new link.')
+
+    if (message.toLowerCase().includes('already verified')) {
+      status.value = 'success'
+      statusMessage.value = message
+    }
+    else {
+      status.value = 'error'
+      statusMessage.value = message
+      return
+    }
+  }
+
+  try {
     await refreshSession()
-    setTimeout(() => navigateTo(user.value ? '/' : '/login'), 2000)
   }
-  else if (isAlreadyVerified.value) {
-    setTimeout(() => navigateTo(user.value ? '/' : '/login'), 2000)
+  catch {
+    // Session refresh failure should not block successful verification.
   }
+}
+
+async function onRequestSubmit(event: FormSubmitEvent<RequestSchema>) {
+  requestErrorMessage.value = ''
+  requestSuccessMessage.value = ''
+
+  try {
+    const response = await $fetch<{ message?: string }>('/api/auth/email/request', {
+      method: 'POST',
+      body: { email: event.data.email },
+    })
+
+    requestSuccessMessage.value = response.message || 'Verification email sent. Please check your inbox.'
+  }
+  catch (error) {
+    requestErrorMessage.value = getErrorMessage(error, 'Failed to send verification email. Please try again.')
+  }
+}
+
+onMounted(() => {
+  verifyEmail()
 })
 </script>

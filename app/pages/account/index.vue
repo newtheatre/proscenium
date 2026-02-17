@@ -69,17 +69,9 @@ async function onSubmit(event: FormSubmitEvent<ProfileSchema>) {
     })
   }
   catch (error: unknown) {
-    let message = 'Failed to update profile'
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const fetchError = error as { statusCode: number, data?: { statusMessage?: string } }
-      if (fetchError.statusCode === 400) {
-        message = fetchError.data?.statusMessage || 'This email is already in use'
-      }
-    }
-
     toast.add({
       title: 'Error',
-      description: message,
+      description: getErrorMessage(error, 'Failed to update profile'),
       icon: 'i-lucide-x-circle',
       color: 'error',
     })
@@ -105,10 +97,9 @@ async function requestVerification() {
     })
   }
   catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
     toast.add({
       title: 'Error',
-      description: err.data?.message || 'Failed to send verification email',
+      description: getErrorMessage(error, 'Failed to send verification email'),
       icon: 'i-lucide-x-circle',
       color: 'error',
     })

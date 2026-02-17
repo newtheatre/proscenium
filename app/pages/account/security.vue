@@ -88,21 +88,9 @@ async function onPasswordSubmit(event: FormSubmitEvent<PasswordSchema>) {
     password.new = undefined
   }
   catch (error: unknown) {
-    // Check for specific error types
-    let message = 'Failed to update password'
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      const fetchError = error as { statusCode: number, message?: string }
-      if (fetchError.statusCode === 401) {
-        message = 'Current password is incorrect'
-      }
-      else if (fetchError.statusCode === 400 && fetchError.message?.includes('different')) {
-        message = 'New password must be different from current password'
-      }
-    }
-
     toast.add({
       title: 'Error',
-      description: message,
+      description: getErrorMessage(error, 'Failed to update password'),
       icon: 'i-lucide-x-circle',
       color: 'error',
     })
@@ -135,10 +123,9 @@ async function deleteAccount() {
     await navigateTo('/')
   }
   catch (error: unknown) {
-    const err = error as { data?: { statusMessage?: string } }
     toast.add({
       title: 'Error',
-      description: err.data?.statusMessage || 'Failed to delete account',
+      description: getErrorMessage(error, 'Failed to delete account'),
       icon: 'i-lucide-x-circle',
       color: 'error',
     })

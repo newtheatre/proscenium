@@ -88,10 +88,9 @@ async function onSubmit() {
     emit('refresh')
   }
   catch (error: unknown) {
-    const err = error as { data?: { statusMessage?: string } }
     toast.add({
       title: 'Error',
-      description: err.data?.statusMessage || 'Failed to delete users',
+      description: getErrorMessage(error, 'Failed to delete users'),
       icon: 'i-lucide-x-circle',
       color: 'error',
     })

@@ -101,10 +101,9 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     emit('refresh')
   }
   catch (error: unknown) {
-    const err = error as { data?: { statusMessage?: string } }
     toast.add({
       title: 'Error',
-      description: err.data?.statusMessage || 'Failed to create user',
+      description: getErrorMessage(error, 'Failed to create user'),
       icon: 'i-lucide-x-circle',
       color: 'error',
     })

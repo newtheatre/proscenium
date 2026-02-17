@@ -96,10 +96,9 @@ async function deleteSingleUser() {
     await refresh()
   }
   catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
     toast.add({
       title: 'Error',
-      description: err.data?.message || 'Failed to delete user',
+      description: getErrorMessage(error, 'Failed to delete user'),
       icon: 'i-lucide-x-circle',
       color: 'error',
     })

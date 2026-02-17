@@ -90,10 +90,9 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     emit('refresh')
   }
   catch (error: unknown) {
-    const err = error as { data?: { statusMessage?: string } }
     toast.add({
       title: 'Error',
-      description: err.data?.statusMessage || 'Failed to update user',
+      description: getErrorMessage(error, 'Failed to update user'),
       icon: 'i-lucide-x-circle',
       color: 'error',
     })

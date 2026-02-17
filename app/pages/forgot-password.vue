@@ -107,12 +107,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     successMessage.value = response.message || 'Password reset email sent! Please check your inbox.'
   }
   catch (error) {
-    if (error instanceof Error) {
-      errorMessage.value = error.message
-    }
-    else {
-      errorMessage.value = 'An unexpected error occurred. Please try again.'
-    }
+    errorMessage.value = getErrorMessage(error, 'An unexpected error occurred. Please try again.')
   }
 }
 </script>
