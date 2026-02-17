@@ -73,3 +73,9 @@ export const updateUserRoles = defineAbility((user: User) => {
 export const updateUserVerified = defineAbility((user: User) => {
   return hasRole(user, 'ADMIN')
 })
+
+// Reset user password - ADMIN and MANAGER can trigger password resets for other users
+export const resetUserPassword = defineAbility((user: User, resource: UserResource) => {
+  if (user.id === resource.id) return false
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})

@@ -2,13 +2,11 @@ import { users, userRoles } from 'hub:db:schema'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { createUser, updateUserRoles, updateUserVerified } from '~~/shared/utils/abilities'
+import { generateVerificationToken, sendPasswordResetEmail } from '~~/server/utils/auth'
+import { passwordResets } from 'hub:db:schema'
 
 const bodySchema = z.object({
   email: z.email(),
-  password: z.string().min(8, 'Password must be at least 8 characters long')
-    .refine(val => /[a-z]/.test(val), { message: 'Password must contain at least one lowercase letter' })
-    .refine(val => /[A-Z]/.test(val), { message: 'Password must contain at least one uppercase letter' })
-    .refine(val => /\d/.test(val), { message: 'Password must contain at least one number' }),
   name: z.string().min(1, 'Name is required'),
   verified: z.boolean().optional().default(false),
   roles: z.array(z.enum(['ADMIN', 'MANAGER', 'BOX_OFFICE'])).optional().default([]),
@@ -18,7 +16,7 @@ export default defineEventHandler(async (event) => {
   // Check if user has permission to create users
   await authorize(event, createUser)
 
-  const { email, password, name, verified, roles: userRolesToAssign } = await readValidatedBody(event, bodySchema.parse)
+  const { email, name, verified, roles: userRolesToAssign } = await readValidatedBody(event, bodySchema.parse)
 
   // Check if user has permission to set verified status
   if (verified && !(await allows(event, updateUserVerified))) {
@@ -37,13 +35,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'User with this email already exists' })
   }
 
-  // Hash the password
-  const hashedPassword = await hashPassword(password)
-
-  // Insert the new user into the database
+  // Insert the new user into the database (no password - user must set their own)
   const [newUser] = await db.insert(users).values({
     email,
-    password: hashedPassword,
     name,
     verified,
   }).returning()
@@ -80,6 +74,18 @@ export default defineEventHandler(async (event) => {
   if (!createdUser) {
     throw createError({ statusCode: 500, statusMessage: 'Failed to retrieve created user' })
   }
+
+  // Send password reset email so the user can set their own password
+  const resetToken = generateVerificationToken()
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+
+  await db.insert(passwordResets).values({
+    userId: newUser.id,
+    token: resetToken,
+    expiresAt,
+  })
+
+  await sendPasswordResetEmail(email, resetToken)
 
   return {
     ...createdUser,

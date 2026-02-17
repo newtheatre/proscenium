@@ -5,8 +5,9 @@
  *
  * Features:
  * - Form validation with Zod schema
- * - Name, email, password, and role selection
+ * - Name, email, and role selection
  * - Creates user via POST /api/users
+ * - Sends password reset email so user sets their own password
  * - Toast notifications for success/error
  *
  * @emits refresh - Emitted after successful user creation
@@ -22,11 +23,6 @@ const emit = defineEmits<{
 const schema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
   email: z.string().email('Invalid email'),
-  password: z.string()
-    .min(8, 'Password must be at least 8 characters')
-    .refine(val => /[a-z]/.test(val), { message: 'Password must contain at least one lowercase letter' })
-    .refine(val => /[A-Z]/.test(val), { message: 'Password must contain at least one uppercase letter' })
-    .refine(val => /\d/.test(val), { message: 'Password must contain at least one number' }),
   verified: z.boolean().optional().default(false),
   roles: z.array(z.enum(['ADMIN', 'MANAGER', 'BOX_OFFICE'])).optional().default([]),
 })
@@ -39,39 +35,15 @@ type Schema = z.output<typeof schema>
 const state = reactive<Partial<Schema>>({
   name: undefined,
   email: undefined,
-  password: undefined,
   verified: false,
   roles: [],
 })
 
 const toast = useToast()
 
-function generatePassword() {
-  // Generate a random password with uppercase, lowercase, numbers
-  const lower = 'abcdefghijklmnopqrstuvwxyz'
-  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-  const numbers = '0123456789'
-  const all = lower + upper + numbers
-
-  // Ensure at least one of each required type
-  let password = ''
-  password += lower[Math.floor(Math.random() * lower.length)]
-  password += upper[Math.floor(Math.random() * upper.length)]
-  password += numbers[Math.floor(Math.random() * numbers.length)]
-
-  // Fill the rest randomly
-  for (let i = 0; i < 13; i++) {
-    password += all[Math.floor(Math.random() * all.length)]
-  }
-
-  // Shuffle the password
-  state.password = password.split('').sort(() => Math.random() - 0.5).join('')
-}
-
 function resetForm() {
   state.name = undefined
   state.email = undefined
-  state.password = undefined
   state.verified = false
   state.roles = []
 }
@@ -84,14 +56,9 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       body: event.data,
     })
 
-    // Copy password to clipboard
-    if (event.data.password) {
-      await navigator.clipboard.writeText(event.data.password)
-    }
-
     toast.add({
       title: 'User created',
-      description: `${event.data.name} has been added. Password copied to clipboard.`,
+      description: `${event.data.name} has been added. A password reset email has been sent.`,
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -159,30 +126,6 @@ const roleOptions = [
             placeholder="john.doe@example.com"
             class="w-full"
           />
-        </UFormField>
-
-        <UFormField
-          label="Password"
-          name="password"
-        >
-          <div class="flex gap-2">
-            <UInput
-              v-model="state.password"
-              type="text"
-              placeholder="Enter password"
-              class="flex-1"
-            />
-            <UButton
-              label="Generate"
-              icon="i-lucide-refresh-cw"
-              color="neutral"
-              variant="outline"
-              @click="generatePassword"
-            />
-          </div>
-          <template #description>
-            Must be at least 8 characters with lowercase, uppercase, and number
-          </template>
         </UFormField>
 
         <UFormField

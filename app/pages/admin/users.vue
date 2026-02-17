@@ -8,16 +8,18 @@
  * - Filter by role (ADMIN, MANAGER, BOX_OFFICE)
  * - Search by name or email
  * - View user details (verified status, account creation date)
- * - Create new user accounts
+ * - Create new user accounts (password set by user via reset email)
  * - Update user roles
+ * - Send password reset emails to users
  * - Delete user account(s) (confirmation required, bulk supported)
  *
  * Data Loading:
  * - GET /api/users
  *
  * Data Mutations:
- * - POST /api/users (create user)
+ * - POST /api/users (create user, sends password reset email)
  * - PUT /api/users/:id (update user)
+ * - POST /api/users/:id/reset-password (send password reset email)
  * - DELETE /api/users/:id (delete account)
  *
  * Uses nuxt-auth-utils:
@@ -105,6 +107,27 @@ async function deleteSingleUser() {
   }
 }
 
+// Reset password for a user
+async function resetPassword(user: User) {
+  try {
+    await $fetch(`/api/users/${user.id}/reset-password`, { method: 'POST' })
+    toast.add({
+      title: 'Password reset email sent',
+      description: `A password reset link has been sent to ${user.email}`,
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+  }
+  catch (error: unknown) {
+    toast.add({
+      title: 'Error',
+      description: getErrorMessage(error, 'Failed to send password reset email'),
+      icon: 'i-lucide-x-circle',
+      color: 'error',
+    })
+  }
+}
+
 // Get row actions for dropdown
 function getRowItems(row: Row<User>) {
   const user = row.original
@@ -136,6 +159,14 @@ function getRowItems(row: Row<User>) {
       disabled: isSelf,
       onSelect() {
         userToEdit.value = user
+      },
+    },
+    {
+      label: 'Reset password',
+      icon: 'i-lucide-key-round',
+      disabled: isSelf,
+      onSelect() {
+        resetPassword(user)
       },
     },
     {
