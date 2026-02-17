@@ -50,9 +50,18 @@ export const updateUser = defineAbility((user: User, resource: UserResource) => 
   return user.id === resource.id
 })
 
-// Delete a user - Only ADMIN can delete users
-export const deleteUser = defineAbility((user: User) => {
-  return hasRole(user, 'ADMIN')
+// Delete a user - ADMIN can delete users, and users can delete their own account, but ADMINs cannot delete themselves
+export const deleteUser = defineAbility((user: User, resource: UserResource) => {
+  // Users can delete their own account
+  if (user.id === resource.id && !hasRole(user, 'ADMIN')) {
+    return true
+  }
+
+  if (hasRole(user, 'ADMIN') && user.id !== resource.id) {
+    return true
+  }
+
+  return false
 })
 
 // Update user roles - Only ADMIN can update user roles

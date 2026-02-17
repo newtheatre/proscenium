@@ -16,14 +16,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'User not found' })
   }
 
-  // Check if user has permission to delete users
+  // Check if user has permission to delete this user
   await authorize(event, deleteUser)
-
-  // Prevent users from deleting themselves
-  const session = await getUserSession(event)
-  if (session.user?.id === userId) {
-    throw createError({ statusCode: 400, statusMessage: 'You cannot delete your own account' })
-  }
 
   // Delete user (cascade will delete related records)
   await db.delete(users).where(eq(users.id, userId))
