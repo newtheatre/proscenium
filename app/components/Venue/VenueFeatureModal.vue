@@ -258,7 +258,7 @@ const iconSuggestions = [
                 />
               </UFormField>
 
-              <div class="flex justify-end gap-2">
+              <div class="flex gap-2">
                 <UButton
                   type="button"
                   label="Cancel"
@@ -280,7 +280,7 @@ const iconSuggestions = [
           <!-- Feature Row -->
           <div
             v-else
-            class="flex items-center p-3 rounded-lg hover:bg-elevated"
+            class="flex items-center justify-between rounded-lg p-3 hover:bg-elevated"
           >
             <div class="flex gap-3">
               <span
@@ -321,16 +321,10 @@ const iconSuggestions = [
           </div>
         </template>
 
-        <!-- Divider -->
-        <div
-          v-if="features && features.length > 0"
-          class="border-t border-default my-2"
-        />
-
         <!-- Create Form -->
         <div
           v-if="isCreating"
-          class="p-3 border bg-elevated"
+          class="p-3 border border-default bg-elevated"
         >
           <UForm
             :schema="schema"
@@ -413,6 +407,7 @@ const iconSuggestions = [
           variant="outline"
           block
           @click="startCreate"
+          class="mt-2"
         />
       </div>
     </template>
