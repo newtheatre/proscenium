@@ -72,6 +72,11 @@ const navigation: NavigationMenuItem[][] = [
       icon: 'i-heroicons-users-20-solid',
       to: '/admin/users',
     },
+      {
+        label: 'Venues',
+        icon: 'i-heroicons-building-office-solid',
+        to: '/admin/venues',
+      },
   ],
 ]
 </script>
