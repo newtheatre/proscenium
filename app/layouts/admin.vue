@@ -77,6 +77,11 @@ const navigation: NavigationMenuItem[][] = [
         icon: 'i-heroicons-building-office-solid',
         to: '/admin/venues',
       },
+      {
+        label: 'Ticket Types',
+        icon: 'i-lucide-ticket',
+        to: '/admin/ticket-types',
+      },
   ],
 ]
 </script>
