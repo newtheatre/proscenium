@@ -1,102 +1,57 @@
-import { users, userRoles } from 'hub:db:schema'
-import { eq } from 'drizzle-orm'
+import { users } from 'hub:db:schema'
+import { seedUsers, printUsersSummary } from './seed/users'
+import { seedVenueFeatures, seedVenues, printVenuesSummary } from './seed/venues'
 
+/**
+ * Main Database Seeding Task
+ *
+ * Coordinates seeding of all database entities in the correct order.
+ * To add new seed data, create a new file in server/tasks/seed/ and import it here.
+ *
+ * @see server/tasks/seed/README.md for documentation
+ */
 export default defineTask({
   meta: {
     name: 'db:seed',
     description: 'Seed database with initial data',
   },
   async run() {
-    console.log('🌱 Seeding database...')
+    console.log('🌱 Seeding database...\n')
 
-    // Check if database already has users
+    // Check if database already has data
     const existingUsers = await db.select().from(users).all()
 
     if (existingUsers.length > 0) {
       console.log('⚠️  Database already has users. Skipping seed.')
+      console.log('💡 To re-seed, first reset the database with: bunx nuxt db push --force\n')
       return { result: 'Database already seeded' }
     }
 
-    // Hash the default development password
-    const defaultPassword = await hashPassword('DevPassword123!')
+    try {
+      // Seed users and roles
+      await seedUsers()
 
-    // Create users
-    const usersToCreate = [
-      {
-        email: 'admin@newtheatre.org.uk',
-        password: defaultPassword,
-        name: 'Admin User',
-        verified: true,
-      },
-      {
-        email: 'manager@newtheatre.org.uk',
-        password: defaultPassword,
-        name: 'Manager User',
-        verified: true,
-      },
-      {
-        email: 'boxoffice@newtheatre.org.uk',
-        password: defaultPassword,
-        name: 'Box Office User',
-        verified: true,
-      },
-      {
-        email: 'user@newtheatre.org.uk',
-        password: defaultPassword,
-        name: 'Regular User',
-        verified: true,
-      },
-      {
-        email: 'unverified@newtheatre.org.uk',
-        password: defaultPassword,
-        name: 'Unverified User',
-        verified: false,
-      },
-    ]
+      // Seed venue features (must come before venues)
+      const features = await seedVenueFeatures()
 
-    const createdUsers = await db.insert(users).values(usersToCreate).returning()
+      // Seed venues with their feature associations
+      await seedVenues(features)
 
-    console.log(`✅ Created ${createdUsers.length} users`)
+      // Future seed calls can be added here:
+      // await seedShows()
+      // await seedPerformances(venues)
+      // etc.
 
-    // Assign roles to users
-    const rolesToCreate = [
-      // Admin user gets all roles
-      { userId: createdUsers[0].id, role: 'ADMIN' as const },
-      { userId: createdUsers[0].id, role: 'MANAGER' as const },
-      { userId: createdUsers[0].id, role: 'BOX_OFFICE' as const },
-      // Manager user
-      { userId: createdUsers[1].id, role: 'MANAGER' as const },
-      // Box Office user
-      { userId: createdUsers[2].id, role: 'BOX_OFFICE' as const },
-    ]
+      // Print summary
+      printUsersSummary()
+      printVenuesSummary()
 
-    await db.insert(userRoles).values(rolesToCreate)
-
-    console.log(`✅ Assigned ${rolesToCreate.length} roles`)
-
-    console.log('\n📋 Seeded users:')
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('Email: admin@newtheatre.org.uk')
-    console.log('Password: DevPassword123!')
-    console.log('Roles: ADMIN, MANAGER, BOX_OFFICE')
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('Email: manager@newtheatre.org.uk')
-    console.log('Password: DevPassword123!')
-    console.log('Roles: MANAGER')
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('Email: boxoffice@newtheatre.org.uk')
-    console.log('Password: DevPassword123!')
-    console.log('Roles: BOX_OFFICE')
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('Email: user@newtheatre.org.uk')
-    console.log('Password: DevPassword123!')
-    console.log('Roles: None')
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('Email: unverified@newtheatre.org.uk')
-    console.log('Password: DevPassword123!')
-    console.log('Verified: No')
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
-
-    return { result: 'Database seeded successfully' }
+      console.log('\n✅ Database seeded successfully!\n')
+      return { result: 'Database seeded successfully' }
+    }
+    catch (error) {
+      console.error('\n❌ Seeding failed:', error)
+      throw error
+    }
   },
 })
