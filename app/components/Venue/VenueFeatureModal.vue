@@ -1,7 +1,7 @@
 /**
- * Venue Features Management Modal Component
+ * Venue Features Management Slideover Component
  *
- * Modal for managing venue features (admin/manager only).
+ * Slideover for managing venue features (admin/manager only).
  *
  * Features:
  * - List all venue features
@@ -10,8 +10,8 @@
  * - Delete features
  * - Toast notifications for success/error
  *
- * @props open - Whether the modal is open
- * @emits update:open - Emitted when modal open state changes
+ * @props open - Whether the slideover is open
+ * @emits update:open - Emitted when slideover open state changes
  * @emits refresh - Emitted when venues should be refreshed
  */
 <script setup lang="ts">
@@ -175,7 +175,7 @@ const iconSuggestions = [
 </script>
 
 <template>
-  <UModal
+  <USlideover
     v-model:open="localOpen"
     title="Manage Venue Features"
     description="Add, edit, or remove venue features"
@@ -324,7 +324,7 @@ const iconSuggestions = [
         <!-- Create Form -->
         <div
           v-if="isCreating"
-          class="p-3 border border-default bg-elevated"
+          class="p-3 border border-default rounded-lg bg-elevated"
         >
           <UForm
             :schema="schema"
@@ -411,5 +411,5 @@ const iconSuggestions = [
         />
       </div>
     </template>
-  </UModal>
+  </USlideover>
 </template>
