@@ -79,3 +79,47 @@ export const resetUserPassword = defineAbility((user: User, resource: UserResour
   if (user.id === resource.id) return false
   return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
 })
+
+// Venue abilities
+// List venues - Everyone can list venues (public data)
+export const listVenues = defineAbility(() => true)
+
+// Create venue - ADMIN and MANAGER can create venues
+export const createVenue = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})
+
+// Read venue - Everyone can read venues (public data)
+export const readVenue = defineAbility(() => true)
+
+// Update venue - ADMIN and MANAGER can update venues
+export const updateVenue = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})
+
+// Delete venue - Only ADMIN can delete venues
+export const deleteVenue = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN')
+})
+
+// Venue feature abilities
+// List features - Everyone can list features (public data)
+export const listVenueFeatures = defineAbility(() => true)
+
+// Create feature - ADMIN and MANAGER can create features
+export const createVenueFeature = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})
+
+// Read feature - Everyone can read features (public data)
+export const readVenueFeature = defineAbility(() => true)
+
+// Update feature - ADMIN and MANAGER can update features
+export const updateVenueFeature = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})
+
+// Delete feature - Only ADMIN can delete features
+export const deleteVenueFeature = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN')
+})
