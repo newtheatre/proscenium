@@ -213,14 +213,7 @@ const columns: TableColumn<User>[] = [
   },
   {
     accessorKey: 'name',
-    header: 'User',
-    cell: ({ row }) => {
-      const user = row.original
-      return h('div', undefined, [
-        h('p', { class: 'font-medium text-highlighted' }, user.name),
-        h('p', { class: 'text-sm text-muted' }, user.email),
-      ])
-    },
+    header: 'Name',
   },
   {
     accessorKey: 'email',
