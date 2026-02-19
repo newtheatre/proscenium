@@ -123,3 +123,25 @@ export const updateVenueFeature = defineAbility((user: User) => {
 export const deleteVenueFeature = defineAbility((user: User) => {
   return hasRole(user, 'ADMIN')
 })
+
+// Ticket type abilities
+// List ticket types - Everyone can list ticket types (needed for booking flows)
+export const listTicketTypes = defineAbility(() => true)
+
+// Create ticket type - ADMIN and MANAGER can create ticket types
+export const createTicketType = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})
+
+// Read ticket type - Everyone can read ticket types
+export const readTicketType = defineAbility(() => true)
+
+// Update ticket type - ADMIN and MANAGER can update ticket types
+export const updateTicketType = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})
+
+// Delete ticket type - Only ADMIN can delete ticket types
+export const deleteTicketType = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN')
+})
