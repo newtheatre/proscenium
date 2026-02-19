@@ -1,6 +1,7 @@
 import { users } from 'hub:db:schema'
 import { seedUsers, printUsersSummary } from './seed/users'
 import { seedVenueFeatures, seedVenues, printVenuesSummary } from './seed/venues'
+import { seedTicketTypes, printTicketTypesSummary } from './seed/ticketTypes'
 
 /**
  * Main Database Seeding Task
@@ -37,6 +38,9 @@ export default defineTask({
       // Seed venues with their feature associations
       await seedVenues(features)
 
+      // Seed ticket types
+      const createdTicketTypes = await seedTicketTypes()
+
       // Future seed calls can be added here:
       // await seedShows()
       // await seedPerformances(venues)
@@ -45,6 +49,7 @@ export default defineTask({
       // Print summary
       printUsersSummary()
       printVenuesSummary()
+      printTicketTypesSummary(createdTicketTypes)
 
       console.log('\n✅ Database seeded successfully!\n')
       return { result: 'Database seeded successfully' }
