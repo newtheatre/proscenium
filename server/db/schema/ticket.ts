@@ -1,6 +1,7 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql, relations } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
+import { shows, performances } from './show'
 
 // Base ticket type definitions shared across all shows/performances
 export const ticketTypes = sqliteTable('ticket_types', {
@@ -28,7 +29,7 @@ export const ticketTypesRelations = relations(ticketTypes, ({ many }) => ({
 // Show-level overrides — apply to all performances in a show unless further overridden
 export const showTicketTypeOverrides = sqliteTable('show_ticket_type_overrides', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
-  showId: text('show_id').notNull(), // FK to shows.id — will be constrained once show schema is defined
+  showId: text('show_id').notNull().references(() => shows.id, { onDelete: 'cascade' }),
   ticketTypeId: text('ticket_type_id').notNull().references(() => ticketTypes.id, { onDelete: 'cascade' }),
 
   price: integer('price'), // Overrides ticketTypes.price when set
@@ -48,13 +49,16 @@ export const showTicketTypeOverridesRelations = relations(showTicketTypeOverride
     fields: [showTicketTypeOverrides.ticketTypeId],
     references: [ticketTypes.id],
   }),
-  // show: one(shows, { ... }) — will be added in show schema
+  show: one(shows, {
+    fields: [showTicketTypeOverrides.showId],
+    references: [shows.id],
+  }),
 }))
 
 // Performance-level overrides — most specific, highest priority in the override chain
 export const performanceTicketTypeOverrides = sqliteTable('performance_ticket_type_overrides', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
-  performanceId: text('performance_id').notNull(), // FK to performances.id — will be constrained once performance schema is defined
+  performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'cascade' }),
   ticketTypeId: text('ticket_type_id').notNull().references(() => ticketTypes.id, { onDelete: 'cascade' }),
 
   price: integer('price'), // Overrides show/base price when set
@@ -74,7 +78,10 @@ export const performanceTicketTypeOverridesRelations = relations(performanceTick
     fields: [performanceTicketTypeOverrides.ticketTypeId],
     references: [ticketTypes.id],
   }),
-  // performance: one(performances, { ... }) — will be added in performance schema
+  performance: one(performances, {
+    fields: [performanceTicketTypeOverrides.performanceId],
+    references: [performances.id],
+  }),
 }))
 
 // An individual issued ticket, created when a customer books a seat.
@@ -82,7 +89,7 @@ export const performanceTicketTypeOverridesRelations = relations(performanceTick
 export const tickets = sqliteTable('tickets', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   reservationId: text('reservation_id').notNull(), // FK to reservations.id — will be constrained once reservation schema is defined
-  performanceId: text('performance_id').notNull(), // FK to performances.id — will be constrained once performance schema is defined
+  performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),
   ticketTypeId: text('ticket_type_id').notNull().references(() => ticketTypes.id, { onDelete: 'restrict' }),
 
   // Snapshot of the price paid at time of booking; important since prices can be overridden and change over time
@@ -105,6 +112,9 @@ export const ticketsRelations = relations(tickets, ({ one }) => ({
     fields: [tickets.ticketTypeId],
     references: [ticketTypes.id],
   }),
+  performance: one(performances, {
+    fields: [tickets.performanceId],
+    references: [performances.id],
+  }),
   // reservation: one(reservations, { ... }) — will be added in reservation schema
-  // performance: one(performances, { ... }) — will be added in performance schema
 }))

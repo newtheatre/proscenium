@@ -1,0 +1,265 @@
+import { shows, performances } from 'hub:db:schema'
+
+type SeededVenues = Array<{ id: string, name: string, capacity: number | null }>
+
+export default defineTask({
+  meta: {
+    name: 'db:seed:shows',
+    description: 'Seed database with sample shows and performances',
+  },
+  async run() {
+    const allVenues = await db.query.venues.findMany()
+    const { seededShows, seededPerformances } = await seedShows(allVenues)
+    printShowsSummary(seededShows, seededPerformances)
+    return { result: 'Shows seeded successfully' }
+  },
+})
+
+/**
+ * Seed Shows and Performances
+ *
+ * Creates a realistic spread of shows across all three lifecycle stages:
+ * - A completed past show (PUBLISHED, all performances past)
+ * - A currently running show (PUBLISHED, performances ON_SALE)
+ * - An upcoming show still in preparation (DRAFT)
+ *
+ * Dates are specified in UTC. startsAt/doorsAt use unix timestamps (seconds).
+ */
+export async function seedShows(venues: SeededVenues) {
+  console.log('🎭 Seeding shows and performances...')
+
+  const newTheatre = venues.find(v => v.name === 'New Theatre')
+  const lakeside = venues.find(v => v.name === 'Lakeside Arts Theatre')
+  const djanogly = venues.find(v => v.name === 'Djanogly Theatre')
+
+  if (!newTheatre || !lakeside || !djanogly) {
+    throw new Error('Required venues not found — run venue seed first')
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  // Returns a Date at the given hour:minute UTC, offset by `days` from today.
+  // day(0) = today, day(-1) = yesterday, day(7) = one week from now.
+  function day(offset: number, hour = 19, minute = 30): Date {
+    const d = new Date()
+    d.setUTCHours(hour, minute, 0, 0)
+    d.setUTCDate(d.getUTCDate() + offset)
+    return d
+  }
+
+  function doors(showtime: Date, minutesBefore = 30): Date {
+    return new Date(showtime.getTime() - minutesBefore * 60_000)
+  }
+
+  // ── Shows ─────────────────────────────────────────────────────────────────
+
+  const showsToCreate = [
+    {
+      slug: 'importance-of-being-earnest',
+      title: 'The Importance of Being Earnest',
+      subtitle: 'A Trivial Comedy for Serious People',
+      description: 'Oscar Wilde\'s masterpiece of wit and wordplay. Two friends maintain fictitious alter egos to escape their social obligations, with mistaken identities and romantic entanglements following inevitably.',
+      status: 'PUBLISHED' as const,
+    },
+    {
+      slug: 'hamlet',
+      title: 'Hamlet',
+      subtitle: null,
+      description: 'Shakespeare\'s most celebrated tragedy. The Prince of Denmark wrestles with grief, betrayal, and the burden of revenge in this timeless examination of mortality and moral corruption.',
+      status: 'PUBLISHED' as const,
+    },
+    {
+      slug: 'into-the-woods',
+      title: 'Into the Woods',
+      subtitle: null,
+      description: 'Sondheim and Lapine\'s beloved musical interweaves classic fairy tales to explore the consequences of wishes — and what happens after "happily ever after".',
+      status: 'DRAFT' as const,
+    },
+  ]
+
+  const seededShows = await db.insert(shows).values(showsToCreate).returning()
+  console.log(`  ✅ Created ${seededShows.length} shows`)
+
+  const earnest = seededShows.find(s => s.slug === 'importance-of-being-earnest')!
+  const hamlet = seededShows.find(s => s.slug === 'hamlet')!
+  const intoTheWoods = seededShows.find(s => s.slug === 'into-the-woods')!
+
+  // ── Performances ──────────────────────────────────────────────────────────
+
+  // ── Performances ──────────────────────────────────────────────────────────
+  // Offsets are relative to today so the spread of past/current/future is
+  // always the same regardless of when the seed runs.
+  //
+  // Earnest  — completed run,  days -35 to -31  (~5 weeks ago)
+  // Hamlet   — currently live, days  -1 to  +9  (yesterday → next weekend)
+  // Into the Woods — upcoming, days +49 to +53  (~7 weeks from now)
+
+  const performancesToCreate = [
+    // The Importance of Being Earnest — completed run at New Theatre
+    {
+      showId: earnest.id,
+      venueId: newTheatre.id,
+      startsAt: day(-35),
+      doorsAt: doors(day(-35)),
+      durationMinutes: 120,
+      intervalCount: 1,
+      status: 'CANCELLED' as const, // Preview night was cancelled
+    },
+    {
+      showId: earnest.id,
+      venueId: newTheatre.id,
+      startsAt: day(-34),
+      doorsAt: doors(day(-34)),
+      durationMinutes: 120,
+      intervalCount: 1,
+      status: 'ON_SALE' as const, // Past + ON_SALE → inferred COMPLETED at query time
+    },
+    {
+      showId: earnest.id,
+      venueId: newTheatre.id,
+      startsAt: day(-33),
+      doorsAt: doors(day(-33)),
+      durationMinutes: 120,
+      intervalCount: 1,
+      status: 'ON_SALE' as const,
+    },
+    {
+      showId: earnest.id,
+      venueId: newTheatre.id,
+      startsAt: day(-32, 14, 30), // Matinée
+      doorsAt: doors(day(-32, 14, 30)),
+      durationMinutes: 120,
+      intervalCount: 1,
+      status: 'ON_SALE' as const,
+    },
+    {
+      showId: earnest.id,
+      venueId: newTheatre.id,
+      startsAt: day(-32), // Same-day evening
+      doorsAt: doors(day(-32)),
+      durationMinutes: 120,
+      intervalCount: 1,
+      status: 'ON_SALE' as const,
+    },
+
+    // Hamlet — currently running at New Theatre
+    {
+      showId: hamlet.id,
+      venueId: newTheatre.id,
+      startsAt: day(-1),
+      doorsAt: doors(day(-1)),
+      durationMinutes: 180,
+      intervalCount: 1,
+      status: 'ON_SALE' as const, // Past + ON_SALE → inferred COMPLETED at query time
+    },
+    {
+      showId: hamlet.id,
+      venueId: newTheatre.id,
+      startsAt: day(1),
+      doorsAt: doors(day(1)),
+      durationMinutes: 180,
+      intervalCount: 1,
+      status: 'ON_SALE' as const,
+    },
+    {
+      showId: hamlet.id,
+      venueId: newTheatre.id,
+      startsAt: day(2),
+      doorsAt: doors(day(2)),
+      durationMinutes: 180,
+      intervalCount: 1,
+      status: 'ON_SALE' as const,
+    },
+    {
+      showId: hamlet.id,
+      venueId: newTheatre.id,
+      startsAt: day(3, 14, 30), // Matinée
+      doorsAt: doors(day(3, 14, 30)),
+      durationMinutes: 180,
+      intervalCount: 1,
+      status: 'ON_SALE' as const,
+    },
+    {
+      showId: hamlet.id,
+      venueId: newTheatre.id,
+      startsAt: day(3), // Same-day evening
+      doorsAt: doors(day(3)),
+      durationMinutes: 180,
+      intervalCount: 1,
+      status: 'ON_SALE' as const,
+    },
+    {
+      showId: hamlet.id,
+      venueId: djanogly.id, // Transfer performance at larger venue
+      startsAt: day(9),
+      doorsAt: doors(day(9)),
+      durationMinutes: 180,
+      intervalCount: 1,
+      capacityOverride: 120, // Restricted staging capacity
+      status: 'ON_SALE' as const,
+    },
+
+    // Into the Woods — upcoming draft at Lakeside Arts
+    {
+      showId: intoTheWoods.id,
+      venueId: lakeside.id,
+      startsAt: day(49),
+      doorsAt: doors(day(49)),
+      durationMinutes: 150,
+      intervalCount: 1,
+      status: 'DRAFT' as const,
+    },
+    {
+      showId: intoTheWoods.id,
+      venueId: lakeside.id,
+      startsAt: day(50),
+      doorsAt: doors(day(50)),
+      durationMinutes: 150,
+      intervalCount: 1,
+      status: 'DRAFT' as const,
+    },
+    {
+      showId: intoTheWoods.id,
+      venueId: lakeside.id,
+      startsAt: day(51),
+      doorsAt: doors(day(51)),
+      durationMinutes: 150,
+      intervalCount: 1,
+      status: 'DRAFT' as const,
+    },
+    {
+      showId: intoTheWoods.id,
+      venueId: lakeside.id,
+      startsAt: day(52, 14, 30), // Matinée
+      doorsAt: doors(day(52, 14, 30)),
+      durationMinutes: 150,
+      intervalCount: 1,
+      status: 'DRAFT' as const,
+    },
+    {
+      showId: intoTheWoods.id,
+      venueId: lakeside.id,
+      startsAt: day(52), // Same-day evening
+      doorsAt: doors(day(52)),
+      durationMinutes: 150,
+      intervalCount: 1,
+      status: 'DRAFT' as const,
+    },
+  ]
+
+  const seededPerformances = await db.insert(performances).values(performancesToCreate).returning()
+  console.log(`  ✅ Created ${seededPerformances.length} performances`)
+
+  return { seededShows, seededPerformances }
+}
+
+export function printShowsSummary(
+  seededShows: Awaited<ReturnType<typeof seedShows>>['seededShows'],
+  seededPerformances: Awaited<ReturnType<typeof seedShows>>['seededPerformances'],
+) {
+  console.log('\n🎭 Shows:')
+  for (const show of seededShows) {
+    const count = seededPerformances.filter(p => p.showId === show.id).length
+    console.log(`  • [${show.status}] ${show.title} — ${count} performance${count !== 1 ? 's' : ''}`)
+  }
+}

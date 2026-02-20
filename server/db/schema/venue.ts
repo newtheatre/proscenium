@@ -18,8 +18,8 @@ export const venues = sqliteTable('venues', {
 ])
 
 export const venuesRelations = relations(venues, ({ many }) => ({
-  // performances: many(performances), // Will be defined in performance schema
   venuesToFeatures: many(venuesToFeatures),
+  // performances relation is defined in show.ts to avoid circular imports
 }))
 
 export const venueFeatures = sqliteTable('venue_features', {

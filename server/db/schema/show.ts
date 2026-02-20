@@ -1,0 +1,77 @@
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { sql, relations } from 'drizzle-orm'
+import { nanoid } from 'nanoid'
+import { venues } from './venue'
+
+// A show is a production — the top-level entity for a run of performances.
+export const shows = sqliteTable('shows', {
+  id: text('id').primaryKey().$defaultFn(() => nanoid()),
+  slug: text('slug').notNull().unique(), // URL-friendly identifier, e.g. "machinal-2026"
+  title: text('title').notNull(),
+  subtitle: text('subtitle'), // Optional secondary title or tagline
+  description: text('description'),
+  posterUrl: text('poster_url'), // Reference to NuxtHub blob storage (Cloudflare R2)
+
+  status: text('status', {
+    enum: ['DRAFT', 'PUBLISHED'],
+  }).notNull().default('DRAFT'),
+
+  // Metadata
+  createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
+  updatedAt: text('updated_at').notNull().$onUpdate(() => sql`(current_timestamp)`),
+}, table => [
+  index('shows_title_idx').on(table.title),
+  index('shows_status_idx').on(table.status),
+  uniqueIndex('shows_slug_unique').on(table.slug),
+])
+
+export const showsRelations = relations(shows, ({ many }) => ({
+  performances: many(performances),
+  // ticketTypeOverrides and tickets relations are defined in ticket.ts to avoid circular imports
+}))
+
+// A performance is a specific scheduled instance of a show at a venue on a given date/time.
+export const performances = sqliteTable('performances', {
+  id: text('id').primaryKey().$defaultFn(() => nanoid()),
+  showId: text('show_id').notNull().references(() => shows.id, { onDelete: 'cascade' }),
+  venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),
+
+  // Date/time stored as unix timestamps for reliable sorting and comparison
+  startsAt: integer('starts_at', { mode: 'timestamp' }).notNull(),
+  doorsAt: integer('doors_at', { mode: 'timestamp' }), // Optional — when doors open to the public
+
+  durationMinutes: integer('duration_minutes'), // Approximate run time in minutes (excluding interval)
+  intervalCount: integer('interval_count').notNull().default(0), // Number of intervals (0, 1, 2, ...)
+
+  // Overrides venue.capacity for this specific performance; null = use venue default
+  capacityOverride: integer('capacity_override'),
+
+  // SOLD_OUT is calculated from ticket counts vs. effective capacity.
+  // COMPLETED is inferred from startsAt < now AND status != CANCELLED.
+  status: text('status', {
+    enum: ['DRAFT', 'ON_SALE', 'CANCELLED'],
+  }).notNull().default('DRAFT'),
+
+  notes: text('notes'), // Internal production notes, not shown to customers
+
+  // Metadata
+  createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
+  updatedAt: text('updated_at').notNull().$onUpdate(() => sql`(current_timestamp)`),
+}, table => [
+  index('performances_show_id_idx').on(table.showId),
+  index('performances_venue_id_idx').on(table.venueId),
+  index('performances_starts_at_idx').on(table.startsAt),
+  index('performances_status_idx').on(table.status),
+])
+
+export const performancesRelations = relations(performances, ({ one }) => ({
+  show: one(shows, {
+    fields: [performances.showId],
+    references: [shows.id],
+  }),
+  venue: one(venues, {
+    fields: [performances.venueId],
+    references: [venues.id],
+  }),
+  // ticketTypeOverrides and tickets relations are defined in ticket.ts to avoid circular imports
+}))
