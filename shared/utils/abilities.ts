@@ -145,3 +145,41 @@ export const updateTicketType = defineAbility((user: User) => {
 export const deleteTicketType = defineAbility((user: User) => {
   return hasRole(user, 'ADMIN')
 })
+
+// Show abilities
+// List shows - Everyone can list shows (public data)
+export const listShows = defineAbility(() => true)
+
+// Create show - ADMIN and MANAGER can create shows
+export const createShow = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})
+
+// Read show - Everyone can read shows (public data)
+export const readShow = defineAbility(() => true)
+
+// Update show - ADMIN and MANAGER can update shows
+export const updateShow = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})
+
+// Delete show - Only ADMIN can delete shows
+export const deleteShow = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN')
+})
+
+// Performance abilities
+// Create performance - ADMIN and MANAGER can create performances
+export const createPerformance = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})
+
+// Update performance - ADMIN and MANAGER can update performances
+export const updatePerformance = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})
+
+// Delete performance - ADMIN and MANAGER can delete performances
+export const deletePerformance = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})
