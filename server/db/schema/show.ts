@@ -42,6 +42,7 @@ export const performances = sqliteTable('performances', {
 
   durationMinutes: integer('duration_minutes'), // Approximate run time in minutes (excluding interval)
   intervalCount: integer('interval_count').notNull().default(0), // Number of intervals (0, 1, 2, ...)
+  intervalMinutes: integer('interval_minutes'), // Duration of each interval in minutes
 
   // Overrides venue.capacity for this specific performance; null = use venue default
   capacityOverride: integer('capacity_override'),
