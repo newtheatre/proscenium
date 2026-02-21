@@ -64,23 +64,28 @@ const navigation: NavigationMenuItem[][] = [
   [
     {
       label: 'Dashboard',
-      icon: 'i-heroicons-chart-bar-20-solid',
+      icon: 'i-lucide-layout-dashboard',
       to: '/admin',
     },
     {
       label: 'Users',
-      icon: 'i-heroicons-users-20-solid',
+      icon: 'i-lucide-users',
       to: '/admin/users',
     },
       {
         label: 'Venues',
-        icon: 'i-heroicons-building-office-solid',
+        icon: 'i-lucide-building',
         to: '/admin/venues',
       },
       {
         label: 'Ticket Types',
         icon: 'i-lucide-ticket',
         to: '/admin/ticket-types',
+      },
+      {
+        label: 'Shows',
+        icon: 'i-lucide-calendar',
+        to: '/admin/shows',
       },
   ],
 ]
