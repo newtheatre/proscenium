@@ -183,3 +183,30 @@ export const updatePerformance = defineAbility((user: User) => {
 export const deletePerformance = defineAbility((user: User) => {
   return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
 })
+
+// Reservation abilities
+// List all reservations - staff only
+export const listReservations = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER') || hasRole(user, 'BOX_OFFICE')
+})
+
+// Create a reservation - staff only (customers use the public booking flow)
+export const createReservation = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER') || hasRole(user, 'BOX_OFFICE')
+})
+
+// Read a specific reservation - staff can read any, customers only their own
+export const readReservation = defineAbility((user: User, resource: { userId: string }) => {
+  if (hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER') || hasRole(user, 'BOX_OFFICE')) return true
+  return user.id === resource.userId
+})
+
+// Update a reservation - staff only
+export const updateReservation = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER') || hasRole(user, 'BOX_OFFICE')
+})
+
+// Delete a reservation - ADMIN and MANAGER only
+export const deleteReservation = defineAbility((user: User) => {
+  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
+})
