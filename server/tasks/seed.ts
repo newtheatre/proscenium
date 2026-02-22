@@ -3,6 +3,7 @@ import { seedUsers, printUsersSummary } from './seed/users'
 import { seedVenueFeatures, seedVenues, printVenuesSummary } from './seed/venues'
 import { seedTicketTypes, printTicketTypesSummary } from './seed/ticketTypes'
 import { seedShows, printShowsSummary } from './seed/shows'
+import { seedReservations } from './seed/reservations'
 
 /**
  * Main Database Seeding Task
@@ -31,7 +32,7 @@ export default defineTask({
 
     try {
       // Seed users and roles
-      await seedUsers()
+      const createdUsers = await seedUsers()
 
       // Seed venue features (must come before venues)
       const features = await seedVenueFeatures()
@@ -42,8 +43,11 @@ export default defineTask({
       // Seed ticket types
       const createdTicketTypes = await seedTicketTypes()
 
-      // Seed shows and performances (depends on venues)
-      const { seededShows, seededPerformances } = await seedShows(seededVenues)
+      // Seed shows and performances (depends on venues and ticket types)
+      const { seededShows, seededPerformances } = await seedShows(seededVenues, createdTicketTypes)
+
+      // Seed reservations (depends on users, shows, and ticket types)
+      await seedReservations(createdUsers, seededShows, seededPerformances, createdTicketTypes)
 
       // Print summary
       printUsersSummary()

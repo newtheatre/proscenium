@@ -1,6 +1,7 @@
-import { shows, performances } from 'hub:db:schema'
+import { shows, performances, showTicketTypeOverrides, ticketTypes as ticketTypesTable } from 'hub:db:schema'
 
 type SeededVenues = Array<{ id: string, name: string, capacity: number | null }>
+type TicketType = { id: string, name: string, price: number, activeByDefault: boolean }
 
 export default defineTask({
   meta: {
@@ -25,7 +26,7 @@ export default defineTask({
  *
  * Dates are specified in UTC. startsAt/doorsAt use unix timestamps (seconds).
  */
-export async function seedShows(venues: SeededVenues) {
+export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]) {
   console.log('🎭 Seeding shows and performances...')
 
   const newTheatre = venues.find(v => v.name === 'New Theatre')
@@ -75,6 +76,13 @@ export async function seedShows(venues: SeededVenues) {
       description: 'Sondheim and Lapine\'s beloved musical interweaves classic fairy tales to explore the consequences of wishes — and what happens after "happily ever after".',
       status: 'DRAFT' as const,
     },
+    {
+      slug: 'oscars',
+      title: 'Oscar Night',
+      subtitle: 'The 98th Academy Awards',
+      description: 'Join us for a free screening of the Academy Awards ceremony. Grab a seat, enjoy the show, and see who takes home the gold.',
+      status: 'PUBLISHED' as const,
+    },
   ]
 
   const seededShows = await db.insert(shows).values(showsToCreate).returning()
@@ -83,6 +91,7 @@ export async function seedShows(venues: SeededVenues) {
   const earnest = seededShows.find(s => s.slug === 'importance-of-being-earnest')!
   const hamlet = seededShows.find(s => s.slug === 'hamlet')!
   const intoTheWoods = seededShows.find(s => s.slug === 'into-the-woods')!
+  const oscars = seededShows.find(s => s.slug === 'oscars')!
 
   // ── Performances ──────────────────────────────────────────────────────────
 
@@ -199,6 +208,17 @@ export async function seedShows(venues: SeededVenues) {
       status: 'ON_SALE' as const,
     },
 
+    // Oscar Night — free one-off event at New Theatre, one week from seeding date
+    {
+      showId: oscars.id,
+      venueId: newTheatre.id,
+      startsAt: day(7),
+      doorsAt: doors(day(7)),
+      durationMinutes: 210,
+      intervalCount: 0,
+      status: 'ON_SALE' as const,
+    },
+
     // Into the Woods — upcoming draft at Lakeside Arts
     {
       showId: intoTheWoods.id,
@@ -249,6 +269,23 @@ export async function seedShows(venues: SeededVenues) {
 
   const seededPerformances = await db.insert(performances).values(performancesToCreate).returning()
   console.log(`  ✅ Created ${seededPerformances.length} performances`)
+
+  // ── Ticket Type Overrides ─────────────────────────────────────────────────
+  // Oscar Night is a free event — disable all paid ticket types and enable Complimentary.
+  const resolvedTicketTypes = ticketTypes ?? await db.select().from(ticketTypesTable)
+  const overridesToCreate = resolvedTicketTypes
+    .filter(tt => tt.price > 0 || tt.name === 'Complimentary')
+    .map(tt => ({
+      showId: oscars.id,
+      ticketTypeId: tt.id,
+      price: tt.price, // keep existing price (paid types remain priced but inactive)
+      active: tt.name === 'Complimentary' ? true : false,
+    }))
+
+  if (overridesToCreate.length > 0) {
+    await db.insert(showTicketTypeOverrides).values(overridesToCreate)
+    console.log(`  ✅ Created ${overridesToCreate.length} ticket type overrides for Oscar Night (free event)`)
+  }
 
   return { seededShows, seededPerformances }
 }

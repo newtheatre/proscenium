@@ -2,6 +2,7 @@ import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqli
 import { sql, relations } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { shows, performances } from './show'
+import { reservations } from './reservation'
 
 // Base ticket type definitions shared across all shows/performances
 export const ticketTypes = sqliteTable('ticket_types', {
@@ -86,16 +87,20 @@ export const performanceTicketTypeOverridesRelations = relations(performanceTick
 
 // An individual issued ticket, created when a customer books a seat.
 // Belongs to a reservation and is tied to a specific performance and ticket type.
+//
+// Status is managed at the reservation level. The only per-ticket state is whether
+// it has been individually refunded (e.g., a partial refund within a larger booking).
 export const tickets = sqliteTable('tickets', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
-  reservationId: text('reservation_id').notNull(), // FK to reservations.id — will be constrained once reservation schema is defined
+  reservationId: text('reservation_id').notNull().references(() => reservations.id, { onDelete: 'restrict' }),
   performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),
   ticketTypeId: text('ticket_type_id').notNull().references(() => ticketTypes.id, { onDelete: 'restrict' }),
 
   // Snapshot of the price paid at time of booking; important since prices can be overridden and change over time
   pricePaid: integer('price_paid').notNull(),
 
-  status: text('status', { enum: ['PENDING', 'COLLECTED', 'CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_ADMIN', 'NO_SHOW', 'REFUNDED'] }).notNull().default('PENDING'),
+  // Set when this specific ticket is refunded independently of the reservation status
+  refundedAt: integer('refunded_at', { mode: 'timestamp' }),
 
   // Metadata
   createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
@@ -104,10 +109,20 @@ export const tickets = sqliteTable('tickets', {
   index('tickets_reservation_id_idx').on(table.reservationId),
   index('tickets_performance_id_idx').on(table.performanceId),
   index('tickets_ticket_type_id_idx').on(table.ticketTypeId),
-  index('tickets_status_idx').on(table.status),
 ])
 
+// Augments reservationsRelations with the tickets many-relation.
+// Defined here (not in reservation.ts) to avoid a circular import,
+// since ticket.ts already imports from reservation.ts.
+export const reservationsTicketsRelation = relations(reservations, ({ many }) => ({
+  tickets: many(tickets),
+}))
+
 export const ticketsRelations = relations(tickets, ({ one }) => ({
+  reservation: one(reservations, {
+    fields: [tickets.reservationId],
+    references: [reservations.id],
+  }),
   ticketType: one(ticketTypes, {
     fields: [tickets.ticketTypeId],
     references: [ticketTypes.id],
@@ -116,5 +131,4 @@ export const ticketsRelations = relations(tickets, ({ one }) => ({
     fields: [tickets.performanceId],
     references: [performances.id],
   }),
-  // reservation: one(reservations, { ... }) — will be added in reservation schema
 }))
