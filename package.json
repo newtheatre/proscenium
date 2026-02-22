@@ -14,7 +14,7 @@
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/content": "3.11.2",
     "@nuxt/eslint": "1.15.1",
-    "@nuxt/hints": "1.0.0-alpha.6",
+    "@nuxt/hints": "1.0.0-alpha.7",
     "@nuxt/image": "2.0.0",
     "@nuxt/ui": "4.4.0",
     "@nuxthub/core": "0.10.6",
@@ -22,15 +22,15 @@
     "better-sqlite3": "^12.6.2",
     "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",
-    "eslint": "^10.0.0",
+    "eslint": "^10.0.1",
     "nuxt": "^4.3.1",
-    "nuxt-auth-utils": "0.5.28",
+    "nuxt-auth-utils": "0.5.29",
     "nuxt-authorization": "0.3.5",
     "typescript": "^5.6.3",
     "vue": "^3.5.28",
-    "vue-router": "^5.0.2"
+    "vue-router": "^5.0.3"
   },
   "devDependencies": {
-    "wrangler": "^4.65.0"
+    "wrangler": "^4.67.0"
   }
 }
