@@ -87,6 +87,11 @@ const navigation: NavigationMenuItem[][] = [
         icon: 'i-lucide-calendar',
         to: '/admin/shows',
       },
+      {
+        label: 'Reservations',
+        icon: 'i-lucide-bookmark-check',
+        to: '/admin/reservations',
+      },
   ],
 ]
 </script>
