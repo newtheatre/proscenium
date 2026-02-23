@@ -1,4 +1,4 @@
-import { users, emailVerifications } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { createEmailVerificationToken, sendVerificationEmail } from '~~/server/utils/auth'
@@ -12,8 +12,8 @@ export default defineEventHandler(async (event) => {
 
   // Find verification record
   const verification = await db.select()
-    .from(emailVerifications)
-    .where(eq(emailVerifications.token, token))
+    .from(schema.emailVerifications)
+    .where(eq(schema.emailVerifications.token, token))
     .get()
 
   if (!verification) {
@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
   // Check if token is expired
   if (new Date(verification.expiresAt) < new Date()) {
     // Token has expired - generate and send new one
-    const user = await db.select().from(users).where(eq(users.id, verification.userId)).get()
+    const user = await db.select().from(schema.users).where(eq(schema.users.id, verification.userId)).get()
 
     if (user && !user.verified) {
       const newToken = await createEmailVerificationToken(user.id)
@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Get user
-  const user = await db.select().from(users).where(eq(users.id, verification.userId)).get()
+  const user = await db.select().from(schema.users).where(eq(schema.users.id, verification.userId)).get()
 
   if (!user) {
     throw createError({
@@ -57,12 +57,12 @@ export default defineEventHandler(async (event) => {
   }
 
   // Mark user as verified
-  await db.update(users)
+  await db.update(schema.users)
     .set({ verified: true })
-    .where(eq(users.id, user.id))
+    .where(eq(schema.users.id, user.id))
 
   // Delete the verification record
-  await db.delete(emailVerifications).where(eq(emailVerifications.id, verification.id))
+  await db.delete(schema.emailVerifications).where(eq(schema.emailVerifications.id, verification.id))
 
   // Update session if user is logged in
   const session = await getUserSession(event)

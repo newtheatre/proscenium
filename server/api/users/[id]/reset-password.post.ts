@@ -1,4 +1,4 @@
-import { users, passwordResets } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { generateVerificationToken, sendPasswordResetEmail } from '~~/server/utils/auth'
 import { resetUserPassword } from '~~/shared/utils/abilities'
@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   await authorize(event, resetUserPassword, { id })
 
   // Find the target user
-  const user = await db.select().from(users).where(eq(users.id, id)).get()
+  const user = await db.select().from(schema.users).where(eq(schema.users.id, id)).get()
 
   if (!user) {
     throw createError({ statusCode: 404, statusMessage: 'User not found' })
@@ -21,10 +21,10 @@ export default defineEventHandler(async (event) => {
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
 
   // Delete any existing password reset tokens for this user
-  await db.delete(passwordResets).where(eq(passwordResets.userId, user.id))
+  await db.delete(schema.passwordResets).where(eq(schema.passwordResets.userId, user.id))
 
   // Create password reset record
-  await db.insert(passwordResets).values({
+  await db.insert(schema.passwordResets).values({
     userId: user.id,
     token: resetToken,
     expiresAt,

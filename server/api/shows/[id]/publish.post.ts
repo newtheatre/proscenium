@@ -1,4 +1,4 @@
-import { shows, performances } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { updateShow, updatePerformance } from '~~/shared/utils/abilities'
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, updateShow)
 
-  const show = await db.select().from(shows).where(eq(shows.id, showId)).get()
+  const show = await db.select().from(schema.shows).where(eq(schema.shows.id, showId)).get()
   if (!show) {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
@@ -33,9 +33,9 @@ export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, bodySchema.parse)
 
   // Update show status to PUBLISHED
-  const [updatedShow] = await db.update(shows)
+  const [updatedShow] = await db.update(schema.shows)
     .set({ status: 'PUBLISHED' })
-    .where(eq(shows.id, showId))
+    .where(eq(schema.shows.id, showId))
     .returning()
 
   let updatedPerformanceCount = 0
@@ -44,9 +44,9 @@ export default defineEventHandler(async (event) => {
     await authorize(event, updatePerformance)
 
     // Update all non-cancelled performances to ON_SALE
-    const result = await db.update(performances)
+    const result = await db.update(schema.performances)
       .set({ status: 'ON_SALE' })
-      .where(eq(performances.showId, showId))
+      .where(eq(schema.performances.showId, showId))
       .returning()
 
     updatedPerformanceCount = result.length

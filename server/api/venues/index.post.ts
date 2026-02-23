@@ -1,4 +1,4 @@
-import { venues, venuesToFeatures } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { createVenue } from '~~/shared/utils/abilities'
@@ -18,14 +18,14 @@ export default defineEventHandler(async (event) => {
   const { name, address, capacity, description, featureIds } = await readValidatedBody(event, bodySchema.parse)
 
   // Check if venue with this name already exists
-  const existingVenue = await db.select().from(venues).where(eq(venues.name, name)).get()
+  const existingVenue = await db.select().from(schema.venues).where(eq(schema.venues.name, name)).get()
 
   if (existingVenue) {
     throw createError({ statusCode: 400, statusMessage: 'Venue with this name already exists' })
   }
 
   // Insert the new venue
-  const [newVenue] = await db.insert(venues).values({
+  const [newVenue] = await db.insert(schema.venues).values({
     name,
     address,
     capacity,
@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
 
   // Assign features if provided
   if (featureIds.length > 0) {
-    await db.insert(venuesToFeatures).values(
+    await db.insert(schema.venuesToFeatures).values(
       featureIds.map(featureId => ({
         venueId: newVenue.id,
         featureId,
@@ -63,15 +63,5 @@ export default defineEventHandler(async (event) => {
   }
 
   // Map to expected format
-  return {
-    id: createdVenue.id,
-    name: createdVenue.name,
-    address: createdVenue.address,
-    capacity: createdVenue.capacity,
-    imageUrl: createdVenue.imageUrl,
-    description: createdVenue.description,
-    createdAt: createdVenue.createdAt,
-    updatedAt: createdVenue.updatedAt,
-    features: createdVenue.venuesToFeatures.map((vtf) => vtf.feature),
-  }
+  return formatVenueResponse(createdVenue)
 })

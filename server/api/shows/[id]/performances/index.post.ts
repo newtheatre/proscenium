@@ -1,4 +1,4 @@
-import { shows, performances } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { createPerformance } from '~~/shared/utils/abilities'
@@ -24,14 +24,14 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, createPerformance)
 
-  const show = await db.select().from(shows).where(eq(shows.id, showId)).get()
+  const show = await db.select().from(schema.shows).where(eq(schema.shows.id, showId)).get()
   if (!show) {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
 
   const body = await readValidatedBody(event, bodySchema.parse)
 
-  const [newPerformance] = await db.insert(performances).values({
+  const [newPerformance] = await db.insert(schema.performances).values({
     showId,
     venueId: body.venueId,
     startsAt: new Date(body.startsAt * 1000),

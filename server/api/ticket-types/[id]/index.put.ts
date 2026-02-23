@@ -1,4 +1,4 @@
-import { ticketTypes } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { updateTicketType } from '~~/shared/utils/abilities'
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, updateTicketType)
 
-  const existing = await db.select().from(ticketTypes).where(eq(ticketTypes.id, ticketTypeId)).get()
+  const existing = await db.select().from(schema.ticketTypes).where(eq(schema.ticketTypes.id, ticketTypeId)).get()
   if (!existing) {
     throw createError({ statusCode: 404, statusMessage: 'Ticket type not found' })
   }
@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
 
   // Check name uniqueness if being changed
   if (body.name !== undefined && body.name !== existing.name) {
-    const conflict = await db.select().from(ticketTypes).where(eq(ticketTypes.name, body.name)).get()
+    const conflict = await db.select().from(schema.ticketTypes).where(eq(schema.ticketTypes.name, body.name)).get()
     if (conflict) {
       throw createError({ statusCode: 400, statusMessage: 'A ticket type with this name already exists' })
     }
@@ -50,9 +50,9 @@ export default defineEventHandler(async (event) => {
     return existing
   }
 
-  const [updated] = await db.update(ticketTypes)
+  const [updated] = await db.update(schema.ticketTypes)
     .set(updateData)
-    .where(eq(ticketTypes.id, ticketTypeId))
+    .where(eq(schema.ticketTypes.id, ticketTypeId))
     .returning()
 
   return updated

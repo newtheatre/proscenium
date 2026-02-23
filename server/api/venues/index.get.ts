@@ -1,3 +1,5 @@
+import { db } from '@nuxthub/db'
+
 export default defineEventHandler(async () => {
   // Venues are public - no authentication required
 
@@ -14,15 +16,5 @@ export default defineEventHandler(async () => {
   })
 
   // Map to expected format with features array
-  return allVenues.map((venue) => ({
-    id: venue.id,
-    name: venue.name,
-    address: venue.address,
-    capacity: venue.capacity,
-    imageUrl: venue.imageUrl,
-    description: venue.description,
-    createdAt: venue.createdAt,
-    updatedAt: venue.updatedAt,
-    features: venue.venuesToFeatures.map((vtf) => vtf.feature),
-  }))
+  return allVenues.map(formatVenueResponse)
 })

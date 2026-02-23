@@ -1,8 +1,7 @@
-import { shows, performances, ticketTypes, performanceTicketTypeOverrides } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq, and } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { updatePerformance } from '~~/shared/utils/abilities'
-import { nanoid } from 'nanoid'
 
 const bodySchema = z.object({
   ticketTypeId: z.string().min(1, 'Ticket type ID is required'),
@@ -25,13 +24,13 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, updatePerformance)
 
-  const show = await db.select().from(shows).where(eq(shows.id, showId)).get()
+  const show = await db.select().from(schema.shows).where(eq(schema.shows.id, showId)).get()
   if (!show) {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
 
-  const performance = await db.select().from(performances)
-    .where(and(eq(performances.id, performanceId), eq(performances.showId, showId)))
+  const performance = await db.select().from(schema.performances)
+    .where(and(eq(schema.performances.id, performanceId), eq(schema.performances.showId, showId)))
     .get()
   if (!performance) {
     throw createError({ statusCode: 404, statusMessage: 'Performance not found' })
@@ -39,39 +38,38 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, bodySchema.parse)
 
-  const ticketType = await db.select().from(ticketTypes).where(eq(ticketTypes.id, body.ticketTypeId)).get()
+  const ticketType = await db.select().from(schema.ticketTypes).where(eq(schema.ticketTypes.id, body.ticketTypeId)).get()
   if (!ticketType) {
     throw createError({ statusCode: 404, statusMessage: 'Ticket type not found' })
   }
 
   const existing = await db.select()
-    .from(performanceTicketTypeOverrides)
+    .from(schema.performanceTicketTypeOverrides)
     .where(and(
-      eq(performanceTicketTypeOverrides.performanceId, performanceId),
-      eq(performanceTicketTypeOverrides.ticketTypeId, body.ticketTypeId),
+      eq(schema.performanceTicketTypeOverrides.performanceId, performanceId),
+      eq(schema.performanceTicketTypeOverrides.ticketTypeId, body.ticketTypeId),
     ))
     .get()
 
   if (existing) {
-    await db.update(performanceTicketTypeOverrides)
+    const [updated] = await db.update(schema.performanceTicketTypeOverrides)
       .set({
         price: body.price ?? null,
         active: body.active ?? null,
       })
-      .where(eq(performanceTicketTypeOverrides.id, existing.id))
-      .run()
-  }
-  else {
-    await db.insert(performanceTicketTypeOverrides)
-      .values({
-        id: nanoid(),
-        performanceId,
-        ticketTypeId: body.ticketTypeId,
-        price: body.price ?? null,
-        active: body.active ?? null,
-      })
-      .run()
+      .where(eq(schema.performanceTicketTypeOverrides.id, existing.id))
+      .returning()
+    return updated
   }
 
-  return { ok: true }
+  const [created] = await db.insert(schema.performanceTicketTypeOverrides)
+    .values({
+      performanceId,
+      ticketTypeId: body.ticketTypeId,
+      price: body.price ?? null,
+      active: body.active ?? null,
+    })
+    .returning()
+
+  return created
 })

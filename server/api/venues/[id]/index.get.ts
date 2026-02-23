@@ -1,3 +1,5 @@
+import { db } from '@nuxthub/db'
+
 export default defineEventHandler(async (event) => {
   const venueId = getRouterParam(event, 'id')
 
@@ -24,15 +26,5 @@ export default defineEventHandler(async (event) => {
   }
 
   // Map to expected format
-  return {
-    id: venue.id,
-    name: venue.name,
-    address: venue.address,
-    capacity: venue.capacity,
-    imageUrl: venue.imageUrl,
-    description: venue.description,
-    createdAt: venue.createdAt,
-    updatedAt: venue.updatedAt,
-    features: venue.venuesToFeatures.map((vtf) => vtf.feature),
-  }
+  return formatVenueResponse(venue)
 })

@@ -1,4 +1,4 @@
-import { users } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { createEmailVerificationToken, sendVerificationEmail } from '~~/server/utils/auth'
@@ -10,7 +10,7 @@ const bodySchema = z.object({
 export default defineEventHandler(async (event) => {
   const { email } = await readValidatedBody(event, bodySchema.parse)
 
-  const user = await db.select().from(users).where(eq(users.email, email)).get()
+  const user = await db.select().from(schema.users).where(eq(schema.users.email, email)).get()
 
   if (!user) {
     // To prevent user enumeration, respond with a success message even if the user doesn't exist

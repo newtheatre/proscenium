@@ -1,4 +1,4 @@
-import { shows, ticketTypes, showTicketTypeOverrides } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { readShow } from '~~/shared/utils/abilities'
 
@@ -17,15 +17,15 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, readShow)
 
-  const show = await db.select().from(shows).where(eq(shows.id, showId)).get()
+  const show = await db.select().from(schema.shows).where(eq(schema.shows.id, showId)).get()
   if (!show) {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
 
   const [allTypes, overrides] = await Promise.all([
-    db.select().from(ticketTypes).orderBy(ticketTypes.name).all(),
-    db.select().from(showTicketTypeOverrides)
-      .where(eq(showTicketTypeOverrides.showId, showId))
+    db.select().from(schema.ticketTypes).orderBy(schema.ticketTypes.name).all(),
+    db.select().from(schema.showTicketTypeOverrides)
+      .where(eq(schema.showTicketTypeOverrides.showId, showId))
       .all(),
   ])
 

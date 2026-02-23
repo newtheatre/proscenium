@@ -1,6 +1,6 @@
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
-import { reservations } from 'hub:db:schema'
 import { updateReservation } from '~~/shared/utils/abilities'
 
 const bodySchema = z.object({
@@ -19,12 +19,12 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Reservation ID is required' })
 
-  const existing = await db.select().from(reservations).where(eq(reservations.id, id)).get()
+  const existing = await db.select().from(schema.reservations).where(eq(schema.reservations.id, id)).get()
   if (!existing) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
 
   const body = await readValidatedBody(event, bodySchema.parse)
 
-  const updateData: Partial<typeof reservations.$inferInsert> = {}
+  const updateData: Partial<typeof schema.reservations.$inferInsert> = {}
   if (body.status !== undefined) updateData.status = body.status
   if (body.cancelledBy !== undefined) updateData.cancelledBy = body.cancelledBy ?? null
   if (body.customerNotes !== undefined) updateData.customerNotes = body.customerNotes ?? null
@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'No valid fields provided for update' })
   }
 
-  const [updated] = await db.update(reservations).set(updateData).where(eq(reservations.id, id)).returning()
+  const [updated] = await db.update(schema.reservations).set(updateData).where(eq(schema.reservations.id, id)).returning()
 
   return updated
 })

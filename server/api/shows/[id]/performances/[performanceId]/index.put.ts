@@ -1,4 +1,4 @@
-import { performances } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq, and } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { updatePerformance } from '~~/shared/utils/abilities'
@@ -25,8 +25,8 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, updatePerformance)
 
-  const existing = await db.select().from(performances)
-    .where(and(eq(performances.id, performanceId), eq(performances.showId, showId)))
+  const existing = await db.select().from(schema.performances)
+    .where(and(eq(schema.performances.id, performanceId), eq(schema.performances.showId, showId)))
     .get()
 
   if (!existing) {
@@ -50,9 +50,9 @@ export default defineEventHandler(async (event) => {
     return existing
   }
 
-  const [updated] = await db.update(performances)
+  const [updated] = await db.update(schema.performances)
     .set(updateData)
-    .where(eq(performances.id, performanceId))
+    .where(eq(schema.performances.id, performanceId))
     .returning()
 
   return updated

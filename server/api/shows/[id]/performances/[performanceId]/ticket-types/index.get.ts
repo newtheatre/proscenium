@@ -1,4 +1,4 @@
-import { shows, performances, ticketTypes, showTicketTypeOverrides, performanceTicketTypeOverrides } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq, and } from 'drizzle-orm'
 import { readShow } from '~~/shared/utils/abilities'
 
@@ -19,25 +19,25 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, readShow)
 
-  const show = await db.select().from(shows).where(eq(shows.id, showId)).get()
+  const show = await db.select().from(schema.shows).where(eq(schema.shows.id, showId)).get()
   if (!show) {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
 
-  const performance = await db.select().from(performances)
-    .where(and(eq(performances.id, performanceId), eq(performances.showId, showId)))
+  const performance = await db.select().from(schema.performances)
+    .where(and(eq(schema.performances.id, performanceId), eq(schema.performances.showId, showId)))
     .get()
   if (!performance) {
     throw createError({ statusCode: 404, statusMessage: 'Performance not found' })
   }
 
   const [allTypes, showOverrides, perfOverrides] = await Promise.all([
-    db.select().from(ticketTypes).orderBy(ticketTypes.name).all(),
-    db.select().from(showTicketTypeOverrides)
-      .where(eq(showTicketTypeOverrides.showId, showId))
+    db.select().from(schema.ticketTypes).orderBy(schema.ticketTypes.name).all(),
+    db.select().from(schema.showTicketTypeOverrides)
+      .where(eq(schema.showTicketTypeOverrides.showId, showId))
       .all(),
-    db.select().from(performanceTicketTypeOverrides)
-      .where(eq(performanceTicketTypeOverrides.performanceId, performanceId))
+    db.select().from(schema.performanceTicketTypeOverrides)
+      .where(eq(schema.performanceTicketTypeOverrides.performanceId, performanceId))
       .all(),
   ])
 

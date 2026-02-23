@@ -1,4 +1,4 @@
-import { performances } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq, and } from 'drizzle-orm'
 import { deletePerformance } from '~~/shared/utils/abilities'
 
@@ -12,8 +12,8 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, deletePerformance)
 
-  const existing = await db.select().from(performances)
-    .where(and(eq(performances.id, performanceId), eq(performances.showId, showId)))
+  const existing = await db.select().from(schema.performances)
+    .where(and(eq(schema.performances.id, performanceId), eq(schema.performances.showId, showId)))
     .get()
 
   if (!existing) {
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    await db.delete(performances).where(eq(performances.id, performanceId))
+    await db.delete(schema.performances).where(eq(schema.performances.id, performanceId))
   }
   catch {
     throw createError({
@@ -30,5 +30,5 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return { success: true, message: 'Performance deleted successfully' }
+  return { message: 'Performance deleted successfully' }
 })

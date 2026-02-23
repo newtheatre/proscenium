@@ -1,4 +1,4 @@
-import { venues } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { blob } from 'hub:blob'
 import { updateVenue } from '~~/shared/utils/abilities'
@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   await authorize(event, updateVenue)
 
   // Get the venue
-  const venue = await db.select().from(venues).where(eq(venues.id, venueId)).get()
+  const venue = await db.select().from(schema.venues).where(eq(schema.venues.id, venueId)).get()
 
   if (!venue) {
     throw createError({ statusCode: 404, statusMessage: 'Venue not found' })
@@ -34,12 +34,9 @@ export default defineEventHandler(async (event) => {
   }
 
   // Update venue to remove image URL
-  await db.update(venues)
+  await db.update(schema.venues)
     .set({ imageUrl: null })
-    .where(eq(venues.id, venueId))
+    .where(eq(schema.venues.id, venueId))
 
-  return {
-    success: true,
-    message: 'Image deleted successfully',
-  }
+  return { message: 'Image deleted successfully' }
 })

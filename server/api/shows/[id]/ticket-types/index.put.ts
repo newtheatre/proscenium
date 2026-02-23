@@ -1,4 +1,4 @@
-import { shows, ticketTypes, showTicketTypeOverrides } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq, and } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { updateShow } from '~~/shared/utils/abilities'
@@ -25,35 +25,35 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, updateShow)
 
-  const show = await db.select().from(shows).where(eq(shows.id, showId)).get()
+  const show = await db.select().from(schema.shows).where(eq(schema.shows.id, showId)).get()
   if (!show) {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
 
   const body = await readValidatedBody(event, bodySchema.parse)
 
-  const ticketType = await db.select().from(ticketTypes).where(eq(ticketTypes.id, body.ticketTypeId)).get()
+  const ticketType = await db.select().from(schema.ticketTypes).where(eq(schema.ticketTypes.id, body.ticketTypeId)).get()
   if (!ticketType) {
     throw createError({ statusCode: 404, statusMessage: 'Ticket type not found' })
   }
 
   // Check for existing override
-  const existing = await db.select().from(showTicketTypeOverrides)
+  const existing = await db.select().from(schema.showTicketTypeOverrides)
     .where(and(
-      eq(showTicketTypeOverrides.showId, showId),
-      eq(showTicketTypeOverrides.ticketTypeId, body.ticketTypeId),
+      eq(schema.showTicketTypeOverrides.showId, showId),
+      eq(schema.showTicketTypeOverrides.ticketTypeId, body.ticketTypeId),
     ))
     .get()
 
   if (existing) {
-    const [updated] = await db.update(showTicketTypeOverrides)
+    const [updated] = await db.update(schema.showTicketTypeOverrides)
       .set({ price: body.price ?? null, active: body.active ?? null })
-      .where(eq(showTicketTypeOverrides.id, existing.id))
+      .where(eq(schema.showTicketTypeOverrides.id, existing.id))
       .returning()
     return updated
   }
 
-  const [created] = await db.insert(showTicketTypeOverrides).values({
+  const [created] = await db.insert(schema.showTicketTypeOverrides).values({
     showId,
     ticketTypeId: body.ticketTypeId,
     price: body.price ?? null,

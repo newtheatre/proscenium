@@ -1,3 +1,4 @@
+import { db } from '@nuxthub/db'
 import { readUser } from '~~/shared/utils/abilities'
 
 export default defineEventHandler(async (event) => {
@@ -10,16 +11,7 @@ export default defineEventHandler(async (event) => {
   // Get the user with roles using query API
   const user = await db.query.users.findFirst({
     where: (users, { eq }) => eq(users.id, userId),
-    columns: {
-      password: false,
-    },
-    with: {
-      userRoles: {
-        columns: {
-          role: true,
-        },
-      },
-    },
+    ...userWithRolesQuery,
   })
 
   if (!user) {
@@ -29,9 +21,5 @@ export default defineEventHandler(async (event) => {
   // Check if user has permission to read this user
   await authorize(event, readUser, user)
 
-  return {
-    ...user,
-    roles: user.userRoles.map(r => r.role),
-    userRoles: undefined,
-  }
+  return formatUserResponse(user)
 })

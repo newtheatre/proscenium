@@ -1,5 +1,5 @@
+import { db, schema } from '@nuxthub/db'
 import { asc } from 'drizzle-orm'
-import { performances } from 'hub:db:schema'
 
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
     where: (shows, { eq }) => eq(shows.id, showId),
     with: {
       performances: {
-        orderBy: [asc(performances.startsAt)],
+        orderBy: [asc(schema.performances.startsAt)],
         with: {
           venue: {
             columns: { id: true, name: true, capacity: true },

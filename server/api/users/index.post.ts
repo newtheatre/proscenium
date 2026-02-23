@@ -1,9 +1,8 @@
-import { users, userRoles } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { createUser, updateUserRoles, updateUserVerified } from '~~/shared/utils/abilities'
 import { generateVerificationToken, sendPasswordResetEmail } from '~~/server/utils/auth'
-import { passwordResets } from 'hub:db:schema'
 
 const bodySchema = z.object({
   email: z.email(),
@@ -29,14 +28,14 @@ export default defineEventHandler(async (event) => {
   }
 
   // Check if user already exists
-  const existingUser = await db.select().from(users).where(eq(users.email, email)).get()
+  const existingUser = await db.select().from(schema.users).where(eq(schema.users.email, email)).get()
 
   if (existingUser) {
     throw createError({ statusCode: 400, statusMessage: 'User with this email already exists' })
   }
 
   // Insert the new user into the database (no password - user must set their own)
-  const [newUser] = await db.insert(users).values({
+  const [newUser] = await db.insert(schema.users).values({
     email,
     name,
     verified,
@@ -48,7 +47,7 @@ export default defineEventHandler(async (event) => {
 
   // Assign roles if provided
   if (userRolesToAssign.length > 0) {
-    await db.insert(userRoles).values(
+    await db.insert(schema.userRoles).values(
       userRolesToAssign.map(role => ({
         userId: newUser.id,
         role,
@@ -59,16 +58,7 @@ export default defineEventHandler(async (event) => {
   // Get the created user with roles using query API
   const createdUser = await db.query.users.findFirst({
     where: (users, { eq }) => eq(users.id, newUser.id),
-    columns: {
-      password: false,
-    },
-    with: {
-      userRoles: {
-        columns: {
-          role: true,
-        },
-      },
-    },
+    ...userWithRolesQuery,
   })
 
   if (!createdUser) {
@@ -79,7 +69,7 @@ export default defineEventHandler(async (event) => {
   const resetToken = generateVerificationToken()
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
 
-  await db.insert(passwordResets).values({
+  await db.insert(schema.passwordResets).values({
     userId: newUser.id,
     token: resetToken,
     expiresAt,
@@ -87,9 +77,5 @@ export default defineEventHandler(async (event) => {
 
   await sendPasswordResetEmail(email, resetToken)
 
-  return {
-    ...createdUser,
-    roles: createdUser.userRoles.map(r => r.role),
-    userRoles: undefined,
-  }
+  return formatUserResponse(createdUser)
 })

@@ -1,3 +1,5 @@
+import { db } from '@nuxthub/db'
+
 export default defineEventHandler(async (event) => {
   const ticketTypeId = getRouterParam(event, 'id')
 

@@ -1,5 +1,5 @@
+import { db, schema } from '@nuxthub/db'
 import { and, eq, inArray } from 'drizzle-orm'
-import { reservations, performances, ticketTypes, showTicketTypeOverrides, performanceTicketTypeOverrides } from 'hub:db:schema'
 import { updateReservation } from '~~/shared/utils/abilities'
 
 /**
@@ -20,8 +20,8 @@ export default defineEventHandler(async (event) => {
 
   const reservation = await db
     .select()
-    .from(reservations)
-    .where(eq(reservations.id, id))
+    .from(schema.reservations)
+    .where(eq(schema.reservations.id, id))
     .get()
 
   if (!reservation) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
@@ -30,30 +30,30 @@ export default defineEventHandler(async (event) => {
 
   // Resolve showId from the performance
   const perf = await db
-    .select({ showId: performances.showId })
-    .from(performances)
-    .where(eq(performances.id, performanceId))
+    .select({ showId: schema.performances.showId })
+    .from(schema.performances)
+    .where(eq(schema.performances.id, performanceId))
     .get()
 
   if (!perf) throw createError({ statusCode: 500, statusMessage: 'Performance not found' })
   const showId = perf.showId
 
   // Load all base ticket types
-  const allTypes = await db.select().from(ticketTypes)
+  const allTypes = await db.select().from(schema.ticketTypes)
   const typeIds = allTypes.map(t => t.id)
 
   // Load show-level and performance-level overrides for these types
   const [showOverrides, perfOverrides] = await Promise.all([
-    db.select().from(showTicketTypeOverrides).where(
+    db.select().from(schema.showTicketTypeOverrides).where(
       and(
-        eq(showTicketTypeOverrides.showId, showId),
-        inArray(showTicketTypeOverrides.ticketTypeId, typeIds),
+        eq(schema.showTicketTypeOverrides.showId, showId),
+        inArray(schema.showTicketTypeOverrides.ticketTypeId, typeIds),
       ),
     ),
-    db.select().from(performanceTicketTypeOverrides).where(
+    db.select().from(schema.performanceTicketTypeOverrides).where(
       and(
-        eq(performanceTicketTypeOverrides.performanceId, performanceId),
-        inArray(performanceTicketTypeOverrides.ticketTypeId, typeIds),
+        eq(schema.performanceTicketTypeOverrides.performanceId, performanceId),
+        inArray(schema.performanceTicketTypeOverrides.ticketTypeId, typeIds),
       ),
     ),
   ])

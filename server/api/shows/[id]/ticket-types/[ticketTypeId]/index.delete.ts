@@ -1,4 +1,4 @@
-import { shows, showTicketTypeOverrides } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq, and } from 'drizzle-orm'
 import { updateShow } from '~~/shared/utils/abilities'
 
@@ -18,15 +18,15 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, updateShow)
 
-  const show = await db.select().from(shows).where(eq(shows.id, showId)).get()
+  const show = await db.select().from(schema.shows).where(eq(schema.shows.id, showId)).get()
   if (!show) {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
 
-  const existing = await db.select().from(showTicketTypeOverrides)
+  const existing = await db.select().from(schema.showTicketTypeOverrides)
     .where(and(
-      eq(showTicketTypeOverrides.showId, showId),
-      eq(showTicketTypeOverrides.ticketTypeId, ticketTypeId),
+      eq(schema.showTicketTypeOverrides.showId, showId),
+      eq(schema.showTicketTypeOverrides.ticketTypeId, ticketTypeId),
     ))
     .get()
 
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'No override exists for this ticket type' })
   }
 
-  await db.delete(showTicketTypeOverrides).where(eq(showTicketTypeOverrides.id, existing.id))
+  await db.delete(schema.showTicketTypeOverrides).where(eq(schema.showTicketTypeOverrides.id, existing.id))
 
-  return { success: true }
+  return { message: 'Show ticket type override removed' }
 })

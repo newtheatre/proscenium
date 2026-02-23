@@ -1,4 +1,4 @@
-import { users, userRoles } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 
@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const { email, password } = await readValidatedBody(event, bodySchema.parse)
 
   // Find user by email
-  const user = await db.select().from(users).where(eq(users.email, email)).get()
+  const user = await db.select().from(schema.users).where(eq(schema.users.email, email)).get()
 
   if (!user) {
     throw createError({
@@ -39,12 +39,12 @@ export default defineEventHandler(async (event) => {
   }
 
   // Get user roles
-  const roles = await db.select().from(userRoles).where(eq(userRoles.userId, user.id)).all()
+  const roles = await db.select().from(schema.userRoles).where(eq(schema.userRoles.userId, user.id)).all()
 
   // Update last login
-  await db.update(users)
+  await db.update(schema.users)
     .set({ lastLogin: new Date().toISOString() })
-    .where(eq(users.id, user.id))
+    .where(eq(schema.users.id, user.id))
 
   // Set user session
   await setUserSession(event, {

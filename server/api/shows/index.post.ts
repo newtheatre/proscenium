@@ -1,4 +1,4 @@
-import { shows } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { createShow } from '~~/shared/utils/abilities'
@@ -17,12 +17,12 @@ export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, bodySchema.parse)
 
   // Check for duplicate slug
-  const existing = await db.select().from(shows).where(eq(shows.slug, body.slug)).get()
+  const existing = await db.select().from(schema.shows).where(eq(schema.shows.slug, body.slug)).get()
   if (existing) {
     throw createError({ statusCode: 400, statusMessage: 'A show with this slug already exists' })
   }
 
-  const [newShow] = await db.insert(shows).values({
+  const [newShow] = await db.insert(schema.shows).values({
     title: body.title,
     slug: body.slug,
     subtitle: body.subtitle,

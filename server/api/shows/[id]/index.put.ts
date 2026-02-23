@@ -1,4 +1,4 @@
-import { shows } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { updateShow } from '~~/shared/utils/abilities'
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, updateShow)
 
-  const existing = await db.select().from(shows).where(eq(shows.id, showId)).get()
+  const existing = await db.select().from(schema.shows).where(eq(schema.shows.id, showId)).get()
   if (!existing) {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
 
   // Check slug uniqueness if changing
   if (body.slug !== undefined && body.slug !== existing.slug) {
-    const conflict = await db.select().from(shows).where(eq(shows.slug, body.slug)).get()
+    const conflict = await db.select().from(schema.shows).where(eq(schema.shows.slug, body.slug)).get()
     if (conflict) {
       throw createError({ statusCode: 400, statusMessage: 'A show with this slug already exists' })
     }
@@ -48,9 +48,9 @@ export default defineEventHandler(async (event) => {
     return existing
   }
 
-  const [updated] = await db.update(shows)
+  const [updated] = await db.update(schema.shows)
     .set(updateData)
-    .where(eq(shows.id, showId))
+    .where(eq(schema.shows.id, showId))
     .returning()
 
   return updated

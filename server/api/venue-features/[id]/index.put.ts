@@ -1,4 +1,4 @@
-import { venueFeatures } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { updateVenueFeature } from '~~/shared/utils/abilities'
@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
   await authorize(event, updateVenueFeature)
 
   // Get the feature
-  const feature = await db.select().from(venueFeatures).where(eq(venueFeatures.id, featureId)).get()
+  const feature = await db.select().from(schema.venueFeatures).where(eq(schema.venueFeatures.id, featureId)).get()
 
   if (!feature) {
     throw createError({ statusCode: 404, statusMessage: 'Venue feature not found' })
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
 
   // Check if name is already taken by another feature
   if (body.name !== undefined && body.name !== feature.name) {
-    const existingFeature = await db.select().from(venueFeatures).where(eq(venueFeatures.name, body.name)).get()
+    const existingFeature = await db.select().from(schema.venueFeatures).where(eq(schema.venueFeatures.name, body.name)).get()
     if (existingFeature && existingFeature.id !== featureId) {
       throw createError({ statusCode: 400, statusMessage: 'Feature name is already taken' })
     }
@@ -52,9 +52,9 @@ export default defineEventHandler(async (event) => {
     return feature
   }
 
-  const [updatedFeature] = await db.update(venueFeatures)
+  const [updatedFeature] = await db.update(schema.venueFeatures)
     .set(updateData)
-    .where(eq(venueFeatures.id, featureId))
+    .where(eq(schema.venueFeatures.id, featureId))
     .returning()
 
   if (!updatedFeature) {

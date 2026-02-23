@@ -1,4 +1,4 @@
-import { venues } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { blob } from 'hub:blob'
 import { deleteVenue } from '~~/shared/utils/abilities'
@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   await authorize(event, deleteVenue)
 
   // Get the venue
-  const venue = await db.select().from(venues).where(eq(venues.id, venueId)).get()
+  const venue = await db.select().from(schema.venues).where(eq(schema.venues.id, venueId)).get()
 
   if (!venue) {
     throw createError({ statusCode: 404, statusMessage: 'Venue not found' })
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Delete the venue (cascade will delete related records)
-  await db.delete(venues).where(eq(venues.id, venueId))
+  await db.delete(schema.venues).where(eq(schema.venues.id, venueId))
 
-  return { success: true, message: 'Venue deleted successfully' }
+  return { message: 'Venue deleted successfully' }
 })

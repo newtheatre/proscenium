@@ -1,4 +1,4 @@
-import { shows } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { blob } from 'hub:blob'
 import { updateShow } from '~~/shared/utils/abilities'
@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, updateShow)
 
-  const show = await db.select().from(shows).where(eq(shows.id, showId)).get()
+  const show = await db.select().from(schema.shows).where(eq(schema.shows.id, showId)).get()
   if (!show) {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
@@ -23,9 +23,9 @@ export default defineEventHandler(async (event) => {
 
   await blob.delete(show.posterUrl)
 
-  const [updated] = await db.update(shows)
+  const [updated] = await db.update(schema.shows)
     .set({ posterUrl: null })
-    .where(eq(shows.id, showId))
+    .where(eq(schema.shows.id, showId))
     .returning()
 
   return updated

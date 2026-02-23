@@ -1,4 +1,4 @@
-import { ticketTypes } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { deleteTicketType } from '~~/shared/utils/abilities'
 
@@ -11,14 +11,14 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, deleteTicketType)
 
-  const existing = await db.select().from(ticketTypes).where(eq(ticketTypes.id, ticketTypeId)).get()
+  const existing = await db.select().from(schema.ticketTypes).where(eq(schema.ticketTypes.id, ticketTypeId)).get()
   if (!existing) {
     throw createError({ statusCode: 404, statusMessage: 'Ticket type not found' })
   }
 
   // Note: deletion will be blocked by the DB if any issued tickets reference this type (onDelete: 'restrict')
   try {
-    await db.delete(ticketTypes).where(eq(ticketTypes.id, ticketTypeId))
+    await db.delete(schema.ticketTypes).where(eq(schema.ticketTypes.id, ticketTypeId))
   }
   catch {
     throw createError({
@@ -27,5 +27,5 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return { success: true, message: 'Ticket type deleted successfully' }
+  return { message: 'Ticket type deleted successfully' }
 })

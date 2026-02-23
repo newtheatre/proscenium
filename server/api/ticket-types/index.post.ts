@@ -1,4 +1,4 @@
-import { ticketTypes } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { createTicketType } from '~~/shared/utils/abilities'
@@ -16,12 +16,12 @@ export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, bodySchema.parse)
 
   // Check for duplicate name
-  const existing = await db.select().from(ticketTypes).where(eq(ticketTypes.name, body.name)).get()
+  const existing = await db.select().from(schema.ticketTypes).where(eq(schema.ticketTypes.name, body.name)).get()
   if (existing) {
     throw createError({ statusCode: 400, statusMessage: 'A ticket type with this name already exists' })
   }
 
-  const [newTicketType] = await db.insert(ticketTypes).values({
+  const [newTicketType] = await db.insert(schema.ticketTypes).values({
     name: body.name,
     description: body.description,
     price: body.price,

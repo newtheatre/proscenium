@@ -1,4 +1,4 @@
-import { venueFeatures } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { createVenueFeature } from '~~/shared/utils/abilities'
@@ -16,14 +16,14 @@ export default defineEventHandler(async (event) => {
   const { name, description, icon } = await readValidatedBody(event, bodySchema.parse)
 
   // Check if feature with this name already exists
-  const existingFeature = await db.select().from(venueFeatures).where(eq(venueFeatures.name, name)).get()
+  const existingFeature = await db.select().from(schema.venueFeatures).where(eq(schema.venueFeatures.name, name)).get()
 
   if (existingFeature) {
     throw createError({ statusCode: 400, statusMessage: 'Feature with this name already exists' })
   }
 
   // Insert the new feature
-  const [newFeature] = await db.insert(venueFeatures).values({
+  const [newFeature] = await db.insert(schema.venueFeatures).values({
     name,
     description,
     icon,

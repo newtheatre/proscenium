@@ -1,5 +1,5 @@
+import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
-import { performances } from 'hub:db:schema'
 import { listReservations } from '~~/shared/utils/abilities'
 
 export default defineEventHandler(async (event) => {
@@ -12,22 +12,19 @@ export default defineEventHandler(async (event) => {
   const status = query.status as 'PENDING' | 'COLLECTED' | 'DOOR' | 'CANCELLED' | 'NO_SHOW' | undefined
 
   // Resolve performance IDs when filtering by show
-  let performanceIds: string[] | undefined
+  let resolvedPerfIds: string[] | undefined
   if (showId) {
     const showPerfs = await db
-      .select({ id: performances.id })
-      .from(performances)
-      .where(eq(performances.showId, showId))
-    performanceIds = showPerfs.map((p: { id: string }) => p.id)
-    if (performanceIds.length === 0) {
-      return []
-    }
+      .select({ id: schema.performances.id })
+      .from(schema.performances)
+      .where(eq(schema.performances.showId, showId))
+    const ids = showPerfs.map(p => p.id)
+    if (ids.length === 0) return []
+    resolvedPerfIds = ids
   }
 
-  const resolvedPerfIds = performanceIds
-
   const allReservations = await db.query.reservations.findMany({
-    where: (r: any, { eq, and, inArray }: any) => {
+    where: (r, { eq, and, inArray }) => {
       const conditions = []
       if (performanceId) conditions.push(eq(r.performanceId, performanceId))
       if (resolvedPerfIds) conditions.push(inArray(r.performanceId, resolvedPerfIds))
@@ -35,18 +32,8 @@ export default defineEventHandler(async (event) => {
       if (status) conditions.push(eq(r.status, status))
       return conditions.length ? and(...conditions) : undefined
     },
-    with: {
-      user: {
-        columns: { id: true, name: true, email: true, password: false, verified: true },
-      },
-      performance: {
-        with: {
-          show: { columns: { id: true, title: true, slug: true } },
-          venue: { columns: { id: true, name: true } },
-        },
-      },
-    },
-    orderBy: (r: any, { desc }: any) => [desc(r.createdAt)],
+    with: reservationSummaryWith,
+    orderBy: (r, { desc }) => [desc(r.createdAt)],
   })
 
   return allReservations

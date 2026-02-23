@@ -1,12 +1,12 @@
-import { shows, performances, showTicketTypeOverrides, performanceTicketTypeOverrides } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { asc, count, inArray } from 'drizzle-orm'
 
 export default defineEventHandler(async () => {
   const allShows = await db.query.shows.findMany({
-    orderBy: [asc(shows.title)],
+    orderBy: [asc(schema.shows.title)],
     with: {
       performances: {
-        orderBy: [asc(performances.startsAt)],
+        orderBy: [asc(schema.performances.startsAt)],
         with: {
           venue: {
             columns: { id: true, name: true, capacity: true },
@@ -25,16 +25,16 @@ export default defineEventHandler(async () => {
   )
 
   const [showOverrideCounts, perfOverrideCounts] = await Promise.all([
-    db.select({ showId: showTicketTypeOverrides.showId, c: count() })
-      .from(showTicketTypeOverrides)
-      .where(inArray(showTicketTypeOverrides.showId, showIds))
-      .groupBy(showTicketTypeOverrides.showId)
+    db.select({ showId: schema.showTicketTypeOverrides.showId, c: count() })
+      .from(schema.showTicketTypeOverrides)
+      .where(inArray(schema.showTicketTypeOverrides.showId, showIds))
+      .groupBy(schema.showTicketTypeOverrides.showId)
       .all(),
     perfIds.length > 0
-      ? db.select({ performanceId: performanceTicketTypeOverrides.performanceId, c: count() })
-          .from(performanceTicketTypeOverrides)
-          .where(inArray(performanceTicketTypeOverrides.performanceId, perfIds))
-          .groupBy(performanceTicketTypeOverrides.performanceId)
+      ? db.select({ performanceId: schema.performanceTicketTypeOverrides.performanceId, c: count() })
+          .from(schema.performanceTicketTypeOverrides)
+          .where(inArray(schema.performanceTicketTypeOverrides.performanceId, perfIds))
+          .groupBy(schema.performanceTicketTypeOverrides.performanceId)
           .all()
       : Promise.resolve([]),
   ])

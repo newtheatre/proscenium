@@ -1,3 +1,4 @@
+import { db } from '@nuxthub/db'
 import { readReservation } from '~~/shared/utils/abilities'
 
 export default defineEventHandler(async (event) => {
@@ -6,21 +7,7 @@ export default defineEventHandler(async (event) => {
 
   const reservation = await db.query.reservations.findFirst({
     where: (r, { eq }) => eq(r.id, id),
-    with: {
-      user: { columns: { id: true, name: true, email: true, password: false, verified: true } },
-      performance: {
-        with: {
-          show: { columns: { id: true, title: true, slug: true } },
-          venue: { columns: { id: true, name: true } },
-        },
-      },
-      tickets: {
-        with: {
-          ticketType: { columns: { id: true, name: true, description: true } },
-        },
-        orderBy: (t, { asc }) => [asc(t.createdAt)],
-      },
-    },
+    with: reservationDetailWith,
   })
 
   if (!reservation) {

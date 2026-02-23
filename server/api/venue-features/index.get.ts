@@ -1,3 +1,5 @@
+import { db } from '@nuxthub/db'
+
 export default defineEventHandler(async () => {
   // Features are public - no authentication required
 

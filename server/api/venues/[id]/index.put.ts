@@ -1,4 +1,4 @@
-import { venues, venuesToFeatures } from 'hub:db:schema'
+import { db } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { updateVenue } from '~~/shared/utils/abilities'
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   await authorize(event, updateVenue)
 
   // Get the venue
-  const venue = await db.select().from(venues).where(eq(venues.id, venueId)).get()
+  const venue = await db.select().from(schema.venues).where(eq(schema.venues.id, venueId)).get()
 
   if (!venue) {
     throw createError({ statusCode: 404, statusMessage: 'Venue not found' })
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
 
   // Check if name is already taken by another venue
   if (body.name !== undefined && body.name !== venue.name) {
-    const existingVenue = await db.select().from(venues).where(eq(venues.name, body.name)).get()
+    const existingVenue = await db.select().from(schema.venues).where(eq(schema.venues.name, body.name)).get()
     if (existingVenue && existingVenue.id !== venueId) {
       throw createError({ statusCode: 400, statusMessage: 'Venue name is already taken' })
     }
@@ -53,19 +53,19 @@ export default defineEventHandler(async (event) => {
 
   // Update venue if there are changes
   if (Object.keys(updateData).length > 0) {
-    await db.update(venues)
+    await db.update(schema.venues)
       .set(updateData)
-      .where(eq(venues.id, venueId))
+      .where(eq(schema.venues.id, venueId))
   }
 
   // Update features if provided
   if (body.featureIds !== undefined) {
     // Delete existing feature associations
-    await db.delete(venuesToFeatures).where(eq(venuesToFeatures.venueId, venueId))
+    await db.delete(schema.venuesToFeatures).where(eq(schema.venuesToFeatures.venueId, venueId))
 
     // Insert new feature associations
     if (body.featureIds.length > 0) {
-      await db.insert(venuesToFeatures).values(
+      await db.insert(schema.venuesToFeatures).values(
         body.featureIds.map(featureId => ({
           venueId,
           featureId,
@@ -91,15 +91,5 @@ export default defineEventHandler(async (event) => {
   }
 
   // Map to expected format
-  return {
-    id: updatedVenue.id,
-    name: updatedVenue.name,
-    address: updatedVenue.address,
-    capacity: updatedVenue.capacity,
-    imageUrl: updatedVenue.imageUrl,
-    description: updatedVenue.description,
-    createdAt: updatedVenue.createdAt,
-    updatedAt: updatedVenue.updatedAt,
-    features: updatedVenue.venuesToFeatures.map((vtf) => vtf.feature),
-  }
+  return formatVenueResponse(updatedVenue)
 })

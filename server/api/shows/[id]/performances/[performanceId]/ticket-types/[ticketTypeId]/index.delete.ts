@@ -1,4 +1,4 @@
-import { shows, performances, performanceTicketTypeOverrides } from 'hub:db:schema'
+import { db, schema } from '@nuxthub/db'
 import { eq, and } from 'drizzle-orm'
 import { updatePerformance } from '~~/shared/utils/abilities'
 
@@ -18,24 +18,24 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, updatePerformance)
 
-  const show = await db.select().from(shows).where(eq(shows.id, showId)).get()
+  const show = await db.select().from(schema.shows).where(eq(schema.shows.id, showId)).get()
   if (!show) {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
 
-  const performance = await db.select().from(performances)
-    .where(and(eq(performances.id, performanceId), eq(performances.showId, showId)))
+  const performance = await db.select().from(schema.performances)
+    .where(and(eq(schema.performances.id, performanceId), eq(schema.performances.showId, showId)))
     .get()
   if (!performance) {
     throw createError({ statusCode: 404, statusMessage: 'Performance not found' })
   }
 
-  await db.delete(performanceTicketTypeOverrides)
+  await db.delete(schema.performanceTicketTypeOverrides)
     .where(and(
-      eq(performanceTicketTypeOverrides.performanceId, performanceId),
-      eq(performanceTicketTypeOverrides.ticketTypeId, ticketTypeId),
+      eq(schema.performanceTicketTypeOverrides.performanceId, performanceId),
+      eq(schema.performanceTicketTypeOverrides.ticketTypeId, ticketTypeId),
     ))
     .run()
 
-  return { ok: true }
+  return { message: 'Performance ticket type override removed' }
 })
