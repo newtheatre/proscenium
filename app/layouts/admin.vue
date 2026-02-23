@@ -59,39 +59,38 @@
 import type { NavigationMenuItem } from '@nuxt/ui'
 
 const route = useRoute()
+const { user } = useUserSession()
 
-const navigation: NavigationMenuItem[][] = [
-  [
+const isAdmin = computed(() =>
+  user.value?.roles?.includes('ADMIN') || user.value?.roles?.includes('MANAGER'),
+)
+
+const navigation = computed<NavigationMenuItem[][]>(() => {
+  const sections: NavigationMenuItem[][] = []
+
+  if (isAdmin.value) {
+    sections.push([
+      // @ts-expect-error — Nuxt UI v4 NavigationMenu supports type:'label' at runtime
+      { type: 'label', label: 'Administration' },
+      { label: 'Dashboard', icon: 'i-lucide-layout-dashboard', to: '/admin' },
+      { label: 'Users', icon: 'i-lucide-users', to: '/admin/users' },
+      { label: 'Venues', icon: 'i-lucide-building', to: '/admin/venues' },
+      { label: 'Ticket Types', icon: 'i-lucide-ticket', to: '/admin/ticket-types' },
+      { label: 'Shows', icon: 'i-lucide-calendar', to: '/admin/shows' },
+      { label: 'Reservations', icon: 'i-lucide-bookmark-check', to: '/admin/reservations' },
+    ])
+  }
+
+  sections.push([
+    // @ts-expect-error — Nuxt UI v4 NavigationMenu supports type:'label' at runtime
+    { type: 'label', label: 'Front of House' },
     {
-      label: 'Dashboard',
-      icon: 'i-lucide-layout-dashboard',
-      to: '/admin',
+      label: 'Box Office',
+      icon: 'i-lucide-monitor-check',
+      to: '/admin/box-office/reservations',
     },
-    {
-      label: 'Users',
-      icon: 'i-lucide-users',
-      to: '/admin/users',
-    },
-      {
-        label: 'Venues',
-        icon: 'i-lucide-building',
-        to: '/admin/venues',
-      },
-      {
-        label: 'Ticket Types',
-        icon: 'i-lucide-ticket',
-        to: '/admin/ticket-types',
-      },
-      {
-        label: 'Shows',
-        icon: 'i-lucide-calendar',
-        to: '/admin/shows',
-      },
-      {
-        label: 'Reservations',
-        icon: 'i-lucide-bookmark-check',
-        to: '/admin/reservations',
-      },
-  ],
-]
+  ])
+
+  return sections
+})
 </script>
