@@ -1,7 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
-import { createEmailVerificationToken, sendVerificationEmail } from '~~/server/utils/auth'
 
 const bodySchema = z.object({
   email: z.email(),
@@ -9,6 +8,7 @@ const bodySchema = z.object({
   name: z.string().min(1, 'Name is required'),
 })
 
+/** POST /api/auth/register — register a new user account. */
 export default defineEventHandler(async (event) => {
   const { email, password, name } = await readValidatedBody(event, bodySchema.parse)
 

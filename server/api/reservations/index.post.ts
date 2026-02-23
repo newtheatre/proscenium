@@ -25,6 +25,7 @@ const bodySchema = z.object({
   { message: 'Either userId or both name and email are required' },
 )
 
+/** POST /api/reservations — create a new reservation. Staff only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, createReservation)
 

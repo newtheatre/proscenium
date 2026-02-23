@@ -2,6 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { deleteVenueFeature } from '~~/shared/utils/abilities'
 
+/** DELETE /api/venue-features/:id — delete a venue feature. Admin only. */
 export default defineEventHandler(async (event) => {
   const featureId = getRouterParam(event, 'id')
 

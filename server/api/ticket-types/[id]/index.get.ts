@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 
+/** GET /api/ticket-types/:id — get a ticket type by ID. Public. */
 export default defineEventHandler(async (event) => {
   const ticketTypeId = getRouterParam(event, 'id')
 

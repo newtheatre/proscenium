@@ -2,6 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { deleteReservation } from '~~/shared/utils/abilities'
 
+/** DELETE /api/reservations/:id — delete a reservation. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, deleteReservation)
 

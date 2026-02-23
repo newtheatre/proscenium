@@ -1,6 +1,5 @@
-import { db } from 'hub:db'
+import { db, schema } from '@nuxthub/db'
 import { and, eq, inArray } from 'drizzle-orm'
-import { ticketTypes, showTicketTypeOverrides, performanceTicketTypeOverrides } from 'hub:db:schema'
 
 /**
  * Loaded override data used by `resolveEffectivePrice`.
@@ -25,17 +24,17 @@ export async function loadTicketPriceContext(
   performanceId: string,
 ): Promise<TicketPriceContext> {
   const [baseTypes, showOverrides, perfOverrides] = await Promise.all([
-    db.select().from(ticketTypes).where(inArray(ticketTypes.id, ticketTypeIds)),
-    db.select().from(showTicketTypeOverrides).where(
+    db.select().from(schema.ticketTypes).where(inArray(schema.ticketTypes.id, ticketTypeIds)),
+    db.select().from(schema.showTicketTypeOverrides).where(
       and(
-        eq(showTicketTypeOverrides.showId, showId),
-        inArray(showTicketTypeOverrides.ticketTypeId, ticketTypeIds),
+        eq(schema.showTicketTypeOverrides.showId, showId),
+        inArray(schema.showTicketTypeOverrides.ticketTypeId, ticketTypeIds),
       ),
     ),
-    db.select().from(performanceTicketTypeOverrides).where(
+    db.select().from(schema.performanceTicketTypeOverrides).where(
       and(
-        eq(performanceTicketTypeOverrides.performanceId, performanceId),
-        inArray(performanceTicketTypeOverrides.ticketTypeId, ticketTypeIds),
+        eq(schema.performanceTicketTypeOverrides.performanceId, performanceId),
+        inArray(schema.performanceTicketTypeOverrides.ticketTypeId, ticketTypeIds),
       ),
     ),
   ])

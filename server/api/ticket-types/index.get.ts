@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 
+/** GET /api/ticket-types — list all ticket types. Public. */
 export default defineEventHandler(async () => {
   // Ticket types are public — needed for booking flows
 

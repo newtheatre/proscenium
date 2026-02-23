@@ -16,6 +16,7 @@ const bodySchema = z.object({
  * If price and active are both null, the override is effectively transparent
  * (falls back to the base ticket type defaults).
  */
+/** PUT /api/shows/:id/ticket-types — set ticket type price overrides for a show. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 

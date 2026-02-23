@@ -1,62 +1,65 @@
 import { randomBytes } from 'crypto'
-import { emailVerifications } from 'hub:db:schema'
+import { schema } from '@nuxthub/db'
+import { eq } from 'drizzle-orm'
+
+/** Token expiry durations in milliseconds. */
+export const TOKEN_EXPIRY = {
+  /** Email verification tokens are valid for 24 hours. */
+  EMAIL_VERIFICATION: 24 * 60 * 60 * 1000,
+  /** Password reset tokens are valid for 1 hour. */
+  PASSWORD_RESET: 1 * 60 * 60 * 1000,
+  /** Admin-initiated password reset tokens are valid for 24 hours. */
+  ADMIN_PASSWORD_RESET: 24 * 60 * 60 * 1000,
+} as const
 
 /**
- * Generate a secure verification token
+ * Generate a cryptographically secure random token.
  */
 export function generateVerificationToken(): string {
   return randomBytes(32).toString('hex')
 }
 
 /**
- * Generate and set email verification token for a user
- * Returns the generated token
+ * Create and persist an email verification token for a user.
+ *
+ * @returns The generated token string.
  */
 export async function createEmailVerificationToken(userId: string): Promise<string> {
-  const verificationToken = generateVerificationToken()
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+  const token = generateVerificationToken()
+  const expiresAt = new Date(Date.now() + TOKEN_EXPIRY.EMAIL_VERIFICATION)
 
-  await db.insert(emailVerifications).values({
+  await db.insert(schema.emailVerifications).values({
     userId,
-    token: verificationToken,
+    token,
     expiresAt,
   })
 
-  return verificationToken
+  return token
 }
 
 /**
- * Send verification email
+ * Create and persist a password reset token for a user.
+ * Deletes any existing reset tokens for the user first.
+ *
+ * @param userId  The user to create a reset token for.
+ * @param expiry  Token lifetime in ms (defaults to PASSWORD_RESET — 1 hour).
+ * @returns The generated token string.
  */
-export async function sendVerificationEmail(email: string, token: string): Promise<void> {
-  // TODO: Implement an email service
-  console.log(`Email verification for ${email} with token: ${token}`)
-  console.log(`Verification URL: ${process.env.NUXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/verify-email?token=${token}`)
+export async function createPasswordResetToken(
+  userId: string,
+  expiry: number = TOKEN_EXPIRY.PASSWORD_RESET,
+): Promise<string> {
+  const token = generateVerificationToken()
+  const expiresAt = new Date(Date.now() + expiry)
 
-  // For now, just log to console. Replace with actual email sending logic
-  // Example with Resend:
-  // await resend.emails.send({
-  //   from: 'noreply@newtheatre.org.uk',
-  //   to: email,
-  //   subject: 'Verify your email address',
-  //   html: `<a href="${process.env.NUXT_PUBLIC_BASE_URL}/verify-email?token=${token}">Click here to verify your email</a>`
-  // })
-}
+  // Remove any previous reset tokens for this user
+  await db.delete(schema.passwordResets).where(eq(schema.passwordResets.userId, userId))
 
-/**
- * Send password reset email
- */
-export async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
-  // TODO: Implement an email service
-  console.log(`Password reset for ${email} with token: ${token}`)
-  console.log(`Reset URL: ${process.env.NUXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/reset-password?token=${token}`)
+  await db.insert(schema.passwordResets).values({
+    userId,
+    token,
+    expiresAt,
+  })
 
-  // For now, just log to console. Replace with actual email sending logic
-  // Example with Resend:
-  // await resend.emails.send({
-  //   from: 'noreply@newtheatre.org.uk',
-  //   to: email,
-  //   subject: 'Reset your password',
-  //   html: `<a href="${process.env.NUXT_PUBLIC_BASE_URL}/reset-password?token=${token}">Click here to reset your password</a>`
-  // })
+  return token
 }

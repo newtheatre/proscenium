@@ -1,12 +1,12 @@
 import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
-import { createEmailVerificationToken, sendVerificationEmail } from '~~/server/utils/auth'
 
 const bodySchema = z.object({
   email: z.email('Valid email is required'),
 })
 
+/** POST /api/auth/email/request — request a new email verification link. */
 export default defineEventHandler(async (event) => {
   const { email } = await readValidatedBody(event, bodySchema.parse)
 

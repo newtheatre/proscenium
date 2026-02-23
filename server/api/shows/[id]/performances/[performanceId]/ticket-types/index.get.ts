@@ -9,6 +9,7 @@ import { readShow } from '~~/shared/utils/abilities'
  * performance, reflecting the full override chain:
  *   performance override → show override → base ticket type default
  */
+/** GET /api/shows/:id/performances/:performanceId/ticket-types — get ticket type overrides for a performance. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
   const performanceId = getRouterParam(event, 'performanceId')

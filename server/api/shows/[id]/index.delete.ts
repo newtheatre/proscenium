@@ -2,6 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { deleteShow } from '~~/shared/utils/abilities'
 
+/** DELETE /api/shows/:id — delete a show. Admin only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 

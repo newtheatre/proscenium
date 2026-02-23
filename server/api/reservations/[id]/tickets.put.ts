@@ -25,6 +25,7 @@ const bodySchema = z.object({
   })).min(1),
 })
 
+/** PUT /api/reservations/:id/tickets — update ticket quantities on a reservation. Staff only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, updateReservation)
 

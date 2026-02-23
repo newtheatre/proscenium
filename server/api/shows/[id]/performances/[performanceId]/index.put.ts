@@ -15,6 +15,7 @@ const bodySchema = z.object({
   notes: z.string().optional().nullable(),
 })
 
+/** PUT /api/shows/:id/performances/:performanceId — update a performance. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
   const performanceId = getRouterParam(event, 'performanceId')

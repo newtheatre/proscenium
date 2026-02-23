@@ -1,10 +1,15 @@
 import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
-import { generateVerificationToken, sendPasswordResetEmail } from '~~/server/utils/auth'
 import { resetUserPassword } from '~~/shared/utils/abilities'
+import { TOKEN_EXPIRY } from '~~/server/utils/auth'
 
+/** POST /api/users/:id/reset-password — trigger a password reset for a user. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
-  const { id } = getRouterParams(event)
+  const id = getRouterParam(event, 'id')
+
+  if (!id) {
+    throw createError({ statusCode: 400, statusMessage: 'User ID is required' })
+  }
 
   // Check if user has permission to reset passwords
   await authorize(event, resetUserPassword, { id })
@@ -16,22 +21,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'User not found' })
   }
 
-  // Generate reset token
-  const resetToken = generateVerificationToken()
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-
-  // Delete any existing password reset tokens for this user
-  await db.delete(schema.passwordResets).where(eq(schema.passwordResets.userId, user.id))
-
-  // Create password reset record
-  await db.insert(schema.passwordResets).values({
-    userId: user.id,
-    token: resetToken,
-    expiresAt,
-  })
-
-  // Send password reset email
-  await sendPasswordResetEmail(user.email, resetToken)
+  // Admin-initiated resets get a longer token lifetime (24 hours)
+  const token = await createPasswordResetToken(user.id, TOKEN_EXPIRY.ADMIN_PASSWORD_RESET)
+  await sendPasswordResetEmail(user.email, token)
 
   return { message: 'Password reset email sent' }
 })

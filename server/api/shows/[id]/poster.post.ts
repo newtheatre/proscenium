@@ -2,6 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { updateShow } from '~~/shared/utils/abilities'
 
+/** POST /api/shows/:id/poster — upload a show poster image. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 

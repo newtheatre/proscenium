@@ -16,6 +16,7 @@ const bodySchema = z.object({
  *
  * Requires both updateShow and updatePerformance abilities.
  */
+/** POST /api/shows/:id/publish — toggle show published status. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 

@@ -12,6 +12,7 @@ const bodySchema = z.object({
   status: z.enum(['DRAFT', 'PUBLISHED']).optional(),
 })
 
+/** PUT /api/shows/:id — update a show. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 

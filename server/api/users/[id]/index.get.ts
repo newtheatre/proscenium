@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { readUser } from '~~/shared/utils/abilities'
 
+/** GET /api/users/:id — get a user by ID. Staff or own profile. */
 export default defineEventHandler(async (event) => {
   const userId = getRouterParam(event, 'id')
 

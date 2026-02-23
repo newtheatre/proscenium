@@ -1,6 +1,7 @@
 import { db, schema } from '@nuxthub/db'
 import { asc, count, inArray } from 'drizzle-orm'
 
+/** GET /api/shows — list all shows. Public. */
 export default defineEventHandler(async () => {
   const allShows = await db.query.shows.findMany({
     orderBy: [asc(schema.shows.title)],

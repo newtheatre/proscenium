@@ -7,6 +7,7 @@ const bodySchema = z.object({
   password: passwordSchema,
 })
 
+/** POST /api/auth/password/reset — set a new password using a reset token. */
 export default defineEventHandler(async (event) => {
   const { token, password } = await readValidatedBody(event, bodySchema.parse)
 

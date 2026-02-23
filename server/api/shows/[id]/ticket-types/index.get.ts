@@ -8,6 +8,7 @@ import { readShow } from '~~/shared/utils/abilities'
  * Returns all ticket types with their effective price and active status
  * for a specific show, reflecting any show-level overrides.
  */
+/** GET /api/shows/:id/ticket-types — get ticket type overrides for a show. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 

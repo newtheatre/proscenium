@@ -1,4 +1,4 @@
-import type { db } from 'hub:db'
+import type { db } from '@nuxthub/db'
 
 type UserQuery = NonNullable<Parameters<(typeof db)['query']['users']['findMany']>[0]>
 

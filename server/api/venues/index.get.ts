@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 
+/** GET /api/venues — list all venues. Public. */
 export default defineEventHandler(async () => {
   // Venues are public - no authentication required
 

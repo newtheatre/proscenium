@@ -11,6 +11,7 @@ const bodySchema = z.object({
   status: z.enum(['DRAFT', 'PUBLISHED']).optional().default('DRAFT'),
 })
 
+/** POST /api/shows — create a new show. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, createShow)
 

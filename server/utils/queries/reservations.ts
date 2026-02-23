@@ -1,4 +1,4 @@
-import type { db } from 'hub:db'
+import type { db } from '@nuxthub/db'
 
 /**
  * Shared Drizzle relational query includes for reservation responses.

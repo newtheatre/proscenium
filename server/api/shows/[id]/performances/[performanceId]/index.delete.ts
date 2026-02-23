@@ -2,6 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq, and } from 'drizzle-orm'
 import { deletePerformance } from '~~/shared/utils/abilities'
 
+/** DELETE /api/shows/:id/performances/:performanceId — delete a performance. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
   const performanceId = getRouterParam(event, 'performanceId')

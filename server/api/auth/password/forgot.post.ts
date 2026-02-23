@@ -1,35 +1,24 @@
 import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
-import { generateVerificationToken, sendPasswordResetEmail } from '~~/server/utils/auth'
 
 const bodySchema = z.object({
   email: z.email(),
 })
 
+/** POST /api/auth/password/forgot — request a password reset email. */
 export default defineEventHandler(async (event) => {
   const { email } = await readValidatedBody(event, bodySchema.parse)
 
   const user = await db.select().from(schema.users).where(eq(schema.users.email, email)).get()
 
   if (!user) {
-    // To prevent user enumeration, respond with a success message even if the user doesn't exist
+    // Prevent user enumeration — always return a success message
     return { message: 'If the email exists, a password reset link has been sent' }
   }
 
-  // Generate reset token
-  const resetToken = generateVerificationToken()
-  const expiresAt = new Date(Date.now() + 1 * 60 * 60 * 1000) // 1 hour
-
-  // Create password reset record
-  await db.insert(schema.passwordResets).values({
-    userId: user.id,
-    token: resetToken,
-    expiresAt,
-  })
-
-  // Send password reset email
-  await sendPasswordResetEmail(user.email, resetToken)
+  const token = await createPasswordResetToken(user.id)
+  await sendPasswordResetEmail(user.email, token)
 
   return { message: 'Password reset email sent' }
 })

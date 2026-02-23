@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { blob } from 'hub:blob'
 import { updateShow } from '~~/shared/utils/abilities'
 
+/** DELETE /api/shows/:id/poster — delete a show poster image. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 

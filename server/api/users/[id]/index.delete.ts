@@ -2,6 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { deleteUser } from '~~/shared/utils/abilities'
 
+/** DELETE /api/users/:id — delete a user. Admin or own account. */
 export default defineEventHandler(async (event) => {
   const userId = getRouterParam(event, 'id')
 

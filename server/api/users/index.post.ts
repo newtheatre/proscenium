@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { createUser, updateUserRoles, updateUserVerified } from '~~/shared/utils/abilities'
-import { generateVerificationToken, sendPasswordResetEmail } from '~~/server/utils/auth'
+import { TOKEN_EXPIRY } from '~~/server/utils/auth'
 
 const bodySchema = z.object({
   email: z.email(),
@@ -11,30 +11,27 @@ const bodySchema = z.object({
   roles: z.array(z.enum(['ADMIN', 'MANAGER', 'BOX_OFFICE'])).optional().default([]),
 })
 
+/** POST /api/users — create a new user. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
-  // Check if user has permission to create users
   await authorize(event, createUser)
 
   const { email, name, verified, roles: userRolesToAssign } = await readValidatedBody(event, bodySchema.parse)
 
-  // Check if user has permission to set verified status
+  // Check granular permissions for verified status and roles
   if (verified && !(await allows(event, updateUserVerified))) {
     throw createError({ statusCode: 403, statusMessage: 'Only admins can set verified status' })
   }
-
-  // Check if user has permission to assign roles
   if (userRolesToAssign.length > 0 && !(await allows(event, updateUserRoles))) {
     throw createError({ statusCode: 403, statusMessage: 'Only admins can assign roles' })
   }
 
-  // Check if user already exists
+  // Ensure email is not already taken
   const existingUser = await db.select().from(schema.users).where(eq(schema.users.email, email)).get()
-
   if (existingUser) {
     throw createError({ statusCode: 400, statusMessage: 'User with this email already exists' })
   }
 
-  // Insert the new user into the database (no password - user must set their own)
+  // Create the user (no password — they must set their own via the reset flow)
   const [newUser] = await db.insert(schema.users).values({
     email,
     name,
@@ -55,7 +52,7 @@ export default defineEventHandler(async (event) => {
     )
   }
 
-  // Get the created user with roles using query API
+  // Fetch the created user with roles
   const createdUser = await db.query.users.findFirst({
     where: (users, { eq }) => eq(users.id, newUser.id),
     ...userWithRolesQuery,
@@ -66,16 +63,8 @@ export default defineEventHandler(async (event) => {
   }
 
   // Send password reset email so the user can set their own password
-  const resetToken = generateVerificationToken()
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-
-  await db.insert(schema.passwordResets).values({
-    userId: newUser.id,
-    token: resetToken,
-    expiresAt,
-  })
-
-  await sendPasswordResetEmail(email, resetToken)
+  const token = await createPasswordResetToken(newUser.id, TOKEN_EXPIRY.ADMIN_PASSWORD_RESET)
+  await sendPasswordResetEmail(email, token)
 
   return formatUserResponse(createdUser)
 })

@@ -1,12 +1,12 @@
 import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
-import { createEmailVerificationToken, sendVerificationEmail } from '~~/server/utils/auth'
 
 const bodySchema = z.object({
   token: z.string().min(1, 'Verification token is required'),
 })
 
+/** POST /api/auth/email/verify — verify an email address with a token. */
 export default defineEventHandler(async (event) => {
   const { token } = await readValidatedBody(event, bodySchema.parse)
 

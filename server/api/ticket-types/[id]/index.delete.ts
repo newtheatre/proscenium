@@ -2,6 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { deleteTicketType } from '~~/shared/utils/abilities'
 
+/** DELETE /api/ticket-types/:id — delete a ticket type. Admin only. */
 export default defineEventHandler(async (event) => {
   const ticketTypeId = getRouterParam(event, 'id')
 

@@ -7,6 +7,7 @@ import { updatePerformance } from '~~/shared/utils/abilities'
  *
  * Removes a performance-level ticket type override, reverting to show/base defaults.
  */
+/** DELETE /api/shows/:id/performances/:performanceId/ticket-types/:ticketTypeId — remove a performance ticket type override. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
   const performanceId = getRouterParam(event, 'performanceId')

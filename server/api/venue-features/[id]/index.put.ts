@@ -9,6 +9,7 @@ const bodySchema = z.object({
   icon: z.string().optional().nullable(),
 })
 
+/** PUT /api/venue-features/:id — update a venue feature. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const featureId = getRouterParam(event, 'id')
 

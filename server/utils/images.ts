@@ -1,4 +1,4 @@
-import { blob } from 'hub:blob'
+import { blob } from '@nuxthub/blob'
 
 /**
  * Allowed MIME types for image uploads.

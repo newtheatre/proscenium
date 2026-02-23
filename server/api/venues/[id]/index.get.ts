@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 
+/** GET /api/venues/:id — get a venue by ID. Public. */
 export default defineEventHandler(async (event) => {
   const venueId = getRouterParam(event, 'id')
 

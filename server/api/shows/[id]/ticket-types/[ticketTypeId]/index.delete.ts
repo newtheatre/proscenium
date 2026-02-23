@@ -8,6 +8,7 @@ import { updateShow } from '~~/shared/utils/abilities'
  * Removes a show-level ticket type override, reverting that ticket type
  * to its base defaults for this show.
  */
+/** DELETE /api/shows/:id/ticket-types/:ticketTypeId — remove a show ticket type override. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
   const ticketTypeId = getRouterParam(event, 'ticketTypeId')

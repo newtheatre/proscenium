@@ -11,6 +11,7 @@ const bodySchema = z.object({
   featureIds: z.array(z.string()).optional().default([]),
 })
 
+/** POST /api/venues — create a new venue. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   // Check if user has permission to create venues
   await authorize(event, createVenue)

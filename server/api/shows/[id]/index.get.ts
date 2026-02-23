@@ -1,6 +1,7 @@
 import { db, schema } from '@nuxthub/db'
 import { asc } from 'drizzle-orm'
 
+/** GET /api/shows/:id — get a show by ID with performances. Public. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 

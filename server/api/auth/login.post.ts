@@ -7,6 +7,7 @@ const bodySchema = z.object({
   password: z.string().min(1, 'Password is required'),
 })
 
+/** POST /api/auth/login — authenticate with email and password. */
 export default defineEventHandler(async (event) => {
   const { email, password } = await readValidatedBody(event, bodySchema.parse)
 

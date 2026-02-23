@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { listUsers } from '~~/shared/utils/abilities'
 
+/** GET /api/users — list all users. Staff only. */
 export default defineEventHandler(async (event) => {
   // Check if user has permission to read users
   await authorize(event, listUsers)

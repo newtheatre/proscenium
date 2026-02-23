@@ -11,6 +11,7 @@ const bodySchema = z.object({
   featureIds: z.array(z.string()).optional(),
 })
 
+/** PUT /api/venues/:id — update a venue. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const venueId = getRouterParam(event, 'id')
 

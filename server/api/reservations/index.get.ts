@@ -1,15 +1,20 @@
 import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
+import { z } from 'zod/v4'
 import { listReservations } from '~~/shared/utils/abilities'
 
+const querySchema = z.object({
+  performanceId: z.string().optional(),
+  showId: z.string().optional(),
+  userId: z.string().optional(),
+  status: z.enum(['PENDING', 'COLLECTED', 'DOOR', 'CANCELLED', 'NO_SHOW']).optional(),
+})
+
+/** GET /api/reservations — list reservations with optional filters. Staff only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, listReservations)
 
-  const query = getQuery(event)
-  const performanceId = query.performanceId as string | undefined
-  const showId = query.showId as string | undefined
-  const userId = query.userId as string | undefined
-  const status = query.status as 'PENDING' | 'COLLECTED' | 'DOOR' | 'CANCELLED' | 'NO_SHOW' | undefined
+  const { performanceId, showId, userId, status } = await getValidatedQuery(event, querySchema.parse)
 
   // Resolve performance IDs when filtering by show
   let resolvedPerfIds: string[] | undefined

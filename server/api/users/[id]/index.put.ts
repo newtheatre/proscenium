@@ -11,6 +11,7 @@ const bodySchema = z.object({
   roles: z.array(z.enum(['ADMIN', 'MANAGER', 'BOX_OFFICE'])).optional(),
 })
 
+/** PUT /api/users/:id — update a user. Admin/Manager or own profile. */
 export default defineEventHandler(async (event) => {
   const userId = getRouterParam(event, 'id')
 
