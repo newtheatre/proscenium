@@ -17,7 +17,7 @@ if (error.value) {
 useSeoMeta({
   title: () => show.value?.title ?? 'Show',
   description: () => show.value?.description?.substring(0, 160) ?? '',
-  ogImage: () => show.value?.posterUrl ?? undefined,
+  ogImage: () => show.value?.posterUrl ? `/images/${show.value.posterUrl}` : undefined,
 })
 
 const router = useRouter()
@@ -29,31 +29,24 @@ function handlePerformanceSelect(performanceId: string) {
   })
 }
 
-// Compute the price range across all performances
-const priceRange = computed(() => {
-  if (!show.value) return null
-
-  const prices = show.value.performances
-    .flatMap(p => p.ticketTypes?.map(t => t.effectivePrice) ?? [])
-    .filter(p => p != null)
-
-  if (prices.length === 0) return null
-
-  const min = Math.min(...prices)
-  const max = Math.max(...prices)
-
-  const format = (p: number) => {
-    if (p === 0) return 'Free'
-    return `£${(p / 100).toFixed(2)}`
-  }
-
-  if (min === max) return format(min)
-  return `${format(min)} – ${format(max)}`
-})
-
 const hasAvailablePerformances = computed(() => {
   return show.value?.performances.some(p => !p.isSoldOut) ?? false
 })
+
+const firstPerformance = computed(() => show.value?.performances[0] ?? null)
+
+function formatPrice(pence: number): string {
+  if (pence === 0) return 'Free'
+  return `£${(pence / 100).toFixed(2)}`
+}
+
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m}min`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}m`
+}
 </script>
 
 <template>
@@ -87,13 +80,6 @@ const hasAvailablePerformances = computed(() => {
       <WhatsOnShowHero :show="show">
         <template #actions>
           <div class="flex flex-wrap items-center gap-4">
-            <div
-              v-if="priceRange"
-              class="text-lg font-semibold text-default"
-            >
-              {{ priceRange }}
-            </div>
-
             <UButton
               v-if="hasAvailablePerformances"
               label="Book Tickets"
@@ -112,75 +98,111 @@ const hasAvailablePerformances = computed(() => {
         </template>
       </WhatsOnShowHero>
 
-      <!-- Performances Section -->
-      <div class="mt-10">
-        <h2 class="text-2xl font-bold text-default mb-6">
-          Performances
-        </h2>
+      <!-- Main content with sidebar -->
+      <UPage>
+        <UPageBody>
+          <!-- Performances Section -->
+          <h2 class="text-2xl font-bold text-default mb-6">
+            Performances
+          </h2>
 
-        <WhatsOnPerformanceList
-          :performances="show.performances"
-          :show-slug="slug"
-          @select="handlePerformanceSelect"
-        />
-      </div>
+          <WhatsOnPerformanceList
+            :performances="show.performances"
+            :show-slug="slug"
+            @select="handlePerformanceSelect"
+          />
+        </UPageBody>
 
-      <!-- Show Info Cards -->
-      <div
-        v-if="show.performances.length > 0"
-        class="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-4"
-      >
-        <!-- Ticket Prices -->
-        <WhatsOnInfoCard
-          icon="i-lucide-ticket"
-          title="Ticket Prices"
-        >
-          <div class="space-y-1">
-            <div
-              v-for="ticketType in show.performances[0]?.ticketTypes ?? []"
-              :key="ticketType.id"
-              class="flex justify-between text-sm"
-            >
-              <span class="text-muted">{{ ticketType.name }}</span>
-              <span class="font-medium text-default">
-                {{ ticketType.effectivePrice === 0 ? 'Free' : `£${(ticketType.effectivePrice / 100).toFixed(2)}` }}
-              </span>
+        <template #right>
+          <UPageAside>
+            <div class="space-y-5">
+              <!-- Ticket Prices -->
+              <div v-if="firstPerformance?.ticketTypes?.length">
+                <h4 class="flex items-center gap-2 text-sm font-semibold text-default mb-3">
+                  <UIcon
+                    name="i-lucide-ticket"
+                    class="size-4 text-primary"
+                  />
+                  Ticket Prices
+                </h4>
+                <div class="space-y-2">
+                  <div
+                    v-for="ticketType in firstPerformance.ticketTypes"
+                    :key="ticketType.id"
+                    class="flex justify-between text-sm"
+                  >
+                    <span class="text-muted">{{ ticketType.name }}</span>
+                    <span class="font-medium text-default">{{ formatPrice(ticketType.effectivePrice) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <USeparator v-if="firstPerformance?.ticketTypes?.length" />
+
+              <!-- Venue -->
+              <div v-if="firstPerformance">
+                <h4 class="flex items-center gap-2 text-sm font-semibold text-default mb-3">
+                  <UIcon
+                    name="i-lucide-map-pin"
+                    class="size-4 text-primary"
+                  />
+                  Venue
+                </h4>
+                <p class="text-sm font-medium text-default">
+                  {{ firstPerformance.venue.name }}
+                </p>
+                <p
+                  v-if="firstPerformance.venue.address"
+                  class="text-sm text-muted mt-0.5"
+                >
+                  {{ firstPerformance.venue.address }}
+                </p>
+              </div>
+
+              <USeparator v-if="firstPerformance?.durationMinutes" />
+
+              <!-- Duration -->
+              <div v-if="firstPerformance?.durationMinutes">
+                <h4 class="flex items-center gap-2 text-sm font-semibold text-default mb-3">
+                  <UIcon
+                    name="i-lucide-clock"
+                    class="size-4 text-primary"
+                  />
+                  Duration
+                </h4>
+                <p class="text-sm text-default">
+                  {{ formatDuration(firstPerformance.durationMinutes) }}
+                  <span
+                    v-if="firstPerformance.intervalCount > 0"
+                    class="text-muted"
+                  >
+                    (incl. {{ firstPerformance.intervalCount }} interval{{ firstPerformance.intervalCount > 1 ? 's' : '' }})
+                  </span>
+                </p>
+              </div>
+
+              <USeparator />
+
+              <!-- Book CTA -->
+              <UButton
+                v-if="hasAvailablePerformances"
+                label="Book Tickets"
+                icon="i-lucide-ticket"
+                block
+                :to="`/whats-on/${slug}/book`"
+              />
+              <UBadge
+                v-else
+                label="Sold Out"
+                color="error"
+                variant="subtle"
+                size="lg"
+                class="w-full justify-center"
+              />
             </div>
-          </div>
-        </WhatsOnInfoCard>
-
-        <!-- Venue -->
-        <WhatsOnInfoCard
-          icon="i-lucide-map-pin"
-          title="Venue"
-        >
-          <div class="space-y-1">
-            <p class="font-medium text-default">
-              {{ show.performances[0]?.venue.name }}
-            </p>
-            <p
-              v-if="show.performances[0]?.venue.address"
-              class="text-sm text-muted"
-            >
-              {{ show.performances[0]?.venue.address }}
-            </p>
-          </div>
-        </WhatsOnInfoCard>
-
-        <!-- Duration -->
-        <WhatsOnInfoCard
-          v-if="show.performances[0]?.durationMinutes"
-          icon="i-lucide-clock"
-          title="Duration"
-        >
-          <p class="text-default">
-            {{ Math.floor(show.performances[0].durationMinutes / 60) }}h {{ show.performances[0].durationMinutes % 60 }}m
-            <span v-if="show.performances[0].intervalCount > 0">
-              (incl. {{ show.performances[0].intervalCount }} interval{{ show.performances[0].intervalCount > 1 ? 's' : '' }})
-            </span>
-          </p>
-        </WhatsOnInfoCard>
-      </div>
+          </UPageAside>
+        </template>
+      </UPage>
     </template>
   </UContainer>
 </template>

@@ -80,7 +80,7 @@ const availabilityColor = computed(() => {
         <div class="aspect-3/4 overflow-hidden bg-elevated relative">
           <NuxtImg
             v-if="show.posterUrl"
-            :src="show.posterUrl"
+            :src="`/images/${show.posterUrl}`"
             :alt="show.title"
             class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             loading="lazy"

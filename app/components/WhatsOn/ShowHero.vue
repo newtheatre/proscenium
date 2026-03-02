@@ -18,7 +18,7 @@ defineProps<{
       <div class="aspect-3/4 overflow-hidden md:col-span-1">
         <NuxtImg
           v-if="show.posterUrl"
-          :src="show.posterUrl"
+          :src="`/images/${show.posterUrl}`"
           :alt="show.title"
           class="h-full w-full object-cover"
           width="600"

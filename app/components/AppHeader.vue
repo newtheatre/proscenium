@@ -6,6 +6,7 @@
         dark="/images/logos/anniversary-white.png"
         alt="Nottingham New Theatre Logo"
         height="100"
+        class="h-30"
       />
     </template>
 

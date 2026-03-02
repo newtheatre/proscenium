@@ -87,4 +87,6 @@ export default defineNuxtConfig({
       },
     ],
   },
+
+  image: { provider: 'none' },
 })
