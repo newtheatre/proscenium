@@ -42,5 +42,37 @@ export default defineEventHandler(async (event) => {
 
   const [updated] = await db.update(schema.reservations).set(updateData).where(eq(schema.reservations.id, id)).returning()
 
+  // Send cancellation email if status was changed to CANCELLED
+  if (body.status === 'CANCELLED' && existing.status !== 'CANCELLED') {
+    const reservation = await db.query.reservations.findFirst({
+      where: (r, { eq: eqFn }) => eqFn(r.id, id),
+      with: {
+        user: { columns: { id: true, name: true, email: true } },
+        performance: {
+          with: {
+            show: { columns: { id: true, title: true, slug: true } },
+            venue: { columns: { id: true, name: true } },
+          },
+        },
+        tickets: {
+          with: { ticketType: { columns: { id: true, name: true } } },
+        },
+      },
+    })
+
+    if (reservation) {
+      sendBookingCancellationEmail({
+        bookingRef: reservation.bookingRef,
+        customerName: reservation.user.name,
+        customerEmail: reservation.user.email,
+        showTitle: reservation.performance.show.title,
+        showSlug: reservation.performance.show.slug,
+        venueName: reservation.performance.venue.name,
+        performanceDate: reservation.performance.startsAt,
+        tickets: reservation.tickets,
+      }).catch(err => console.error('[Email] Failed to send cancellation email:', err))
+    }
+  }
+
   return updated
 })
