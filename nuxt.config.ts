@@ -88,7 +88,7 @@ export default defineNuxtConfig({
           {
             binding: 'DB',
             database_name: 'proscenium',
-            database_id: '01a75263-87a9-452a-a4a0-b3b9db71dfe5',
+            database_id: 'c4200074-3ce8-411d-b428-811277057e6b',
           },
         ],
         observability: {
