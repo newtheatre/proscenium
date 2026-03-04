@@ -29,14 +29,11 @@ export default defineNuxtConfig({
       //   namespaceId: 'c6d3be0190414e1ab170a0788ec51fb6',
       // },
       // R2 bucket (binding defaults to 'BLOB')
-      // FIXME: Currently using S3 driver because we have no R2 bucket on the NNT account,
-      // but should switch to Cloudflare R2 once we have a bucket set up
-      blob: true,
-      // blob: {
-      //   driver: 'cloudflare-r2',
-      //   bucketName: '<bucket-name>', // TODO: replace once we have a bucket
-      //   binding: 'BLOB',
-      // },
+      blob: {
+        driver: 'cloudflare-r2',
+        bucketName: 'proscenium-blob',
+        binding: 'BLOB',
+      },
     },
 
     image: {
@@ -64,7 +61,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
 
   nitro: {
-    // preset: 'cloudflare_module', // TODO: enable when deploying
+    preset: 'cloudflare_module',
     experimental: {
       tasks: true,
       wasm: true,
