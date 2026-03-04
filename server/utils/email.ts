@@ -1,10 +1,12 @@
 /**
- * Email sending utilities.
+ * Email sending utilities using Resend.
  *
- * All email functions are currently placeholders that log to the console.
- * Replace the `sendEmail` implementation with a real provider (e.g. Resend,
- * Postmark, SES) when ready for production.
+ * Requires `NUXT_RESEND_API_KEY` and `NUXT_RESEND_FROM_EMAIL` environment
+ * variables (mapped to `runtimeConfig.resendApiKey` and
+ * `runtimeConfig.resendFromEmail`).
  */
+
+import { Resend } from 'resend'
 
 interface SendEmailOptions {
   to: string
@@ -13,7 +15,7 @@ interface SendEmailOptions {
 }
 
 /**
- * Send an email. Currently logs to the console as a placeholder.
+ * Send an email via Resend.
  *
  * @example
  * ```ts
@@ -25,9 +27,31 @@ interface SendEmailOptions {
  * ```
  */
 export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<void> {
-  // TODO: Replace with a real email provider (e.g. Resend, Postmark, SES)
-  console.log(`[Email] To: ${to} | Subject: ${subject}`)
-  console.log(`[Email] Body: ${html}`)
+  const { resendApiKey, resendFromEmail } = useRuntimeConfig()
+
+  if (!resendApiKey) {
+    console.warn('[Email] NUXT_RESEND_API_KEY is not set — logging email instead of sending')
+    console.log(`[Email] To: ${to} | Subject: ${subject}`)
+    console.log(`[Email] Body: ${html}`)
+    return
+  }
+
+  const resend = new Resend(resendApiKey)
+
+  const { error } = await resend.emails.send({
+    from: resendFromEmail || 'no-reply@tickets.newtheatre.org.uk',
+    to,
+    subject,
+    html,
+  })
+
+  if (error) {
+    console.error('[Email] Failed to send email:', error)
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to send email',
+    })
+  }
 }
 
 /**
