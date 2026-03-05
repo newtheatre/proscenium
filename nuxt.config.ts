@@ -66,6 +66,19 @@ export default defineNuxtConfig({
       tasks: true,
       wasm: true,
     },
+    rollupConfig: {
+      plugins: [
+        {
+          name: 'stub-react-email',
+          resolveId(id: string) {
+            if (id === '@react-email/render') return id
+          },
+          load(id: string) {
+            if (id === '@react-email/render') return 'export {}'
+          },
+        },
+      ],
+    },
     cloudflare: {
       deployConfig: true,
       nodeCompat: true,
