@@ -6,9 +6,26 @@ interface Show {
   posterUrl: string | null
 }
 
-defineProps<{
+const props = defineProps<{
   show: Show
 }>()
+
+const TRUNCATE_LENGTH = 300
+
+const isTruncated = computed(() =>
+  !!props.show.description && props.show.description.length > TRUNCATE_LENGTH,
+)
+
+const truncatedDescription = computed(() => {
+  if (!props.show.description) return ''
+  if (!isTruncated.value) return props.show.description
+  // Cut at the last space before the limit to avoid mid-word truncation
+  const cut = props.show.description.substring(0, TRUNCATE_LENGTH)
+  const lastSpace = cut.lastIndexOf(' ')
+  return (lastSpace > 0 ? cut.substring(0, lastSpace) : cut) + '…'
+})
+
+const fullDescriptionOpen = ref(false)
 </script>
 
 <template>
@@ -48,16 +65,48 @@ defineProps<{
           {{ show.subtitle }}
         </p>
 
-        <MDC
-          v-if="show.description"
-          :value="show.description"
-          class="mt-4 text-default leading-relaxed prose prose-sm max-w-none"
-        />
+        <template v-if="show.description">
+          <MDC
+            :value="truncatedDescription"
+            class="mt-4 text-default leading-relaxed prose prose-sm max-w-none"
+          />
+
+          <UButton
+            v-if="isTruncated"
+            label="Show more…"
+            variant="link"
+            size="sm"
+            class="mt-1 self-start"
+            @click="fullDescriptionOpen = true"
+          />
+        </template>
 
         <div class="mt-6">
           <slot name="actions" />
         </div>
       </div>
     </div>
+
+    <!-- Full description modal -->
+    <UModal
+      v-model:open="fullDescriptionOpen"
+      :title="show.title"
+      description="Full description"
+    >
+      <template #body>
+        <MDC
+          v-if="show.description"
+          :value="show.description"
+          class="prose prose-sm max-w-none"
+        />
+      </template>
+      <template #footer>
+        <UButton
+          label="Close"
+          variant="soft"
+          @click="fullDescriptionOpen = false"
+        />
+      </template>
+    </UModal>
   </div>
 </template>
