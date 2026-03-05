@@ -222,7 +222,7 @@ const additionalRows = computed(() =>
 
 const visibleRows = computed(() =>
   showAllTypes.value ? displayRows.value : primaryRows.value,
-))
+)
 
 // ── Totals ────────────────────────────────────────────────────────────────────
 
