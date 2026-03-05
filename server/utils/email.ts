@@ -6,7 +6,9 @@
  * `runtimeConfig.resendFromEmail`).
  */
 
-import { Resend } from 'resend'
+import resend from './resend'
+
+const resendFromEmail = useRuntimeConfig().resendFromEmail
 
 interface SendEmailOptions {
   to: string
@@ -27,17 +29,6 @@ interface SendEmailOptions {
  * ```
  */
 export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<void> {
-  const { resendApiKey, resendFromEmail } = useRuntimeConfig()
-
-  if (!resendApiKey) {
-    console.warn('[Email] NUXT_RESEND_API_KEY is not set — logging email instead of sending')
-    console.log(`[Email] To: ${to} | Subject: ${subject}`)
-    console.log(`[Email] Body: ${html}`)
-    return
-  }
-
-  const resend = new Resend(resendApiKey)
-
   const { error } = await resend.emails.send({
     from: resendFromEmail || 'no-reply@tickets.newtheatre.org.uk',
     to,
