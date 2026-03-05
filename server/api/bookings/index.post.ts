@@ -193,9 +193,9 @@ export default defineEventHandler(async (event) => {
     },
   }) as BookingResult | undefined
 
-  // Send confirmation email (fire-and-forget — don't block the response)
+  // Send confirmation email (don't block the response, but keep the worker alive)
   if (booking) {
-    sendBookingConfirmationEmail({
+    const emailPromise = sendBookingConfirmationEmail({
       bookingRef: booking.bookingRef,
       customerName: booking.user.name,
       customerEmail: booking.user.email,
@@ -206,6 +206,9 @@ export default defineEventHandler(async (event) => {
       tickets: booking.tickets,
       customerNotes: booking.customerNotes,
     }).catch((err: unknown) => console.error('[Email] Failed to send booking confirmation:', err))
+
+    // Keep the Cloudflare Worker alive until the email is sent
+    event.context.cloudflare?.context.waitUntil(emailPromise)
   }
 
   return booking

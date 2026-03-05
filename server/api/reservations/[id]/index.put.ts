@@ -61,7 +61,7 @@ export default defineEventHandler(async (event) => {
     })
 
     if (reservation) {
-      sendBookingCancellationEmail({
+      const emailPromise = sendBookingCancellationEmail({
         bookingRef: reservation.bookingRef,
         customerName: reservation.user.name,
         customerEmail: reservation.user.email,
@@ -71,6 +71,9 @@ export default defineEventHandler(async (event) => {
         performanceDate: reservation.performance.startsAt,
         tickets: reservation.tickets,
       }).catch(err => console.error('[Email] Failed to send cancellation email:', err))
+
+      // Keep the Cloudflare Worker alive until the email is sent
+      event.context.cloudflare?.context.waitUntil(emailPromise)
     }
   }
 
