@@ -48,10 +48,10 @@ defineProps<{
           {{ show.subtitle }}
         </p>
 
-        <div
+        <MDC
           v-if="show.description"
+          :value="show.description"
           class="mt-4 text-default leading-relaxed prose prose-sm max-w-none"
-          v-html="show.description"
         />
 
         <div class="mt-6">
