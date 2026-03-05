@@ -79,6 +79,5 @@ export default defineEventHandler(async (event) => {
         active,
       }
     })
-    .filter(t => t.active)
     .sort((a, b) => a.name.localeCompare(b.name))
 })

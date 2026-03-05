@@ -137,6 +137,7 @@ async function loadData() {
 
 watch(() => props.reservationId, (id) => {
   if (id) {
+    showAllTypes.value = false
     loadData()
   }
   else {
@@ -147,6 +148,8 @@ watch(() => props.reservationId, (id) => {
 }, { immediate: true })
 
 // ── Ticket display rows ───────────────────────────────────────────────────────
+
+const showAllTypes = ref(false)
 
 const activeTickets = computed(() =>
   (reservation.value?.tickets ?? []).filter(t => !t.refundedAt),
@@ -167,7 +170,7 @@ const refundedCountByType = computed(() => {
 const displayRows = computed(() => {
   if (!reservation.value) return []
 
-  const rows = new Map<string, { id: string, name: string, effectivePrice: number }>()
+  const rows = new Map<string, { id: string, name: string, effectivePrice: number, isDefault: boolean }>()
 
   // Active tickets
   for (const t of activeTickets.value) {
@@ -177,6 +180,7 @@ const displayRows = computed(() => {
         id: t.ticketTypeId,
         name: t.ticketType.name,
         effectivePrice: avail?.effectivePrice ?? t.pricePaid,
+        isDefault: true, // types with existing tickets always show
       })
     }
   }
@@ -188,6 +192,7 @@ const displayRows = computed(() => {
         id: avail.id,
         name: avail.name,
         effectivePrice: avail.effectivePrice,
+        isDefault: avail.active,
       })
     }
   }
@@ -199,12 +204,25 @@ const displayRows = computed(() => {
         id: t.ticketTypeId,
         name: t.ticketType.name,
         effectivePrice: t.pricePaid,
+        isDefault: true, // refunded types always show
       })
     }
   }
 
   return Array.from(rows.values()).sort((a, b) => a.name.localeCompare(b.name))
 })
+
+const primaryRows = computed(() =>
+  displayRows.value.filter(row => row.isDefault),
+)
+
+const additionalRows = computed(() =>
+  displayRows.value.filter(row => !row.isDefault),
+)
+
+const visibleRows = computed(() =>
+  showAllTypes.value ? displayRows.value : primaryRows.value,
+))
 
 // ── Totals ────────────────────────────────────────────────────────────────────
 
@@ -403,7 +421,7 @@ async function markNoShow() {
         <!-- Ticket rows -->
         <div class="space-y-1.5">
           <div
-            v-for="row in displayRows"
+            v-for="row in visibleRows"
             :key="row.id"
             class="flex items-center gap-3 py-2.5 px-3 rounded-lg border border-default"
           >
@@ -453,6 +471,19 @@ async function markNoShow() {
             </div>
           </div>
         </div>
+
+        <!-- Show all toggle -->
+        <UButton
+          v-if="additionalRows.length > 0"
+          :label="showAllTypes ? 'Show fewer ticket types' : `Show all ticket types (${additionalRows.length} more)`"
+          :icon="showAllTypes ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          block
+          class="mt-2"
+          @click="showAllTypes = !showAllTypes"
+        />
 
         <!-- Unsaved-change hint -->
         <p

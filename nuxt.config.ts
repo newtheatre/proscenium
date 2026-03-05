@@ -57,6 +57,9 @@ export default defineNuxtConfig({
   runtimeConfig: {
     resendApiKey: '',
     resendFromEmail: '',
+    public: {
+      baseURL: process.env.BASE_URL || 'https://newtheatre.org.uk',
+    },
   },
   compatibilityDate: '2025-07-15',
 

@@ -58,8 +58,19 @@ const columnFilters = ref([{ id: 'name', value: '' }])
 const columnVisibility = ref()
 const rowSelection = ref<Record<string, boolean>>({})
 const pagination = ref({ pageSize: 15, pageIndex: 0 })
+const showAll = ref(false)
 
-const { data, status, refresh } = await useFetch<TicketType[]>('/api/ticket-types', { lazy: true })
+const { data: rawData, status, refresh } = await useFetch<TicketType[]>('/api/ticket-types', { lazy: true })
+
+const data = computed(() => {
+  if (showAll.value) return rawData.value
+  return rawData.value?.filter(tt => tt.activeByDefault) ?? null
+})
+
+const hiddenCount = computed(() => {
+  if (!rawData.value) return 0
+  return rawData.value.filter(tt => !tt.activeByDefault).length
+})
 
 const ticketTypeToEdit = ref<TicketType | null>(null)
 const ticketTypeToDelete = ref<TicketType | null>(null)
@@ -226,6 +237,15 @@ const columns: TableColumn<TicketType>[] = [
           const filter = columnFilters.find(f => f.id === 'name')
           if (filter) filter.value = value
         }"
+      />
+
+      <UButton
+        v-if="hiddenCount > 0"
+        :label="showAll ? 'Show active only' : `Show all (${hiddenCount} hidden)`"
+        :icon="showAll ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+        color="neutral"
+        variant="outline"
+        @click="showAll = !showAll"
       />
 
       <UDropdownMenu

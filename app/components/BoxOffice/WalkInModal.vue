@@ -14,8 +14,8 @@ interface TicketType {
   id: string
   name: string
   description: string | null
-  price: number
-  activeByDefault: boolean
+  effectivePrice: number
+  active: boolean
 }
 
 const props = defineProps<{
@@ -38,12 +38,30 @@ const toast = useToast()
 
 // ── Ticket types ──────────────────────────────────────────────────────────────
 
-const { data: ticketTypes } = useFetch<TicketType[]>('/api/ticket-types', {
-  key: 'walk-in-ticket-types',
-  lazy: true,
-})
+const { data: ticketTypes } = useFetch<TicketType[]>(
+  () => props.performanceId
+    ? `/api/bookings/available-ticket-types?performanceId=${props.performanceId}`
+    : null,
+  {
+    key: 'walk-in-ticket-types',
+    lazy: true,
+    watch: [() => props.performanceId],
+  },
+)
 
-const activeTypes = computed(() => ticketTypes.value ?? [])
+const showAllTypes = ref(false)
+
+const defaultTypes = computed(() =>
+  (ticketTypes.value ?? []).filter(t => t.active),
+)
+
+const additionalTypes = computed(() =>
+  (ticketTypes.value ?? []).filter(t => !t.active),
+)
+
+const activeTypes = computed(() =>
+  showAllTypes.value ? ticketTypes.value ?? [] : defaultTypes.value,
+)
 
 // Quantities keyed by ticket type ID
 const quantities = ref(new Map<string, number>())
@@ -66,8 +84,8 @@ const totalCount = computed(() => {
 
 const totalPrice = computed(() => {
   let p = 0
-  for (const type of activeTypes.value) {
-    p += getQty(type.id) * type.price
+  for (const type of ticketTypes.value ?? []) {
+    p += getQty(type.id) * type.effectivePrice
   }
   return p
 })
@@ -117,6 +135,7 @@ watch(modelOpen, (v) => {
     nameFromLookup.value = false
     existingUserId.value = null
     quantities.value = new Map()
+    showAllTypes.value = false
   }
 })
 
@@ -235,7 +254,6 @@ async function submit() {
         <div class="space-y-3">
           <p class="text-xs font-semibold uppercase tracking-wider text-muted">
             Tickets
-            <span class="font-normal normal-case ml-1">(base prices — overrides apply on save)</span>
           </p>
 
           <div class="space-y-1.5">
@@ -249,7 +267,7 @@ async function submit() {
                   {{ type.name }}
                 </p>
                 <p class="text-xs text-muted">
-                  {{ formatPrice(type.price) }}
+                  {{ formatPrice(type.effectivePrice) }}
                 </p>
               </div>
 
@@ -276,11 +294,23 @@ async function submit() {
 
               <div class="w-14 text-right tabular-nums text-sm shrink-0">
                 <span :class="getQty(type.id) > 0 ? 'text-highlighted font-medium' : 'text-muted'">
-                  {{ formatPrice(getQty(type.id) * type.price) }}
+                  {{ formatPrice(getQty(type.id) * type.effectivePrice) }}
                 </span>
               </div>
             </div>
           </div>
+
+          <!-- Show all toggle -->
+          <UButton
+            v-if="additionalTypes.length > 0"
+            :label="showAllTypes ? 'Show fewer ticket types' : `Show all ticket types (${additionalTypes.length} more)`"
+            :icon="showAllTypes ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            block
+            @click="showAllTypes = !showAllTypes"
+          />
 
           <!-- Running total -->
           <div
