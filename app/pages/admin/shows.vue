@@ -67,6 +67,7 @@ interface Performance {
   updatedAt: string
   venue?: Venue
   ticketTypeOverrideCount: number
+  ticketsSold: number
   // Sub-row anchor — never present on real performance rows
   performances?: never
 }
@@ -479,6 +480,69 @@ const columns: TableColumn<AnyRow>[] = [
           ? h('p', { class: 'text-xs text-muted' }, `– ${fmt(last!)} · ${perfs.length} ${perfs.length === 1 ? 'performance' : 'performances'}`)
           : h('p', { class: 'text-xs text-muted' }, '1 performance'),
       ])
+    },
+  },
+  {
+    id: 'tickets',
+    header: 'Tickets',
+    cell: ({ row }) => {
+      const isShow = row.depth === 0
+
+      if (isShow) {
+        const show = row.original as Show
+        const perfs = show.performances ?? []
+        if (perfs.length === 0) return null
+
+        const totalSold = perfs.reduce((sum, p) => sum + (p.ticketsSold ?? 0), 0)
+        const totalCapacity = perfs.reduce((sum, p) => {
+          const cap = p.capacityOverride ?? p.venue?.capacity ?? null
+          return cap !== null ? sum + cap : sum
+        }, 0)
+        const hasCapacity = perfs.some(p => (p.capacityOverride ?? p.venue?.capacity ?? null) !== null)
+
+        return h('div', undefined, [
+          h('p', { class: 'text-sm font-medium text-highlighted tabular-nums' }, `${totalSold} sold`),
+          hasCapacity
+            ? h('p', { class: 'text-xs text-muted tabular-nums' }, `of ${totalCapacity} total capacity`)
+            : null,
+        ])
+      }
+
+      // Performance row
+      const perf = row.original as Performance
+      const sold = perf.ticketsSold ?? 0
+      const capacity = perf.capacityOverride ?? perf.venue?.capacity ?? null
+
+      if (capacity !== null) {
+        const remaining = capacity - sold
+        const pct = Math.round((sold / capacity) * 100)
+        const isSoldOut = remaining <= 0
+        const isLow = !isSoldOut && remaining <= 10
+
+        return h('div', { class: 'flex items-center gap-2' }, [
+          h('div', { class: 'flex-1 min-w-0' }, [
+            h('p', {
+              class: `text-sm tabular-nums font-medium ${
+                isSoldOut ? 'text-error' : isLow ? 'text-warning' : 'text-highlighted'
+              }`,
+            }, isSoldOut ? 'Sold out' : `${sold} / ${capacity}`),
+            h('p', { class: 'text-xs text-muted tabular-nums' },
+              isSoldOut ? `${capacity} capacity` : `${remaining} remaining`),
+          ]),
+          h('div', {
+            class: 'w-12 h-1.5 rounded-full bg-default overflow-hidden shrink-0',
+          }, [
+            h('div', {
+              class: `h-full rounded-full transition-all ${
+                isSoldOut ? 'bg-error' : isLow ? 'bg-warning' : 'bg-primary'
+              }`,
+              style: { width: `${Math.min(pct, 100)}%` },
+            }),
+          ]),
+        ])
+      }
+
+      return h('p', { class: 'text-sm tabular-nums text-highlighted' }, `${sold} sold`)
     },
   },
   {

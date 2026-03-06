@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { asc, count, inArray } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, isNull } from 'drizzle-orm'
 
 /** GET /api/shows — list all shows. Public. */
 export default defineEventHandler(async () => {
@@ -25,7 +25,7 @@ export default defineEventHandler(async () => {
     s.performances.map((p: { id: string }) => p.id),
   )
 
-  const [showOverrideCounts, perfOverrideCounts] = await Promise.all([
+  const [showOverrideCounts, perfOverrideCounts, ticketCounts] = await Promise.all([
     db.select({ showId: schema.showTicketTypeOverrides.showId, c: count() })
       .from(schema.showTicketTypeOverrides)
       .where(inArray(schema.showTicketTypeOverrides.showId, showIds))
@@ -38,6 +38,24 @@ export default defineEventHandler(async () => {
           .groupBy(schema.performanceTicketTypeOverrides.performanceId)
           .all()
       : Promise.resolve([]),
+    // Count non-refunded tickets from active reservations per performance
+    perfIds.length > 0
+      ? db.select({
+          performanceId: schema.tickets.performanceId,
+          c: count(),
+        })
+          .from(schema.tickets)
+          .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
+          .where(
+            and(
+              inArray(schema.tickets.performanceId, perfIds),
+              inArray(schema.reservations.status, ['PENDING', 'COLLECTED', 'DOOR']),
+              isNull(schema.tickets.refundedAt),
+            ),
+          )
+          .groupBy(schema.tickets.performanceId)
+          .all()
+      : Promise.resolve([]),
   ])
 
   const showOverrideMap = new Map(
@@ -46,6 +64,9 @@ export default defineEventHandler(async () => {
   const perfOverrideMap = new Map(
     perfOverrideCounts.map((r: { performanceId: string, c: number }) => [r.performanceId, r.c]),
   )
+  const ticketCountMap = new Map(
+    ticketCounts.map((r: { performanceId: string, c: number }) => [r.performanceId, r.c]),
+  )
 
   return allShows.map((show: { id: string, performances: Array<{ id: string }> }) => ({
     ...show,
@@ -53,6 +74,7 @@ export default defineEventHandler(async () => {
     performances: show.performances.map((perf: { id: string }) => ({
       ...perf,
       ticketTypeOverrideCount: perfOverrideMap.get(perf.id) ?? 0,
+      ticketsSold: ticketCountMap.get(perf.id) ?? 0,
     })),
   }))
 })
