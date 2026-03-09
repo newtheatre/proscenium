@@ -21,6 +21,7 @@ import type { TableColumn } from '@nuxt/ui'
 
 const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')
+const UPopover = resolveComponent('UPopover')
 
 definePageMeta({
   layout: 'admin',
@@ -411,15 +412,60 @@ const columns: TableColumn<Reservation>[] = [
   },
   {
     id: 'notes',
-    header: '',
+    header: 'Notes',
     cell: ({ row }) => {
-      if (!row.original.customerNotes) return null
-      return h(UBadge, {
-        label: 'Notes',
-        color: 'warning',
-        variant: 'soft',
-        icon: 'i-lucide-message-circle-warning',
-      })
+      const hasCustomerNotes = !!row.original.customerNotes
+      const hasStaffNotes = !!row.original.staffNotes
+
+      if (!hasCustomerNotes && !hasStaffNotes) return null
+
+      const badges = []
+
+      // Customer notes badge with popover
+      if (hasCustomerNotes) {
+        badges.push(
+          h(UPopover, {
+            mode: 'hover',
+            openDelay: 200,
+          }, {
+            default: () => h(UBadge, {
+              label: 'Customer',
+              color: 'warning',
+              variant: 'soft',
+              icon: 'i-lucide-message-circle-warning',
+              class: 'cursor-help',
+            }),
+            content: () => h('div', { class: 'p-3 max-w-xs' }, [
+              h('p', { class: 'text-xs font-semibold text-highlighted mb-1' }, 'Customer Notes'),
+              h('p', { class: 'text-sm text-default whitespace-pre-wrap' }, row.original.customerNotes),
+            ]),
+          }),
+        )
+      }
+
+      // Staff notes badge with popover
+      if (hasStaffNotes) {
+        badges.push(
+          h(UPopover, {
+            mode: 'hover',
+            openDelay: 200,
+          }, {
+            default: () => h(UBadge, {
+              label: 'Staff',
+              color: 'info',
+              variant: 'soft',
+              icon: 'i-lucide-clipboard-list',
+              class: 'cursor-help',
+            }),
+            content: () => h('div', { class: 'p-3 max-w-xs' }, [
+              h('p', { class: 'text-xs font-semibold text-highlighted mb-1' }, 'Staff Notes'),
+              h('p', { class: 'text-sm text-default whitespace-pre-wrap' }, row.original.staffNotes),
+            ]),
+          }),
+        )
+      }
+
+      return h('div', { class: 'flex gap-1.5' }, badges)
     },
   },
   {
