@@ -15,7 +15,6 @@ export default defineEventHandler(async () => {
   // Fetch published shows with their ON_SALE future performances
   const publishedShows = await db.query.shows.findMany({
     where: (s, { eq }) => eq(s.status, 'PUBLISHED'),
-    orderBy: [asc(schema.shows.title)],
     with: {
       performances: {
         where: (p, { and, eq, gt }) => and(
@@ -34,6 +33,14 @@ export default defineEventHandler(async () => {
 
   // Only return shows that have at least one future ON_SALE performance
   const showsWithPerformances = publishedShows.filter(s => s.performances.length > 0)
+
+  // Sort shows by their earliest performance date (soonest first)
+  showsWithPerformances.sort((a, b) => {
+    const aEarliest = a.performances[0]?.startsAt
+    const bEarliest = b.performances[0]?.startsAt
+    if (!aEarliest || !bEarliest) return 0
+    return new Date(aEarliest).getTime() - new Date(bEarliest).getTime()
+  })
 
   if (showsWithPerformances.length === 0) return []
 
