@@ -42,21 +42,27 @@ const venues = computed(() => {
   return Array.from(venueNames).join(', ')
 })
 
-const lowestAvailability = computed(() => {
-  let lowest = Infinity
-  for (const perf of props.show.performances) {
-    if (perf.capacity) {
-      const remaining = perf.capacity - perf.ticketsSold
-      if (remaining < lowest) lowest = remaining
-    }
-  }
-  return lowest === Infinity ? null : lowest
+const availabilityByPerformance = computed(() => {
+  return props.show.performances
+    .filter(perf => perf.capacity !== null)
+    .map(perf => ({
+      remaining: perf.capacity! - perf.ticketsSold,
+    }))
+})
+
+const isFullySoldOut = computed(() => {
+  if (availabilityByPerformance.value.length === 0) return false
+  return availabilityByPerformance.value.every(perf => perf.remaining <= 0)
+})
+
+const hasLimitedAvailability = computed(() => {
+  if (availabilityByPerformance.value.length === 0) return false
+  return availabilityByPerformance.value.some(perf => perf.remaining > 0 && perf.remaining <= 10)
 })
 
 const availabilityLabel = computed(() => {
-  if (lowestAvailability.value === null) return null
-  if (lowestAvailability.value <= 0) return 'Sold Out'
-  if (lowestAvailability.value <= 10) return 'Limited Availability'
+  if (isFullySoldOut.value) return 'Sold Out'
+  if (hasLimitedAvailability.value) return 'Limited Availability'
   return null
 })
 
