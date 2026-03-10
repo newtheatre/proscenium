@@ -55,6 +55,16 @@ const isFullySoldOut = computed(() => {
   return availabilityByPerformance.value.every(perf => perf.remaining <= 0)
 })
 
+const hasAnySoldOutPerformances = computed(() => {
+  if (availabilityByPerformance.value.length === 0) return false
+  return availabilityByPerformance.value.some(perf => perf.remaining <= 0)
+})
+
+const hasAnyAvailablePerformances = computed(() => {
+  if (availabilityByPerformance.value.length === 0) return false
+  return availabilityByPerformance.value.some(perf => perf.remaining > 0)
+})
+
 const hasLimitedAvailability = computed(() => {
   if (availabilityByPerformance.value.length === 0) return false
   return availabilityByPerformance.value.some(perf => perf.remaining > 0 && perf.remaining <= 10)
@@ -63,6 +73,7 @@ const hasLimitedAvailability = computed(() => {
 const availabilityLabel = computed(() => {
   if (isFullySoldOut.value) return 'Sold Out'
   if (hasLimitedAvailability.value) return 'Limited Availability'
+  if (hasAnySoldOutPerformances.value && hasAnyAvailablePerformances.value) return 'Some Performances Sold Out'
   return null
 })
 
