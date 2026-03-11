@@ -11,7 +11,9 @@ export default defineEventHandler(async (event) => {
   await authorize(event, defineAbility((user: AbilityUser) => isAdminOrManager(user)))
 
   const now = new Date()
-  const activeStatuses = ['PENDING', 'COLLECTED', 'DOOR'] as const
+  // Only count revenue for tickets that have actually been paid at the box office.
+  // PENDING reservations are pre-bookings that have not yet exchanged money.
+  const revenueStatuses = ['COLLECTED', 'DOOR'] as const
 
   const [
     activeShowsResult,
@@ -39,7 +41,7 @@ export default defineEventHandler(async (event) => {
       .from(schema.reservations)
       .groupBy(schema.reservations.status),
 
-    // Total revenue (pence) and total ticket count from active reservations
+    // Total revenue (pence) and total ticket count — collected/door only
     db.select({
       totalRevenue: sum(schema.tickets.pricePaid),
       totalTickets: count(),
@@ -47,11 +49,11 @@ export default defineEventHandler(async (event) => {
       .from(schema.tickets)
       .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
       .where(and(
-        inArray(schema.reservations.status, activeStatuses),
+        inArray(schema.reservations.status, revenueStatuses),
         isNull(schema.tickets.refundedAt),
       )),
 
-    // Revenue breakdown per show (active reservations, non-refunded)
+    // Revenue breakdown per show (collected/door only, non-refunded)
     db.select({
       showId: schema.shows.id,
       showTitle: schema.shows.title,
@@ -64,7 +66,7 @@ export default defineEventHandler(async (event) => {
       .innerJoin(schema.performances, eq(schema.tickets.performanceId, schema.performances.id))
       .innerJoin(schema.shows, eq(schema.performances.showId, schema.shows.id))
       .where(and(
-        inArray(schema.reservations.status, activeStatuses),
+        inArray(schema.reservations.status, revenueStatuses),
         isNull(schema.tickets.refundedAt),
       ))
       .groupBy(schema.shows.id, schema.shows.title, schema.shows.status)

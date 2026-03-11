@@ -170,8 +170,14 @@ const recentColumns: TableColumn<RecentReservation>[] = [
 <template>
   <div class="p-6 space-y-8">
     <!-- Loading state -->
-    <div v-if="statsStatus === 'pending'" class="flex items-center justify-center py-20">
-      <UIcon name="i-lucide-loader-circle" class="size-8 animate-spin text-primary" />
+    <div
+      v-if="statsStatus === 'pending'"
+      class="flex items-center justify-center py-20"
+    >
+      <UIcon
+        name="i-lucide-loader-circle"
+        class="size-8 animate-spin text-primary"
+      />
     </div>
 
     <template v-else-if="stats">
@@ -181,14 +187,21 @@ const recentColumns: TableColumn<RecentReservation>[] = [
         <UCard class="hover:ring-1 hover:ring-primary transition-shadow">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-sm text-muted truncate">Total Revenue</p>
+              <p class="text-sm text-muted truncate">
+                Total Revenue
+              </p>
               <p class="mt-1 text-2xl font-bold tracking-tight text-highlighted truncate">
                 {{ formatPounds(stats.totalRevenuePence) }}
               </p>
-              <p class="mt-1 text-xs text-muted">Active reservations only</p>
+              <p class="mt-1 text-xs text-muted">
+                Collected &amp; door only
+              </p>
             </div>
             <div class="shrink-0 rounded-lg bg-success/10 p-2">
-              <UIcon name="i-lucide-pound-sterling" class="size-5 text-success" />
+              <UIcon
+                name="i-lucide-pound-sterling"
+                class="size-5 text-success"
+              />
             </div>
           </div>
         </UCard>
@@ -197,14 +210,21 @@ const recentColumns: TableColumn<RecentReservation>[] = [
         <UCard class="hover:ring-1 hover:ring-primary transition-shadow">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-sm text-muted truncate">Tickets Sold</p>
+              <p class="text-sm text-muted truncate">
+                Tickets Sold
+              </p>
               <p class="mt-1 text-2xl font-bold tracking-tight text-highlighted">
                 {{ stats.totalTicketsSold.toLocaleString('en-GB') }}
               </p>
-              <p class="mt-1 text-xs text-muted">Across all shows</p>
+              <p class="mt-1 text-xs text-muted">
+                Collected &amp; door only
+              </p>
             </div>
             <div class="shrink-0 rounded-lg bg-primary/10 p-2">
-              <UIcon name="i-lucide-ticket" class="size-5 text-primary" />
+              <UIcon
+                name="i-lucide-ticket"
+                class="size-5 text-primary"
+              />
             </div>
           </div>
         </UCard>
@@ -213,14 +233,21 @@ const recentColumns: TableColumn<RecentReservation>[] = [
         <UCard class="hover:ring-1 hover:ring-primary transition-shadow">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-sm text-muted truncate">Published Shows</p>
+              <p class="text-sm text-muted truncate">
+                Published Shows
+              </p>
               <p class="mt-1 text-2xl font-bold tracking-tight text-highlighted">
                 {{ stats.activeShows }}
               </p>
-              <p class="mt-1 text-xs text-muted">Currently live</p>
+              <p class="mt-1 text-xs text-muted">
+                Currently live
+              </p>
             </div>
             <div class="shrink-0 rounded-lg bg-info/10 p-2">
-              <UIcon name="i-lucide-clapperboard" class="size-5 text-info" />
+              <UIcon
+                name="i-lucide-clapperboard"
+                class="size-5 text-info"
+              />
             </div>
           </div>
         </UCard>
@@ -229,14 +256,21 @@ const recentColumns: TableColumn<RecentReservation>[] = [
         <UCard class="hover:ring-1 hover:ring-primary transition-shadow">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-sm text-muted truncate">Upcoming Performances</p>
+              <p class="text-sm text-muted truncate">
+                Upcoming Performances
+              </p>
               <p class="mt-1 text-2xl font-bold tracking-tight text-highlighted">
                 {{ stats.upcomingPerformances }}
               </p>
-              <p class="mt-1 text-xs text-muted">On sale, yet to start</p>
+              <p class="mt-1 text-xs text-muted">
+                On sale, yet to start
+              </p>
             </div>
             <div class="shrink-0 rounded-lg bg-warning/10 p-2">
-              <UIcon name="i-lucide-calendar-clock" class="size-5 text-warning" />
+              <UIcon
+                name="i-lucide-calendar-clock"
+                class="size-5 text-warning"
+              />
             </div>
           </div>
         </UCard>
@@ -246,7 +280,10 @@ const recentColumns: TableColumn<RecentReservation>[] = [
       <UCard>
         <template #header>
           <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-bookmark-check" class="size-4 text-muted" />
+            <UIcon
+              name="i-lucide-bookmark-check"
+              class="size-4 text-muted"
+            />
             <span class="font-semibold">Reservations by Status</span>
           </div>
         </template>
@@ -258,7 +295,11 @@ const recentColumns: TableColumn<RecentReservation>[] = [
             class="flex flex-col items-center rounded-xl border border-default bg-elevated/50 p-4 gap-1"
           >
             <span class="text-2xl font-bold text-highlighted">{{ statusCount(key) }}</span>
-            <UBadge :color="cfg.color" variant="subtle" :label="cfg.label" />
+            <UBadge
+              :color="cfg.color"
+              variant="subtle"
+              :label="cfg.label"
+            />
           </div>
         </div>
       </UCard>
@@ -268,10 +309,17 @@ const recentColumns: TableColumn<RecentReservation>[] = [
         <template #header>
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-bar-chart-2" class="size-4 text-muted" />
+              <UIcon
+                name="i-lucide-bar-chart-2"
+                class="size-4 text-muted"
+              />
               <span class="font-semibold">Revenue by Show</span>
             </div>
-            <UBadge color="neutral" variant="subtle" :label="`${stats.revenueByShow.length} shows`" />
+            <UBadge
+              color="neutral"
+              variant="subtle"
+              :label="`${stats.revenueByShow.length} shows`"
+            />
           </div>
         </template>
 
@@ -303,7 +351,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
                 :style="{
                   width: stats.totalRevenuePence > 0
                     ? `${Math.round((show.totalRevenuePence / stats.totalRevenuePence) * 100)}%`
-                    : '0%'
+                    : '0%',
                 }"
               />
             </div>
@@ -322,7 +370,10 @@ const recentColumns: TableColumn<RecentReservation>[] = [
         <template #header>
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-clock" class="size-4 text-muted" />
+              <UIcon
+                name="i-lucide-clock"
+                class="size-4 text-muted"
+              />
               <span class="font-semibold">Recent Reservations</span>
             </div>
             <UButton
@@ -383,9 +434,17 @@ const recentColumns: TableColumn<RecentReservation>[] = [
     <UCard>
       <template #header>
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-download" class="size-4 text-muted" />
+          <UIcon
+            name="i-lucide-download"
+            class="size-4 text-muted"
+          />
           <span class="font-semibold">Export Ticket Data</span>
-          <UBadge color="warning" variant="subtle" label="Treasurer" size="sm" />
+          <UBadge
+            color="warning"
+            variant="subtle"
+            label="Treasurer"
+            size="sm"
+          />
         </div>
       </template>
 
@@ -396,7 +455,10 @@ const recentColumns: TableColumn<RecentReservation>[] = [
       </p>
 
       <div class="flex flex-col sm:flex-row items-start sm:items-end gap-3">
-        <UFormField label="Filter by show" class="flex-1 min-w-48">
+        <UFormField
+          label="Filter by show"
+          class="flex-1 min-w-48"
+        >
           <USelect
             v-model="exportShowId"
             :options="showOptions"
@@ -420,7 +482,10 @@ const recentColumns: TableColumn<RecentReservation>[] = [
       <USeparator class="my-4" />
 
       <p class="text-xs text-muted">
-        <UIcon name="i-lucide-info" class="size-3 inline" />
+        <UIcon
+          name="i-lucide-info"
+          class="size-3 inline"
+        />
         Columns included: Booking Ref, Status, Refunded, Customer Name, Customer Email, Show, Performance Date, Performance Time, Venue, Ticket Type, Price Paid (£), Booked At, Customer Notes, Staff Notes
       </p>
     </UCard>
