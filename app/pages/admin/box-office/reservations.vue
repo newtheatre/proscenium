@@ -502,7 +502,9 @@ const todayFormatted = computed(() =>
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col gap-4 p-6">
+  <div class="flex flex-col h-full overflow-hidden">
+    <!-- Top: fixed sections (header, navigator, alerts, filters) -->
+    <div class="flex flex-col gap-4 p-6 pb-0 shrink-0">
     <!-- Header -->
     <div class="flex w-full items-center justify-between gap-3 flex-wrap">
       <div>
@@ -683,7 +685,7 @@ const todayFormatted = computed(() =>
       </div>
 
       <!-- Search + No-Show All -->
-      <div class="flex gap-3 flex-wrap">
+      <div class="flex gap-3 flex-wrap pb-4">
         <UInput
           v-model="searchQuery"
           placeholder="Search by booking ref or customer…"
@@ -701,7 +703,15 @@ const todayFormatted = computed(() =>
           @click="markAllNoShow"
         />
       </div>
+    </template>
+    </div>
+    <!-- End top fixed section -->
 
+    <!-- Scrollable table area -->
+    <div
+      v-if="selectedPerformanceId"
+      class="flex-1 min-h-0 overflow-y-auto px-6 pb-6 flex flex-col gap-4"
+    >
       <!-- Reservations table -->
       <UTable
         :data="filteredReservations"
@@ -743,7 +753,7 @@ const todayFormatted = computed(() =>
           <span class="text-warning font-medium">{{ pendingCount }}</span> still pending
         </span>
       </div>
-    </template>
+    </div>
 
     <!-- Collect slideover -->
     <BoxOfficeCollectModal
