@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { eq } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { listReservations } from '~~/shared/utils/abilities'
 
@@ -41,5 +41,19 @@ export default defineEventHandler(async (event) => {
     orderBy: (r, { desc }) => [desc(r.createdAt)],
   })
 
-  return allReservations
+  if (allReservations.length === 0) return []
+
+  const reservationIds = allReservations.map(r => r.id)
+  const ticketCounts = await db
+    .select({ reservationId: schema.tickets.reservationId, c: count() })
+    .from(schema.tickets)
+    .where(and(inArray(schema.tickets.reservationId, reservationIds), isNull(schema.tickets.refundedAt)))
+    .groupBy(schema.tickets.reservationId)
+
+  const ticketCountMap = new Map(ticketCounts.map(r => [r.reservationId, r.c]))
+
+  return allReservations.map(r => ({
+    ...r,
+    ticketCount: ticketCountMap.get(r.id) ?? 0,
+  }))
 })

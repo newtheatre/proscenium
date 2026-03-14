@@ -58,6 +58,7 @@ interface Reservation {
   id: string
   bookingRef: string
   performanceId: string
+  ticketCount?: number
   status: 'PENDING' | 'COLLECTED' | 'DOOR' | 'CANCELLED' | 'NO_SHOW'
   cancelledBy?: 'CUSTOMER' | 'STAFF' | null
   customerNotes?: string | null
@@ -409,6 +410,12 @@ const columns: TableColumn<Reservation>[] = [
         row.original.bookingRef),
   },
   {
+    id: 'tickets',
+    header: 'Tickets',
+    cell: ({ row }) =>
+      h('span', { class: 'tabular-nums text-sm text-highlighted font-medium' }, String(row.original.ticketCount ?? 0)),
+  },
+  {
     id: 'customer',
     header: 'Customer',
     cell: ({ row }) => {
@@ -459,7 +466,7 @@ const columns: TableColumn<Reservation>[] = [
             }),
             content: () => h('div', { class: 'p-3 max-w-xs' }, [
               h('p', { class: 'text-xs font-semibold text-highlighted mb-1' }, 'Customer Notes'),
-              h('p', { class: 'text-sm text-default whitespace-pre-wrap' }, row.original.customerNotes),
+              h('p', { class: 'text-sm text-default whitespace-pre-wrap' }, row.original.customerNotes ?? ''),
             ]),
           }),
         )
@@ -481,7 +488,7 @@ const columns: TableColumn<Reservation>[] = [
             }),
             content: () => h('div', { class: 'p-3 max-w-xs' }, [
               h('p', { class: 'text-xs font-semibold text-highlighted mb-1' }, 'Staff Notes'),
-              h('p', { class: 'text-sm text-default whitespace-pre-wrap' }, row.original.staffNotes),
+              h('p', { class: 'text-sm text-default whitespace-pre-wrap' }, row.original.staffNotes ?? ''),
             ]),
           }),
         )
@@ -680,71 +687,43 @@ const todayFormatted = computed(() =>
       />
 
       <template v-if="selectedPerformanceId">
-        <!-- Capacity summary -->
-        <div class="rounded-xl border border-default bg-elevated/60 p-3 sm:p-4">
-          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] sm:items-center">
-            <div class="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3">
-              <p class="text-xs uppercase tracking-wide text-primary/90 font-semibold">
-                Tickets Remaining
-              </p>
-              <div class="mt-1 flex items-end gap-2">
-                <span class="text-3xl sm:text-4xl leading-none font-bold tabular-nums text-highlighted">
-                  {{ ticketsRemaining ?? '—' }}
-                </span>
-                <span
-                  v-if="performanceCapacity !== null"
-                  class="pb-0.5 text-sm text-muted tabular-nums"
-                >
-                  of {{ performanceCapacity }}
-                </span>
-              </div>
-              <p class="mt-1 text-xs text-muted">
-                {{ ticketsSold.toLocaleString('en-GB') }} sold
-                <template v-if="ticketsSoldPercent !== null">
-                  · {{ ticketsSoldPercent }}% full
-                </template>
-              </p>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2">
-              <div class="rounded-lg border border-default bg-default/40 px-3 py-2">
-                <p class="text-[11px] uppercase tracking-wide text-muted font-semibold">
-                  Reservations
-                </p>
-                <p class="mt-0.5 text-xl font-semibold tabular-nums text-highlighted">
-                  {{ reservations?.length ?? 0 }}
-                </p>
-              </div>
-              <div class="rounded-lg border border-default bg-default/40 px-3 py-2">
-                <p class="text-[11px] uppercase tracking-wide text-muted font-semibold">
-                  Still Pending
-                </p>
-                <p class="mt-0.5 text-xl font-semibold tabular-nums text-warning">
-                  {{ pendingCount }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- Status pills -->
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="(cfg, key) in STATUS_CONFIG"
-            :key="key"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
-            :class="statusFilter === key
-              ? 'bg-primary text-white border-primary'
-              : 'bg-elevated border-default text-muted hover:text-default'"
-            @click="statusFilter = statusFilter === key ? 'ALL' : key"
-          >
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="(cfg, key) in STATUS_CONFIG"
+              :key="key"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
+              :class="statusFilter === key
+                ? 'bg-primary text-white border-primary'
+                : 'bg-elevated border-default text-muted hover:text-default'"
+              @click="statusFilter = statusFilter === key ? 'ALL' : key"
+            >
+              <UIcon
+                :name="cfg.icon"
+                class="size-3.5"
+              />
+              {{ cfg.label }}
+              <span class="opacity-70">({{ statusCounts[key] ?? 0 }})</span>
+            </button>
+          </div>
+
+          <div class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-default bg-elevated text-xs text-muted tabular-nums whitespace-nowrap">
             <UIcon
-              :name="cfg.icon"
-              class="size-3.5"
+              name="i-lucide-ticket"
+              class="size-3.5 text-primary"
             />
-            {{ cfg.label }}
-            <span class="opacity-70">({{ statusCounts[key] ?? 0 }})</span>
-          </button>
+            <span class="font-medium text-highlighted">{{ ticketsRemaining ?? '—' }}</span>
+            <span v-if="performanceCapacity !== null">left</span>
+            <template v-if="performanceCapacity !== null">
+              <span class="opacity-50">·</span>
+              <span>{{ ticketsSold }} / {{ performanceCapacity }} sold</span>
+            </template>
+            <template v-if="ticketsSoldPercent !== null">
+              <span class="opacity-50">·</span>
+              <span>{{ ticketsSoldPercent }}%</span>
+            </template>
+          </div>
         </div>
 
         <!-- Search + No-Show All -->
