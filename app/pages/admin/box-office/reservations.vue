@@ -40,6 +40,8 @@ interface Performance {
   startsAt: string | number
   doorsAt?: string | number | null
   durationMinutes?: number | null
+  capacityOverride?: number | null
+  ticketsSold?: number
   intervalCount: number
   intervalMinutes?: number | null
   status: string
@@ -250,6 +252,26 @@ const statusCounts = computed(() => {
 })
 
 const pendingCount = computed(() => statusCounts.value.PENDING ?? 0)
+
+const performanceCapacity = computed(() => {
+  const p = selectedPerformance.value
+  if (!p) return null
+  return p.capacityOverride ?? p.venue.capacity ?? null
+})
+
+const ticketsSold = computed(() => selectedPerformance.value?.ticketsSold ?? 0)
+
+const ticketsRemaining = computed(() => {
+  const capacity = performanceCapacity.value
+  if (capacity === null || capacity === undefined) return null
+  return Math.max(0, capacity - ticketsSold.value)
+})
+
+const ticketsSoldPercent = computed(() => {
+  const capacity = performanceCapacity.value
+  if (!capacity || capacity <= 0) return null
+  return Math.min(100, Math.max(0, Math.round((ticketsSold.value / capacity) * 100)))
+})
 
 // ── Reactive clock (ticks every 30s for show-started check) ──────────────────
 
@@ -505,205 +527,246 @@ const todayFormatted = computed(() =>
   <div class="flex flex-col h-full overflow-hidden">
     <!-- Top: fixed sections (header, navigator, alerts, filters) -->
     <div class="flex flex-col gap-4 p-6 pb-0 shrink-0">
-    <!-- Header -->
-    <div class="flex w-full items-center justify-between gap-3 flex-wrap">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight">
-          Box Office
-        </h1>
-        <p class="text-muted text-sm">
-          {{ todayFormatted }}
-        </p>
+      <!-- Header -->
+      <div class="flex w-full items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight">
+            Box Office
+          </h1>
+          <p class="text-muted text-sm">
+            {{ todayFormatted }}
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <UButton
+            label="Walk-in"
+            icon="i-lucide-door-open"
+            color="success"
+            variant="subtle"
+            :disabled="!selectedPerformanceId"
+            @click="walkInOpen = true"
+          />
+
+          <UButton
+            icon="i-lucide-refresh-cw"
+            color="neutral"
+            variant="ghost"
+            :loading="reservationsStatus === 'pending'"
+            @click="refresh()"
+          />
+        </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <UButton
-          label="Walk-in"
-          icon="i-lucide-door-open"
-          color="success"
-          variant="subtle"
-          :disabled="!selectedPerformanceId"
-          @click="walkInOpen = true"
-        />
+      <!-- Performance navigator -->
+      <div class="rounded-xl border border-default bg-elevated/60 overflow-hidden">
+        <div class="flex items-center gap-2 px-3 py-2">
+          <UButton
+            icon="i-lucide-chevron-left"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            :disabled="!prevPerformance"
+            :tooltip="prevPerformance
+              ? `${prevPerformance.showTitle} — ${formatDateTime(prevPerformance.startsAt)}`
+              : undefined"
+            @click="goToPrev"
+          />
 
-        <UButton
-          icon="i-lucide-refresh-cw"
-          color="neutral"
-          variant="ghost"
-          :loading="reservationsStatus === 'pending'"
-          @click="refresh()"
-        />
-      </div>
-    </div>
+          <!-- Centre label -->
+          <div class="flex-1 text-center min-w-0">
+            <div
+              v-if="showsStatus === 'pending'"
+              class="flex justify-center"
+            >
+              <USkeleton class="h-5 w-52" />
+            </div>
 
-    <!-- Performance navigator -->
-    <div class="rounded-xl border border-default bg-elevated/60 overflow-hidden">
-      <div class="flex items-center gap-2 px-3 py-2">
-        <UButton
-          icon="i-lucide-chevron-left"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          :disabled="!prevPerformance"
-          :tooltip="prevPerformance
-            ? `${prevPerformance.showTitle} — ${formatDateTime(prevPerformance.startsAt)}`
-            : undefined"
-          @click="goToPrev"
-        />
+            <div
+              v-else-if="selectedPerformance"
+              class="flex items-center justify-center gap-2 flex-wrap"
+            >
+              <span class="font-semibold text-highlighted truncate">
+                {{ selectedPerformance.showTitle }}
+              </span>
+              <UBadge
+                v-if="isToday"
+                label="Today"
+                color="success"
+                variant="subtle"
+                size="sm"
+              />
+              <span class="text-muted text-sm">
+                {{
+                  (toDate(selectedPerformance.startsAt) ?? new Date()).toLocaleDateString('en-GB', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                  })
+                }}
+              </span>
+            </div>
 
-        <!-- Centre label -->
-        <div class="flex-1 text-center min-w-0">
-          <div
-            v-if="showsStatus === 'pending'"
-            class="flex justify-center"
-          >
-            <USkeleton class="h-5 w-52" />
+            <span
+              v-else
+              class="text-muted text-sm"
+            >
+              No performance selected
+            </span>
           </div>
 
-          <div
-            v-else-if="selectedPerformance"
-            class="flex items-center justify-center gap-2 flex-wrap"
-          >
-            <span class="font-semibold text-highlighted truncate">
-              {{ selectedPerformance.showTitle }}
-            </span>
-            <UBadge
-              v-if="isToday"
-              label="Today"
-              color="success"
-              variant="subtle"
-              size="sm"
+          <UButton
+            icon="i-lucide-chevron-right"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            :disabled="!nextPerformance"
+            :tooltip="nextPerformance
+              ? `${nextPerformance.showTitle} — ${formatDateTime(nextPerformance.startsAt)}`
+              : undefined"
+            @click="goToNext"
+          />
+        </div>
+
+        <!-- Performance details -->
+        <div
+          v-if="selectedPerformance"
+          class="flex items-center gap-4 px-4 py-2 border-t border-default text-sm text-muted flex-wrap"
+        >
+          <span class="inline-flex items-center gap-1.5">
+            <UIcon
+              name="i-lucide-building"
+              class="size-3.5 shrink-0"
             />
-            <span class="text-muted text-sm">
-              {{
-                (toDate(selectedPerformance.startsAt) ?? new Date()).toLocaleDateString('en-GB', {
-                  weekday: 'short',
-                  day: 'numeric',
-                  month: 'short',
-                })
-              }}
-            </span>
-          </div>
-
-          <span
-            v-else
-            class="text-muted text-sm"
-          >
-            No performance selected
+            {{ selectedPerformance.venue.name }}
+          </span>
+          <span class="inline-flex items-center gap-1.5">
+            <UIcon
+              name="i-lucide-clock"
+              class="size-3.5 shrink-0"
+            />
+            Doors {{ formatTime(selectedPerformance.doorsAt) }}
+            · Curtain
+            <strong class="text-highlighted">{{ formatTime(selectedPerformance.startsAt) }}</strong>
+            <template v-if="selectedPerformance.durationMinutes">
+              · ~{{ selectedPerformance.durationMinutes }} min
+            </template>
+            <template v-if="selectedPerformance.intervalCount > 0">
+              with {{ selectedPerformance.intervalCount }}
+              interval<template v-if="selectedPerformance.intervalMinutes">
+                ({{ selectedPerformance.intervalMinutes }} min)
+              </template>
+            </template>
           </span>
         </div>
 
-        <UButton
-          icon="i-lucide-chevron-right"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          :disabled="!nextPerformance"
-          :tooltip="nextPerformance
-            ? `${nextPerformance.showTitle} — ${formatDateTime(nextPerformance.startsAt)}`
-            : undefined"
-          @click="goToNext"
-        />
-      </div>
-
-      <!-- Performance details -->
-      <div
-        v-if="selectedPerformance"
-        class="flex items-center gap-4 px-4 py-2 border-t border-default text-sm text-muted flex-wrap"
-      >
-        <span class="inline-flex items-center gap-1.5">
-          <UIcon
-            name="i-lucide-building"
-            class="size-3.5 shrink-0"
-          />
-          {{ selectedPerformance.venue.name }}
-        </span>
-        <span class="inline-flex items-center gap-1.5">
-          <UIcon
-            name="i-lucide-clock"
-            class="size-3.5 shrink-0"
-          />
-          Doors {{ formatTime(selectedPerformance.doorsAt) }}
-          · Curtain
-          <strong class="text-highlighted">{{ formatTime(selectedPerformance.startsAt) }}</strong>
-          <template v-if="selectedPerformance.durationMinutes">
-            · ~{{ selectedPerformance.durationMinutes }} min
-          </template>
-          <template v-if="selectedPerformance.intervalCount > 0">
-            with {{ selectedPerformance.intervalCount }}
-            interval<template v-if="selectedPerformance.intervalMinutes">
-              ({{ selectedPerformance.intervalMinutes }} min)
-            </template>
-          </template>
-        </span>
-        <span
-          v-if="sortedPerformances.length > 1"
-          class="ml-auto text-xs tabular-nums opacity-50"
+        <!-- No performances at all -->
+        <div
+          v-else-if="showsStatus !== 'pending'"
+          class="px-4 py-3 text-sm text-muted"
         >
-          {{ currentIndex + 1 }} / {{ sortedPerformances.length }}
-        </span>
+          No performances found.
+        </div>
       </div>
 
-      <!-- No performances at all -->
-      <div
-        v-else-if="showsStatus !== 'pending'"
-        class="px-4 py-3 text-sm text-muted"
-      >
-        No performances found.
-      </div>
-    </div>
+      <!-- No show today banner -->
+      <UAlert
+        v-if="noPerformanceToday && selectedPerformanceId"
+        title="No performance today"
+        description="No shows scheduled for today — showing the nearest available performance."
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-calendar-x"
+      />
 
-    <!-- No show today banner -->
-    <UAlert
-      v-if="noPerformanceToday && selectedPerformanceId"
-      title="No performance today"
-      description="No shows scheduled for today — showing the nearest available performance."
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-calendar-x"
-    />
+      <template v-if="selectedPerformanceId">
+        <!-- Capacity summary -->
+        <div class="rounded-xl border border-default bg-elevated/60 p-3 sm:p-4">
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] sm:items-center">
+            <div class="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3">
+              <p class="text-xs uppercase tracking-wide text-primary/90 font-semibold">
+                Tickets Remaining
+              </p>
+              <div class="mt-1 flex items-end gap-2">
+                <span class="text-3xl sm:text-4xl leading-none font-bold tabular-nums text-highlighted">
+                  {{ ticketsRemaining ?? '—' }}
+                </span>
+                <span
+                  v-if="performanceCapacity !== null"
+                  class="pb-0.5 text-sm text-muted tabular-nums"
+                >
+                  of {{ performanceCapacity }}
+                </span>
+              </div>
+              <p class="mt-1 text-xs text-muted">
+                {{ ticketsSold.toLocaleString('en-GB') }} sold
+                <template v-if="ticketsSoldPercent !== null">
+                  · {{ ticketsSoldPercent }}% full
+                </template>
+              </p>
+            </div>
 
-    <template v-if="selectedPerformanceId">
-      <!-- Status pills -->
-      <div class="flex flex-wrap gap-2">
-        <button
-          v-for="(cfg, key) in STATUS_CONFIG"
-          :key="key"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
-          :class="statusFilter === key
-            ? 'bg-primary text-white border-primary'
-            : 'bg-elevated border-default text-muted hover:text-default'"
-          @click="statusFilter = statusFilter === key ? 'ALL' : key"
-        >
-          <UIcon
-            :name="cfg.icon"
-            class="size-3.5"
+            <div class="grid grid-cols-2 gap-2">
+              <div class="rounded-lg border border-default bg-default/40 px-3 py-2">
+                <p class="text-[11px] uppercase tracking-wide text-muted font-semibold">
+                  Reservations
+                </p>
+                <p class="mt-0.5 text-xl font-semibold tabular-nums text-highlighted">
+                  {{ reservations?.length ?? 0 }}
+                </p>
+              </div>
+              <div class="rounded-lg border border-default bg-default/40 px-3 py-2">
+                <p class="text-[11px] uppercase tracking-wide text-muted font-semibold">
+                  Still Pending
+                </p>
+                <p class="mt-0.5 text-xl font-semibold tabular-nums text-warning">
+                  {{ pendingCount }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status pills -->
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="(cfg, key) in STATUS_CONFIG"
+            :key="key"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
+            :class="statusFilter === key
+              ? 'bg-primary text-white border-primary'
+              : 'bg-elevated border-default text-muted hover:text-default'"
+            @click="statusFilter = statusFilter === key ? 'ALL' : key"
+          >
+            <UIcon
+              :name="cfg.icon"
+              class="size-3.5"
+            />
+            {{ cfg.label }}
+            <span class="opacity-70">({{ statusCounts[key] ?? 0 }})</span>
+          </button>
+        </div>
+
+        <!-- Search + No-Show All -->
+        <div class="flex gap-3 flex-wrap pb-4">
+          <UInput
+            v-model="searchQuery"
+            placeholder="Search by booking ref or customer…"
+            icon="i-lucide-search"
+            class="flex-1 min-w-48"
           />
-          {{ cfg.label }}
-          <span class="opacity-70">({{ statusCounts[key] ?? 0 }})</span>
-        </button>
-      </div>
 
-      <!-- Search + No-Show All -->
-      <div class="flex gap-3 flex-wrap pb-4">
-        <UInput
-          v-model="searchQuery"
-          placeholder="Search by booking ref or customer…"
-          icon="i-lucide-search"
-          class="flex-1 min-w-48"
-        />
-
-        <UButton
-          label="Mark all as no-show"
-          icon="i-lucide-user-x"
-          color="warning"
-          variant="subtle"
-          :disabled="pendingCount === 0"
-          :loading="isMarkingAllNoShow"
-          @click="markAllNoShow"
-        />
-      </div>
-    </template>
+          <UButton
+            label="Mark all as no-show"
+            icon="i-lucide-user-x"
+            color="warning"
+            variant="subtle"
+            :disabled="pendingCount === 0"
+            :loading="isMarkingAllNoShow"
+            @click="markAllNoShow"
+          />
+        </div>
+      </template>
     </div>
     <!-- End top fixed section -->
 
@@ -745,9 +808,6 @@ const todayFormatted = computed(() =>
         <span>
           {{ filteredReservations.length }}
           reservation{{ filteredReservations.length === 1 ? '' : 's' }} shown
-          <template v-if="reservations && reservations.length !== filteredReservations.length">
-            of {{ reservations.length }} total
-          </template>
         </span>
         <span v-if="pendingCount > 0">
           <span class="text-warning font-medium">{{ pendingCount }}</span> still pending
