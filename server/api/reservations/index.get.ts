@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
     .where(and(inArray(schema.tickets.reservationId, reservationIds), isNull(schema.tickets.refundedAt)))
     .groupBy(schema.tickets.reservationId)
 
-  const ticketCountMap = new Map(ticketCounts.map(r => [r.reservationId, r.c]))
+  const ticketCountMap = new Map(ticketCounts.map(r => [r.reservationId, Number(r.c)]))
 
   return allReservations.map(r => ({
     ...r,
