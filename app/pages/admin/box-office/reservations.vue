@@ -14,7 +14,7 @@
 
   Data:
   - GET /api/shows  → build performance navigator
-  - GET /api/reservations?performanceId=:id → reservations table
+  - GET /api/reservations?performanceId=:id&withCounts=true → reservations table
 -->
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
@@ -210,7 +210,7 @@ const { data: reservations, status: reservationsStatus, refresh } = await useAsy
   () => {
     if (!selectedPerformanceId.value) return Promise.resolve([] as Reservation[])
     return $fetch<Reservation[]>('/api/reservations', {
-      query: { performanceId: selectedPerformanceId.value },
+      query: { performanceId: selectedPerformanceId.value, withCounts: 'true' },
     })
   },
   {

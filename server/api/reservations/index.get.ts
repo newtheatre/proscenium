@@ -8,13 +8,14 @@ const querySchema = z.object({
   showId: z.string().optional(),
   userId: z.string().optional(),
   status: z.enum(['PENDING', 'COLLECTED', 'DOOR', 'CANCELLED', 'NO_SHOW']).optional(),
+  withCounts: z.enum(['true', 'false']).optional(),
 })
 
 /** GET /api/reservations — list reservations with optional filters. Staff only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, listReservations)
 
-  const { performanceId, showId, userId, status } = await getValidatedQuery(event, querySchema.parse)
+  const { performanceId, showId, userId, status, withCounts } = await getValidatedQuery(event, querySchema.parse)
 
   // Resolve performance IDs when filtering by show
   let resolvedPerfIds: string[] | undefined
@@ -42,15 +43,25 @@ export default defineEventHandler(async (event) => {
   })
 
   if (allReservations.length === 0) return []
+  if (withCounts !== 'true') return allReservations
 
   const reservationIds = allReservations.map(r => r.id)
-  const ticketCounts = await db
-    .select({ reservationId: schema.tickets.reservationId, c: count() })
-    .from(schema.tickets)
-    .where(and(inArray(schema.tickets.reservationId, reservationIds), isNull(schema.tickets.refundedAt)))
-    .groupBy(schema.tickets.reservationId)
+  // SQLite has a max bound-parameter limit, so fetch counts in chunks.
+  const chunkSize = 800
+  const ticketCountMap = new Map<string, number>()
 
-  const ticketCountMap = new Map(ticketCounts.map(r => [r.reservationId, Number(r.c)]))
+  for (let i = 0; i < reservationIds.length; i += chunkSize) {
+    const chunk = reservationIds.slice(i, i + chunkSize)
+    const ticketCounts = await db
+      .select({ reservationId: schema.tickets.reservationId, c: count() })
+      .from(schema.tickets)
+      .where(and(inArray(schema.tickets.reservationId, chunk), isNull(schema.tickets.refundedAt)))
+      .groupBy(schema.tickets.reservationId)
+
+    for (const row of ticketCounts) {
+      ticketCountMap.set(row.reservationId, Number(row.c))
+    }
+  }
 
   return allReservations.map(r => ({
     ...r,
