@@ -121,9 +121,11 @@ function formatEmailPrice(pence: number): string {
 }
 
 function buildTicketTable(tickets: BookingTicket[]): string {
+  // Group by name AND price paid so a type sold at more than one price shows one
+  // row per price and the rows sum to the total.
   const grouped = new Map<string, { name: string, count: number, unitPrice: number }>()
   for (const ticket of tickets) {
-    const key = ticket.ticketType.name
+    const key = `${ticket.ticketType.name}:${ticket.pricePaid}`
     const existing = grouped.get(key)
     if (existing) {
       existing.count++
