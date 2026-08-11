@@ -12,22 +12,14 @@ export default defineEventHandler(async (event) => {
 
   const user = await db.select().from(schema.users).where(eq(schema.users.email, email)).get()
 
-  if (!user) {
-    // To prevent user enumeration, respond with a success message even if the user doesn't exist
-    return { message: 'If the email exists, a verification link has been sent' }
+  // Respond identically whether or not the address exists, and whether or not
+  // it is already verified — otherwise the differing responses let an attacker
+  // enumerate which addresses are registered/verified accounts. Only send a new
+  // link when there is an unverified account to send it to.
+  if (user && !user.verified) {
+    const verificationToken = await createEmailVerificationToken(user.id)
+    await sendVerificationEmail(email, verificationToken)
   }
 
-  // Check if already verified
-  if (user.verified) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Email is already verified',
-    })
-  }
-
-  // Generate and send new verification token
-  const verificationToken = await createEmailVerificationToken(user.id)
-  await sendVerificationEmail(email, verificationToken)
-
-  return { message: 'Verification email sent' }
+  return { message: 'If the email exists and is unverified, a verification link has been sent' }
 })

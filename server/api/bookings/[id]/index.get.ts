@@ -1,10 +1,13 @@
 import { db } from '@nuxthub/db'
 
 /**
- * GET /api/bookings/:id — get a booking by ID.
+ * GET /api/bookings/:id — get a booking by its id or its booking reference.
  *
- * Accessible to the booking owner (logged in) or staff.
- * Also accessible via booking reference for confirmation pages.
+ * Confirmation emails link with the short bookingRef, so the `:id` segment may
+ * be either the nanoid primary key or the six-character reference.
+ *
+ * Accessible to the booking owner (logged in) or staff, or to a guest that
+ * supplies the matching booking reference as `?ref=`.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
@@ -13,7 +16,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const booking = await db.query.reservations.findFirst({
-    where: (r, { eq }) => eq(r.id, id),
+    where: (r, { eq, or }) => or(eq(r.id, id), eq(r.bookingRef, id)),
     with: {
       user: { columns: { id: true, name: true, email: true } },
       performance: {

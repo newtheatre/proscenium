@@ -129,7 +129,10 @@ export default defineEventHandler(async (event) => {
 
   const requestedTypeIds = body.tickets.map(t => t.ticketTypeId)
   const priceCtx = await loadTicketPriceContext(requestedTypeIds, performance.show.id, body.performanceId)
-  validateTicketTypesExist(requestedTypeIds, priceCtx)
+  // Reject types that are inactive for this show/performance. They are hidden in
+  // the UI but reachable by ID, so a crafted request must not be able to book a
+  // disabled or comp-only type at its (possibly £0) price.
+  validateTicketTypesActive(requestedTypeIds, priceCtx)
 
   // ── Create reservation + tickets ──────────────────────────────────────────
 

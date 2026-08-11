@@ -1,8 +1,11 @@
 import { db, schema } from '@nuxthub/db'
 import { asc } from 'drizzle-orm'
+import { readShow } from '~~/shared/utils/abilities'
 
-/** GET /api/shows/:id — get a show by ID with performances. Public. */
+/** GET /api/shows/:id — get a show by ID with performances. Staff only; the public uses /api/whats-on. */
 export default defineEventHandler(async (event) => {
+  await authorize(event, readShow)
+
   const showId = getRouterParam(event, 'id')
 
   if (!showId) {

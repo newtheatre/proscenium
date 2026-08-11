@@ -1,8 +1,11 @@
 import { db, schema } from '@nuxthub/db'
 import { and, asc, count, eq, inArray, isNull } from 'drizzle-orm'
+import { listShows } from '~~/shared/utils/abilities'
 
-/** GET /api/shows — list all shows. Public. */
-export default defineEventHandler(async () => {
+/** GET /api/shows — list all shows including drafts. Staff only; the public uses /api/whats-on. */
+export default defineEventHandler(async (event) => {
+  await authorize(event, listShows)
+
   const allShows = await db.query.shows.findMany({
     orderBy: [asc(schema.shows.title)],
     with: {
