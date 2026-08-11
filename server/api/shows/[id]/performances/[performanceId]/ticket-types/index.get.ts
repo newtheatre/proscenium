@@ -44,16 +44,16 @@ export default defineEventHandler(async (event) => {
 
   const showOverrideMap = new Map(showOverrides.map(o => [o.ticketTypeId, o]))
   const perfOverrideMap = new Map(perfOverrides.map(o => [o.ticketTypeId, o]))
+  const ctx = { baseTypes: allTypes, showOverrides, perfOverrides }
 
   return allTypes.map((tt) => {
-    const showOverride = showOverrideMap.get(tt.id) ?? null
-    const perfOverride = perfOverrideMap.get(tt.id) ?? null
+    const { effectivePrice, active } = resolveEffectiveTicketType(tt.id, ctx)
     return {
       ...tt,
-      showOverride,
-      perfOverride,
-      effectivePrice: perfOverride?.price ?? showOverride?.price ?? tt.price,
-      effectiveActive: perfOverride?.active ?? showOverride?.active ?? tt.activeByDefault,
+      showOverride: showOverrideMap.get(tt.id) ?? null,
+      perfOverride: perfOverrideMap.get(tt.id) ?? null,
+      effectivePrice,
+      effectiveActive: active,
     }
   })
 })

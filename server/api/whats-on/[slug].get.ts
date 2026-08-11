@@ -88,17 +88,10 @@ export default defineEventHandler(async (event) => {
   const performancesWithTickets = show.performances.map((perf) => {
     const perfTicketOverrides = perfOverrides.filter(o => o.performanceId === perf.id)
 
+    const ctx = { baseTypes: allTicketTypes, showOverrides, perfOverrides: perfTicketOverrides }
     const ticketTypes = allTicketTypes
       .map((type) => {
-        const perfOverride = perfTicketOverrides.find(o => o.ticketTypeId === type.id)
-        const showOverride = showOverrides.find(o => o.ticketTypeId === type.id)
-
-        const baseActive = type.activeByDefault
-        const showActive = showOverride?.active ?? baseActive
-        const active = perfOverride?.active ?? showActive
-
-        const effectivePrice = perfOverride?.price ?? showOverride?.price ?? type.price
-
+        const { effectivePrice, active } = resolveEffectiveTicketType(type.id, ctx)
         return {
           id: type.id,
           name: type.name,
