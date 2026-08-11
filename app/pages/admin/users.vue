@@ -278,7 +278,7 @@ const columns: TableColumn<User>[] = [
     header: 'Joined',
     cell: ({ row }) => {
       const date = new Date(row.original.createdAt)
-      return h('span', { class: 'text-sm text-muted' }, date.toLocaleDateString())
+      return h('span', { class: 'text-sm text-muted' }, date.toLocaleDateString('en-GB', { timeZone: 'Europe/London' }))
     },
   },
   {

@@ -35,6 +35,7 @@ const isCancelled = computed(() => props.booking.status === 'CANCELLED')
 
 function formatDate(date: string | Date) {
   return new Date(date).toLocaleDateString('en-GB', {
+    timeZone: 'Europe/London',
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -44,6 +45,7 @@ function formatDate(date: string | Date) {
 
 function formatTime(date: string | Date) {
   return new Date(date).toLocaleTimeString('en-GB', {
+    timeZone: 'Europe/London',
     hour: '2-digit',
     minute: '2-digit',
   })

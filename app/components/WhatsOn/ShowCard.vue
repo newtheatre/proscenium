@@ -29,7 +29,7 @@ const performanceDateRange = computed(() => {
   const first = new Date(perfs[0]!.startsAt)
   const last = new Date(perfs[perfs.length - 1]!.startsAt)
 
-  const formatDate = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  const formatDate = (d: Date) => d.toLocaleDateString('en-GB', { timeZone: 'Europe/London', day: 'numeric', month: 'short' })
 
   if (first.toDateString() === last.toDateString()) {
     return formatDate(first)

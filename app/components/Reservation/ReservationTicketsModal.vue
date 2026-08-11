@@ -311,7 +311,7 @@ function formatDate(val: string | number): string {
   const d = new Date(typeof val === 'number' ? val * 1000 : val)
   return Number.isNaN(d.getTime())
     ? ''
-    : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+    : d.toLocaleString('en-GB', { timeZone: 'Europe/London', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 </script>
 

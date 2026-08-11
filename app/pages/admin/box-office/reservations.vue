@@ -98,13 +98,14 @@ function toDate(val: string | number | null | undefined): Date | null {
 function formatTime(val: string | number | null | undefined): string {
   const d = toDate(val)
   if (!d) return '—'
-  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
+  return d.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function formatDateTime(val: string | number | null | undefined): string {
   const d = toDate(val)
   if (!d) return '—'
   return d.toLocaleString('en-GB', {
+    timeZone: 'Europe/London',
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
@@ -529,6 +530,7 @@ const columns: TableColumn<Reservation>[] = [
 
 const todayFormatted = computed(() =>
   new Date().toLocaleDateString('en-GB', {
+    timeZone: 'Europe/London',
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -613,6 +615,7 @@ const todayFormatted = computed(() =>
               <span class="text-muted text-sm">
                 {{
                   (toDate(selectedPerformance.startsAt) ?? new Date()).toLocaleDateString('en-GB', {
+                    timeZone: 'Europe/London',
                     weekday: 'short',
                     day: 'numeric',
                     month: 'short',

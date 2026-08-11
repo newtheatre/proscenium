@@ -282,6 +282,7 @@ function formatDate(val: string | number): string {
   return Number.isNaN(d.getTime())
     ? ''
     : d.toLocaleString('en-GB', {
+        timeZone: 'Europe/London',
         day: 'numeric',
         month: 'short',
         year: 'numeric',

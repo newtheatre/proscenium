@@ -272,16 +272,17 @@ const formatDateRange = (start, end) => {
 
   if (isMultiDay(start, end)) {
     if (hasTime) {
-      return `${startDate.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })} ${startDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })} ${endDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+      return `${startDate.toLocaleDateString('en-GB', { timeZone: 'Europe/London', month: 'short', day: 'numeric' })} ${startDate.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleDateString('en-GB', { timeZone: 'Europe/London', month: 'short', day: 'numeric' })} ${endDate.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' })}`
     }
-    return `${startDate.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}`
+    return `${startDate.toLocaleDateString('en-GB', { timeZone: 'Europe/London', month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-GB', { timeZone: 'Europe/London', month: 'short', day: 'numeric' })}`
   }
 
   if (hasTime) {
-    return `${startDate.toLocaleDateString('en-GB', { weekday: 'short', month: 'short', day: 'numeric' })} ${startDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+    return `${startDate.toLocaleDateString('en-GB', { timeZone: 'Europe/London', weekday: 'short', month: 'short', day: 'numeric' })} ${startDate.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' })}`
   }
 
   return startDate.toLocaleDateString('en-GB', {
+    timeZone: 'Europe/London',
     weekday: 'short',
     month: 'short',
     day: 'numeric',
