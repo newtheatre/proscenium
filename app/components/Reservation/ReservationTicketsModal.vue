@@ -153,6 +153,53 @@ const refundedCountByType = computed(() => {
   }
   return map
 })
+
+// Active (non-refunded) count per type: Map<typeId, count>
+const activeCountByType = computed(() => {
+  const map = new Map<string, number>()
+  for (const t of activeTickets.value) {
+    map.set(t.ticketTypeId, (map.get(t.ticketTypeId) ?? 0) + 1)
+  }
+  return map
+})
+
+// ── Refunds (admin/manager) ─────────────────────────────────────────────────
+const refunding = ref(false)
+
+async function refundOne(typeId: string, typeName: string) {
+  if (!props.reservationId) return
+  const ok = await confirm({
+    title: 'Refund a ticket?',
+    description: `Mark one ${typeName} ticket as refunded. It stays on record for audit but is excluded from capacity and revenue.`,
+    confirmLabel: 'Refund',
+    confirmColor: 'warning',
+    icon: 'i-lucide-banknote',
+  })
+  if (!ok) return
+
+  refunding.value = true
+  try {
+    await $fetch(`/api/reservations/${props.reservationId}/refund`, {
+      method: 'POST',
+      body: { ticketTypeId: typeId, quantity: 1 },
+    })
+    toast.add({ title: 'Ticket refunded', icon: 'i-lucide-check-circle', color: 'success' })
+    await loadData()
+    emit('refresh')
+  }
+  catch (error: unknown) {
+    toast.add({
+      title: 'Refund failed',
+      description: getErrorMessage(error, 'Could not refund the ticket'),
+      icon: 'i-lucide-x-circle',
+      color: 'error',
+    })
+  }
+  finally {
+    refunding.value = false
+  }
+}
+
 // All rows to display: types on the reservation plus available types not yet added
 const displayRows = computed(() => {
   if (!reservation.value) return []
@@ -369,6 +416,21 @@ function formatDate(val: string | number): string {
                 </template>
               </p>
             </div>
+
+            <!-- Refund (admin/manager) — disabled while there are unsaved quantity edits -->
+            <UButton
+              v-if="(activeCountByType.get(row.id) ?? 0) > 0"
+              icon="i-lucide-banknote"
+              color="warning"
+              variant="ghost"
+              size="xs"
+              class="shrink-0"
+              :loading="refunding"
+              :disabled="isDirty || refunding"
+              :title="isDirty ? 'Save or discard changes before refunding' : `Refund one ${row.name}`"
+              :aria-label="`Refund one ${row.name}`"
+              @click="refundOne(row.id, row.name)"
+            />
 
             <!-- Stepper -->
             <div class="flex items-center gap-1 shrink-0">
