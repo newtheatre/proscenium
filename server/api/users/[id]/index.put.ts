@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { updateUser, updateUserRoles, updateUserVerified } from '~~/shared/utils/abilities'
 
@@ -79,17 +79,24 @@ export default defineEventHandler(async (event) => {
 
   // Update roles if provided
   if (body.roles !== undefined) {
-    // Delete existing roles
-    await db.delete(schema.userRoles).where(eq(schema.userRoles.userId, userId))
+    // Replace the role set atomically so a failure can't leave the user with no
+    // roles (or a partial set) mid-update. The sessionEpoch bump makes the role
+    // change take effect on the user's next authorized request rather than only
+    // at their next login.
+    const clearRoles = db.delete(schema.userRoles).where(eq(schema.userRoles.userId, userId))
+    const bumpEpoch = db.update(schema.users)
+      .set({ sessionEpoch: sql`${schema.users.sessionEpoch} + 1` })
+      .where(eq(schema.users.id, userId))
 
-    // Insert new roles
     if (body.roles.length > 0) {
-      await db.insert(schema.userRoles).values(
-        body.roles.map(role => ({
-          userId,
-          role,
-        })),
-      )
+      await db.batch([
+        clearRoles,
+        bumpEpoch,
+        db.insert(schema.userRoles).values(body.roles.map(role => ({ userId, role }))),
+      ])
+    }
+    else {
+      await db.batch([clearRoles, bumpEpoch])
     }
   }
 

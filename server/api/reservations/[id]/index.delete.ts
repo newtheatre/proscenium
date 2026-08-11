@@ -12,9 +12,13 @@ export default defineEventHandler(async (event) => {
   const existing = await db.select().from(schema.reservations).where(eq(schema.reservations.id, id)).get()
   if (!existing) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
 
-  // Delete tickets first (onDelete: 'restrict' on the reservation FK prevents deleting parent first)
-  await db.delete(schema.tickets).where(eq(schema.tickets.reservationId, id))
-  await db.delete(schema.reservations).where(eq(schema.reservations.id, id))
+  // Delete tickets first (onDelete: 'restrict' on the reservation FK prevents
+  // deleting the parent first), atomically, so a failure can't leave a
+  // reservation stripped of its tickets or vice versa.
+  await db.batch([
+    db.delete(schema.tickets).where(eq(schema.tickets.reservationId, id)),
+    db.delete(schema.reservations).where(eq(schema.reservations.id, id)),
+  ])
 
   return { message: 'Reservation deleted successfully' }
 })
