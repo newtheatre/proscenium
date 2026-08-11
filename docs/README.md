@@ -3,10 +3,10 @@
 Proscenium is the Nottingham New Theatre's website **and** its box office. One Nuxt 4 application,
 deployed to Cloudflare Workers, serving `newtheatre.org.uk`.
 
-This directory is the app's institutional memory. The repository has a single squashed commit and
-no code review history, so there is nothing to learn intent from except what is written down here.
-Keep it current: a committee turns over every year, and the person reading this in August 2027 will
-not be able to ask you.
+This directory is the app's institutional memory. It was built solo and committed directly to
+`main`, with no pull requests and no code review, so beyond terse commit messages there is little
+record of *why* outside what is written down here. Keep it current: a committee turns over every
+year, and the person reading this in August 2027 will not be able to ask you.
 
 ## Where to start
 

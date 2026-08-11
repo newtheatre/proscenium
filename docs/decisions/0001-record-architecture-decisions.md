@@ -4,11 +4,11 @@
 
 ## Context
 
-Proscenium was built by one person and inherited by another with no overlap. The repository has a
-single squashed commit, no pull requests, no code review history and, until August 2026, no
-documentation beyond the stock Nuxt starter README. The August 2026 audit had to reconstruct intent
-by reading the code — and in several places the code contradicts its own comments, so even that was
-unreliable.
+Proscenium was built and is still maintained by one person; no handover has happened yet, but one
+will. The repository has an ordinary incremental commit history, but development ran directly on
+`main` — no pull requests, no code review — and until August 2026 there was no documentation beyond
+the stock Nuxt starter README. Writing that documentation meant reconstructing intent from the code,
+and in several places the code contradicts its own comments, so even that was not wholly reliable.
 
 The theatre's committee turns over every year. Anyone who can answer "why is it like this?" will
 have graduated within twelve months. This is the same bus-factor problem the IT estate tracker flags
