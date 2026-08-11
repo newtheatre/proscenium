@@ -59,4 +59,5 @@ export {
   readReservation,
   updateReservation,
   deleteReservation,
+  refundTicket,
 } from './reservations'

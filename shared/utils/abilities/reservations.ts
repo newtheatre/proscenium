@@ -26,3 +26,6 @@ export const updateReservation = defineAbility((user: AbilityUser) => isStaff(us
 
 /** Delete a reservation — ADMIN and MANAGER only. */
 export const deleteReservation = defineAbility((user: AbilityUser) => isAdminOrManager(user))
+
+/** Refund a ticket — ADMIN and MANAGER only. */
+export const refundTicket = defineAbility((user: AbilityUser) => isAdminOrManager(user))
