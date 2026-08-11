@@ -15,42 +15,37 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Booking ID is required' })
   }
 
+  // Customer-facing shape: this endpoint is reachable by anyone holding the
+  // booking reference, so it must not return internal columns — see
+  // reservationCustomerColumns. `userId` is still needed for the owner check
+  // below, so it is selected here and stripped from the response.
   const booking = await db.query.reservations.findFirst({
     where: (r, { eq, or }) => or(eq(r.id, id), eq(r.bookingRef, id)),
-    with: {
-      user: { columns: { id: true, name: true, email: true } },
-      performance: {
-        with: {
-          show: { columns: { id: true, title: true, slug: true, posterUrl: true } },
-          venue: { columns: { id: true, name: true, address: true } },
-        },
-      },
-      tickets: {
-        with: {
-          ticketType: { columns: { id: true, name: true } },
-        },
-      },
-    },
+    columns: { ...reservationCustomerColumns, userId: true },
+    with: reservationCustomerWith,
   })
 
   if (!booking) {
     throw createError({ statusCode: 404, statusMessage: 'Booking not found' })
   }
 
+  // userId is only needed to decide access; it is not part of the response.
+  const { userId, ...customerBooking } = booking
+
   // Allow access for: the booking owner, or staff
   const session = await getUserSession(event)
   const sessionUser = session?.user
 
   if (sessionUser) {
-    const isOwner = sessionUser.id === booking.userId
+    const isOwner = sessionUser.id === userId
     const isStaff = sessionUser.roles?.some((r: string) => ['ADMIN', 'MANAGER', 'BOX_OFFICE'].includes(r))
-    if (isOwner || isStaff) return booking
+    if (isOwner || isStaff) return customerBooking
   }
 
   // For guest access, require the booking ref as a query parameter
   const query = getQuery(event)
   if (query.ref && query.ref === booking.bookingRef) {
-    return booking
+    return customerBooking
   }
 
   throw createError({ statusCode: 403, statusMessage: 'You do not have access to this booking' })

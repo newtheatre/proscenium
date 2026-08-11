@@ -8,6 +8,8 @@
 interface Ticket {
   id: string
   pricePaid: number
+  /** Imported legacy tickets may have no recorded price — see formatTotal. */
+  priceConfidence?: 'EXACT' | 'DERIVED' | 'UNKNOWN'
   ticketType: { id: string, name: string }
 }
 
@@ -80,6 +82,24 @@ function getTicketSummary(tickets: Ticket[]) {
 
 function getTotal(tickets: Ticket[]) {
   return tickets.reduce((sum, t) => sum + t.pricePaid, 0)
+}
+
+/**
+ * The booking total as a string.
+ *
+ * An imported legacy booking can carry `priceConfidence: 'UNKNOWN'` with
+ * `pricePaid: 0`, because the old box office never recorded what was taken.
+ * Rendering that as "Free" would tell someone who paid that they did not.
+ */
+function formatTotal(tickets: Ticket[]): string {
+  if (tickets.length > 0 && tickets.every(t => t.priceConfidence === 'UNKNOWN')) {
+    return 'Price not recorded'
+  }
+  const total = getTotal(tickets)
+  if (tickets.some(t => t.priceConfidence === 'UNKNOWN')) {
+    return `${formatPrice(total)} (some prices not recorded)`
+  }
+  return formatPrice(total)
 }
 </script>
 
@@ -195,7 +215,7 @@ function getTotal(tickets: Ticket[]) {
       <div class="flex items-center justify-between">
         <span class="font-semibold text-default">Total</span>
         <span class="text-lg font-bold text-default">
-          {{ formatPrice(getTotal(booking.tickets)) }}
+          {{ formatTotal(booking.tickets) }}
         </span>
       </div>
     </UCard>
