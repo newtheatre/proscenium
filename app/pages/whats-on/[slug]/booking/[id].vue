@@ -13,6 +13,7 @@ interface BookingDetail {
   customerNotes: string | null
   user: { id: string, name: string, email: string }
   performance: {
+    id: string
     startsAt: string | Date
     doorsAt: string | Date | null
     durationMinutes: number | null
@@ -30,7 +31,7 @@ const route = useRoute()
 const bookingId = route.params.id as string
 const bookingRef = route.query.ref as string | undefined
 
-const { data: booking, status, error } = await useFetch<BookingDetail>(`/api/bookings/${bookingId}`, {
+const { data: booking, status, error, refresh } = await useFetch<BookingDetail>(`/api/bookings/${bookingId}`, {
   key: `booking-${bookingId}`,
   query: bookingRef ? { ref: bookingRef } : undefined,
 })
@@ -75,6 +76,13 @@ useSeoMeta({
       />
 
       <BookingConfirmation :booking="booking" />
+
+      <BookingManage
+        :booking="booking"
+        :booking-ref="bookingRef"
+        class="mt-8"
+        @refresh="refresh"
+      />
     </template>
   </UContainer>
 </template>
