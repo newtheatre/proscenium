@@ -121,7 +121,7 @@ function isSameDay(a: Date, b: Date): boolean {
 
 // ── Shows data ────────────────────────────────────────────────────────────────
 
-const { data: shows, status: showsStatus } = await useFetch<Show[]>('/api/shows', {
+const { data: shows, status: showsStatus, refresh: refreshShows } = await useFetch<Show[]>('/api/shows', {
   key: 'box-office-shows',
 })
 
@@ -205,7 +205,7 @@ const noPerformanceToday = computed(() => {
 
 // ── Reservations data ─────────────────────────────────────────────────────────
 
-const { data: reservations, status: reservationsStatus, refresh } = await useAsyncData(
+const { data: reservations, status: reservationsStatus, refresh: refreshReservations } = await useAsyncData(
   'box-office-reservations',
   () => {
     if (!selectedPerformanceId.value) return Promise.resolve([] as Reservation[])
@@ -218,6 +218,13 @@ const { data: reservations, status: reservationsStatus, refresh } = await useAsy
     watch: [selectedPerformanceId],
   },
 )
+
+// Refresh both reservations and the shows data — the capacity pill's
+// ticketsSold comes from /api/shows, so it must be re-fetched after a walk-in
+// or collection, not just the reservation list.
+async function refresh() {
+  await Promise.all([refreshReservations(), refreshShows()])
+}
 
 // ── Status filter + search ────────────────────────────────────────────────────
 
