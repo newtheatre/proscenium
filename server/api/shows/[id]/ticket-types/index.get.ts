@@ -31,14 +31,16 @@ export default defineEventHandler(async (event) => {
   ])
 
   const overrideMap = new Map(overrides.map(o => [o.ticketTypeId, o]))
+  // No performance level here, so pass an empty perfOverrides set.
+  const ctx = { baseTypes: allTypes, showOverrides: overrides, perfOverrides: [] }
 
   return allTypes.map((tt) => {
-    const override = overrideMap.get(tt.id) ?? null
+    const { effectivePrice, active } = resolveEffectiveTicketType(tt.id, ctx)
     return {
       ...tt,
-      override,
-      effectivePrice: override?.price ?? tt.price,
-      effectiveActive: override?.active ?? tt.activeByDefault,
+      override: overrideMap.get(tt.id) ?? null,
+      effectivePrice,
+      effectiveActive: active,
     }
   })
 })

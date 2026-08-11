@@ -103,6 +103,21 @@ export function resolveEffectiveActive(
 }
 
 /**
+ * Resolve both the effective price and active status for a ticket type through
+ * the override chain (performance → show → base). The single source of truth for
+ * the resolution rule; endpoints should use this rather than re-implementing it.
+ */
+export function resolveEffectiveTicketType(
+  ticketTypeId: string,
+  ctx: TicketPriceContext,
+): { effectivePrice: number, active: boolean } {
+  return {
+    effectivePrice: resolveEffectivePrice(ticketTypeId, ctx),
+    active: resolveEffectiveActive(ticketTypeId, ctx),
+  }
+}
+
+/**
  * Validate that every requested ticket type is active for this show/performance.
  * Existence is checked first. Throws a 400 on the first inactive type.
  *

@@ -56,17 +56,10 @@ export default defineEventHandler(async (event) => {
       : Promise.resolve([]),
   ])
 
+  const ctx = { baseTypes: allTypes, showOverrides, perfOverrides }
   return allTypes
     .map((type) => {
-      const perfOverride = perfOverrides.find(o => o.ticketTypeId === type.id)
-      const showOverride = showOverrides.find(o => o.ticketTypeId === type.id)
-
-      const baseActive = type.activeByDefault
-      const showActive = showOverride?.active ?? baseActive
-      const active = perfOverride?.active ?? showActive
-
-      const effectivePrice = perfOverride?.price ?? showOverride?.price ?? type.price
-
+      const { effectivePrice, active } = resolveEffectiveTicketType(type.id, ctx)
       return {
         id: type.id,
         name: type.name,
