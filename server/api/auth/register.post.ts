@@ -21,12 +21,29 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'User with this email already exists' })
   }
 
+  // Addresses at RFC-reserved TLDs can never receive mail, so no registration
+  // against one can be legitimate — but the import created thousands of them
+  // (`door-sales@legacy.invalid`, and one per anonymised booker). Claiming one
+  // would hand over that account's booking history.
+  if (/\.(invalid|test|example|localhost)$/i.test(email)) {
+    throw createError({ statusCode: 400, statusMessage: 'That email address cannot be used' })
+  }
+
   if (existingUser) {
     // A password-less row is only claimable if it is genuinely an unclaimed
-    // customer shadow account. A privileged row must never be claimable by
-    // whoever gets to the address first: the legacy import created
-    // password-less accounts carrying ADMIN/MANAGER/BOX_OFFICE, which made
-    // `register` an unauthenticated route to full administrative access.
+    // customer shadow account.
+    //
+    // Not claimable:
+    //  - anything holding a role. The import created password-less accounts
+    //    carrying ADMIN/MANAGER/BOX_OFFICE, which made `register` an
+    //    unauthenticated route to full administrative access.
+    //  - anything anonymised under the retention policy. The person is
+    //    deliberately no longer identifiable, so nobody can prove they own it,
+    //    and claiming it would undo the anonymisation.
+    if (existingUser.anonymisedAt) {
+      throw createError({ statusCode: 400, statusMessage: 'User with this email already exists' })
+    }
+
     const privileged = await db
       .select({ role: schema.userRoles.role })
       .from(schema.userRoles)
