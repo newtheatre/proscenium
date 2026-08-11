@@ -117,13 +117,18 @@ export default defineEventHandler(async (event) => {
     // quantity === currentCount → no-op
   }
 
-  // Execute mutations
-  if (toDelete.length > 0) {
-    await db.delete(schema.tickets).where(inArray(schema.tickets.id, toDelete))
-  }
-  if (toInsert.length > 0) {
-    await db.insert(schema.tickets).values(toInsert)
-  }
+  // Execute mutations atomically so a diff can't half-apply (deletions land but
+  // insertions fail, or vice versa).
+  const del = toDelete.length > 0
+    ? db.delete(schema.tickets).where(inArray(schema.tickets.id, toDelete))
+    : null
+  const ins = toInsert.length > 0
+    ? db.insert(schema.tickets).values(toInsert)
+    : null
+
+  if (del && ins) await db.batch([del, ins])
+  else if (del) await del
+  else if (ins) await ins
 
   // ── Return the updated reservation with full ticket list ───────────────────
 

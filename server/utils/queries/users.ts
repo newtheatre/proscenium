@@ -6,9 +6,9 @@ type UserQuery = NonNullable<Parameters<(typeof db)['query']['users']['findMany'
  * Map a raw user row (with nested `userRoles` relation) to the API response shape.
  * Flattens `userRoles` into a `roles` string array and strips `userRoles`.
  */
-export function formatUserResponse(
-  user: { userRoles: Array<{ role: string }>, [key: string]: unknown },
-) {
+export function formatUserResponse<
+  T extends { userRoles: Array<{ role: 'ADMIN' | 'MANAGER' | 'BOX_OFFICE' }> },
+>(user: T) {
   const { userRoles, ...rest } = user
   return {
     ...rest,

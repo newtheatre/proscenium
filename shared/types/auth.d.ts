@@ -5,6 +5,8 @@ declare module '#auth-utils' {
     name: string
     verified: boolean
     roles: Array<'ADMIN' | 'MANAGER' | 'BOX_OFFICE'>
+    /** Snapshot of users.sessionEpoch at login; a stale value invalidates the session. */
+    sessionEpoch: number
   }
 
   interface UserSession {

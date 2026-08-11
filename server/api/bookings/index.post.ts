@@ -1,5 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import { and, count, eq, inArray, isNull } from 'drizzle-orm'
+import { nanoid } from 'nanoid'
 import { z } from 'zod/v4'
 import { sendBookingConfirmationEmail } from '~~/server/utils/email'
 
@@ -95,12 +96,14 @@ export default defineEventHandler(async (event) => {
   // ── Resolve user ───────────────────────────────────────────────────────────
 
   let resolvedUserId: string
+  let needShadowUser = false
 
   if (loggedInUser) {
     resolvedUserId = loggedInUser.id
   }
   else {
-    // Find existing account by email, or create a shadow account
+    // Find existing account by email, or create a shadow account. The shadow
+    // insert is deferred so it can go in the same atomic batch as the booking.
     const existingUser = await db
       .select({ id: schema.users.id })
       .from(schema.users)
@@ -111,17 +114,8 @@ export default defineEventHandler(async (event) => {
       resolvedUserId = existingUser.id
     }
     else {
-      const [shadowUser] = await db.insert(schema.users).values({
-        email: body.email!,
-        name: body.name!,
-        password: null,
-        verified: false,
-      }).returning({ id: schema.users.id })
-
-      if (!shadowUser) {
-        throw createError({ statusCode: 500, statusMessage: 'Failed to create guest account' })
-      }
-      resolvedUserId = shadowUser.id
+      resolvedUserId = nanoid()
+      needShadowUser = true
     }
   }
 
@@ -134,30 +128,45 @@ export default defineEventHandler(async (event) => {
   // disabled or comp-only type at its (possibly £0) price.
   validateTicketTypesActive(requestedTypeIds, priceCtx)
 
-  // ── Create reservation + tickets ──────────────────────────────────────────
+  // ── Create shadow user (if needed) + reservation + tickets, atomically ─────
 
-  const [reservation] = await db.insert(schema.reservations).values({
-    performanceId: body.performanceId,
-    userId: resolvedUserId,
-    customerNotes: body.customerNotes ?? null,
-    status: 'PENDING',
-  }).returning()
-
-  if (!reservation) {
-    throw createError({ statusCode: 500, statusMessage: 'Failed to create reservation' })
-  }
+  const reservationId = nanoid()
 
   // Expand quantities into individual ticket rows
   const ticketRows = body.tickets.flatMap(({ ticketTypeId, quantity }) =>
     Array.from({ length: quantity }, () => ({
-      reservationId: reservation.id,
+      reservationId,
       performanceId: body.performanceId,
       ticketTypeId,
       pricePaid: resolveEffectivePrice(ticketTypeId, priceCtx),
     })),
   )
 
-  await db.insert(schema.tickets).values(ticketRows)
+  const reservationInsert = db.insert(schema.reservations).values({
+    id: reservationId,
+    performanceId: body.performanceId,
+    userId: resolvedUserId,
+    customerNotes: body.customerNotes ?? null,
+    status: 'PENDING',
+  })
+  const ticketsInsert = db.insert(schema.tickets).values(ticketRows)
+
+  if (needShadowUser) {
+    await db.batch([
+      db.insert(schema.users).values({
+        id: resolvedUserId,
+        email: body.email!,
+        name: body.name!,
+        password: null,
+        verified: false,
+      }),
+      reservationInsert,
+      ticketsInsert,
+    ])
+  }
+  else {
+    await db.batch([reservationInsert, ticketsInsert])
+  }
 
   // Return the full booking details
   interface BookingResult {
@@ -179,7 +188,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const booking = await db.query.reservations.findFirst({
-    where: (r, { eq }) => eq(r.id, reservation.id),
+    where: (r, { eq }) => eq(r.id, reservationId),
     with: {
       user: { columns: { id: true, name: true, email: true } },
       performance: {

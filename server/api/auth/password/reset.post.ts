@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod/v4'
 
 const bodySchema = z.object({
@@ -38,9 +38,10 @@ export default defineEventHandler(async (event) => {
   // Hash the new password
   const hashedPassword = await hashPassword(password)
 
-  // Update user password
+  // Update user password and bump sessionEpoch so any existing sessions for
+  // this account are invalidated (a reset should log out everywhere).
   await db.update(schema.users)
-    .set({ password: hashedPassword })
+    .set({ password: hashedPassword, sessionEpoch: sql`${schema.users.sessionEpoch} + 1` })
     .where(eq(schema.users.id, resetRecord.userId))
 
   // Delete all password reset records for this user
