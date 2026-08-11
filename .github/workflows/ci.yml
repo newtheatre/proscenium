@@ -24,12 +24,9 @@ jobs:
       - name: Build
         run: bun run build
 
-      # Typecheck is a hard gate — the codebase is clean.
+      # Typecheck and lint are hard gates — the codebase is clean.
       - name: Typecheck
         run: bun run typecheck
 
-      # Lint is reported but not yet blocking: there is still a backlog of
-      # pre-existing style errors. Drop `continue-on-error` once it is cleared.
       - name: Lint
         run: bun run lint
-        continue-on-error: true

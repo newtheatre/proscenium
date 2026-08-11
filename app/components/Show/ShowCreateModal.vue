@@ -179,7 +179,9 @@ function handlePosterSelect(event: Event) {
   }
   imageFile.value = file
   const reader = new FileReader()
-  reader.onload = e => { imagePreview.value = e.target?.result as string }
+  reader.onload = (e) => {
+    imagePreview.value = e.target?.result as string
+  }
   reader.readAsDataURL(file)
 }
 
@@ -202,7 +204,7 @@ async function onSubmit() {
 
   isSubmitting.value = true
   try {
-    const show = await $fetch<{ id: string; title: string }>('/api/shows', {
+    const show = await $fetch<{ id: string, title: string }>('/api/shows', {
       method: 'POST',
       body: {
         title: step1.title,

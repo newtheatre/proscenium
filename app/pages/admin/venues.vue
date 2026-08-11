@@ -193,13 +193,13 @@ const columns: TableColumn<Venue>[] = [
       return h('div', { class: 'flex items-center gap-3' }, [
         venue.imageUrl
           ? h('img', {
-            src: `/images/${venue.imageUrl}`,
-            alt: venue.name,
-            class: 'w-10 h-10 rounded object-cover',
-          })
+              src: `/images/${venue.imageUrl}`,
+              alt: venue.name,
+              class: 'w-10 h-10 rounded object-cover',
+            })
           : h('div', {
-            class: 'w-10 h-10 rounded bg-neutral-500/10 flex items-center justify-center',
-          }, h('span', { class: 'text-lg' }, '🏛️')),
+              class: 'w-10 h-10 rounded bg-neutral-500/10 flex items-center justify-center',
+            }, h('span', { class: 'text-lg' }, '🏛️')),
         h('div', undefined, [
           h('p', { class: 'font-medium text-highlighted' }, venue.name),
           h('p', { class: 'text-sm text-muted' }, venue.address || 'No address'),

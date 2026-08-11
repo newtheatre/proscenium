@@ -36,7 +36,7 @@ const emit = defineEmits<{
 
 const localOpen = computed({
   get: () => props.open,
-  set: (value) => emit('update:open', value),
+  set: value => emit('update:open', value),
 })
 
 const schema = z.object({
@@ -196,8 +196,8 @@ const iconSuggestions = [
 
         <!-- Features List with Inline Editing -->
         <template
-          v-else
           v-for="feature in features"
+          v-else
           :key="feature.id"
         >
           <!-- Inline Edit Form -->
@@ -357,8 +357,8 @@ const iconSuggestions = [
                   type="button"
                   :disabled="isSubmitting"
                   :class="['text-xl p-1.5 rounded text-center leading-none',
-                    state.icon === emoji ? 'bg-primary/15 ring-1 ring-primary' : 'hover:bg-elevated',
-                    isSubmitting ? 'opacity-50 cursor-not-allowed' : '',
+                           state.icon === emoji ? 'bg-primary/15 ring-1 ring-primary' : 'hover:bg-elevated',
+                           isSubmitting ? 'opacity-50 cursor-not-allowed' : '',
                   ]"
                   @click="state.icon = state.icon === emoji ? null : emoji"
                 >
@@ -406,8 +406,8 @@ const iconSuggestions = [
           color="neutral"
           variant="outline"
           block
-          @click="startCreate"
           class="mt-2"
+          @click="startCreate"
         />
       </div>
     </template>

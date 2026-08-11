@@ -27,7 +27,6 @@
  */
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import type { Row } from '@tanstack/table-core'
 
 const UButton = resolveComponent('UButton')
 const UDropdownMenu = resolveComponent('UDropdownMenu')
@@ -88,6 +87,12 @@ interface Show {
 
 type AnyRow = Show | Performance
 
+// A show's performances are its sub-rows (kept in script so the union type
+// doesn't read as a Vue filter in the template).
+function getSubRows(row: AnyRow): AnyRow[] | undefined {
+  return (row as Show).performances as AnyRow[] | undefined
+}
+
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 const globalFilter = ref('')
@@ -126,14 +131,14 @@ function formatDate(val: number | string | null | undefined): string {
   return Number.isNaN(d.getTime())
     ? '—'
     : d.toLocaleString('en-GB', {
-      timeZone: 'Europe/London',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    })
+        timeZone: 'Europe/London',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      })
 }
 
 // ─── Delete handlers ─────────────────────────────────────────────────────────
@@ -350,14 +355,14 @@ const columns: TableColumn<AnyRow>[] = [
         const show = original as Show
         const children = [
           h(UButton, {
-            color: 'neutral',
-            variant: 'ghost',
-            size: 'xs',
-            square: true,
-            icon: row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right',
+            'color': 'neutral',
+            'variant': 'ghost',
+            'size': 'xs',
+            'square': true,
+            'icon': row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right',
             'aria-label': row.getIsExpanded() ? 'Collapse' : 'Expand',
-            class: row.getCanExpand() ? '' : 'invisible',
-            onClick: row.getToggleExpandedHandler(),
+            'class': row.getCanExpand() ? '' : 'invisible',
+            'onClick': row.getToggleExpandedHandler(),
           }),
           h('div', { class: 'flex-1 min-w-0' }, [
             h('div', { class: 'flex items-center gap-2 flex-wrap' }, [
@@ -616,7 +621,7 @@ const columns: TableColumn<AnyRow>[] = [
       v-model:sorting="sorting"
       :data="data ?? []"
       :columns="columns"
-      :get-sub-rows="(row: AnyRow) => (row as Show).performances as AnyRow[] | undefined"
+      :get-sub-rows="getSubRows"
       :loading="status === 'pending'"
       :ui="{
         base: 'border-separate border-spacing-0',
