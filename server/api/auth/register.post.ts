@@ -46,6 +46,7 @@ export default defineEventHandler(async (event) => {
       name: newUser.name,
       verified: newUser.verified,
       roles: [],
+      sessionEpoch: newUser.sessionEpoch,
     },
     loggedInAt: new Date(),
   })

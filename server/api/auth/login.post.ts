@@ -55,6 +55,7 @@ export default defineEventHandler(async (event) => {
       name: user.name,
       verified: user.verified,
       roles: roles.map(r => r.role),
+      sessionEpoch: user.sessionEpoch,
     },
     loggedInAt: new Date(),
   })

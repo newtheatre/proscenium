@@ -9,6 +9,11 @@ export const users = sqliteTable('users', {
   name: text('name').notNull(),
   verified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
 
+  // Bumped to invalidate every existing session for this user (role change,
+  // password reset, force-logout). Embedded in the session and checked on each
+  // authorization; a session whose epoch is stale is treated as unauthenticated.
+  sessionEpoch: integer('session_epoch').notNull().default(0),
+
   // Metadata
   createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
   updatedAt: text('updated_at').notNull().$onUpdate(() => sql`(current_timestamp)`),
