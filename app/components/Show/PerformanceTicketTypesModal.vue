@@ -145,10 +145,15 @@ async function handleDone() {
       }
       else {
         const pricePence = Math.round(parseFloat(d.priceStr) * 100)
+        // Only persist a price override when it differs from the inherited
+        // show/base price; otherwise send null so toggling active alone doesn't
+        // pin the current price as a performance-level override.
+        const inheritedPrice = tt.showOverride?.price ?? tt.price
+        const priceToSend = pricePence === inheritedPrice ? null : pricePence
         if (d.active !== tt.effectiveActive || pricePence !== tt.effectivePrice) {
           ops.push($fetch(
             `/api/shows/${perf.showId}/performances/${perf.id}/ticket-types`,
-            { method: 'PUT', body: { ticketTypeId: tt.id, active: d.active, price: pricePence } },
+            { method: 'PUT', body: { ticketTypeId: tt.id, active: d.active, price: priceToSend } },
           ))
         }
       }

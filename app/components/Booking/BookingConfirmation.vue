@@ -27,12 +27,15 @@ interface Booking {
   tickets: Ticket[]
 }
 
-defineProps<{
+const props = defineProps<{
   booking: Booking
 }>()
 
+const isCancelled = computed(() => props.booking.status === 'CANCELLED')
+
 function formatDate(date: string | Date) {
   return new Date(date).toLocaleDateString('en-GB', {
+    timeZone: 'Europe/London',
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -42,6 +45,7 @@ function formatDate(date: string | Date) {
 
 function formatTime(date: string | Date) {
   return new Date(date).toLocaleTimeString('en-GB', {
+    timeZone: 'Europe/London',
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -53,9 +57,12 @@ function formatPrice(pence: number): string {
 }
 
 function getTicketSummary(tickets: Ticket[]) {
+  // Group by ticket type AND price paid, so a type sold at more than one price
+  // (e.g. after a price change) shows one line per price and the line totals
+  // sum to the grand total.
   const grouped = new Map<string, { name: string, count: number, unitPrice: number }>()
   for (const ticket of tickets) {
-    const key = ticket.ticketType.id
+    const key = `${ticket.ticketType.id}:${ticket.pricePaid}`
     const existing = grouped.get(key)
     if (existing) {
       existing.count++
@@ -78,20 +85,29 @@ function getTotal(tickets: Ticket[]) {
 
 <template>
   <div class="space-y-8">
-    <!-- Success header -->
+    <!-- Status header -->
     <div class="text-center space-y-3">
-      <div class="mx-auto flex size-16 items-center justify-center rounded-full bg-success/10">
+      <div
+        class="mx-auto flex size-16 items-center justify-center rounded-full"
+        :class="isCancelled ? 'bg-error/10' : 'bg-success/10'"
+      >
         <UIcon
-          name="i-lucide-check-circle"
-          class="size-8 text-success"
+          :name="isCancelled ? 'i-lucide-x-circle' : 'i-lucide-check-circle'"
+          class="size-8"
+          :class="isCancelled ? 'text-error' : 'text-success'"
         />
       </div>
       <h2 class="text-2xl font-bold text-default">
-        Booking Confirmed!
+        {{ isCancelled ? 'Booking Cancelled' : 'Booking Confirmed!' }}
       </h2>
       <p class="text-muted">
-        Your reservation has been made. A confirmation email has been sent to
-        <span class="font-medium text-default">{{ booking.user.email }}</span>.
+        <template v-if="isCancelled">
+          This booking has been cancelled. If you believe this is a mistake, please contact the box office.
+        </template>
+        <template v-else>
+          Your reservation has been made. A confirmation email has been sent to
+          <span class="font-medium text-default">{{ booking.user.email }}</span>.
+        </template>
       </p>
     </div>
 
@@ -165,7 +181,7 @@ function getTotal(tickets: Ticket[]) {
       <div class="divide-y divide-default">
         <div
           v-for="item in getTicketSummary(booking.tickets)"
-          :key="item.name"
+          :key="`${item.name}:${item.unitPrice}`"
           class="flex items-center justify-between py-2 first:pt-0 text-sm"
         >
           <span class="text-default">{{ item.count }}× {{ item.name }}</span>
@@ -196,6 +212,7 @@ function getTotal(tickets: Ticket[]) {
 
     <!-- Important info -->
     <UAlert
+      v-if="!isCancelled"
       title="Collect Your Tickets"
       description="Please arrive at the box office before the show starts to collect your tickets. Have your booking reference ready."
       icon="i-lucide-ticket"

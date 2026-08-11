@@ -41,6 +41,7 @@ const emit = defineEmits<{
 
 function formatDate(date: string | Date) {
   return new Date(date).toLocaleDateString('en-GB', {
+    timeZone: 'Europe/London',
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -49,6 +50,7 @@ function formatDate(date: string | Date) {
 
 function formatTime(date: string | Date) {
   return new Date(date).toLocaleTimeString('en-GB', {
+    timeZone: 'Europe/London',
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -106,6 +108,7 @@ const groupedPerformances = computed(() => {
           v-for="perf in group.performances"
           :key="perf.id"
           :disabled="perf.isSoldOut"
+          :aria-pressed="perf.id === selectedPerformanceId"
           class="w-full text-left rounded-lg border-2 p-4 transition-all duration-150"
           :class="[
             perf.id === selectedPerformanceId

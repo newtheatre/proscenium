@@ -98,19 +98,7 @@ function toDate(val: string | number | null | undefined): Date | null {
 function formatTime(val: string | number | null | undefined): string {
   const d = toDate(val)
   if (!d) return '—'
-  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
-}
-
-function formatDateTime(val: string | number | null | undefined): string {
-  const d = toDate(val)
-  if (!d) return '—'
-  return d.toLocaleString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
+  return d.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function isSameDay(a: Date, b: Date): boolean {
@@ -121,7 +109,7 @@ function isSameDay(a: Date, b: Date): boolean {
 
 // ── Shows data ────────────────────────────────────────────────────────────────
 
-const { data: shows, status: showsStatus } = await useFetch<Show[]>('/api/shows', {
+const { data: shows, status: showsStatus, refresh: refreshShows } = await useFetch<Show[]>('/api/shows', {
   key: 'box-office-shows',
 })
 
@@ -205,7 +193,7 @@ const noPerformanceToday = computed(() => {
 
 // ── Reservations data ─────────────────────────────────────────────────────────
 
-const { data: reservations, status: reservationsStatus, refresh } = await useAsyncData(
+const { data: reservations, status: reservationsStatus, refresh: refreshReservations } = await useAsyncData(
   'box-office-reservations',
   () => {
     if (!selectedPerformanceId.value) return Promise.resolve([] as Reservation[])
@@ -218,6 +206,13 @@ const { data: reservations, status: reservationsStatus, refresh } = await useAsy
     watch: [selectedPerformanceId],
   },
 )
+
+// Refresh both reservations and the shows data — the capacity pill's
+// ticketsSold comes from /api/shows, so it must be re-fetched after a walk-in
+// or collection, not just the reservation list.
+async function refresh() {
+  await Promise.all([refreshReservations(), refreshShows()])
+}
 
 // ── Status filter + search ────────────────────────────────────────────────────
 
@@ -522,6 +517,7 @@ const columns: TableColumn<Reservation>[] = [
 
 const todayFormatted = computed(() =>
   new Date().toLocaleDateString('en-GB', {
+    timeZone: 'Europe/London',
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -574,9 +570,6 @@ const todayFormatted = computed(() =>
             variant="ghost"
             size="sm"
             :disabled="!prevPerformance"
-            :tooltip="prevPerformance
-              ? `${prevPerformance.showTitle} — ${formatDateTime(prevPerformance.startsAt)}`
-              : undefined"
             @click="goToPrev"
           />
 
@@ -606,6 +599,7 @@ const todayFormatted = computed(() =>
               <span class="text-muted text-sm">
                 {{
                   (toDate(selectedPerformance.startsAt) ?? new Date()).toLocaleDateString('en-GB', {
+                    timeZone: 'Europe/London',
                     weekday: 'short',
                     day: 'numeric',
                     month: 'short',
@@ -628,9 +622,6 @@ const todayFormatted = computed(() =>
             variant="ghost"
             size="sm"
             :disabled="!nextPerformance"
-            :tooltip="nextPerformance
-              ? `${nextPerformance.showTitle} — ${formatDateTime(nextPerformance.startsAt)}`
-              : undefined"
             @click="goToNext"
           />
         </div>
@@ -697,6 +688,7 @@ const todayFormatted = computed(() =>
               :class="statusFilter === key
                 ? 'bg-primary text-white border-primary'
                 : 'bg-elevated border-default text-muted hover:text-default'"
+              :aria-pressed="statusFilter === key"
               @click="statusFilter = statusFilter === key ? 'ALL' : key"
             >
               <UIcon

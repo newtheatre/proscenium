@@ -280,6 +280,7 @@ async function submit() {
                   variant="outline"
                   size="xs"
                   :disabled="getQty(type.id) === 0"
+                  :aria-label="`Decrease ${type.name} tickets`"
                   @click="setQty(type.id, getQty(type.id) - 1)"
                 />
                 <span class="w-6 text-center tabular-nums text-sm font-medium">
@@ -290,6 +291,7 @@ async function submit() {
                   color="neutral"
                   variant="outline"
                   size="xs"
+                  :aria-label="`Increase ${type.name} tickets`"
                   @click="setQty(type.id, getQty(type.id) + 1)"
                 />
               </div>

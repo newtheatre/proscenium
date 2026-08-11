@@ -713,6 +713,7 @@ const displayedSessions = computed(() => {
 // Helper functions
 const formatDate = (date) => {
   return new Date(date).toLocaleDateString('en-GB', {
+    timeZone: 'Europe/London',
     weekday: 'long',
     year: 'numeric',
     month: 'long',

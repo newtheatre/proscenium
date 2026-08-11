@@ -126,6 +126,7 @@ function formatDate(val: number | string | null | undefined): string {
   return Number.isNaN(d.getTime())
     ? '—'
     : d.toLocaleString('en-GB', {
+      timeZone: 'Europe/London',
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -473,7 +474,7 @@ const columns: TableColumn<AnyRow>[] = [
         .sort((a, b) => a - b)
       const first = times[0]
       const last = times[times.length - 1]
-      const fmt = (t: number) => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      const fmt = (t: number) => new Date(t).toLocaleDateString('en-GB', { timeZone: 'Europe/London', day: 'numeric', month: 'short', year: 'numeric' })
       return h('div', undefined, [
         h('p', { class: 'text-sm text-highlighted' }, fmt(first!)),
         first !== last

@@ -30,7 +30,6 @@ import type { Row } from '@tanstack/table-core'
 const UButton = resolveComponent('UButton')
 const UDropdownMenu = resolveComponent('UDropdownMenu')
 const UBadge = resolveComponent('UBadge')
-const UCheckbox = resolveComponent('UCheckbox')
 
 definePageMeta({
   layout: 'admin',
@@ -83,7 +82,6 @@ const STATUS_CONFIG = {
 // ── Table state ───────────────────────────────────────────────────────────────
 
 const columnVisibility = ref()
-const rowSelection = ref<Record<string, boolean>>({})
 const pagination = ref({ pageSize: 15, pageIndex: 0 })
 
 const searchQuery = ref('')
@@ -144,6 +142,7 @@ function formatDate(val: string | number | null | undefined): string {
   return Number.isNaN(d.getTime())
     ? '—'
     : d.toLocaleString('en-GB', {
+        timeZone: 'Europe/London',
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -207,21 +206,6 @@ function getRowItems(row: Row<Reservation>) {
 // ── Table columns ─────────────────────────────────────────────────────────────
 
 const columns: TableColumn<Reservation>[] = [
-  {
-    id: 'select',
-    header: ({ table: t }) =>
-      h(UCheckbox, {
-        'modelValue': t.getIsSomePageRowsSelected() ? 'indeterminate' : t.getIsAllPageRowsSelected(),
-        'onUpdate:modelValue': (value: boolean | 'indeterminate') => t.toggleAllPageRowsSelected(!!value),
-        'ariaLabel': 'Select all',
-      }),
-    cell: ({ row }) =>
-      h(UCheckbox, {
-        'modelValue': row.getIsSelected(),
-        'onUpdate:modelValue': (value: boolean | 'indeterminate') => row.toggleSelected(!!value),
-        'ariaLabel': 'Select row',
-      }),
-  },
   {
     accessorKey: 'bookingRef',
     header: 'Booking Ref',
@@ -318,6 +302,7 @@ const columns: TableColumn<Reservation>[] = [
         :class="statusFilter === key
           ? 'bg-primary text-white border-primary'
           : 'bg-elevated border-default text-muted hover:text-default'"
+        :aria-pressed="statusFilter === key"
         @click="statusFilter = statusFilter === key ? 'ALL' : key"
       >
         <UIcon
@@ -376,7 +361,6 @@ const columns: TableColumn<Reservation>[] = [
     <UTable
       ref="table"
       v-model:column-visibility="columnVisibility"
-      v-model:row-selection="rowSelection"
       v-model:pagination="pagination"
       :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
       class="shrink-0"
@@ -395,7 +379,6 @@ const columns: TableColumn<Reservation>[] = [
     <!-- Footer -->
     <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
       <div class="text-sm text-muted">
-        {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }} of
         {{ filteredData.length }} reservation(s) shown
         <template v-if="data && data.length !== filteredData.length">
           ({{ data.length }} total)

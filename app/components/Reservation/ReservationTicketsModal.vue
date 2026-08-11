@@ -162,12 +162,13 @@ const displayRows = computed(() => {
 
   for (const t of activeTickets.value) {
     if (!fromActive.has(t.ticketTypeId)) {
-      // Try to get current price from availableTypes, fall back to pricePaid
       const avail = availableTypes.value.find(a => a.id === t.ticketTypeId)
       fromActive.set(t.ticketTypeId, {
         id: t.ticketTypeId,
         name: t.ticketType.name,
-        effectivePrice: avail?.effectivePrice ?? t.pricePaid,
+        // Existing tickets keep the price the customer booked at, not the
+        // current price. New additions are priced at the current rate below.
+        effectivePrice: t.pricePaid,
         fromAvailable: !!avail,
       })
     }
@@ -213,10 +214,25 @@ function formatPrice(pence: number): string {
   return `£${(pence / 100).toFixed(2)}`
 }
 
+// Subtotal for a type: existing tickets kept keep their booked price
+// (pricePaid); newly added tickets are charged at the current effective price.
+function rowSubtotal(typeId: string): number {
+  const desired = getQty(typeId)
+  const existing = activeTickets.value.filter(t => t.ticketTypeId === typeId)
+  const kept = Math.min(desired, existing.length)
+  const added = Math.max(0, desired - existing.length)
+
+  let sub = 0
+  for (let i = 0; i < kept; i++) sub += existing[i]!.pricePaid
+  const currentPrice = availableTypes.value.find(a => a.id === typeId)?.effectivePrice ?? 0
+  sub += added * currentPrice
+  return sub
+}
+
 const activeTotal = computed(() => {
   let total = 0
   for (const row of displayRows.value) {
-    total += getQty(row.id) * row.effectivePrice
+    total += rowSubtotal(row.id)
   }
   return total
 })
@@ -295,7 +311,7 @@ function formatDate(val: string | number): string {
   const d = new Date(typeof val === 'number' ? val * 1000 : val)
   return Number.isNaN(d.getTime())
     ? ''
-    : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+    : d.toLocaleString('en-GB', { timeZone: 'Europe/London', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 </script>
 
@@ -378,7 +394,7 @@ function formatDate(val: string | number): string {
 
             <!-- Row subtotal -->
             <div class="w-16 text-right text-sm text-muted tabular-nums shrink-0">
-              {{ formatPrice(getQty(row.id) * row.effectivePrice) }}
+              {{ formatPrice(rowSubtotal(row.id)) }}
             </div>
           </div>
         </div>
