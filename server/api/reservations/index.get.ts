@@ -17,27 +17,24 @@ export default defineEventHandler(async (event) => {
 
   const { performanceId, showId, userId, status, withCounts } = await getValidatedQuery(event, querySchema.parse)
 
-  // Resolve performance IDs when filtering by show
-  let resolvedPerfIds: string[] | undefined
-  if (showId) {
-    const showPerfs = await db
-      .select({ id: schema.performances.id })
-      .from(schema.performances)
-      .where(eq(schema.performances.showId, showId))
-    const ids = showPerfs.map(p => p.id)
-    if (ids.length === 0) return []
-    resolvedPerfIds = ids
-  }
+  // Filtering by show is expressed as a subquery rather than by loading the
+  // show's performance ids and binding them. D1 allows at most 100 bound
+  // parameters per query, so an id list built from a result set is a latent
+  // hard failure as soon as the data grows.
+  const showPerformances = db
+    .select({ id: schema.performances.id })
+    .from(schema.performances)
+    .where(eq(schema.performances.showId, showId ?? ''))
+
+  const filters = []
+  if (performanceId) filters.push(eq(schema.reservations.performanceId, performanceId))
+  if (showId) filters.push(inArray(schema.reservations.performanceId, showPerformances))
+  if (userId) filters.push(eq(schema.reservations.userId, userId))
+  if (status) filters.push(eq(schema.reservations.status, status))
+  const where = filters.length ? and(...filters) : undefined
 
   const allReservations = await db.query.reservations.findMany({
-    where: (r, { eq, and, inArray }) => {
-      const conditions = []
-      if (performanceId) conditions.push(eq(r.performanceId, performanceId))
-      if (resolvedPerfIds) conditions.push(inArray(r.performanceId, resolvedPerfIds))
-      if (userId) conditions.push(eq(r.userId, userId))
-      if (status) conditions.push(eq(r.status, status))
-      return conditions.length ? and(...conditions) : undefined
-    },
+    where: () => where,
     with: reservationSummaryWith,
     orderBy: (r, { desc }) => [desc(r.createdAt)],
   })
@@ -45,23 +42,17 @@ export default defineEventHandler(async (event) => {
   if (allReservations.length === 0) return []
   if (withCounts !== 'true') return allReservations
 
-  const reservationIds = allReservations.map(r => r.id)
-  // SQLite has a max bound-parameter limit, so fetch counts in chunks.
-  const chunkSize = 800
-  const ticketCountMap = new Map<string, number>()
+  // One grouped aggregate over the same filtered set — no chunking, and nothing
+  // bound from the rows we just loaded. (The previous version chunked 800 ids
+  // per query, eight times over D1's limit.)
+  const ticketCounts = await db
+    .select({ reservationId: schema.tickets.reservationId, c: count() })
+    .from(schema.tickets)
+    .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
+    .where(where ? and(where, isNull(schema.tickets.refundedAt)) : isNull(schema.tickets.refundedAt))
+    .groupBy(schema.tickets.reservationId)
 
-  for (let i = 0; i < reservationIds.length; i += chunkSize) {
-    const chunk = reservationIds.slice(i, i + chunkSize)
-    const ticketCounts = await db
-      .select({ reservationId: schema.tickets.reservationId, c: count() })
-      .from(schema.tickets)
-      .where(and(inArray(schema.tickets.reservationId, chunk), isNull(schema.tickets.refundedAt)))
-      .groupBy(schema.tickets.reservationId)
-
-    for (const row of ticketCounts) {
-      ticketCountMap.set(row.reservationId, Number(row.c))
-    }
-  }
+  const ticketCountMap = new Map(ticketCounts.map(r => [r.reservationId, Number(r.c)]))
 
   return allReservations.map(r => ({
     ...r,

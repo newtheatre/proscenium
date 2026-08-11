@@ -2,7 +2,18 @@ import { db, schema } from '@nuxthub/db'
 import { and, asc, count, eq, inArray, isNull } from 'drizzle-orm'
 import { listShows } from '~~/shared/utils/abilities'
 
-/** GET /api/shows — list all shows including drafts. Staff only; the public uses /api/whats-on. */
+/**
+ * GET /api/shows — list all shows including drafts. Staff only; the public uses /api/whats-on.
+ *
+ * The per-show and per-performance counts are deliberately computed as whole-table
+ * aggregates rather than by passing the loaded ids into `inArray(...)`.
+ *
+ * **D1 allows at most 100 bound parameters per query.** Since the legacy import
+ * this endpoint sees 498 shows and 1,304 performances, so an id list built from
+ * the result set binds 498 or 1,304 parameters and the query is rejected
+ * outright. Grouping the override tables in full costs a few hundred rows and
+ * binds nothing.
+ */
 export default defineEventHandler(async (event) => {
   await authorize(event, listShows)
 
@@ -22,43 +33,31 @@ export default defineEventHandler(async (event) => {
 
   if (allShows.length === 0) return []
 
-  // Fetch override counts so the UI can show badges
-  const showIds = allShows.map((s: { id: string }) => s.id)
-  const perfIds = allShows.flatMap((s: { performances: Array<{ id: string }> }) =>
-    s.performances.map((p: { id: string }) => p.id),
-  )
-
   const [showOverrideCounts, perfOverrideCounts, ticketCounts] = await Promise.all([
     db.select({ showId: schema.showTicketTypeOverrides.showId, c: count() })
       .from(schema.showTicketTypeOverrides)
-      .where(inArray(schema.showTicketTypeOverrides.showId, showIds))
       .groupBy(schema.showTicketTypeOverrides.showId)
       .all(),
-    perfIds.length > 0
-      ? db.select({ performanceId: schema.performanceTicketTypeOverrides.performanceId, c: count() })
-          .from(schema.performanceTicketTypeOverrides)
-          .where(inArray(schema.performanceTicketTypeOverrides.performanceId, perfIds))
-          .groupBy(schema.performanceTicketTypeOverrides.performanceId)
-          .all()
-      : Promise.resolve([]),
-    // Count non-refunded tickets from active reservations per performance
-    perfIds.length > 0
-      ? db.select({
-          performanceId: schema.tickets.performanceId,
-          c: count(),
-        })
-          .from(schema.tickets)
-          .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
-          .where(
-            and(
-              inArray(schema.tickets.performanceId, perfIds),
-              inArray(schema.reservations.status, ['PENDING', 'COLLECTED', 'DOOR']),
-              isNull(schema.tickets.refundedAt),
-            ),
-          )
-          .groupBy(schema.tickets.performanceId)
-          .all()
-      : Promise.resolve([]),
+    db.select({ performanceId: schema.performanceTicketTypeOverrides.performanceId, c: count() })
+      .from(schema.performanceTicketTypeOverrides)
+      .groupBy(schema.performanceTicketTypeOverrides.performanceId)
+      .all(),
+    // Non-refunded tickets on active reservations, per performance. The status
+    // list is a fixed three-element literal, so it is safe to bind.
+    db.select({
+      performanceId: schema.tickets.performanceId,
+      c: count(),
+    })
+      .from(schema.tickets)
+      .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
+      .where(
+        and(
+          inArray(schema.reservations.status, ['PENDING', 'COLLECTED', 'DOOR']),
+          isNull(schema.tickets.refundedAt),
+        ),
+      )
+      .groupBy(schema.tickets.performanceId)
+      .all(),
   ])
 
   const showOverrideMap = new Map(
