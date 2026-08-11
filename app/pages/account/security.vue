@@ -59,19 +59,11 @@ async function onPasswordSubmit(event: FormSubmitEvent<PasswordSchema>) {
   isSubmitting.value = true
 
   try {
-    // First verify the current password by attempting login
-    await $fetch('/api/auth/login', {
-      method: 'POST',
-      body: {
-        email: user.value?.email,
-        password: event.data.current,
-      },
-    })
-
-    // Then update the password
+    // The server verifies the current password before applying the change.
     await $fetch(`/api/users/${user.value?.id}`, {
       method: 'PUT',
       body: {
+        currentPassword: event.data.current,
         password: event.data.new,
       },
     })
