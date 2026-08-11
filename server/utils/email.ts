@@ -49,8 +49,8 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions): Promis
  * Send an email verification link to the user.
  */
 export async function sendVerificationEmail(email: string, token: string): Promise<void> {
-  const { public: { baseUrl } } = useRuntimeConfig()
-  const url = `${baseUrl}/verify-email?token=${token}`
+  const { public: { baseURL } } = useRuntimeConfig()
+  const url = `${baseURL}/verify-email?token=${token}`
 
   await sendEmail({
     to: email,
@@ -63,8 +63,8 @@ export async function sendVerificationEmail(email: string, token: string): Promi
  * Send a password reset link to the user.
  */
 export async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
-  const { public: { baseUrl } } = useRuntimeConfig()
-  const url = `${baseUrl}/reset-password?token=${token}`
+  const { public: { baseURL } } = useRuntimeConfig()
+  const url = `${baseURL}/reset-password?token=${token}`
 
   await sendEmail({
     to: email,
@@ -164,8 +164,8 @@ function buildTicketTable(tickets: BookingTicket[]): string {
  * view the booking online.
  */
 export async function sendBookingConfirmationEmail(data: BookingEmailData): Promise<void> {
-  const { public: { baseUrl } } = useRuntimeConfig()
-  const bookingUrl = `${baseUrl}/whats-on/${data.showSlug}/booking/${data.bookingRef}?ref=${data.bookingRef}`
+  const { public: { baseURL } } = useRuntimeConfig()
+  const bookingUrl = `${baseURL}/whats-on/${data.showSlug}/booking/${data.bookingRef}?ref=${data.bookingRef}`
 
   const html = `
 <!DOCTYPE html>
@@ -269,8 +269,8 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData): Prom
  * to attend.
  */
 export async function sendBookingCancellationEmail(data: Omit<BookingEmailData, 'customerNotes'>): Promise<void> {
-  const { public: { baseUrl } } = useRuntimeConfig()
-  const whatsOnUrl = `${baseUrl}/whats-on`
+  const { public: { baseURL } } = useRuntimeConfig()
+  const whatsOnUrl = `${baseURL}/whats-on`
 
   const html = `
 <!DOCTYPE html>
@@ -342,8 +342,8 @@ export async function sendBookingCancellationEmail(data: Omit<BookingEmailData, 
  * the performance). Reminds the customer about their upcoming booking.
  */
 export async function sendBookingReminderEmail(data: BookingEmailData): Promise<void> {
-  const { public: { baseUrl } } = useRuntimeConfig()
-  const bookingUrl = `${baseUrl}/whats-on/${data.showSlug}/booking/${data.bookingRef}?ref=${data.bookingRef}`
+  const { public: { baseURL } } = useRuntimeConfig()
+  const bookingUrl = `${baseURL}/whats-on/${data.showSlug}/booking/${data.bookingRef}?ref=${data.bookingRef}`
 
   const html = `
 <!DOCTYPE html>
