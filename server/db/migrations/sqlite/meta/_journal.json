@@ -78,6 +78,13 @@
       "when": 1786479360619,
       "tag": "0010_freezing_stone_men",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1786485585178,
+      "tag": "0011_loose_onslaught",
+      "breakpoints": true
     }
   ]
 }

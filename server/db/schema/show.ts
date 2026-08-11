@@ -3,6 +3,7 @@ import { sql, relations } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { venues } from './venue'
 import { showCategories } from './legacy'
+import { seasons } from './passes'
 
 // A show is a production — the top-level entity for a run of performances.
 export const shows = sqliteTable('shows', {
@@ -23,6 +24,11 @@ export const shows = sqliteTable('shows', {
   // The strand this show belongs to — In House, Fringe, StuFF, External, …
   categoryId: text('category_id').references(() => showCategories.id, { onDelete: 'restrict' }),
 
+  // The programming period this show sits in — "Autumn 2026". Orthogonal to
+  // category: category is what kind of show, season is when. Nullable, because
+  // externals and one-offs do not belong to one.
+  seasonId: text('season_id').references(() => seasons.id, { onDelete: 'set null' }),
+
   // Free-text notes accompanying the content warnings.
   contentWarningNotes: text('content_warning_notes'),
   // TRUE means "checked, there are none" — meaningfully different from the
@@ -40,6 +46,7 @@ export const shows = sqliteTable('shows', {
   index('shows_title_idx').on(table.title),
   index('shows_status_idx').on(table.status),
   index('shows_category_id_idx').on(table.categoryId),
+  index('shows_season_id_idx').on(table.seasonId),
   uniqueIndex('shows_slug_unique').on(table.slug),
 ])
 
