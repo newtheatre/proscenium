@@ -117,6 +117,10 @@ export default defineEventHandler(async (event) => {
     // quantity === currentCount → no-op
   }
 
+  // Enforce capacity on the net increase before applying. Staff who need to
+  // oversell raise the performance's capacityOverride rather than bypassing this.
+  await assertCapacity(performanceId, toInsert.length - toDelete.length)
+
   // Execute mutations atomically so a diff can't half-apply (deletions land but
   // insertions fail, or vice versa).
   const del = toDelete.length > 0
