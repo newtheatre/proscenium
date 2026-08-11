@@ -28,13 +28,34 @@ function formatTime(date: string | Date) {
   })
 }
 
+interface PricedTicket {
+  pricePaid: number
+  priceConfidence?: 'EXACT' | 'DERIVED' | 'UNKNOWN'
+}
+
 function formatPrice(pence: number): string {
   if (pence === 0) return 'Free'
   return `£${(pence / 100).toFixed(2)}`
 }
 
-function getTotal(tickets: Array<{ pricePaid: number }>) {
-  return tickets.reduce((sum, t) => sum + t.pricePaid, 0)
+/**
+ * What a booking cost, as a string.
+ *
+ * Imported legacy bookings can carry `priceConfidence: 'UNKNOWN'` with
+ * `pricePaid: 0` — the old box office never recorded what was taken. Showing
+ * that as "Free" tells someone who paid £8 in 2019 that they paid nothing, so
+ * an unpriced booking says so instead of inventing a total.
+ */
+function formatBookingTotal(tickets: PricedTicket[]): string {
+  if (tickets.length === 0) return formatPrice(0)
+  if (tickets.every(t => t.priceConfidence === 'UNKNOWN')) return 'Price not recorded'
+
+  const total = tickets.reduce((sum, t) => sum + t.pricePaid, 0)
+  // Partially unpriced: the total is a floor, not the real figure.
+  if (tickets.some(t => t.priceConfidence === 'UNKNOWN')) {
+    return `${formatPrice(total)} (some prices not recorded)`
+  }
+  return formatPrice(total)
 }
 
 function getStatusColor(status: string) {
@@ -135,7 +156,7 @@ function getStatusLabel(status: string) {
                 </div>
                 <div class="text-right shrink-0">
                   <div class="font-medium text-default">
-                    {{ formatPrice(getTotal(booking.tickets)) }}
+                    {{ formatBookingTotal(booking.tickets) }}
                   </div>
                   <NuxtLink
                     :to="`/whats-on/${booking.performance.show.slug}/booking/${booking.id}?ref=${booking.bookingRef}`"
@@ -210,7 +231,7 @@ function getStatusLabel(status: string) {
                 </div>
                 <div class="text-right shrink-0">
                   <div class="font-medium text-default">
-                    {{ formatPrice(getTotal(booking.tickets)) }}
+                    {{ formatBookingTotal(booking.tickets) }}
                   </div>
                 </div>
               </div>

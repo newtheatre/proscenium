@@ -3,23 +3,22 @@ import { desc } from 'drizzle-orm'
 
 interface BookingPerformance {
   startsAt: Date
-  show: { id: string, title: string, slug: string }
-  venue: { id: string, name: string }
+  show: { id: string, title: string, slug: string, posterUrl: string | null }
+  venue: { id: string, name: string, address: string | null }
 }
 
+/**
+ * The customer-facing shape. Deliberately narrower than the reservation row:
+ * `staffNotes`, `legacyRef`, `source`, `originalQuantity` and `anonymisedAt` are
+ * internal and must not reach the browser — see reservationCustomerColumns.
+ */
 interface BookingRow {
   id: string
   bookingRef: string
   performanceId: string
-  userId: string
   status: 'PENDING' | 'COLLECTED' | 'DOOR' | 'CANCELLED' | 'NO_SHOW'
   cancelledBy: 'CUSTOMER' | 'STAFF' | null
   customerNotes: string | null
-  staffNotes: string | null
-  legacyRef: string | null
-  source: 'WEB' | 'BOX_OFFICE' | 'DOOR' | 'LEGACY_IMPORT'
-  originalQuantity: number | null
-  anonymisedAt: string | null
   createdAt: string
   updatedAt: string
   performance: BookingPerformance
@@ -27,6 +26,8 @@ interface BookingRow {
   tickets: Array<{
     id: string
     pricePaid: number
+    priceConfidence: 'EXACT' | 'DERIVED' | 'UNKNOWN'
+    refundedAt: Date | null
     ticketType: { id: string, name: string, description: string | null }
   }>
 }
@@ -44,7 +45,8 @@ export default defineEventHandler(async (event) => {
   const bookings = await db.query.reservations.findMany({
     where: (r, { eq }) => eq(r.userId, userId),
     orderBy: [desc(schema.reservations.createdAt)],
-    with: reservationDetailWith,
+    columns: reservationCustomerColumns,
+    with: reservationCustomerWith,
   }) as BookingRow[]
 
   // Split into upcoming and past based on performance start time
