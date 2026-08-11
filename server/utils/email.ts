@@ -1,14 +1,14 @@
 /**
  * Email sending utilities using Resend.
  *
- * Requires `NUXT_RESEND_API_KEY` and `NUXT_RESEND_FROM_EMAIL` environment
- * variables (mapped to `runtimeConfig.resendApiKey` and
- * `runtimeConfig.resendFromEmail`).
+ * The API key is read from `runtimeConfig.resendApiKey` (env
+ * `NUXT_RESEND_API_KEY`), falling back to the bare `RESEND_API_KEY` env var.
+ * The sender address comes from `runtimeConfig.resendFromEmail` (env
+ * `NUXT_RESEND_FROM_EMAIL`). When no key is configured, sends become no-ops
+ * with a logged warning rather than errors.
  */
 
-import resend from './resend'
-
-const resendFromEmail = useRuntimeConfig().resendFromEmail
+import { getResend } from './resend'
 
 interface SendEmailOptions {
   to: string
@@ -29,6 +29,13 @@ interface SendEmailOptions {
  * ```
  */
 export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<void> {
+  const resend = getResend()
+  if (!resend) {
+    console.warn(`[Email] Skipping send (no Resend key configured): "${subject}" to ${to}`)
+    return
+  }
+
+  const resendFromEmail = useRuntimeConfig().resendFromEmail
   const { error } = await resend.emails.send({
     from: resendFromEmail || 'no-reply@tickets.newtheatre.org.uk',
     to,
