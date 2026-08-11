@@ -111,8 +111,10 @@ async function lookupEmail() {
   nameFromLookup.value = false
 
   try {
-    const users = await $fetch<Array<{ id: string, name: string, email: string }>>('/api/users')
-    const match = users.find(u => u.email.toLowerCase() === e.toLowerCase())
+    const users = await $fetch<Array<{ id: string, name: string, email: string }>>('/api/users', {
+      query: { email: e },
+    })
+    const match = users[0]
     if (match) {
       existingUserId.value = match.id
       name.value = match.name
