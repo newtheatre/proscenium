@@ -19,7 +19,7 @@ export default defineNuxtConfig({
       db: {
         dialect: 'sqlite',
         driver: 'd1', // FIXME: https://github.com/nuxt-hub/core/pull/775
-        connection: { databaseId: 'c4200074-3ce8-411d-b428-811277057e6b' },
+        connection: { databaseId: '01a75263-87a9-452a-a4a0-b3b9db71dfe5' },
       },
       // KV namespace (binding defaults to 'KV')
       kv: false,
@@ -101,7 +101,7 @@ export default defineNuxtConfig({
           {
             binding: 'DB',
             database_name: 'proscenium',
-            database_id: 'c4200074-3ce8-411d-b428-811277057e6b',
+            database_id: '01a75263-87a9-452a-a4a0-b3b9db71dfe5',
           },
         ],
         observability: {

@@ -33,7 +33,8 @@ There is no `wrangler.toml` in the repository. The Wrangler configuration is **g
 | Custom domain | `proscenium.newtheatre.org.uk` | Same |
 | D1 binding | `DB` | `nitro.cloudflare.wrangler.d1_databases`, and again via `$production.hub.db` |
 | D1 database name | `proscenium` | Same |
-| **D1 database id** | `c4200074-3ce8-411d-b428-811277057e6b` | Hard-coded in **two** places: `nitro.cloudflare.wrangler.d1_databases[0].database_id` and `$production.hub.db.connection.databaseId`. Keep them in step. |
+| **D1 database id** | `01a75263-87a9-452a-a4a0-b3b9db71dfe5` | Hard-coded in **two** places: `nitro.cloudflare.wrangler.d1_databases[0].database_id` and `$production.hub.db.connection.databaseId`. Keep them in step. |
+| | | **August 2026:** these ids previously pointed at `proscenium-testing` (`c4200074-…`) while the name said `proscenium`, so production ran on the testing database. The live data was copied into `proscenium` and the ids corrected — see "Database cutover" below. |
 | R2 binding | `BLOB` | `$production.hub.blob.binding` |
 | **R2 bucket name** | `proscenium-blob` | `$production.hub.blob.bucketName` |
 | Observability logs | Enabled | `nitro.cloudflare.wrangler.observability.logs.enabled` |
@@ -52,7 +53,7 @@ $production: {
     db: {
       dialect: 'sqlite',
       driver: 'd1', // FIXME: https://github.com/nuxt-hub/core/pull/775
-      connection: { databaseId: 'c4200074-3ce8-411d-b428-811277057e6b' },
+      connection: { databaseId: '01a75263-87a9-452a-a4a0-b3b9db71dfe5' },
     },
 ```
 
@@ -140,7 +141,7 @@ Migrations are **never** applied automatically in production — not at build, n
 
 ```bash
 export NUXT_HUB_CLOUDFLARE_ACCOUNT_ID=…
-export NUXT_HUB_CLOUDFLARE_DATABASE_ID=c4200074-3ce8-411d-b428-811277057e6b
+export NUXT_HUB_CLOUDFLARE_DATABASE_ID=01a75263-87a9-452a-a4a0-b3b9db71dfe5
 export NUXT_HUB_CLOUDFLARE_API_TOKEN=…      # needs D1 edit permission
 NODE_ENV=production bunx nuxt db migrate
 ```
