@@ -1,4 +1,7 @@
-import { users, reservations, tickets } from 'hub:db:schema'
+import { db } from '@nuxthub/db'
+import { users } from '~~/server/db/schema/user'
+import { reservations } from '~~/server/db/schema/reservation'
+import { tickets } from '~~/server/db/schema/ticket'
 import type { seedUsers } from './users'
 import type { seedShows } from './shows'
 import type { seedTicketTypes } from './ticketTypes'

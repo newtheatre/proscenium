@@ -70,7 +70,6 @@ const navigation = computed<NavigationMenuItem[][]>(() => {
 
   if (isAdmin.value) {
     sections.push([
-      // @ts-expect-error — Nuxt UI v4 NavigationMenu supports type:'label' at runtime
       { type: 'label', label: 'Administration' },
       { label: 'Dashboard', icon: 'i-lucide-layout-dashboard', to: '/admin' },
       { label: 'Users', icon: 'i-lucide-users', to: '/admin/users' },
@@ -82,7 +81,6 @@ const navigation = computed<NavigationMenuItem[][]>(() => {
   }
 
   sections.push([
-    // @ts-expect-error — Nuxt UI v4 NavigationMenu supports type:'label' at runtime
     { type: 'label', label: 'Front of House' },
     {
       label: 'Box Office',

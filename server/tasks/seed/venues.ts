@@ -1,4 +1,5 @@
-import { venues, venueFeatures, venuesToFeatures } from 'hub:db:schema'
+import { db } from '@nuxthub/db'
+import { venues, venueFeatures, venuesToFeatures } from '~~/server/db/schema/venue'
 
 /**
  * Seed Venue Features
@@ -82,20 +83,20 @@ export async function seedVenues(features: Awaited<ReturnType<typeof seedVenueFe
   // Assign features to venues
   const venueFeatureAssignments = [
     // New Theatre features
-    { venueId: createdVenues[0].id, featureId: features[0].id }, // Wheelchair Accessible
-    { venueId: createdVenues[0].id, featureId: features[3].id }, // Bar Available
+    { venueId: createdVenues[0]!.id, featureId: features[0]!.id }, // Wheelchair Accessible
+    { venueId: createdVenues[0]!.id, featureId: features[3]!.id }, // Bar Available
     // Lakeside Arts Theatre features
-    { venueId: createdVenues[1].id, featureId: features[0].id }, // Wheelchair Accessible
-    { venueId: createdVenues[1].id, featureId: features[1].id }, // Hearing Loop
-    { venueId: createdVenues[1].id, featureId: features[2].id }, // Parking Available
-    { venueId: createdVenues[1].id, featureId: features[3].id }, // Bar Available
-    { venueId: createdVenues[1].id, featureId: features[4].id }, // Air Conditioning
-    { venueId: createdVenues[1].id, featureId: features[5].id }, // Step-Free Access
+    { venueId: createdVenues[1]!.id, featureId: features[0]!.id }, // Wheelchair Accessible
+    { venueId: createdVenues[1]!.id, featureId: features[1]!.id }, // Hearing Loop
+    { venueId: createdVenues[1]!.id, featureId: features[2]!.id }, // Parking Available
+    { venueId: createdVenues[1]!.id, featureId: features[3]!.id }, // Bar Available
+    { venueId: createdVenues[1]!.id, featureId: features[4]!.id }, // Air Conditioning
+    { venueId: createdVenues[1]!.id, featureId: features[5]!.id }, // Step-Free Access
     // Djanogly Theatre features
-    { venueId: createdVenues[2].id, featureId: features[0].id }, // Wheelchair Accessible
-    { venueId: createdVenues[2].id, featureId: features[1].id }, // Hearing Loop
-    { venueId: createdVenues[2].id, featureId: features[4].id }, // Air Conditioning
-    { venueId: createdVenues[2].id, featureId: features[5].id }, // Step-Free Access
+    { venueId: createdVenues[2]!.id, featureId: features[0]!.id }, // Wheelchair Accessible
+    { venueId: createdVenues[2]!.id, featureId: features[1]!.id }, // Hearing Loop
+    { venueId: createdVenues[2]!.id, featureId: features[4]!.id }, // Air Conditioning
+    { venueId: createdVenues[2]!.id, featureId: features[5]!.id }, // Step-Free Access
   ]
 
   await db.insert(venuesToFeatures).values(venueFeatureAssignments)

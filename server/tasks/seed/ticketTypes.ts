@@ -1,4 +1,5 @@
-import { ticketTypes } from 'hub:db:schema'
+import { db } from '@nuxthub/db'
+import { ticketTypes } from '~~/server/db/schema/ticket'
 
 export default defineTask({
   meta: {

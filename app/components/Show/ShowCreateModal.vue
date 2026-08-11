@@ -53,6 +53,9 @@ const step1 = reactive<Partial<Step1Schema>>({
   description: '',
 })
 let slugManuallyEdited: boolean = false
+function markSlugEdited() {
+  slugManuallyEdited = true
+}
 const step1Error = ref('')
 
 watch(
@@ -301,7 +304,7 @@ function resetAll() {
   <UButton
     label="New Show"
     icon="i-lucide-plus"
-    @click="open = true"
+    @click="() => { open = true }"
   />
 
   <UModal
@@ -349,7 +352,7 @@ function resetAll() {
                 v-model="step1.slug"
                 placeholder="importance-of-being-earnest"
                 class="w-full"
-                @input="slugManuallyEdited = true"
+                @input="markSlugEdited"
               />
             </UFormField>
 
@@ -645,12 +648,12 @@ function resetAll() {
               leading-icon="i-lucide-arrow-left"
               color="neutral"
               variant="ghost"
-              @click="currentStep = 0"
+              @click="() => { currentStep = 0 }"
             />
             <UButton
               label="Next: Review"
               trailing-icon="i-lucide-arrow-right"
-              @click="currentStep = 2"
+              @click="() => { currentStep = 2 }"
             />
           </div>
         </template>
@@ -722,7 +725,7 @@ function resetAll() {
               leading-icon="i-lucide-arrow-left"
               color="neutral"
               variant="ghost"
-              @click="currentStep = 1"
+              @click="() => { currentStep = 1 }"
             />
             <UButton
               label="Create show"

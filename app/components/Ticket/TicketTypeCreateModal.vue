@@ -89,7 +89,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   <UButton
     label="Add Ticket Type"
     icon="i-lucide-plus"
-    @click="open = true"
+    @click="() => { open = true }"
   />
 
   <UModal
@@ -162,7 +162,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
             color="neutral"
             variant="subtle"
             :disabled="isSubmitting"
-            @click="open = false"
+            @click="() => { open = false }"
           />
           <UButton
             type="submit"

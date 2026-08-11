@@ -54,8 +54,11 @@ const toast = useToast()
 // parent Suspense tree, which freezes the page and breaks close handlers.
 // Use useFetch (no await) with a computed URL; it re-fetches automatically.
 
+// Nuxt types the request getter as () => NitroFetchRequest and does not model
+// returning null to skip, so cast it — the runtime honours the null.
+const ticketTypesUrl = () => props.show?.id ? `/api/shows/${props.show.id}/ticket-types` : null
 const { data: ttData, status: fetchStatus, refresh } = useFetch<TicketTypeEntry[]>(
-  () => props.show?.id ? `/api/shows/${props.show.id}/ticket-types` : null,
+  ticketTypesUrl as () => string,
   { immediate: false },
 )
 
@@ -65,7 +68,7 @@ watch(() => props.show?.id, (id, oldId) => {
     // Only clear when opening/switching, not when closing (id → null),
     // so the modal animates out showing the last state with no flash.
     if (id !== oldId) {
-      ttData.value = null
+      ttData.value = undefined
       draft.value = {}
     }
     refresh()
@@ -216,7 +219,7 @@ const hasDraft = computed(() => {
         class="divide-y divide-default"
       >
         <div
-          v-for="tt in ttData"
+          v-for="tt in (ttData ?? [])"
           :key="tt.id"
           class="py-3 flex items-start gap-3"
         >

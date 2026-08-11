@@ -77,7 +77,7 @@ const fullDescriptionOpen = ref(false)
             variant="link"
             size="sm"
             class="mt-1 self-start"
-            @click="fullDescriptionOpen = true"
+            @click="() => { fullDescriptionOpen = true }"
           />
         </template>
 
@@ -104,7 +104,7 @@ const fullDescriptionOpen = ref(false)
         <UButton
           label="Close"
           variant="soft"
-          @click="fullDescriptionOpen = false"
+          @click="() => { fullDescriptionOpen = false }"
         />
       </template>
     </UModal>

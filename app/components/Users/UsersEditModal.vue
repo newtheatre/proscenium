@@ -174,7 +174,7 @@ const roleOptions = [
             label="Cancel"
             color="neutral"
             variant="subtle"
-            @click="open = false"
+            @click="() => { open = false }"
           />
           <UButton
             label="Save Changes"

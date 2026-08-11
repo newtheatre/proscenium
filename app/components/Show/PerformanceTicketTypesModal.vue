@@ -49,17 +49,20 @@ const toast = useToast()
 
 // ─── Data fetching (no await — see ShowTicketTypesModal for explanation) ─────────
 
+// Nuxt types the request getter as () => NitroFetchRequest and does not model
+// returning null to skip, so cast it — the runtime honours the null.
+const ticketTypesUrl = () => props.performance?.id
+  ? `/api/shows/${props.performance.showId}/performances/${props.performance.id}/ticket-types`
+  : null
 const { data: ttData, status: fetchStatus, refresh } = useFetch<TicketTypeEntry[]>(
-  () => props.performance?.id
-    ? `/api/shows/${props.performance.showId}/performances/${props.performance.id}/ticket-types`
-    : null,
+  ticketTypesUrl as () => string,
   { immediate: false },
 )
 
 watch(() => props.performance?.id, (id, oldId) => {
   if (id) {
     if (id !== oldId) {
-      ttData.value = null
+      ttData.value = undefined
       draft.value = {}
     }
     refresh()
@@ -226,7 +229,7 @@ const modalTitle = computed(() => {
         class="divide-y divide-default"
       >
         <div
-          v-for="tt in ttData"
+          v-for="tt in (ttData ?? [])"
           :key="tt.id"
           class="py-3 flex items-start gap-3"
         >

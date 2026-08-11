@@ -13,6 +13,8 @@
  * @emits close        - Emitted with `true` (confirmed) or `false` (cancelled)
  */
 <script setup lang="ts">
+import { computed } from 'vue'
+
 const props = withDefaults(defineProps<{
   title: string
   description?: string
@@ -20,12 +22,14 @@ const props = withDefaults(defineProps<{
   confirmColor?: 'error' | 'warning' | 'primary' | 'neutral'
   cancelLabel?: string
   icon?: string
-  open: boolean
+  // Managed by useOverlay when opened programmatically.
+  open?: boolean
 }>(), {
   confirmLabel: 'Confirm',
   confirmColor: 'error',
   cancelLabel: 'Cancel',
   icon: 'i-lucide-triangle-alert',
+  open: false,
 })
 
 const emit = defineEmits<{
@@ -34,7 +38,7 @@ const emit = defineEmits<{
 
 const localOpen = computed({
   get: () => props.open,
-  set: (value) => {
+  set: (value: boolean) => {
     if (!value) emit('close', false)
   },
 })

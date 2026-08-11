@@ -219,7 +219,7 @@ async function deleteAccount() {
           label="Delete account"
           color="error"
           :disabled="isAdmin"
-          @click="deleteModalOpen = true"
+          @click="() => { deleteModalOpen = true }"
         />
       </template>
     </UPageCard>
@@ -262,7 +262,7 @@ async function deleteAccount() {
             label="Cancel"
             color="neutral"
             variant="subtle"
-            @click="deleteModalOpen = false"
+            @click="() => { deleteModalOpen = false }"
           />
           <UButton
             label="Delete My Account"

@@ -288,7 +288,7 @@ const columns: TableColumn<TicketType>[] = [
       v-model:pagination="pagination"
       :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
       class="shrink-0"
-      :data="data"
+      :data="data ?? []"
       :columns="columns"
       :loading="status === 'pending'"
       :ui="{
