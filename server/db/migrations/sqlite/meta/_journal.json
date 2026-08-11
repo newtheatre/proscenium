@@ -71,6 +71,13 @@
       "when": 1786460129375,
       "tag": "0009_useful_the_initiative",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786479360619,
+      "tag": "0010_freezing_stone_men",
+      "breakpoints": true
     }
   ]
 }

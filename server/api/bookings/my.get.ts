@@ -16,6 +16,10 @@ interface BookingRow {
   cancelledBy: 'CUSTOMER' | 'STAFF' | null
   customerNotes: string | null
   staffNotes: string | null
+  legacyRef: string | null
+  source: 'WEB' | 'BOX_OFFICE' | 'DOOR' | 'LEGACY_IMPORT'
+  originalQuantity: number | null
+  anonymisedAt: string | null
   createdAt: string
   updatedAt: string
   performance: BookingPerformance

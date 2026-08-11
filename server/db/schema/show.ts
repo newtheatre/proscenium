@@ -2,6 +2,7 @@ import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqli
 import { sql, relations } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { venues } from './venue'
+import { showCategories } from './legacy'
 
 // A show is a production — the top-level entity for a run of performances.
 export const shows = sqliteTable('shows', {
@@ -10,7 +11,23 @@ export const shows = sqliteTable('shows', {
   title: text('title').notNull(),
   subtitle: text('subtitle'), // Optional secondary title or tagline
   description: text('description'),
+  // The legacy site carried two descriptions: a short one for cards and a long
+  // one for the show page. 403 of 477 legacy shows used both.
+  longDescription: text('long_description'),
   posterUrl: text('poster_url'), // Reference to NuxtHub blob storage (Cloudflare R2)
+  // Link to the digital programme. 13 legacy shows have one.
+  programmeUrl: text('programme_url'),
+  // External booking or info link for shows we host but do not sell for.
+  externalUrl: text('external_url'),
+
+  // The strand this show belongs to — In House, Fringe, StuFF, External, …
+  categoryId: text('category_id').references(() => showCategories.id, { onDelete: 'restrict' }),
+
+  // Free-text notes accompanying the content warnings.
+  contentWarningNotes: text('content_warning_notes'),
+  // TRUE means "checked, there are none" — meaningfully different from the
+  // absence of any showContentWarnings rows, which means "nobody filled it in".
+  warningsConfirmedNone: integer('warnings_confirmed_none', { mode: 'boolean' }).notNull().default(false),
 
   status: text('status', {
     enum: ['DRAFT', 'PUBLISHED'],
@@ -22,11 +39,17 @@ export const shows = sqliteTable('shows', {
 }, table => [
   index('shows_title_idx').on(table.title),
   index('shows_status_idx').on(table.status),
+  index('shows_category_id_idx').on(table.categoryId),
   uniqueIndex('shows_slug_unique').on(table.slug),
 ])
 
-export const showsRelations = relations(shows, ({ many }) => ({
+export const showsRelations = relations(shows, ({ one, many }) => ({
   performances: many(performances),
+  category: one(showCategories, {
+    fields: [shows.categoryId],
+    references: [showCategories.id],
+  }),
+  // contentWarnings is defined in legacy.ts (showContentWarningsRelations)
   // ticketTypeOverrides and tickets relations are defined in ticket.ts to avoid circular imports
 }))
 
@@ -46,6 +69,10 @@ export const performances = sqliteTable('performances', {
 
   // Overrides venue.capacity for this specific performance; null = use venue default
   capacityOverride: integer('capacity_override'),
+
+  // Booking closes this many hours before startsAt. Legacy `hours_til_close`:
+  // 789 performances used 2, 440 used 1, 25 used 0.
+  bookingClosesHoursBefore: integer('booking_closes_hours_before'),
 
   // SOLD_OUT is calculated from ticket counts vs. effective capacity.
   // COMPLETED is inferred from startsAt < now AND status != CANCELLED.
