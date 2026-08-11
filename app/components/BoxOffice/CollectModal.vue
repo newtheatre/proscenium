@@ -175,11 +175,12 @@ const displayRows = computed(() => {
   // Active tickets
   for (const t of activeTickets.value) {
     if (!rows.has(t.ticketTypeId)) {
-      const avail = availableTypes.value.find(a => a.id === t.ticketTypeId)
       rows.set(t.ticketTypeId, {
         id: t.ticketTypeId,
         name: t.ticketType.name,
-        effectivePrice: avail?.effectivePrice ?? t.pricePaid,
+        // Existing tickets keep the price the customer booked at, not the
+        // current price — the customer holds an email quoting the old price.
+        effectivePrice: t.pricePaid,
         isDefault: true, // types with existing tickets always show
       })
     }
@@ -236,10 +237,26 @@ const totalCount = computed(() => {
   return n
 })
 
+// Subtotal for a type: existing tickets kept are charged at the price they were
+// booked at (pricePaid); tickets newly added at the door are charged at the
+// current effective price.
+function rowSubtotal(typeId: string): number {
+  const desired = getQty(typeId)
+  const existing = activeTickets.value.filter(t => t.ticketTypeId === typeId)
+  const kept = Math.min(desired, existing.length)
+  const added = Math.max(0, desired - existing.length)
+
+  let sub = 0
+  for (let i = 0; i < kept; i++) sub += existing[i]!.pricePaid
+  const currentPrice = availableTypes.value.find(a => a.id === typeId)?.effectivePrice ?? 0
+  sub += added * currentPrice
+  return sub
+}
+
 const totalPrice = computed(() => {
   let total = 0
   for (const row of displayRows.value) {
-    total += getQty(row.id) * row.effectivePrice
+    total += rowSubtotal(row.id)
   }
   return total
 })
@@ -466,7 +483,7 @@ async function markNoShow() {
             <!-- Row subtotal -->
             <div class="w-16 text-right text-sm tabular-nums shrink-0">
               <span :class="getQty(row.id) > 0 ? 'text-highlighted font-medium' : 'text-muted'">
-                {{ formatPrice(getQty(row.id) * row.effectivePrice) }}
+                {{ formatPrice(rowSubtotal(row.id)) }}
               </span>
             </div>
           </div>
