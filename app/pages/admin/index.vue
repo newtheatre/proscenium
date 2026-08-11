@@ -73,7 +73,7 @@ const STATUS_CONFIG = {
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
-const { data: stats, status: statsStatus, refresh: refreshStats } = await useFetch<Stats>('/api/admin/stats', { lazy: true })
+const { data: stats, status: statsStatus } = await useFetch<Stats>('/api/admin/stats', { lazy: true })
 const { data: shows } = await useFetch<Show[]>('/api/shows', { lazy: true })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

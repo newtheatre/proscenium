@@ -121,7 +121,10 @@ const isSaving = ref(false)
 
 async function handleDone() {
   const tts = ttData.value
-  if (!props.show || !tts?.length) { emit('close'); return }
+  if (!props.show || !tts?.length) {
+    emit('close')
+    return
+  }
 
   for (const [ttId, d] of Object.entries(draft.value)) {
     if (!d.wasReset) {
@@ -169,7 +172,9 @@ async function handleDone() {
   finally { isSaving.value = false }
 }
 
-function handleClose() { emit('close') }
+function handleClose() {
+  emit('close')
+}
 
 const hasDraft = computed(() => {
   return (ttData.value ?? []).some((tt) => {

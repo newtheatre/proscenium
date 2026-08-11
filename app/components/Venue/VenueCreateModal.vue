@@ -216,85 +216,85 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           class="space-y-4"
           @submit="onSubmit"
         >
-        <UFormField
-          label="Name"
-          name="name"
-          required
-        >
-          <UInput
-            v-model="state.name"
-            placeholder="New Theatre"
-            class="w-full"
-          />
-        </UFormField>
+          <UFormField
+            label="Name"
+            name="name"
+            required
+          >
+            <UInput
+              v-model="state.name"
+              placeholder="New Theatre"
+              class="w-full"
+            />
+          </UFormField>
 
-        <UFormField
-          label="Address"
-          name="address"
-        >
-          <UTextarea
-            v-model="state.address"
-            placeholder="Mount Street, Nottingham NG1 6HE, UK"
-            :rows="2"
-            class="w-full"
-          />
-        </UFormField>
+          <UFormField
+            label="Address"
+            name="address"
+          >
+            <UTextarea
+              v-model="state.address"
+              placeholder="Mount Street, Nottingham NG1 6HE, UK"
+              :rows="2"
+              class="w-full"
+            />
+          </UFormField>
 
-        <UFormField
-          label="Capacity"
-          name="capacity"
-          hint="Default seating capacity"
-        >
-          <UInputNumber
-            v-model="state.capacity"
-            placeholder="80"
-            :min="1"
-            class="w-full"
-          />
-        </UFormField>
+          <UFormField
+            label="Capacity"
+            name="capacity"
+            hint="Default seating capacity"
+          >
+            <UInputNumber
+              v-model="state.capacity"
+              placeholder="80"
+              :min="1"
+              class="w-full"
+            />
+          </UFormField>
 
-        <UFormField
-          label="Description"
-          name="description"
-        >
-          <UTextarea
-            v-model="state.description"
-            placeholder="Brief description of the venue..."
-            :rows="3"
-            class="w-full"
-          />
-        </UFormField>
+          <UFormField
+            label="Description"
+            name="description"
+          >
+            <UTextarea
+              v-model="state.description"
+              placeholder="Brief description of the venue..."
+              :rows="3"
+              class="w-full"
+            />
+          </UFormField>
 
-        <UFormField
-          label="Features"
-          name="featureIds"
-          hint="Select accessibility and amenity features"
-        >
-          <USelectMenu
-            v-model="state.featureIds"
-            :items="featureOptions"
-            value-key="value"
-            multiple
-            searchable
-            placeholder="Select features..."
-            class="w-full"
-          />
-        </UFormField>
+          <UFormField
+            label="Features"
+            name="featureIds"
+            hint="Select accessibility and amenity features"
+          >
+            <USelectMenu
+              v-model="state.featureIds"
+              :items="featureOptions"
+              value-key="value"
+              multiple
+              searchable
+              placeholder="Select features..."
+              class="w-full"
+            />
+          </UFormField>
 
-        <div class="flex justify-end gap-2 pt-4">
-          <UButton
-            type="button"
-            label="Cancel"
-            color="neutral"
-            variant="subtle"
-            @click="() => { open = false }"
-          />
-          <UButton
-            type="submit"
-            label="Create Venue"
-            :loading="isSubmitting"
-          />
-        </div>
+          <div class="flex justify-end gap-2 pt-4">
+            <UButton
+              type="button"
+              label="Cancel"
+              color="neutral"
+              variant="subtle"
+              @click="() => { open = false }"
+            />
+            <UButton
+              type="submit"
+              label="Create Venue"
+              :loading="isSubmitting"
+            />
+          </div>
         </UForm>
       </div>
     </template>

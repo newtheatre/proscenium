@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql, relations } from 'drizzle-orm'
 import { nanoid, customAlphabet } from 'nanoid'
 import { performances } from './show'
@@ -60,7 +60,7 @@ export const reservations = sqliteTable('reservations', {
   index('reservations_status_idx').on(table.status),
 ])
 
-export const reservationsRelations = relations(reservations, ({ one, many }) => ({
+export const reservationsRelations = relations(reservations, ({ one }) => ({
   performance: one(performances, {
     fields: [reservations.performanceId],
     references: [performances.id],

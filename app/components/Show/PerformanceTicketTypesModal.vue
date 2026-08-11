@@ -22,8 +22,8 @@ interface TicketTypeEntry {
   description?: string | null
   price: number
   activeByDefault: boolean
-  showOverride: { id: string; price: number | null; active: boolean | null } | null
-  perfOverride: { id: string; price: number | null; active: boolean | null } | null
+  showOverride: { id: string, price: number | null, active: boolean | null } | null
+  perfOverride: { id: string, price: number | null, active: boolean | null } | null
   effectivePrice: number
   effectiveActive: boolean
 }
@@ -120,7 +120,10 @@ const isSaving = ref(false)
 async function handleDone() {
   const tts = ttData.value
   const perf = props.performance
-  if (!perf || !tts?.length) { emit('close'); return }
+  if (!perf || !tts?.length) {
+    emit('close')
+    return
+  }
 
   for (const [ttId, d] of Object.entries(draft.value)) {
     if (!d.wasReset) {
@@ -174,7 +177,9 @@ async function handleDone() {
   finally { isSaving.value = false }
 }
 
-function handleClose() { emit('close') }
+function handleClose() {
+  emit('close')
+}
 
 const hasDraft = computed(() => {
   return (ttData.value ?? []).some((tt) => {
@@ -252,12 +257,20 @@ const modalTitle = computed(() => {
             <p class="text-xs text-muted mt-0.5">
               <template v-if="draft[tt.id]?.wasReset">
                 Will reset to
-                <template v-if="tt.showOverride">show override</template>
-                <template v-else>base</template>
+                <template v-if="tt.showOverride">
+                  show override
+                </template>
+                <template v-else>
+                  base
+                </template>
                 ·
               </template>
-              <template v-else-if="tt.perfOverride">Performance override · </template>
-              <template v-else-if="tt.showOverride">Show override · </template>
+              <template v-else-if="tt.perfOverride">
+                Performance override ·
+              </template>
+              <template v-else-if="tt.showOverride">
+                Show override ·
+              </template>
               Base: £{{ (tt.price / 100).toFixed(2) }}
             </p>
           </div>

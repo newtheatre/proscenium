@@ -21,7 +21,7 @@ interface Show {
   description?: string | null
   posterUrl?: string | null
   status: 'DRAFT' | 'PUBLISHED'
-  performances?: Array<{ id: string; status: string }>
+  performances?: Array<{ id: string, status: string }>
 }
 
 const props = defineProps<{
@@ -202,7 +202,9 @@ function handlePosterSelect(event: Event) {
   imageFile.value = file
   pendingImageAction.value = 'replace'
   const reader = new FileReader()
-  reader.onload = e => { imagePreview.value = e.target?.result as string }
+  reader.onload = (e) => {
+    imagePreview.value = e.target?.result as string
+  }
   reader.readAsDataURL(file)
 }
 

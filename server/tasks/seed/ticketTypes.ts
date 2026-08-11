@@ -43,10 +43,10 @@ export async function seedTicketTypes() {
       activeByDefault: true,
     },
     {
-        name: 'Fellow',
-        description: 'Special discounted ticket for New Theatre Fellows',
-        price: 0, // Free
-        activeByDefault: true,
+      name: 'Fellow',
+      description: 'Special discounted ticket for New Theatre Fellows',
+      price: 0, // Free
+      activeByDefault: true,
     },
     {
       name: 'Complimentary',
@@ -64,7 +64,7 @@ export async function seedTicketTypes() {
 
 export function printTicketTypesSummary(ticketTypes: Awaited<ReturnType<typeof seedTicketTypes>>) {
   console.log('\n🎟️  Ticket Types:')
-  ticketTypes.forEach(tt => {
+  ticketTypes.forEach((tt) => {
     const price = tt.price === 0 ? 'Free' : `£${(tt.price / 100).toFixed(2)}`
     const status = tt.activeByDefault ? 'active by default' : 'inactive by default'
     console.log(`  • ${tt.name} — ${price} (${status})`)
