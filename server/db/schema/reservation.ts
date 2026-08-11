@@ -1,4 +1,4 @@
-import { sqliteTable, text, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql, relations } from 'drizzle-orm'
 import { nanoid, customAlphabet } from 'nanoid'
 import { performances } from './show'
@@ -31,6 +31,32 @@ export const reservations = sqliteTable('reservations', {
   // e.g. "A3KP7X" — uses an unambiguous character set to avoid misreads
   bookingRef: text('booking_ref').notNull().$defaultFn(() => bookingRefId()),
 
+  // The legacy 16-hex code. It was the reservation's public handle: every
+  // confirmation email since 2016 carried a /cancel/<code>/ link, and it was
+  // the value front-of-house typed to collect. Keeping it lets those URLs be
+  // redirected instead of 404ing, and makes "what did legacy row N become?"
+  // answerable. (It was never a QR code — the legacy app generated none.)
+  legacyRef: text('legacy_ref'),
+
+  // How the booking reached us. LEGACY_IMPORT marks rows whose provenance is
+  // the Heroku system rather than this application.
+  source: text('source', {
+    enum: ['WEB', 'BOX_OFFICE', 'DOOR', 'LEGACY_IMPORT'],
+  }).notNull().default('WEB'),
+
+  // How many seats were originally booked.
+  //
+  // Legacy destroyed this: on collection, Django copied `quantity` into
+  // `initial_quantity` and OVERWROTE `quantity` with the number actually
+  // collected, so a legacy reservation's `quantity` means "seats booked" before
+  // collection and "seats collected" after. 662 bookings were genuinely reduced
+  // at the door. Proscenium models tickets as rows, so the original figure has
+  // nowhere else to live.
+  originalQuantity: integer('original_quantity'),
+
+  // Set when the owning user was anonymised under the retention policy.
+  anonymisedAt: text('anonymised_at'),
+
   performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),
 
   // Always references a user — guests get a shadow account with no password.
@@ -55,6 +81,8 @@ export const reservations = sqliteTable('reservations', {
   updatedAt: text('updated_at').notNull().$onUpdate(() => sql`(current_timestamp)`),
 }, table => [
   uniqueIndex('reservations_booking_ref_unique').on(table.bookingRef),
+  // SQLite treats NULLs as distinct, so this only constrains imported rows.
+  uniqueIndex('reservations_legacy_ref_unique').on(table.legacyRef),
   index('reservations_performance_id_idx').on(table.performanceId),
   index('reservations_user_id_idx').on(table.userId),
   index('reservations_status_idx').on(table.status),

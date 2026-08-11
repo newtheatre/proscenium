@@ -9,6 +9,11 @@ export const users = sqliteTable('users', {
   name: text('name').notNull(),
   verified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
 
+  // Set when this user's identifying fields were replaced under the retention
+  // policy. The row is kept so reservation history, repeat-booker counts and
+  // revenue analysis survive; the person does not.
+  anonymisedAt: text('anonymised_at'),
+
   // Bumped to invalidate every existing session for this user (role change,
   // password reset, force-logout). Embedded in the session and checked on each
   // authorization; a session whose epoch is stale is treated as unauthenticated.
