@@ -38,10 +38,13 @@ const toast = useToast()
 
 // ── Ticket types ──────────────────────────────────────────────────────────────
 
+// Nuxt types the request getter as () => NitroFetchRequest and does not model
+// returning null to skip, so cast it — the runtime honours the null.
+const ticketTypesUrl = () => props.performanceId
+  ? `/api/bookings/available-ticket-types?performanceId=${props.performanceId}`
+  : null
 const { data: ticketTypes } = useFetch<TicketType[]>(
-  () => props.performanceId
-    ? `/api/bookings/available-ticket-types?performanceId=${props.performanceId}`
-    : null,
+  ticketTypesUrl as () => string,
   {
     key: 'walk-in-ticket-types',
     lazy: true,
