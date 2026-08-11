@@ -68,7 +68,7 @@ watch(() => props.show?.id, (id, oldId) => {
     // Only clear when opening/switching, not when closing (id → null),
     // so the modal animates out showing the last state with no flash.
     if (id !== oldId) {
-      ttData.value = null
+      ttData.value = undefined
       draft.value = {}
     }
     refresh()

@@ -1,3 +1,4 @@
+import { useOverlay } from '#imports'
 import AppConfirmModal from '~/components/AppConfirmModal.vue'
 
 interface ConfirmOptions {

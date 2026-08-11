@@ -316,7 +316,7 @@ async function submit() {
             variant="ghost"
             size="xs"
             block
-            @click="showAllTypes = !showAllTypes"
+            @click="() => { showAllTypes = !showAllTypes }"
           />
 
           <!-- Running total -->
@@ -342,7 +342,7 @@ async function submit() {
           color="neutral"
           variant="ghost"
           :disabled="submitting"
-          @click="modelOpen = false"
+          @click="() => { modelOpen = false }"
         />
         <UButton
           label="Create & collect"

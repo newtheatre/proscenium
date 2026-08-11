@@ -59,6 +59,9 @@ const state = reactive<Partial<Schema>>({
 })
 
 let doorsManuallyEdited: boolean = false
+function markDoorsEdited() {
+  doorsManuallyEdited = true
+}
 
 function autoDoorsTime(time: string): string {
   if (!time) return ''
@@ -219,7 +222,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
               v-model="state.doorsTime"
               type="time"
               class="w-full"
-              @change="doorsManuallyEdited = true"
+              @change="markDoorsEdited"
             />
           </UFormField>
 

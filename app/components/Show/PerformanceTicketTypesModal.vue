@@ -62,7 +62,7 @@ const { data: ttData, status: fetchStatus, refresh } = useFetch<TicketTypeEntry[
 watch(() => props.performance?.id, (id, oldId) => {
   if (id) {
     if (id !== oldId) {
-      ttData.value = null
+      ttData.value = undefined
       draft.value = {}
     }
     refresh()

@@ -177,7 +177,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
             color="neutral"
             variant="subtle"
             :disabled="isSubmitting"
-            @click="open = false"
+            @click="() => { open = false }"
           />
           <UButton
             type="submit"

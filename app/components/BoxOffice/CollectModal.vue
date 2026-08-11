@@ -502,7 +502,7 @@ async function markNoShow() {
           size="xs"
           block
           class="mt-2"
-          @click="showAllTypes = !showAllTypes"
+          @click="() => { showAllTypes = !showAllTypes }"
         />
 
         <!-- Unsaved-change hint -->
