@@ -9,7 +9,7 @@ back office and the box office. There is no separate API service, no background 
                  ┌──────────────────────────── Cloudflare ────────────────────────────┐
                  │                                                                     │
   browser ──────▶│  Worker (Nitro `cloudflare_module`)                                 │
-                 │    ├── Vue 4 SSR + client hydration     app/                        │
+                 │    ├── Vue 3 SSR + client hydration     app/                        │
                  │    ├── Nitro server routes              server/api/**               │
                  │    └── Nuxt Content (D1-backed)         content/**                  │
                  │             │                    │                                  │
@@ -44,7 +44,7 @@ Everything runs inside one Worker request. There is nowhere for a long-running j
 ```
 app/            Vue: pages, components, layouts, middleware. One composable.
 server/
-  api/          63 Nitro handlers, file-based routing
+  api/          62 Nitro handlers, file-based routing (plus one blob route under server/routes/)
   db/schema/    Drizzle tables — the source of truth for the data model
   db/migrations/sqlite/   0000–0008
   utils/        Shared server logic: auth, email, images, tickets, validation
