@@ -466,6 +466,7 @@ async function markNoShow() {
                 variant="outline"
                 size="xs"
                 :disabled="alreadyActioned || getQty(row.id) === 0"
+                :aria-label="`Decrease ${row.name} tickets`"
                 @click="setQty(row.id, getQty(row.id) - 1)"
               />
               <span class="w-7 text-center text-sm font-medium tabular-nums">
@@ -477,6 +478,7 @@ async function markNoShow() {
                 variant="outline"
                 size="xs"
                 :disabled="alreadyActioned"
+                :aria-label="`Increase ${row.name} tickets`"
                 @click="setQty(row.id, getQty(row.id) + 1)"
               />
             </div>

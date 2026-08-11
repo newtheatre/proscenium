@@ -688,6 +688,7 @@ const todayFormatted = computed(() =>
               :class="statusFilter === key
                 ? 'bg-primary text-white border-primary'
                 : 'bg-elevated border-default text-muted hover:text-default'"
+              :aria-pressed="statusFilter === key"
               @click="statusFilter = statusFilter === key ? 'ALL' : key"
             >
               <UIcon

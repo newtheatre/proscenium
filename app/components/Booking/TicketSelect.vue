@@ -119,10 +119,15 @@ function formatPrice(pence: number): string {
             color="neutral"
             size="sm"
             :disabled="getQuantity(type.id) === 0"
-            aria-label="Decrease quantity"
+            :aria-label="`Decrease ${type.name} tickets`"
             @click="setQuantity(type.id, getQuantity(type.id) - 1)"
           />
-          <span class="w-8 text-center text-sm font-medium tabular-nums text-default">
+          <span
+            class="w-8 text-center text-sm font-medium tabular-nums text-default"
+            role="status"
+            aria-live="polite"
+            :aria-label="`${type.name} quantity`"
+          >
             {{ getQuantity(type.id) }}
           </span>
           <UButton
@@ -131,7 +136,7 @@ function formatPrice(pence: number): string {
             color="neutral"
             size="sm"
             :disabled="!canIncrement(type.id)"
-            aria-label="Increase quantity"
+            :aria-label="`Increase ${type.name} tickets`"
             @click="setQuantity(type.id, getQuantity(type.id) + 1)"
           />
         </div>
