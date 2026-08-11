@@ -23,8 +23,8 @@ not take effect until that person logs in again. Demoting a volunteer mid-shift 
 they close their browser. Self-edits are the exception — `PUT /api/users/:id` calls
 `replaceUserSession` when you edit yourself.
 
-The fix, when someone gets to it, is the session-epoch approach the auth service plan already
-specifies: a `sessionEpoch` integer on `users`, embedded in the session, checked on refresh. About
+The fix, when someone gets to it, is the session-epoch approach planned for the auth service: a
+`sessionEpoch` integer on `users`, embedded in the session, checked on refresh. About
 twenty lines, and it also buys a "force logout" button.
 
 **Rotating `NUXT_SESSION_PASSWORD` invalidates every session estate-wide.** That is the emergency
@@ -132,7 +132,7 @@ MANAGER — can set a password with no challenge. Flagged in
 
 ## Relationship to the central auth service
 
-The `newtheatre/auth` service will take over identity for the whole estate: one account per person
+The planned `newtheatre/auth` service will take over identity for the whole estate: one account per person
 across Proscenium, rooms, photos and anything that follows, with Google SSO for `newtheatre.org.uk`
 Workspace accounts and email+password for audience members.
 

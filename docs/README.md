@@ -38,9 +38,8 @@ Gaps section of [08-operations](./08-operations.md) are what you have actually i
 
 ### Decision records
 
-Significant decisions live in [`decisions/`](./decisions/) as ADRs, following the same convention
-as the `newtheatre/auth` repo. Add one whenever you make a choice a successor would otherwise have
-to reverse-engineer.
+Significant decisions live in [`decisions/`](./decisions/) as ADRs. Add one whenever you make a
+choice a successor would otherwise have to reverse-engineer.
 
 | ADR | Decision |
 |---|---|

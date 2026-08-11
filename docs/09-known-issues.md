@@ -154,7 +154,7 @@ The whole partial-refund story is schema-only.
 Roles are snapshotted into the session cookie at login. Granting or removing a role has no effect
 until that person logs in again.
 
-**Fix:** the `sessionEpoch` approach specified in the auth service plan — an integer on `users`,
+**Fix:** the `sessionEpoch` approach planned for the auth service — an integer on `users`,
 embedded in the session, checked on refresh. ~20 lines, and it also gives you a force-logout button.
 
 ### Customers cannot cancel

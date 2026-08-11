@@ -17,7 +17,7 @@ repository preserves zero productions.
 Proscenium as it stands cannot hold about a third of the legacy model: no show categories, no
 content warnings, no passes, no programmes, no booking windows, no audit trail, and no legacy
 identifiers. And it cannot hold a reservation without a user, so a naive import creates 9,501 shadow
-accounts from decade-old audience data — which, under the auth service plan (ADR-0007 there), would
+accounts from decade-old audience data — which, under the planned auth service, would
 become central identities across the whole estate.
 
 ## Decision

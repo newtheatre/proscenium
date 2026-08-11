@@ -121,8 +121,8 @@ laptop. Treat that as the current risk profile rather than a target state.
 
 **One app, not a service split.** The theatre has one developer at a time and a twelve-month
 handover cycle. A second deployable would double the operational surface for no benefit at this
-size. The auth service ([ADR-0002 in `newtheatre/auth`](https://github.com/newtheatre/auth)) is the
-exception, and only because identity genuinely is shared across several apps.
+size. The planned central auth service is the exception, and only because identity genuinely is
+shared across several apps.
 
 **Money in integer pence, everywhere.** No floats, no decimals. The legacy system used
 `DecimalField` and reconstructing historic unit prices from it turned out to be impossible; this
@@ -135,7 +135,7 @@ leaks.
 
 **Guest checkout creates a real user row with a null password.** It means booking history is never
 orphaned, and a guest who later registers on the same email simply *becomes* the owner of their past
-bookings. This is also the contract the central auth service is built around.
+bookings. This is also the contract the planned central auth service is designed around.
 
 ## Known architectural weaknesses
 

@@ -14,12 +14,13 @@ The theatre's committee turns over every year. Anyone who can answer "why is it 
 have graduated within twelve months. This is the same bus-factor problem the IT estate tracker flags
 as critical for this repository.
 
-The `newtheatre/auth` repository already uses ADRs and they work well there.
+ADRs are a lightweight, well-proven way to record this kind of decision, and adopting them here sets
+a convention the rest of the estate — including the planned `newtheatre/auth` service — can follow.
 
 ## Decision
 
-Significant decisions are recorded as ADRs in `docs/decisions/`, numbered sequentially, following
-the same format as `newtheatre/auth`: **Status · Date · Deciders**, then **Context**, **Decision**,
+Significant decisions are recorded as ADRs in `docs/decisions/`, numbered sequentially, in a
+consistent format: **Status · Date · Deciders**, then **Context**, **Decision**,
 **Alternatives considered**, **Consequences**.
 
 Write one when a decision would otherwise have to be reverse-engineered — a schema shape, a choice
@@ -47,8 +48,8 @@ the old one.
 ## Consequences
 
 **Good.** Decisions survive handover. Reviewing a change means reading its ADR rather than
-excavating the code. New committee members have somewhere to start. The format matches the auth
-repository, so the estate reads consistently.
+excavating the code. New committee members have somewhere to start. The format is one the rest of
+the estate can adopt, so the docs read consistently as it grows.
 
 **Bad.** It is a habit that has to be maintained, and habits lapse under deadline. Mitigation: the
 handover checklist in [08-operations](../08-operations.md) includes reviewing this directory, and
