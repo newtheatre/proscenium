@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { eq } from 'drizzle-orm'
+import { and, eq, ne } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { updateShow, updatePerformance } from '~~/shared/utils/abilities'
 
@@ -44,10 +44,17 @@ export default defineEventHandler(async (event) => {
   if (body.markPerformancesOnSale) {
     await authorize(event, updatePerformance)
 
-    // Update all non-cancelled performances to ON_SALE
+    // Put every not-yet-on-sale performance on sale, but leave cancelled ones
+    // cancelled — without the CANCELLED filter, publishing a show would put its
+    // cancelled performances back on sale. Excluding already-ON_SALE rows keeps
+    // updatedPerformanceCount to the performances actually changed.
     const result = await db.update(schema.performances)
       .set({ status: 'ON_SALE' })
-      .where(eq(schema.performances.showId, showId))
+      .where(and(
+        eq(schema.performances.showId, showId),
+        ne(schema.performances.status, 'CANCELLED'),
+        ne(schema.performances.status, 'ON_SALE'),
+      ))
       .returning()
 
     updatedPerformanceCount = result.length
