@@ -44,6 +44,8 @@ export default defineEventHandler(async (event) => {
 
   // Send cancellation email if status was changed to CANCELLED
   if (body.status === 'CANCELLED' && existing.status !== 'CANCELLED') {
+    // Drizzle does not infer the relations on this nested query, so type the
+    // result explicitly (same pattern as the booking handlers).
     const reservation = await db.query.reservations.findFirst({
       where: (r, { eq: eqFn }) => eqFn(r.id, id),
       with: {
@@ -58,7 +60,16 @@ export default defineEventHandler(async (event) => {
           with: { ticketType: { columns: { id: true, name: true } } },
         },
       },
-    })
+    }) as {
+      bookingRef: string
+      user: { name: string, email: string }
+      performance: {
+        startsAt: Date
+        show: { title: string, slug: string }
+        venue: { name: string }
+      }
+      tickets: Array<{ id: string, pricePaid: number, ticketType: { id: string, name: string } }>
+    } | undefined
 
     if (reservation) {
       const emailPromise = sendBookingCancellationEmail({
