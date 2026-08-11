@@ -1,4 +1,5 @@
-import { users, userRoles } from 'hub:db:schema'
+import { db } from '@nuxthub/db'
+import { users, userRoles } from '~~/server/db/schema/user'
 
 /**
  * Seed Users and Roles
@@ -51,13 +52,13 @@ export async function seedUsers() {
   // Assign roles to users
   const rolesToCreate = [
     // Admin user gets all roles
-    { userId: createdUsers[0].id, role: 'ADMIN' as const },
-    { userId: createdUsers[0].id, role: 'MANAGER' as const },
-    { userId: createdUsers[0].id, role: 'BOX_OFFICE' as const },
+    { userId: createdUsers[0]!.id, role: 'ADMIN' as const },
+    { userId: createdUsers[0]!.id, role: 'MANAGER' as const },
+    { userId: createdUsers[0]!.id, role: 'BOX_OFFICE' as const },
     // Manager user
-    { userId: createdUsers[1].id, role: 'MANAGER' as const },
+    { userId: createdUsers[1]!.id, role: 'MANAGER' as const },
     // Box Office user
-    { userId: createdUsers[2].id, role: 'BOX_OFFICE' as const },
+    { userId: createdUsers[2]!.id, role: 'BOX_OFFICE' as const },
   ]
 
   await db.insert(userRoles).values(rolesToCreate)

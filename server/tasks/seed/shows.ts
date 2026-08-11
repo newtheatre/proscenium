@@ -1,4 +1,6 @@
-import { shows, performances, showTicketTypeOverrides, ticketTypes as ticketTypesTable } from 'hub:db:schema'
+import { db } from '@nuxthub/db'
+import { shows, performances } from '~~/server/db/schema/show'
+import { showTicketTypeOverrides, ticketTypes as ticketTypesTable } from '~~/server/db/schema/ticket'
 
 type SeededVenues = Array<{ id: string, name: string, capacity: number | null }>
 type TicketType = { id: string, name: string, price: number, activeByDefault: boolean }
