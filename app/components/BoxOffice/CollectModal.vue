@@ -62,6 +62,9 @@ interface AvailableType {
 const props = defineProps<{
   reservationId: string | null
   bookingRef: string | null
+  // When true, this is a walk-in being processed at the door, so it is recorded
+  // as DOOR rather than COLLECTED.
+  door?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -312,13 +315,14 @@ async function collect() {
   collecting.value = true
   try {
     await saveTicketsIfDirty()
+    const status = props.door ? 'DOOR' : 'COLLECTED'
     await $fetch(`/api/reservations/${props.reservationId}`, {
       method: 'PUT',
-      body: { status: 'COLLECTED' },
+      body: { status },
     })
     toast.add({
-      title: 'Tickets collected',
-      description: `Booking ${props.bookingRef} marked as collected`,
+      title: props.door ? 'Sold at the door' : 'Tickets collected',
+      description: `Booking ${props.bookingRef} marked as ${props.door ? 'door sale' : 'collected'}`,
       icon: 'i-lucide-check-circle',
       color: 'success',
     })

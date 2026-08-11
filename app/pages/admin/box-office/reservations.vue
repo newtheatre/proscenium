@@ -366,10 +366,14 @@ async function markAllNoShow() {
 
 const collectReservationId = ref<string | null>(null)
 const collectBookingRef = ref<string | null>(null)
+// A walk-in is a sale made at the door, so it collects as DOOR rather than
+// COLLECTED — this keeps on-the-door and pre-booked revenue distinguishable.
+const collectAsDoor = ref(false)
 
 function openCollect(r: Reservation) {
   collectReservationId.value = r.id
   collectBookingRef.value = r.bookingRef
+  collectAsDoor.value = false
 }
 
 function closeCollect() {
@@ -389,9 +393,11 @@ const performanceLabel = computed(() => {
 
 async function onWalkInCreated(reservationId: string, bookingRef: string) {
   await refresh()
-  // Immediately open collect so staff can process the walk-in in one flow
+  // Immediately open collect so staff can process the walk-in in one flow,
+  // recording it as an on-the-door (DOOR) sale.
   collectReservationId.value = reservationId
   collectBookingRef.value = bookingRef
+  collectAsDoor.value = true
 }
 
 // ── Table columns ─────────────────────────────────────────────────────────────
@@ -790,6 +796,7 @@ const todayFormatted = computed(() =>
     <BoxOfficeCollectModal
       :reservation-id="collectReservationId"
       :booking-ref="collectBookingRef"
+      :door="collectAsDoor"
       @close="closeCollect"
       @refresh="refresh()"
     />
