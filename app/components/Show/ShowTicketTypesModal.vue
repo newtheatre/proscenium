@@ -141,10 +141,14 @@ async function handleDone() {
       }
       else {
         const pricePence = Math.round(parseFloat(d.priceStr) * 100)
+        // Only persist a price override when it differs from the inherited base
+        // price; otherwise send null so toggling active alone doesn't pin the
+        // current price as an override.
+        const priceToSend = pricePence === tt.price ? null : pricePence
         if (d.active !== tt.effectiveActive || pricePence !== tt.effectivePrice) {
           ops.push($fetch(`/api/shows/${props.show.id}/ticket-types`, {
             method: 'PUT',
-            body: { ticketTypeId: tt.id, active: d.active, price: pricePence },
+            body: { ticketTypeId: tt.id, active: d.active, price: priceToSend },
           }))
         }
       }
