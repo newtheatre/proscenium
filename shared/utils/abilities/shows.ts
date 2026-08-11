@@ -1,24 +1,27 @@
 /**
  * Show and performance authorization abilities.
  *
- * Shows are public data (anyone can list/read).
+ * The public reads shows through `/api/whats-on`, which returns only PUBLISHED
+ * shows and hides internal fields. The raw `/api/shows` endpoints expose every
+ * show — including DRAFT — with internal notes and sales figures, so listing
+ * and reading a show directly is staff-only.
  * ADMIN / MANAGER can create, update, and manage performances.
  * ADMIN only can delete shows.
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser } from './types'
-import { hasRole, isAdminOrManager } from './types'
+import { hasRole, isAdminOrManager, isStaff } from './types'
 
 // ── Show abilities ───────────────────────────────────────────────
 
-/** List shows — public. */
-export const listShows = defineAbility(() => true)
+/** List shows via /api/shows (exposes drafts and internal fields) — staff only. */
+export const listShows = defineAbility((user: AbilityUser) => isStaff(user))
 
 /** Create a show — ADMIN and MANAGER. */
 export const createShow = defineAbility((user: AbilityUser) => isAdminOrManager(user))
 
-/** Read a show — public. */
-export const readShow = defineAbility(() => true)
+/** Read a show via /api/shows/:id (exposes drafts and internal fields) — staff only. */
+export const readShow = defineAbility((user: AbilityUser) => isStaff(user))
 
 /** Update a show — ADMIN and MANAGER. */
 export const updateShow = defineAbility((user: AbilityUser) => isAdminOrManager(user))
