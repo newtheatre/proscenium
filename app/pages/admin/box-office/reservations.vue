@@ -101,19 +101,6 @@ function formatTime(val: string | number | null | undefined): string {
   return d.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
-function formatDateTime(val: string | number | null | undefined): string {
-  const d = toDate(val)
-  if (!d) return '—'
-  return d.toLocaleString('en-GB', {
-    timeZone: 'Europe/London',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-}
-
 function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear()
     && a.getMonth() === b.getMonth()
@@ -583,9 +570,6 @@ const todayFormatted = computed(() =>
             variant="ghost"
             size="sm"
             :disabled="!prevPerformance"
-            :tooltip="prevPerformance
-              ? `${prevPerformance.showTitle} — ${formatDateTime(prevPerformance.startsAt)}`
-              : undefined"
             @click="goToPrev"
           />
 
@@ -638,9 +622,6 @@ const todayFormatted = computed(() =>
             variant="ghost"
             size="sm"
             :disabled="!nextPerformance"
-            :tooltip="nextPerformance
-              ? `${nextPerformance.showTitle} — ${formatDateTime(nextPerformance.startsAt)}`
-              : undefined"
             @click="goToNext"
           />
         </div>

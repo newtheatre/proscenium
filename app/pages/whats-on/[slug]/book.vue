@@ -167,15 +167,9 @@ if (selectedPerformanceId.value && show.value?.performances.some(p => p.id === s
   currentStep.value = 1
 }
 
-// If logged in, skip the details step when navigating forward
+// Advance from the tickets step to the details step.
 function handleNextFromTickets() {
-  if (loggedIn.value && canProceedFromDetails.value) {
-    // Auto-fill is already done; still go to details so user can add notes or confirm
-    currentStep.value = 2
-  }
-  else {
-    currentStep.value = 2
-  }
+  currentStep.value = 2
 }
 
 // ── Submission ───────────────────────────────────────────────────────────────
