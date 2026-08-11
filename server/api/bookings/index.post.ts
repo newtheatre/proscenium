@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, count, eq, inArray, isNull } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { z } from 'zod/v4'
 import { sendBookingConfirmationEmail } from '~~/server/utils/email'
@@ -67,31 +67,8 @@ export default defineEventHandler(async (event) => {
 
   // ── Check capacity ─────────────────────────────────────────────────────────
 
-  const capacity = performance.capacityOverride ?? performance.venue.capacity
-
-  if (capacity !== null && capacity !== undefined) {
-    const [existing] = await db
-      .select({ count: count() })
-      .from(schema.tickets)
-      .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
-      .where(
-        and(
-          eq(schema.tickets.performanceId, body.performanceId),
-          inArray(schema.reservations.status, ['PENDING', 'COLLECTED', 'DOOR']),
-          isNull(schema.tickets.refundedAt),
-        ),
-      )
-
-    const totalRequested = body.tickets.reduce((sum, t) => sum + t.quantity, 0)
-    const currentCount = existing?.count ?? 0
-
-    if (currentCount + totalRequested > capacity) {
-      throw createError({
-        statusCode: 409,
-        statusMessage: 'Not enough tickets available for this performance',
-      })
-    }
-  }
+  const totalRequested = body.tickets.reduce((sum, t) => sum + t.quantity, 0)
+  await assertCapacity(body.performanceId, totalRequested)
 
   // ── Resolve user ───────────────────────────────────────────────────────────
 

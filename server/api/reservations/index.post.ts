@@ -79,6 +79,11 @@ export default defineEventHandler(async (event) => {
   const priceCtx = await loadTicketPriceContext(requestedTypeIds, performance.show.id, body.performanceId)
   validateTicketTypesExist(requestedTypeIds, priceCtx)
 
+  // Enforce capacity on the walk-in path too. Staff who need to oversell raise
+  // the performance's capacityOverride rather than bypassing this.
+  const totalRequested = body.tickets.reduce((sum, t) => sum + t.quantity, 0)
+  await assertCapacity(body.performanceId, totalRequested)
+
   // ── Create shadow user (if needed) + reservation + tickets, atomically ─────
 
   const reservationId = nanoid()

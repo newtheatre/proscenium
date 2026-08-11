@@ -12,23 +12,29 @@ const bodySchema = z.object({
 export default defineEventHandler(async (event) => {
   const { email, password, name } = await readValidatedBody(event, bodySchema.parse)
 
-  // Check if user already exists
+  // A password-less shadow account (created by a guest booking or walk-in) may
+  // already exist for this email — registering should claim it so the booking
+  // history carries over. Only a real, password-set account blocks registration.
   const existingUser = await db.select().from(schema.users).where(eq(schema.users.email, email)).get()
 
-  if (existingUser) {
+  if (existingUser?.password) {
     throw createError({ statusCode: 400, statusMessage: 'User with this email already exists' })
   }
 
   // Hash the password
   const hashedPassword = await hashPassword(password)
 
-  // Insert the new user into the database with no roles by default
-  const [newUser] = await db.insert(schema.users).values({
-    email,
-    password: hashedPassword,
-    name,
-    verified: false,
-  }).returning()
+  const [newUser] = existingUser
+    ? await db.update(schema.users)
+        .set({ password: hashedPassword, name })
+        .where(eq(schema.users.id, existingUser.id))
+        .returning()
+    : await db.insert(schema.users).values({
+        email,
+        password: hashedPassword,
+        name,
+        verified: false,
+      }).returning()
 
   if (!newUser) {
     throw createError({ statusCode: 500, statusMessage: 'Failed to create user' })

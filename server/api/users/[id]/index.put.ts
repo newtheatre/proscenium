@@ -6,6 +6,8 @@ import { updateUser, updateUserRoles, updateUserVerified } from '~~/shared/utils
 const bodySchema = z.object({
   email: z.email().optional(),
   password: passwordSchema.optional(),
+  // Required when a user changes their own password; ignored for admin overrides.
+  currentPassword: z.string().optional(),
   name: z.string().min(1, 'Name is required').optional(),
   verified: z.boolean().optional(),
   roles: z.array(z.enum(['ADMIN', 'MANAGER', 'BOX_OFFICE'])).optional(),
@@ -39,6 +41,24 @@ export default defineEventHandler(async (event) => {
   // Check if user is trying to update verified status without permission
   if (body.verified !== undefined && !(await allows(event, updateUserVerified))) {
     throw createError({ statusCode: 403, statusMessage: 'Only admins can update verified status' })
+  }
+
+  // A user changing their OWN password must prove the current one. Admins/
+  // managers changing another user's password are exempt (override).
+  const session = await getUserSession(event)
+  const isSelf = session.user?.id === userId
+  if (body.password !== undefined && isSelf) {
+    if (!body.currentPassword) {
+      throw createError({ statusCode: 400, statusMessage: 'Current password is required' })
+    }
+    const current = await db
+      .select({ password: schema.users.password })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .get()
+    if (!current?.password || !(await verifyPassword(current.password, body.currentPassword))) {
+      throw createError({ statusCode: 401, statusMessage: 'Current password is incorrect' })
+    }
   }
 
   // Prepare update data
@@ -77,6 +97,13 @@ export default defineEventHandler(async (event) => {
       .where(eq(schema.users.id, userId))
   }
 
+  // A password change invalidates this user's other existing sessions.
+  if (body.password !== undefined) {
+    await db.update(schema.users)
+      .set({ sessionEpoch: sql`${schema.users.sessionEpoch} + 1` })
+      .where(eq(schema.users.id, userId))
+  }
+
   // Update roles if provided
   if (body.roles !== undefined) {
     // Replace the role set atomically so a failure can't leave the user with no
@@ -112,9 +139,9 @@ export default defineEventHandler(async (event) => {
 
   const result = formatUserResponse(updatedUser)
 
-  // Update session if user is updating their own profile
-  const { user: currentUser } = await getUserSession(event)
-  if (currentUser && currentUser.id === userId) {
+  // Update session if user is updating their own profile (keeps this session
+  // valid after its own sessionEpoch bump).
+  if (isSelf) {
     await replaceUserSession(event, {
       user: result,
       loggedInAt: new Date(),

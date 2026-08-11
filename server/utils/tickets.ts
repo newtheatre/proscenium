@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull } from 'drizzle-orm'
 
 /**
  * Loaded override data used by `resolveEffectivePrice`.
@@ -118,5 +118,57 @@ export function validateTicketTypesActive(
   const inactiveId = ticketTypeIds.find(id => !resolveEffectiveActive(id, ctx))
   if (inactiveId) {
     throw createError({ statusCode: 400, statusMessage: `Ticket type ${inactiveId} is not available for this performance` })
+  }
+}
+
+/**
+ * Assert that `additional` more tickets can be sold for a performance without
+ * exceeding its capacity, counting active (non-refunded) tickets on
+ * PENDING/COLLECTED/DOOR reservations.
+ *
+ * Capacity is `performances.capacityOverride ?? venues.capacity`; a null
+ * capacity means uncapped. Raising `capacityOverride` is the deliberate way for
+ * staff to oversell, rather than bypassing this check.
+ *
+ * Throws 404 if the performance is unknown, 409 if the request would oversell.
+ * Note: this is a read-then-write check with no lock, so two concurrent writes
+ * can still both pass — accepted at this booking volume.
+ */
+export async function assertCapacity(performanceId: string, additional: number): Promise<void> {
+  if (additional <= 0) return
+
+  const perf = await db
+    .select({
+      capacityOverride: schema.performances.capacityOverride,
+      venueCapacity: schema.venues.capacity,
+    })
+    .from(schema.performances)
+    .innerJoin(schema.venues, eq(schema.performances.venueId, schema.venues.id))
+    .where(eq(schema.performances.id, performanceId))
+    .get()
+
+  if (!perf) throw createError({ statusCode: 404, statusMessage: 'Performance not found' })
+
+  const capacity = perf.capacityOverride ?? perf.venueCapacity
+  if (capacity == null) return // uncapped
+
+  const [existing] = await db
+    .select({ count: count() })
+    .from(schema.tickets)
+    .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
+    .where(
+      and(
+        eq(schema.tickets.performanceId, performanceId),
+        inArray(schema.reservations.status, ['PENDING', 'COLLECTED', 'DOOR']),
+        isNull(schema.tickets.refundedAt),
+      ),
+    )
+
+  const currentCount = existing?.count ?? 0
+  if (currentCount + additional > capacity) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Not enough tickets available for this performance',
+    })
   }
 }
