@@ -21,6 +21,23 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'User with this email already exists' })
   }
 
+  if (existingUser) {
+    // A password-less row is only claimable if it is genuinely an unclaimed
+    // customer shadow account. A privileged row must never be claimable by
+    // whoever gets to the address first: the legacy import created
+    // password-less accounts carrying ADMIN/MANAGER/BOX_OFFICE, which made
+    // `register` an unauthenticated route to full administrative access.
+    const privileged = await db
+      .select({ role: schema.userRoles.role })
+      .from(schema.userRoles)
+      .where(eq(schema.userRoles.userId, existingUser.id))
+      .get()
+
+    if (privileged) {
+      throw createError({ statusCode: 400, statusMessage: 'User with this email already exists' })
+    }
+  }
+
   // Hash the password
   const hashedPassword = await hashPassword(password)
 
