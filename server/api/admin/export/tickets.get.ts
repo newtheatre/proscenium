@@ -105,7 +105,14 @@ type TicketRow = {
 
 function csvCell(val: string | number | null | undefined): string {
   if (val == null) return ''
-  const str = String(val)
+  let str = String(val)
+  // Neutralise spreadsheet formula injection: Excel/Sheets treat a cell that
+  // begins with = + - @ (optionally after a tab or carriage return) as a
+  // formula. Customer-controlled fields flow into this export, so prefix any
+  // such cell with an apostrophe to force it to be read as text.
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`
+  }
   if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
     return `"${str.replace(/"/g, '""')}"`
   }
