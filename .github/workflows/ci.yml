@@ -24,13 +24,12 @@ jobs:
       - name: Build
         run: bun run build
 
-      # Typecheck and lint are reported but not yet blocking: the repository has
-      # a backlog of pre-existing errors (tracked in the known-issues docs). Drop
-      # `continue-on-error` once that backlog is cleared so they gate PRs too.
+      # Typecheck is a hard gate — the codebase is clean.
       - name: Typecheck
         run: bun run typecheck
-        continue-on-error: true
 
+      # Lint is reported but not yet blocking: there is still a backlog of
+      # pre-existing style errors. Drop `continue-on-error` once it is cleared.
       - name: Lint
         run: bun run lint
         continue-on-error: true
