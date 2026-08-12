@@ -51,6 +51,16 @@ if (error.value) {
   })
 }
 
+// The server moved the token into a cookie on first use, so take it out of the
+// address bar. Without this it stays in browser history and in the Referer of
+// any outbound link on this page — for a live credential.
+onMounted(() => {
+  if (!accessToken) return
+  const url = new URL(window.location.href)
+  url.searchParams.delete('t')
+  window.history.replaceState({}, '', url.pathname + url.search + url.hash)
+})
+
 useSeoMeta({
   title: () => booking.value ? `Booking ${booking.value.bookingRef}` : 'Booking',
 })

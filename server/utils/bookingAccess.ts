@@ -4,12 +4,13 @@ import type { H3Event } from 'h3'
 
 /**
  * Cookie carrying a signed access token, for a guest who arrived from a link
- * that carried one. Keeping the token out of the address bar afterwards stops
- * it reaching browser history, intermediary logs, or the Referer of any
- * outbound link on the booking page.
+ * that carried one in its query string.
  *
- * The token is already scoped to one booking and already expires; the cookie is
- * only a place to put it.
+ * A token in the URL reaches browser history, any intermediary's logs, and the
+ * Referer of every outbound link on the booking page. Moving it into a cookie on
+ * first use — and letting the page drop it from the address bar — keeps a live
+ * credential out of all three. The token is already scoped to one booking and
+ * already expires; the cookie is only a better place to keep it.
  */
 export const BOOKING_TOKEN_COOKIE = 'nnt_booking_token'
 
@@ -38,11 +39,15 @@ export function setBookingTokenCookie(event: H3Event, token: string): void {
 export async function hasBookingToken(event: H3Event, bookingId: string): Promise<boolean> {
   const query = getQuery(event)
   const fromQuery = typeof query.t === 'string' ? query.t : undefined
-  const fromCookie = getCookie(event, BOOKING_TOKEN_COOKIE)
 
-  for (const token of [fromQuery, fromCookie]) {
-    if (token && await verifyBookingToken(token, bookingId)) return true
+  if (fromQuery && await verifyBookingToken(fromQuery, bookingId)) {
+    // Hand it off to a cookie so the page can drop it from the URL.
+    setBookingTokenCookie(event, fromQuery)
+    return true
   }
+
+  const fromCookie = getCookie(event, BOOKING_TOKEN_COOKIE)
+  if (fromCookie && await verifyBookingToken(fromCookie, bookingId)) return true
 
   return false
 }
