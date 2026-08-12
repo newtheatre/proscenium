@@ -16,6 +16,7 @@ export {
   readUser,
   updateUser,
   deleteUser,
+  anonymiseUserAccount,
   updateUserRoles,
   updateUserVerified,
   resetUserPassword,

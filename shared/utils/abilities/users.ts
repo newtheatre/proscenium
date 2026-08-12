@@ -35,6 +35,18 @@ export const deleteUser = defineAbility((user: AbilityUser, resource: OwnedResou
   return false
 })
 
+/**
+ * Anonymise a user — same rule as deletion.
+ *
+ * Deletion is impossible for anyone with booking history (the foreign key is
+ * restrict, and the sales record has to be kept), so this is the path that
+ * actually answers an erasure request. It therefore carries the same permission
+ * as the deletion it stands in for, and no more: you may close your own
+ * account, an ADMIN may close someone else's, and an ADMIN cannot close their
+ * own by this route.
+ */
+export const anonymiseUserAccount = deleteUser
+
 /** Update user roles — ADMIN only. */
 export const updateUserRoles = defineAbility((user: AbilityUser) => hasRole(user, 'ADMIN'))
 
