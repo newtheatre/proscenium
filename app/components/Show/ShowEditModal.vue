@@ -19,6 +19,11 @@ interface Show {
   slug: string
   subtitle?: string | null
   description?: string | null
+  longDescription?: string | null
+  programmeUrl?: string | null
+  externalUrl?: string | null
+  contentWarningNotes?: string | null
+  warningsConfirmedNone?: boolean
   posterUrl?: string | null
   status: 'DRAFT' | 'PUBLISHED'
   performances?: Array<{ id: string, status: string }>
@@ -63,6 +68,11 @@ const schema = z.object({
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Only lowercase letters, numbers, and hyphens'),
   subtitle: z.string().optional(),
   description: z.string().optional(),
+  longDescription: z.string().optional(),
+  programmeUrl: z.string().url('Must be a full URL').or(z.literal('')).optional(),
+  externalUrl: z.string().url('Must be a full URL').or(z.literal('')).optional(),
+  contentWarningNotes: z.string().optional(),
+  warningsConfirmedNone: z.boolean().optional(),
   status: z.enum(['DRAFT', 'PUBLISHED']),
 })
 
@@ -73,8 +83,65 @@ const state = reactive<Partial<Schema>>({
   slug: undefined,
   subtitle: undefined,
   description: undefined,
+  longDescription: undefined,
+  programmeUrl: undefined,
+  externalUrl: undefined,
+  contentWarningNotes: undefined,
+  warningsConfirmedNone: false,
   status: 'DRAFT',
 })
+
+// ── Content warnings ─────────────────────────────────────────────────────────
+
+type WarningKind = 'TECHNICAL' | 'ACTION' | 'DIALOGUE'
+
+interface WarningOption { id: string, title: string }
+
+const AXES: Array<{ kind: WarningKind, label: string, hint: string }> = [
+  { kind: 'TECHNICAL', label: 'Technical effects', hint: 'Strobe, haze, loud noise' },
+  { kind: 'ACTION', label: 'Depicted on stage', hint: 'Shown as part of the action' },
+  { kind: 'DIALOGUE', label: 'Referred to', hint: 'Discussed rather than shown' },
+]
+
+// The vocabulary is shared across shows so the same warning means the same
+// thing everywhere. Fetched once; 384 came across from the legacy site.
+const { data: warningVocabulary } = useFetch<WarningOption[]>('/api/content-warnings', { lazy: true })
+
+const selectedWarnings = reactive<Record<WarningKind, string[]>>({
+  TECHNICAL: [],
+  ACTION: [],
+  DIALOGUE: [],
+})
+
+const warningsLoading = ref(false)
+
+async function loadWarnings(showId: string) {
+  warningsLoading.value = true
+  try {
+    const links = await $fetch<Array<{ contentWarningId: string, kind: WarningKind }>>(
+      `/api/shows/${showId}/content-warnings`,
+    )
+    for (const axis of AXES) {
+      selectedWarnings[axis.kind] = links.filter(l => l.kind === axis.kind).map(l => l.contentWarningId)
+    }
+  }
+  catch {
+    // Non-fatal: the rest of the editor still works. Leaving the selections
+    // empty would be worse than showing nothing, because saving would then
+    // silently clear the show's warnings.
+    toast.add({ title: 'Could not load content warnings', description: 'Leave the warnings section alone to avoid overwriting them.', color: 'warning' })
+    warningsFailed.value = true
+  }
+  finally {
+    warningsLoading.value = false
+  }
+}
+
+const warningsFailed = ref(false)
+
+const totalSelectedWarnings = computed(() =>
+  AXES.reduce((n, axis) => n + selectedWarnings[axis.kind].length, 0),
+)
 
 // Sync state when the show prop changes
 watch(
@@ -85,7 +152,14 @@ watch(
       state.slug = show.slug
       state.subtitle = show.subtitle ?? ''
       state.description = show.description ?? ''
+      state.longDescription = show.longDescription ?? ''
+      state.programmeUrl = show.programmeUrl ?? ''
+      state.externalUrl = show.externalUrl ?? ''
+      state.contentWarningNotes = show.contentWarningNotes ?? ''
+      state.warningsConfirmedNone = show.warningsConfirmedNone ?? false
       state.status = show.status
+      warningsFailed.value = false
+      loadWarnings(show.id)
       previousStatus = show.status
       performanceCount.value = show.performances?.length ?? 0
     }
@@ -114,6 +188,20 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         slug: event.data.slug,
         subtitle: event.data.subtitle || null,
         description: event.data.description || null,
+        longDescription: event.data.longDescription || null,
+        programmeUrl: event.data.programmeUrl || null,
+        externalUrl: event.data.externalUrl || null,
+        contentWarningNotes: event.data.contentWarningNotes || null,
+        warningsConfirmedNone: event.data.warningsConfirmedNone ?? false,
+        // Omitted entirely if the existing links could not be read, so a failed
+        // load cannot turn into a silent wipe of the show's warnings.
+        ...(warningsFailed.value
+          ? {}
+          : {
+              contentWarnings: AXES.flatMap(axis =>
+                selectedWarnings[axis.kind].map(id => ({ contentWarningId: id, kind: axis.kind })),
+              ),
+            }),
         status: event.data.status,
       },
     })
@@ -337,6 +425,121 @@ function cancelPosterChange() {
             :rows="3"
           />
         </UFormField>
+
+        <UFormField
+          name="longDescription"
+          label="Full description"
+          help="Shown on the show page below the hero. The short description above is used on cards and listings."
+        >
+          <UTextarea
+            v-model="state.longDescription"
+            placeholder="The full write-up for the show page..."
+            class="w-full"
+            :rows="6"
+          />
+        </UFormField>
+
+        <div class="grid sm:grid-cols-2 gap-4">
+          <UFormField
+            name="programmeUrl"
+            label="Digital programme"
+            help="Link to the programme, if there is one."
+          >
+            <UInput
+              v-model="state.programmeUrl"
+              type="url"
+              placeholder="https://..."
+              class="w-full"
+            />
+          </UFormField>
+
+          <UFormField
+            name="externalUrl"
+            label="External booking link"
+            help="For shows we host but do not sell for. Setting this replaces our booking button."
+          >
+            <UInput
+              v-model="state.externalUrl"
+              type="url"
+              placeholder="https://..."
+              class="w-full"
+            />
+          </UFormField>
+        </div>
+
+        <USeparator />
+
+        <!-- Content warnings. The "confirmed none" checkbox is the point of
+             this section: a show with no warnings listed and no confirmation
+             tells a customer nothing, and the page says so rather than
+             implying the show is free of them. -->
+        <div class="space-y-4">
+          <div class="flex items-baseline justify-between gap-2">
+            <h3 class="font-semibold text-default">
+              Content warnings
+            </h3>
+            <span
+              v-if="totalSelectedWarnings"
+              class="text-xs text-muted"
+            >{{ totalSelectedWarnings }} selected</span>
+          </div>
+
+          <UAlert
+            v-if="warningsFailed"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-alert-triangle"
+            title="Content warnings could not be loaded"
+            description="They will be left exactly as they are when you save. Reopen the editor to try again."
+          />
+
+          <template v-else>
+            <UFormField name="warningsConfirmedNone">
+              <UCheckbox
+                v-model="state.warningsConfirmedNone"
+                label="Confirmed: this production has no content warnings"
+                help="Tick only if the company has actually checked. Left unticked with nothing selected, the show page says no information was recorded."
+              />
+            </UFormField>
+
+            <div
+              v-for="axis in AXES"
+              :key="axis.kind"
+            >
+              <UFormField
+                :label="axis.label"
+                :help="axis.hint"
+              >
+                <USelectMenu
+                  v-model="selectedWarnings[axis.kind]"
+                  :items="warningVocabulary ?? []"
+                  :loading="warningsLoading"
+                  value-key="id"
+                  label-key="title"
+                  multiple
+                  searchable
+                  placeholder="None"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+
+            <UFormField
+              name="contentWarningNotes"
+              label="Notes"
+              help="Anything the list above cannot express — timings, intensity, how to avoid a particular moment."
+            >
+              <UTextarea
+                v-model="state.contentWarningNotes"
+                placeholder="e.g. The strobe sequence lasts about 20 seconds in Act 2."
+                class="w-full"
+                :rows="3"
+              />
+            </UFormField>
+          </template>
+        </div>
+
+        <USeparator />
 
         <UFormField
           name="status"

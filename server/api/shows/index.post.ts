@@ -8,6 +8,13 @@ const bodySchema = z.object({
   slug: z.string().min(1, 'Slug is required').regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase letters, numbers, and hyphens only'),
   subtitle: z.string().optional(),
   description: z.string().optional(),
+  longDescription: z.string().max(20000).optional().nullable(),
+  programmeUrl: z.url().max(2048).optional().nullable(),
+  externalUrl: z.url().max(2048).optional().nullable(),
+  categoryId: z.string().optional().nullable(),
+  contentWarningNotes: z.string().max(2000).optional().nullable(),
+  warningsConfirmedNone: z.boolean().optional(),
+  /** Full replacement of the show's warning links. Omit to leave them alone. */
   status: z.enum(['DRAFT', 'PUBLISHED']).optional().default('DRAFT'),
 })
 
@@ -28,6 +35,12 @@ export default defineEventHandler(async (event) => {
     slug: body.slug,
     subtitle: body.subtitle,
     description: body.description,
+    longDescription: body.longDescription,
+    programmeUrl: body.programmeUrl,
+    externalUrl: body.externalUrl,
+    categoryId: body.categoryId,
+    contentWarningNotes: body.contentWarningNotes,
+    warningsConfirmedNone: body.warningsConfirmedNone ?? false,
     status: body.status,
   }).returning()
 

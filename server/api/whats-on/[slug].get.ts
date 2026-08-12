@@ -30,6 +30,14 @@ export default defineEventHandler(async (event) => {
           venue: true,
         },
       },
+      // The import loaded 1,001 show-to-warning links across 424 warnings and
+      // none of it reached the page where someone decides whether to attend.
+      contentWarnings: {
+        with: {
+          contentWarning: { columns: { id: true, title: true, icon: true } },
+        },
+      },
+      category: { columns: { id: true, name: true, slug: true } },
     },
   })
 

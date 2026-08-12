@@ -80,8 +80,22 @@ function formatDuration(minutes: number): string {
       <WhatsOnShowHero :show="show">
         <template #actions>
           <div class="flex flex-wrap items-center gap-4">
+            <!-- externalUrl marks a show the theatre hosts but does not sell
+                 for. Sending someone into our booking flow for one would take a
+                 booking we cannot honour. -->
             <UButton
-              v-if="hasAvailablePerformances"
+              v-if="show.externalUrl"
+              label="Book on the organiser's site"
+              icon="i-lucide-external-link"
+              size="lg"
+              :to="show.externalUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              external
+            />
+
+            <UButton
+              v-else-if="hasAvailablePerformances"
               label="Book Tickets"
               icon="i-lucide-ticket"
               size="lg"
@@ -94,6 +108,19 @@ function formatDuration(minutes: number): string {
               color="error"
               size="lg"
             />
+
+            <UButton
+              v-if="show.programmeUrl"
+              label="Digital programme"
+              icon="i-lucide-book-open"
+              size="lg"
+              color="neutral"
+              variant="subtle"
+              :to="show.programmeUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              external
+            />
           </div>
         </template>
       </WhatsOnShowHero>
@@ -101,6 +128,27 @@ function formatDuration(minutes: number): string {
       <!-- Main content with sidebar -->
       <UPage>
         <UPageBody>
+          <!-- The legacy site carried a long description as well as the card
+               blurb; 403 of 477 imported shows have one. -->
+          <section
+            v-if="show.longDescription"
+            class="mb-10"
+          >
+            <h2 class="text-2xl font-bold text-default mb-4">
+              About the show
+            </h2>
+            <div class="prose prose-sm dark:prose-invert max-w-none whitespace-pre-line">
+              {{ show.longDescription }}
+            </div>
+          </section>
+
+          <WhatsOnContentWarnings
+            :warnings="show.contentWarnings ?? []"
+            :notes="show.contentWarningNotes"
+            :confirmed-none="show.warningsConfirmedNone"
+            class="mb-10"
+          />
+
           <!-- Performances Section -->
           <h2 class="text-2xl font-bold text-default mb-6">
             Performances
@@ -185,7 +233,17 @@ function formatDuration(minutes: number): string {
 
               <!-- Book CTA -->
               <UButton
-                v-if="hasAvailablePerformances"
+                v-if="show.externalUrl"
+                label="Book on the organiser's site"
+                icon="i-lucide-external-link"
+                block
+                :to="show.externalUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                external
+              />
+              <UButton
+                v-else-if="hasAvailablePerformances"
                 label="Book Tickets"
                 icon="i-lucide-ticket"
                 block
