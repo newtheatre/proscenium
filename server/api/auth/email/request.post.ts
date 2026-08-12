@@ -10,6 +10,15 @@ const bodySchema = z.object({
 export default defineEventHandler(async (event) => {
   const { email } = await readValidatedBody(event, bodySchema.parse)
 
+  // Sends an email on every call, so the same inbox-flooding and quota-burning
+  // objection applies here as to password reset.
+  await assertRateLimit(event, [
+    { key: `verify:ip:${clientIp(event)}`, limit: 30, windowSeconds: 60 * 60 },
+    { key: `verify:email:${email.toLowerCase()}`, limit: 3, windowSeconds: 60 * 60 },
+  ], 'Too many verification emails requested. Please wait an hour, or contact the box office.')
+
+  await sweepRateLimits(event)
+
   const user = await db.select().from(schema.users).where(eq(schema.users.email, email)).get()
 
   // Respond identically whether or not the address exists, and whether or not
