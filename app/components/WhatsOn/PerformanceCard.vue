@@ -17,9 +17,10 @@ interface Performance {
   ticketsSold: number
   capacity: number | null
   isSoldOut: boolean
+  isBookingClosed?: boolean
 }
 
-defineProps<{
+const props = defineProps<{
   performance: Performance
   availability: {
     label: string
@@ -31,13 +32,23 @@ defineProps<{
 const emit = defineEmits<{
   select: []
 }>()
+
+// Sold out and past the online cutoff are different reasons, but both mean the
+// customer cannot book here. Saying which one it is saves a wasted click.
+const unavailable = computed(() => props.performance.isSoldOut || !!props.performance.isBookingClosed)
+
+const bookButtonLabel = computed(() => {
+  if (props.performance.isSoldOut) return 'Sold Out'
+  if (props.performance.isBookingClosed) return 'Booking Closed'
+  return 'Book Now'
+})
 </script>
 
 <template>
   <UCard
     :ui="{ body: 'p-4' }"
     class="transition-colors"
-    :class="{ 'opacity-60': performance.isSoldOut }"
+    :class="{ 'opacity-60': unavailable }"
   >
     <div class="flex items-center justify-between gap-4">
       <!-- Time & Venue -->
@@ -89,10 +100,10 @@ const emit = defineEmits<{
 
       <!-- Book button -->
       <UButton
-        :disabled="performance.isSoldOut"
-        :label="performance.isSoldOut ? 'Sold Out' : 'Book Now'"
-        :color="performance.isSoldOut ? 'neutral' : 'primary'"
-        :variant="performance.isSoldOut ? 'outline' : 'solid'"
+        :disabled="unavailable"
+        :label="bookButtonLabel"
+        :color="unavailable ? 'neutral' : 'primary'"
+        :variant="unavailable ? 'outline' : 'solid'"
         icon="i-lucide-ticket"
         @click="emit('select')"
       />

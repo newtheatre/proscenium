@@ -64,10 +64,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Show is not currently published' })
   }
 
-  // Check performance is in the future
-  if (performance.startsAt < new Date()) {
-    throw createError({ statusCode: 400, statusMessage: 'This performance has already started' })
-  }
+  // Online booking closes at startsAt minus bookingClosesHoursBefore, which the
+  // legacy import populated for 1,254 performances. Staff endpoints do not call
+  // this — the box office still takes walk-ups after the online cutoff.
+  assertBookingOpen(performance)
 
   // ── Check capacity ─────────────────────────────────────────────────────────
 

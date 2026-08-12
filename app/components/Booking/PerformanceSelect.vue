@@ -23,6 +23,7 @@ interface Performance {
   ticketsSold: number
   capacity: number | null
   isSoldOut: boolean
+  isBookingClosed?: boolean
   ticketTypes: Array<{
     id: string
     name: string
@@ -107,16 +108,16 @@ const groupedPerformances = computed(() => {
         <button
           v-for="perf in group.performances"
           :key="perf.id"
-          :disabled="perf.isSoldOut"
+          :disabled="perf.isSoldOut || perf.isBookingClosed"
           :aria-pressed="perf.id === selectedPerformanceId"
           class="w-full text-left rounded-lg border-2 p-4 transition-all duration-150"
           :class="[
             perf.id === selectedPerformanceId
               ? 'border-primary bg-primary/5'
               : 'border-default hover:border-muted',
-            perf.isSoldOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+            perf.isSoldOut || perf.isBookingClosed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
           ]"
-          @click="!perf.isSoldOut && emit('select', perf.id)"
+          @click="!perf.isSoldOut && !perf.isBookingClosed && emit('select', perf.id)"
         >
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">

@@ -29,9 +29,12 @@ export default defineEventHandler(async (event) => {
   if (booking.status !== 'PENDING') {
     throw createError({ statusCode: 400, statusMessage: 'Only a booking that has not yet been collected can be changed' })
   }
-  if (booking.performance.status !== 'ON_SALE' || booking.performance.startsAt < new Date()) {
+  if (booking.performance.status !== 'ON_SALE') {
     throw createError({ statusCode: 400, statusMessage: 'This performance is no longer open for changes' })
   }
+  // Honours bookingClosesHoursBefore, so a customer cannot add tickets after
+  // front-of-house has stopped counting on online numbers.
+  assertBookingOpen(booking.performance)
 
   const body = await readValidatedBody(event, bodySchema.parse)
   const { performanceId } = booking

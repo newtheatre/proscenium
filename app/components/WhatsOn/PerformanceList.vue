@@ -17,6 +17,7 @@ interface Performance {
   ticketsSold: number
   capacity: number | null
   isSoldOut: boolean
+  isBookingClosed?: boolean
 }
 
 const props = defineProps<{
@@ -62,6 +63,7 @@ function formatDuration(minutes: number, intervalCount: number, intervalMinutes:
 
 function getAvailabilityInfo(perf: Performance) {
   if (perf.isSoldOut) return { label: 'Sold Out', color: 'error' as const, icon: 'i-lucide-x-circle' }
+  if (perf.isBookingClosed) return { label: 'Booking Closed', color: 'error' as const, icon: 'i-lucide-clock-alert' }
   if (perf.capacity === null) return { label: 'Available', color: 'success' as const, icon: 'i-lucide-check-circle' }
 
   const remaining = perf.capacity - perf.ticketsSold

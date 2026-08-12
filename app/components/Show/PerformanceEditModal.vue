@@ -21,6 +21,7 @@ interface Performance {
   intervalCount: number
   intervalMinutes?: number | null
   capacityOverride?: number | null
+  bookingClosesHoursBefore?: number | null
   status: 'DRAFT' | 'ON_SALE' | 'CANCELLED'
   notes?: string | null
 }
@@ -53,6 +54,7 @@ const schema = z.object({
   intervalCount: z.number().int().nonnegative().default(0),
   intervalMinutes: z.number().int().positive().optional().nullable(),
   capacityOverride: z.number().int().positive().optional().nullable(),
+  bookingClosesHoursBefore: z.number().int().nonnegative().max(168).optional().nullable(),
   notes: z.string().optional(),
 })
 
@@ -67,6 +69,7 @@ const state = reactive<Partial<Schema>>({
   intervalCount: 0,
   intervalMinutes: null,
   capacityOverride: null,
+  bookingClosesHoursBefore: null,
   notes: '',
 })
 
@@ -116,6 +119,7 @@ watch(
       state.intervalCount = perf.intervalCount
       state.intervalMinutes = perf.intervalMinutes ?? null
       state.capacityOverride = perf.capacityOverride ?? null
+      state.bookingClosesHoursBefore = perf.bookingClosesHoursBefore ?? null
       state.notes = perf.notes ?? ''
       doorsManuallyEdited = !!perf.doorsAt // treat existing doors as manually set
     }
@@ -156,6 +160,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           intervalCount: event.data.intervalCount,
           intervalMinutes: event.data.intervalMinutes,
           capacityOverride: event.data.capacityOverride,
+          bookingClosesHoursBefore: event.data.bookingClosesHoursBefore,
           // Status is intentionally omitted here — managed via show publish/cancel actions
           notes: event.data.notes || null,
         },
@@ -299,6 +304,25 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
             />
           </UFormField>
         </div>
+
+        <UFormField
+          name="bookingClosesHoursBefore"
+          label="Close online booking"
+          help="Hours before the start time. Leave blank to keep booking open until curtain-up. The box office can still sell on the door afterwards."
+        >
+          <UInput
+            v-model.number="state.bookingClosesHoursBefore"
+            type="number"
+            min="0"
+            max="168"
+            placeholder="0"
+            class="w-full"
+          >
+            <template #trailing>
+              <span class="text-xs text-muted">hours before</span>
+            </template>
+          </UInput>
+        </UFormField>
 
         <UFormField
           name="notes"

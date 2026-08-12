@@ -112,6 +112,9 @@ export default defineEventHandler(async (event) => {
       ticketsSold,
       capacity,
       isSoldOut: capacity !== null && ticketsSold >= capacity,
+      // So the listing can say "booking closed" rather than letting a customer
+      // pick a performance and only find out when the booking is rejected.
+      isBookingClosed: !isBookingOpen(perf),
     }
   })
 

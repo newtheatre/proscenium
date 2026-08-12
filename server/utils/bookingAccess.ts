@@ -54,6 +54,7 @@ export interface BookingAccess {
     startsAt: Date
     status: 'DRAFT' | 'ON_SALE' | 'CANCELLED'
     showId: string
+    bookingClosesHoursBefore: number | null
   }
 }
 
@@ -96,6 +97,7 @@ export async function requireBookingAccess(event: H3Event, idOrRef: string): Pro
       startsAt: schema.performances.startsAt,
       status: schema.performances.status,
       showId: schema.performances.showId,
+      bookingClosesHoursBefore: schema.performances.bookingClosesHoursBefore,
     })
     .from(schema.performances)
     .where(eq(schema.performances.id, booking.performanceId))
