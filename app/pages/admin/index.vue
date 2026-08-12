@@ -46,10 +46,13 @@ interface RecentReservation {
 }
 
 interface Stats {
+  window: { from: string, to: string, isCurrentSeason: boolean }
   activeShows: number
   upcomingPerformances: number
   totalRevenuePence: number
   totalTicketsSold: number
+  unknownPricedTickets: number
+  derivedPricedTickets: number
   reservationsByStatus: Array<{ status: string, count: number }>
   revenueByShow: RevenueByShow[]
   recentReservations: RecentReservation[]
@@ -74,6 +77,33 @@ const STATUS_CONFIG = {
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
 const { data: stats, status: statsStatus } = await useFetch<Stats>('/api/admin/stats', { lazy: true })
+
+/** e.g. "2025/26 season" — or the explicit dates when a custom range is set. */
+const windowLabel = computed(() => {
+  const w = stats.value?.window
+  if (!w) return ''
+  if (w.isCurrentSeason) {
+    const startYear = Number(w.from.slice(0, 4))
+    return `${startYear}/${String(startYear + 1).slice(2)} season`
+  }
+  const fmt = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+  return `${fmt(w.from)} to ${fmt(w.to)}`
+})
+
+/**
+ * Imported tickets whose price was never recorded still count as admissions but
+ * contribute nothing to revenue, so revenue-per-ticket reads low. Say so rather
+ * than letting someone draw the wrong conclusion from the two cards together.
+ */
+const statsCaveat = computed(() => {
+  const unknown = stats.value?.unknownPricedTickets ?? 0
+  const derived = stats.value?.derivedPricedTickets ?? 0
+  if (!unknown && !derived) return ''
+  const parts: string[] = []
+  if (unknown) parts.push(`${unknown.toLocaleString('en-GB')} with no recorded price`)
+  if (derived) parts.push(`${derived.toLocaleString('en-GB')} estimated`)
+  return `Includes ${parts.join(', ')}`
+})
 const { data: shows } = await useFetch<Show[]>('/api/shows', { lazy: true })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -204,6 +234,30 @@ const recentColumns: TableColumn<RecentReservation>[] = [
     </div>
 
     <template v-else-if="stats">
+      <!-- The figures below are for one season, not all time. Before this was
+           bounded the dashboard showed a decade of imported takings as though
+           they were the current year's. -->
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <UIcon
+          name="i-lucide-calendar-range"
+          class="size-4 text-muted"
+        />
+        <span class="text-muted">Showing</span>
+        <span class="font-medium text-highlighted">{{ windowLabel }}</span>
+        <UBadge
+          v-if="!stats.window.isCurrentSeason"
+          color="warning"
+          variant="subtle"
+          label="Custom range"
+        />
+        <UBadge
+          v-if="statsCaveat"
+          color="neutral"
+          variant="subtle"
+          :label="statsCaveat"
+        />
+      </div>
+
       <!-- ── Stat cards ─────────────────────────────────────────────────── -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- Total Revenue -->
@@ -217,7 +271,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
                 {{ formatPounds(stats.totalRevenuePence) }}
               </p>
               <p class="mt-1 text-xs text-muted">
-                Collected &amp; door only
+                Collected &amp; door, {{ windowLabel }}
               </p>
             </div>
             <div class="shrink-0 rounded-lg bg-success/10 p-2">
@@ -240,7 +294,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
                 {{ stats.totalTicketsSold.toLocaleString('en-GB') }}
               </p>
               <p class="mt-1 text-xs text-muted">
-                Collected &amp; door only
+                Admissions, {{ windowLabel }}
               </p>
             </div>
             <div class="shrink-0 rounded-lg bg-primary/10 p-2">
