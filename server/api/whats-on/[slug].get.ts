@@ -118,6 +118,11 @@ export default defineEventHandler(async (event) => {
     }
   })
 
+  // Same reasoning as the listing: fully public, slow-changing, and the only
+  // fast-moving field is ticketsSold, which is advisory here — capacity is
+  // enforced when the booking is written.
+  setHeader(event, 'Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
+
   return {
     ...show,
     performances: performancesWithTickets,

@@ -141,6 +141,20 @@ export default defineEventHandler(async (event) => {
 
   const totals = revenueAndTicketsResult[0]
 
+  // Private, browser-only, and short: a dashboard does not need to be
+  // second-accurate, and this stops a reload or a tab switch re-running the
+  // aggregates.
+  //
+  // Deliberately not defineCachedEventHandler. That caches the handler's result
+  // and skips the handler on a hit — including the authorize() call above — so
+  // an unauthenticated request could be served a cached copy of the theatre's
+  // finances. Keying the cache on the session cookie would fix that and also
+  // make it per-user, which is what this header already does without the
+  // footgun. The row counts that motivated caching here were mostly the missing
+  // date bound, and that is fixed: the aggregates now read about 1,100 ticket
+  // rows for a season rather than 25,006 for all time.
+  setHeader(event, 'Cache-Control', 'private, max-age=30')
+
   return {
     window: {
       from: (from ?? season.from),
