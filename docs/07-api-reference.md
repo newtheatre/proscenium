@@ -111,21 +111,25 @@ Two independent mechanisms are in play.
 Role helpers in `abilities/types.ts`:
 
 ```ts
-hasRole(user, role)      // user.roles.includes(role)
+hasRole(user, role)      // user.roles.includes(`proscenium:${role}`)
 isAdminOrManager(user)   // ADMIN | MANAGER
 isStaff(user)            // ADMIN | MANAGER | BOX_OFFICE
 ```
 
-The three roles are `ADMIN`, `MANAGER`, `BOX_OFFICE`, stored one row per role in `user_roles` and flattened onto the session user as `roles: string[]`. A user with no rows is a plain customer.
+The three roles are `ADMIN`, `MANAGER`, `BOX_OFFICE`. They arrive **namespaced** on the session as `proscenium:ADMIN` and friends, because one estate session carries every app's roles — `hasRole` adds the prefix for you. Never compare against a bare role name. A user with no `proscenium:` role is a plain customer.
+
+**Roles go stale.** A session whose `refreshedAt` is older than 15 minutes has its `proscenium:` roles dropped for authorization purposes, so staff abilities fail closed until the browser refreshes through the auth service. See [04-auth-and-permissions](./04-auth-and-permissions.md).
 
 **Two things about `authorize()` that are easy to get wrong:**
 
 1. **It always requires a session.** Every ability in this repo is declared with the single-argument form `defineAbility(fn)`, which sets `allowGuest: false`. `nuxt-authorization` short-circuits to *denied* when the resolved user is `null`, *before* the ability body runs. So abilities whose body is `() => true` — `readShow`, `listShows`, `readTicketType`, `listVenues`, and friends — do **not** mean "public" when passed to `authorize()`. They mean "any logged-in user, regardless of role". The genuinely public endpoints achieve that by not calling `authorize()` at all.
 2. **Denial is a 403, not a 401,** and the payload comes from the library rather than from `createError` in the handler: `statusCode: 403` with `message: 'Unauthorized'`. Do not pattern-match on `statusMessage` for authorisation failures.
 
-`allows(event, ability)` is the non-throwing sibling, used inside `POST /api/users` and `PUT /api/users/:id` for granular checks on `roles` and `verified`.
+`allows(event, ability)` is the non-throwing sibling. Note that `authorize()` **swallows any non-`AuthorizationError` thrown while resolving the user** and then resolves successfully — which is why `sessionUserForAuthorization` must never throw. See [04-auth-and-permissions](./04-auth-and-permissions.md#staleness-not-epochs).
 
-> **Any handler with no `authorize()` and no `requireUserSession()` call is fully public** — reachable by anyone on the internet, unauthenticated. That includes all seven `/api/auth/*` endpoints, `POST /api/bookings`, `GET /api/bookings/:id` (via `?ref=`), all of `/api/whats-on`, `/api/venues` and `/api/venue-features` reads, `/api/ticket-types` reads, `/images/**`, and — importantly — **`GET /api/shows` and `GET /api/shows/:id`**.
+> **Any handler with no `authorize()` and no `requireUserSession()` call is fully public** — reachable by anyone on the internet, unauthenticated. That includes `POST /api/bookings`, `GET /api/bookings/:id` (via a signed `?t=` token), all of `/api/whats-on`, `/api/venues` and `/api/venue-features` reads, `/api/ticket-types` reads, and `/images/**`. `GET /api/shows` and `GET /api/shows/:id` are **not** in that list any more — they now call `authorize()`, because they return DRAFT productions.
+
+Public write paths are rate limited in `server/middleware/rateLimit.ts`, declared against route patterns rather than per handler.
 
 ### Money and dates
 
@@ -147,21 +151,21 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-63 endpoints: 62 under `server/api/`, plus one blob route under `server/routes/`.
+69 endpoints under `server/api/`, plus one blob route under `server/routes/`.
+
+There are **no `/api/auth/*` endpoints**. Registration, login, logout, verification and password reset all live at `auth.newtheatre.org.uk` — this app reads the shared session cookie and never writes it. Anything in an older copy of this document describing `POST /api/auth/login` and friends is describing code that was deleted at the stage-door cutover.
 
 In the Auth column, **Public** means no `authorize()` and no `requireUserSession()`; **Any user** means `authorize()` with a permissive ability (so login required, role irrelevant); **Staff** means ADMIN, MANAGER, or BOX_OFFICE.
 
-### Auth
+### Service hooks (called by the auth service)
+
+Authenticated by the SHA-256 of this app's `AUTH_SERVICE_TOKEN`, compared constant-time. Not reachable by a browser session.
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| POST | `/api/auth/register` | Public | Create an account, send a verification email, and log in |
-| POST | `/api/auth/login` | Public | Exchange email and password for a session cookie |
-| POST | `/api/auth/logout` | Public | Clear the session cookie |
-| POST | `/api/auth/email/request` | Public | Re-send an email verification link |
-| POST | `/api/auth/email/verify` | Public | Consume a verification token and mark the email verified |
-| POST | `/api/auth/password/forgot` | Public | Send a password reset link |
-| POST | `/api/auth/password/reset` | Public | Consume a reset token and set a new password |
+| POST | `/api/_hooks/auth/export` | Service token | This app's contribution to a subject-access bundle |
+| POST | `/api/_hooks/auth/anonymise` | Service token | GDPR erasure: scrub the mirror row and reservation notes. Idempotent |
+| POST | `/api/_hooks/auth/last-activity` | Service token | Most recent booking or pass per user, feeding the retention sweep |
 
 ### Bookings (public-facing box office)
 
@@ -177,20 +181,21 @@ In the Auth column, **Public** means no `authorize()` and no `requireUserSession
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | GET | `/api/reservations` | Staff (`listReservations`) | Filterable reservation list, optionally with ticket counts |
-| POST | `/api/reservations` | Staff (`createReservation`) | Create a reservation on a customer's behalf — **no capacity check** |
+| POST | `/api/reservations` | Staff (`createReservation`) | Create a reservation on a customer's behalf; capacity-checked |
 | GET | `/api/reservations/:id` | Staff or owner (`readReservation`) | Reservation detail with tickets |
 | PUT | `/api/reservations/:id` | Staff (`updateReservation`) | Change status, cancellation attribution, and notes |
 | DELETE | `/api/reservations/:id` | ADMIN/MANAGER (`deleteReservation`) | Hard-delete the reservation and its tickets |
-| PUT | `/api/reservations/:id/tickets` | Staff (`updateReservation`) | Set desired quantities per ticket type; server diffs and applies |
+| PUT | `/api/reservations/:id/tickets` | Staff (`updateReservation`) | Set desired quantities per ticket type; server diffs and applies. **PENDING only** |
+| POST | `/api/reservations/:id/refund` | ADMIN/MANAGER (`refundTicket`) | Refund n tickets of a type. **Collected bookings only** |
 | GET | `/api/reservations/:id/available-ticket-types` | Staff (`updateReservation`) | Effective prices for this reservation's performance |
 
 ### Shows
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| GET | `/api/shows` | **Public** | All shows including DRAFT, with performances and sales counts |
+| GET | `/api/shows` | Staff (`listShows`) | All shows including DRAFT, with performances and sales counts |
 | POST | `/api/shows` | ADMIN/MANAGER (`createShow`) | Create a show |
-| GET | `/api/shows/:id` | **Public** | One show with its performances |
+| GET | `/api/shows/:id` | Any user (`readShow`) | One show with its performances |
 | PUT | `/api/shows/:id` | ADMIN/MANAGER (`updateShow`) | Update show fields |
 | DELETE | `/api/shows/:id` | ADMIN (`deleteShow`) | Delete a show; performances cascade |
 | POST | `/api/shows/:id/poster` | ADMIN/MANAGER (`updateShow`) | Upload a poster image to R2 |
@@ -225,12 +230,25 @@ In the Auth column, **Public** means no `authorize()` and no `requireUserSession
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| GET | `/api/users` | Staff (`listUsers`) | All users with roles |
-| POST | `/api/users` | ADMIN/MANAGER (`createUser`) | Create a user with no password and email them a reset link |
-| GET | `/api/users/:id` | Staff or self (`readUser`) | One user with roles |
-| PUT | `/api/users/:id` | ADMIN/MANAGER or self (`updateUser`) | Update profile; roles and verified are ADMIN-only |
-| DELETE | `/api/users/:id` | ADMIN (others) or self (`deleteUser`) | Delete a user |
-| POST | `/api/users/:id/reset-password` | ADMIN/MANAGER, not self (`resetUserPassword`) | Send a 24-hour reset link to another user |
+| GET | `/api/users` | Staff (`listUsers`) | Mirror users, paginated; `?email=` returns at most one |
+| POST | `/api/users` | ADMIN/MANAGER (`createUser`) | Create a shadow account via the auth service and mirror it |
+| GET | `/api/users/:id` | Staff or self (`readUser`) | One mirror user |
+| DELETE | `/api/users/:id` | ADMIN (others) or self (`deleteUser`) | Delete the mirror row; refuses if they have bookings |
+
+Credentials, roles, verification and erasure are the auth service's — there is no `PUT /api/users/:id`
+and no password-reset route here.
+
+### Passes
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/pass-types` | Staff (`listPassTypes`) | Pass products with prices, scope and issued counts |
+| POST | `/api/pass-types` | ADMIN/MANAGER (`managePassTypes`) | Create a pass product (always `DRAFT`) |
+| PUT | `/api/pass-types/:id` | ADMIN/MANAGER (`managePassTypes`) | Edit a product; **the only way to put one on sale** |
+| GET | `/api/passes` | Staff (`listPasses`) | Search issued passes; `?performanceId=` adds door eligibility |
+| POST | `/api/passes` | Staff (`issuePass`) | Issue a pass to a holder |
+| PUT | `/api/passes/:id` | ADMIN/MANAGER (`cancelPass`) | Cancel or reinstate an issued pass |
+| POST | `/api/passes/:id/redeem` | Staff (`redeemPass`) | Admit a holder to a performance |
 
 ### Venues
 
@@ -273,153 +291,48 @@ In the Auth column, **Public** means no `authorize()` and no `requireUserSession
 
 ## 3. Endpoint detail
 
-### 3.1 Auth
+### 3.1 Service hooks
 
-All seven auth endpoints are fully public. None calls `authorize()` or `requireUserSession()`.
+Called by stage-door, never by a browser. Each authenticates with `Authorization: Bearer <sha256hex>`
+where the value is the SHA-256 of this app's own `AUTH_SERVICE_TOKEN` — the auth service stores only
+the hash, so no plaintext ever travels and the hash cannot be replayed inbound against the auth
+service. Verified constant-time in `server/utils/hookAuth.ts`; anything else is a bare 401.
 
----
+#### `POST /api/_hooks/auth/export`
 
-#### `POST /api/auth/register`
+**Source** `server/api/_hooks/auth/export.post.ts` · **Auth** Service token
 
-**Source** `server/api/auth/register.post.ts` · **Auth** Public
+**Body** `{ userId: string }`
 
-```ts
-{
-  email: z.email(),
-  password: passwordSchema,          // min 8, one lowercase, one uppercase, one digit
-  name: z.string().min(1),           // 'Name is required'
-}
-```
+**Returns** `{ data: { profile, reservations[], passes[] } }` — the personal data this app holds for
+that person: mirror profile, every reservation with its show, performance, status, notes, ticket
+count and total paid, and every pass. Empty structures rather than a 404 when the person never used
+this app.
 
-**Response** `200` — `{ message: 'User registered successfully' }`
+#### `POST /api/_hooks/auth/anonymise`
 
-New users are created with `verified: false` and **no roles**.
+**Source** `server/api/_hooks/auth/anonymise.post.ts` · **Auth** Service token
 
-**Errors**
+**Body** `{ userId: string }` · **Returns** `{ ok: true }`
 
-| Code | Cause |
-| --- | --- |
-| 400 | `User with this email already exists` |
-| 500 | `Failed to create user`, or `Failed to send email` from the Resend helper |
+Rewrites the mirror row to `deleted-<userId>@anonymised.invalid` / `Deleted user` — byte-identical
+to what stage-door writes centrally — and clears **both** `customerNotes` and `staffNotes` on every
+reservation the person owns, stamping `anonymisedAt`. Bookings and ticket rows survive: attendance
+and revenue statistics stay intact, the person does not.
 
-**Side effects** Hashes the password with `hashPassword` (nuxt-auth-utils, scrypt); inserts a `users` row; creates a 24-hour `email_verifications` token; sends a verification email via Resend; sets the session cookie. The email is awaited *before* the session is set, so a Resend outage produces a created-but-not-logged-in user.
+**Idempotent**, and returns `{ ok: true }` for a user this app has never seen, because stage-door
+retries until every app succeeds and an erasure is not complete until they all do.
 
----
+#### `POST /api/_hooks/auth/last-activity`
 
-#### `POST /api/auth/login`
+**Source** `server/api/_hooks/auth/last-activity.post.ts` · **Auth** Service token
 
-**Source** `server/api/auth/login.post.ts` · **Auth** Public
+**Body** `{ userIds: string[] }` (max 500) · **Returns** `{ [userId]: epochMs | null }`
 
-```ts
-{
-  email: z.email(),
-  password: z.string().min(1),       // 'Password is required'
-}
-```
-
-**Response** `200` — `{ message: 'Login successful' }`. The useful output is the `nuxt-session` cookie, containing `{ user: { id, email, name, verified, roles }, loggedInAt }`.
-
-**Errors**
-
-| Code | Cause |
-| --- | --- |
-| 401 | `Invalid email or password` — returned identically for unknown email, an account with a `null` password (guest/shadow accounts), and a wrong password |
-
-**Side effects** Writes `users.lastLogin`; sets the session cookie. Note that a shadow account created by a guest booking has `password: null` and therefore cannot log in until it claims a password through the reset flow.
-
----
-
-#### `POST /api/auth/logout`
-
-**Source** `server/api/auth/logout.post.ts` · **Auth** Public — works with or without a session
-
-**Body** none. **Response** `200` — `{ message: 'Logout successful' }`
-
-**Side effects** `clearUserSession(event)`.
-
----
-
-#### `POST /api/auth/email/request`
-
-**Source** `server/api/auth/email/request.post.ts` · **Auth** Public
-
-```ts
-{ email: z.email('Valid email is required') }
-```
-
-**Response** `200` — `{ message: 'Verification email sent' }`, or `{ message: 'If the email exists, a verification link has been sent' }` when no such user exists. The second wording is deliberate anti-enumeration.
-
-**Errors**
-
-| Code | Cause |
-| --- | --- |
-| 400 | `Email is already verified` — this *does* leak that the address exists and is verified |
-| 500 | `Failed to send email` |
-
-**Side effects** Inserts a new `email_verifications` row (previous ones are not deleted) and sends an email.
-
----
-
-#### `POST /api/auth/email/verify`
-
-**Source** `server/api/auth/email/verify.post.ts` · **Auth** Public
-
-```ts
-{ token: z.string().min(1) }        // 'Verification token is required'
-```
-
-**Response** `200` — `{ message: 'Email verified successfully' }`
-
-**Errors**
-
-| Code | Cause |
-| --- | --- |
-| 400 | `Invalid or expired verification token` (no matching row) |
-| 400 | `Verification token has expired. A new one has been sent to your email.` |
-| 400 | `Email is already verified` |
-| 404 | `User not found` (orphaned token) |
-
-**Side effects** On expiry, silently issues *and emails* a fresh token before throwing. On success, sets `users.verified = true`, deletes the consumed verification row, and — if the caller is logged in as that same user — rewrites the session so `verified` is up to date without a re-login.
-
----
-
-#### `POST /api/auth/password/forgot`
-
-**Source** `server/api/auth/password/forgot.post.ts` · **Auth** Public
-
-```ts
-{ email: z.email() }
-```
-
-**Response** `200` — `{ message: 'Password reset email sent' }`, or the anti-enumeration `{ message: 'If the email exists, a password reset link has been sent' }`.
-
-**Side effects** `createPasswordResetToken` **deletes all existing reset tokens for that user** before inserting a new one with a 1-hour expiry, then emails the link. Requesting a second reset invalidates the first.
-
----
-
-#### `POST /api/auth/password/reset`
-
-**Source** `server/api/auth/password/reset.post.ts` · **Auth** Public
-
-```ts
-{
-  token: z.string().min(1),          // 'Reset token is required'
-  password: passwordSchema,
-}
-```
-
-**Response** `200` — `{ message: 'Password reset successfully' }`
-
-**Errors**
-
-| Code | Cause |
-| --- | --- |
-| 400 | `Invalid or expired password reset token` |
-| 400 | `Password reset token has expired. Please request a new one.` |
-
-**Side effects** Deletes the expired row on expiry. On success, hashes and writes the new password, then deletes every reset token for that user. This is the route by which a shadow account (created by a guest booking) becomes a real account — it does **not** set `verified`, and it does not create a session, so the user must log in afterwards.
-
----
+The most recent reservation or pass per user, feeding the retention sweep's guest cohort. Every
+requested id appears in the response, `null` where nothing is known. Ids are chunked at 90 per query
+internally — D1 binds at most 100 parameters per statement, and stage-door batches at 90 for the
+same reason.
 
 ### 3.2 Bookings
 
@@ -478,7 +391,7 @@ One `tickets` row is created per seat — a line of `quantity: 3` yields three r
 | 400 | `Ticket type <id> not found` (from `validateTicketTypesExist`) |
 | 500 | `Failed to create guest account` / `Failed to create reservation` |
 
-**Capacity check.** Effective capacity is `performance.capacityOverride ?? venue.capacity`. If both are `null` the check is skipped entirely and the booking is unbounded. Otherwise the handler counts existing non-refunded tickets on the performance whose reservation status is `PENDING`, `COLLECTED`, or `DOOR`, and rejects when `current + requested > capacity`. **This is a read-then-write with no transaction or lock** — two concurrent bookings can both pass the check and jointly oversell.
+**Capacity check.** `assertCapacity` — effective capacity is `performance.capacityOverride ?? venue.capacity`, and both `null` means uncapped. Occupied seats are counted by `countOccupiedSeats`, the one shared rule: non-refunded tickets on `PENDING`/`COLLECTED`/`DOOR` reservations, excluding `PASS_SALE` types (a pass purchase is not a seat — the seat is the separate `PASS_ADMISSION` ticket). Every write path calls it, including reinstating a cancelled reservation. **It remains a read-then-write with no lock** — two concurrent bookings can both pass and jointly oversell. Accepted at this volume; see [09-known-issues](./09-known-issues.md#capacity-is-still-read-then-write).
 
 **Side effects**
 - Guests are matched to an existing account by email if one exists (including a staff account — the booking is then attributed to that user); otherwise a **shadow account** is created with `password: null, verified: false`.
@@ -1192,15 +1105,17 @@ Unlike its show-level counterpart, this handler does **not** check that the over
 
 ### 3.7 Users
 
-User responses come from `formatUserResponse` (`server/utils/queries/users.ts`), which flattens the `userRoles` relation into a `roles: string[]` and drops the join rows. The `password` column is excluded by `userWithRolesQuery` and is never returned.
+These act on the **local mirror** only — `id`, `email`, `name`, `anonymisedAt`, timestamps. Credentials, roles, verification and erasure belong to the auth service; there is deliberately no `PUT /api/users/:id`, no password reset and no role editor here, and the abilities that used to describe them have been removed rather than left implying a permission model this app does not enforce.
 
 ```jsonc
 {
-  "id": "…", "email": "…", "name": "…", "verified": true,
-  "createdAt": "…", "updatedAt": "…", "lastLogin": "…",
-  "roles": ["MANAGER"]
+  "id": "…", "email": "…", "name": "…",
+  "anonymisedAt": null,
+  "createdAt": "…", "updatedAt": "…"
 }
 ```
+
+Anonymised rows and legacy `.invalid` placeholders never appear in listings or lookups — they surface only as a `hiddenAnonymised` count on the paginated response.
 
 ---
 
@@ -1208,7 +1123,11 @@ User responses come from `formatUserResponse` (`server/utils/queries/users.ts`),
 
 **Source** `server/api/users/index.get.ts` · **Auth** `authorize(event, listUsers)` — staff (ADMIN, MANAGER, BOX_OFFICE)
 
-**Response** `200` — an array of formatted users. No pagination, no filtering, no sorting: this returns **every** user, including shadow accounts created by guest bookings. **Errors** `403`.
+**Query** `?email=` returns **at most one row, as a bare array** — the exact-address lookup the box-office walk-in form uses, so a volunteer's browser never receives the user table. Otherwise `?page`, `?limit` (max 100) and `?q` (name or email, case-insensitive) give the paginated envelope `{ rows, total, page, limit, hiddenAnonymised }`.
+
+Note the two response shapes from one path; `?email=` is the exception to the `Paginated<T>` contract in `server/utils/pagination.ts`.
+
+**Errors** `403`.
 
 ---
 
@@ -1233,13 +1152,15 @@ A MANAGER may create a plain user, but `allows(event, updateUserVerified)` and `
 
 | Code | Cause |
 | --- | --- |
-| 403 | `Only admins can set verified status` |
-| 403 | `Only admins can assign roles` |
 | 400 | `User with this email already exists` |
-| 500 | `Failed to create user` / `Failed to retrieve created user` / `Failed to send email` |
+| 502 | The auth service is unreachable, or `NUXT_AUTH_SERVICE_TOKEN` is unset |
 | 403 | Not ADMIN/MANAGER |
 
-**Side effects** The user is created **with no password**. A password reset token with the longer `ADMIN_PASSWORD_RESET` lifetime (**24 hours**, versus 1 hour for self-service) is created and emailed, and the user sets their own password through `/reset-password`. The email is awaited, so a Resend failure produces a 500 *after* the user and roles have already been written.
+**Side effects** Calls `POST /api/users/shadow` on the auth service to match or create the central
+identity, then mirrors the returned id locally. No password is set and no email is sent — the person
+claims the account by registering or signing in with Google on the same address, and their booking
+history comes with it. If the auth service is unreachable the operation fails rather than creating a
+local-only user, because an id this app invented would never match the central one.
 
 ---
 
@@ -1250,42 +1171,6 @@ A MANAGER may create a plain user, but `allows(event, updateUserVerified)` and `
 The row is fetched before the check, so an unknown id yields 404 regardless of who is asking.
 
 **Response** `200` — the formatted user. **Errors** `400 User ID is required`; `404 User not found`; `403`.
-
----
-
-#### `PUT /api/users/:id`
-
-**Source** `server/api/users/[id]/index.put.ts` · **Auth** `authorize(event, updateUser, user)` — ADMIN/MANAGER can update anyone; any user can update themselves. Then two granular `allows()` checks.
-
-```ts
-{
-  email:    z.email().optional(),
-  password: passwordSchema.optional(),
-  name:     z.string().min(1).optional(),
-  verified: z.boolean().optional(),                                          // ADMIN only
-  roles:    z.array(z.enum(['ADMIN','MANAGER','BOX_OFFICE'])).optional(),    // ADMIN only
-}
-```
-
-**Response** `200` — the formatted, updated user.
-
-**Errors**
-
-| Code | Cause |
-| --- | --- |
-| 400 | `User ID is required` |
-| 404 | `User not found` |
-| 403 | `Only admins can update user roles` |
-| 403 | `Only admins can update verified status` |
-| 400 | `Email is already taken` |
-| 500 | `Failed to retrieve updated user` |
-
-**Side effects**
-
-- `roles` is a **full replacement**: all existing `user_roles` rows are deleted and the supplied list is inserted. Sending `roles: []` strips every role. Omitting the key leaves roles alone.
-- Passwords are hashed with `hashPassword` before storage.
-- **Changing your own password here does not require the old password** — possession of the session is sufficient. The same applies to changing your own email.
-- When a user updates their own record, `replaceUserSession` rewrites the session cookie with the new values and a fresh `loggedInAt`. An ADMIN editing *someone else's* roles does **not** invalidate that person's existing session; the change takes effect on their next login.
 
 ---
 
@@ -1306,21 +1191,80 @@ The `deleteUser` ability is unusual — read it carefully:
 
 **Errors** `400 User ID is required`; `404 User not found`; `403`.
 
-**Side effects** `user_roles`, `email_verifications`, and `password_resets` cascade. **`reservations.userId` is `onDelete: 'restrict'`**, so deleting a user who has ever booked fails at the database and surfaces as an uncaught 500 — the schema comment says to reassign the reservations first. The caller's own session is not cleared when they delete themselves.
+**Side effects** none — this deletes the mirror row only, and the central identity is untouched. **`reservations.userId` and `passes.userId` are both `onDelete: 'restrict'`**, so anyone who has ever booked or held a pass cannot be deleted; the handler pre-checks reservations and returns 409. To remove a *person*, use erasure at the auth service, which calls this app's anonymise hook. The caller's session is not cleared when they delete themselves.
 
 ---
 
-#### `POST /api/users/:id/reset-password`
+### 3.7a Passes and pass types
 
-**Source** `server/api/users/[id]/reset-password.post.ts` · **Auth** `authorize(event, resetUserPassword, { id })` — ADMIN or MANAGER, **and never on yourself** (the ability returns false when `user.id === resource.id`; use `/api/auth/password/forgot` for that)
+Season and festival passes. Design notes in [10-passes-design](./10-passes-design.md); the
+entitlement rule lives in `server/utils/passes.ts` and nowhere else.
 
-**Body** none.
+#### `GET /api/pass-types`
 
-**Response** `200` — `{ message: 'Password reset email sent' }`
+**Source** `server/api/pass-types/index.get.ts` · **Auth** `authorize(event, listPassTypes)` — staff
 
-**Errors** `400 User ID is required`; `404 User not found`; `403`; `500 Failed to send email`.
+Pass products with their price variants, show scope count and issued count.
 
-**Side effects** Deletes any existing reset tokens for that user, creates one with the 24-hour `ADMIN_PASSWORD_RESET` lifetime, and emails the link to the **target user's** address (never to the requesting staff member). This is also the intended route for converting a shadow account into a real one.
+#### `POST /api/pass-types`
+
+**Source** `server/api/pass-types/index.post.ts` · **Auth** `authorize(event, managePassTypes)` — ADMIN or MANAGER
+
+Creates a product, its price variants and its show scope in one batch. **Always created `DRAFT`** —
+use the route below to put it on sale.
+
+`validFrom` / `validTo` accept `YYYY-MM-DD` and are stored as the **first and last instants of those
+days in Europe/London**, so a pass covers the whole of its final day. Passing a full ISO datetime
+overrides that.
+
+#### `PUT /api/pass-types/:id`
+
+**Source** `server/api/pass-types/[id]/index.put.ts` · **Auth** `authorize(event, managePassTypes)` — ADMIN or MANAGER
+
+Edits a product and is the **only** way to change `status`. The box office offers `ON_SALE` types
+only, so without this a pass product could never be sold.
+
+**Errors** `409` when putting a product on sale that covers no shows (it would be redeemable
+nowhere), and `409` when lowering `maxIssued` below the number already issued.
+
+#### `GET /api/passes`
+
+**Source** `server/api/passes/index.get.ts` · **Auth** `authorize(event, listPasses)` — staff
+
+Paginated `{ rows, total, page, limit }`. `?q` matches reference, holder name or holder email.
+
+With `?performanceId=`, each row gains `redeemable: { ok, reason?, message? }` — the door check,
+decided for the whole page in four queries rather than five per pass.
+
+#### `POST /api/passes`
+
+**Source** `server/api/passes/index.post.ts` · **Auth** `authorize(event, issuePass)` — staff
+
+Issues a pass to a holder, creating a shadow account via the auth service when the buyer has none.
+Enforces `maxIssued` against ACTIVE passes.
+
+#### `PUT /api/passes/:id`
+
+**Source** `server/api/passes/[id]/index.put.ts` · **Auth** `authorize(event, cancelPass)` — ADMIN or MANAGER
+
+Cancels or reinstates one issued pass.
+
+#### `POST /api/passes/:id/redeem`
+
+**Source** `server/api/passes/[id]/redeem.post.ts` · **Auth** `authorize(event, redeemPass)` — staff
+
+Admits a pass holder to a performance: writes a £0 `PASS_ADMISSION` ticket and a `pass_admissions`
+ledger row in one batch. `canRedeem` checks, in order, that the pass is ACTIVE, in date, covers the
+show, has not already been used for this performance, that the performance is ON_SALE, and that
+there is room.
+
+`UNIQUE (pass_id, performance_id)` on `pass_admissions` **is** the once-per-performance rule — D1 has
+no interactive transactions, so that index is what holds under a double-submit. Deleting the
+admission ticket would cascade that row away, which is why neither ticket-diff route will touch a
+`PASS_ADMISSION` type and why deleting a reservation holding one returns 409.
+
+Rejections in `STAFF_OVERRIDABLE` (currently only `PERFORMANCE_NOT_ON_SALE`) can be overridden at
+the door; the rest cannot.
 
 ---
 
@@ -1528,7 +1472,7 @@ These two endpoints are the customer-safe view of the programme. Unlike `/api/sh
 }]
 ```
 
-`ticketsSold` counts non-refunded tickets on `PENDING` / `COLLECTED` / `DOOR` reservations. Note that the performance's internal `notes` column is spread into the response here too, via `...perf`.
+`ticketsSold` comes from `countOccupiedSeats`, the same rule the capacity check uses, so the sold-out badge and the booking path always agree. Show and performance rows are projected through the allow-lists in `server/utils/queries/whatsOn.ts` — the internal `notes` column is **not** returned.
 
 ---
 

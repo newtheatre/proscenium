@@ -107,11 +107,22 @@ const nameFromLookup = ref(false)
 
 async function lookupEmail() {
   const e = email.value.trim()
+
+  // Cleared BEFORE the early return, not after it. With the reset below the
+  // guard, typing a value with no "@" (a partial address, a phone number) left
+  // `existingUserId` pointing at the *previous* customer — and since a non-empty
+  // email and the retained name satisfy `canSubmit`, the walk-in was then
+  // attached to that person's account.
+  existingUserId.value = null
+  if (nameFromLookup.value) {
+    // Only clear a name the lookup filled in — never one the volunteer typed.
+    name.value = ''
+    nameFromLookup.value = false
+  }
+
   if (!e || !e.includes('@')) return
 
   lookingUp.value = true
-  existingUserId.value = null
-  nameFromLookup.value = false
 
   try {
     const users = await $fetch<Array<{ id: string, name: string, email: string }>>('/api/users', {

@@ -68,13 +68,13 @@ export default defineEventHandler(async (event) => {
     .limit(limit)
     .offset((page - 1) * limit)
 
-  // Only the current page is checked — canRedeem does several queries each.
-  const withEligibility = performanceId
-    ? await Promise.all(rows.map(async row => ({
-        ...row,
-        redeemable: await canRedeem(row.id, performanceId),
-      })))
-    : rows
+  // Decided for the whole page in four queries. Calling canRedeem per row cost
+  // five D1 queries each — 500 subrequests at limit=100.
+  let withEligibility: Array<typeof rows[number] & { redeemable?: RedeemCheck }> = rows
+  if (performanceId) {
+    const redeemability = await redeemabilityForPage(performanceId, rows)
+    withEligibility = rows.map(row => ({ ...row, redeemable: redeemability.get(row.id) }))
+  }
 
   return {
     rows: withEligibility,

@@ -1,4 +1,5 @@
 import { db } from '@nuxthub/db'
+import { isStaff } from '~~/shared/utils/abilities'
 
 /**
  * GET /api/bookings/:id — get a booking by its id or its booking reference.
@@ -39,8 +40,10 @@ export default defineEventHandler(async (event) => {
 
   if (sessionUser) {
     const isOwner = sessionUser.id === userId
-    const isStaff = sessionUser.roles?.some((r: string) => ['ADMIN', 'MANAGER', 'BOX_OFFICE'].includes(r))
-    if (isOwner || isStaff) return customerBooking
+    // isStaff() from the abilities layer, not a literal role list: session roles
+    // are app-scoped ('proscenium:ADMIN'), so comparing against bare 'ADMIN'
+    // never matched and this branch silently never fired.
+    if (isOwner || isStaff(sessionUser)) return customerBooking
   }
 
   // Guest access: a signed token scoped to this booking, from `?t=` or the

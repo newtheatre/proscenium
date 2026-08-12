@@ -46,6 +46,21 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Guest checkout sends a confirmation to whatever address the caller supplies,
+  // carrying their name and notes — so the theatre's own domain will deliver
+  // whatever a script puts in them. The per-IP limit in the rate-limit
+  // middleware is set generously for shared connections, which leaves this
+  // narrower bucket to bound how often one *address* can be mailed. A real
+  // person booking for several performances in an evening stays well inside it.
+  const guestEmail = (body.email ?? loggedInUser?.email)?.trim().toLowerCase()
+  if (guestEmail) {
+    await assertRateLimit(
+      event,
+      [{ key: `booking-create:email:${guestEmail}`, limit: 8, windowSeconds: 3600 }],
+      'That email address has made several bookings just now. Please wait a little while, or call the box office.',
+    )
+  }
+
   // ── Validate performance ───────────────────────────────────────────────────
 
   const performance = await db.query.performances.findFirst({

@@ -78,6 +78,36 @@ const statusColour: Record<PassType['status'], 'neutral' | 'success' | 'warning'
 
 const createOpen = ref(false)
 
+// Which pass type is mid-save, so only its own button spins.
+const statusSaving = ref<string | null>(null)
+
+async function setPassTypeStatus(passType: PassType, status: PassType['status']) {
+  if (statusSaving.value) return
+  statusSaving.value = passType.id
+  try {
+    await $fetch(`/api/pass-types/${passType.id}`, { method: 'PUT', body: { status } })
+    toast.add({
+      title: status === 'ON_SALE' ? `${passType.name} is on sale` : `${passType.name} closed`,
+      icon: 'i-lucide-check-circle',
+      color: 'success',
+    })
+    await refreshTypes()
+  }
+  catch (error: unknown) {
+    // The server refuses ON_SALE for a product covering no shows, and says why
+    // — surface that rather than a generic failure.
+    toast.add({
+      title: 'Could not update this pass product',
+      description: getErrorMessage(error, 'Please try again'),
+      icon: 'i-lucide-alert-circle',
+      color: 'error',
+    })
+  }
+  finally {
+    statusSaving.value = null
+  }
+}
+
 // ── Issued passes ─────────────────────────────────────────────────────────
 // Server-side search and pagination: there will be thousands of these and D1
 // bills by rows read, so the browser never receives the whole table.
@@ -226,13 +256,39 @@ async function cancelPass(pass: IssuedPass) {
               </div>
             </div>
 
-            <div class="text-right shrink-0">
-              <div class="text-2xl font-semibold tabular-nums text-highlighted">
-                {{ pt.issuedCount }}
+            <div class="text-right shrink-0 space-y-2">
+              <div>
+                <div class="text-2xl font-semibold tabular-nums text-highlighted">
+                  {{ pt.issuedCount }}
+                </div>
+                <div class="text-xs text-muted">
+                  issued{{ pt.maxIssued ? ` / ${pt.maxIssued}` : '' }}
+                </div>
               </div>
-              <div class="text-xs text-muted">
-                issued{{ pt.maxIssued ? ` / ${pt.maxIssued}` : '' }}
-              </div>
+
+              <!-- Until this existed a pass product could only ever be DRAFT,
+                   and the box office's Sell tab — which lists ON_SALE types
+                   only — was permanently empty. -->
+              <UButton
+                v-if="pt.status !== 'ON_SALE'"
+                :loading="statusSaving === pt.id"
+                label="Put on sale"
+                icon="i-lucide-badge-check"
+                color="primary"
+                variant="soft"
+                size="xs"
+                @click="setPassTypeStatus(pt, 'ON_SALE')"
+              />
+              <UButton
+                v-else
+                :loading="statusSaving === pt.id"
+                label="Close sales"
+                icon="i-lucide-ban"
+                color="neutral"
+                variant="soft"
+                size="xs"
+                @click="setPassTypeStatus(pt, 'CLOSED')"
+              />
               <!-- Pass pressure: passes issued against seats available is the
                    number a human can act on before a popular night. -->
               <div

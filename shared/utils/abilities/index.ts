@@ -14,12 +14,7 @@ export {
   listUsers,
   createUser,
   readUser,
-  updateUser,
   deleteUser,
-  anonymiseUserAccount,
-  updateUserRoles,
-  updateUserVerified,
-  resetUserPassword,
 } from './users'
 
 export {

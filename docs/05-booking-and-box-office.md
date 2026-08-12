@@ -75,21 +75,28 @@ one continuous flow.
 **The definition** — one sentence, and every implementation should match it:
 
 > Count `tickets` joined to `reservations` where the reservation status is `PENDING`, `COLLECTED` or
-> `DOOR`, and `tickets.refundedAt IS NULL`. Compare against
-> `performance.capacityOverride ?? venue.capacity`. A `NULL` capacity means unlimited.
+> `DOOR`, `tickets.refundedAt IS NULL`, and the ticket type's `kind` is not `PASS_SALE`. Compare
+> against `performance.capacityOverride ?? venue.capacity`. A `NULL` capacity means unlimited.
 
 `CANCELLED` and `NO_SHOW` release their seats. That is correct and intended.
 
-**Where it is enforced:** exactly one place, `POST /api/bookings`.
+`PASS_SALE` is excluded because such a row records the **purchase** of a pass, not a seat at this
+performance — the seat is the separate `PASS_ADMISSION` ticket. Counting both makes one buyer
+consume two seats.
 
-**Where it is bypassed:** `POST /api/reservations` (staff walk-in) and
-`PUT /api/reservations/:id/tickets` (adding tickets at collection).
+**Where it lives:** `countOccupiedSeats()` in `server/utils/tickets.ts`, and nowhere else. Every
+write path enforces it through `assertCapacity()`; every display path counts with the same function.
+Do not write a second copy — there used to be four, and they disagreed in ways that were invisible
+until someone was turned away at the door.
 
-**Where it is recomputed for display:** `GET /api/whats-on/:slug` (the only place `isSoldOut` is
-calculated), `GET /api/whats-on`, `GET /api/shows`, and four client-side components. Five copies of
-the same arithmetic. They currently agree; nothing keeps them agreeing.
+**Enforced by:** `POST /api/bookings`, `POST /api/reservations`, both `PUT .../tickets` routes,
+`POST /api/passes/:id/redeem`, and `PUT /api/reservations/:id` when a cancelled reservation is
+reinstated (its seats re-enter the count). `PUT .../performances/:id` refuses to set
+`capacityOverride` below what is already sold.
 
-There is **no database constraint** backing capacity. It is advisory application logic.
+**Still true:** the check and the write are separate statements, so two concurrent bookings can both
+pass. There is **no database constraint** backing capacity — it is advisory application logic. See
+[09-known-issues](./09-known-issues.md#capacity-is-still-read-then-write).
 
 ## 4. The door: collection and no-shows
 
@@ -156,6 +163,35 @@ Worth knowing before someone promises one of them:
 - No seat selection. Unreserved seating only.
 - No holds or expiry — a `PENDING` reservation from 2026 will still be there in 2028.
 - No waiting list for sold-out performances.
-- No refunds. `tickets.refundedAt` exists, is read in five places, and is written by nothing.
+- No payment integration, so a "refund" is a record that money was handed back at the desk, not a
+  card reversal.
 - No group or school bookings beyond raising the quantity cap.
-- No passes or season tickets — see [10-passes-design](./10-passes-design.md).
+- No passes-by-post or transfers between holders — but passes themselves exist, see
+  [10-passes-design](./10-passes-design.md).
+
+## 7. Editing versus refunding
+
+The rule the write paths enforce, because it was previously implicit and the two paths contradicted
+each other:
+
+**Nothing is paid until the tickets are collected.**
+
+| Reservation status | Tickets editable? | Refundable? |
+|---|---|---|
+| `PENDING` | ✅ by the customer or the box office | ❌ nothing has been paid |
+| `COLLECTED`, `DOOR` | ❌ | ✅ ADMIN/MANAGER only |
+| `CANCELLED`, `NO_SHOW` | ❌ | ❌ |
+
+Before collection a booking is an intention: adding and removing tickets is free, and removing one
+is not a refund because nothing was taken. After collection the composition is a record of a
+completed transaction — editing it would delete paid-for tickets with nothing to show that anything
+was returned — so the only way to reverse part of it is `POST /api/reservations/:id/refund`, which
+stamps `refundedAt` and leaves the row in place as the audit trail.
+
+Implemented in `server/utils/reservationLifecycle.ts` and applied by both ticket-diff routes and the
+refund route. The collect screen edits tickets *before* setting the status, which is why that flow
+still works.
+
+Refunded tickets stop counting towards capacity and revenue, and are excluded from anything the
+customer sees — their confirmation page, their account page and the self-service editor all filter
+them out.

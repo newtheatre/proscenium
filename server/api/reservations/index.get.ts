@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, count, eq, inArray, isNull, like, or, sql } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull, or } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { listReservations } from '~~/shared/utils/abilities'
 
@@ -43,13 +43,12 @@ export default defineEventHandler(async (event) => {
   if (status) filters.push(eq(schema.reservations.status, status))
 
   if (q) {
-    const term = likeTerm(q)
     const matchingUsers = db
       .select({ id: schema.users.id })
       .from(schema.users)
       .where(or(
-        like(sql`lower(${schema.users.name})`, term),
-        like(sql`lower(${schema.users.email})`, term),
+        likeInsensitive(schema.users.name, q),
+        likeInsensitive(schema.users.email, q),
       ))
     filters.push(or(
       eq(schema.reservations.bookingRef, q.toUpperCase()),

@@ -23,7 +23,14 @@ const bodySchema = z.object({
     ticketTypeId: z.string().min(1),
     quantity: z.int().min(0).max(50),
   })).min(1),
-})
+}).refine(
+  // The handler treats each entry as the desired TOTAL for that type and reads
+  // the current count from a map it never updates, so two entries for one type
+  // each computed against the original count and the quantities compounded —
+  // "10 then 10" inserted 20. A repeated type is a client bug either way.
+  data => new Set(data.tickets.map(t => t.ticketTypeId)).size === data.tickets.length,
+  { message: 'Each ticket type may only appear once' },
+)
 
 /** PUT /api/reservations/:id/tickets — update ticket quantities on a reservation. Staff only. */
 export default defineEventHandler(async (event) => {
@@ -43,6 +50,11 @@ export default defineEventHandler(async (event) => {
     .get()
 
   if (!reservation) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
+
+  // Collected tickets are a record of a completed transaction, not a working
+  // draft: changing them here would delete paid-for tickets with nothing to show
+  // that anything was returned. After collection the only route is a refund.
+  assertTicketsEditable(reservation.status)
 
   const { performanceId } = reservation
 

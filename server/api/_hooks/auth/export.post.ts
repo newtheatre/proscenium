@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { eq, inArray } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
 
 const bodySchema = z.object({ userId: z.string().min(1) })
@@ -33,13 +33,20 @@ export default defineEventHandler(async (event) => {
     .where(eq(schema.reservations.userId, userId))
 
   // No reservations→tickets relation is declared; aggregate separately.
+  //
+  // Joined on the owner rather than on a list of reservation ids: D1 allows at
+  // most 100 bound parameters per statement, and a decade of legacy bookings
+  // puts regular attendees well past 100 reservations — exactly the people most
+  // likely to file a subject-access request. `inArray(..., reservations.map(...))`
+  // would fail the request for them. This binds one parameter at any volume.
   const ticketTotals = new Map<string, { count: number, total: number }>()
   if (reservations.length) {
     const ticketRows = await db.select({
       reservationId: schema.tickets.reservationId,
       pricePaid: schema.tickets.pricePaid,
     }).from(schema.tickets)
-      .where(inArray(schema.tickets.reservationId, reservations.map(r => r.id)))
+      .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
+      .where(eq(schema.reservations.userId, userId))
     for (const t of ticketRows) {
       const entry = ticketTotals.get(t.reservationId) ?? { count: 0, total: 0 }
       entry.count += 1

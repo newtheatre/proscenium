@@ -31,6 +31,17 @@ function formatTime(date: string | Date) {
 interface PricedTicket {
   pricePaid: number
   priceConfidence?: 'EXACT' | 'DERIVED' | 'UNKNOWN'
+  /** Set once the box office has refunded this specific ticket. */
+  refundedAt?: string | Date | null
+}
+
+/**
+ * Refunded tickets come back from the API (the customer query selects
+ * `refundedAt`) but are no longer held. Counting them showed a ticket count and
+ * a total that contradicted the refund the customer had already been given.
+ */
+function activeTickets<T extends PricedTicket>(tickets: T[]): T[] {
+  return tickets.filter(t => !t.refundedAt)
 }
 
 function formatPrice(pence: number): string {
@@ -46,7 +57,8 @@ function formatPrice(pence: number): string {
  * that as "Free" tells someone who paid £8 in 2019 that they paid nothing, so
  * an unpriced booking says so instead of inventing a total.
  */
-function formatBookingTotal(tickets: PricedTicket[]): string {
+function formatBookingTotal(allTickets: PricedTicket[]): string {
+  const tickets = activeTickets(allTickets)
   if (tickets.length === 0) return formatPrice(0)
   if (tickets.every(t => t.priceConfidence === 'UNKNOWN')) return 'Price not recorded'
 
@@ -147,7 +159,7 @@ function getStatusLabel(status: string) {
                         name="i-lucide-ticket"
                         class="size-3.5"
                       />
-                      {{ booking.tickets.length }} ticket{{ booking.tickets.length !== 1 ? 's' : '' }}
+                      {{ activeTickets(booking.tickets).length }} ticket{{ activeTickets(booking.tickets).length !== 1 ? 's' : '' }}
                     </span>
                   </div>
                   <div class="text-xs text-muted font-mono">

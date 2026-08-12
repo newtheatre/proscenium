@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, count, eq, inArray, isNull } from 'drizzle-orm'
+import { asc, count, isNotNull } from 'drizzle-orm'
 import { listShows } from '~~/shared/utils/abilities'
 
 /**
@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
 
   if (allShows.length === 0) return []
 
-  const [showOverrideCounts, perfOverrideCounts, ticketCounts] = await Promise.all([
+  const [showOverrideCounts, perfOverrideCounts, ticketCountMap] = await Promise.all([
     db.select({ showId: schema.showTicketTypeOverrides.showId, c: count() })
       .from(schema.showTicketTypeOverrides)
       .groupBy(schema.showTicketTypeOverrides.showId)
@@ -42,22 +42,11 @@ export default defineEventHandler(async (event) => {
       .from(schema.performanceTicketTypeOverrides)
       .groupBy(schema.performanceTicketTypeOverrides.performanceId)
       .all(),
-    // Non-refunded tickets on active reservations, per performance. The status
-    // list is a fixed three-element literal, so it is safe to bind.
-    db.select({
-      performanceId: schema.tickets.performanceId,
-      c: count(),
-    })
-      .from(schema.tickets)
-      .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
-      .where(
-        and(
-          inArray(schema.reservations.status, ['PENDING', 'COLLECTED', 'DOOR']),
-          isNull(schema.tickets.refundedAt),
-        ),
-      )
-      .groupBy(schema.tickets.performanceId)
-      .all(),
+    // Seats occupied per performance, by the shared rule so this admin listing
+    // agrees with what the booking path will actually allow. Whole-table scope
+    // (`isNotNull` on a NOT NULL column) for the same 100-parameter reason as
+    // the counts above — no id list is bound.
+    countOccupiedSeats(isNotNull(schema.tickets.performanceId)),
   ])
 
   const showOverrideMap = new Map(
@@ -66,10 +55,6 @@ export default defineEventHandler(async (event) => {
   const perfOverrideMap = new Map(
     perfOverrideCounts.map((r: { performanceId: string, c: number }) => [r.performanceId, r.c]),
   )
-  const ticketCountMap = new Map(
-    ticketCounts.map((r: { performanceId: string, c: number }) => [r.performanceId, r.c]),
-  )
-
   return allShows.map((show: { id: string, performances: Array<{ id: string }> }) => ({
     ...show,
     ticketTypeOverrideCount: showOverrideMap.get(show.id) ?? 0,

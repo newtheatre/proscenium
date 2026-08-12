@@ -37,6 +37,23 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, bodySchema.parse)
 
+  // Capacity cannot be set below what is already sold. Every write path checks
+  // tickets against capacity, but this is the route that moves the *other* side
+  // of that comparison: lowering the override under the current sold count puts
+  // the performance permanently over capacity, so assertCapacity then refuses
+  // every subsequent ticket change, pass redemption and door sale for it, while
+  // the listing reports more sold than the house holds. Raising the override is
+  // still the sanctioned way to oversell deliberately.
+  if (body.capacityOverride !== undefined && body.capacityOverride !== null) {
+    const sold = await countOccupiedSeatsFor(performanceId)
+    if (body.capacityOverride < sold) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `This performance has already sold ${sold} tickets, so capacity cannot be set to ${body.capacityOverride}. Refund or cancel tickets first.`,
+      })
+    }
+  }
+
   const updateData: Record<string, unknown> = {}
   if (body.venueId !== undefined) updateData.venueId = body.venueId
   if (body.startsAt !== undefined) updateData.startsAt = new Date(body.startsAt * 1000)

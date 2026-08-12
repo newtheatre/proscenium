@@ -290,26 +290,43 @@ bunx wrangler secret put NUXT_SESSION_PASSWORD --name proscenium
 
 ### Adding a staff account and granting roles
 
-Roles are `ADMIN`, `MANAGER`, `BOX_OFFICE` (`server/db/schema/user.ts`). What they gate:
+**This is no longer done from Proscenium.** Since the estate cut over to stage-door, accounts,
+credentials and roles all live at `auth.newtheatre.org.uk`. There is no user-creation form, no
+password reset and no role editor in this app, and there is no `user_roles` table in this database —
+`users` here is a mirror of `id`, `email` and `name` only.
+
+Roles in this app's namespace, and what they gate:
 
 | Role | Access |
 | --- | --- |
-| `ADMIN` | Everything, including creating users, assigning roles and setting verified status |
-| `MANAGER` | The admin area; may create users but **not** assign roles or set verified |
-| `BOX_OFFICE` | `/admin/box-office` only — selling and managing reservations on the door |
+| `proscenium:ADMIN` | Everything, including deleting shows, venues and ticket types |
+| `proscenium:MANAGER` | The admin area, programming, passes and refunds |
+| `proscenium:BOX_OFFICE` | `/admin/box-office` only — selling and managing reservations on the door |
 
-Normal route: sign in as an `ADMIN`, go to `/admin/users`, create the user with their name, email and roles. The application creates them **without a password** and emails them an admin-initiated password-reset link valid for 24 hours (`TOKEN_EXPIRY.ADMIN_PASSWORD_RESET`). If it expires, use the reset action on `/admin/users` to send a fresh one.
+**Normal route:** sign in to `auth.newtheatre.org.uk/admin` as an `auth:ADMIN`, find the person, and
+grant `proscenium:<ROLE>` from the roles dropdown. Role definitions (description, default expiry —
+most app roles want *end of committee year*) are managed there too.
 
-Emergency route, if the admin area is unreachable but the database is up — grant an existing user a role directly:
+The new role takes effect when that person's session next refreshes — **up to 15 minutes**, or
+immediately if they sign out and back in. Removing a role is subject to the same window. There is
+nothing to do in this app either way.
 
-```bash
-bunx wrangler d1 execute proscenium --remote \
-  --command "INSERT INTO user_roles (id, user_id, role) VALUES ('<random-id>', '<user-id>', 'ADMIN')"
-```
+**There is no emergency route from this database.** A previous version of this runbook gave an
+`INSERT INTO user_roles …` command for when the admin area is unreachable; that table no longer
+exists and the command fails with *"no such table"*. If the auth service itself is down, granting
+access is not possible and the incident is stage-door's — see its
+[operations doc](https://github.com/newtheatre/stage-door/blob/main/docs/operations.md). Front-of-house
+can still take money on the door and record it afterwards.
 
-Use sparingly, and record it somewhere. `user_roles` has a unique index on `(user_id, role)`, so a duplicate insert will be rejected rather than silently duplicated.
+**Removing access when someone leaves committee:** remove their roles in the auth service. Do not
+delete the mirror row here — `reservations.user_id` is `ON DELETE restrict`, so anyone with a
+booking cannot be deleted anyway, and their booking history has to survive for the treasurer.
 
-Removing access when someone leaves committee: delete their rows from `user_roles` (the account itself can stay — deleting a user cascades to their verification and reset tokens, and reservations reference users with `ON DELETE restrict`, so a user with bookings cannot be deleted anyway).
+**Erasing someone (a GDPR request):** also the auth service — `POST /api/users/:id/erase`, or
+self-service from their `/account` page. That rewrites the central identity, bumps `session_epoch`
+and calls this app's anonymise hook, retrying until it succeeds. Do not try to scrub this database
+by hand: an erasure that does not go through the auth service leaves the central identity intact,
+and the mirror will be repopulated from the next request that person's browser makes.
 
 ### Annual handover checklist for this app
 

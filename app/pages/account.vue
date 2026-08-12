@@ -32,11 +32,6 @@ const navigation: NavigationMenuItem[][] = [
       icon: 'i-lucide-shield',
       to: '/account/security',
     },
-    {
-      label: 'Notifications',
-      icon: 'i-lucide-bell',
-      to: '/account/notifications',
-    },
   ],
 ]
 </script>

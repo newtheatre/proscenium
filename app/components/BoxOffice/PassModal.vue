@@ -132,6 +132,28 @@ const buyerName = ref('')
 const buyerEmail = ref('')
 const selling = ref(false)
 
+/**
+ * Clear everything when the modal opens.
+ *
+ * These refs live for the lifetime of the page, and only a *successful* sale
+ * reset any of them — so reopening the modal for the next person at the door
+ * still showed the previous holder's name, email and pass reference in the
+ * results list, with the previous buyer's details pre-filled in the Sell tab
+ * ready to be submitted against the new customer. WalkInModal already guards
+ * this; this one had no reset at all.
+ */
+watch(modelOpen, (isOpen) => {
+  if (!isOpen) return
+  tab.value = 'admit'
+  search.value = ''
+  results.value = []
+  admitting.value = null
+  sellTypeId.value = undefined
+  sellPriceId.value = undefined
+  buyerName.value = ''
+  buyerEmail.value = ''
+})
+
 const selectedType = computed(() => onSaleTypes.value.find(t => t.id === sellTypeId.value))
 const priceOptions = computed(() =>
   (selectedType.value?.prices ?? []).filter(p => p.active)

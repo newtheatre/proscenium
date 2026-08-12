@@ -27,7 +27,11 @@ const ticketsConfig = {
  * `with` clause for reservation list/summary views (no tickets).
  */
 export const reservationSummaryWith = {
-  user: { columns: { id: true, name: true, email: true, password: false, verified: true } },
+  // `password`/`verified` are deliberately not listed: migration 0014 dropped
+  // both columns when identity moved to the auth service. Naming them here read
+  // as a security decision about columns that no longer exist, and `verified`
+  // silently resolved to undefined in consumers typed to expect a boolean.
+  user: { columns: { id: true, name: true, email: true } },
   performance: {
     with: {
       show: { columns: { id: true, title: true, slug: true } },
@@ -40,7 +44,11 @@ export const reservationSummaryWith = {
  * `with` clause for detailed reservation views (with tickets).
  */
 export const reservationDetailWith = {
-  user: { columns: { id: true, name: true, email: true, password: false, verified: true } },
+  // `password`/`verified` are deliberately not listed: migration 0014 dropped
+  // both columns when identity moved to the auth service. Naming them here read
+  // as a security decision about columns that no longer exist, and `verified`
+  // silently resolved to undefined in consumers typed to expect a boolean.
+  user: { columns: { id: true, name: true, email: true } },
   performance: {
     with: {
       show: { columns: { id: true, title: true, slug: true } },

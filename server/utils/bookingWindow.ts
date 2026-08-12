@@ -42,6 +42,9 @@ export function assertBookingOpen(performance: BookingWindowPerformance, now = n
     statusCode: 400,
     statusMessage: started
       ? 'This performance has already started'
-      : `Online booking for this performance closed at ${closesAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}. Tickets may still be available on the door.`,
+      // Europe/London, not the Worker's UTC: quoting a cutoff an hour before
+      // the one the show page advertised sends the customer to the box office
+      // convinced the site is wrong.
+      : `Online booking for this performance closed at ${closesAt.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' })}. Tickets may still be available on the door.`,
   })
 }

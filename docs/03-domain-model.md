@@ -22,7 +22,6 @@ erDiagram
     ticket_types ||--o{ performance_ticket_type_overrides : "overridden by"
     ticket_types ||--o{ tickets : types
     users ||--o{ reservations : owns
-    users ||--o{ user_roles : holds
     reservations ||--o{ tickets : contains
 ```
 
@@ -105,24 +104,25 @@ misread thing in the schema.
 
 ### `users`
 
+A **mirror**, not an identity store. Accounts, credentials, roles and verification live in the
+central auth service (stage-door); migration 0014 dropped `password`, `email_verified`,
+`last_login`, `user_roles`, `email_verifications` and `password_resets` from this database.
+
 | Column | Notes |
 |---|---|
-| `email` | **UNIQUE, NOT NULL** |
-| `password` | **nullable** — this is what makes shadow accounts possible |
+| `id` | The auth service's canonical id. **Never regenerate or reuse one** — `reservations.user_id` FKs against it |
+| `email` | **UNIQUE, NOT NULL**, lowercase (canonical store convention) |
 | `name` | NOT NULL |
-| `verified` | mapped from column `email_verified` |
-| `lastLogin` | |
+| `anonymisedAt` | Set when the person has been erased; the row and its bookings stay |
 
-**Shadow accounts.** A guest who books without registering gets a row with `password = NULL`. They
-are a real user in every other respect, which is what lets them later claim the account by setting
-a password. Do not add a `isGuest` flag; the nullable password *is* the flag.
+Rows appear via `ensureLocalUser` (an idempotent primary-key upsert from the session) or, for guest
+checkout, from `POST /api/users/shadow` on the auth service. The FK is `onDelete: 'restrict'`, so
+nobody with booking history can be deleted — erasure rewrites instead of removing, which is why
+`anonymisedAt` exists. See [04-auth-and-permissions](./04-auth-and-permissions.md#erasure).
 
-`user_roles` is a separate table, unique on `(userId, role)`, roles `ADMIN` | `MANAGER` |
-`BOX_OFFICE`. Absence of a row is the customer role. See
-[04-auth-and-permissions](./04-auth-and-permissions.md).
-
-`email_verifications` and `password_resets` are single-use token tables, both cascading on user
-delete.
+**Shadow accounts.** A guest who books without registering gets a real central account with no
+password, mirrored here like any other. `session.user.guest` distinguishes them. There is no local
+flag, and there should not be one — this app cannot see credentials.
 
 ### `reservations`
 

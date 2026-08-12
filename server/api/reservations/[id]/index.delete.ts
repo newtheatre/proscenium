@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { eq } from 'drizzle-orm'
+import { count, eq } from 'drizzle-orm'
 import { deleteReservation } from '~~/shared/utils/abilities'
 
 /** DELETE /api/reservations/:id — delete a reservation. Admin/Manager only. */
@@ -11,6 +11,25 @@ export default defineEventHandler(async (event) => {
 
   const existing = await db.select().from(schema.reservations).where(eq(schema.reservations.id, id)).get()
   if (!existing) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
+
+  // A pass was admitted into this reservation, so deleting it would take the
+  // redemption ledger with it: `pass_admissions.ticket_id` cascades, and the
+  // UNIQUE (pass_id, performance_id) row that stops a pass being used twice for
+  // one performance is what would disappear. Cancel the reservation instead —
+  // the record is the point. Matches how the show and user delete routes refuse
+  // rather than let a cascade quietly destroy referenced rows.
+  const [admissions] = await db
+    .select({ n: count() })
+    .from(schema.passAdmissions)
+    .innerJoin(schema.tickets, eq(schema.passAdmissions.ticketId, schema.tickets.id))
+    .where(eq(schema.tickets.reservationId, id))
+
+  if (admissions?.n) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'A pass was admitted into this reservation, and deleting it would erase that record. Cancel the reservation instead.',
+    })
+  }
 
   // Delete tickets first (onDelete: 'restrict' on the reservation FK prevents
   // deleting the parent first), atomically, so a failure can't leave a

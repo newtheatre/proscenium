@@ -8,6 +8,8 @@
 interface BookingTicket {
   id: string
   pricePaid: number
+  /** Set once the box office has refunded this specific ticket. */
+  refundedAt: string | Date | null
   ticketType: { id: string, name: string }
 }
 
@@ -104,7 +106,18 @@ const performance = computed(() =>
 
 const ticketTypes = computed(() => performance.value?.ticketTypes ?? [])
 
-const currentCount = computed(() => props.booking.tickets.length)
+/**
+ * Refunds only exist after collection, and a collected booking cannot be edited
+ * at all — so on this screen (PENDING only) there should be no refunded tickets
+ * to begin with. Filtered anyway: the server diffs on `isNull(refundedAt)`, so
+ * if the two sides ever disagree about which tickets count, an unchanged Save
+ * asks for more of a type than the server can see and it issues a replacement
+ * for one that was refunded. Cheap insurance against a real money bug, and
+ * legacy imported rows are not bound by the new invariant.
+ */
+const activeTickets = computed(() => props.booking.tickets.filter(t => !t.refundedAt))
+
+const currentCount = computed(() => activeTickets.value.length)
 
 // Seats the customer may occupy: what's free now plus the seats they already hold.
 const remainingCapacity = computed(() => {
@@ -113,12 +126,24 @@ const remainingCapacity = computed(() => {
   return Math.max(0, perf.capacity - perf.ticketsSold + currentCount.value)
 })
 
+/**
+ * Types the booking currently holds, remembered when editing starts.
+ *
+ * Needed at save time because the stepper drops an entry once its quantity
+ * reaches zero, and the server only diffs the types named in the request
+ * ("requested types only; others untouched"). Removing a whole type therefore
+ * sent a body that never mentioned it, and the tickets silently stayed —
+ * the UI said "Booking updated" and nothing had changed.
+ */
+const editedTypeIds = ref<string[]>([])
+
 function startEditing() {
   const counts = new Map<string, number>()
-  for (const t of props.booking.tickets) {
+  for (const t of activeTickets.value) {
     counts.set(t.ticketType.id, (counts.get(t.ticketType.id) ?? 0) + 1)
   }
   selection.value = Array.from(counts, ([ticketTypeId, quantity]) => ({ ticketTypeId, quantity }))
+  editedTypeIds.value = [...counts.keys()]
   editing.value = true
 }
 
@@ -131,10 +156,17 @@ async function saveTickets() {
   }
   saving.value = true
   try {
+    // Explicit zeros for types the customer emptied, so the server sees the
+    // removal instead of leaving those tickets untouched.
+    const requested = new Map(selection.value.map(t => [t.ticketTypeId, t.quantity]))
+    for (const id of editedTypeIds.value) {
+      if (!requested.has(id)) requested.set(id, 0)
+    }
+
     await $fetch(`/api/bookings/${props.booking.id}/tickets`, {
       method: 'PUT',
       query: accessQuery.value,
-      body: { tickets: selection.value },
+      body: { tickets: Array.from(requested, ([ticketTypeId, quantity]) => ({ ticketTypeId, quantity })) },
     })
     toast.add({ title: 'Booking updated', icon: 'i-lucide-check-circle', color: 'success' })
     editing.value = false

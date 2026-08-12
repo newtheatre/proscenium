@@ -1,6 +1,7 @@
 import { db, schema } from '@nuxthub/db'
 import { eq, or } from 'drizzle-orm'
 import type { H3Event } from 'h3'
+import { isStaff } from '~~/shared/utils/abilities'
 
 /**
  * Cookie carrying a signed access token, for a guest who arrived from a link
@@ -93,10 +94,14 @@ export async function requireBookingAccess(event: H3Event, idOrRef: string): Pro
   // revoked session must not still satisfy it.
   const sessionUser = await getVerifiedSessionUser(event)
   const isOwner = sessionUser?.id === booking.userId
-  const isStaff = sessionUser?.roles?.some((r: string) => ['ADMIN', 'MANAGER', 'BOX_OFFICE'].includes(r)) ?? false
+  // isStaff() from the abilities layer rather than a literal role list: roles
+  // arrive app-scoped ('proscenium:BOX_OFFICE'), so matching against bare
+  // 'BOX_OFFICE' was always false and staff could not open, amend or cancel a
+  // booking on a customer's behalf at all.
+  const staff = sessionUser ? isStaff(sessionUser) : false
   const hasToken = await hasBookingToken(event, booking.id)
 
-  if (!isOwner && !isStaff && !hasToken) {
+  if (!isOwner && !staff && !hasToken) {
     throw createError({ statusCode: 403, statusMessage: 'You do not have access to this booking' })
   }
 

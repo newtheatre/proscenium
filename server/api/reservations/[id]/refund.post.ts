@@ -5,7 +5,11 @@ import { refundTicket } from '~~/shared/utils/abilities'
 
 const bodySchema = z.object({
   ticketTypeId: z.string().min(1),
-  quantity: z.int().min(1),
+  // Bounded because `quantity` becomes the length of an `inArray` id list and
+  // D1 binds at most 100 parameters per statement. Refunding more than 50
+  // tickets of one type in a single call is a data-repair job, not a box-office
+  // action.
+  quantity: z.int().min(1).max(50),
 })
 
 /**
@@ -22,6 +26,17 @@ export default defineEventHandler(async (event) => {
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Reservation ID is required' })
 
   const { ticketTypeId, quantity } = await readValidatedBody(event, bodySchema.parse)
+
+  const reservation = await db
+    .select({ status: schema.reservations.status })
+    .from(schema.reservations)
+    .where(eq(schema.reservations.id, id))
+    .get()
+
+  if (!reservation) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
+
+  // Only a collected booking has money to give back — see reservationLifecycle.
+  assertRefundable(reservation.status)
 
   const active = await db
     .select()
@@ -47,10 +62,27 @@ export default defineEventHandler(async (event) => {
     .slice(0, quantity)
     .map(t => t.id)
 
-  await db
+  // `refundedAt IS NULL` in the WHERE, not just in the SELECT above: the read
+  // and the write are separate statements, so a double-click or two staff
+  // refunding at once both select the same rows and both report success while
+  // only one stamp lands — cash out twice, recorded once. With the guard the
+  // loser updates nothing, and `returning()` tells us how many rows this call
+  // actually refunded rather than how many it intended to.
+  const refunded = await db
     .update(schema.tickets)
     .set({ refundedAt: new Date() })
-    .where(inArray(schema.tickets.id, toRefund))
+    .where(and(
+      inArray(schema.tickets.id, toRefund),
+      isNull(schema.tickets.refundedAt),
+    ))
+    .returning({ id: schema.tickets.id })
 
-  return { refunded: toRefund.length }
+  if (refunded.length < quantity) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Some of those tickets were refunded by someone else just now. Reload the reservation and check the totals before refunding again.',
+    })
+  }
+
+  return { refunded: refunded.length }
 })
