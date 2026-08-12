@@ -193,13 +193,36 @@ const noPerformanceToday = computed(() => {
 
 // ── Reservations data ─────────────────────────────────────────────────────────
 
+/**
+ * The door list must be complete — a silently truncated one sends someone away
+ * who has actually booked. `/api/reservations` is paginated and caps a page at
+ * 100; the busiest performance on record has 94 reservations, so this is
+ * normally a single request, but it follows pages until it has them all rather
+ * than relying on that staying true.
+ */
+async function fetchAllForPerformance(performanceId: string): Promise<Reservation[]> {
+  const limit = 100
+  const rows: Reservation[] = []
+  let page = 1
+  let total = 0
+
+  do {
+    const res = await $fetch<{ rows: Reservation[], total: number }>('/api/reservations', {
+      query: { performanceId, withCounts: 'true', page, limit },
+    })
+    rows.push(...res.rows)
+    total = res.total
+    page++
+  } while (rows.length < total && rows.length > 0)
+
+  return rows
+}
+
 const { data: reservations, status: reservationsStatus, refresh: refreshReservations } = await useAsyncData(
   'box-office-reservations',
   () => {
     if (!selectedPerformanceId.value) return Promise.resolve([] as Reservation[])
-    return $fetch<Reservation[]>('/api/reservations', {
-      query: { performanceId: selectedPerformanceId.value, withCounts: 'true' },
-    })
+    return fetchAllForPerformance(selectedPerformanceId.value)
   },
   {
     default: () => [] as Reservation[],

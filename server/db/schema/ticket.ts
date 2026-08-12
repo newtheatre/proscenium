@@ -135,6 +135,12 @@ export const tickets = sqliteTable('tickets', {
   index('tickets_reservation_id_idx').on(table.reservationId),
   index('tickets_performance_id_idx').on(table.performanceId),
   index('tickets_ticket_type_id_idx').on(table.ticketTypeId),
+
+  // Covers the hot capacity count — COUNT(*) WHERE performance_id = ? AND
+  // refunded_at IS NULL — which runs on every booking, walk-in and ticket edit,
+  // and the per-reservation ticket counts on the box-office list.
+  index('tickets_perf_refunded_idx').on(table.performanceId, table.refundedAt),
+  index('tickets_res_refunded_idx').on(table.reservationId, table.refundedAt),
 ])
 
 // Augments reservationsRelations with the tickets many-relation.
