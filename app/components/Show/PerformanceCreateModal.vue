@@ -41,6 +41,7 @@ const schema = z.object({
   intervalCount: z.number().int().nonnegative().default(0),
   intervalMinutes: z.number().int().positive().optional().nullable(),
   capacityOverride: z.number().int().positive().optional().nullable(),
+  bookingClosesHoursBefore: z.number().int().nonnegative().max(168).optional().nullable(),
   notes: z.string().optional(),
 })
 
@@ -107,6 +108,7 @@ function resetForm() {
   state.intervalCount = 0
   state.intervalMinutes = null
   state.capacityOverride = null
+  state.bookingClosesHoursBefore = null
   state.notes = ''
   doorsManuallyEdited = false
 }
@@ -132,6 +134,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         intervalCount: event.data.intervalCount,
         intervalMinutes: event.data.intervalMinutes,
         capacityOverride: event.data.capacityOverride,
+        bookingClosesHoursBefore: event.data.bookingClosesHoursBefore,
         // Derive status from parent show: published shows have on-sale performances by default
         status: props.showStatus === 'PUBLISHED' ? 'ON_SALE' : 'DRAFT',
         notes: event.data.notes || null,
@@ -278,6 +281,25 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
             />
           </UFormField>
         </div>
+
+        <UFormField
+          name="bookingClosesHoursBefore"
+          label="Close online booking"
+          help="Hours before the start time. Leave blank to keep booking open until curtain-up. The box office can still sell on the door afterwards."
+        >
+          <UInput
+            v-model.number="state.bookingClosesHoursBefore"
+            type="number"
+            min="0"
+            max="168"
+            placeholder="0"
+            class="w-full"
+          >
+            <template #trailing>
+              <span class="text-xs text-muted">hours before</span>
+            </template>
+          </UInput>
+        </UFormField>
 
         <UFormField
           name="notes"

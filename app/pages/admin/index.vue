@@ -46,10 +46,13 @@ interface RecentReservation {
 }
 
 interface Stats {
+  window: { from: string, to: string, isCurrentSeason: boolean }
   activeShows: number
   upcomingPerformances: number
   totalRevenuePence: number
   totalTicketsSold: number
+  unknownPricedTickets: number
+  derivedPricedTickets: number
   reservationsByStatus: Array<{ status: string, count: number }>
   revenueByShow: RevenueByShow[]
   recentReservations: RecentReservation[]
@@ -74,6 +77,33 @@ const STATUS_CONFIG = {
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
 const { data: stats, status: statsStatus } = await useFetch<Stats>('/api/admin/stats', { lazy: true })
+
+/** e.g. "2025/26 season" — or the explicit dates when a custom range is set. */
+const windowLabel = computed(() => {
+  const w = stats.value?.window
+  if (!w) return ''
+  if (w.isCurrentSeason) {
+    const startYear = Number(w.from.slice(0, 4))
+    return `${startYear}/${String(startYear + 1).slice(2)} season`
+  }
+  const fmt = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+  return `${fmt(w.from)} to ${fmt(w.to)}`
+})
+
+/**
+ * Imported tickets whose price was never recorded still count as admissions but
+ * contribute nothing to revenue, so revenue-per-ticket reads low. Say so rather
+ * than letting someone draw the wrong conclusion from the two cards together.
+ */
+const statsCaveat = computed(() => {
+  const unknown = stats.value?.unknownPricedTickets ?? 0
+  const derived = stats.value?.derivedPricedTickets ?? 0
+  if (!unknown && !derived) return ''
+  const parts: string[] = []
+  if (unknown) parts.push(`${unknown.toLocaleString('en-GB')} with no recorded price`)
+  if (derived) parts.push(`${derived.toLocaleString('en-GB')} estimated`)
+  return `Includes ${parts.join(', ')}`
+})
 const { data: shows } = await useFetch<Show[]>('/api/shows', { lazy: true })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -95,15 +125,38 @@ function statusCount(status: string): number {
 // ── Export ────────────────────────────────────────────────────────────────────
 
 const exportShowId = ref<string>('')
+const exportFrom = ref<string>('')
+const exportTo = ref<string>('')
 
+// No "All shows" option. Unfiltered, the export joins all 45,563 tickets and
+// builds around 10 MB of CSV inside a Worker — it was the default choice, one
+// click away. A date range covers the same need for a season's accounts.
 const showOptions = computed(() => [
-  { label: 'All shows', value: '' },
+  { label: 'Choose a show…', value: '' },
   ...(shows.value ?? []).map(s => ({ label: s.title, value: s.id })),
 ])
+
+/** The season the theatre is currently in: 1 August to 31 July. */
+function currentSeason(): { from: string, to: string } {
+  const now = new Date()
+  const startYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1
+  return { from: `${startYear}-08-01`, to: `${startYear + 1}-07-31` }
+}
+
+function useCurrentSeason() {
+  const { from, to } = currentSeason()
+  exportShowId.value = ''
+  exportFrom.value = from
+  exportTo.value = to
+}
+
+const exportBounded = computed(() => !!exportShowId.value || !!exportFrom.value || !!exportTo.value)
 
 const exportUrl = computed(() => {
   const params = new URLSearchParams()
   if (exportShowId.value) params.set('showId', exportShowId.value)
+  if (exportFrom.value) params.set('from', exportFrom.value)
+  if (exportTo.value) params.set('to', exportTo.value)
   const qs = params.toString()
   return `/api/admin/export/tickets${qs ? `?${qs}` : ''}`
 })
@@ -181,6 +234,30 @@ const recentColumns: TableColumn<RecentReservation>[] = [
     </div>
 
     <template v-else-if="stats">
+      <!-- The figures below are for one season, not all time. Before this was
+           bounded the dashboard showed a decade of imported takings as though
+           they were the current year's. -->
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <UIcon
+          name="i-lucide-calendar-range"
+          class="size-4 text-muted"
+        />
+        <span class="text-muted">Showing</span>
+        <span class="font-medium text-highlighted">{{ windowLabel }}</span>
+        <UBadge
+          v-if="!stats.window.isCurrentSeason"
+          color="warning"
+          variant="subtle"
+          label="Custom range"
+        />
+        <UBadge
+          v-if="statsCaveat"
+          color="neutral"
+          variant="subtle"
+          :label="statsCaveat"
+        />
+      </div>
+
       <!-- ── Stat cards ─────────────────────────────────────────────────── -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- Total Revenue -->
@@ -194,7 +271,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
                 {{ formatPounds(stats.totalRevenuePence) }}
               </p>
               <p class="mt-1 text-xs text-muted">
-                Collected &amp; door only
+                Collected &amp; door, {{ windowLabel }}
               </p>
             </div>
             <div class="shrink-0 rounded-lg bg-success/10 p-2">
@@ -217,7 +294,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
                 {{ stats.totalTicketsSold.toLocaleString('en-GB') }}
               </p>
               <p class="mt-1 text-xs text-muted">
-                Collected &amp; door only
+                Admissions, {{ windowLabel }}
               </p>
             </div>
             <div class="shrink-0 rounded-lg bg-primary/10 p-2">
@@ -456,7 +533,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
 
       <div class="flex flex-col sm:flex-row items-start sm:items-end gap-3">
         <UFormField
-          label="Filter by show"
+          label="Show"
           class="flex-1 min-w-48"
         >
           <USelect
@@ -464,20 +541,52 @@ const recentColumns: TableColumn<RecentReservation>[] = [
             :options="showOptions"
             value-attribute="value"
             option-attribute="label"
-            placeholder="All shows"
+            placeholder="Choose a show…"
             class="w-full"
           />
         </UFormField>
+
+        <UFormField label="Performances from">
+          <UInput
+            v-model="exportFrom"
+            type="date"
+            class="w-full"
+          />
+        </UFormField>
+
+        <UFormField label="to">
+          <UInput
+            v-model="exportTo"
+            type="date"
+            class="w-full"
+          />
+        </UFormField>
+
+        <UButton
+          color="neutral"
+          variant="subtle"
+          icon="i-lucide-calendar-range"
+          label="This season"
+          @click="useCurrentSeason"
+        />
 
         <UButton
           color="success"
           icon="i-lucide-download"
           label="Download CSV"
           :to="exportUrl"
+          :disabled="!exportBounded"
           external
           download
         />
       </div>
+
+      <p
+        v-if="!exportBounded"
+        class="text-xs text-muted mt-2"
+      >
+        Pick a show or a date range first. There are 45,563 tickets in the archive, which is more than one request can build.
+      </p>
 
       <USeparator class="my-4" />
 
@@ -486,7 +595,8 @@ const recentColumns: TableColumn<RecentReservation>[] = [
           name="i-lucide-info"
           class="size-3 inline"
         />
-        Columns included: Booking Ref, Status, Refunded, Customer Name, Customer Email, Show, Performance Date, Performance Time, Venue, Ticket Type, Price Paid (£), Booked At, Customer Notes, Staff Notes
+        Columns included: Booking Ref, Status, Refunded, Customer Name, Customer Email, Show, Performance Date, Performance Time, Venue, Ticket Type, Ticket Kind, Price Paid (£), Price Confidence, Price Note, Booked At, Customer Notes, Staff Notes.
+        Imported tickets carry a price confidence: EXACT, DERIVED (estimated by apportioning a booking total) or UNKNOWN (never recorded by the old system, so the price cell is left empty rather than showing £0.00).
       </p>
     </UCard>
   </div>

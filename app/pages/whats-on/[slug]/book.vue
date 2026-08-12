@@ -163,7 +163,7 @@ function handlePerformanceSelect(performanceId: string) {
 }
 
 // If performance was pre-selected and is valid, skip to tickets
-if (selectedPerformanceId.value && show.value?.performances.some(p => p.id === selectedPerformanceId.value && !p.isSoldOut)) {
+if (selectedPerformanceId.value && show.value?.performances.some(p => p.id === selectedPerformanceId.value && !p.isSoldOut && !p.isBookingClosed)) {
   currentStep.value = 1
 }
 

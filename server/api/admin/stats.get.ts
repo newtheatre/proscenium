@@ -1,19 +1,71 @@
 import { db, schema } from '@nuxthub/db'
-import { and, count, desc, eq, gt, inArray, isNull, sum } from 'drizzle-orm'
+import { and, count, desc, eq, gt, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
+import { z } from 'zod/v4'
 import { isAdminOrManager } from '~~/shared/utils/abilities'
 import type { AbilityUser } from '~~/shared/utils/abilities'
+
+const querySchema = z.object({
+  /** Inclusive performance-date bounds, YYYY-MM-DD. Defaults to the current season. */
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+})
+
+/**
+ * The theatre's season runs 1 August to 31 July, matching the university year
+ * and the committee handover.
+ */
+function currentSeason(now: Date): { from: string, to: string } {
+  const startYear = now.getUTCMonth() >= 7 ? now.getUTCFullYear() : now.getUTCFullYear() - 1
+  return { from: `${startYear}-08-01`, to: `${startYear + 1}-07-31` }
+}
 
 /**
  * GET /api/admin/stats — aggregate dashboard statistics.
  * ADMIN and MANAGER only.
+ *
+ * Bounded to a season by default. These aggregates used to have no date bound at
+ * all, so after the import the dashboard presented £105,245.50 of takings going
+ * back to 2016, and 23,889 legacy tickets, as though they were the current
+ * year's — with no indication that most of it was a decade old.
+ *
+ * Two further corrections to what gets counted:
+ *
+ * - PASS_SALE tickets are money but not admissions, and PASS_ADMISSION rows are
+ *   admissions but not money. Counting both in both places double-counted the
+ *   135 pass sales against the 1,186 entries they paid for, which is exactly
+ *   what ticket.ts warns about. Revenue therefore excludes PASS_ADMISSION, and
+ *   the admissions count excludes PASS_SALE.
+ *
+ * - 20,234 imported tickets have priceConfidence UNKNOWN and pricePaid 0: the
+ *   price was never recorded. They are real admissions and still counted as
+ *   such, but they contribute nothing to revenue, so revenue-per-ticket read
+ *   about half true with no hint why. The counts are returned alongside so the
+ *   dashboard can say so.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, defineAbility((user: AbilityUser) => isAdminOrManager(user)))
 
   const now = new Date()
+  const { from, to } = await getValidatedQuery(event, querySchema.parse)
+  const season = currentSeason(now)
+  const windowFrom = new Date(`${from ?? season.from}T00:00:00Z`)
+  const windowTo = new Date(`${to ?? season.to}T23:59:59Z`)
+
   // Only count revenue for tickets that have actually been paid at the box office.
   // PENDING reservations are pre-bookings that have not yet exchanged money.
   const revenueStatuses = ['COLLECTED', 'DOOR'] as const
+
+  const inWindow = and(
+    inArray(schema.reservations.status, revenueStatuses),
+    isNull(schema.tickets.refundedAt),
+    gte(schema.performances.startsAt, windowFrom),
+    lte(schema.performances.startsAt, windowTo),
+  )
+
+  // Money, excluding pass admissions (the pass sale is where the money was).
+  const revenueExpr = sql<number>`coalesce(sum(case when ${schema.ticketTypes.kind} = 'PASS_ADMISSION' then 0 else ${schema.tickets.pricePaid} end), 0)`
+  // Bums on seats, excluding the sale of a pass (which admits nobody by itself).
+  const admissionsExpr = sql<number>`coalesce(sum(case when ${schema.ticketTypes.kind} = 'PASS_SALE' then 0 else 1 end), 0)`
 
   const [
     activeShowsResult,
@@ -41,36 +93,35 @@ export default defineEventHandler(async (event) => {
       .from(schema.reservations)
       .groupBy(schema.reservations.status),
 
-    // Total revenue (pence) and total ticket count — collected/door only
+    // Revenue (pence), admissions, and how much of it we can vouch for
     db.select({
-      totalRevenue: sum(schema.tickets.pricePaid),
-      totalTickets: count(),
+      totalRevenue: revenueExpr,
+      totalTickets: admissionsExpr,
+      unknownPricedTickets: sql<number>`coalesce(sum(case when ${schema.tickets.priceConfidence} = 'UNKNOWN' then 1 else 0 end), 0)`,
+      derivedPricedTickets: sql<number>`coalesce(sum(case when ${schema.tickets.priceConfidence} = 'DERIVED' then 1 else 0 end), 0)`,
     })
       .from(schema.tickets)
       .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
-      .where(and(
-        inArray(schema.reservations.status, revenueStatuses),
-        isNull(schema.tickets.refundedAt),
-      )),
+      .innerJoin(schema.performances, eq(schema.tickets.performanceId, schema.performances.id))
+      .innerJoin(schema.ticketTypes, eq(schema.tickets.ticketTypeId, schema.ticketTypes.id))
+      .where(inWindow),
 
-    // Revenue breakdown per show (collected/door only, non-refunded)
+    // Revenue breakdown per show
     db.select({
       showId: schema.shows.id,
       showTitle: schema.shows.title,
       showStatus: schema.shows.status,
-      totalRevenue: sum(schema.tickets.pricePaid),
-      totalTickets: count(),
+      totalRevenue: revenueExpr,
+      totalTickets: admissionsExpr,
     })
       .from(schema.tickets)
       .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
       .innerJoin(schema.performances, eq(schema.tickets.performanceId, schema.performances.id))
       .innerJoin(schema.shows, eq(schema.performances.showId, schema.shows.id))
-      .where(and(
-        inArray(schema.reservations.status, revenueStatuses),
-        isNull(schema.tickets.refundedAt),
-      ))
+      .innerJoin(schema.ticketTypes, eq(schema.tickets.ticketTypeId, schema.ticketTypes.id))
+      .where(inWindow)
       .groupBy(schema.shows.id, schema.shows.title, schema.shows.status)
-      .orderBy(desc(sum(schema.tickets.pricePaid))),
+      .orderBy(desc(revenueExpr)),
 
     // Ten most recent reservations with related data
     db.query.reservations.findMany({
@@ -88,18 +139,27 @@ export default defineEventHandler(async (event) => {
     }),
   ])
 
+  const totals = revenueAndTicketsResult[0]
+
   return {
+    window: {
+      from: (from ?? season.from),
+      to: (to ?? season.to),
+      isCurrentSeason: !from && !to,
+    },
     activeShows: activeShowsResult[0]?.count ?? 0,
     upcomingPerformances: upcomingPerfsResult[0]?.count ?? 0,
-    totalRevenuePence: Number(revenueAndTicketsResult[0]?.totalRevenue ?? 0),
-    totalTicketsSold: revenueAndTicketsResult[0]?.totalTickets ?? 0,
+    totalRevenuePence: Number(totals?.totalRevenue ?? 0),
+    totalTicketsSold: Number(totals?.totalTickets ?? 0),
+    unknownPricedTickets: Number(totals?.unknownPricedTickets ?? 0),
+    derivedPricedTickets: Number(totals?.derivedPricedTickets ?? 0),
     reservationsByStatus: reservationsByStatusResult,
     revenueByShow: revenueByShowResult.map(r => ({
       showId: r.showId,
       showTitle: r.showTitle,
       showStatus: r.showStatus,
       totalRevenuePence: Number(r.totalRevenue ?? 0),
-      totalTickets: r.totalTickets,
+      totalTickets: Number(r.totalTickets),
     })),
     recentReservations,
   }
