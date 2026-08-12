@@ -113,6 +113,27 @@ export default defineNuxtConfig({
     },
     routeRules: {
       '/mailing-list/': { redirect: 'https://newtheatre.us3.list-manage.com/subscribe?u=ce5311ce46fe45638f90f4022&id=97e4899eb8' },
+
+      // Baseline security headers on every response.
+      '/**': {
+        headers: {
+          // Booking references are bearer secrets and still appear in some URLs
+          // (?ref=), so keep them out of the Referer sent to other origins.
+          'Referrer-Policy': 'strict-origin-when-cross-origin',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+          // No subdomain rules and no preload: this header is served from the
+          // ticketing host, and the society's other subdomains are not ours to
+          // commit to HTTPS from here.
+          'Strict-Transport-Security': 'max-age=15552000',
+          'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+          // Deliberately no script-src. Nuxt emits inline hydration scripts, so
+          // a script policy needs per-request nonces rather than a static rule —
+          // worth doing, but as its own change. These three directives are the
+          // part that can be set statically without breaking the app.
+          'Content-Security-Policy': 'frame-ancestors \'none\'; object-src \'none\'; base-uri \'self\'',
+        },
+      },
     },
   },
 

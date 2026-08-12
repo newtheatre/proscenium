@@ -99,6 +99,32 @@ interface BookingEmailData {
   showSlug: string
 }
 
+/**
+ * Escape a value for interpolation into an email's HTML body.
+ *
+ * `customerName` and `customerNotes` arrive from the unauthenticated booking
+ * endpoint, where the caller also chooses the recipient address. Unescaped, that
+ * lets anyone put arbitrary markup — a payment link, say — inside a DKIM-signed
+ * message from the theatre's own domain.
+ *
+ * Show, venue and ticket-type names are staff-entered rather than public, but
+ * they are escaped too: an apostrophe in a show title is common enough on its
+ * own, and a rule with exceptions is one someone will later apply wrongly.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/** Escape, then keep the customer's line breaks visible in the HTML body. */
+function escapeMultiline(value: string): string {
+  return escapeHtml(value).replace(/\r?\n/g, '<br>')
+}
+
 function formatEmailDate(date: Date): string {
   return date.toLocaleDateString('en-GB', {
     weekday: 'long',
@@ -138,7 +164,7 @@ function buildTicketTable(tickets: BookingTicket[]): string {
   const rows = Array.from(grouped.values())
     .map(t => `
       <tr>
-        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e5e5;">${t.count}&times; ${t.name}</td>
+        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e5e5;">${t.count}&times; ${escapeHtml(t.name)}</td>
         <td style="padding: 8px 12px; border-bottom: 1px solid #e5e5e5; text-align: right;">${formatEmailPrice(t.unitPrice * t.count)}</td>
       </tr>
     `)
@@ -193,7 +219,7 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData): Prom
     <div style="background: #ffffff; border-radius: 12px; padding: 32px; border: 1px solid #e5e5e5;">
 
       <!-- Greeting -->
-      <p style="margin: 0 0 20px; font-size: 16px;">Hi ${data.customerName},</p>
+      <p style="margin: 0 0 20px; font-size: 16px;">Hi ${escapeHtml(data.customerName)},</p>
       <p style="margin: 0 0 24px; font-size: 16px;">
         Thank you for your booking! Your reservation has been confirmed. Here are the details:
       </p>
@@ -206,7 +232,7 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData): Prom
 
       <!-- Show details -->
       <div style="background-color: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-        <h2 style="margin: 0 0 12px; font-size: 18px;">${data.showTitle}</h2>
+        <h2 style="margin: 0 0 12px; font-size: 18px;">${escapeHtml(data.showTitle)}</h2>
         <table cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
           <tr>
             <td style="padding: 4px 8px 4px 0; color: #737373; font-size: 14px;">📅</td>
@@ -218,7 +244,7 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData): Prom
           </tr>
           <tr>
             <td style="padding: 4px 8px 4px 0; color: #737373; font-size: 14px;">📍</td>
-            <td style="padding: 4px 0; font-size: 14px;">${data.venueName}</td>
+            <td style="padding: 4px 0; font-size: 14px;">${escapeHtml(data.venueName)}</td>
           </tr>
         </table>
       </div>
@@ -229,7 +255,7 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData): Prom
       ${data.customerNotes
         ? `<div style="background-color: #fffbeb; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;">
             <p style="margin: 0 0 4px; font-size: 12px; font-weight: 600; color: #92400e;">Special Requirements</p>
-            <p style="margin: 0; font-size: 14px; color: #78716c;">${data.customerNotes}</p>
+            <p style="margin: 0; font-size: 14px; color: #78716c;">${escapeMultiline(data.customerNotes)}</p>
           </div>`
         : ''}
 
@@ -297,18 +323,18 @@ export async function sendBookingCancellationEmail(data: Omit<BookingEmailData, 
     <!-- Main card -->
     <div style="background: #ffffff; border-radius: 12px; padding: 32px; border: 1px solid #e5e5e5;">
 
-      <p style="margin: 0 0 20px; font-size: 16px;">Hi ${data.customerName},</p>
+      <p style="margin: 0 0 20px; font-size: 16px;">Hi ${escapeHtml(data.customerName)},</p>
       <p style="margin: 0 0 24px; font-size: 16px;">
-        Your booking for <strong>${data.showTitle}</strong> has been cancelled.
+        Your booking for <strong>${escapeHtml(data.showTitle)}</strong> has been cancelled.
       </p>
 
       <!-- Cancelled booking details -->
       <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
         <p style="margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #dc2626; font-weight: 600;">Cancelled</p>
         <p style="margin: 0 0 8px; font-size: 14px;"><strong>Reference:</strong> ${data.bookingRef}</p>
-        <p style="margin: 0 0 4px; font-size: 14px;"><strong>Show:</strong> ${data.showTitle}</p>
+        <p style="margin: 0 0 4px; font-size: 14px;"><strong>Show:</strong> ${escapeHtml(data.showTitle)}</p>
         <p style="margin: 0 0 4px; font-size: 14px;"><strong>Date:</strong> ${formatEmailDate(data.performanceDate)} at ${formatEmailTime(data.performanceDate)}</p>
-        <p style="margin: 0; font-size: 14px;"><strong>Venue:</strong> ${data.venueName}</p>
+        <p style="margin: 0; font-size: 14px;"><strong>Venue:</strong> ${escapeHtml(data.venueName)}</p>
       </div>
 
       ${buildTicketTable(data.tickets)}
@@ -370,14 +396,14 @@ export async function sendBookingReminderEmail(data: BookingEmailData): Promise<
     <!-- Main card -->
     <div style="background: #ffffff; border-radius: 12px; padding: 32px; border: 1px solid #e5e5e5;">
 
-      <p style="margin: 0 0 20px; font-size: 16px;">Hi ${data.customerName},</p>
+      <p style="margin: 0 0 20px; font-size: 16px;">Hi ${escapeHtml(data.customerName)},</p>
       <p style="margin: 0 0 24px; font-size: 16px;">
-        Just a reminder that your booking for <strong>${data.showTitle}</strong> is coming up soon!
+        Just a reminder that your booking for <strong>${escapeHtml(data.showTitle)}</strong> is coming up soon!
       </p>
 
       <!-- Show details -->
       <div style="background-color: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-        <h2 style="margin: 0 0 12px; font-size: 18px;">${data.showTitle}</h2>
+        <h2 style="margin: 0 0 12px; font-size: 18px;">${escapeHtml(data.showTitle)}</h2>
         <table cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
           <tr>
             <td style="padding: 4px 8px 4px 0; color: #737373; font-size: 14px;">📅</td>
@@ -389,7 +415,7 @@ export async function sendBookingReminderEmail(data: BookingEmailData): Promise<
           </tr>
           <tr>
             <td style="padding: 4px 8px 4px 0; color: #737373; font-size: 14px;">📍</td>
-            <td style="padding: 4px 0; font-size: 14px;">${data.venueName}</td>
+            <td style="padding: 4px 0; font-size: 14px;">${escapeHtml(data.venueName)}</td>
           </tr>
         </table>
       </div>

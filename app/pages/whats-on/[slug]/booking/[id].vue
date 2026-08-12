@@ -31,9 +31,13 @@ const route = useRoute()
 const bookingId = route.params.id as string
 const bookingRef = route.query.ref as string | undefined
 
+// A guest arriving from a legacy /cancel/:code link carries their booking
+// reference in a cookie rather than in the URL, so the server-rendered request
+// has to forward the incoming cookies. Plain useFetch does not.
 const { data: booking, status, error, refresh } = await useFetch<BookingDetail>(`/api/bookings/${bookingId}`, {
   key: `booking-${bookingId}`,
   query: bookingRef ? { ref: bookingRef } : undefined,
+  headers: import.meta.server ? useRequestHeaders(['cookie']) : undefined,
 })
 
 if (error.value) {

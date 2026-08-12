@@ -32,9 +32,10 @@ export default defineEventHandler(async (event) => {
   // userId is only needed to decide access; it is not part of the response.
   const { userId, ...customerBooking } = booking
 
-  // Allow access for: the booking owner, or staff
-  const session = await getUserSession(event)
-  const sessionUser = session?.user
+  // Allow access for: the booking owner, or staff. Verified rather than raw —
+  // the staff branch below returns any booking, so a revoked session must not
+  // reach it.
+  const sessionUser = await getVerifiedSessionUser(event)
 
   if (sessionUser) {
     const isOwner = sessionUser.id === userId
@@ -42,9 +43,9 @@ export default defineEventHandler(async (event) => {
     if (isOwner || isStaff) return customerBooking
   }
 
-  // For guest access, require the booking ref as a query parameter
-  const query = getQuery(event)
-  if (query.ref && query.ref === booking.bookingRef) {
+  // Guest access: the booking reference, from `?ref=` or from the cookie set by
+  // the legacy /cancel/:code redirect.
+  if (presentedBookingRef(event, booking.id) === booking.bookingRef) {
     return customerBooking
   }
 

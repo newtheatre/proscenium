@@ -7,9 +7,11 @@ import { sendBookingConfirmationEmail } from '~~/server/utils/email'
 const bodySchema = z.object({
   performanceId: z.string().min(1),
 
-  // Customer details — not required if the user is logged in
-  name: z.string().min(1).optional(),
-  email: z.email().optional(),
+  // Customer details — not required if the user is logged in.
+  // Both are bounded: this endpoint is unauthenticated, and both values are
+  // stored and later rendered into an email whose recipient the caller chooses.
+  name: z.string().trim().min(1).max(100).optional(),
+  email: z.email().max(254).optional(),
 
   // Tickets to book
   tickets: z.array(z.object({
@@ -17,7 +19,9 @@ const bodySchema = z.object({
     quantity: z.int().min(1).max(10),
   })).min(1, 'At least one ticket is required'),
 
-  customerNotes: z.string().optional(),
+  // Access requirements and similar. Capped so an unauthenticated caller cannot
+  // use it as free storage, or pad an email past a provider's size limit.
+  customerNotes: z.string().trim().max(500).optional(),
 })
 
 /**

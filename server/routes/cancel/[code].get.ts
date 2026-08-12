@@ -72,10 +72,18 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // 301: the mapping is fixed for good, so it is safe (and desirable) to cache.
-  return sendRedirect(
-    event,
-    `/whats-on/${show.slug}/booking/${booking.id}?ref=${booking.bookingRef}`,
-    301,
-  )
+  // The reference goes in a short-lived, host-only cookie rather than the
+  // redirect target's query string. In the query it would be written into
+  // browser history, into any intermediary's logs, and into the Referer header
+  // of every outbound link on the booking page — for a value that is itself the
+  // access token.
+  setBookingRefCookie(event, booking.id, booking.bookingRef)
+
+  // 302, not 301: the mapping is stable, but a permanent redirect is cached
+  // indefinitely by browsers and intermediaries, which would pin the response
+  // (and previously the secret in its Location header) beyond our reach. This
+  // also has to stay uncacheable because the response now sets a cookie.
+  setResponseHeader(event, 'Cache-Control', 'no-store')
+
+  return sendRedirect(event, `/whats-on/${show.slug}/booking/${booking.id}`, 302)
 })
