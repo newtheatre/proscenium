@@ -61,3 +61,14 @@ export {
   deleteReservation,
   refundTicket,
 } from './reservations'
+
+export {
+  listSeasons,
+  manageSeasons,
+  listPassTypes,
+  managePassTypes,
+  listPasses,
+  issuePass,
+  redeemPass,
+  cancelPass,
+} from './passes'

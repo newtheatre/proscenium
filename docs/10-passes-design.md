@@ -1,7 +1,8 @@
 # Passes and season tickets — design
 
-**Status:** Proposed. Not built. Approved in principle by Matt Adcock (IT Manager/Archivist 26/27),
-10 August 2026.
+**Status:** **Phase 1 built** (August 2026) — schema, `canRedeem`, pass-type admin, and sell
+and admit at the box office. Phases 2–4 remain as described in §9. Approved in principle by
+Matt Adcock (IT Manager/Archivist 26/27), 10 August 2026.
 **Decision record:** [ADR-0002](./decisions/0002-passes-as-first-class-entities.md)
 **Target:** Autumn 2026 in-house/studio season, with festival passes following.
 
@@ -288,7 +289,7 @@ See [ADR-0003](./decisions/0003-legacy-ticketing-import.md).
 
 | Phase | Scope | Needed by |
 |---|---|---|
-| **1** | Schema + migration; `seasons` and season assignment on shows; pass type admin; sell and redeem at the box office; the `canRedeem` util | Before Autumn 2026 passes go on sale |
+| **1** ✅ | Schema + migration (`0011`); `seasons` and `shows.seasonId`; pass type admin at `/admin/passes`; sell and admit at the box office; `canRedeem` in `server/utils/passes.ts` | **Built August 2026** |
 | **2** | Online redemption in the booking flow for logged-in holders; pass in "my account" | Ideally the same term; season is usable without it |
 | **3** | Reporting — pass revenue in stats, utilisation, renewal list | End of Autumn term, when you first want the numbers |
 | **4** | Festival pass types for StuFF | Spring, ahead of the festival |

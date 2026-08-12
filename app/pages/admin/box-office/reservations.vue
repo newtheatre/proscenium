@@ -385,6 +385,11 @@ function closeCollect() {
 
 const walkInOpen = ref(false)
 
+// ── Passes ────────────────────────────────────────────────────────────────────
+// Admitting a pass holder creates a £0 ticket, so it lands on the door list like
+// any other sale — refresh to pick it up.
+const passesOpen = ref(false)
+
 const performanceLabel = computed(() => {
   const p = selectedPerformance.value
   if (!p) return ''
@@ -555,6 +560,15 @@ const todayFormatted = computed(() =>
             variant="subtle"
             :disabled="!selectedPerformanceId"
             @click="walkInOpen = true"
+          />
+
+          <UButton
+            label="Passes"
+            icon="i-lucide-credit-card"
+            color="neutral"
+            variant="subtle"
+            :disabled="!selectedPerformanceId"
+            @click="passesOpen = true"
           />
 
           <UButton
@@ -807,6 +821,14 @@ const todayFormatted = computed(() =>
       :performance-id="selectedPerformanceId"
       :performance-label="performanceLabel"
       @created="onWalkInCreated"
+    />
+
+    <!-- Passes: look a holder up and admit them, or sell a new pass -->
+    <BoxOfficePassModal
+      v-model:open="passesOpen"
+      :performance-id="selectedPerformanceId"
+      :performance-label="performanceLabel"
+      @admitted="refresh()"
     />
   </div>
 </template>
