@@ -1,6 +1,6 @@
 import { db } from '@nuxthub/db'
 import { users } from '~~/server/db/schema/user'
-import { seedUsers, printUsersSummary } from './seed/users'
+import { seedUsers } from './seed/users'
 import { seedVenueFeatures, seedVenues, printVenuesSummary } from './seed/venues'
 import { seedTicketTypes, printTicketTypesSummary } from './seed/ticketTypes'
 import { seedShows, printShowsSummary } from './seed/shows'
@@ -51,7 +51,7 @@ export default defineTask({
       await seedReservations(createdUsers, seededShows, seededPerformances, createdTicketTypes)
 
       // Print summary
-      printUsersSummary()
+
       printVenuesSummary()
       printTicketTypesSummary(createdTicketTypes)
       printShowsSummary(seededShows, seededPerformances)

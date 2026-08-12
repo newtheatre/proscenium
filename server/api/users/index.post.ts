@@ -1,70 +1,54 @@
 import { db, schema } from '@nuxthub/db'
-import { eq } from 'drizzle-orm'
 import { z } from 'zod/v4'
-import { createUser, updateUserRoles, updateUserVerified } from '~~/shared/utils/abilities'
-import { TOKEN_EXPIRY } from '~~/server/utils/auth'
+import { createUser } from '~~/shared/utils/abilities'
 
 const bodySchema = z.object({
   email: z.email(),
   name: z.string().min(1, 'Name is required'),
-  verified: z.boolean().optional().default(false),
-  roles: z.array(z.enum(['ADMIN', 'MANAGER', 'BOX_OFFICE'])).optional().default([]),
 })
 
-/** POST /api/users — create a new user. Admin/Manager only. */
+/**
+ * POST /api/users — create a user to attach a reservation to (staff).
+ *
+ * Identity lives in the central auth service: this asks it for a shadow
+ * account (match-or-create by email, idempotent, service-token
+ * authenticated) and mirrors the canonical id locally. No passwords,
+ * roles, or verified flags here — full account management is the auth
+ * service admin's job; the person can claim the account themselves later.
+ */
 export default defineEventHandler(async (event) => {
   await authorize(event, createUser)
 
-  const { email, name, verified, roles: userRolesToAssign } = await readValidatedBody(event, bodySchema.parse)
+  const { email, name } = await readValidatedBody(event, bodySchema.parse)
 
-  // Check granular permissions for verified status and roles
-  if (verified && !(await allows(event, updateUserVerified))) {
-    throw createError({ statusCode: 403, statusMessage: 'Only admins can set verified status' })
-  }
-  if (userRolesToAssign.length > 0 && !(await allows(event, updateUserRoles))) {
-    throw createError({ statusCode: 403, statusMessage: 'Only admins can assign roles' })
+  const config = useRuntimeConfig(event)
+  if (!config.authServiceToken) {
+    throw createError({ statusCode: 502, statusMessage: 'Auth service token not configured' })
   }
 
-  // Ensure email is not already taken
-  const existingUser = await db.select().from(schema.users).where(eq(schema.users.email, email)).get()
-  if (existingUser) {
-    throw createError({ statusCode: 400, statusMessage: 'User with this email already exists' })
-  }
-
-  // Create the user (no password — they must set their own via the reset flow)
-  const [newUser] = await db.insert(schema.users).values({
-    email,
-    name,
-    verified,
-  }).returning()
-
-  if (!newUser) {
-    throw createError({ statusCode: 500, statusMessage: 'Failed to create user' })
-  }
-
-  // Assign roles if provided
-  if (userRolesToAssign.length > 0) {
-    await db.insert(schema.userRoles).values(
-      userRolesToAssign.map(role => ({
-        userId: newUser.id,
-        role,
-      })),
+  let shadow: { id: string, existing: boolean, guest: boolean }
+  try {
+    shadow = await $fetch<{ id: string, existing: boolean, guest: boolean }>(
+      `${config.public.authBaseURL}/api/users/shadow`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${config.authServiceToken}` },
+        body: { email, name },
+      },
     )
   }
-
-  // Fetch the created user with roles
-  const createdUser = await db.query.users.findFirst({
-    where: (users, { eq }) => eq(users.id, newUser.id),
-    ...userWithRolesQuery,
-  })
-
-  if (!createdUser) {
-    throw createError({ statusCode: 500, statusMessage: 'Failed to retrieve created user' })
+  catch (error) {
+    console.error('[users] shadow-account call failed:', error)
+    throw createError({ statusCode: 502, statusMessage: 'Could not reach the auth service — try again' })
   }
 
-  // Send password reset email so the user can set their own password
-  const token = await createPasswordResetToken(newUser.id, TOKEN_EXPIRY.ADMIN_PASSWORD_RESET)
-  await sendPasswordResetEmail(email, token)
+  const [user] = await db.insert(schema.users)
+    .values({ id: shadow.id, email: email.toLowerCase(), name })
+    .onConflictDoUpdate({
+      target: schema.users.id,
+      set: { email: email.toLowerCase(), name },
+    })
+    .returning()
 
-  return formatUserResponse(createdUser)
+  return { user: { ...user!, existing: shadow.existing } }
 })

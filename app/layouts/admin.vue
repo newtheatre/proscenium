@@ -57,12 +57,13 @@
 
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
+import { isAdminOrManager } from '~~/shared/utils/abilities'
 
 const route = useRoute()
 const { user } = useUserSession()
 
 const isAdmin = computed(() =>
-  user.value?.roles?.includes('ADMIN') || user.value?.roles?.includes('MANAGER'),
+  user.value ? isAdminOrManager(user.value) : false,
 )
 
 const navigation = computed<NavigationMenuItem[][]>(() => {

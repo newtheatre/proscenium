@@ -15,6 +15,18 @@ export default defineNuxtConfig({
   ],
 
   $production: {
+    runtimeConfig: {
+      // The estate cookie is scoped to the parent domain so every
+      // *.newtheatre.org.uk app reads the same session. Production only —
+      // localhost has no subdomains.
+      session: {
+        name: 'nnt-session',
+        password: '',
+        maxAge: 60 * 60 * 24 * 30,
+        cookie: { domain: '.newtheatre.org.uk', sameSite: 'lax', secure: true },
+      },
+    },
+
     hub: {
       db: {
         dialect: 'sqlite',
@@ -55,13 +67,28 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    // Estate SSO (stage-door docs/session-contract.md): this app READS the
+    // nnt-session cookie sealed by auth.newtheatre.org.uk and never writes
+    // it (dev-only exception: /dev-login). NUXT_SESSION_PASSWORD is the
+    // shared estate seal secret.
+    session: {
+      name: 'nnt-session',
+      password: '',
+      maxAge: 60 * 60 * 24 * 30,
+    },
     resendApiKey: '',
     resendFromEmail: '',
     // Signs guest booking-access tokens. Falls back to the session password when
     // unset; set NUXT_BOOKING_TOKEN_SECRET to rotate booking links on their own,
-    // which invalidates every outstanding one.
+    // which invalidates every outstanding one. NOTE: post-SSO the session
+    // password is estate-wide — set the dedicated secret so booking links
+    // don't die with estate-wide seal rotations.
     bookingTokenSecret: '',
+    // Service token for server-to-server calls to the auth service
+    // (AUTH_SERVICE_TOKEN worker secret) — guest checkout shadow accounts.
+    authServiceToken: '',
     public: {
+      authBaseURL: 'https://auth.newtheatre.org.uk',
       baseURL: 'https://newtheatre.org.uk',
     },
   },
