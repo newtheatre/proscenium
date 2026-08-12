@@ -78,7 +78,10 @@ export default defineEventHandler(async (event) => {
     const existing = await db.select({ id: schema.users.id }).from(schema.users)
       .where(eq(schema.users.email, body.email!)).get()
     if (existing) userId = existing.id
-    else { userId = nanoid(); needShadowUser = true }
+    else {
+      userId = nanoid()
+      needShadowUser = true
+    }
   }
 
   const passId = nanoid()

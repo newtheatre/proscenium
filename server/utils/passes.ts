@@ -15,13 +15,13 @@ import { and, count, eq, isNull } from 'drizzle-orm'
  * this function is for giving a human a reason, not for safety.
  */
 
-export type PassRejection =
-  | 'PASS_NOT_ACTIVE'
-  | 'OUTSIDE_VALIDITY'
-  | 'SHOW_NOT_COVERED'
-  | 'ALREADY_REDEEMED'
-  | 'PERFORMANCE_NOT_ON_SALE'
-  | 'SOLD_OUT'
+export type PassRejection
+  = | 'PASS_NOT_ACTIVE'
+    | 'OUTSIDE_VALIDITY'
+    | 'SHOW_NOT_COVERED'
+    | 'ALREADY_REDEEMED'
+    | 'PERFORMANCE_NOT_ON_SALE'
+    | 'SOLD_OUT'
 
 /** Copy a volunteer can read out at the door. */
 export const PASS_REJECTION_MESSAGE: Record<PassRejection, string> = {
@@ -30,7 +30,7 @@ export const PASS_REJECTION_MESSAGE: Record<PassRejection, string> = {
   SHOW_NOT_COVERED: 'This pass does not cover this show.',
   ALREADY_REDEEMED: 'This pass has already been used for this performance.',
   PERFORMANCE_NOT_ON_SALE: 'This performance is not on sale.',
-  SOLD_OUT: "We're full tonight, I'm afraid — a pass doesn't reserve a seat.",
+  SOLD_OUT: 'We\'re full tonight, I\'m afraid — a pass doesn\'t reserve a seat.',
 }
 
 export interface RedeemCheck {

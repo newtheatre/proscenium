@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, count, eq, inArray, isNull } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull, ne } from 'drizzle-orm'
 
 /**
  * Loaded override data used by `resolveEffectivePrice`.
@@ -167,15 +167,20 @@ export async function assertCapacity(performanceId: string, additional: number):
   const capacity = perf.capacityOverride ?? perf.venueCapacity
   if (capacity == null) return // uncapped
 
+  // PASS_SALE rows record the purchase of a pass, not a seat at this
+  // performance — the seat is the separate PASS_ADMISSION ticket. Counting both
+  // would make one buyer consume two seats and trigger sold-out early.
   const [existing] = await db
     .select({ count: count() })
     .from(schema.tickets)
     .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
+    .innerJoin(schema.ticketTypes, eq(schema.tickets.ticketTypeId, schema.ticketTypes.id))
     .where(
       and(
         eq(schema.tickets.performanceId, performanceId),
         inArray(schema.reservations.status, ['PENDING', 'COLLECTED', 'DOOR']),
         isNull(schema.tickets.refundedAt),
+        ne(schema.ticketTypes.kind, 'PASS_SALE'),
       ),
     )
 

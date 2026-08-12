@@ -34,7 +34,7 @@ Gaps section of [08-operations](./08-operations.md) are what you have actually i
 | 07 | [API reference](./07-api-reference.md) | All 63 endpoints: auth, schemas, responses, side effects | Writing a client, or auditing access |
 | 08 | [Operations](./08-operations.md) | Deploy, rollback, migrations, backups, incident checklists, handover | On call |
 | 09 | [Known issues](./09-known-issues.md) | Every bug and sharp edge found in the August 2026 audit, with severity | Prioritising work |
-| 10 | [Passes — design](./10-passes-design.md) | Season passes and festival passes. **Proposed, not yet built.** | Implementing passes |
+| 10 | [Passes — design](./10-passes-design.md) | Season passes and festival passes. **Phase 1 built** (Aug 2026); phases 2–4 outstanding. | Implementing passes |
 
 ### Decision records
 
