@@ -31,12 +31,16 @@ import { isStaff } from '~~/shared/utils/abilities'
 const { loggedIn, user, clear } = useUserSession()
 const config = useRuntimeConfig()
 const route = useRoute()
+// useRequestURL resolves on both server and client — window.location does
+// not, and this header is server-rendered on every first page load, so a
+// window-only origin silently dropped the redirect for pre-hydration
+// clicks and dumped people at the apex after logging in (#107).
+const requestURL = useRequestURL()
 
 // Hosted login (stage-door), returning to the current page. Dev: /dev-login.
 const loginHref = computed(() => {
   if (import.meta.dev) return '/dev-login'
-  if (import.meta.server) return `${config.public.authBaseURL}/login`
-  return `${config.public.authBaseURL}/login?redirect=${encodeURIComponent(window.location.origin + route.fullPath)}`
+  return `${config.public.authBaseURL}/login?redirect=${encodeURIComponent(requestURL.origin + route.fullPath)}`
 })
 
 const showAdminLink = computed(() => user.value ? isStaff(user.value) : false)
