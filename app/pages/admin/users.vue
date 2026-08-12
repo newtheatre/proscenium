@@ -48,6 +48,9 @@ watch(q, () => {
 
 const { data, status, refresh } = await useFetch<Paginated<MirrorUser>>('/api/users', { query })
 
+// A pager for a single page of results is noise.
+const showPagination = computed(() => (data.value?.total ?? 0) > limit)
+
 const columns = [
   { accessorKey: 'name', header: 'Name' },
   { accessorKey: 'email', header: 'Email' },
@@ -144,6 +147,7 @@ async function createUser() {
         </template>
       </p>
       <UPagination
+        v-if="showPagination"
         v-model:page="page"
         :total="data?.total ?? 0"
         :items-per-page="limit"
