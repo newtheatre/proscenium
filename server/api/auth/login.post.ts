@@ -7,9 +7,43 @@ const bodySchema = z.object({
   password: z.string().min(1, 'Password is required'),
 })
 
-/** POST /api/auth/login — authenticate with email and password. */
+/**
+ * POST /api/auth/login — authenticate with email and password.
+ *
+ * Rate limited on two axes. The per-IP bucket stops one source working through
+ * a list of addresses; the per-address bucket stops a distributed attempt
+ * working through passwords for one account. Neither alone is enough.
+ *
+ * The address bucket counts failures only, and is cleared on success, so
+ * someone who mistypes their own password three times and then gets it right
+ * starts from zero again.
+ */
 export default defineEventHandler(async (event) => {
   const { email, password } = await readValidatedBody(event, bodySchema.parse)
+
+  const ip = clientIp(event)
+  const emailKey = `login:email:${email.toLowerCase()}`
+
+  // The per-IP limit is deliberately loose. Most of this audience is on
+  // university wifi behind shared NAT, so an entire hall of residence can look
+  // like one address during an on-sale — a tight limit here would lock out real
+  // customers long before it inconvenienced an attacker. The per-account
+  // failure limit below is the one doing the actual work.
+  await assertRateLimit(event, [
+    { key: `login:ip:${ip}`, limit: 100, windowSeconds: 15 * 60 },
+  ], 'Too many sign-in attempts from this connection. Please wait a few minutes and try again.')
+
+  // Counted before the password check so a failure cannot skip it by throwing.
+  const failures = await consumeRateLimit({ key: emailKey, limit: 8, windowSeconds: 15 * 60 })
+  if (!failures.ok) {
+    setResponseHeader(event, 'retry-after', failures.retryAfter)
+    throw createError({
+      statusCode: 429,
+      statusMessage: 'Too many failed sign-in attempts for this account. Please wait a few minutes, or reset your password.',
+    })
+  }
+
+  await sweepRateLimits(event)
 
   // Find user by email
   const user = await db.select().from(schema.users).where(eq(schema.users.email, email)).get()
@@ -38,6 +72,9 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Invalid email or password',
     })
   }
+
+  // Correct password: forget the failures.
+  await resetRateLimit(emailKey)
 
   // Get user roles
   const roles = await db.select().from(schema.userRoles).where(eq(schema.userRoles.userId, user.id)).all()

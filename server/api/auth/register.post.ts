@@ -12,6 +12,15 @@ const bodySchema = z.object({
 export default defineEventHandler(async (event) => {
   const { email, password, name } = await readValidatedBody(event, bodySchema.parse)
 
+  // Not in the original issue, but this endpoint both sends an email and probes
+  // whether an address already has a password — the same account-claiming
+  // surface that had to be guarded after the import. Bounded per IP.
+  await assertRateLimit(event, [
+    { key: `register:ip:${clientIp(event)}`, limit: 30, windowSeconds: 60 * 60 },
+  ], 'Too many sign-up attempts from this connection. Please wait a while and try again.')
+
+  await sweepRateLimits(event)
+
   // A password-less shadow account (created by a guest booking or walk-in) may
   // already exist for this email — registering should claim it so the booking
   // history carries over. Only a real, password-set account blocks registration.
