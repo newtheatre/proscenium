@@ -2,7 +2,7 @@ import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqli
 import { sql, relations } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { venues } from './venue'
-import { showCategories } from './legacy'
+import { showCategories, showContentWarnings } from './legacy'
 import { seasons } from './passes'
 
 // A show is a production — the top-level entity for a run of performances.
@@ -56,7 +56,10 @@ export const showsRelations = relations(shows, ({ one, many }) => ({
     fields: [shows.categoryId],
     references: [showCategories.id],
   }),
-  // contentWarnings is defined in legacy.ts (showContentWarningsRelations)
+  // The link rows, each carrying its axis (ACTION / DIALOGUE / TECHNICAL).
+  // legacy.ts declares the reverse side; without this side a show cannot load
+  // its own warnings, which is why 1,001 imported links had no read path.
+  contentWarnings: many(showContentWarnings),
   // ticketTypeOverrides and tickets relations are defined in ticket.ts to avoid circular imports
 }))
 
