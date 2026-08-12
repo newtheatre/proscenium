@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
   if ((bookings?.n ?? 0) > 0) {
     throw createError({
       statusCode: 409,
-      statusMessage: `This account cannot be deleted because it has ${bookings!.n} booking${bookings!.n === 1 ? '' : 's'} against it. Booking history has to be kept for reporting, so the account has to be anonymised instead.`,
+      statusMessage: `This account cannot be deleted because it has ${bookings!.n} booking${bookings!.n === 1 ? '' : 's'} against it. Booking history has to be kept for reporting. Close the account instead — POST /api/users/${userId}/anonymise removes the person and keeps the sales record.`,
     })
   }
 
