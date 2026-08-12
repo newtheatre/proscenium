@@ -7,7 +7,7 @@ import { db } from '@nuxthub/db'
  * be either the nanoid primary key or the six-character reference.
  *
  * Accessible to the booking owner (logged in) or staff, or to a guest that
- * supplies the matching booking reference as `?ref=`.
+ * supplies a valid access token as `?t=`.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
@@ -43,9 +43,10 @@ export default defineEventHandler(async (event) => {
     if (isOwner || isStaff) return customerBooking
   }
 
-  // Guest access: the booking reference, from `?ref=` or from the cookie set by
-  // the legacy /cancel/:code redirect.
-  if (presentedBookingRef(event, booking.id) === booking.bookingRef) {
+  // Guest access: a signed token scoped to this booking, from `?t=` or the
+  // cookie. The booking reference is no longer accepted — it is quoted aloud at
+  // the box office and printed on every email, so it cannot also be the key.
+  if (await hasBookingToken(event, booking.id)) {
     return customerBooking
   }
 

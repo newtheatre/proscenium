@@ -1,0 +1,123 @@
+/**
+ * Signed, expiring access tokens for guest booking links.
+ *
+ * `bookingRef` used to be both the reference a customer quotes at the box
+ * office and the bearer secret that unlocked their booking. Six characters from
+ * a 32-symbol alphabet is about 1.07e9 values, and with 28,879 live rows a blind
+ * guess hit a real booking roughly once in 37,000 — enumerable, and the payload
+ * is a name, an email and a phone-adjacent set of notes.
+ *
+ * These tokens separate the two jobs. The reference goes back to being a
+ * reference; access is granted by something signed, scoped to one booking, and
+ * expiring on its own.
+ *
+ * Format: `<base64url payload>.<base64url HMAC-SHA256>`. Compact enough for a
+ * URL, verifiable without a database round trip, and revocable in bulk by
+ * rotating the secret. HMAC rather than encryption because nothing in the
+ * payload is secret — the booking id is already in the path.
+ */
+
+interface TokenPayload {
+  /** Booking id. Named short because this rides in a URL. */
+  b: string
+  /** Expiry, unix seconds. */
+  e: number
+}
+
+/** A week, as a floor — a booking made the day before still needs a usable link. */
+const MIN_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000
+/** A day past the performance, so the page still opens on the night. */
+const GRACE_AFTER_PERFORMANCE_MS = 24 * 60 * 60 * 1000
+
+function b64url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function b64urlDecode(value: string): Uint8Array<ArrayBuffer> {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=')
+  const binary = atob(padded)
+  const bytes = new Uint8Array(new ArrayBuffer(binary.length))
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+function secret(): string {
+  const config = useRuntimeConfig()
+  // Falls back to the session password so this works on an existing deployment
+  // without a new environment variable. Set bookingTokenSecret to rotate booking
+  // links independently of sessions.
+  const value = config.bookingTokenSecret || (config as { session?: { password?: string } }).session?.password
+  if (!value) {
+    throw createError({ statusCode: 500, statusMessage: 'Booking token secret is not configured' })
+  }
+  return value
+}
+
+async function key(): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret()),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify'],
+  )
+}
+
+/**
+ * Expiry for a booking's token: a day after the performance, but never less
+ * than a week away. Tying it to the performance means the credential stops
+ * working once it can no longer be acted on.
+ */
+export function bookingTokenExpiry(performanceStartsAt: Date, now = new Date()): number {
+  const afterPerformance = performanceStartsAt.getTime() + GRACE_AFTER_PERFORMANCE_MS
+  return Math.floor(Math.max(afterPerformance, now.getTime() + MIN_LIFETIME_MS) / 1000)
+}
+
+export async function signBookingToken(bookingId: string, expiresAt: number): Promise<string> {
+  const payload: TokenPayload = { b: bookingId, e: expiresAt }
+  const encoded = b64url(new TextEncoder().encode(JSON.stringify(payload)))
+  const signature = await crypto.subtle.sign('HMAC', await key(), new TextEncoder().encode(encoded))
+  return `${encoded}.${b64url(new Uint8Array(signature))}`
+}
+
+/**
+ * Verify a token and return the booking id it grants access to, or null.
+ *
+ * Returns null for every failure — bad shape, bad signature, expired, wrong
+ * booking — rather than distinguishing them, so this cannot be used to probe
+ * which booking ids exist.
+ */
+export async function verifyBookingToken(token: string, bookingId: string, now = new Date()): Promise<boolean> {
+  const separator = token.lastIndexOf('.')
+  if (separator <= 0) return false
+
+  const encoded = token.slice(0, separator)
+  const signature = token.slice(separator + 1)
+
+  let valid: boolean
+  try {
+    valid = await crypto.subtle.verify(
+      'HMAC',
+      await key(),
+      b64urlDecode(signature),
+      new TextEncoder().encode(encoded),
+    )
+  }
+  catch {
+    return false
+  }
+  if (!valid) return false
+
+  let payload: TokenPayload
+  try {
+    payload = JSON.parse(new TextDecoder().decode(b64urlDecode(encoded))) as TokenPayload
+  }
+  catch {
+    return false
+  }
+
+  if (payload.b !== bookingId) return false
+  if (typeof payload.e !== 'number' || payload.e * 1000 <= now.getTime()) return false
+
+  return true
+}

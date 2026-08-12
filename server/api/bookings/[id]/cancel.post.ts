@@ -6,7 +6,7 @@ import { sendBookingCancellationEmail } from '~~/server/utils/email'
  * POST /api/bookings/:id/cancel
  *
  * Lets a customer cancel their own booking — the logged-in owner, or a guest
- * presenting the matching `?ref=`. Only a PENDING booking for a future
+ * presenting a valid access token. Only a PENDING booking for a future
  * performance can be cancelled; it is marked CANCELLED / cancelledBy CUSTOMER
  * and a cancellation email is sent.
  */
@@ -54,6 +54,7 @@ export default defineEventHandler(async (event) => {
 
   if (full) {
     const emailPromise = sendBookingCancellationEmail({
+      bookingId: booking.id,
       bookingRef: full.bookingRef,
       customerName: full.user.name,
       customerEmail: full.user.email,

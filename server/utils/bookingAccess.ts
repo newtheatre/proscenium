@@ -3,45 +3,48 @@ import { eq, or } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
 /**
- * Cookie carrying a booking reference for a guest who arrived from a legacy
- * `/cancel/:code` link, so the reference does not have to travel in the URL.
+ * Cookie carrying a signed access token, for a guest who arrived from a link
+ * that carried one. Keeping the token out of the address bar afterwards stops
+ * it reaching browser history, intermediary logs, or the Referer of any
+ * outbound link on the booking page.
  *
- * Scoped to the booking it was issued for: the value is `<bookingId>.<ref>` and
- * the id must match the booking being accessed, so a cookie picked up from one
- * booking cannot be replayed against another.
+ * The token is already scoped to one booking and already expires; the cookie is
+ * only a place to put it.
  */
-export const BOOKING_REF_COOKIE = 'nnt_booking_ref'
+export const BOOKING_TOKEN_COOKIE = 'nnt_booking_token'
 
-/** How long a guest has to act on a legacy link before it must be followed again. */
-export const BOOKING_REF_COOKIE_MAX_AGE = 60 * 30
+/** Long enough to read the page and act on it, short enough not to linger. */
+export const BOOKING_TOKEN_COOKIE_MAX_AGE = 60 * 60
 
-export function setBookingRefCookie(event: H3Event, bookingId: string, bookingRef: string): void {
-  setCookie(event, BOOKING_REF_COOKIE, `${bookingId}.${bookingRef}`, {
+export function setBookingTokenCookie(event: H3Event, token: string): void {
+  setCookie(event, BOOKING_TOKEN_COOKIE, token, {
     httpOnly: true,
     secure: !import.meta.dev,
     sameSite: 'lax',
     path: '/',
-    maxAge: BOOKING_REF_COOKIE_MAX_AGE,
+    maxAge: BOOKING_TOKEN_COOKIE_MAX_AGE,
   })
 }
 
 /**
- * The booking reference the caller is presenting, from `?ref=` or from the
- * cookie set by the legacy-link redirect. Returns undefined if neither is
- * present or the cookie was issued for a different booking.
+ * Whether the caller presents a valid access token for this booking, from `?t=`
+ * or from the cookie.
+ *
+ * `?ref=` is deliberately no longer accepted. The booking reference is a
+ * customer-facing identifier — printed on emails, read aloud at the box office,
+ * quoted in messages — and treating it as a credential meant every one of those
+ * places was handing out access.
  */
-export function presentedBookingRef(event: H3Event, bookingId: string): string | undefined {
+export async function hasBookingToken(event: H3Event, bookingId: string): Promise<boolean> {
   const query = getQuery(event)
-  if (typeof query.ref === 'string' && query.ref) return query.ref
+  const fromQuery = typeof query.t === 'string' ? query.t : undefined
+  const fromCookie = getCookie(event, BOOKING_TOKEN_COOKIE)
 
-  const cookie = getCookie(event, BOOKING_REF_COOKIE)
-  if (!cookie) return undefined
+  for (const token of [fromQuery, fromCookie]) {
+    if (token && await verifyBookingToken(token, bookingId)) return true
+  }
 
-  const separator = cookie.indexOf('.')
-  if (separator === -1) return undefined
-  if (cookie.slice(0, separator) !== bookingId) return undefined
-
-  return cookie.slice(separator + 1) || undefined
+  return false
 }
 
 export interface BookingAccess {
@@ -60,7 +63,7 @@ export interface BookingAccess {
 
 /**
  * Load a booking by its id or bookingRef and assert the caller may act on it:
- * the logged-in owner or staff, or a guest presenting the matching `?ref=`.
+ * the logged-in owner or staff, or a guest presenting a valid access token.
  *
  * Returns the reservation plus its performance's start time, status and show —
  * enough for the self-service guards. Throws 404 if unknown, 403 if the caller
@@ -86,9 +89,9 @@ export async function requireBookingAccess(event: H3Event, idOrRef: string): Pro
   const sessionUser = await getVerifiedSessionUser(event)
   const isOwner = sessionUser?.id === booking.userId
   const isStaff = sessionUser?.roles?.some((r: string) => ['ADMIN', 'MANAGER', 'BOX_OFFICE'].includes(r)) ?? false
-  const hasRef = presentedBookingRef(event, booking.id) === booking.bookingRef
+  const hasToken = await hasBookingToken(event, booking.id)
 
-  if (!isOwner && !isStaff && !hasRef) {
+  if (!isOwner && !isStaff && !hasToken) {
     throw createError({ statusCode: 403, statusMessage: 'You do not have access to this booking' })
   }
 

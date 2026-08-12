@@ -2,7 +2,7 @@
 /**
  * Customer self-service management for their own booking: cancel it, or change
  * the ticket composition. Only shown for a PENDING booking on a future
- * performance. Authorises with the same `?ref=` the page was opened with (or the
+ * performance. Authorises with the same access token the page was opened with (or the
  * logged-in owner's session).
  */
 interface BookingTicket {
@@ -39,7 +39,7 @@ interface ShowPerformance {
 
 const props = defineProps<{
   booking: Booking
-  bookingRef?: string
+  accessToken?: string
 }>()
 
 const emit = defineEmits<{ refresh: [] }>()
@@ -47,7 +47,7 @@ const emit = defineEmits<{ refresh: [] }>()
 const toast = useToast()
 const confirm = useConfirm()
 
-const refQuery = computed(() => (props.bookingRef ? { ref: props.bookingRef } : undefined))
+const accessQuery = computed(() => (props.accessToken ? { t: props.accessToken } : undefined))
 
 const canManage = computed(() =>
   props.booking.status === 'PENDING'
@@ -69,7 +69,7 @@ async function cancelBooking() {
 
   cancelling.value = true
   try {
-    await $fetch(`/api/bookings/${props.booking.id}/cancel`, { method: 'POST', query: refQuery.value })
+    await $fetch(`/api/bookings/${props.booking.id}/cancel`, { method: 'POST', query: accessQuery.value })
     toast.add({ title: 'Booking cancelled', icon: 'i-lucide-check-circle', color: 'success' })
     emit('refresh')
   }
@@ -133,7 +133,7 @@ async function saveTickets() {
   try {
     await $fetch(`/api/bookings/${props.booking.id}/tickets`, {
       method: 'PUT',
-      query: refQuery.value,
+      query: accessQuery.value,
       body: { tickets: selection.value },
     })
     toast.add({ title: 'Booking updated', icon: 'i-lucide-check-circle', color: 'success' })

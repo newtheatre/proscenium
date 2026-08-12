@@ -159,7 +159,7 @@ function getStatusLabel(status: string) {
                     {{ formatBookingTotal(booking.tickets) }}
                   </div>
                   <NuxtLink
-                    :to="`/whats-on/${booking.performance.show.slug}/booking/${booking.id}?ref=${booking.bookingRef}`"
+                    :to="`/whats-on/${booking.performance.show.slug}/booking/${booking.id}`"
                     class="text-sm text-primary hover:underline"
                   >
                     View

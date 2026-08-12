@@ -61,6 +61,7 @@ export default defineEventHandler(async (event) => {
         },
       },
     }) as {
+      id: string
       bookingRef: string
       user: { name: string, email: string }
       performance: {
@@ -73,6 +74,7 @@ export default defineEventHandler(async (event) => {
 
     if (reservation) {
       const emailPromise = sendBookingCancellationEmail({
+        bookingId: reservation.id,
         bookingRef: reservation.bookingRef,
         customerName: reservation.user.name,
         customerEmail: reservation.user.email,
