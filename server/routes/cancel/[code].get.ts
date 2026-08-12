@@ -14,9 +14,9 @@ import { eq } from 'drizzle-orm'
  * import keeps it as `reservations.legacyRef`, so those links can resolve to
  * the imported booking instead of dying.
  *
- * The legacy code is itself the shared secret, exactly as the new `?ref=` is,
- * so handing one off for the other preserves the original level of access and
- * the customer keeps the same self-service they had before.
+ * The legacy code is itself a shared secret, so trading it for a signed access
+ * token preserves the original level of access and the customer keeps the same
+ * self-service they had before.
  *
  * Note this path only receives traffic once `ticketing.newtheatre.org.uk` is
  * pointed at this Worker (or a redirect rule forwards it). The legacy app is
@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const performance = await db
-    .select({ showId: schema.performances.showId })
+    .select({ showId: schema.performances.showId, startsAt: schema.performances.startsAt })
     .from(schema.performances)
     .where(eq(schema.performances.id, booking.performanceId))
     .get()
@@ -72,12 +72,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // The reference goes in a short-lived, host-only cookie rather than the
-  // redirect target's query string. In the query it would be written into
-  // browser history, into any intermediary's logs, and into the Referer header
-  // of every outbound link on the booking page — for a value that is itself the
-  // access token.
-  setBookingRefCookie(event, booking.id, booking.bookingRef)
+  // The legacy code is itself a shared secret, so trading it for a signed token
+  // preserves the original level of access without the reference having to be
+  // the credential. The token goes in a short-lived host-only cookie rather than
+  // the redirect target's query string, where it would land in browser history,
+  // in intermediary logs, and in the Referer of every outbound link on the page.
+  const token = await signBookingToken(booking.id, bookingTokenExpiry(performance!.startsAt))
+  setBookingTokenCookie(event, token)
 
   // 302, not 301: the mapping is stable, but a permanent redirect is cached
   // indefinitely by browsers and intermediaries, which would pin the response

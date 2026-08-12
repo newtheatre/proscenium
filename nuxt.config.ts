@@ -57,6 +57,10 @@ export default defineNuxtConfig({
   runtimeConfig: {
     resendApiKey: '',
     resendFromEmail: '',
+    // Signs guest booking-access tokens. Falls back to the session password when
+    // unset; set NUXT_BOOKING_TOKEN_SECRET to rotate booking links on their own,
+    // which invalidates every outstanding one.
+    bookingTokenSecret: '',
     public: {
       baseURL: 'https://newtheatre.org.uk',
     },

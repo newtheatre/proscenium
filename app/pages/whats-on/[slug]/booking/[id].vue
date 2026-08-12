@@ -2,7 +2,7 @@
 /**
  * Booking lookup and confirmation page.
  *
- * Accessible via /whats-on/:slug/booking/:id?ref=BOOKREF
+ * Accessible via /whats-on/:slug/booking/:id?t=<signed access token>
  * Shows booking details for confirmation emails and post-booking access.
  */
 
@@ -29,14 +29,17 @@ interface BookingDetail {
 
 const route = useRoute()
 const bookingId = route.params.id as string
-const bookingRef = route.query.ref as string | undefined
+// A signed, expiring access token from the confirmation email. The booking
+// reference is no longer accepted as a credential — it is quoted at the box
+// office and printed on every email, so it could not also be the key.
+const accessToken = route.query.t as string | undefined
 
-// A guest arriving from a legacy /cancel/:code link carries their booking
-// reference in a cookie rather than in the URL, so the server-rendered request
-// has to forward the incoming cookies. Plain useFetch does not.
+// A guest arriving from a legacy /cancel/:code link carries their token in a
+// cookie rather than in the URL, so the server-rendered request has to forward
+// the incoming cookies. Plain useFetch does not.
 const { data: booking, status, error, refresh } = await useFetch<BookingDetail>(`/api/bookings/${bookingId}`, {
   key: `booking-${bookingId}`,
-  query: bookingRef ? { ref: bookingRef } : undefined,
+  query: accessToken ? { t: accessToken } : undefined,
   headers: import.meta.server ? useRequestHeaders(['cookie']) : undefined,
 })
 
@@ -83,7 +86,7 @@ useSeoMeta({
 
       <BookingManage
         :booking="booking"
-        :booking-ref="bookingRef"
+        :access-token="accessToken"
         class="mt-8"
         @refresh="refresh"
       />

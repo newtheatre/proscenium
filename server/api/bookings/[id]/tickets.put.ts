@@ -6,7 +6,7 @@ import { z } from 'zod/v4'
  * PUT /api/bookings/:id/tickets
  *
  * Customer self-service edit of their own booking's ticket composition (the
- * logged-in owner, or a guest presenting the matching `?ref=`).
+ * logged-in owner, or a guest presenting a valid access token).
  *
  * Same desired-quantity diff as the staff endpoint, but with self-service
  * guards: the booking must be PENDING and the performance ON_SALE and in the

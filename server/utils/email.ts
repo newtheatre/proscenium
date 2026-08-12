@@ -88,6 +88,8 @@ interface BookingTicket {
 }
 
 interface BookingEmailData {
+  /** Needed to mint the access token; the reference alone no longer grants access. */
+  bookingId: string
   bookingRef: string
   customerName: string
   customerEmail: string
@@ -200,7 +202,11 @@ function buildTicketTable(tickets: BookingTicket[]): string {
  */
 export async function sendBookingConfirmationEmail(data: BookingEmailData): Promise<void> {
   const { public: { baseURL } } = useRuntimeConfig()
-  const bookingUrl = `${baseURL}/whats-on/${data.showSlug}/booking/${data.bookingRef}?ref=${data.bookingRef}`
+  // A signed, expiring token rather than the booking reference. The reference is
+  // printed below for the customer to quote at the box office, which is exactly
+  // why it cannot also be the thing that unlocks the booking.
+  const token = await signBookingToken(data.bookingId, bookingTokenExpiry(data.performanceDate))
+  const bookingUrl = `${baseURL}/whats-on/${data.showSlug}/booking/${data.bookingRef}?t=${encodeURIComponent(token)}`
 
   const html = `
 <!DOCTYPE html>
@@ -378,7 +384,11 @@ export async function sendBookingCancellationEmail(data: Omit<BookingEmailData, 
  */
 export async function sendBookingReminderEmail(data: BookingEmailData): Promise<void> {
   const { public: { baseURL } } = useRuntimeConfig()
-  const bookingUrl = `${baseURL}/whats-on/${data.showSlug}/booking/${data.bookingRef}?ref=${data.bookingRef}`
+  // A signed, expiring token rather than the booking reference. The reference is
+  // printed below for the customer to quote at the box office, which is exactly
+  // why it cannot also be the thing that unlocks the booking.
+  const token = await signBookingToken(data.bookingId, bookingTokenExpiry(data.performanceDate))
+  const bookingUrl = `${baseURL}/whats-on/${data.showSlug}/booking/${data.bookingRef}?t=${encodeURIComponent(token)}`
 
   const html = `
 <!DOCTYPE html>

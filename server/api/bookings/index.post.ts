@@ -189,6 +189,7 @@ export default defineEventHandler(async (event) => {
   // Send confirmation email (don't block the response, but keep the worker alive)
   if (booking) {
     const emailPromise = sendBookingConfirmationEmail({
+      bookingId: booking.id,
       bookingRef: booking.bookingRef,
       customerName: booking.user.name,
       customerEmail: booking.user.email,
