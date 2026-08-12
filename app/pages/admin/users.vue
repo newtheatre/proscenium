@@ -20,6 +20,7 @@ interface Paginated<T> {
   total: number
   page: number
   limit: number
+  hiddenAnonymised?: number
 }
 
 definePageMeta({
@@ -138,6 +139,9 @@ async function createUser() {
     <div class="flex items-center justify-between">
       <p class="text-sm text-muted">
         {{ data?.total ?? 0 }} users
+        <template v-if="data?.hiddenAnonymised">
+          · {{ data.hiddenAnonymised.toLocaleString() }} anonymised accounts not shown
+        </template>
       </p>
       <UPagination
         v-model:page="page"

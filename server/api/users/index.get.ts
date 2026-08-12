@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, count, like, or, sql } from 'drizzle-orm'
+import { and, asc, count, isNull, isNotNull, like, or, sql } from 'drizzle-orm'
 import { listUsers } from '~~/shared/utils/abilities'
 
 /**
@@ -17,6 +17,14 @@ import { listUsers } from '~~/shared/utils/abilities'
  *  - otherwise a paginated `{ rows, total, page, limit }` envelope, optionally
  *    filtered by `q` against name and email.
  */
+// Anonymised bookers (retention policy / account closure) and legacy
+// placeholder rows are records, not people — they never load in listings or
+// lookups, and surface only as a count.
+const notAnonymised = and(
+  isNull(schema.users.anonymisedAt),
+  sql`${schema.users.email} NOT LIKE '%.invalid'`,
+)
+
 export default defineEventHandler(async (event) => {
   await authorize(event, listUsers)
 
@@ -25,25 +33,34 @@ export default defineEventHandler(async (event) => {
   // Single-user lookup by exact address.
   if (typeof email === 'string' && email.length > 0) {
     const user = await db.query.users.findFirst({
-      where: (u, { eq: eqFn, sql: sqlFn }) => eqFn(sqlFn`lower(${u.email})`, email.toLowerCase()),
+      where: (u, { eq: eqFn, sql: sqlFn, and: andFn }) => andFn(
+        eqFn(sqlFn`lower(${u.email})`, email.toLowerCase()),
+        notAnonymised,
+      ),
     })
     return user ? [user] : []
   }
 
   const { page, limit, q } = await getValidatedQuery(event, paginationSchema.parse)
 
-  const filters = []
+  const filters = [notAnonymised]
   if (q) {
     filters.push(or(
       like(sql`lower(${schema.users.name})`, likeTerm(q)),
       like(sql`lower(${schema.users.email})`, likeTerm(q)),
     ))
   }
-  const where = filters.length ? and(...filters) : undefined
+  const where = and(...filters)
 
   const [totalRow] = await db.select({ n: count() }).from(schema.users).where(where)
   const total = totalRow?.n ?? 0
-  if (total === 0) return paginated([], 0, { page, limit })
+
+  // The number somewhere: standing count of hidden anonymised/placeholder rows.
+  const [hiddenRow] = await db.select({ n: count() }).from(schema.users)
+    .where(or(isNotNull(schema.users.anonymisedAt), sql`${schema.users.email} LIKE '%.invalid'`))
+  const hiddenAnonymised = hiddenRow?.n ?? 0
+
+  if (total === 0) return { ...paginated([], 0, { page, limit }), hiddenAnonymised }
 
   const rows = await db.query.users.findMany({
     where: () => where,
@@ -52,5 +69,5 @@ export default defineEventHandler(async (event) => {
     offset: offsetFor({ page, limit }),
   })
 
-  return paginated(rows, total, { page, limit })
+  return { ...paginated(rows, total, { page, limit }), hiddenAnonymised }
 })
