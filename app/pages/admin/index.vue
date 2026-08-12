@@ -95,15 +95,38 @@ function statusCount(status: string): number {
 // ── Export ────────────────────────────────────────────────────────────────────
 
 const exportShowId = ref<string>('')
+const exportFrom = ref<string>('')
+const exportTo = ref<string>('')
 
+// No "All shows" option. Unfiltered, the export joins all 45,563 tickets and
+// builds around 10 MB of CSV inside a Worker — it was the default choice, one
+// click away. A date range covers the same need for a season's accounts.
 const showOptions = computed(() => [
-  { label: 'All shows', value: '' },
+  { label: 'Choose a show…', value: '' },
   ...(shows.value ?? []).map(s => ({ label: s.title, value: s.id })),
 ])
+
+/** The season the theatre is currently in: 1 August to 31 July. */
+function currentSeason(): { from: string, to: string } {
+  const now = new Date()
+  const startYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1
+  return { from: `${startYear}-08-01`, to: `${startYear + 1}-07-31` }
+}
+
+function useCurrentSeason() {
+  const { from, to } = currentSeason()
+  exportShowId.value = ''
+  exportFrom.value = from
+  exportTo.value = to
+}
+
+const exportBounded = computed(() => !!exportShowId.value || !!exportFrom.value || !!exportTo.value)
 
 const exportUrl = computed(() => {
   const params = new URLSearchParams()
   if (exportShowId.value) params.set('showId', exportShowId.value)
+  if (exportFrom.value) params.set('from', exportFrom.value)
+  if (exportTo.value) params.set('to', exportTo.value)
   const qs = params.toString()
   return `/api/admin/export/tickets${qs ? `?${qs}` : ''}`
 })
@@ -456,7 +479,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
 
       <div class="flex flex-col sm:flex-row items-start sm:items-end gap-3">
         <UFormField
-          label="Filter by show"
+          label="Show"
           class="flex-1 min-w-48"
         >
           <USelect
@@ -464,20 +487,52 @@ const recentColumns: TableColumn<RecentReservation>[] = [
             :options="showOptions"
             value-attribute="value"
             option-attribute="label"
-            placeholder="All shows"
+            placeholder="Choose a show…"
             class="w-full"
           />
         </UFormField>
+
+        <UFormField label="Performances from">
+          <UInput
+            v-model="exportFrom"
+            type="date"
+            class="w-full"
+          />
+        </UFormField>
+
+        <UFormField label="to">
+          <UInput
+            v-model="exportTo"
+            type="date"
+            class="w-full"
+          />
+        </UFormField>
+
+        <UButton
+          color="neutral"
+          variant="subtle"
+          icon="i-lucide-calendar-range"
+          label="This season"
+          @click="useCurrentSeason"
+        />
 
         <UButton
           color="success"
           icon="i-lucide-download"
           label="Download CSV"
           :to="exportUrl"
+          :disabled="!exportBounded"
           external
           download
         />
       </div>
+
+      <p
+        v-if="!exportBounded"
+        class="text-xs text-muted mt-2"
+      >
+        Pick a show or a date range first. There are 45,563 tickets in the archive, which is more than one request can build.
+      </p>
 
       <USeparator class="my-4" />
 
@@ -486,7 +541,8 @@ const recentColumns: TableColumn<RecentReservation>[] = [
           name="i-lucide-info"
           class="size-3 inline"
         />
-        Columns included: Booking Ref, Status, Refunded, Customer Name, Customer Email, Show, Performance Date, Performance Time, Venue, Ticket Type, Price Paid (£), Booked At, Customer Notes, Staff Notes
+        Columns included: Booking Ref, Status, Refunded, Customer Name, Customer Email, Show, Performance Date, Performance Time, Venue, Ticket Type, Ticket Kind, Price Paid (£), Price Confidence, Price Note, Booked At, Customer Notes, Staff Notes.
+        Imported tickets carry a price confidence: EXACT, DERIVED (estimated by apportioning a booking total) or UNKNOWN (never recorded by the old system, so the price cell is left empty rather than showing £0.00).
       </p>
     </UCard>
   </div>
