@@ -1,546 +1,190 @@
+<script lang="ts" setup>
 /**
- * Admin: Manage Users Page
+ * Admin Users Page — stage-door integration.
  *
- * Administrative interface for user account management.
- *
- * Features:
- * - Table view of all user accounts with selection
- * - Filter by role (ADMIN, MANAGER, BOX_OFFICE)
- * - Search by name or email
- * - View user details (verified status, account creation date)
- * - Create new user accounts (password set by user via reset email)
- * - Update user roles
- * - Send password reset emails to users
- * - Delete user account(s) (confirmation required, bulk supported)
- *
- * Data Loading:
- * - GET /api/users
- *
- * Data Mutations:
- * - POST /api/users (create user, sends password reset email)
- * - PUT /api/users/:id (update user)
- * - POST /api/users/:id/reset-password (send password reset email)
- * - DELETE /api/users/:id (delete account)
- *
- * Uses nuxt-auth-utils:
- * - useUserSession() to check authentication
- * - Redirect to /login if not authenticated
- * - Redirect to / if user doesn't have ADMIN role (403)
- * - Prevent self-deletion or self-role-change (UI safeguard)
- *
- * @route /admin/users
- * @authenticated
- * @admin-only
+ * Identity, credentials, roles, and verification live in the central auth
+ * service; this page is the app-side view of the local user mirror (who
+ * exists here for reservations) plus shadow-account creation for walk-ins.
+ * Everything else deep-links to the auth service admin.
  */
-<script setup lang="ts">
-import type { TableColumn } from '@nuxt/ui'
-import { upperFirst } from 'scule'
-import type { Row } from '@tanstack/table-core'
-
-const UButton = resolveComponent('UButton')
-const UDropdownMenu = resolveComponent('UDropdownMenu')
-const UCheckbox = resolveComponent('UCheckbox')
-
-definePageMeta({
-  layout: 'admin',
-  middleware: ['admin'],
-  title: 'User Management',
-})
-
-const { user: currentUser } = useUserSession()
-const toast = useToast()
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const table = useTemplateRef<any>('table')
-
-// User type
-interface User {
+interface MirrorUser {
   id: string
-  name: string
   email: string
-  verified: boolean
-  roles: Array<'ADMIN' | 'MANAGER' | 'BOX_OFFICE'>
+  name: string
+  anonymisedAt: string | null
   createdAt: string
 }
 
-// Table state
-const columnVisibility = ref()
-const rowSelection = ref<Record<string, boolean>>({})
+interface Paginated<T> {
+  rows: T[]
+  total: number
+  page: number
+  limit: number
+}
 
-// Searching and paging happen on the server: there are ~10,000 users after the
-// legacy import, and fetching them all to render ten was ~20,000 rows read.
-const pageSize = 25
-const currentPage = ref(1)
-const search = ref('')
-const roleFilter = ref('all')
-
-// Debounced locally — @vueuse/core is only a transitive dependency here.
-const debouncedSearch = ref('')
-let searchTimer: ReturnType<typeof setTimeout> | undefined
-watch(search, (value) => {
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    debouncedSearch.value = value.trim()
-    currentPage.value = 1
-  }, 300)
+definePageMeta({
+  layout: 'admin',
+  middleware: 'admin',
+  title: 'Users',
 })
-onUnmounted(() => clearTimeout(searchTimer))
 
-const { data: usersPage, status, refresh } = await useAsyncData(
-  'admin-users',
-  () => $fetch<{ rows: User[], total: number }>('/api/users', {
-    query: {
-      page: currentPage.value,
-      limit: pageSize,
-      q: debouncedSearch.value || undefined,
-      role: roleFilter.value !== 'all' ? roleFilter.value : undefined,
-    },
-  }),
-  {
-    lazy: true,
-    default: () => ({ rows: [] as User[], total: 0 }),
-    watch: [currentPage, debouncedSearch, roleFilter],
-  },
-)
+const config = useRuntimeConfig()
+const toast = useToast()
 
-const data = computed(() => usersPage.value?.rows ?? [])
-const totalUsers = computed(() => usersPage.value?.total ?? 0)
+const q = ref('')
+const page = ref(1)
+const limit = 25
 
-// Selected user for editing
-const userToEdit = ref<User | null>(null)
-const userToDelete = ref<User | null>(null)
-const deleteModalOpen = ref(false)
+const query = computed(() => ({
+  ...(q.value ? { q: q.value } : {}),
+  page: page.value,
+  limit,
+}))
 
-// Delete single user
-async function deleteSingleUser() {
-  if (!userToDelete.value) return
+watch(q, () => {
+  page.value = 1
+})
 
-  try {
-    await $fetch(`/api/users/${userToDelete.value.id}`, { method: 'DELETE' })
-    toast.add({
-      title: 'User deleted',
-      description: `${userToDelete.value.name} has been removed`,
-      icon: 'i-lucide-check',
-      color: 'success',
-    })
-    deleteModalOpen.value = false
-    userToDelete.value = null
-    await refresh()
-  }
-  catch (error: unknown) {
-    toast.add({
-      title: 'Error',
-      description: getErrorMessage(error, 'Failed to delete user'),
-      icon: 'i-lucide-x-circle',
-      color: 'error',
-    })
-  }
-}
+const { data, status, refresh } = await useFetch<Paginated<MirrorUser>>('/api/users', { query })
 
-// Reset password for a user
-async function resetPassword(user: User) {
-  try {
-    await $fetch(`/api/users/${user.id}/reset-password`, { method: 'POST' })
-    toast.add({
-      title: 'Password reset email sent',
-      description: `A password reset link has been sent to ${user.email}`,
-      icon: 'i-lucide-check',
-      color: 'success',
-    })
-  }
-  catch (error: unknown) {
-    toast.add({
-      title: 'Error',
-      description: getErrorMessage(error, 'Failed to send password reset email'),
-      icon: 'i-lucide-x-circle',
-      color: 'error',
-    })
-  }
-}
-
-// Get row actions for dropdown
-function getRowItems(row: Row<User>) {
-  const user = row.original
-  const isSelf = user.id === currentUser.value?.id
-  const isAdmin = user.roles?.includes('ADMIN')
-
-  return [
-    {
-      type: 'label' as const,
-      label: 'Actions',
-    },
-    {
-      label: 'Copy user ID',
-      icon: 'i-lucide-copy',
-      onSelect() {
-        navigator.clipboard.writeText(user.id)
-        toast.add({
-          title: 'Copied to clipboard',
-          description: 'User ID copied to clipboard',
-        })
-      },
-    },
-    {
-      type: 'separator' as const,
-    },
-    {
-      label: 'Edit user',
-      icon: 'i-lucide-pencil',
-      disabled: isSelf,
-      onSelect() {
-        userToEdit.value = user
-      },
-    },
-    {
-      label: 'Reset password',
-      icon: 'i-lucide-key-round',
-      disabled: isSelf,
-      onSelect() {
-        resetPassword(user)
-      },
-    },
-    {
-      type: 'separator' as const,
-    },
-    {
-      label: 'Delete user',
-      icon: 'i-lucide-trash',
-      color: 'error' as const,
-      disabled: isSelf || isAdmin,
-      onSelect() {
-        userToDelete.value = user
-        deleteModalOpen.value = true
-      },
-    },
-  ]
-}
-
-// Define table columns
-const columns: TableColumn<User>[] = [
-  {
-    id: 'select',
-    header: ({ table }) =>
-      h(UCheckbox, {
-        'modelValue': table.getIsSomePageRowsSelected()
-          ? 'indeterminate'
-          : table.getIsAllPageRowsSelected(),
-        'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
-          table.toggleAllPageRowsSelected(!!value),
-        'ariaLabel': 'Select all',
-      }),
-    cell: ({ row }) =>
-      h(UCheckbox, {
-        'modelValue': row.getIsSelected(),
-        'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
-          row.toggleSelected(!!value),
-        'ariaLabel': 'Select row',
-      }),
-  },
-  {
-    accessorKey: 'id',
-    header: 'ID',
-    cell: ({ row }) => h('span', { class: 'text-sm text-muted font-mono' }, row.original.id.slice(0, 8)),
-  },
-  {
-    accessorKey: 'name',
-    header: 'Name',
-  },
-  {
-    accessorKey: 'email',
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
-
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'Email',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc'),
-      })
-    },
-  },
-  {
-    accessorKey: 'roles',
-    header: 'Roles',
-    filterFn: (row, _columnId, filterValue) => {
-      if (!filterValue) return true
-      return row.original.roles?.includes(filterValue)
-    },
-    cell: ({ row }) => {
-      const roles = row.original.roles || []
-      if (roles.length === 0) {
-        return h('span', { class: 'text-sm text-muted' }, 'No roles')
-      }
-      return h('div', { class: 'flex flex-wrap gap-1' }, roles.map(role =>
-        h('span', {
-          class: `inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-            role === 'ADMIN'
-              ? 'bg-primary/10 text-primary'
-              : role === 'MANAGER'
-                ? 'bg-blue-500/10 text-blue-500'
-                : 'bg-neutral-500/10 text-neutral-500'
-          }`,
-        }, role),
-      ))
-    },
-  },
-  {
-    accessorKey: 'verified',
-    header: 'Verified',
-    cell: ({ row }) => {
-      const verified = row.original.verified
-      return h('span', {
-        class: `inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-          verified
-            ? 'bg-success/10 text-success'
-            : 'bg-warning/10 text-warning'
-        }`,
-      }, verified ? 'Verified' : 'Unverified')
-    },
-  },
-  {
-    accessorKey: 'createdAt',
-    header: 'Joined',
-    cell: ({ row }) => {
-      const date = new Date(row.original.createdAt)
-      return h('span', { class: 'text-sm text-muted' }, date.toLocaleDateString('en-GB', { timeZone: 'Europe/London' }))
-    },
-  },
-  {
-    id: 'actions',
-    cell: ({ row }) => {
-      return h(
-        'div',
-        { class: 'text-right' },
-        h(
-          UDropdownMenu,
-          {
-            content: {
-              align: 'end',
-            },
-            items: getRowItems(row),
-          },
-          () =>
-            h(UButton, {
-              icon: 'i-lucide-ellipsis-vertical',
-              color: 'neutral',
-              variant: 'ghost',
-              class: 'ml-auto',
-            }),
-        ),
-      )
-    },
-  },
+const columns = [
+  { accessorKey: 'name', header: 'Name' },
+  { accessorKey: 'email', header: 'Email' },
+  { accessorKey: 'status', header: 'Status' },
+  { accessorKey: 'created', header: 'Created' },
 ]
 
-// Role filter
-// Filtered on the server, like the search: a client-side role filter would only
-// filter the current page, which reads as "there are no admins" when there are.
-watch(roleFilter, () => {
-  currentPage.value = 1
-})
+const rows = computed(() => (data.value?.rows ?? []).map(user => ({
+  name: user.name,
+  email: user.email,
+  status: user.anonymisedAt ? 'Anonymised' : 'Active',
+  created: new Date(user.createdAt).toLocaleDateString('en-GB'),
+})))
 
-// Pagination
+const createOpen = ref(false)
+const creating = ref(false)
+const createForm = reactive({ name: '', email: '' })
 
-// Get selected users for bulk actions
-const selectedUsers = computed<User[]>(() => {
-  if (!table.value?.tableApi || !data.value) return []
-  return table.value.tableApi.getFilteredSelectedRowModel().rows.map((row: { original: User }) => row.original)
-})
+function openCreate() {
+  createOpen.value = true
+}
+
+async function createUser() {
+  creating.value = true
+  try {
+    const result = await $fetch<{ user: { existing: boolean } }>('/api/users', {
+      method: 'POST',
+      body: { ...createForm },
+    })
+    createOpen.value = false
+    Object.assign(createForm, { name: '', email: '' })
+    await refresh()
+    toast.add({
+      title: result.user.existing ? 'Existing NNT account linked' : 'User created',
+      description: result.user.existing
+        ? 'That email already has an NNT account — reservations will attach to it.'
+        : 'They can claim the account later via forgot-password on the NNT login page.',
+      color: 'success',
+    })
+  }
+  catch (error) {
+    toast.add({ title: getErrorMessage(error, 'Could not create user'), color: 'error' })
+  }
+  finally {
+    creating.value = false
+  }
+}
 </script>
 
 <template>
-  <div class="flex flex-col gap-4 p-4">
-    <div class="flex flex-wrap items-center justify-between gap-1.5">
-      <!-- Searches the whole user table on the server, not just the page. -->
+  <div class="flex flex-col gap-4">
+    <UAlert
+      icon="i-lucide-info"
+      color="neutral"
+      variant="subtle"
+      title="Identity is managed centrally"
+      description="Names, emails, passwords, roles, and verification are edited in the NNT account admin. This list shows the local mirror used to attach reservations."
+    />
+
+    <div class="flex flex-wrap gap-2 items-center">
       <UInput
-        v-model="search"
-        class="max-w-sm"
+        v-model="q"
+        placeholder="Search by name or email…"
         icon="i-lucide-search"
-        placeholder="Search name or email…"
+        class="w-72"
       />
-
-      <div class="flex flex-wrap items-center gap-1.5">
-        <!-- Bulk Delete Button (shows when rows are selected) -->
-        <UsersDeleteModal
-          :count="selectedUsers.length"
-          :users="selectedUsers"
-          @refresh="() => { refresh(); rowSelection = {} }"
-        >
-          <UButton
-            v-if="selectedUsers.length > 0"
-            label="Delete"
-            color="error"
-            variant="subtle"
-            icon="i-lucide-trash"
-          >
-            <template #trailing>
-              <UKbd>
-                {{ selectedUsers.length }}
-              </UKbd>
-            </template>
-          </UButton>
-        </UsersDeleteModal>
-
-        <USelect
-          v-model="roleFilter"
-          :items="[
-            { label: 'All Roles', value: 'all' },
-            { label: 'Admins', value: 'ADMIN' },
-            { label: 'Managers', value: 'MANAGER' },
-            { label: 'Box Office', value: 'BOX_OFFICE' },
-          ]"
-          :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
-          placeholder="Filter role"
-          class="min-w-32"
-        />
-
-        <UDropdownMenu
-          :items="
-            table?.tableApi
-              ?.getAllColumns()
-              .filter((column: any) => column.getCanHide())
-              .map((column: any) => ({
-                label: upperFirst(column.id),
-                type: 'checkbox' as const,
-                checked: column.getIsVisible(),
-                onUpdateChecked(checked: boolean) {
-                  table?.tableApi?.getColumn(column.id)?.toggleVisibility(!!checked)
-                },
-                onSelect(e?: Event) {
-                  e?.preventDefault()
-                },
-              }))
-          "
-          :content="{ align: 'end' }"
-        >
-          <UButton
-            label="Display"
-            color="neutral"
-            variant="outline"
-            trailing-icon="i-lucide-settings-2"
-          />
-        </UDropdownMenu>
-
-        <UsersCreateModal @refresh="refresh" />
-      </div>
+      <div class="flex-1" />
+      <UButton
+        :to="`${config.public.authBaseURL}/admin`"
+        external
+        target="_blank"
+        variant="outline"
+        icon="i-lucide-external-link"
+        label="Manage accounts & roles"
+      />
+      <UButton
+        icon="i-lucide-user-round-plus"
+        label="Add user"
+        @click="openCreate"
+      />
     </div>
 
-    <!-- Paging and search are server-side; the table renders the page it is given. -->
     <UTable
-      ref="table"
-      v-model:column-visibility="columnVisibility"
-      v-model:row-selection="rowSelection"
-      class="shrink-0"
-      :data="data"
+      :data="rows"
       :columns="columns"
       :loading="status === 'pending'"
-      :ui="{
-        base: 'table-fixed border-separate border-spacing-0',
-        thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-        tbody: '[&>tr]:last:[&>td]:border-b-0',
-        th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-        td: 'border-b border-default',
-      }"
     />
 
-    <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-      <div class="text-sm text-muted">
-        {{ totalUsers.toLocaleString('en-GB') }} user{{ totalUsers === 1 ? '' : 's' }}
-        <template v-if="debouncedSearch">
-          matching
-        </template>
-      </div>
-
-      <div class="flex items-center gap-1.5">
-        <UPagination
-          v-model:page="currentPage"
-          :items-per-page="pageSize"
-          :total="totalUsers"
-        />
-      </div>
+    <div class="flex items-center justify-between">
+      <p class="text-sm text-muted">
+        {{ data?.total ?? 0 }} users
+      </p>
+      <UPagination
+        v-model:page="page"
+        :total="data?.total ?? 0"
+        :items-per-page="limit"
+      />
     </div>
 
-    <!-- Edit User Modal -->
-    <UsersEditModal
-      :user="userToEdit"
-      @refresh="() => { refresh(); userToEdit = null }"
-    />
-
-    <!-- Delete Single User Modal (from dropdown) -->
     <UModal
-      v-model:open="deleteModalOpen"
-      :title="`Delete ${userToDelete?.name || 'user'}`"
-      :description="`Are you sure? This action cannot be undone.`"
+      v-model:open="createOpen"
+      title="Add user"
+      description="Creates an NNT account they can claim later — no passwords to hand out."
     >
       <template #body>
-        <div
-          v-if="userToDelete"
-          class="space-y-4"
+        <UForm
+          :state="createForm"
+          class="flex flex-col gap-4"
+          @submit="createUser"
         >
-          <!-- Admin Protection Warning -->
-          <div
-            v-if="userToDelete.roles?.includes('ADMIN')"
-            class="p-3 rounded-md bg-warning/10 border border-warning/20"
+          <UFormField
+            label="Name"
+            name="name"
+            required
           >
-            <div class="flex gap-2">
-              <UIcon
-                name="i-lucide-shield-alert"
-                class="text-warning shrink-0 mt-0.5"
-              />
-              <div class="text-sm text-warning">
-                <p class="font-medium mb-1">
-                  Admin Account Protection
-                </p>
-                <p>
-                  This user has an admin role. Remove the admin role first before you can delete their account.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Standard Deletion Warning -->
-          <div
-            v-else
-            class="p-3 rounded-md bg-error/10 border border-error/20"
+            <UInput
+              v-model="createForm.name"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Email"
+            name="email"
+            required
           >
-            <div class="flex gap-2">
-              <UIcon
-                name="i-lucide-info"
-                class="text-error shrink-0 mt-0.5"
-              />
-              <div class="text-sm text-error">
-                <p class="font-medium mb-1">
-                  What happens when you delete this user:
-                </p>
-                <ul class="list-disc list-inside space-y-1">
-                  <li>User account will be permanently deleted</li>
-                  <li>All associated data will be removed</li>
-                  <li>User will be logged out immediately</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex justify-end gap-2 mt-4">
+            <UInput
+              v-model="createForm.email"
+              type="email"
+              class="w-full"
+            />
+          </UFormField>
           <UButton
-            label="Cancel"
-            color="neutral"
-            variant="subtle"
-            @click="deleteModalOpen = false"
+            type="submit"
+            :loading="creating"
+            class="self-end"
+            label="Add user"
           />
-          <UButton
-            label="Delete User"
-            color="error"
-            :disabled="userToDelete?.roles?.includes('ADMIN')"
-            @click="deleteSingleUser"
-          />
-        </div>
+        </UForm>
       </template>
     </UModal>
   </div>

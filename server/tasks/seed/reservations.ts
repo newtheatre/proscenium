@@ -34,9 +34,9 @@ export async function seedReservations(
   const earnestPerfs = seededPerformances.filter(p => p.showId === earnest.id)
   const hamletPerfs = seededPerformances.filter(p => p.showId === hamlet.id)
 
-  // Actual-account users to attach reservations to
-  const regularUser = seededUsers.find(u => u.email === 'user@newtheatre.org.uk')!
-  const unverifiedUser = seededUsers.find(u => u.email === 'unverified@newtheatre.org.uk')!
+  // Actual-account users to attach reservations to (mirror rows)
+  const regularUser = seededUsers.find(u => u.email === 'dev-user@proscenium.test')!
+  const unverifiedUser = seededUsers.find(u => u.email === 'dev-guest@proscenium.test')!
 
   // Ticket types
   const adult = createdTicketTypes.find(t => t.name === 'Adult')!
@@ -47,9 +47,9 @@ export async function seedReservations(
   // ── Shadow / guest accounts ───────────────────────────────────────────────
 
   const shadowUsersToCreate = [
-    { email: 'alice.johnson@example.com', name: 'Alice Johnson', password: null, verified: false },
-    { email: 'bob.smith@example.com', name: 'Bob Smith', password: null, verified: false },
-    { email: 'carol.white@example.com', name: 'Carol White', password: null, verified: false },
+    { email: 'alice.johnson@example-user.co.uk', name: 'Alice Johnson' },
+    { email: 'bob.smith@example-user.co.uk', name: 'Bob Smith' },
+    { email: 'carol.white@example-user.co.uk', name: 'Carol White' },
   ]
   const shadowUsers = await db.insert(users).values(shadowUsersToCreate).returning()
   const [alice, bob, carol] = shadowUsers

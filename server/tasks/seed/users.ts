@@ -1,96 +1,28 @@
 import { db } from '@nuxthub/db'
-import { users, userRoles } from '~~/server/db/schema/user'
+import { users } from '~~/server/db/schema/user'
 
 /**
- * Seed Users and Roles
+ * Seed Users (mirror rows)
  *
- * Creates default user accounts with different role assignments for testing.
+ * Identity lives in the central auth service; locally we only mirror
+ * `{ id, email, name }` so reservations have owners. Dev sessions come from
+ * `/dev-login` (which mints scoped roles without any password), so no
+ * credentials are seeded here — the known-password seed accounts of the old
+ * auth stack must not recur (stage-door docs/development.md#seeds).
  */
 export async function seedUsers() {
-  console.log('👥 Seeding users...')
+  console.log('👥 Seeding user mirrors...')
 
-  // Hash the default development password
-  const defaultPassword = await hashPassword('DevPassword123!')
-
-  // Create users
   const usersToCreate = [
-    {
-      email: 'admin@newtheatre.org.uk',
-      password: defaultPassword,
-      name: 'Admin User',
-      verified: true,
-    },
-    {
-      email: 'manager@newtheatre.org.uk',
-      password: defaultPassword,
-      name: 'Manager User',
-      verified: true,
-    },
-    {
-      email: 'boxoffice@newtheatre.org.uk',
-      password: defaultPassword,
-      name: 'Box Office User',
-      verified: true,
-    },
-    {
-      email: 'user@newtheatre.org.uk',
-      password: defaultPassword,
-      name: 'Regular User',
-      verified: true,
-    },
-    {
-      email: 'unverified@newtheatre.org.uk',
-      password: defaultPassword,
-      name: 'Unverified User',
-      verified: false,
-    },
+    { id: 'dev-admin', email: 'dev-admin@proscenium.test', name: 'Dev Admin' },
+    { id: 'dev-manager', email: 'dev-manager@proscenium.test', name: 'Dev Manager' },
+    { id: 'dev-box-office', email: 'dev-box-office@proscenium.test', name: 'Dev Box Office' },
+    { id: 'dev-user', email: 'dev-user@proscenium.test', name: 'Dev User' },
+    { id: 'dev-guest', email: 'dev-guest@proscenium.test', name: 'Dev Guest (shadow)' },
   ]
 
   const createdUsers = await db.insert(users).values(usersToCreate).returning()
-  console.log(`  ✅ Created ${createdUsers.length} users`)
-
-  // Assign roles to users
-  const rolesToCreate = [
-    // Admin user gets all roles
-    { userId: createdUsers[0]!.id, role: 'ADMIN' as const },
-    { userId: createdUsers[0]!.id, role: 'MANAGER' as const },
-    { userId: createdUsers[0]!.id, role: 'BOX_OFFICE' as const },
-    // Manager user
-    { userId: createdUsers[1]!.id, role: 'MANAGER' as const },
-    // Box Office user
-    { userId: createdUsers[2]!.id, role: 'BOX_OFFICE' as const },
-  ]
-
-  await db.insert(userRoles).values(rolesToCreate)
-  console.log(`  ✅ Assigned ${rolesToCreate.length} roles`)
+  console.log(`  ✅ Created ${createdUsers.length} user mirrors (log in via /dev-login?staff=admin etc.)`)
 
   return createdUsers
-}
-
-/**
- * Print seeded users information
- */
-export function printUsersSummary() {
-  console.log('\n📋 Seeded users:')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('Email: admin@newtheatre.org.uk')
-  console.log('Password: DevPassword123!')
-  console.log('Roles: ADMIN, MANAGER, BOX_OFFICE')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('Email: manager@newtheatre.org.uk')
-  console.log('Password: DevPassword123!')
-  console.log('Roles: MANAGER')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('Email: boxoffice@newtheatre.org.uk')
-  console.log('Password: DevPassword123!')
-  console.log('Roles: BOX_OFFICE')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('Email: user@newtheatre.org.uk')
-  console.log('Password: DevPassword123!')
-  console.log('Roles: None')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('Email: unverified@newtheatre.org.uk')
-  console.log('Password: DevPassword123!')
-  console.log('Verified: No')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 }

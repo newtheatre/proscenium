@@ -1,22 +1,29 @@
-/**
- * Staff middleware
- *
- * Allows access to ADMIN, MANAGER, and BOX_OFFICE roles.
- * Redirects unauthenticated users to /login.
- * Redirects authenticated non-staff users to /.
- */
-export default defineNuxtRouteMiddleware(() => {
-  const { loggedIn, user } = useUserSession()
+import { isStaff } from '~~/shared/utils/abilities'
+
+// Staff pages (ADMIN, MANAGER, BOX_OFFICE) — same staleness rule as admin.
+export default defineNuxtRouteMiddleware((to) => {
+  const { loggedIn, user, session } = useUserSession()
+  const config = useRuntimeConfig()
+  const target = `${useRequestURL().origin}${to.fullPath}`
 
   if (!loggedIn.value) {
-    return navigateTo('/login')
+    if (import.meta.dev) {
+      return navigateTo('/dev-login?staff=box-office', { external: true })
+    }
+    return navigateTo(
+      `${config.public.authBaseURL}/login?redirect=${encodeURIComponent(target)}`,
+      { external: true },
+    )
   }
 
-  const isStaff = user.value?.roles?.includes('ADMIN')
-    || user.value?.roles?.includes('MANAGER')
-    || user.value?.roles?.includes('BOX_OFFICE')
+  if (!import.meta.dev && isStale(session.value)) {
+    return navigateTo(
+      `${config.public.authBaseURL}/api/session/refresh?redirect=${encodeURIComponent(target)}`,
+      { external: true },
+    )
+  }
 
-  if (!isStaff) {
+  if (!user.value || !isStaff(user.value)) {
     return navigateTo('/')
   }
 })

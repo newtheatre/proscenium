@@ -75,13 +75,32 @@ export default defineEventHandler(async (event) => {
     userId = existing.id
   }
   else {
-    const existing = await db.select({ id: schema.users.id }).from(schema.users)
-      .where(eq(schema.users.email, body.email!)).get()
-    if (existing) userId = existing.id
-    else {
-      userId = nanoid()
-      needShadowUser = true
+    // Identity is central (stage-door ADR-0007): match-or-create a shadow
+    // account by email in the auth service, mirror the canonical id locally
+    // in the batch below.
+    const config = useRuntimeConfig(event)
+    if (!config.authServiceToken) {
+      throw createError({ statusCode: 502, statusMessage: 'Auth service token not configured' })
     }
+    let shadow: { id: string }
+    try {
+      shadow = await $fetch<{ id: string }>(
+        `${config.public.authBaseURL}/api/users/shadow`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${config.authServiceToken}` },
+          body: { email: body.email!, name: body.name! },
+        },
+      )
+    }
+    catch (error) {
+      console.error('[passes] shadow-account call failed:', error)
+      throw createError({ statusCode: 502, statusMessage: 'Could not reach the auth service — try again' })
+    }
+    userId = shadow.id
+    const mirror = await db.select({ id: schema.users.id }).from(schema.users)
+      .where(eq(schema.users.id, shadow.id)).get()
+    needShadowUser = !mirror
   }
 
   const passId = nanoid()
@@ -100,7 +119,7 @@ export default defineEventHandler(async (event) => {
   if (needShadowUser) {
     await db.batch([
       db.insert(schema.users).values({
-        id: userId, email: body.email!, name: body.name!, password: null, verified: false,
+        id: userId, email: body.email!.toLowerCase(), name: body.name!,
       }),
       passInsert,
     ])

@@ -52,34 +52,6 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions): Promis
   }
 }
 
-/**
- * Send an email verification link to the user.
- */
-export async function sendVerificationEmail(email: string, token: string): Promise<void> {
-  const { public: { baseURL } } = useRuntimeConfig()
-  const url = `${baseURL}/verify-email?token=${token}`
-
-  await sendEmail({
-    to: email,
-    subject: 'Verify your email address',
-    html: `<p>Click the link below to verify your email address:</p><p><a href="${url}">${url}</a></p>`,
-  })
-}
-
-/**
- * Send a password reset link to the user.
- */
-export async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
-  const { public: { baseURL } } = useRuntimeConfig()
-  const url = `${baseURL}/reset-password?token=${token}`
-
-  await sendEmail({
-    to: email,
-    subject: 'Reset your password',
-    html: `<p>Click the link below to reset your password:</p><p><a href="${url}">${url}</a></p>`,
-  })
-}
-
 // ── Booking Emails ──────────────────────────────────────────────────────────
 
 interface BookingTicket {
@@ -281,6 +253,11 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData): Prom
         <li>Have your booking reference <strong>${data.bookingRef}</strong> ready to quote.</li>
         <li>Payment is collected when you pick up your tickets.</li>
       </ul>
+      <p style="margin: 12px 0 0; font-size: 13px; color: #78716c;">
+        Want to track your bookings across NNT sites?
+        <a href="https://auth.newtheatre.org.uk/forgot-password" style="color: #7c3aed;">Set a password</a>
+        for your NNT account — it already exists for this email address.
+      </p>
     </div>
 
     <!-- Footer -->

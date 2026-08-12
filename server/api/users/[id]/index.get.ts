@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { readUser } from '~~/shared/utils/abilities'
 
-/** GET /api/users/:id — get a user by ID. Staff or own profile. */
+/** GET /api/users/:id — get a local user mirror by ID. Staff or own profile. */
 export default defineEventHandler(async (event) => {
   const userId = getRouterParam(event, 'id')
 
@@ -9,10 +9,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'User ID is required' })
   }
 
-  // Get the user with roles using query API
   const user = await db.query.users.findFirst({
     where: (users, { eq }) => eq(users.id, userId),
-    ...userWithRolesQuery,
   })
 
   if (!user) {
@@ -22,5 +20,5 @@ export default defineEventHandler(async (event) => {
   // Check if user has permission to read this user
   await authorize(event, readUser, user)
 
-  return formatUserResponse(user)
+  return user
 })

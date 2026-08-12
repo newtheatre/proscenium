@@ -27,19 +27,19 @@ export default defineEventHandler(async (event) => {
 
   await authorize(event, anonymiseUserAccount, { id: userId })
 
-  // An account holding a staff role is refused. Anonymising it would leave a
-  // nameless row with box-office access, and the role should be removed by
-  // someone who has thought about who takes the job over.
-  const role = await db
-    .select({ role: schema.userRoles.role })
-    .from(schema.userRoles)
-    .where(eq(schema.userRoles.userId, userId))
-    .get()
+  // Roles live in the central auth service now, so the old local "still
+  // holds a staff role" refusal can't be checked here. The one case this app
+  // CAN see is the caller anonymising themselves while holding staff roles —
+  // refuse that; for other targets, remove roles in the auth admin first
+  // (stage-door Phase 7 will orchestrate erasure centrally, roles included).
+  const callerSession = await getUserSession(event)
+  const selfWithRoles = callerSession.user?.id === userId
+    && callerSession.user.roles?.some(r => r.startsWith('proscenium:'))
 
-  if (role) {
+  if (selfWithRoles) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'This account still holds a staff role. Remove the role first, so it is clear who is taking over that responsibility.',
+      statusMessage: 'This account still holds a staff role. Remove the role first (auth service admin), so it is clear who is taking over that responsibility.',
     })
   }
 
@@ -68,14 +68,12 @@ export default defineEventHandler(async (event) => {
     return { message: 'This account has already been closed.', reservationsAffected: 0 }
   }
 
-  // Closing your own account ends the session with it.
-  const session = await getUserSession(event)
-  if (session?.user?.id === userId) {
-    await clearUserSession(event)
-  }
-
+  // Note: the estate session is NOT cleared here — only the auth service
+  // writes that cookie (single-writer rule), and the central identity
+  // survives this app-local scrub. Until stage-door Phase 7 orchestrates
+  // full erasure, pair this with disable/force-logout in the auth admin.
   return {
-    message: 'The account has been closed and its personal details removed. Booking records are kept without them.',
+    message: 'The account has been closed on this site and its personal details removed here. Booking records are kept without them. To close the NNT account itself, use the NNT account service.',
     reservationsAffected: result.reservationsAffected,
   }
 })

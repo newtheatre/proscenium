@@ -15,9 +15,16 @@ export interface OwnedResource {
   id: string
 }
 
-/** Check whether a user holds a specific role. */
+/**
+ * Check whether a user holds a specific role.
+ *
+ * Roles now come from the central auth service as scoped strings
+ * (`proscenium:ADMIN`) — the estate session carries every app's roles, and
+ * this app only reads its own namespace. Mapping here, at the primitive,
+ * keeps every ability and call site untouched.
+ */
 export function hasRole(user: AbilityUser, role: string): boolean {
-  return user.roles?.includes(role) || false
+  return user.roles?.includes(`proscenium:${role}`) || false
 }
 
 /** Shorthand: user is ADMIN or MANAGER. */

@@ -59,18 +59,34 @@ export default defineEventHandler(async (event) => {
     resolvedUserId = existingUser.id
   }
   else {
-    // Find existing account (full or shadow) by email, or create a shadow account
-    const existingUser = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, body.email!)).get()
+    // Identity is central (stage-door ADR-0007): match-or-create a shadow
+    // account by email in the auth service, then mirror the canonical id
+    // locally in the same atomic batch below. They can claim the account
+    // later via the hosted forgot-password flow.
+    const config = useRuntimeConfig(event)
+    if (!config.authServiceToken) {
+      throw createError({ statusCode: 502, statusMessage: 'Auth service token not configured' })
+    }
 
-    if (existingUser) {
-      resolvedUserId = existingUser.id
+    let shadow: { id: string }
+    try {
+      shadow = await $fetch<{ id: string }>(
+        `${config.public.authBaseURL}/api/users/shadow`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${config.authServiceToken}` },
+          body: { email: body.email!, name: body.name! },
+        },
+      )
     }
-    else {
-      // Create a shadow account — no password set; they can claim it later via
-      // password reset. Deferred so it goes in the same atomic batch below.
-      resolvedUserId = nanoid()
-      needShadowUser = true
+    catch (error) {
+      console.error('[reservations] shadow-account call failed:', error)
+      throw createError({ statusCode: 502, statusMessage: 'Could not reach the auth service — try again' })
     }
+
+    resolvedUserId = shadow.id
+    const mirror = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, shadow.id)).get()
+    needShadowUser = !mirror
   }
 
   // ── Resolve effective ticket prices ───────────────────────────────────────
@@ -112,10 +128,8 @@ export default defineEventHandler(async (event) => {
     await db.batch([
       db.insert(schema.users).values({
         id: resolvedUserId,
-        email: body.email!,
+        email: body.email!.toLowerCase(),
         name: body.name!,
-        password: null,
-        verified: false,
       }),
       reservationInsert,
       ticketsInsert,

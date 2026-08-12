@@ -76,6 +76,11 @@ export default defineEventHandler(async (event) => {
 
   // ── Resolve user ───────────────────────────────────────────────────────────
 
+  // Identity lives in the central auth service (stage-door ADR-0007): guest
+  // checkout asks it to match-or-create a shadow account by email, then the
+  // canonical id is mirrored locally in the same atomic batch as the booking
+  // (reservations.user_id FKs the mirror). Idempotent on the auth side, so a
+  // retried request is safe.
   let resolvedUserId: string
   let needShadowUser = false
 
@@ -83,21 +88,39 @@ export default defineEventHandler(async (event) => {
     resolvedUserId = loggedInUser.id
   }
   else {
-    // Find existing account by email, or create a shadow account. The shadow
-    // insert is deferred so it can go in the same atomic batch as the booking.
-    const existingUser = await db
+    const config = useRuntimeConfig(event)
+    if (!config.authServiceToken) {
+      throw createError({ statusCode: 502, statusMessage: 'Booking is temporarily unavailable — please try again shortly' })
+    }
+
+    let shadow: { id: string, existing: boolean }
+    try {
+      shadow = await $fetch<{ id: string, existing: boolean }>(
+        `${config.public.authBaseURL}/api/users/shadow`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${config.authServiceToken}` },
+          body: { email: body.email!, name: body.name! },
+        },
+      )
+    }
+    catch (error) {
+      // Bookings/min is tiny; fail the booking with a retry message rather
+      // than inventing local identity that would diverge from the canonical
+      // store (plan §4.8).
+      console.error('[bookings] shadow-account call failed:', error)
+      throw createError({ statusCode: 502, statusMessage: 'Booking is temporarily unavailable — please try again shortly' })
+    }
+
+    resolvedUserId = shadow.id
+    // Mirror row may not exist yet (new shadow, or existing user who has
+    // never hit this app since cutover) — upsert it in the booking batch.
+    const mirror = await db
       .select({ id: schema.users.id })
       .from(schema.users)
-      .where(eq(schema.users.email, body.email!))
+      .where(eq(schema.users.id, shadow.id))
       .get()
-
-    if (existingUser) {
-      resolvedUserId = existingUser.id
-    }
-    else {
-      resolvedUserId = nanoid()
-      needShadowUser = true
-    }
+    needShadowUser = !mirror
   }
 
   // ── Resolve effective ticket prices ───────────────────────────────────────
@@ -136,10 +159,8 @@ export default defineEventHandler(async (event) => {
     await db.batch([
       db.insert(schema.users).values({
         id: resolvedUserId,
-        email: body.email!,
+        email: body.email!.toLowerCase(),
         name: body.name!,
-        password: null,
-        verified: false,
       }),
       reservationInsert,
       ticketsInsert,

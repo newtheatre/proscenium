@@ -10,11 +10,16 @@ import { eq, sql } from 'drizzle-orm'
  * booking stays, the person does not.
  *
  * The result is deliberately indistinguishable in shape from what the legacy
- * import produced for 8,267 retention-expired bookers, so that the guards which
- * already depend on it keep working: `register.post.ts` refuses to let an
- * anonymised account be claimed, and `password/forgot.post.ts` refuses to send
- * a reset to one. Only the email prefix differs, so the two can still be told
- * apart when auditing.
+ * import produced for 8,267 retention-expired bookers. The registration/claim
+ * guards for these addresses now live in the central auth service, which
+ * refuses to register or reset anything on an undeliverable domain.
+ *
+ * SCOPE (until stage-door Phase 7): this scrubs THIS APP's mirror and
+ * reservation data only. The central identity — and any live sessions —
+ * survive; full erasure is orchestrated centrally via app hooks in Phase 7,
+ * for which this function is the future hook implementation. Until then,
+ * pair a local anonymisation with the matching central action in the auth
+ * admin (disable / force-logout).
  */
 
 /** Non-routable by definition — `.invalid` is reserved (RFC 2606). */
@@ -37,8 +42,7 @@ export interface AnonymiseResult {
  *
  * Everything goes in a single batch: a half-applied anonymisation would leave
  * the name cleared but the notes intact, or the reverse, with no record of
- * which. `sessionEpoch` is bumped so any session the person still holds stops
- * working immediately rather than at the cookie's own expiry.
+ * which.
  *
  * Both note fields are cleared. The bulk import only cleared `customerNotes`,
  * which is defensible for a retention sweep, but this path runs because someone
@@ -67,11 +71,7 @@ export async function anonymiseUser(userId: string): Promise<AnonymiseResult> {
       .set({
         name: ANONYMISED_NAME,
         email: anonymisedEmail(),
-        password: null,
-        verified: false,
         anonymisedAt: now,
-        // Kills every session this person still holds.
-        sessionEpoch: sql`${schema.users.sessionEpoch} + 1`,
       })
       .where(eq(schema.users.id, userId)),
 
