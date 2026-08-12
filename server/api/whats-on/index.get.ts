@@ -15,6 +15,16 @@ import { and, asc, count, eq, gt, inArray, isNull, min } from 'drizzle-orm'
 export default defineEventHandler(async (event) => {
   const now = new Date()
 
+  // Set before any return, including the empty one below. Placed after it, the
+  // header was skipped whenever nothing was on sale — which is the cheapest
+  // response of all to cache, and the state the site sits in between seasons.
+  //
+  // Public and slow-changing, so let Cloudflare serve it from the edge. The one
+  // thing that moves quickly is ticketsSold, and a minute-old sold-out badge is
+  // harmless: capacity is enforced when the booking is written, not from this
+  // response.
+  setHeader(event, 'Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
+
   // Which published shows have at least one future ON_SALE performance, and when
   // does each one open? Ordering by the earliest performance is what the list
   // wants, and doing it here means the rest of the work is already narrowed.
@@ -96,12 +106,6 @@ export default defineEventHandler(async (event) => {
 
   const ticketCountMap = new Map(ticketCounts.map(r => [r.performanceId, r.count]))
   const byId = new Map(shows.map(s => [s.id, s]))
-
-  // Public and slow-changing, so let Cloudflare serve it from the edge. The one
-  // thing that does move quickly is ticketsSold, and a minute-old sold-out
-  // badge is harmless: capacity is enforced when the booking is written, not
-  // from this response.
-  setHeader(event, 'Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
 
   // Rebuilt in the order the grouping query established.
   return orderedShowIds
