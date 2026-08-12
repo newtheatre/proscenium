@@ -35,7 +35,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import { upperFirst } from 'scule'
-import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
 
 const UButton = resolveComponent('UButton')
@@ -64,17 +63,47 @@ interface User {
 }
 
 // Table state
-const columnFilters = ref([{
-  id: 'email',
-  value: '',
-}])
 const columnVisibility = ref()
 const rowSelection = ref<Record<string, boolean>>({})
 
-// Fetch users
-const { data, status, refresh } = await useFetch<User[]>('/api/users', {
-  lazy: true,
+// Searching and paging happen on the server: there are ~10,000 users after the
+// legacy import, and fetching them all to render ten was ~20,000 rows read.
+const pageSize = 25
+const currentPage = ref(1)
+const search = ref('')
+const roleFilter = ref('all')
+
+// Debounced locally — @vueuse/core is only a transitive dependency here.
+const debouncedSearch = ref('')
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(search, (value) => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    debouncedSearch.value = value.trim()
+    currentPage.value = 1
+  }, 300)
 })
+onUnmounted(() => clearTimeout(searchTimer))
+
+const { data: usersPage, status, refresh } = await useAsyncData(
+  'admin-users',
+  () => $fetch<{ rows: User[], total: number }>('/api/users', {
+    query: {
+      page: currentPage.value,
+      limit: pageSize,
+      q: debouncedSearch.value || undefined,
+      role: roleFilter.value !== 'all' ? roleFilter.value : undefined,
+    },
+  }),
+  {
+    lazy: true,
+    default: () => ({ rows: [] as User[], total: 0 }),
+    watch: [currentPage, debouncedSearch, roleFilter],
+  },
+)
+
+const data = computed(() => usersPage.value?.rows ?? [])
+const totalUsers = computed(() => usersPage.value?.total ?? 0)
 
 // Selected user for editing
 const userToEdit = ref<User | null>(null)
@@ -309,27 +338,13 @@ const columns: TableColumn<User>[] = [
 ]
 
 // Role filter
-const roleFilter = ref('all')
-
-watch(() => roleFilter.value, (newVal) => {
-  if (!table?.value?.tableApi) return
-
-  const rolesColumn = table.value.tableApi.getColumn('roles')
-  if (!rolesColumn) return
-
-  if (newVal === 'all') {
-    rolesColumn.setFilterValue(undefined)
-  }
-  else {
-    rolesColumn.setFilterValue(newVal)
-  }
+// Filtered on the server, like the search: a client-side role filter would only
+// filter the current page, which reads as "there are no admins" when there are.
+watch(roleFilter, () => {
+  currentPage.value = 1
 })
 
 // Pagination
-const pagination = ref({
-  pageIndex: 0,
-  pageSize: 10,
-})
 
 // Get selected users for bulk actions
 const selectedUsers = computed<User[]>(() => {
@@ -341,12 +356,12 @@ const selectedUsers = computed<User[]>(() => {
 <template>
   <div class="flex flex-col gap-4 p-4">
     <div class="flex flex-wrap items-center justify-between gap-1.5">
+      <!-- Searches the whole user table on the server, not just the page. -->
       <UInput
-        :model-value="(table?.tableApi?.getColumn('email')?.getFilterValue() as string)"
+        v-model="search"
         class="max-w-sm"
         icon="i-lucide-search"
-        placeholder="Filter emails..."
-        @update:model-value="table?.tableApi?.getColumn('email')?.setFilterValue($event)"
+        placeholder="Search name or email…"
       />
 
       <div class="flex flex-wrap items-center gap-1.5">
@@ -415,15 +430,11 @@ const selectedUsers = computed<User[]>(() => {
       </div>
     </div>
 
+    <!-- Paging and search are server-side; the table renders the page it is given. -->
     <UTable
       ref="table"
-      v-model:column-filters="columnFilters"
       v-model:column-visibility="columnVisibility"
       v-model:row-selection="rowSelection"
-      v-model:pagination="pagination"
-      :pagination-options="{
-        getPaginationRowModel: getPaginationRowModel(),
-      }"
       class="shrink-0"
       :data="data"
       :columns="columns"
@@ -439,16 +450,17 @@ const selectedUsers = computed<User[]>(() => {
 
     <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
       <div class="text-sm text-muted">
-        {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }} of
-        {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} row(s) selected.
+        {{ totalUsers.toLocaleString('en-GB') }} user{{ totalUsers === 1 ? '' : 's' }}
+        <template v-if="debouncedSearch">
+          matching
+        </template>
       </div>
 
       <div class="flex items-center gap-1.5">
         <UPagination
-          :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
-          :items-per-page="table?.tableApi?.getState().pagination.pageSize"
-          :total="table?.tableApi?.getFilteredRowModel().rows.length"
-          @update:page="(p: number) => table?.tableApi?.setPageIndex(p - 1)"
+          v-model:page="currentPage"
+          :items-per-page="pageSize"
+          :total="totalUsers"
         />
       </div>
     </div>

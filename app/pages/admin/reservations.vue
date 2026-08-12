@@ -13,7 +13,8 @@
  * - Pagination
  *
  * Data Loading:
- * - GET /api/reservations
+ * - GET /api/reservations (server-side paginated, filtered and searched)
+ * - GET /api/admin/reservation-counts (status tallies)
  *
  * Data Mutations:
  * - PUT /api/reservations/:id (update status/notes)
@@ -24,7 +25,6 @@
  */
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
 
 const UButton = resolveComponent('UButton')
@@ -82,7 +82,6 @@ const STATUS_CONFIG = {
 // ── Table state ───────────────────────────────────────────────────────────────
 
 const columnVisibility = ref()
-const pagination = ref({ pageSize: 15, pageIndex: 0 })
 
 const searchQuery = ref('')
 const statusFilter = ref<string>('ALL')
@@ -98,41 +97,61 @@ const statusOptions = [
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
-const { data, status, refresh } = await useFetch<Reservation[]>('/api/reservations', {
-  lazy: true,
+// Filtering, searching and paging all happen on the server. There are 30,000+
+// reservations: fetching them to filter in the browser was ~18 MB per page load.
+const pageSize = 25
+const currentPage = ref(1)
+
+// Debounced locally — @vueuse/core is only a transitive dependency here.
+const debouncedSearch = ref('')
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(searchQuery, (value) => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    debouncedSearch.value = value.trim()
+    currentPage.value = 1
+  }, 300)
+})
+onUnmounted(() => clearTimeout(searchTimer))
+
+watch(statusFilter, () => {
+  currentPage.value = 1
 })
 
-// ── Filtering ─────────────────────────────────────────────────────────────────
+const { data, status, refresh } = await useAsyncData(
+  'admin-reservations',
+  () => $fetch<{ rows: Reservation[], total: number }>('/api/reservations', {
+    query: {
+      page: currentPage.value,
+      limit: pageSize,
+      q: debouncedSearch.value || undefined,
+      status: statusFilter.value && statusFilter.value !== 'ALL' ? statusFilter.value : undefined,
+    },
+  }),
+  {
+    lazy: true,
+    default: () => ({ rows: [] as Reservation[], total: 0 }),
+    watch: [currentPage, debouncedSearch, statusFilter],
+  },
+)
 
-const filteredData = computed(() => {
-  let rows = data.value ?? []
-
-  if (statusFilter.value && statusFilter.value !== 'ALL') {
-    rows = rows.filter(r => r.status === statusFilter.value)
-  }
-
-  const q = searchQuery.value.trim().toLowerCase()
-  if (q) {
-    rows = rows.filter(r =>
-      r.bookingRef.toLowerCase().includes(q)
-      || r.user.name.toLowerCase().includes(q)
-      || r.user.email.toLowerCase().includes(q)
-      || r.performance.show.title.toLowerCase().includes(q)
-      || r.performance.venue.name.toLowerCase().includes(q),
-    )
-  }
-
-  return rows
-})
+const filteredData = computed(() => data.value?.rows ?? [])
+const totalCount = computed(() => data.value?.total ?? 0)
 
 // ── State summary counts ──────────────────────────────────────────────────────
+// One GROUP BY on the server, rather than five passes over every reservation
+// in the browser.
+const { data: counts, refresh: refreshCounts } = await useAsyncData(
+  'admin-reservation-counts',
+  () => $fetch<{ byStatus: Record<string, number>, total: number }>('/api/admin/reservation-counts'),
+  { lazy: true, default: () => ({ byStatus: {} as Record<string, number>, total: 0 }) },
+)
 
-const statusCounts = computed(() => {
-  const all = data.value ?? []
-  return Object.fromEntries(
-    Object.keys(STATUS_CONFIG).map(s => [s, all.filter(r => r.status === s).length]),
-  ) as Record<string, number>
-})
+const statusCounts = computed(() => counts.value?.byStatus ?? {})
+
+async function refreshAll() {
+  await Promise.all([refresh(), refreshCounts()])
+}
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -358,11 +377,10 @@ const columns: TableColumn<Reservation>[] = [
     </div>
 
     <!-- Table -->
+    <!-- Paging is server-side, so the table renders exactly the page it is given. -->
     <UTable
       ref="table"
       v-model:column-visibility="columnVisibility"
-      v-model:pagination="pagination"
-      :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
       class="shrink-0"
       :data="filteredData"
       :columns="columns"
@@ -379,18 +397,17 @@ const columns: TableColumn<Reservation>[] = [
     <!-- Footer -->
     <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
       <div class="text-sm text-muted">
-        {{ filteredData.length }} reservation(s) shown
-        <template v-if="data && data.length !== filteredData.length">
-          ({{ data.length }} total)
+        {{ totalCount.toLocaleString('en-GB') }} reservation{{ totalCount === 1 ? '' : 's' }}
+        <template v-if="debouncedSearch || (statusFilter && statusFilter !== 'ALL')">
+          matching
         </template>
       </div>
 
       <div class="flex gap-1.5">
         <UPagination
-          :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
-          :items-per-page="table?.tableApi?.getState().pagination.pageSize"
-          :total="filteredData.length"
-          @update:page="(p: number) => table?.tableApi?.setPageIndex(p - 1)"
+          v-model:page="currentPage"
+          :items-per-page="pageSize"
+          :total="totalCount"
         />
       </div>
     </div>
@@ -399,7 +416,7 @@ const columns: TableColumn<Reservation>[] = [
     <ReservationEditModal
       :reservation="reservationToEdit"
       @close="reservationToEdit = null"
-      @refresh="() => { refresh(); reservationToEdit = null }"
+      @refresh="() => { refreshAll(); reservationToEdit = null }"
     />
 
     <!-- Manage Tickets Slideover -->

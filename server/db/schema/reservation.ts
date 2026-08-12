@@ -86,6 +86,17 @@ export const reservations = sqliteTable('reservations', {
   index('reservations_performance_id_idx').on(table.performanceId),
   index('reservations_user_id_idx').on(table.userId),
   index('reservations_status_idx').on(table.status),
+
+  // Every reservation list sorts by createdAt DESC. Without an index SQLite
+  // reads and sorts all 30,110 rows before returning a page, so pagination on
+  // its own does not reduce the work — these have to land together.
+  //
+  // The composites let one index satisfy both the filter and the ordering, for
+  // the admin status filter and the box-office per-performance list.
+  index('reservations_created_at_idx').on(table.createdAt),
+  index('reservations_status_created_idx').on(table.status, table.createdAt),
+  index('reservations_perf_created_idx').on(table.performanceId, table.createdAt),
+  index('reservations_user_created_idx').on(table.userId, table.createdAt),
 ])
 
 export const reservationsRelations = relations(reservations, ({ one }) => ({
