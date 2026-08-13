@@ -99,6 +99,19 @@ const globalFilter = ref('')
 const { data, status, refresh } = await useFetch<Show[]>('/api/shows', { lazy: true })
 
 /**
+ * Rows for the table. **Always an array, never null.**
+ *
+ * The template used to bind `:data="data ?? []"`, allocating a brand-new empty
+ * array on every render while the lazy fetch was pending. UTable rebuilds its
+ * TanStack row models when `data` changes identity, and rebuilding writes back
+ * through the `v-model:` bindings, which re-renders this page, which allocates
+ * another array — a render loop with no fixed point. A computed caches, so this
+ * identity only changes when the fetch resolves. Do not reintroduce `?? []` at
+ * the binding.
+ */
+const rows = computed<Show[]>(() => data.value ?? [])
+
+/**
  * performanceId → the show it belongs to.
  *
  * Built once whenever the data changes, because the alternative is doing it per
@@ -639,7 +652,7 @@ const columns: TableColumn<AnyRow>[] = [
       v-model:expanded="expanded"
       v-model:global-filter="globalFilter"
       v-model:sorting="sorting"
-      :data="data ?? []"
+      :data="rows"
       :columns="columns"
       :get-sub-rows="getSubRows"
       :loading="status === 'pending'"

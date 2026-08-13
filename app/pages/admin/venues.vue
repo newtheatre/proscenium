@@ -75,7 +75,12 @@ const columnFilters = ref([{
   id: 'name',
   value: '',
 }])
-const columnVisibility = ref()
+const columnVisibility = ref({})
+// Hoisted, not inline in the template: an inline object builds a fresh options
+// bag and row-model function per render, which makes the table rebuild every
+// time. Harmless here only because `:data` is a stable ref — see the note in
+// admin/ticket-types.vue.
+const paginationOptions = { getPaginationRowModel: getPaginationRowModel() }
 const rowSelection = ref<Record<string, boolean>>({})
 const pagination = ref({
   pageSize: 10,
@@ -333,9 +338,7 @@ const columns: TableColumn<Venue>[] = [
       v-model:column-visibility="columnVisibility"
       v-model:row-selection="rowSelection"
       v-model:pagination="pagination"
-      :pagination-options="{
-        getPaginationRowModel: getPaginationRowModel(),
-      }"
+      :pagination-options="paginationOptions"
       class="shrink-0"
       :data="data"
       :columns="columns"

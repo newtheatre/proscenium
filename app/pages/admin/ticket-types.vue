@@ -58,7 +58,11 @@ interface TicketType {
 
 // Table state
 const columnFilters = ref([{ id: 'name', value: '' }])
-const columnVisibility = ref()
+// `{}` rather than `undefined`: an undefined v-model means the table's first
+// internal sync writes a value back to the parent, which is one more
+// parent-render-during-child-setup than this page can afford. See the note on
+// `rows` below.
+const columnVisibility = ref({})
 const rowSelection = ref<Record<string, boolean>>({})
 const pagination = ref({ pageSize: 15, pageIndex: 0 })
 const showArchived = ref(false)
@@ -72,18 +76,38 @@ const { data: rawData, status, refresh } = await useFetch<TicketType[]>('/api/ti
 })
 
 /**
- * Hiding is by `archived`, not by `activeByDefault`.
+ * Rows for the table. **Always an array, never null.**
  *
- * This filter used to be `activeByDefault`, which conflated two unrelated
- * things: whether a live type is pre-selected on new shows, and whether a type
- * is still in use at all. A perfectly current type that simply is not on by
- * default vanished from the list, while a decade of dead Fringe and StuFF types
- * sat in it because someone had once ticked the box.
+ * This is load-bearing, not tidiness. The template used to bind
+ * `:data="data ?? []"` against a computed that returned `null` until the fetch
+ * resolved — so every render produced a *brand-new* empty array. UTable rebuilds
+ * its TanStack row models whenever `data` changes identity, and rebuilding
+ * writes back through `v-model:pagination` / `:row-selection` /
+ * `:column-visibility`, which re-renders this page, which allocates another new
+ * array. That is a render loop with no fixed point, and it locked the tab up.
+ *
+ * It bit hardest arriving by client-side navigation, because there is no
+ * server-rendered payload to land on and `lazy: true` guarantees a window where
+ * the data is null — which is exactly the "navigate to ticket types and
+ * everything freezes" report.
+ *
+ * A computed caches, so this identity only changes when its dependencies do.
+ * Keep it that way: do not reintroduce `?? []` at the binding.
+ *
+ * (Hiding is by `archived`, not `activeByDefault` — the two answer different
+ * questions; see docs/06-pricing-and-ticket-types.md.)
  */
-const data = computed(() => {
-  if (showArchived.value) return rawData.value
-  return rawData.value?.filter(tt => !tt.archived) ?? null
+const rows = computed<TicketType[]>(() => {
+  const all = rawData.value ?? []
+  return showArchived.value ? all : all.filter(tt => !tt.archived)
 })
+
+/**
+ * Hoisted for the same reason: an inline `:pagination-options="{ ... }"` builds
+ * a fresh options object *and* a fresh row-model function on every render,
+ * which is enough on its own to make the table rebuild in a loop.
+ */
+const paginationOptions = { getPaginationRowModel: getPaginationRowModel() }
 
 const archivedCount = computed(() => rawData.value?.filter(tt => tt.archived).length ?? 0)
 
@@ -358,9 +382,9 @@ const columns: TableColumn<TicketType>[] = [
       v-model:column-visibility="columnVisibility"
       v-model:row-selection="rowSelection"
       v-model:pagination="pagination"
-      :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
+      :pagination-options="paginationOptions"
       class="shrink-0"
-      :data="data ?? []"
+      :data="rows"
       :columns="columns"
       :loading="status === 'pending'"
       :ui="{
