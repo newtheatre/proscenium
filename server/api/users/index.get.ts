@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, count, isNull, isNotNull, like, or, sql } from 'drizzle-orm'
+import { and, asc, count, isNull, isNotNull, or, sql } from 'drizzle-orm'
 import { listUsers } from '~~/shared/utils/abilities'
 
 /**
@@ -46,8 +46,8 @@ export default defineEventHandler(async (event) => {
   const filters = [notAnonymised]
   if (q) {
     filters.push(or(
-      like(sql`lower(${schema.users.name})`, likeTerm(q)),
-      like(sql`lower(${schema.users.email})`, likeTerm(q)),
+      likeInsensitive(schema.users.name, q),
+      likeInsensitive(schema.users.email, q),
     ))
   }
   const where = and(...filters)

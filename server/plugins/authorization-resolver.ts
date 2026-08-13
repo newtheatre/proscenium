@@ -1,10 +1,12 @@
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('request', async (event) => {
     event.context.$authorization = {
-      // Staleness enforcement lives in getVerifiedSessionUser so that
-      // handlers reading the session directly — rather than through
-      // authorize() — apply the same rule. See server/utils/session.ts.
-      resolveServerUser: () => getVerifiedSessionUser(event),
+      // MUST be the non-throwing resolver: nuxt-authorization's authorize()
+      // swallows any non-AuthorizationError its resolver throws and then
+      // resolves successfully, running the handler unguarded. Staleness is
+      // therefore applied by dropping roles, not by throwing. See the note on
+      // sessionUserForAuthorization in server/utils/session.ts.
+      resolveServerUser: () => sessionUserForAuthorization(event),
     }
 
     // Keep the local user mirror fresh for FK integrity (reservations

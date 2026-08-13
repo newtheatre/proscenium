@@ -29,8 +29,11 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, bodySchema.parse)
 
-  const validFrom = new Date(body.validFrom)
-  const validTo = new Date(body.validTo)
+  // Whole days in Europe/London, not UTC midnights — see validityWindow.ts.
+  // Stored as instants so `canRedeem` can compare them to a performance's
+  // startsAt directly.
+  const validFrom = validityStart(body.validFrom)
+  const validTo = validityEnd(body.validTo)
   if (Number.isNaN(validFrom.getTime()) || Number.isNaN(validTo.getTime())) {
     throw createError({ statusCode: 400, statusMessage: 'validFrom and validTo must be valid dates' })
   }

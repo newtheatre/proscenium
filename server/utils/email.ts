@@ -99,8 +99,20 @@ function escapeMultiline(value: string): string {
   return escapeHtml(value).replace(/\r?\n/g, '<br>')
 }
 
+/*
+ * Performance times are instants, and these run inside a Cloudflare Worker,
+ * whose system timezone is UTC. Without an explicit `timeZone` a 19:30 BST
+ * curtain-up renders as "18:30" — so for roughly eight months of the year every
+ * confirmation, reminder and cancellation email quoted a time an hour earlier
+ * than the website, and a post-midnight fringe slot came out on the wrong day
+ * entirely. Every other formatter of this field in the app already pins
+ * Europe/London; these two were the exception.
+ */
+const THEATRE_TIME_ZONE = 'Europe/London'
+
 function formatEmailDate(date: Date): string {
   return date.toLocaleDateString('en-GB', {
+    timeZone: THEATRE_TIME_ZONE,
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -110,6 +122,7 @@ function formatEmailDate(date: Date): string {
 
 function formatEmailTime(date: Date): string {
   return date.toLocaleTimeString('en-GB', {
+    timeZone: THEATRE_TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
   })

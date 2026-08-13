@@ -80,9 +80,14 @@ wants once-per-show, it is a second unique index and a rule change, not a redesi
 
 ## 3. Schema
 
-Five new tables plus one column on `shows`. Full Drizzle in
-[`../schema/passes.ts`](../schema/passes.ts), migration in
-[`../schema/0010_passes.sql`](../schema/0010_passes.sql).
+Five new tables plus one column on `shows`. **Shipped** — the Drizzle schema is
+[`server/db/schema/passes.ts`](../../server/db/schema/passes.ts) and the migration is
+`server/db/migrations/sqlite/0010_freezing_stone_men.sql`.
+
+(This document described the design before it was built. It kept its own copies of the schema and
+migration under `docs/schema/`, still headed "PROPOSED, not yet in the app" long after the feature
+shipped; they have been deleted in favour of pointing at the real files, per
+[CONTRIBUTING.md](../CONTRIBUTING.md) — `server/db/schema/*.ts` is the source of truth.)
 
 ```mermaid
 erDiagram

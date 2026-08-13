@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, count, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray } from 'drizzle-orm'
 
 /**
  * GET /api/whats-on/:slug — get a published show by slug with performances and ticket types.
@@ -19,15 +19,19 @@ export default defineEventHandler(async (event) => {
 
   const show = await db.query.shows.findFirst({
     where: (s, { and, eq }) => and(eq(s.slug, slug), eq(s.status, 'PUBLISHED')),
+    columns: publicShowColumns,
     with: {
       performances: {
         where: (p, { and, eq, gt }) => and(
           eq(p.status, 'ON_SALE'),
           gt(p.startsAt, now),
         ),
+        columns: publicPerformanceColumns,
         orderBy: [asc(schema.performances.startsAt)],
         with: {
-          venue: true,
+          // Allow-listed rather than `true`: the venue row is spread into a
+          // public, edge-cached response.
+          venue: { columns: { id: true, name: true, address: true, capacity: true } },
         },
       },
       // The import loaded 1,001 show-to-warning links across 424 warnings and
@@ -45,52 +49,37 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
 
-  // Load all base ticket types
-  const allTicketTypes = await db.select().from(schema.ticketTypes)
-  const typeIds = allTicketTypes.map(t => t.id)
+  // The performances this response covers, as a subquery rather than a bound id
+  // list. D1 allows at most 100 bound parameters per statement, and a Fringe
+  // show can have well over 100 performances on sale at once — binding the ids
+  // (and the ticket-type ids alongside them) made this public page fail
+  // outright for exactly the busiest shows. /api/whats-on already avoids this;
+  // this handler did the opposite next door to it.
+  const showPerformances = db
+    .select({ id: schema.performances.id })
+    .from(schema.performances)
+    .where(and(
+      eq(schema.performances.showId, show.id),
+      eq(schema.performances.status, 'ON_SALE'),
+      gt(schema.performances.startsAt, now),
+    ))
 
-  // Load show-level overrides
-  const showOverrides = typeIds.length > 0
-    ? await db.select().from(schema.showTicketTypeOverrides).where(
-        and(
-          eq(schema.showTicketTypeOverrides.showId, show.id),
-          inArray(schema.showTicketTypeOverrides.ticketTypeId, typeIds),
-        ),
-      )
-    : []
+  const [allTicketTypes, showOverrides, perfOverrides, ticketCountMap] = await Promise.all([
+    // Archived types are legacy-only: valid for historic tickets, hidden from
+    // anything that sells.
+    db.select().from(schema.ticketTypes).where(eq(schema.ticketTypes.archived, false)),
 
-  // Load performance-level overrides for all performances
-  const perfIds = show.performances.map(p => p.id)
-  const perfOverrides = perfIds.length > 0 && typeIds.length > 0
-    ? await db.select().from(schema.performanceTicketTypeOverrides).where(
-        and(
-          inArray(schema.performanceTicketTypeOverrides.performanceId, perfIds),
-          inArray(schema.performanceTicketTypeOverrides.ticketTypeId, typeIds),
-        ),
-      )
-    : []
+    db.select().from(schema.showTicketTypeOverrides)
+      .where(eq(schema.showTicketTypeOverrides.showId, show.id)),
 
-  // Get ticket counts per performance for availability
-  const ticketCounts = perfIds.length > 0
-    ? await db
-        .select({
-          performanceId: schema.tickets.performanceId,
-          count: count(),
-        })
-        .from(schema.tickets)
-        .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
-        .where(
-          and(
-            inArray(schema.tickets.performanceId, perfIds),
-            inArray(schema.reservations.status, ['PENDING', 'COLLECTED', 'DOOR']),
-            isNull(schema.tickets.refundedAt),
-          ),
-        )
-        .groupBy(schema.tickets.performanceId)
-        .all()
-    : []
+    // Not filtered by ticket-type id: an override row for a type this response
+    // does not carry is simply never looked up (`resolveEffective*` finds by id),
+    // and dropping the filter is what keeps the statement inside D1's limit.
+    db.select().from(schema.performanceTicketTypeOverrides)
+      .where(inArray(schema.performanceTicketTypeOverrides.performanceId, showPerformances)),
 
-  const ticketCountMap = new Map(ticketCounts.map(r => [r.performanceId, r.count]))
+    countOccupiedSeats(inArray(schema.tickets.performanceId, showPerformances)),
+  ])
 
   // Build ticket types per performance
   const performancesWithTickets = show.performances.map((perf) => {

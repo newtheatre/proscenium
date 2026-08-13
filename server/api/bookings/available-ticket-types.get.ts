@@ -32,8 +32,9 @@ export default defineEventHandler(async (event) => {
   if (!perf) throw createError({ statusCode: 404, statusMessage: 'Performance not found' })
   const showId = perf.showId
 
-  // Load all base ticket types
-  const allTypes = await db.select().from(schema.ticketTypes)
+  // Only types a human may sell: archived legacy types and the pass
+  // bookkeeping kinds are excluded. See sellableTicketTypes().
+  const allTypes = await db.select().from(schema.ticketTypes).where(sellableTicketTypes())
   const typeIds = allTypes.map(t => t.id)
 
   // Load show-level and performance-level overrides

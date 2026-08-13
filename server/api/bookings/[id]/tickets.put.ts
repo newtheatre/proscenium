@@ -18,7 +18,14 @@ const bodySchema = z.object({
     ticketTypeId: z.string().min(1),
     quantity: z.int().min(0).max(10),
   })).min(1),
-})
+}).refine(
+  // The handler treats each entry as the desired TOTAL for that type and reads
+  // the current count from a map it never updates, so two entries for one type
+  // each computed against the original count and the quantities compounded —
+  // "10 then 10" inserted 20. A repeated type is a client bug either way.
+  data => new Set(data.tickets.map(t => t.ticketTypeId)).size === data.tickets.length,
+  { message: 'Each ticket type may only appear once' },
+)
 
 export default defineEventHandler(async (event) => {
   const idOrRef = getRouterParam(event, 'id')
@@ -26,9 +33,9 @@ export default defineEventHandler(async (event) => {
 
   const booking = await requireBookingAccess(event, idOrRef)
 
-  if (booking.status !== 'PENDING') {
-    throw createError({ statusCode: 400, statusMessage: 'Only a booking that has not yet been collected can be changed' })
-  }
+  // Same rule as the staff route, from one place: editable until collected,
+  // refundable only after. See server/utils/reservationLifecycle.ts.
+  assertTicketsEditable(booking.status)
   if (booking.performance.status !== 'ON_SALE') {
     throw createError({ statusCode: 400, statusMessage: 'This performance is no longer open for changes' })
   }

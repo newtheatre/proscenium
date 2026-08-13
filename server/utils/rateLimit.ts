@@ -33,15 +33,17 @@ export interface RateLimitResult {
 }
 
 /**
- * The caller's IP, from Cloudflare's own header.
+ * The caller's IP, from Cloudflare's own header, or `null` when there isn't one.
  *
- * `CF-Connecting-IP` is set by the edge and cannot be spoofed by the client on
- * a Cloudflare-fronted origin, unlike `X-Forwarded-For`. Falls back to a shared
- * bucket rather than to a client-supplied value: one over-strict bucket in
- * development is better than a limiter anyone can escape by sending a header.
+ * `CF-Connecting-IP` is set by the edge and cannot be spoofed by the client on a
+ * Cloudflare-fronted origin, unlike `X-Forwarded-For`. Its **absence** means the
+ * request did not come from outside — an SSR render calling its own API, or
+ * local dev — so callers should skip limiting rather than fall back to a shared
+ * bucket: every such request would share it, and a busy evening's page renders
+ * would exhaust the bucket and start rejecting real customers.
  */
-export function clientIp(event: H3Event): string {
-  return getRequestHeader(event, 'cf-connecting-ip') ?? 'unknown'
+export function clientIp(event: H3Event): string | null {
+  return getRequestHeader(event, 'cf-connecting-ip') ?? null
 }
 
 /** Count one request against a bucket and report whether it is over the limit. */

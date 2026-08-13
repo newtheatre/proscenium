@@ -9,27 +9,40 @@ import { eq, sql } from 'drizzle-orm'
  * and for the treasurer's accounts. Anonymisation is the answer instead — the
  * booking stays, the person does not.
  *
- * The result is deliberately indistinguishable in shape from what the legacy
- * import produced for 8,267 retention-expired bookers. The registration/claim
- * guards for these addresses now live in the central auth service, which
- * refuses to register or reset anything on an undeliverable domain.
+ * The registration/claim guards for these addresses live in the central auth
+ * service, which refuses to register or reset anything on an undeliverable
+ * domain. Legacy rows from the import use the same `.invalid` domain, so the
+ * `notAnonymised` filters match both shapes.
  *
- * SCOPE (until stage-door Phase 7): this scrubs THIS APP's mirror and
- * reservation data only. The central identity — and any live sessions —
- * survive; full erasure is orchestrated centrally via app hooks in Phase 7,
- * for which this function is the future hook implementation. Until then,
- * pair a local anonymisation with the matching central action in the auth
- * admin (disable / force-logout).
+ * SCOPE: this scrubs THIS APP's mirror and reservation data only, and it is
+ * the implementation behind `POST /api/_hooks/auth/anonymise`. Since
+ * stage-door Phase 7 shipped (2026-08-12) erasure is orchestrated centrally:
+ * `eraseUser` rewrites the auth identity, deletes credentials/tokens/roles,
+ * bumps `session_epoch`, and then calls this hook on every registered app,
+ * retrying until each one succeeds. Central erasure is the supported route —
+ * see docs/04-auth-and-permissions.md §erasure. Calling this function directly
+ * scrubs the app but leaves the central identity intact, so it is not on its
+ * own a fulfilled erasure request.
  */
 
-/** Non-routable by definition — `.invalid` is reserved (RFC 2606). */
+/**
+ * Non-routable by definition — `.invalid` is reserved (RFC 2606).
+ *
+ * These values are deliberately byte-identical to what stage-door's
+ * `eraseUser` writes to the central auth row (stage-door
+ * `server/utils/erase.ts`), because the mirror is upserted *from the session*:
+ * once the erased identity is re-read from the auth service, `ensureLocalUser`
+ * would otherwise overwrite a locally-invented placeholder with the central
+ * one, leaving the two stores disagreeing about the same person. Deriving the
+ * address from the user id rather than random bytes also makes the hook
+ * genuinely idempotent — re-running it produces the same row, which is what
+ * stage-door's retry loop assumes.
+ */
 const ANONYMISED_DOMAIN = 'anonymised.invalid'
-const ANONYMISED_NAME = 'Anonymised booker'
+const ANONYMISED_NAME = 'Deleted user'
 
-function anonymisedEmail(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(8))
-  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
-  return `closed-${hex}@${ANONYMISED_DOMAIN}`
+function anonymisedEmail(userId: string): string {
+  return `deleted-${userId}@${ANONYMISED_DOMAIN}`
 }
 
 export interface AnonymiseResult {
@@ -70,7 +83,7 @@ export async function anonymiseUser(userId: string): Promise<AnonymiseResult> {
     db.update(schema.users)
       .set({
         name: ANONYMISED_NAME,
-        email: anonymisedEmail(),
+        email: anonymisedEmail(userId),
         anonymisedAt: now,
       })
       .where(eq(schema.users.id, userId)),

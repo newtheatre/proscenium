@@ -78,11 +78,13 @@ There is **no `.env.example` in the repository**, so nothing tells you what to s
 
 | Variable | Read from | Required? | What breaks without it |
 | --- | --- | --- | --- |
-| `RESEND_API_KEY` | `server/utils/resend.ts` — `process.env.RESEND_API_KEY`, directly, at module load | **Yes, in every environment** | The module throws at import time. Because `server/utils/*.ts` are auto-imported into the Nitro bundle, **the entire Worker fails to boot** — not just email. The whole site returns 500. See §5. |
-| `NUXT_SESSION_PASSWORD` | `nuxt-auth-utils`, mapped to `runtimeConfig.session.password` | **Yes in production.** Auto-generated in dev | Session cookies cannot be sealed or unsealed. Nobody can log in; existing sessions become invalid. Must be at least 32 characters. In dev, `nuxt-auth-utils` generates a random one and **appends it to your `.env` file automatically** on first run. |
-| `NUXT_RESEND_FROM_EMAIL` | `nuxt.config.ts` → `runtimeConfig.resendFromEmail`, read in `server/utils/email.ts` | No | Falls back to the hard-coded `no-reply@tickets.newtheatre.org.uk`. If that address is not verified in Resend, every send fails with a 500 from `sendEmail()`. |
-| `NUXT_RESEND_API_KEY` | Implied by `runtimeConfig.resendApiKey` in `nuxt.config.ts` | **No — declared but never read** | Nothing. `runtimeConfig.resendApiKey` is declared and never consumed anywhere in the codebase. Setting it alone will not make email work. See §5. |
-| `NUXT_PUBLIC_BASE_URL` | Maps to `runtimeConfig.public.baseURL`, defaulted to `https://newtheatre.org.uk` | No | Overrides the canonical site URL used by `@nuxtjs/seo`. Note the naming bug in §6 — this is *not* currently what the email links use. |
+| `NUXT_SESSION_PASSWORD` | `nuxt-auth-utils`, mapped to `runtimeConfig.session.password` | **Yes in production.** Auto-generated in dev | The `nnt-session` cookie cannot be unsealed, so nobody is logged in anywhere. This is the **estate-wide** seal shared with every `*.newtheatre.org.uk` app — get it from the ITM, never generate your own for production. Must be at least 32 characters. In dev, `nuxt-auth-utils` generates a random one and **appends it to your `.env`** on first run. |
+| `NUXT_AUTH_SERVICE_TOKEN` | `runtimeConfig.authServiceToken` | **Yes in production** | Every path that needs a shadow account fails closed with a 502 *"Booking is temporarily unavailable"*: guest checkout, staff walk-ins, issuing a pass, creating a mirror user. It is also the token whose SHA-256 authenticates the inbound GDPR hooks, so erasure and subject-access requests from the auth service stop working. |
+| `NUXT_BOOKING_TOKEN_SECRET` | `runtimeConfig.bookingTokenSecret` | No, but **set it in production** | Falls back to `NUXT_SESSION_PASSWORD`. That works, but it signs guest booking links with the estate-wide seal — so rotating the seal (the emergency estate logout lever) also invalidates every booking link already sitting in customers' inboxes, and any other estate app holding the seal could mint booking tokens. |
+| `NUXT_RESEND_API_KEY` | `runtimeConfig.resendApiKey`, read in `server/utils/resend.ts` | No, but email is dead without it | No email at all — confirmations, cancellations, reminders. The client is constructed lazily and logs `[Email] No Resend API key configured; email sending is disabled.` rather than throwing, so the site stays up. The bare `RESEND_API_KEY` is still read as a fallback for older deployments; prefer the `NUXT_` form. |
+| `NUXT_RESEND_FROM_EMAIL` | `runtimeConfig.resendFromEmail`, read in `server/utils/email.ts` | No | Falls back to the hard-coded `no-reply@tickets.newtheatre.org.uk`. If that address is not verified in Resend, every send fails. |
+| `NUXT_PUBLIC_BASE_URL` | `runtimeConfig.public.baseURL`, defaulted to `https://newtheatre.org.uk` | No | The canonical site URL used by `@nuxtjs/seo` **and by every link in every email**. Wrong value here means confirmation and booking links point at the wrong host. |
+| `NUXT_PUBLIC_AUTH_BASE_URL` | `runtimeConfig.public.authBaseURL`, defaulted to `https://auth.newtheatre.org.uk` | No | Where login, account and session-refresh links point. Only override it if you are running a local auth service. |
 
 ### Build- and CLI-time variables (not needed by the running app)
 
@@ -97,60 +99,80 @@ There is **no `.env.example` in the repository**, so nothing tells you what to s
 ### A minimal working `.env` for local development
 
 ```dotenv
-# Required or the Worker will not boot at all
-RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
+# Optional; without it email is disabled and logs a warning — the site still runs
+NUXT_RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
 
 # Optional; sender address must be verified in Resend
 NUXT_RESEND_FROM_EMAIL=no-reply@tickets.newtheatre.org.uk
 
+# Only needed if you want guest checkout, walk-ins or passes to work locally,
+# since all of them call the auth service for a shadow account. Ask the ITM.
+NUXT_AUTH_SERVICE_TOKEN=nnt_svc_xxxxxxxxxxxx
+
 # nuxt-auth-utils will append NUXT_SESSION_PASSWORD here on first `bun run dev`
 ```
 
-If you have no Resend key at all and only want the site to boot, put any non-empty placeholder in `RESEND_API_KEY`. The application will start; any action that actually sends an email (registration, password reset, booking confirmation) will fail at send time instead of at boot.
+You can start with an empty `.env`. Nothing is required for the site to boot: email degrades to a
+logged warning, and `/dev-login?staff=admin` seals a local session without any auth service running
+(see §9).
 
 ---
 
-## 5. The Resend key naming problem — read this before debugging email
+## 5. Email configuration
 
-There are **three different names for what should be one secret**, and they do not agree:
-
-| Name | Where it appears | Is it actually used? |
-| --- | --- | --- |
-| `RESEND_API_KEY` (bare, no `NUXT_` prefix) | `server/utils/resend.ts`: `process.env.RESEND_API_KEY` | **Yes — this is the only one that does anything.** |
-| `NUXT_RESEND_API_KEY` | Implied by `runtimeConfig.resendApiKey` in `nuxt.config.ts`, and documented in the JSDoc at the top of `server/utils/email.ts` | No. Nothing reads `runtimeConfig.resendApiKey`. |
-| `runtimeConfig.resendApiKey` | Declared in `nuxt.config.ts` | No. Declared, empty, never consumed. |
-
-Two consequences you need to internalise:
-
-1. **`server/utils/resend.ts` throws at module load**, not at send time:
-
-   ```ts
-   if (!process.env.RESEND_API_KEY) {
-     throw new Error('RESEND_API_KEY is not set in environment variables')
-   }
-   ```
-
-   This runs when the module is first imported, which on Cloudflare Workers happens during Worker start-up. A missing key therefore takes down **the entire site**, including pages that have nothing to do with email. On a Worker this presents as every request returning an error, with the thrown message in `wrangler tail`.
-
-2. **Reading `process.env` directly is the wrong pattern on Cloudflare.** Workers do not have a real `process.env`; Nitro polyfills it, and values populated only via `runtimeConfig` will not appear there reliably. The correct fix is to move the client construction inside a function and read `useRuntimeConfig().resendApiKey`, so that `NUXT_RESEND_API_KEY` becomes the single canonical name and a missing key degrades email only. Until someone does that, **set the bare `RESEND_API_KEY` everywhere — locally in `.env`, and in production as a Worker secret.**
-
----
-
-## 6. Known bug: email links point at `undefined`
-
-`nuxt.config.ts` declares:
+`server/utils/resend.ts` constructs the Resend client **lazily**, inside `getResend()`:
 
 ```ts
-runtimeConfig: { public: { baseURL: 'https://newtheatre.org.uk' } }
+const key = useRuntimeConfig().resendApiKey || process.env.RESEND_API_KEY
+if (!key) {
+  console.warn('[Email] No Resend API key configured; email sending is disabled.')
+  return null
+}
 ```
 
-but every link-building function in `server/utils/email.ts` reads:
+So the canonical name is **`NUXT_RESEND_API_KEY`** (which populates `runtimeConfig.resendApiKey`),
+with the bare `RESEND_API_KEY` kept as a fallback for deployments configured before the rename.
+Set the `NUXT_` form on anything new.
 
-```ts
-const { public: { baseUrl } } = useRuntimeConfig()
-```
+A missing key disables email and logs that warning; it does **not** take the site down. This used to
+be a module-load `throw`, which on a Worker meant a missing key returned an error for every request
+on the site, including pages with nothing to do with email.
 
-`baseUrl` (lower-case `u`) is not a declared key, so it is `undefined`. Verification links, password-reset links and booking links currently render as `undefined/verify-email?token=…`. Either rename the config key to `baseUrl` or fix the five read sites to `baseURL`. Flagged here because it will confuse you the first time you test the sign-up flow locally.
+When email is misbehaving:
+
+1. **Nothing arriving at all?** Check `wrangler tail` for `[Email] No Resend API key configured` —
+   that is a missing secret, not a Resend problem.
+2. **Sends failing?** Check the Resend dashboard: key still valid, sending domain still verified,
+   messages not bouncing or rate-limited. A failed send logs `[Email] Failed to send email:`.
+3. **Wrong sender?** With `NUXT_RESEND_FROM_EMAIL` unset the code falls back to
+   `no-reply@tickets.newtheatre.org.uk`, which must be verified in Resend.
+4. **Links wrong?** They are built from `runtimeConfig.public.baseURL` (`NUXT_PUBLIC_BASE_URL`).
+
+## 6. Signing in locally
+
+Identity lives in the central auth service (stage-door), and this app only ever *reads* the sealed
+`nnt-session` cookie. You do not need the auth service running to develop.
+
+`GET /dev-login` seals a local session for you — the single sanctioned exception to "apps never
+write the session", guarded by `import.meta.dev` so it does not exist in a production build:
+
+| URL | Session you get |
+| --- | --- |
+| `/dev-login` | An ordinary logged-in customer |
+| `/dev-login?staff=box-office` | `proscenium:BOX_OFFICE` |
+| `/dev-login?staff=manager` | `proscenium:MANAGER` |
+| `/dev-login?staff=admin` | `proscenium:ADMIN` |
+
+The client middleware sends logged-out visitors here in dev and to the hosted login in production.
+
+Two things that will confuse you otherwise:
+
+- **Roles are namespaced.** The session carries `proscenium:ADMIN`, not `ADMIN`, because one estate
+  session holds every app's roles. Compare with `hasRole`/`isStaff` from
+  `shared/utils/abilities/types.ts`, never against a bare string.
+- **Staff sessions go stale after 15 minutes** and lose their roles until refreshed. In dev the
+  middleware skips the refresh bounce, but the server-side rule still applies — if staff-only API
+  calls start 403-ing after a while, hit `/dev-login?staff=…` again.
 
 ---
 
@@ -281,21 +303,28 @@ Someone should correct the two stale references in `server/tasks/seed/README.md`
 
 ---
 
-## 11. Linting
-
-ESLint is configured (`@nuxt/eslint` with stylistic rules enabled in `nuxt.config.ts`) but **`package.json` has no `lint` script**. Run it directly:
+## 11. Linting and typechecking
 
 | Command | What it does |
 | --- | --- |
-| `bunx eslint .` | Lint everything |
-| `bunx eslint . --fix` | Lint and auto-fix (most stylistic rules are fixable) |
+| `bun run lint` | Lint everything |
+| `bun run lint:fix` | Lint and auto-fix (most stylistic rules are fixable) |
+| `bun run typecheck` | `vue-tsc` over the whole project |
 | `bunx eslint app/pages/admin/users.vue` | Lint one file |
 
-`eslint.config.mjs` imports `./.nuxt/eslint.config.mjs`, so **`nuxt prepare` must have run first** or ESLint fails on a missing import. Adding `"lint": "eslint ."` and `"lint:fix": "eslint . --fix"` to `package.json` is an obvious improvement.
+`eslint.config.mjs` imports `./.nuxt/eslint.config.mjs`, so **`nuxt prepare` must have run first**
+or ESLint fails on a missing import. `bun install` runs it via `postinstall`.
 
 ## 12. Tests
 
-**There are none.** No test runner, no test files, no test script. Any change you make is verified by running it. Be correspondingly careful with the booking and payment-adjacent paths, and test them manually against seeded data before deploying.
+**There are none yet.** CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs build,
+typecheck and lint on every pull request, and those are hard gates — but nothing exercises
+behaviour. Any change you make is verified by running it.
+
+Be correspondingly careful with the money paths (`POST /api/bookings`,
+`PUT /api/reservations/:id/tickets`, `POST /api/reservations/:id/refund`) and test them manually
+against seeded data before deploying. Adding a test runner is tracked in
+[09-known-issues](09-known-issues.md#no-tests).
 
 ---
 

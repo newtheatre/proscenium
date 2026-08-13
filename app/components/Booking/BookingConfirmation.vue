@@ -10,7 +10,19 @@ interface Ticket {
   pricePaid: number
   /** Imported legacy tickets may have no recorded price — see formatTotal. */
   priceConfidence?: 'EXACT' | 'DERIVED' | 'UNKNOWN'
+  /** Set once the box office has refunded this specific ticket. */
+  refundedAt?: string | Date | null
   ticketType: { id: string, name: string }
+}
+
+/**
+ * Refunded tickets are returned (the customer query selects `refundedAt`
+ * deliberately) but are no longer held or owed. Counting them listed tickets the
+ * customer does not have and quoted a total higher than they actually paid —
+ * on the very page they read out at the box office.
+ */
+function active(tickets: Ticket[]): Ticket[] {
+  return tickets.filter(t => !t.refundedAt)
 }
 
 interface Booking {
@@ -58,7 +70,8 @@ function formatPrice(pence: number): string {
   return `£${(pence / 100).toFixed(2)}`
 }
 
-function getTicketSummary(tickets: Ticket[]) {
+function getTicketSummary(allTickets: Ticket[]) {
+  const tickets = active(allTickets)
   // Group by ticket type AND price paid, so a type sold at more than one price
   // (e.g. after a price change) shows one line per price and the line totals
   // sum to the grand total.
@@ -81,7 +94,7 @@ function getTicketSummary(tickets: Ticket[]) {
 }
 
 function getTotal(tickets: Ticket[]) {
-  return tickets.reduce((sum, t) => sum + t.pricePaid, 0)
+  return active(tickets).reduce((sum, t) => sum + t.pricePaid, 0)
 }
 
 /**
@@ -91,7 +104,8 @@ function getTotal(tickets: Ticket[]) {
  * `pricePaid: 0`, because the old box office never recorded what was taken.
  * Rendering that as "Free" would tell someone who paid that they did not.
  */
-function formatTotal(tickets: Ticket[]): string {
+function formatTotal(allTickets: Ticket[]): string {
+  const tickets = active(allTickets)
   if (tickets.length > 0 && tickets.every(t => t.priceConfidence === 'UNKNOWN')) {
     return 'Price not recorded'
   }

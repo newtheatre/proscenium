@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, count, eq, gt, inArray, isNull, min } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, min } from 'drizzle-orm'
 
 /**
  * GET /api/whats-on — list published shows with upcoming on-sale performances.
@@ -62,12 +62,14 @@ export default defineEventHandler(async (event) => {
       is(s.status, 'PUBLISHED'),
       within(s.id, showsOnSale),
     ),
+    columns: publicShowColumns,
     with: {
       performances: {
         where: (p, { and: all, eq: is, gt: after }) => all(
           is(p.status, 'ON_SALE'),
           after(p.startsAt, now),
         ),
+        columns: publicPerformanceColumns,
         orderBy: [asc(schema.performances.startsAt)],
         with: {
           venue: {
@@ -89,22 +91,14 @@ export default defineEventHandler(async (event) => {
       gt(schema.performances.startsAt, now),
     ))
 
-  const ticketCounts = await db
-    .select({
-      performanceId: schema.tickets.performanceId,
-      count: count(),
-    })
-    .from(schema.tickets)
-    .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
-    .where(and(
-      inArray(schema.tickets.performanceId, onSalePerformances),
-      // Only count tickets from active reservations (not cancelled/no-show)
-      inArray(schema.reservations.status, ['PENDING', 'COLLECTED', 'DOOR']),
-      isNull(schema.tickets.refundedAt),
-    ))
-    .groupBy(schema.tickets.performanceId)
+  // The shared rule, so the sold-out badge shown to the public and the capacity
+  // check that accepts the booking always agree. This count previously omitted
+  // the PASS_SALE exclusion, so every pass sold read as an occupied seat and a
+  // show could display "sold out" while seats were still on sale.
+  const ticketCountMap = await countOccupiedSeats(
+    inArray(schema.tickets.performanceId, onSalePerformances),
+  )
 
-  const ticketCountMap = new Map(ticketCounts.map(r => [r.performanceId, r.count]))
   const byId = new Map(shows.map(s => [s.id, s]))
 
   // Rebuilt in the order the grouping query established.

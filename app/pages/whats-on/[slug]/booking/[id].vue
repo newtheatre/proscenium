@@ -23,6 +23,9 @@ interface BookingDetail {
   tickets: Array<{
     id: string
     pricePaid: number
+    priceConfidence?: 'EXACT' | 'DERIVED' | 'UNKNOWN'
+    /** Stamped when the box office refunds this specific ticket. */
+    refundedAt: string | Date | null
     ticketType: { id: string, name: string }
   }>
 }

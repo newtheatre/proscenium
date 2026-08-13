@@ -1,3 +1,5 @@
+import type { SQL, SQLWrapper } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import { z } from 'zod/v4'
 
 /**
@@ -39,10 +41,18 @@ export function paginated<T>(rows: T[], total: number, { page, limit }: { page: 
 }
 
 /**
- * Escape a user-supplied search term for use in a SQL LIKE pattern, so `%` and
- * `_` are matched literally rather than acting as wildcards. Pair with
- * `ESCAPE '\'` in the query.
+ * Case-insensitive "contains" match on a text column.
+ *
+ * Emits the `ESCAPE` clause itself, which is the whole point. There used to be
+ * a `likeTerm()` that backslash-escaped `%` and `_` and told callers to "pair
+ * with `ESCAPE '\'`" — but Drizzle's `like()` renders a bare `col like ?`, and
+ * SQLite has no default escape character, so the backslashes were matched as
+ * literal characters. Searching for an address like `john_smith@nott.ac.uk`
+ * looked for a backslash that no row contains and returned nothing at all:
+ * the box office was told the booking did not exist. Underscores are common in
+ * email local parts and the failure was completely silent.
  */
-export function likeTerm(q: string): string {
-  return `%${q.toLowerCase().replace(/[\\%_]/g, c => `\\${c}`)}%`
+export function likeInsensitive(column: SQLWrapper, q: string): SQL {
+  const term = `%${q.toLowerCase().replace(/[\\%_]/g, c => `\\${c}`)}%`
+  return sql`lower(${column}) like ${term} escape '\\'`
 }

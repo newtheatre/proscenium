@@ -274,8 +274,11 @@ const isDirty = computed(() => {
   return false
 })
 
+// DOOR belongs here too: a door sale is collected and paid for, so its tickets
+// are no longer editable — the server refuses the diff either way, and without
+// DOOR in this list the UI offered an edit that could only fail.
 const alreadyActioned = computed(() =>
-  !!reservation.value && ['COLLECTED', 'CANCELLED', 'NO_SHOW'].includes(reservation.value.status),
+  !!reservation.value && ['COLLECTED', 'DOOR', 'CANCELLED', 'NO_SHOW'].includes(reservation.value.status),
 )
 
 // ── Formatters ────────────────────────────────────────────────────────────────

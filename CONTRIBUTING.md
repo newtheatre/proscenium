@@ -43,16 +43,14 @@ under `.data/`; D1 only exists in production.
 
 ## Before you push
 
-There is **no CI yet** (tracked in [docs/09-known-issues.md](docs/09-known-issues.md) #20), so these
-checks are currently manual — run them yourself:
+CI runs on every pull request ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) and gates on
+all three of these. Run them locally first — it is much faster than waiting for the workflow:
 
 ```bash
-bunx nuxt typecheck   # type errors
-bunx eslint .         # lint (ESLint is configured; there is no `lint` script)
-bun run build         # the production Worker bundle must build
+bun run typecheck   # type errors
+bun run lint        # ESLint (bun run lint:fix to autofix)
+bun run build       # the production Worker bundle must build
 ```
-
-Adding a GitHub Actions workflow that runs these on pull requests is a welcome contribution.
 
 ## Changing the database schema
 
