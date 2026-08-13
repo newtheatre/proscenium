@@ -113,8 +113,32 @@ through overrides, not through new types. Resist creating "Macbeth Concession"; 
 override chain is for.
 
 Deleting a type that has ever been sold fails — `tickets.ticketTypeId` is `restrict` — and the
-handler turns that into a 409. Correct behaviour: retire a type by setting `activeByDefault = false`
-rather than deleting it.
+handler turns that into a 409. That restriction is the point: a 2019 ticket still has to resolve its
+name and price. **Retire a type by archiving it.**
+
+### `archived` vs `activeByDefault` — two different questions
+
+These get confused, so they are worth separating plainly:
+
+| | `activeByDefault` | `archived` |
+|---|---|---|
+| Question it answers | Is this type pre-selected on new shows? | Is this type still in use at all? |
+| Still sellable | Yes — switch it on for a show or performance | **No** |
+| Appears in box-office pickers | Yes | No |
+| Appears in the show/performance override screens | Yes | No |
+| Appears in `/admin/ticket-types` | Yes | Only behind "Show archived" |
+| Historic tickets still price correctly | Yes | Yes |
+
+`activeByDefault = false` means "current, but off unless someone asks for it" — a Member rate, say.
+`archived = true` means "we are never selling this again". After the legacy import there are far
+more dead Fringe and StuFF types than live ones, which is why the management screen hides them by
+default.
+
+Archive and restore from the row menu on `/admin/ticket-types`, or
+`PUT /api/ticket-types/:id { "archived": true }`. Nothing else in the app offers an archived type:
+`sellableTicketTypes()` in `server/utils/tickets.ts` is the shared filter, and
+`validateTicketTypesSellable` rejects one that arrives in a request body anyway, so a stale tab
+cannot sell against it.
 
 ## Additions from the legacy migration and passes
 
@@ -124,7 +148,7 @@ Two columns are being added to `ticket_types` (migration `0009`, the legacy impo
   pass counters either double-counts revenue or loses the fact a pass existed. It is also what the
   passes feature uses for the zero-priced admission type.
 - **`archived`** — legacy-only types (Fringe, StuFF, the historic pass products) stay valid for
-  historic tickets but are hidden from box-office pickers.
+  historic tickets but are hidden everywhere a type can be chosen. See the table above.
 
 And one on `tickets`:
 

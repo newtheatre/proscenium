@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const [allTypes, showOverrides, perfOverrides] = await Promise.all([
-    db.select().from(schema.ticketTypes).orderBy(schema.ticketTypes.name).all(),
+    db.select().from(schema.ticketTypes).where(sellableTicketTypes()).orderBy(schema.ticketTypes.name).all(),
     db.select().from(schema.showTicketTypeOverrides)
       .where(eq(schema.showTicketTypeOverrides.showId, showId))
       .all(),

@@ -4,9 +4,10 @@
  * Administrative interface for managing ticket types.
  *
  * Features:
- * - Table view of all ticket types
+ * - Table view of ticket types (archived ones hidden until asked for)
  * - Search by name
  * - View price, active-by-default status, and description
+ * - Archive a type that will never be sold again, or restore one
  * - Create new ticket types
  * - Edit existing ticket types
  * - Delete ticket types (blocked if issued tickets reference them)
@@ -49,6 +50,8 @@ interface TicketType {
   description?: string | null
   price: number // in pence
   activeByDefault: boolean
+  /** Retired: never offered again, but still prices its historic tickets. */
+  archived: boolean
   createdAt: string
   updatedAt: string
 }
@@ -58,19 +61,31 @@ const columnFilters = ref([{ id: 'name', value: '' }])
 const columnVisibility = ref()
 const rowSelection = ref<Record<string, boolean>>({})
 const pagination = ref({ pageSize: 15, pageIndex: 0 })
-const showAll = ref(false)
+const showArchived = ref(false)
 
-const { data: rawData, status, refresh } = await useFetch<TicketType[]>('/api/ticket-types', { lazy: true })
+// `includeArchived` because this is the one screen that has to see retired
+// types — it is where they are archived and restored. Everything else gets the
+// live ones by default.
+const { data: rawData, status, refresh } = await useFetch<TicketType[]>('/api/ticket-types', {
+  lazy: true,
+  query: { includeArchived: 'true' },
+})
 
+/**
+ * Hiding is by `archived`, not by `activeByDefault`.
+ *
+ * This filter used to be `activeByDefault`, which conflated two unrelated
+ * things: whether a live type is pre-selected on new shows, and whether a type
+ * is still in use at all. A perfectly current type that simply is not on by
+ * default vanished from the list, while a decade of dead Fringe and StuFF types
+ * sat in it because someone had once ticked the box.
+ */
 const data = computed(() => {
-  if (showAll.value) return rawData.value
-  return rawData.value?.filter(tt => tt.activeByDefault) ?? null
+  if (showArchived.value) return rawData.value
+  return rawData.value?.filter(tt => !tt.archived) ?? null
 })
 
-const hiddenCount = computed(() => {
-  if (!rawData.value) return 0
-  return rawData.value.filter(tt => !tt.activeByDefault).length
-})
+const archivedCount = computed(() => rawData.value?.filter(tt => tt.archived).length ?? 0)
 
 const ticketTypeToEdit = ref<TicketType | null>(null)
 const ticketTypeToDelete = ref<TicketType | null>(null)
@@ -110,6 +125,45 @@ async function deleteSingleTicketType() {
   }
 }
 
+const isArchiving = ref(false)
+
+/**
+ * Retire a type, or bring it back.
+ *
+ * Deliberately not a delete: DELETE is refused once any ticket references the
+ * type, and those references are exactly what make the historic data readable —
+ * a 2019 ticket still has to resolve its name and price. Archiving is the
+ * answer for "we are never selling this again": it disappears from the pickers
+ * and the override screens while the history keeps working.
+ */
+async function setArchived(tt: TicketType, archived: boolean) {
+  if (isArchiving.value) return
+  isArchiving.value = true
+  try {
+    await $fetch(`/api/ticket-types/${tt.id}`, { method: 'PUT', body: { archived } })
+    toast.add({
+      title: archived ? `${tt.name} archived` : `${tt.name} restored`,
+      description: archived
+        ? 'It will no longer appear when selling or setting prices.'
+        : 'It can be sold again.',
+      icon: 'i-lucide-check-circle',
+      color: 'success',
+    })
+    await refresh()
+  }
+  catch (error: unknown) {
+    toast.add({
+      title: archived ? 'Could not archive this ticket type' : 'Could not restore this ticket type',
+      description: getErrorMessage(error, 'Please try again'),
+      icon: 'i-lucide-alert-circle',
+      color: 'error',
+    })
+  }
+  finally {
+    isArchiving.value = false
+  }
+}
+
 function getRowItems(row: Row<TicketType>) {
   const tt = row.original
   return [
@@ -131,6 +185,13 @@ function getRowItems(row: Row<TicketType>) {
       icon: 'i-lucide-pencil',
       onSelect() {
         ticketTypeToEdit.value = tt
+      },
+    },
+    {
+      label: tt.archived ? 'Restore' : 'Archive',
+      icon: tt.archived ? 'i-lucide-archive-restore' : 'i-lucide-archive',
+      onSelect() {
+        setArchived(tt, !tt.archived)
       },
     },
     { type: 'separator' as const },
@@ -195,6 +256,15 @@ const columns: TableColumn<TicketType>[] = [
     },
   },
   {
+    accessorKey: 'archived',
+    header: 'Status',
+    cell: ({ row }) => h(UBadge, {
+      label: row.original.archived ? 'Archived' : 'In use',
+      color: row.original.archived ? 'warning' : 'success',
+      variant: 'subtle',
+    }),
+  },
+  {
     id: 'actions',
     cell: ({ row }) =>
       h('div', { class: 'text-right' },
@@ -240,12 +310,12 @@ const columns: TableColumn<TicketType>[] = [
       />
 
       <UButton
-        v-if="hiddenCount > 0"
-        :label="showAll ? 'Show active only' : `Show all (${hiddenCount} hidden)`"
-        :icon="showAll ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+        v-if="archivedCount > 0"
+        :label="showArchived ? 'Hide archived' : `Show archived (${archivedCount})`"
+        :icon="showArchived ? 'i-lucide-eye-off' : 'i-lucide-eye'"
         color="neutral"
         variant="outline"
-        @click="showAll = !showAll"
+        @click="showArchived = !showArchived"
       />
 
       <UDropdownMenu
@@ -258,7 +328,9 @@ const columns: TableColumn<TicketType>[] = [
                 ? 'Name'
                 : column.id === 'activeByDefault'
                   ? 'Active by default'
-                  : column.id.charAt(0).toUpperCase() + column.id.slice(1),
+                  : column.id === 'archived'
+                    ? 'Status'
+                    : column.id.charAt(0).toUpperCase() + column.id.slice(1),
               type: 'checkbox' as const,
               checked: column.getIsVisible(),
               onUpdateChecked(checked: boolean) {

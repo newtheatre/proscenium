@@ -19,6 +19,23 @@ export default defineEventHandler(async (event) => {
 
   const allShows = await db.query.shows.findMany({
     orderBy: [asc(schema.shows.title)],
+    // Only what the four callers actually render. This list is unpaginated by
+    // design (the admin table is a tree over the whole archive), so the row
+    // count is fixed but the row *width* is not: `longDescription` alone is a
+    // paragraph per show across 498 of them, shipped and then made deeply
+    // reactive by Vue on every navigation between /admin and /admin/shows,
+    // none of which displays it.
+    columns: {
+      id: true,
+      slug: true,
+      title: true,
+      subtitle: true,
+      description: true,
+      posterUrl: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+    },
     with: {
       performances: {
         orderBy: [asc(schema.performances.startsAt)],

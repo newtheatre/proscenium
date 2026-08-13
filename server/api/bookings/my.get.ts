@@ -38,9 +38,10 @@ interface BookingRow {
  * Requires authentication. Returns upcoming and past bookings.
  */
 export default defineEventHandler(async (event) => {
-  // Verified rather than raw, so a session invalidated by a password reset
-  // cannot keep listing the account's bookings until the cookie expires.
-  const { id: userId } = await requireVerifiedSessionUser(event)
+  // Identity only — this handler never reads a role, so it must not be gated on
+  // role staleness. It used to be, which meant any staff member's own bookings
+  // page went blank fifteen minutes after signing in.
+  const { id: userId } = await requireSessionUser(event)
   const now = new Date()
 
   const bookings = await db.query.reservations.findMany({

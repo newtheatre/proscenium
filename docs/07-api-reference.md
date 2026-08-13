@@ -214,10 +214,10 @@ Authenticated by the SHA-256 of this app's `AUTH_SERVICE_TOKEN`, compared consta
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| GET | `/api/ticket-types` | **Public** | All base ticket types |
+| GET | `/api/ticket-types` | **Public** | Live types; `?includeArchived=true` adds retired ones |
 | POST | `/api/ticket-types` | ADMIN/MANAGER (`createTicketType`) | Create a base ticket type |
 | GET | `/api/ticket-types/:id` | **Public** | One base ticket type |
-| PUT | `/api/ticket-types/:id` | ADMIN/MANAGER (`updateTicketType`) | Update a base ticket type |
+| PUT | `/api/ticket-types/:id` | ADMIN/MANAGER (`updateTicketType`) | Update a base ticket type, including archiving it |
 | DELETE | `/api/ticket-types/:id` | ADMIN (`deleteTicketType`) | Delete a base ticket type |
 | GET | `/api/shows/:id/ticket-types` | Any user (`readShow`) | Base types plus this show's overrides and effective values |
 | PUT | `/api/shows/:id/ticket-types` | ADMIN/MANAGER (`updateShow`) | Upsert a show-level override |
@@ -931,7 +931,17 @@ The performance is looked up by `id` **and** `showId`, so a mismatched pair retu
 
 **Source** `server/api/ticket-types/index.get.ts` · **Auth** **Public** — no `authorize()`; the comment in the source explains that booking flows need it
 
-**Response** `200` — all `ticket_types` rows ordered by name: `{ id, name, description, price, activeByDefault, createdAt, updatedAt }`. `price` is in pence.
+**Query** `?includeArchived=true` to include retired types. Omitted or `false` returns only live
+ones, so a caller that just wants "the ticket types" cannot accidentally offer a dead Fringe type.
+The management screen at `/admin/ticket-types` is the one caller that passes it, because it is where
+types are archived and restored.
+
+**Response** `200` — `ticket_types` rows ordered by name:
+`{ id, name, description, price, kind, archived, activeByDefault, createdAt, updatedAt }`.
+`price` is in pence.
+
+`archived` and `activeByDefault` answer different questions — see
+[06-pricing-and-ticket-types](./06-pricing-and-ticket-types.md#archived-vs-activebydefault--two-different-questions).
 
 ---
 

@@ -33,10 +33,10 @@ export default defineEventHandler(async (event) => {
   // userId is only needed to decide access; it is not part of the response.
   const { userId, ...customerBooking } = booking
 
-  // Allow access for: the booking owner, or staff. Verified rather than raw —
-  // the staff branch below returns any booking, so a revoked session must not
-  // reach it.
-  const sessionUser = await getVerifiedSessionUser(event)
+  // Allow access for: the booking owner, or staff. A stale session keeps its
+  // identity but loses its roles, so the owner branch still works while the
+  // staff branch — which returns any booking — fails closed until refresh.
+  const sessionUser = await sessionUserForAuthorization(event)
 
   if (sessionUser) {
     const isOwner = sessionUser.id === userId
