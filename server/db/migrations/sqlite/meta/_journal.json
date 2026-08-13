@@ -106,6 +106,13 @@
       "when": 1786561193748,
       "tag": "0014_flashy_odin",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1786638328224,
+      "tag": "0015_lovely_stryfe",
+      "breakpoints": true
     }
   ]
 }
