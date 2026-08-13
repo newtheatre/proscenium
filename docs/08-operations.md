@@ -150,14 +150,54 @@ This is what the line at the bottom of the repository `README.md` is referring t
 
 ### Option B — Wrangler
 
-After a `bun run build` has copied the migrations into `.output/server/db/migrations/`:
+After a `bun run build` has copied the migrations into `.output/server/db/migrations/sqlite/`:
 
 ```bash
-bunx wrangler --cwd .output d1 migrations list proscenium --remote
-bunx wrangler --cwd .output d1 migrations apply proscenium --remote
+bunx wrangler --cwd .output/server d1 migrations list proscenium --remote
+bunx wrangler --cwd .output/server d1 migrations apply proscenium --remote
 ```
 
+**`--cwd .output/server`, not `--cwd .output`.** The generated Wrangler config is written to
+`.output/server/wrangler.json`, and from `.output` Wrangler cannot find it — it fails with
+*"No configuration file found"*, which at least tells you something is wrong. (`.wrangler/deploy/
+config.json` redirects Wrangler to that config for deploys, but is not honoured by the `d1
+migrations` subcommands in Wrangler 4.x, so the `--cwd` is still needed here.)
+
+**Always run `list` before `apply`, and read what it prints.** `migrations_dir` is pinned in
+`nuxt.config.ts` because NuxtHub's default for it (`.output/server/db/migrations/`) is resolved by
+Wrangler *relative to the config file*, landing on a path that does not exist — and the failure mode
+was not an error but `✅ No migrations to apply!` and an exit code of 0. If you ever see that message
+when you know a migration is outstanding, do not believe it: check `list` output against
+`server/db/migrations/sqlite/` before concluding production is up to date.
+
 Both routes record applied migrations in the same `_hub_migrations` table, so they interoperate and you can switch between them.
+
+### ⚠️ The production ledger is currently empty — do not run `apply` blindly
+
+As of 2026-08-13, `_hub_migrations` in production contains **zero rows**, on a database that is
+~49 MB and fully populated. The schema is there; the record of how it got there is not. Production
+was migrated by some route that never wrote the ledger, and the broken `migrations_dir` above meant
+nobody found out, because `list` always answered "nothing to do".
+
+So `list` now reports **every** migration back to `0000` as pending. That is a reporting artefact,
+not the truth. **Running `apply` in that state would try to replay the entire history against a live
+database** — including `0008` and `0015`, which drop and rebuild `tickets` and `pass_admissions`.
+Best case it errors out on the first `CREATE TABLE`; worst case it does real damage.
+
+The recovery, when someone has time to do it carefully:
+
+1. Confirm the production schema matches the repo at `0014` — compare `sqlite_master` against the
+   `0014` snapshot in `server/db/migrations/sqlite/meta/`, paying attention to the foreign keys.
+2. `bunx wrangler --cwd .output/server d1 migrations apply proscenium --remote` is **not** the next
+   step. Populate the ledger first so it reflects reality — `nuxt db mark-as-migrated` records
+   migrations as applied without running them, which is exactly this situation (`docs/01` §8 calls
+   it dangerous, and it is, which is why step 1 comes first).
+3. Then apply `0015` — the only genuinely outstanding migration — and confirm with `list`.
+
+Until that is done, **`pass_admissions.ticket_id` is still `cascade` in production**. The
+application-level guards added in #110 hold that line (the box office cannot reach a
+`PASS_ADMISSION` type, and deleting a reservation holding one returns 409), so nothing is broken —
+but the database backstop from #111 is not in place yet.
 
 ### Afterwards
 

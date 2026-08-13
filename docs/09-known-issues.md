@@ -23,6 +23,7 @@ Severity is about consequences for the theatre, not code aesthetics:
 | 14 | [Customers cannot cancel their own booking](#customers-cannot-cancel) | P2 | Small |
 | 16 | [No shared types](#no-shared-types) | P3 | Medium |
 | 20a | [No tests](#no-tests) | P3 | Medium |
+| 21 | [Production migration ledger is empty](#production-migration-ledger-is-empty) | P2 | Small |
 
 ## Fixed
 
@@ -154,6 +155,25 @@ have been a silent money bug rather than a compile error.
 **Fix:** derive types from the Drizzle schema (`InferSelectModel`) into `shared/types/`, and stop
 casting.
 
+### Production migration ledger is empty
+
+`_hub_migrations` in production has zero rows, on a fully populated ~49 MB database. The schema is
+correct; the record of how it got there was never written. Discovered 2026-08-13.
+
+It went unnoticed because the generated Wrangler config pointed `migrations_dir` at a path that did
+not exist, so `d1 migrations list` reported `✅ No migrations to apply!` and exited 0 no matter what
+was outstanding — a false success on the one command whose job is answering that question. That path
+is now pinned in `nuxt.config.ts`, so `list` tells the truth.
+
+The consequence is that `list` now reports every migration since `0000` as pending, and **`apply`
+must not be run in that state** — it would replay `0008` and `0015`, which rebuild `tickets` and
+`pass_admissions`. Recovery is to verify the schema against the `0014` snapshot, populate the ledger
+with `mark-as-migrated`, then apply `0015` alone. Full procedure in
+[08-operations](08-operations.md#-the-production-ledger-is-currently-empty--do-not-run-apply-blindly).
+
+Until then `pass_admissions.ticket_id` is still `cascade` in production and the application guards
+are what protect the redemption ledger.
+
 ### No tests
 
 CI now runs build, typecheck and lint, but there is no test framework and no `tests/`.
@@ -167,7 +187,8 @@ ways no type checker would have caught.
 
 ## Suggested order
 
-1. **#20a** — tests for the money handlers, before the structural work below.
-2. **#16** — shared types. Everything else is safer afterwards.
-3. **#9, #10a** — transactionality and the capacity race, together.
-4. **#13, #14** — the two workflow gaps, whenever the box office next complains.
+1. **#21** — the migration ledger. Cheap, and it blocks deploying any schema change.
+2. **#20a** — tests for the money handlers, before the structural work below.
+3. **#16** — shared types. Everything else is safer afterwards.
+4. **#9, #10a** — transactionality and the capacity race, together.
+5. **#13, #14** — the two workflow gaps, whenever the box office next complains.
