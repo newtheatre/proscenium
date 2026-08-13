@@ -78,6 +78,50 @@ A public booking is representative:
 Server-rendered pages follow the same path with `useFetch` running server-side on first load and
 client-side on navigation.
 
+## Fetching in the admin area
+
+Admin pages fetch **on the server**, so a table arrives populated rather than appearing a moment
+after the page does. Two rules come with that, and both are easy to get wrong.
+
+**1. Forward the session, or SSR gets a 403.**
+
+Every admin endpoint is behind `authorize()`, and a plain `useFetch` running on the server does
+**not** forward the incoming session cookie — so the handler sees no session and denies the request.
+Pass Nuxt's request-scoped fetch:
+
+```ts
+const { data } = await useFetch<Show[]>('/api/shows', { $fetch: useRequestFetch() })
+```
+
+and for `useAsyncData`, hold one instance and call it inside the handler:
+
+```ts
+const requestFetch = useRequestFetch()
+const { data } = await useAsyncData('admin-reservations',
+  () => requestFetch('/api/reservations', { query: { page: page.value } }))
+```
+
+This is why the admin pages were originally written with `lazy: true` — deferring to the client
+sidestepped the cookie problem, because the browser sends it naturally. It also left every admin
+page with a window where its data was `null`, which is what made the render loop below possible.
+`useRequestFetch()` is the fix; `lazy` was the workaround.
+
+**2. Never build the table's `data` prop in the template.**
+
+```vue
+<!-- wrong: a new array every render -->
+:data="rows ?? []"
+```
+
+UTable rebuilds its TanStack row models whenever `data` changes identity, and rebuilding writes back
+through the `v-model:` bindings, which re-renders the page, which allocates another array. That is a
+render loop with no fixed point — a locked tab, not a slow one. It froze `/admin/shows` and
+`/admin/ticket-types`. Bind a computed that always returns an array, and hoist
+`:pagination-options` to a constant for the same reason.
+
+Modals keep `lazy: true` deliberately: they fetch when opened, and blocking a page on data the user
+may never look at is the wrong trade.
+
 ## The constraints Workers and D1 impose
 
 These are the things that make this codebase look odd if you come from a Node/Postgres background.

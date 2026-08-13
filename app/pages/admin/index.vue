@@ -76,7 +76,14 @@ const STATUS_CONFIG = {
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
-const { data: stats, status: statsStatus } = await useFetch<Stats>('/api/admin/stats', { lazy: true })
+// Server-rendered, so the table arrives populated instead of appearing a moment
+// later. requestFetch, not a bare $fetch: every admin endpoint is behind
+// authorize(), and a plain server-side fetch does not forward the incoming
+// session cookie — it would 403 during SSR. See
+// docs/02-architecture.md#fetching-in-the-admin-area.
+const requestFetch = useRequestFetch()
+const { data: stats, status: statsStatus } = await useAsyncData(
+  'admin-stats', () => requestFetch<Stats>('/api/admin/stats'))
 
 /** e.g. "2025/26 season" — or the explicit dates when a custom range is set. */
 const windowLabel = computed(() => {
@@ -104,7 +111,8 @@ const statsCaveat = computed(() => {
   if (derived) parts.push(`${derived.toLocaleString('en-GB')} estimated`)
   return `Includes ${parts.join(', ')}`
 })
-const { data: shows } = await useFetch<Show[]>('/api/shows', { lazy: true })
+const { data: shows } = await useAsyncData(
+  'admin-show-options', () => requestFetch<Show[]>('/api/shows'), { default: () => [] })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

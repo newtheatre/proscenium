@@ -70,10 +70,16 @@ const showArchived = ref(false)
 // `includeArchived` because this is the one screen that has to see retired
 // types — it is where they are archived and restored. Everything else gets the
 // live ones by default.
-const { data: rawData, status, refresh } = await useFetch<TicketType[]>('/api/ticket-types', {
-  lazy: true,
-  query: { includeArchived: 'true' },
-})
+// Server-rendered, so the table arrives populated instead of appearing a moment
+// later. `$fetch: useRequestFetch()` is not optional here: every admin endpoint
+// is behind authorize(), and a plain useFetch running on the server does not
+// forward the incoming session cookie — it would 403 during SSR. See
+// docs/02-architecture.md §Fetching in the admin area.
+const requestFetch = useRequestFetch()
+const { data: rawData, status, refresh } = await useAsyncData(
+  'admin-ticket-types',
+  () => requestFetch<TicketType[]>('/api/ticket-types', { query: { includeArchived: 'true' } }),
+)
 
 /**
  * Rows for the table. **Always an array, never null.**
@@ -86,10 +92,11 @@ const { data: rawData, status, refresh } = await useFetch<TicketType[]>('/api/ti
  * `:column-visibility`, which re-renders this page, which allocates another new
  * array. That is a render loop with no fixed point, and it locked the tab up.
  *
- * It bit hardest arriving by client-side navigation, because there is no
- * server-rendered payload to land on and `lazy: true` guarantees a window where
- * the data is null — which is exactly the "navigate to ticket types and
- * everything freezes" report.
+ * It bit hardest arriving by client-side navigation, because there was no
+ * server-rendered payload to land on and the fetch was `lazy`, guaranteeing a
+ * window where the data was null — exactly the "navigate to ticket types and
+ * everything freezes" report. The fetch is server-rendered now, which closes
+ * that window, but the binding must still never allocate per render.
  *
  * A computed caches, so this identity only changes when its dependencies do.
  * Keep it that way: do not reintroduce `?? []` at the binding.

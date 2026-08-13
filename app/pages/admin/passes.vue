@@ -54,8 +54,14 @@ const toast = useToast()
 const confirm = useConfirm()
 
 // ── Pass products ─────────────────────────────────────────────────────────
-const { data: passTypes, status: typesStatus, refresh: refreshTypes }
-  = await useFetch<PassType[]>('/api/pass-types', { lazy: true, default: () => [] })
+// Server-rendered, so the table arrives populated instead of appearing a moment
+// later. requestFetch, not a bare $fetch: every admin endpoint is behind
+// authorize(), and a plain server-side fetch does not forward the incoming
+// session cookie — it would 403 during SSR. See
+// docs/02-architecture.md#fetching-in-the-admin-area.
+const requestFetch = useRequestFetch()
+const { data: passTypes, status: typesStatus, refresh: refreshTypes } = await useAsyncData(
+  'admin-pass-types', () => requestFetch<PassType[]>('/api/pass-types'), { default: () => [] })
 
 function formatPrice(pence: number) {
   return `£${(pence / 100).toFixed(2)}`
@@ -128,12 +134,14 @@ watch(search, (value) => {
 })
 onUnmounted(() => clearTimeout(searchTimer))
 
+// Searching and paging re-run this on the client, which does not suspend the
+// page — so the table stays interactive while it refetches.
 const { data: issued, status: issuedStatus, refresh: refreshIssued } = await useAsyncData(
   'admin-passes',
-  () => $fetch<{ rows: IssuedPass[], total: number }>('/api/passes', {
+  () => requestFetch<{ rows: IssuedPass[], total: number }>('/api/passes', {
     query: { q: debouncedSearch.value || undefined, page: page.value, limit },
   }),
-  { watch: [debouncedSearch, page], default: () => ({ rows: [], total: 0 }), lazy: true },
+  { watch: [debouncedSearch, page], default: () => ({ rows: [], total: 0 }) },
 )
 
 const pageCount = computed(() => Math.max(1, Math.ceil((issued.value?.total ?? 0) / limit)))
