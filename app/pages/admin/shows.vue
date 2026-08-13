@@ -96,7 +96,14 @@ function getSubRows(row: AnyRow): AnyRow[] | undefined {
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 const globalFilter = ref('')
-const { data, status, refresh } = await useFetch<Show[]>('/api/shows', { lazy: true })
+// Server-rendered, so the table arrives populated instead of appearing a moment
+// later. `$fetch: useRequestFetch()` is not optional here: every admin endpoint
+// is behind authorize(), and a plain useFetch running on the server does not
+// forward the incoming session cookie — it would 403 during SSR. See
+// docs/02-architecture.md §Fetching in the admin area.
+const requestFetch = useRequestFetch()
+const { data, status, refresh } = await useAsyncData(
+  'admin-shows', () => requestFetch<Show[]>('/api/shows'))
 
 /**
  * Rows for the table. **Always an array, never null.**
