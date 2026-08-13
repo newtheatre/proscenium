@@ -170,34 +170,44 @@ was not an error but `✅ No migrations to apply!` and an exit code of 0. If you
 when you know a migration is outstanding, do not believe it: check `list` output against
 `server/db/migrations/sqlite/` before concluding production is up to date.
 
-Both routes record applied migrations in the same `_hub_migrations` table, so they interoperate and you can switch between them.
+### The two routes do not share a name format — pick one and stay on it
 
-### ⚠️ The production ledger is currently empty — do not run `apply` blindly
+Both write to `_hub_migrations`, but they disagree about what a migration is called:
 
-As of 2026-08-13, `_hub_migrations` in production contains **zero rows**, on a database that is
-~49 MB and fully populated. The schema is there; the record of how it got there is not. Production
-was migrated by some route that never wrote the ledger, and the broken `migrations_dir` above meant
-nobody found out, because `list` always answered "nothing to do".
+| Route | Value stored in `name` |
+|---|---|
+| `nuxt db migrate` (Option A) | `0015_lovely_stryfe` — `.sql` stripped |
+| `wrangler d1 migrations apply` (Option B) | `0015_lovely_stryfe.sql` — filename as-is |
 
-So `list` now reports **every** migration back to `0000` as pending. That is a reporting artefact,
-not the truth. **Running `apply` in that state would try to replay the entire history against a live
-database** — including `0008` and `0015`, which drop and rebuild `tickets` and `pass_admissions`.
-Best case it errors out on the first `CREATE TABLE`; worst case it does real damage.
+So they do **not** interoperate, whatever an earlier version of this document said. Apply a migration
+with one and the other still considers it pending, and will re-run it. That is survivable for a
+migration that happens to be idempotent and fatal for one that is not.
 
-The recovery, when someone has time to do it carefully:
+**Option B (wrangler) is the route in use**, because it authenticates with the wrangler login the
+committee already has, while Option A needs `NUXT_HUB_CLOUDFLARE_*` API credentials set separately.
+If you ever deliberately switch, backfill the other format for every migration first.
 
-1. Confirm the production schema matches the repo at `0014` — compare `sqlite_master` against the
-   `0014` snapshot in `server/db/migrations/sqlite/meta/`, paying attention to the foreign keys.
-2. `bunx wrangler --cwd .output/server d1 migrations apply proscenium --remote` is **not** the next
-   step. Populate the ledger first so it reflects reality — `nuxt db mark-as-migrated` records
-   migrations as applied without running them, which is exactly this situation (`docs/01` §8 calls
-   it dangerous, and it is, which is why step 1 comes first).
-3. Then apply `0015` — the only genuinely outstanding migration — and confirm with `list`.
+The 2026-08-13 ledger recovery wrote both formats for `0000`–`0014` for exactly this reason.
 
-Until that is done, **`pass_admissions.ticket_id` is still `cascade` in production**. The
-application-level guards added in #110 hold that line (the box office cannot reach a
-`PASS_ADMISSION` type, and deleting a reservation holding one returns 409), so nothing is broken —
-but the database backstop from #111 is not in place yet.
+### The ledger was recovered on 2026-08-13 — history
+
+For a period ending 2026-08-13, `_hub_migrations` was **empty** on a fully populated production
+database: the schema was there, the record of how it got there was not. Nobody noticed because the
+broken `migrations_dir` above meant `list` always answered "nothing to do".
+
+The recovery, kept here because the same shape of problem could recur:
+
+1. Verified production was genuinely at `0014` — `0014`'s dropped tables absent, `users` carrying
+   exactly the post-`0014` columns, and `pass_admissions.ticket_id` still `cascade` (so `0015` had
+   not run).
+2. Took a Time Travel bookmark first.
+3. Backfilled `0000`–`0014` into the ledger, **in both name formats**, without running anything.
+4. Confirmed `list` then showed only `0015` outstanding.
+5. Applied `0015`, and verified the foreign key had flipped to `restrict`, all four indexes were
+   back, and the row counts were unchanged.
+
+The lesson worth keeping: `mark-as-migrated` and hand-written ledger inserts are only safe once you
+have *proved* the schema matches the migration you are claiming was applied. Prove it first.
 
 ### Afterwards
 
