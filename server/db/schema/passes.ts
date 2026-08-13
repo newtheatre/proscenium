@@ -227,7 +227,22 @@ export const passes = sqliteTable('passes', {
 export const passAdmissions = sqliteTable('pass_admissions', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   passId: text('pass_id').notNull().references(() => passes.id, { onDelete: 'cascade' }),
-  ticketId: text('ticket_id').notNull().references(() => tickets.id, { onDelete: 'cascade' }),
+  /**
+   * `restrict`, not `cascade`: this row IS the record that a pass was used, and
+   * the UNIQUE (pass_id, performance_id) below is the only thing stopping the
+   * same pass admitting a second person to the same performance. Under
+   * `cascade`, deleting the admission ticket — which the box-office ticket
+   * stepper could do, since the £0 PASS_ADMISSION type appeared in its picker —
+   * silently took the ledger row with it and made the pass redeemable again,
+   * with nothing left to show it had ever been used.
+   *
+   * The application refuses those deletions first (`validateTicketTypesSellable`
+   * on every ticket write path, and a 409 from `DELETE /api/reservations/:id`),
+   * so a volunteer gets an explanation rather than a constraint error. This is
+   * the backstop for the paths nobody has thought of yet. To un-redeem a pass,
+   * delete the admission row and then its ticket, in that order.
+   */
+  ticketId: text('ticket_id').notNull().references(() => tickets.id, { onDelete: 'restrict' }),
   performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),
 
   redeemedAt: text('redeemed_at').notNull().default(sql`(current_timestamp)`),

@@ -1259,9 +1259,19 @@ show, has not already been used for this performance, that the performance is ON
 there is room.
 
 `UNIQUE (pass_id, performance_id)` on `pass_admissions` **is** the once-per-performance rule — D1 has
-no interactive transactions, so that index is what holds under a double-submit. Deleting the
-admission ticket would cascade that row away, which is why neither ticket-diff route will touch a
-`PASS_ADMISSION` type and why deleting a reservation holding one returns 409.
+no interactive transactions, so that index is what holds under a double-submit.
+
+The ledger row is protected at three depths, because losing it makes a used pass redeemable again
+with nothing left to show it was ever used:
+
+1. `validateTicketTypesSellable` rejects `PASS_ADMISSION` on every ticket write path, so the box
+   office cannot step the quantity down to zero.
+2. `DELETE /api/reservations/:id` returns 409 when the reservation holds an admission.
+3. `pass_admissions.ticket_id` is `ON DELETE restrict` (migration 0015), so the database refuses the
+   delete even from a path nobody has thought of yet. It was `cascade` until then, which is what
+   made (1) and (2) load-bearing rather than merely friendly.
+
+To un-redeem a pass, delete the `pass_admissions` row and then its ticket, in that order.
 
 Rejections in `STAFF_OVERRIDABLE` (currently only `PERFORMANCE_NOT_ON_SALE`) can be overridden at
 the door; the rest cannot.
