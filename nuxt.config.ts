@@ -133,6 +133,22 @@ export default defineNuxtConfig({
             binding: 'DB',
             database_name: 'proscenium',
             database_id: '01a75263-87a9-452a-a4a0-b3b9db71dfe5',
+            // Set here rather than left to NuxtHub, whose default is
+            // `.output/server/db/migrations/` — wrong twice over, and silently.
+            //
+            // Wrangler resolves this **relative to the config file**, and the
+            // generated config lives at `.output/server/wrangler.json`, so that
+            // default expands to `.output/server/.output/server/db/migrations`.
+            // Point it at the project root instead and it lands on a directory
+            // that holds only a `sqlite/` subdirectory, no `.sql` files — at
+            // which point wrangler reports "✅ No migrations to apply!" and
+            // exits 0. A false success on the one command whose whole job is
+            // telling you whether production is up to date.
+            //
+            // NuxtHub sets it with `||=` (module.mjs), so this wins. Nothing
+            // else reads it: the dev-time migrator resolves its own paths, so
+            // this only affects the wrangler CLI.
+            migrations_dir: 'db/migrations/sqlite',
           },
         ],
         observability: {
