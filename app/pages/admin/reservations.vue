@@ -81,7 +81,7 @@ const STATUS_CONFIG = {
 
 // ── Table state ───────────────────────────────────────────────────────────────
 
-const columnVisibility = ref()
+const columnVisibility = ref({})
 
 const searchQuery = ref('')
 const statusFilter = ref<string>('ALL')
