@@ -87,10 +87,13 @@ const pagination = ref({
   pageIndex: 0,
 })
 
-// Fetch venues
-const { data, status, refresh } = await useFetch<Venue[]>('/api/venues', {
-  lazy: true,
-})
+// Server-rendered, so the table arrives populated. `$fetch: useRequestFetch()`
+// forwards the session cookie, which a plain useFetch does not do on the
+// server — and /api/venues is behind authorize() for writes. See
+// docs/02-architecture.md §Fetching in the admin area.
+const requestFetch = useRequestFetch()
+const { data, status, refresh } = await useAsyncData(
+  'admin-venues', () => requestFetch<Venue[]>('/api/venues'))
 
 // Selected venue for editing or deletion
 const venueToEdit = ref<Venue | null>(null)

@@ -118,9 +118,14 @@ watch(statusFilter, () => {
   currentPage.value = 1
 })
 
+// requestFetch rather than a bare $fetch: this runs on the server for the first
+// render, where only a forwarded session cookie satisfies authorize().
+// Searching, filtering and paging afterwards re-run it on the client, which
+// does not suspend the page.
+const requestFetch = useRequestFetch()
 const { data, status, refresh } = await useAsyncData(
   'admin-reservations',
-  () => $fetch<{ rows: Reservation[], total: number }>('/api/reservations', {
+  () => requestFetch<{ rows: Reservation[], total: number }>('/api/reservations', {
     query: {
       page: currentPage.value,
       limit: pageSize,
@@ -129,7 +134,6 @@ const { data, status, refresh } = await useAsyncData(
     },
   }),
   {
-    lazy: true,
     default: () => ({ rows: [] as Reservation[], total: 0 }),
     watch: [currentPage, debouncedSearch, statusFilter],
   },
@@ -143,8 +147,8 @@ const totalCount = computed(() => data.value?.total ?? 0)
 // in the browser.
 const { data: counts, refresh: refreshCounts } = await useAsyncData(
   'admin-reservation-counts',
-  () => $fetch<{ byStatus: Record<string, number>, total: number }>('/api/admin/reservation-counts'),
-  { lazy: true, default: () => ({ byStatus: {} as Record<string, number>, total: 0 }) },
+  () => requestFetch<{ byStatus: Record<string, number>, total: number }>('/api/admin/reservation-counts'),
+  { default: () => ({ byStatus: {} as Record<string, number>, total: 0 }) },
 )
 
 const statusCounts = computed(() => counts.value?.byStatus ?? {})
