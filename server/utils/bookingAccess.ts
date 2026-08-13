@@ -90,9 +90,10 @@ export async function requireBookingAccess(event: H3Event, idOrRef: string): Pro
 
   if (!booking) throw createError({ statusCode: 404, statusMessage: 'Booking not found' })
 
-  // Verified rather than raw: `roles` below is an authorisation decision, so a
-  // revoked session must not still satisfy it.
-  const sessionUser = await getVerifiedSessionUser(event)
+  // Roles below are an authorisation decision, so a stale session must not
+  // satisfy them — but it must still satisfy the *owner* check underneath,
+  // which is why this resolver drops roles rather than rejecting the request.
+  const sessionUser = await sessionUserForAuthorization(event)
   const isOwner = sessionUser?.id === booking.userId
   // isStaff() from the abilities layer rather than a literal role list: roles
   // arrive app-scoped ('proscenium:BOX_OFFICE'), so matching against bare

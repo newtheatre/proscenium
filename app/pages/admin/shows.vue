@@ -98,6 +98,26 @@ function getSubRows(row: AnyRow): AnyRow[] | undefined {
 const globalFilter = ref('')
 const { data, status, refresh } = await useFetch<Show[]>('/api/shows', { lazy: true })
 
+/**
+ * performanceId → the show it belongs to.
+ *
+ * Built once whenever the data changes, because the alternative is doing it per
+ * rendered row: the actions column used to resolve a performance's parent with
+ * `data.value?.find(s => s.performances.some(p => p.id === perf.id))`, a linear
+ * scan of every show *and* every one of its performances, re-run by TanStack for
+ * each performance row on every sort, expand, filter and refresh. At the current
+ * 498 shows and 1,304 performances that is well over a million comparisons per
+ * render, on the main thread — which is what froze the admin area — and it grows
+ * with the square of the archive.
+ */
+const showByPerformanceId = computed(() => {
+  const map = new Map<string, Show>()
+  for (const show of data.value ?? []) {
+    for (const perf of show.performances ?? []) map.set(perf.id, show)
+  }
+  return map
+})
+
 // Collapsed by default — click chevrons or table header to expand
 const expanded = ref<Record<string, boolean>>({})
 
@@ -561,7 +581,7 @@ const columns: TableColumn<AnyRow>[] = [
       }
       else {
         const perf = row.original as Performance
-        const parentShow = data.value?.find(s => s.performances.some(p => p.id === perf.id))
+        const parentShow = showByPerformanceId.value.get(perf.id)
         items = getPerformanceRowItems(perf, parentShow?.status ?? 'DRAFT', row.index, parentShow?.title ?? '')
       }
 

@@ -8,6 +8,15 @@ const bodySchema = z.object({
   description: z.string().optional().nullable(),
   price: z.number().int().nonnegative('Price must be a non-negative integer (in pence)').optional(),
   activeByDefault: z.boolean().optional(),
+  /**
+   * Retire a type. Distinct from `activeByDefault`, which only decides whether
+   * a *live* type is pre-selected on new shows — an inactive type is still
+   * offered and can be switched on per show or performance. Archiving says the
+   * type will never be sold again: it disappears from every picker and every
+   * override screen, while its historic tickets keep resolving their price and
+   * name. That is what the legacy Fringe and StuFF types need.
+   */
+  archived: z.boolean().optional(),
 })
 
 /** PUT /api/ticket-types/:id — update a ticket type. Admin/Manager only. */
@@ -40,12 +49,14 @@ export default defineEventHandler(async (event) => {
     description?: string | null
     price?: number
     activeByDefault?: boolean
+    archived?: boolean
   } = {}
 
   if (body.name !== undefined) updateData.name = body.name
   if (body.description !== undefined) updateData.description = body.description
   if (body.price !== undefined) updateData.price = body.price
   if (body.activeByDefault !== undefined) updateData.activeByDefault = body.activeByDefault
+  if (body.archived !== undefined) updateData.archived = body.archived
 
   if (Object.keys(updateData).length === 0) {
     return existing
