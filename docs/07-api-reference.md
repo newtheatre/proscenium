@@ -166,6 +166,7 @@ Authenticated by the SHA-256 of this app's `AUTH_SERVICE_TOKEN`, compared consta
 | POST | `/api/_hooks/auth/export` | Service token | This app's contribution to a subject-access bundle |
 | POST | `/api/_hooks/auth/anonymise` | Service token | GDPR erasure: scrub the mirror row and reservation notes. Idempotent |
 | POST | `/api/_hooks/auth/last-activity` | Service token | Most recent booking or pass per user, feeding the retention sweep |
+| POST | `/api/_hooks/auth/merge` | Service token | Account merge: re-point every user-referencing row onto the winner, delete the losing mirror row. Idempotent |
 
 ### Bookings (public-facing box office)
 
@@ -333,6 +334,23 @@ The most recent reservation or pass per user, feeding the retention sweep's gues
 requested id appears in the response, `null` where nothing is known. Ids are chunked at 90 per query
 internally — D1 binds at most 100 parameters per statement, and stage-door batches at 90 for the
 same reason.
+
+#### `POST /api/_hooks/auth/merge`
+
+**Source** `server/api/_hooks/auth/merge.post.ts` · **Auth** Service token
+
+**Body** `{ fromUserId: string, toUserId: string, dryRun?: boolean }` · **Returns** `{ ok: true, notMirrored, counts }`
+
+This app's share of an estate-wide account merge (stage-door ADR-0015). Re-points
+`reservations.userId`, `passes.userId`, `passes.issuedByUserId` and
+`pass_admissions.redeemedByUserId` from the losing account onto the winner, then deletes the losing
+mirror row — with nothing referencing it the `restrict` FKs are satisfied, and the sales record now
+lives intact on the winner. `dryRun: true` returns the affected-row `counts` without writing;
+stage-door shows them in its pre-merge report. Each statement binds two parameters however many rows
+move, so no chunking is needed.
+
+**Idempotent**, and `{ ok: true, notMirrored: true }` for a losing account this app has never seen —
+stage-door retries until every app succeeds.
 
 ### 3.2 Bookings
 
