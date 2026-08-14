@@ -150,7 +150,6 @@ const actions = useShowActions(refreshAll)
 
 // ── Modal state ──────────────────────────────────────────────────────────────
 
-const showForTicketTypes = ref<ShowListItem | null>(null)
 const addPerformanceToShow = ref<ShowListItem | null>(null)
 const performanceToEdit = ref<PerformanceListItem | null>(null)
 const performanceForTicketTypes = ref<PerformanceListItem | null>(null)
@@ -168,7 +167,9 @@ function onRowAction(action: ShowRowAction) {
       navigateTo(`/admin/shows/${action.show.id}`)
       break
     case 'show-ticket-types':
-      showForTicketTypes.value = action.show
+      // Ticket types are a section of the show's own page now, not a dialog.
+      // One place to manage a show beats two entry points to the same form.
+      navigateTo(`/admin/shows/${action.show.id}#ticket-types`)
       break
     case 'add-performance':
       addPerformanceToShow.value = action.show
@@ -298,12 +299,6 @@ const tabItems = computed(() => TABS.map(t => ({
 
     <!-- ── Modals ──────────────────────────────────────────────────────────
          Mounted at page level, where `refreshAll` lives. -->
-
-    <ShowTicketTypesModal
-      :show="showForTicketTypes"
-      @close="showForTicketTypes = null"
-      @refresh="refreshAll"
-    />
 
     <ShowPerformanceTicketTypesModal
       :performance="performanceForTicketTypes"

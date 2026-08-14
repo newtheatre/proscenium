@@ -8,11 +8,19 @@
   width rule across its content.
 -->
 <template>
-  <div class="flex flex-wrap items-center gap-3">
+  <!--
+    Stacks below `sm`, side by side above it.
+
+    It used to be one `flex-wrap` row with a `flex-1 min-w-0` left group. Wrapping
+    never happened, because both groups are single flex items: the left one just
+    shrank, so on a phone a sentence of description became a one-word-per-line
+    column with the action buttons sitting on top of it.
+  -->
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
     <div class="flex flex-1 flex-wrap items-center gap-3 min-w-0">
       <slot name="left" />
     </div>
-    <div class="flex items-center gap-3">
+    <div class="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
       <slot name="right" />
     </div>
   </div>
