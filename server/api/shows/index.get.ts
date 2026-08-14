@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import { listShows } from '~~/shared/utils/abilities'
 
@@ -48,20 +48,11 @@ function unixSeconds(date: Date): number {
 /**
  * GET /api/shows — list shows. Staff only; the public uses /api/whats-on.
  *
- * ## Two modes
- *
- * With **any** query parameter this returns the standard
- * `{ rows, total, page, limit }` envelope, filtered and paged in SQL.
- *
- * With **no query string at all** it returns today's bare array of every show
- * with every performance nested — 498 shows and 1,304 performances.
- *
- * @deprecated The bare-array mode. It exists only so the box office's
- * performance navigator, which genuinely wants every performance, keeps working
- * while it is migrated onto a bounded request. It is a deliberate exception to
- * the rule in server/utils/pagination.ts that a list endpoint always returns an
- * envelope. Delete the `legacy` branch once `app/pages/admin/box-office/
- * reservations.vue` no longer calls this without parameters.
+ * Always returns the standard `{ rows, total, page, limit }` envelope, filtered
+ * and paged in SQL. It briefly also had a no-query-string mode that returned
+ * every show with every performance nested, kept alive only for the box office
+ * navigator; that now uses `/api/performances?near=`, so the exception is gone
+ * and the rule in server/utils/pagination.ts holds without one.
  *
  * ## Staying inside D1's 100 bound parameters
  *
@@ -75,9 +66,6 @@ function unixSeconds(date: Date): number {
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listShows)
-
-  const legacy = Object.keys(getQuery(event)).length === 0
-  if (legacy) return legacyWholeArchive()
 
   const { scope, status, from, to, view, sort, order, page, q, limit: rawLimit }
     = await getValidatedQuery(event, querySchema.parse)
@@ -289,69 +277,3 @@ export default defineEventHandler(async (event) => {
     { page, limit },
   )
 })
-
-/**
- * The pre-pagination response: every show, every performance, whole-table
- * aggregates.
- *
- * Kept verbatim, including the aggregate strategy — with no `where` there is no
- * bounded id list to scope by, so grouping the override tables in full and
- * counting every ticket is still the only option that binds nothing. That cost
- * is exactly why callers should pass parameters.
- *
- * @deprecated See the handler docblock.
- */
-async function legacyWholeArchive() {
-  const allShows = await db.query.shows.findMany({
-    orderBy: [asc(schema.shows.title)],
-    columns: {
-      id: true,
-      slug: true,
-      title: true,
-      subtitle: true,
-      description: true,
-      posterUrl: true,
-      status: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-    with: {
-      performances: {
-        orderBy: [asc(schema.performances.startsAt)],
-        with: {
-          venue: { columns: { id: true, name: true, capacity: true } },
-        },
-      },
-    },
-  })
-
-  if (allShows.length === 0) return []
-
-  const [showOverrideCounts, perfOverrideCounts, ticketCountMap] = await Promise.all([
-    db.select({ showId: schema.showTicketTypeOverrides.showId, c: count() })
-      .from(schema.showTicketTypeOverrides)
-      .groupBy(schema.showTicketTypeOverrides.showId)
-      .all(),
-    db.select({ performanceId: schema.performanceTicketTypeOverrides.performanceId, c: count() })
-      .from(schema.performanceTicketTypeOverrides)
-      .groupBy(schema.performanceTicketTypeOverrides.performanceId)
-      .all(),
-    countOccupiedSeats(isNotNull(schema.tickets.performanceId)),
-  ])
-
-  const showOverrideMap = new Map(
-    showOverrideCounts.map((r: { showId: string, c: number }) => [r.showId, r.c]),
-  )
-  const perfOverrideMap = new Map(
-    perfOverrideCounts.map((r: { performanceId: string, c: number }) => [r.performanceId, r.c]),
-  )
-  return allShows.map((show: { id: string, performances: Array<{ id: string }> }) => ({
-    ...show,
-    ticketTypeOverrideCount: showOverrideMap.get(show.id) ?? 0,
-    performances: show.performances.map((perf: { id: string }) => ({
-      ...perf,
-      ticketTypeOverrideCount: perfOverrideMap.get(perf.id) ?? 0,
-      ticketsSold: ticketCountMap.get(perf.id) ?? 0,
-    })),
-  }))
-}

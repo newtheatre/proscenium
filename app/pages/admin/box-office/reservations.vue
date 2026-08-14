@@ -48,10 +48,9 @@ interface Performance {
   venue: { id: string, name: string, capacity?: number | null }
 }
 
-interface Show {
-  id: string
-  title: string
-  performances: Performance[]
+/** A row of `/api/performances`: flat, with its show attached. */
+interface PerformanceRow extends Performance {
+  show: { id: string, title: string, slug: string, status: string }
 }
 
 interface Reservation {
@@ -97,47 +96,123 @@ function isSameDay(a: Date, b: Date): boolean {
     && a.getDate() === b.getDate()
 }
 
-// ── Shows data ────────────────────────────────────────────────────────────────
+// ── Performance data ──────────────────────────────────────────────────────────
 
-// requestFetch, not a plain useFetch: `/api/shows` is behind authorize(), and a
+/** `YYYY-MM-DD` in Europe/London — the shape `<input type="date">` speaks. */
+function londonDateOnly(date: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/London',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+/**
+ * The date the navigator is centred on. Today, until someone jumps elsewhere.
+ *
+ * This page used to load `/api/shows` with no parameters — every show in the
+ * archive, 498 of them with 1,304 performances nested, to render one navigator.
+ * `/api/performances?near=` returns the performances closest to a date instead,
+ * so the payload is a season rather than three decades. Nothing became
+ * unreachable: the date picker jumps straight to any night, which beats clicking
+ * the previous arrow a thousand times.
+ */
+const today = londonDateOnly(new Date())
+const centreDate = ref(today)
+
+/** Enough either side of the pivot to page a run without another request. */
+const NAVIGATOR_WINDOW = 120
+
+// requestFetch, not a plain useFetch: this endpoint is behind authorize(), and a
 // plain useFetch running on the server does not forward the session cookie — the
 // performance picker came back 403 and empty on every hard load, filling in only
 // once something triggered a client-side refetch. Same rule for the reservation
 // pages fetched below. See docs/02-architecture.md §Fetching in the admin area.
 const requestFetch = useRequestFetch()
-const { data: shows, status: showsStatus, error: showsError, refresh: refreshShows } = await useAsyncData(
-  'box-office-shows', () => requestFetch<Show[]>('/api/shows'))
+const { data: performancePage, status: showsStatus, error: showsError, refresh: refreshShows } = await useAsyncData(
+  'box-office-performances',
+  () => requestFetch<Paginated<PerformanceRow>>('/api/performances', {
+    query: { near: centreDate.value, limit: NAVIGATOR_WINDOW },
+  }),
+  {
+    default: (): Paginated<PerformanceRow> => ({ rows: [], total: 0, page: 1, limit: NAVIGATOR_WINDOW }),
+    watch: [centreDate],
+  },
+)
 
-// Flatten all performances, sorted chronologically (past → future)
-const sortedPerformances = computed(() => {
-  if (!shows.value) return []
-  return shows.value
-    .flatMap(show => show.performances.map(perf => ({ ...perf, showTitle: show.title })))
-    .filter(p => p.status !== 'CANCELLED')
-    .sort((a, b) => (toDate(a.startsAt)?.getTime() ?? 0) - (toDate(b.startsAt)?.getTime() ?? 0))
-})
+// Already chronological and already free of cancelled performances — the
+// endpoint sorts and filters. `showTitle` is flattened on for the template,
+// which reads it in half a dozen places.
+const sortedPerformances = computed(() =>
+  (performancePage.value?.rows ?? []).map(p => ({ ...p, showTitle: p.show.title })),
+)
 
 // ── Performance navigation ────────────────────────────────────────────────────
 
-function pickDefaultPerformance(perfs: typeof sortedPerformances.value): string | undefined {
+/**
+ * The performance a volunteer most likely wants for a given day: one on that
+ * day, else the next one after it, else the most recent before it.
+ *
+ * Takes a target rather than assuming today, so jumping to a date reselects
+ * around that date instead of snapping back to tonight.
+ */
+function pickNearestPerformance(
+  perfs: typeof sortedPerformances.value,
+  target: Date,
+): string | undefined {
   if (perfs.length === 0) return undefined
-  const rightNow = new Date()
-  const nowMs = rightNow.getTime()
 
-  // Try today's first performance
-  const todayPerf = perfs.find((p) => {
+  const onTheDay = perfs.find((p) => {
     const d = toDate(p.startsAt)
-    return d ? isSameDay(d, rightNow) : false
+    return d ? isSameDay(d, target) : false
   })
-  if (todayPerf) return todayPerf.id
+  if (onTheDay) return onTheDay.id
 
-  // Nearest upcoming, or most recent past
-  const upcoming = perfs.find(p => (toDate(p.startsAt)?.getTime() ?? 0) >= nowMs)
+  const targetMs = target.getTime()
+  const upcoming = perfs.find(p => (toDate(p.startsAt)?.getTime() ?? 0) >= targetMs)
   return (upcoming ?? perfs[perfs.length - 1])?.id
 }
 
-// Set the default synchronously — available during SSR since shows are already resolved
-const selectedPerformanceId = ref<string | undefined>(pickDefaultPerformance(sortedPerformances.value))
+/** Midday, so a same-day comparison cannot be tipped over by an hour of BST. */
+function centreAsDate(): Date {
+  return new Date(`${centreDate.value}T12:00:00`)
+}
+
+// Set synchronously — available during SSR, since the window is already resolved.
+const selectedPerformanceId = ref<string | undefined>(
+  pickNearestPerformance(sortedPerformances.value, new Date()),
+)
+
+/**
+ * Set when the volunteer picks a date, cleared once that window has landed.
+ *
+ * Without it a jump can appear to do nothing: windows are wide, so the
+ * performance you were already on is usually still in the new one, and "keep the
+ * current selection if it is still present" would keep it. A refresh and a jump
+ * want opposite things from the same watcher.
+ */
+const jumpPending = ref(false)
+
+function jumpTo(date: string) {
+  if (!date) return
+  centreDate.value = date
+  jumpPending.value = true
+}
+
+// Re-pick when the window changes. After a jump, always — that is the point of
+// jumping. Otherwise only if the current selection fell out of the window, so a
+// refresh after a walk-in does not move the volunteer off the performance they
+// are working.
+watch(sortedPerformances, (perfs) => {
+  if (jumpPending.value) {
+    jumpPending.value = false
+    selectedPerformanceId.value = pickNearestPerformance(perfs, centreAsDate())
+    return
+  }
+  if (perfs.some(p => p.id === selectedPerformanceId.value)) return
+  selectedPerformanceId.value = pickNearestPerformance(perfs, centreAsDate())
+})
 
 const currentIndex = computed(() =>
   sortedPerformances.value.findIndex(p => p.id === selectedPerformanceId.value),
@@ -670,6 +745,43 @@ const todayFormatted = computed(() =>
             :disabled="!nextPerformance"
             @click="goToNext"
           />
+
+          <!-- Jump to a night. The arrows walk a window around this date; the
+               picker is how you reach anything outside it, which used to mean
+               clicking the left arrow several hundred times. -->
+          <UPopover>
+            <UButton
+              icon="i-lucide-calendar-search"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              aria-label="Jump to a date"
+            />
+            <template #content>
+              <div class="p-3 space-y-2 w-60">
+                <p class="text-sm font-medium text-highlighted">
+                  Jump to a date
+                </p>
+                <UInput
+                  :model-value="centreDate"
+                  type="date"
+                  class="w-full"
+                  aria-label="Date to jump to"
+                  @update:model-value="(value: string | number) => jumpTo(String(value))"
+                />
+                <UButton
+                  v-if="centreDate !== today"
+                  label="Back to today"
+                  icon="i-lucide-rotate-ccw"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  block
+                  @click="jumpTo(today)"
+                />
+              </div>
+            </template>
+          </UPopover>
         </div>
 
         <!-- Performance details -->

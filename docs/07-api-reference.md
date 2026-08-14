@@ -677,6 +677,37 @@ This is a **declarative diff**, not an increment. You send the desired *total* a
 
 ---
 
+#### `GET /api/performances`
+
+**Source** `server/api/performances/index.get.ts` · **Auth** `authorize(event, listShows)` — any logged-in user
+
+A flat, chronological list of performances, each with its `show` and `venue` attached and
+`ticketsSold` resolved. Performances otherwise exist only nested under a show, which is why the box
+office used to download all 498 shows and 1,304 performances to render one navigator.
+
+**Query**
+
+| | | |
+|---|---|---|
+| `near` | `YYYY-MM-DD` | the `limit` performances **closest to** that date, roughly half either side |
+| `from`, `to` | `YYYY-MM-DD` | inclusive window, Europe/London |
+| `showId` | | one show's performances |
+| `includeCancelled` | `true` \| `false` | cancelled are **excluded** by default |
+| `order` | `asc` \| `desc` | default `asc`; ignored with `near` |
+| `page`, `limit` | | default limit 50, max 200 |
+
+`near` exists because a fixed window is the wrong primitive for "what's on around now": the theatre
+goes quiet over the summer, so any window is sometimes empty, and an empty navigator on the door is
+worse than an old one. `near` returns something whenever anything exists, so the caller needs no
+fallback. Each side asks for the full `limit` and takes up the other's slack, so a pivot outside the
+season still fills the window. In `near` mode the response is one centred window rather than a page:
+`page` is always 1 and `total` is the size of that window.
+
+Ticket counts scope through a subquery over the time span the page covers, so the page's own ids are
+never bound — two parameters whether the page holds five performances or two hundred.
+
+---
+
 #### `GET /api/shows`
 
 **Source** `server/api/shows/index.get.ts` · **Auth** `authorize(event, listShows)` — any logged-in user
@@ -688,8 +719,7 @@ This is a **declarative diff**, not an increment. You send the desired *total* a
 > (see §2), so a customer account is enough to enumerate the unannounced season. The customer-safe
 > alternative is `/api/whats-on`.
 
-**Query** — pass any parameter and the response is the standard
-`{ rows, total, page, limit }` envelope. Pass none and it is the legacy bare array (see below).
+**Query** — the response is always the standard `{ rows, total, page, limit }` envelope.
 
 | | | |
 |---|---|---|
@@ -715,12 +745,7 @@ through a subquery rather than binding ~150 performance ids. Do not raise the ca
 
 A `tree` row adds `performanceCount`, `firstPerformanceAt` and `lastPerformanceAt` to the fields below.
 
-**Legacy response** — with **no query string at all**, the bare array below, every show and every
-performance, with whole-table aggregates. Deprecated; it exists only until
-`app/pages/admin/box-office/reservations.vue` moves to a bounded request. It is a deliberate,
-documented exception to the envelope rule in `server/utils/pagination.ts`.
-
-**Response** `200` — shows ordered by title, each with:
+**Response** `200` — `rows`, each with:
 
 ```jsonc
 {
