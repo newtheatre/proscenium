@@ -104,8 +104,21 @@ const AXES: Array<{ kind: WarningKind, label: string, hint: string }> = [
 ]
 
 // The vocabulary is shared across shows so the same warning means the same
-// thing everywhere. Fetched once; 384 came across from the legacy site.
-const { data: warningVocabulary } = useFetch<WarningOption[]>('/api/content-warnings', { lazy: true })
+// thing everywhere. 384 rows came across from the legacy site — and this modal
+// is mounted unconditionally by the shows page, so fetching on mount pulled all
+// of them on every visit to /admin/shows whether or not anyone opened an editor.
+// `immediate: false` + refresh-on-open, and a shared key so reopening the modal
+// (or a second one) reuses what is already loaded.
+const { data: warningVocabulary, refresh: refreshVocabulary } = useFetch<WarningOption[]>(
+  '/api/content-warnings',
+  {
+    key: 'content-warnings',
+    lazy: true,
+    immediate: false,
+    default: () => [],
+    getCachedData: (key, nuxtApp) => nuxtApp.payload.data[key] ?? nuxtApp.static.data[key],
+  },
+)
 
 const selectedWarnings = reactive<Record<WarningKind, string[]>>({
   TECHNICAL: [],
@@ -143,21 +156,64 @@ const totalSelectedWarnings = computed(() =>
   AXES.reduce((n, axis) => n + selectedWarnings[axis.kind].length, 0),
 )
 
+// ── The full record ──────────────────────────────────────────────────────────
+//
+// The row this modal is opened with is a column *projection*. `/api/shows`
+// deliberately omits `longDescription`, `programmeUrl`, `externalUrl`,
+// `contentWarningNotes` and `warningsConfirmedNone` so the admin table does not
+// ship a paragraph per show across the whole archive.
+//
+// Hydrating the form from that row set all five to ''/false, and the submit
+// below sends them unconditionally — so `null` reached the PUT, whose guards are
+// `!== undefined`, and editing a show's *title* silently wiped its write-up,
+// programme link and content-warning notes. Load the full record instead, and if
+// that load fails, omit those five keys from the body entirely rather than
+// guessing at them. That is the same defence `warningsFailed` already gives the
+// content-warning links.
+//
+// No `await`: awaiting useFetch in a component suspends the parent Suspense
+// tree — see the note at the top of ShowTicketTypesModal.
+const detailUrl = () => props.show?.id ? `/api/shows/${props.show.id}` : null
+const { data: detail, status: detailStatus, refresh: refreshDetail } = useFetch<Show>(
+  detailUrl as () => string,
+  { immediate: false },
+)
+
+const detailsPending = computed(() => detailStatus.value === 'pending')
+const detailsFailed = computed(() => detailStatus.value === 'error')
+
+// The projection-only fields, filled in once the full record arrives.
+watch(detail, (full) => {
+  if (!full) return
+  state.longDescription = full.longDescription ?? ''
+  state.programmeUrl = full.programmeUrl ?? ''
+  state.externalUrl = full.externalUrl ?? ''
+  state.contentWarningNotes = full.contentWarningNotes ?? ''
+  state.warningsConfirmedNone = full.warningsConfirmedNone ?? false
+})
+
 // Sync state when the show prop changes
 watch(
   () => props.show,
-  (show) => {
+  (show, previous) => {
     if (show) {
       state.title = show.title
       state.slug = show.slug
       state.subtitle = show.subtitle ?? ''
       state.description = show.description ?? ''
-      state.longDescription = show.longDescription ?? ''
-      state.programmeUrl = show.programmeUrl ?? ''
-      state.externalUrl = show.externalUrl ?? ''
-      state.contentWarningNotes = show.contentWarningNotes ?? ''
-      state.warningsConfirmedNone = show.warningsConfirmedNone ?? false
       state.status = show.status
+      // Placeholders until the full record lands; never submitted while
+      // `detailStatus` is anything but 'success'.
+      state.longDescription = ''
+      state.programmeUrl = ''
+      state.externalUrl = ''
+      state.contentWarningNotes = ''
+      state.warningsConfirmedNone = false
+      // Drop the previous show's record before refetching, so a slow response
+      // cannot hydrate this form with the last show's write-up.
+      if (show.id !== previous?.id) detail.value = undefined
+      refreshDetail()
+      refreshVocabulary()
       warningsFailed.value = false
       loadWarnings(show.id)
       previousStatus = show.status
@@ -188,11 +244,18 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         slug: event.data.slug,
         subtitle: event.data.subtitle || null,
         description: event.data.description || null,
-        longDescription: event.data.longDescription || null,
-        programmeUrl: event.data.programmeUrl || null,
-        externalUrl: event.data.externalUrl || null,
-        contentWarningNotes: event.data.contentWarningNotes || null,
-        warningsConfirmedNone: event.data.warningsConfirmedNone ?? false,
+        // Omitted entirely unless the full record loaded, because these five are
+        // not in the list projection this modal is opened with — sending what
+        // the form holds would write nulls over the real values.
+        ...(detailStatus.value === 'success'
+          ? {
+              longDescription: event.data.longDescription || null,
+              programmeUrl: event.data.programmeUrl || null,
+              externalUrl: event.data.externalUrl || null,
+              contentWarningNotes: event.data.contentWarningNotes || null,
+              warningsConfirmedNone: event.data.warningsConfirmedNone ?? false,
+            }
+          : {}),
         // Omitted entirely if the existing links could not be read, so a failed
         // load cannot turn into a silent wipe of the show's warnings.
         ...(warningsFailed.value
@@ -426,6 +489,15 @@ function cancelPosterChange() {
           />
         </UFormField>
 
+        <UAlert
+          v-if="detailsFailed"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-alert-triangle"
+          title="The show's full details could not be loaded"
+          description="The full description, links and content-warning notes will be left exactly as they are when you save. Reopen the editor to try again."
+        />
+
         <UFormField
           name="longDescription"
           label="Full description"
@@ -433,6 +505,7 @@ function cancelPosterChange() {
         >
           <UTextarea
             v-model="state.longDescription"
+            :disabled="detailsPending || detailsFailed"
             placeholder="The full write-up for the show page..."
             class="w-full"
             :rows="6"
@@ -447,6 +520,7 @@ function cancelPosterChange() {
           >
             <UInput
               v-model="state.programmeUrl"
+              :disabled="detailsPending || detailsFailed"
               type="url"
               placeholder="https://..."
               class="w-full"
@@ -460,6 +534,7 @@ function cancelPosterChange() {
           >
             <UInput
               v-model="state.externalUrl"
+              :disabled="detailsPending || detailsFailed"
               type="url"
               placeholder="https://..."
               class="w-full"
@@ -497,6 +572,7 @@ function cancelPosterChange() {
             <UFormField name="warningsConfirmedNone">
               <UCheckbox
                 v-model="state.warningsConfirmedNone"
+                :disabled="detailsPending || detailsFailed"
                 label="Confirmed: this production has no content warnings"
                 help="Tick only if the company has actually checked. Left unticked with nothing selected, the show page says no information was recorded."
               />
@@ -512,7 +588,7 @@ function cancelPosterChange() {
               >
                 <USelectMenu
                   v-model="selectedWarnings[axis.kind]"
-                  :items="warningVocabulary ?? []"
+                  :items="warningVocabulary"
                   :loading="warningsLoading"
                   value-key="id"
                   label-key="title"
@@ -531,6 +607,7 @@ function cancelPosterChange() {
             >
               <UTextarea
                 v-model="state.contentWarningNotes"
+                :disabled="detailsPending || detailsFailed"
                 placeholder="e.g. The strobe sequence lasts about 20 seconds in Act 2."
                 class="w-full"
                 :rows="3"
@@ -563,7 +640,8 @@ function cancelPosterChange() {
           <UButton
             type="submit"
             label="Save changes"
-            :loading="isSubmitting"
+            :loading="isSubmitting || detailsPending"
+            :disabled="detailsPending"
           />
         </div>
       </UForm>

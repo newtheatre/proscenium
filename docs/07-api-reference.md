@@ -695,13 +695,75 @@ This is a **declarative diff**, not an increment. You send the desired *total* a
 
 ---
 
+#### `GET /api/performances`
+
+**Source** `server/api/performances/index.get.ts` · **Auth** `authorize(event, listShows)` — any logged-in user
+
+A flat, chronological list of performances, each with its `show` and `venue` attached and
+`ticketsSold` resolved. Performances otherwise exist only nested under a show, which is why the box
+office used to download all 498 shows and 1,304 performances to render one navigator.
+
+**Query**
+
+| | | |
+|---|---|---|
+| `near` | `YYYY-MM-DD` | the `limit` performances **closest to** that date, roughly half either side |
+| `from`, `to` | `YYYY-MM-DD` | inclusive window, Europe/London |
+| `showId` | | one show's performances |
+| `includeCancelled` | `true` \| `false` | cancelled are **excluded** by default |
+| `order` | `asc` \| `desc` | default `asc`; ignored with `near` |
+| `page`, `limit` | | default limit 50, max 200 |
+
+`near` exists because a fixed window is the wrong primitive for "what's on around now": the theatre
+goes quiet over the summer, so any window is sometimes empty, and an empty navigator on the door is
+worse than an old one. `near` returns something whenever anything exists, so the caller needs no
+fallback. Each side asks for the full `limit` and takes up the other's slack, so a pivot outside the
+season still fills the window. In `near` mode the response is one centred window rather than a page:
+`page` is always 1 and `total` is the size of that window.
+
+Ticket counts scope through a subquery over the time span the page covers, so the page's own ids are
+never bound — two parameters whether the page holds five performances or two hundred.
+
+---
+
 #### `GET /api/shows`
 
-**Source** `server/api/shows/index.get.ts` · **Auth** **Public — no `authorize()` call**
+**Source** `server/api/shows/index.get.ts` · **Auth** `authorize(event, listShows)` — any logged-in user
 
-> ⚠️ **This endpoint is unauthenticated and returns every show, including `DRAFT` ones.** Each show carries its full `performances` array, and each performance includes the internal `notes` column — production notes that are explicitly "not shown to customers" per the schema — along with `capacityOverride`, `ticketsSold`, and DRAFT/CANCELLED statuses. Anyone who can reach the site can enumerate the unannounced season. Treat `performances[].notes` as public until this is fixed; the customer-safe alternative is `/api/whats-on`.
+> This endpoint returns every show, including `DRAFT` ones. Each show carries its full `performances`
+> array, and each performance includes the internal `notes` column — production notes that are
+> explicitly "not shown to customers" per the schema — along with `capacityOverride`, `ticketsSold`,
+> and DRAFT/CANCELLED statuses. `listShows` resolves to "any logged-in user, regardless of role"
+> (see §2), so a customer account is enough to enumerate the unannounced season. The customer-safe
+> alternative is `/api/whats-on`.
 
-**Response** `200` — shows ordered by title, each with:
+**Query** — the response is always the standard `{ rows, total, page, limit }` envelope.
+
+| | | |
+|---|---|---|
+| `scope` | `all` \| `active` \| `current` \| `upcoming` \| `archive` \| `draft` | default `all` |
+| `status` | `DRAFT` \| `PUBLISHED` | |
+| `q` | ≤100 chars | matches title, subtitle, slug **and venue name** |
+| `from`, `to` | `YYYY-MM-DD` | shows with a performance inside the window, inclusive, Europe/London |
+| `view` | `tree` \| `options` | `tree` nests performances; `options` returns `{ id, slug, title, status }` |
+| `sort` | `run` \| `title` | default `run` — earliest performance |
+| `order` | `asc` \| `desc` | defaults to `desc` for `scope=archive`, `asc` otherwise |
+| `page` | | default 1 |
+| `limit` | | default 25, **max 50** for `view=tree`, 500 for `view=options` |
+
+`draft`, `current`, `upcoming` and `archive` **partition** every show — each show is in exactly one,
+so per-tab counts add up to the whole. `active` is `current ∪ upcoming`. A published show with no
+performances counts as `archive`, which is the only scope with an `IS NULL` arm and the reason the
+partition holds. "Today" is resolved in `Europe/London`, not the Worker's UTC.
+
+A `tree` page is capped at 50 rows because the page's show ids are the one thing bound as a list, and
+50 of those plus a fully-loaded filter stays comfortably under D1's 100-parameter limit. Every filter
+is a correlated subquery and binds nothing that grows with the archive; per-performance lookups scope
+through a subquery rather than binding ~150 performance ids. Do not raise the cap without recounting.
+
+A `tree` row adds `performanceCount`, `firstPerformanceAt` and `lastPerformanceAt` to the fields below.
+
+**Response** `200` — `rows`, each with:
 
 ```jsonc
 {
@@ -749,11 +811,24 @@ This is a **declarative diff**, not an increment. You send the desired *total* a
 
 #### `GET /api/shows/:id`
 
-**Source** `server/api/shows/[id]/index.get.ts` · **Auth** **Public — no `authorize()` call**
+**Source** `server/api/shows/[id]/index.get.ts` · **Auth** `authorize(event, readShow)` — any logged-in user
 
-> ⚠️ Same exposure as `GET /api/shows`: no authentication, DRAFT shows returned, `performances[].notes` included.
+> Same exposure as `GET /api/shows`: DRAFT shows returned, `performances[].notes` included, and
+> `readShow` means "any logged-in user, regardless of role".
 
-**Response** `200` — one show with `performances` ordered by `startsAt`, each with `venue` (id, name, capacity). No override or sales counts here — unlike the list endpoint.
+**Response** `200` — one show with **every column**, `performances` ordered by `startsAt` (each with
+`venue`, `ticketsSold` and `ticketTypeOverrideCount`), `contentWarnings` with their vocabulary
+entries resolved, plus `ticketTypeOverrideCount`, `performanceCount`, `firstPerformanceAt` and
+`lastPerformanceAt`.
+
+> **Anything that edits a show must read it from here.** `GET /api/shows` returns a column
+> *projection* that omits `longDescription`, `programmeUrl`, `externalUrl`, `contentWarningNotes` and
+> `warningsConfirmedNone`. A form populated from a list row cannot see those five, and writing back
+> what it never read is what silently emptied shows' write-ups — see
+> [09-known-issues](./09-known-issues.md#editing-a-show-wiped-its-write-up).
+
+Every count scopes through a subquery on this show's performances rather than binding their ids, so
+the parameter cost is fixed however long the run.
 
 **Errors** `400 Show ID is required`; `404 Show not found`.
 

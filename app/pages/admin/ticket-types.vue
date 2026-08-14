@@ -41,6 +41,7 @@ definePageMeta({
 })
 
 const toast = useToast()
+const confirm = useConfirm()
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const table = useTemplateRef<any>('table')
 
@@ -57,7 +58,6 @@ interface TicketType {
 }
 
 // Table state
-const columnFilters = ref([{ id: 'name', value: '' }])
 // `{}` rather than `undefined`: an undefined v-model means the table's first
 // internal sync writes a value back to the parent, which is one more
 // parent-render-during-child-setup than this page can afford. See the note on
@@ -76,7 +76,7 @@ const showArchived = ref(false)
 // forward the incoming session cookie — it would 403 during SSR. See
 // docs/02-architecture.md §Fetching in the admin area.
 const requestFetch = useRequestFetch()
-const { data: rawData, status, refresh } = await useAsyncData(
+const { data: rawData, status, error, refresh } = await useAsyncData(
   'admin-ticket-types',
   () => requestFetch<TicketType[]>('/api/ticket-types', { query: { includeArchived: 'true' } }),
 )
@@ -110,6 +110,33 @@ const rows = computed<TicketType[]>(() => {
 })
 
 /**
+ * Search here rather than through TanStack's `columnFilters`, so the footer can
+ * report the match count without re-walking the table's row model and the input
+ * is a plain `v-model` instead of a find-and-mutate on a filter array.
+ */
+const search = ref('')
+const filteredRows = computed<TicketType[]>(() => {
+  const query = search.value.trim().toLowerCase()
+  if (!query) return rows.value
+  return rows.value.filter(tt =>
+    tt.name.toLowerCase().includes(query)
+    || (tt.description ?? '').toLowerCase().includes(query),
+  )
+})
+
+// UPagination counts from 1; TanStack indexes from 0.
+const page = computed({
+  get: () => pagination.value.pageIndex + 1,
+  set: (value: number) => { pagination.value.pageIndex = value - 1 },
+})
+
+watch([search, showArchived], () => {
+  pagination.value.pageIndex = 0
+})
+
+const selectedCount = computed(() => Object.keys(rowSelection.value).length)
+
+/**
  * Hoisted for the same reason: an inline `:pagination-options="{ ... }"` builds
  * a fresh options object *and* a fresh row-model function on every render,
  * which is enough on its own to make the table rebuild in a loop.
@@ -119,28 +146,29 @@ const paginationOptions = { getPaginationRowModel: getPaginationRowModel() }
 const archivedCount = computed(() => rawData.value?.filter(tt => tt.archived).length ?? 0)
 
 const ticketTypeToEdit = ref<TicketType | null>(null)
-const ticketTypeToDelete = ref<TicketType | null>(null)
-const deleteModalOpen = ref(false)
-const isDeleting = ref(false)
 
-// Format pence to £
-function formatPrice(pence: number): string {
-  return pence === 0 ? 'Free' : `£${(pence / 100).toFixed(2)}`
+/** Free is a price, and reads better than £0.00 on a list of them. */
+function formatTicketPrice(pence: number): string {
+  return pence === 0 ? 'Free' : formatMoney(pence)
 }
 
-async function deleteSingleTicketType() {
-  if (!ticketTypeToDelete.value) return
-  isDeleting.value = true
+async function deleteTicketType(ticketType: TicketType) {
+  const confirmed = await confirm({
+    title: `Delete '${ticketType.name}'?`,
+    description: 'This permanently deletes the ticket type and cannot be undone. If any issued tickets reference it, the deletion will be refused — archive it instead.',
+    confirmLabel: 'Delete',
+    confirmColor: 'error',
+  })
+  if (!confirmed) return
+
   try {
-    await $fetch(`/api/ticket-types/${ticketTypeToDelete.value.id}`, { method: 'DELETE' })
+    await $fetch(`/api/ticket-types/${ticketType.id}`, { method: 'DELETE' })
     toast.add({
       title: 'Ticket type deleted',
-      description: `${ticketTypeToDelete.value.name} has been removed`,
+      description: `${ticketType.name} has been removed`,
       icon: 'i-lucide-check',
       color: 'success',
     })
-    deleteModalOpen.value = false
-    ticketTypeToDelete.value = null
     await refresh()
   }
   catch (error: unknown) {
@@ -150,9 +178,6 @@ async function deleteSingleTicketType() {
       icon: 'i-lucide-x-circle',
       color: 'error',
     })
-  }
-  finally {
-    isDeleting.value = false
   }
 }
 
@@ -231,8 +256,7 @@ function getRowItems(row: Row<TicketType>) {
       icon: 'i-lucide-trash',
       color: 'error' as const,
       onSelect() {
-        ticketTypeToDelete.value = tt
-        deleteModalOpen.value = true
+        deleteTicketType(tt)
       },
     },
   ]
@@ -271,7 +295,7 @@ const columns: TableColumn<TicketType>[] = [
     accessorKey: 'price',
     header: 'Default price',
     cell: ({ row }) => {
-      return h('span', { class: 'font-mono text-sm' }, formatPrice(row.original.price))
+      return h('span', { class: 'font-mono text-sm' }, formatTicketPrice(row.original.price))
     },
   },
   {
@@ -314,158 +338,83 @@ const columns: TableColumn<TicketType>[] = [
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col gap-4 p-6">
-    <div class="flex w-full items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight">
-          Ticket Types
-        </h1>
+  <AdminPage>
+    <AdminTableToolbar>
+      <template #left>
         <p class="text-muted">
           Manage default ticket types, prices, and availability settings
         </p>
-      </div>
+      </template>
+      <template #right>
+        <TicketTypeCreateModal @refresh="refresh" />
+      </template>
+    </AdminTableToolbar>
 
-      <TicketTypeCreateModal @refresh="refresh" />
-    </div>
+    <AdminFetchError
+      v-if="error"
+      :error="error"
+      title="Could not load ticket types"
+      :on-retry="refresh"
+    />
 
-    <div class="flex gap-3">
-      <UInput
-        :model-value="columnFilters.find(f => f.id === 'name')?.value"
-        placeholder="Search ticket types..."
-        icon="i-lucide-search"
-        class="flex-1"
-        @update:model-value="(value: string) => {
-          const filter = columnFilters.find(f => f.id === 'name')
-          if (filter) filter.value = value
-        }"
-      />
-
-      <UButton
-        v-if="archivedCount > 0"
-        :label="showArchived ? 'Hide archived' : `Show archived (${archivedCount})`"
-        :icon="showArchived ? 'i-lucide-eye-off' : 'i-lucide-eye'"
-        color="neutral"
-        variant="outline"
-        @click="showArchived = !showArchived"
-      />
-
-      <UDropdownMenu
-        :items="
-          table?.tableApi
-            ?.getAllColumns()
-            .filter((column: any) => column.getCanHide())
-            .map((column: any) => ({
-              label: column.id === 'name'
-                ? 'Name'
-                : column.id === 'activeByDefault'
-                  ? 'Active by default'
-                  : column.id === 'archived'
-                    ? 'Status'
-                    : column.id.charAt(0).toUpperCase() + column.id.slice(1),
-              type: 'checkbox' as const,
-              checked: column.getIsVisible(),
-              onUpdateChecked(checked: boolean) {
-                table?.tableApi?.getColumn(column.id)?.toggleVisibility(!!checked)
-              },
-              onSelect(e?: Event) {
-                e?.preventDefault()
-              },
-            }))
-        "
-        :content="{ align: 'end' }"
-      >
+    <AdminTableToolbar>
+      <template #left>
+        <UInput
+          v-model="search"
+          placeholder="Search ticket types…"
+          icon="i-lucide-search"
+          class="flex-1"
+        />
+      </template>
+      <template #right>
         <UButton
-          label="Display"
+          v-if="archivedCount > 0"
+          :label="showArchived ? 'Hide archived' : `Show archived (${archivedCount})`"
+          :icon="showArchived ? 'i-lucide-eye-off' : 'i-lucide-eye'"
           color="neutral"
           variant="outline"
-          trailing-icon="i-lucide-settings-2"
+          @click="showArchived = !showArchived"
         />
-      </UDropdownMenu>
-    </div>
+        <AdminTableColumnToggle
+          :table="table"
+          :labels="{ activeByDefault: 'Active by default', archived: 'Status' }"
+        />
+      </template>
+    </AdminTableToolbar>
 
     <UTable
       ref="table"
-      v-model:column-filters="columnFilters"
       v-model:column-visibility="columnVisibility"
       v-model:row-selection="rowSelection"
       v-model:pagination="pagination"
       :pagination-options="paginationOptions"
       class="shrink-0"
-      :data="rows"
+      :data="filteredRows"
       :columns="columns"
       :loading="status === 'pending'"
-      :ui="{
-        base: 'table-fixed border-separate border-spacing-0',
-        thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-        tbody: '[&>tr]:last:[&>td]:border-b-0',
-        th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-        td: 'border-b border-default',
-      }"
+    >
+      <template #empty>
+        <UEmpty
+          icon="i-lucide-ticket"
+          :title="search ? 'No ticket types match your search' : 'No ticket types yet'"
+          :description="search ? 'Try a different name.' : 'Add a ticket type to start pricing performances.'"
+        />
+      </template>
+    </UTable>
+
+    <AdminTablePagination
+      v-model:page="page"
+      :total="filteredRows.length"
+      :limit="pagination.pageSize"
+      :selected="selectedCount"
+      label="ticket type"
+      :suffix="search ? 'matching' : undefined"
     />
 
-    <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-      <div class="text-sm text-muted">
-        {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }} of
-        {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} row(s) selected.
-      </div>
-
-      <UPagination
-        :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
-        :items-per-page="table?.tableApi?.getState().pagination.pageSize"
-        :total="table?.tableApi?.getFilteredRowModel().rows.length"
-        @update:page="(p: number) => table?.tableApi?.setPageIndex(p - 1)"
-      />
-    </div>
-
-    <!-- Edit Modal -->
     <TicketTypeEditModal
       :ticket-type="ticketTypeToEdit"
       @close="ticketTypeToEdit = null"
       @refresh="() => { refresh(); ticketTypeToEdit = null }"
     />
-
-    <!-- Delete Confirmation Modal -->
-    <UModal
-      v-model:open="deleteModalOpen"
-      :title="`Delete '${ticketTypeToDelete?.name || 'ticket type'}'`"
-      description="Are you sure? This action cannot be undone."
-    >
-      <template #body>
-        <div class="space-y-4">
-          <div class="p-3 rounded-md bg-error/10 border border-error/20">
-            <div class="flex gap-2">
-              <UIcon
-                name="i-lucide-info"
-                class="text-error shrink-0 mt-0.5"
-              />
-              <div class="text-sm text-error">
-                <p class="font-medium mb-1">
-                  This will permanently delete the ticket type.
-                </p>
-                <p>
-                  If any issued tickets reference this type, deletion will be blocked.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex justify-end gap-2">
-            <UButton
-              label="Cancel"
-              color="neutral"
-              variant="subtle"
-              :disabled="isDeleting"
-              @click="deleteModalOpen = false"
-            />
-            <UButton
-              label="Delete"
-              color="error"
-              :loading="isDeleting"
-              @click="deleteSingleTicketType"
-            />
-          </div>
-        </div>
-      </template>
-    </UModal>
-  </div>
+  </AdminPage>
 </template>

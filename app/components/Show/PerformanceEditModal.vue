@@ -26,12 +26,6 @@ interface Performance {
   notes?: string | null
 }
 
-interface Venue {
-  id: string
-  name: string
-  capacity?: number | null
-}
-
 const props = defineProps<{
   performance: Performance | null
 }>()
@@ -41,7 +35,7 @@ const emit = defineEmits<{
   refresh: []
 }>()
 
-const { data: venues } = await useFetch<Venue[]>('/api/venues')
+const { data: venues } = useVenues()
 const toast = useToast()
 const isSubmitting = ref(false)
 

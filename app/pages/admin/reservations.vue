@@ -102,17 +102,9 @@ const statusOptions = [
 const pageSize = 25
 const currentPage = ref(1)
 
-// Debounced locally — @vueuse/core is only a transitive dependency here.
-const debouncedSearch = ref('')
-let searchTimer: ReturnType<typeof setTimeout> | undefined
-watch(searchQuery, (value) => {
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    debouncedSearch.value = value.trim()
-    currentPage.value = 1
-  }, 300)
+const debouncedSearch = useDebouncedRef(searchQuery, {
+  onSettle: () => { currentPage.value = 1 },
 })
-onUnmounted(() => clearTimeout(searchTimer))
 
 watch(statusFilter, () => {
   currentPage.value = 1
@@ -123,7 +115,7 @@ watch(statusFilter, () => {
 // Searching, filtering and paging afterwards re-run it on the client, which
 // does not suspend the page.
 const requestFetch = useRequestFetch()
-const { data, status, refresh } = await useAsyncData(
+const { data, status, error, refresh } = await useAsyncData(
   'admin-reservations',
   () => requestFetch<{ rows: Reservation[], total: number }>('/api/reservations', {
     query: {
@@ -141,6 +133,7 @@ const { data, status, refresh } = await useAsyncData(
 
 const filteredData = computed(() => data.value?.rows ?? [])
 const totalCount = computed(() => data.value?.total ?? 0)
+const isFiltered = computed(() => Boolean(debouncedSearch.value) || statusFilter.value !== 'ALL')
 
 // ── State summary counts ──────────────────────────────────────────────────────
 // One GROUP BY on the server, rather than five passes over every reservation
@@ -155,24 +148,6 @@ const statusCounts = computed(() => counts.value?.byStatus ?? {})
 
 async function refreshAll() {
   await Promise.all([refresh(), refreshCounts()])
-}
-
-// ── Formatters ────────────────────────────────────────────────────────────────
-
-function formatDate(val: string | number | null | undefined): string {
-  if (!val) return '—'
-  const d = new Date(typeof val === 'number' ? val * 1000 : val)
-  return Number.isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleString('en-GB', {
-        timeZone: 'Europe/London',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      })
 }
 
 // ── Edit modal ────────────────────────────────────────────────────────────────
@@ -248,7 +223,7 @@ const columns: TableColumn<Reservation>[] = [
         h('p', { class: 'text-xs text-muted mt-0.5' }, [
           r.performance.venue.name,
           ' · ',
-          formatDate(r.performance.startsAt),
+          formatDateTime(r.performance.startsAt),
         ]),
       ])
     },
@@ -280,7 +255,7 @@ const columns: TableColumn<Reservation>[] = [
   {
     accessorKey: 'createdAt',
     header: 'Booked',
-    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, formatDate(row.original.createdAt)),
+    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, formatDateTime(row.original.createdAt)),
   },
   {
     id: 'actions',
@@ -303,18 +278,21 @@ const columns: TableColumn<Reservation>[] = [
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col gap-4 p-6">
-    <!-- Header -->
-    <div class="flex w-full items-start justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight">
-          Reservations
-        </h1>
+  <AdminPage>
+    <AdminTableToolbar>
+      <template #left>
         <p class="text-muted">
           View and manage all customer reservations
         </p>
-      </div>
-    </div>
+      </template>
+    </AdminTableToolbar>
+
+    <AdminFetchError
+      v-if="error"
+      :error="error"
+      title="Could not load reservations"
+      :on-retry="refreshAll"
+    />
 
     <!-- Status summary pills -->
     <div class="flex flex-wrap gap-2">
@@ -337,50 +315,27 @@ const columns: TableColumn<Reservation>[] = [
       </button>
     </div>
 
-    <!-- Filters row -->
-    <div class="flex gap-3">
-      <UInput
-        v-model="searchQuery"
-        placeholder="Search by ref, customer, show or venue…"
-        icon="i-lucide-search"
-        class="flex-1"
-      />
-
-      <USelect
-        v-model="statusFilter"
-        :items="statusOptions"
-        value-key="value"
-        label-key="label"
-        class="w-44"
-      />
-
-      <UDropdownMenu
-        :items="
-          table?.tableApi
-            ?.getAllColumns()
-            .filter((col: any) => col.getCanHide())
-            .map((col: any) => ({
-              label: col.id.charAt(0).toUpperCase() + col.id.slice(1),
-              type: 'checkbox' as const,
-              checked: col.getIsVisible(),
-              onUpdateChecked(checked: boolean) {
-                table?.tableApi?.getColumn(col.id)?.toggleVisibility(!!checked)
-              },
-              onSelect(e?: Event) { e?.preventDefault() },
-            }))
-        "
-        :content="{ align: 'end' }"
-      >
-        <UButton
-          label="Display"
-          color="neutral"
-          variant="outline"
-          trailing-icon="i-lucide-settings-2"
+    <AdminTableToolbar>
+      <template #left>
+        <UInput
+          v-model="searchQuery"
+          placeholder="Search by ref, customer, show or venue…"
+          icon="i-lucide-search"
+          class="flex-1"
         />
-      </UDropdownMenu>
-    </div>
+      </template>
+      <template #right>
+        <USelect
+          v-model="statusFilter"
+          :items="statusOptions"
+          value-key="value"
+          label-key="label"
+          class="w-44"
+        />
+        <AdminTableColumnToggle :table="table" />
+      </template>
+    </AdminTableToolbar>
 
-    <!-- Table -->
     <!-- Paging is server-side, so the table renders exactly the page it is given. -->
     <UTable
       ref="table"
@@ -389,46 +344,35 @@ const columns: TableColumn<Reservation>[] = [
       :data="filteredData"
       :columns="columns"
       :loading="status === 'pending'"
-      :ui="{
-        base: 'table-fixed border-separate border-spacing-0',
-        thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-        tbody: '[&>tr]:last:[&>td]:border-b-0',
-        th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-        td: 'border-b border-default',
-      }"
+    >
+      <template #empty>
+        <UEmpty
+          icon="i-lucide-bookmark-check"
+          :title="isFiltered ? 'No reservations match these filters' : 'No reservations yet'"
+          :description="isFiltered ? 'Try a different search term or status.' : 'Reservations appear here as customers book.'"
+        />
+      </template>
+    </UTable>
+
+    <AdminTablePagination
+      v-model:page="currentPage"
+      :total="totalCount"
+      :limit="pageSize"
+      label="reservation"
+      :suffix="isFiltered ? 'matching' : undefined"
     />
 
-    <!-- Footer -->
-    <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-      <div class="text-sm text-muted">
-        {{ totalCount.toLocaleString('en-GB') }} reservation{{ totalCount === 1 ? '' : 's' }}
-        <template v-if="debouncedSearch || (statusFilter && statusFilter !== 'ALL')">
-          matching
-        </template>
-      </div>
-
-      <div class="flex gap-1.5">
-        <UPagination
-          v-model:page="currentPage"
-          :items-per-page="pageSize"
-          :total="totalCount"
-        />
-      </div>
-    </div>
-
-    <!-- Edit Reservation Modal -->
     <ReservationEditModal
       :reservation="reservationToEdit"
       @close="reservationToEdit = null"
       @refresh="() => { refreshAll(); reservationToEdit = null }"
     />
 
-    <!-- Manage Tickets Slideover -->
     <ReservationTicketsModal
       :reservation-id="ticketsReservationId"
       :booking-ref="ticketsBookingRef"
       @close="ticketsReservationId = null; ticketsBookingRef = null"
       @refresh="refresh"
     />
-  </div>
+  </AdminPage>
 </template>

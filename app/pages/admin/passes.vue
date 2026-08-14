@@ -60,21 +60,8 @@ const confirm = useConfirm()
 // session cookie — it would 403 during SSR. See
 // docs/02-architecture.md#fetching-in-the-admin-area.
 const requestFetch = useRequestFetch()
-const { data: passTypes, status: typesStatus, refresh: refreshTypes } = await useAsyncData(
+const { data: passTypes, status: typesStatus, error: typesError, refresh: refreshTypes } = await useAsyncData(
   'admin-pass-types', () => requestFetch<PassType[]>('/api/pass-types'), { default: () => [] })
-
-function formatPrice(pence: number) {
-  return `£${(pence / 100).toFixed(2)}`
-}
-
-function formatDate(value: string | Date) {
-  return new Date(value).toLocaleDateString('en-GB', {
-    timeZone: 'Europe/London',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
 
 const statusColour: Record<PassType['status'], 'neutral' | 'success' | 'warning'> = {
   DRAFT: 'neutral',
@@ -121,22 +108,13 @@ const search = ref('')
 const page = ref(1)
 const limit = 25
 
-// Debounced locally rather than via VueUse: @vueuse/core is only a transitive
-// dependency here, and relying on an undeclared package is what #37 was about.
-const debouncedSearch = ref('')
-let searchTimer: ReturnType<typeof setTimeout> | undefined
-watch(search, (value) => {
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    debouncedSearch.value = value
-    page.value = 1
-  }, 300)
+const debouncedSearch = useDebouncedRef(search, {
+  onSettle: () => { page.value = 1 },
 })
-onUnmounted(() => clearTimeout(searchTimer))
 
 // Searching and paging re-run this on the client, which does not suspend the
 // page — so the table stays interactive while it refetches.
-const { data: issued, status: issuedStatus, refresh: refreshIssued } = await useAsyncData(
+const { data: issued, status: issuedStatus, error: issuedError, refresh: refreshIssued } = await useAsyncData(
   'admin-passes',
   () => requestFetch<{ rows: IssuedPass[], total: number }>('/api/passes', {
     query: { q: debouncedSearch.value || undefined, page: page.value, limit },
@@ -173,28 +151,34 @@ async function cancelPass(pass: IssuedPass) {
 </script>
 
 <template>
-  <div class="space-y-8">
-    <div class="flex items-start justify-between gap-4">
-      <div>
-        <h1 class="text-xl font-semibold text-highlighted">
-          Passes
-        </h1>
-        <p class="text-sm text-muted mt-1">
+  <AdminPage>
+    <AdminTableToolbar>
+      <template #left>
+        <p class="text-muted">
           Season and festival passes. Sell and admit from the box office.
         </p>
-      </div>
-      <UButton
-        label="New pass type"
-        icon="i-lucide-plus"
-        @click="createOpen = true"
-      />
-    </div>
+      </template>
+      <template #right>
+        <UButton
+          label="New pass type"
+          icon="i-lucide-plus"
+          @click="createOpen = true"
+        />
+      </template>
+    </AdminTableToolbar>
 
     <!-- Pass products -->
     <section class="space-y-3">
       <h2 class="text-sm font-semibold uppercase tracking-wider text-muted">
         Pass types
       </h2>
+
+      <AdminFetchError
+        v-if="typesError"
+        :error="typesError"
+        title="Could not load pass types"
+        :on-retry="refreshTypes"
+      />
 
       <div
         v-if="typesStatus === 'pending'"
@@ -256,7 +240,7 @@ async function cancelPass(pass: IssuedPass) {
                 <UBadge
                   v-for="price in pt.prices"
                   :key="price.id"
-                  :label="`${price.label} ${formatPrice(price.price)}`"
+                  :label="`${price.label} ${formatMoney(price.price)}`"
                   :color="price.active ? 'primary' : 'neutral'"
                   variant="subtle"
                   size="sm"
@@ -325,6 +309,13 @@ async function cancelPass(pass: IssuedPass) {
         />
       </div>
 
+      <AdminFetchError
+        v-if="issuedError"
+        :error="issuedError"
+        title="Could not load issued passes"
+        :on-retry="refreshIssued"
+      />
+
       <div
         v-if="issuedStatus === 'pending'"
         class="space-y-2"
@@ -364,7 +355,7 @@ async function cancelPass(pass: IssuedPass) {
             </p>
           </div>
           <span class="text-sm tabular-nums text-muted shrink-0">
-            {{ formatPrice(pass.pricePaid) }}
+            {{ formatMoney(pass.pricePaid) }}
           </span>
           <UBadge
             :label="pass.status"
@@ -384,19 +375,15 @@ async function cancelPass(pass: IssuedPass) {
           />
         </div>
 
-        <div
+        <AdminTablePagination
           v-if="pageCount > 1"
-          class="flex items-center justify-between pt-3"
-        >
-          <p class="text-sm text-muted">
-            {{ issued.total }} pass{{ issued.total === 1 ? '' : 'es' }}
-          </p>
-          <UPagination
-            v-model:page="page"
-            :total="issued.total"
-            :items-per-page="limit"
-          />
-        </div>
+          v-model:page="page"
+          :total="issued.total"
+          :limit="limit"
+          label="pass"
+          label-plural="passes"
+          :suffix="debouncedSearch ? 'matching' : undefined"
+        />
       </div>
     </section>
 
@@ -404,5 +391,5 @@ async function cancelPass(pass: IssuedPass) {
       v-model:open="createOpen"
       @created="refreshTypes"
     />
-  </div>
+  </AdminPage>
 </template>

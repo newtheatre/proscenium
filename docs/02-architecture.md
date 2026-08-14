@@ -122,6 +122,53 @@ render loop with no fixed point — a locked tab, not a slow one. It froze `/adm
 Modals keep `lazy: true` deliberately: they fetch when opened, and blocking a page on data the user
 may never look at is the wrong trade.
 
+**3. A shared key does not dedupe concurrent callers.**
+
+`useAsyncData` reuses a result that already exists; it does not join a request that is still in
+flight. Three components mounting in the same tick all find nothing cached and all fetch. That is why
+`app/composables/useVenues.ts` memoises the **promise** on the Nuxt app instance rather than relying
+on a key — and why it hangs it off `nuxtApp` and not module scope, which on the server is shared
+between concurrent requests.
+
+## The admin component layer
+
+`app/components/Admin/` is deliberately small. Most of what looked like duplication across the admin
+pages was code that should not have existed at all, because the layout and Nuxt UI already provide it.
+
+| Piece | What it is for |
+|---|---|
+| `Admin/Page.vue` | The page root. Almost nothing — see below. |
+| `Admin/TableToolbar.vue` | Filters left, actions right. Not `UDashboardToolbar`, which only works inside `UDashboardPanel #header`. |
+| `Admin/TableColumnToggle.vue` | The "Display" menu. Confines the `any`-typed `tableApi` access to one file. |
+| `Admin/TablePagination.vue` | The footer. Takes **numbers**, never a table handle. |
+| `Admin/FetchError.vue` | What a page shows when its fetch failed. |
+| `app/utils/format.ts` | `toDate`, `formatDateTime`, `formatDate`, `formatTime`, `formatMoney`, `formatCount`. |
+| `app/composables/useDebouncedRef.ts` | Search boxes that feed a server query. |
+
+Four rules came out of building it, and they are the reason the layer is shaped this way:
+
+**The layout already owns the page chrome.** `UDashboardPanel`'s `#body` slot supplies
+`flex flex-col gap-4 sm:gap-6 flex-1 overflow-y-auto p-4 sm:p-6`, and `UDashboardNavbar` renders a
+real `<h1>` from `route.meta.title`. Pages had grown five different root wrappers that all fought it
+— doubling the padding, nesting a second scroll container, or dropping the padding entirely — and
+five in-body `<h1>`s that made every page ship two. `AdminPage` exists only because eslint requires a
+single template root. **Do not add a page heading; set `title` in `definePageMeta` and make it match
+the sidebar entry.**
+
+**There is no `<AdminDataTable>`, on purpose.** `UTable` stays in the page, bound to a page-owned
+`computed`. A wrapper would have to re-expose every `v-model:` the table takes, and each layer is
+another place a fresh array or object identity can be minted per render — which is the render loop
+above.
+
+**Nothing reads TanStack's row model from a template.** `table?.tableApi?.getFilteredRowModel()
+.rows.length` in a footer re-walks the whole model on every render. Pages own their filter state and
+compute their own counts, which is also why search is a plain `v-model` rather than TanStack
+`columnFilters`.
+
+**Prefer the component that exists.** Empty states are `UTable`'s `#empty` slot with `<UEmpty>` in
+it, not a hand-built div after the table. Destructive confirmations are `useConfirm()`, not a
+hand-rolled `UModal` — there were four of those.
+
 ## The constraints Workers and D1 impose
 
 These are the things that make this codebase look odd if you come from a Node/Postgres background.
@@ -136,9 +183,21 @@ correctness gap in the app ([09-known-issues](./09-known-issues.md#nothing-is-tr
 The practical rule: **if an invariant matters, express it as a UNIQUE index.** That is why the
 passes design puts entitlement in `UNIQUE (pass_id, performance_id)` rather than in a check.
 
-**There is a parameter limit.** SQLite binds a bounded number of parameters per statement;
-`server/api/reservations/index.get.ts` chunks `IN` clauses at 800 for exactly this reason. Copy that
-pattern rather than rediscovering it.
+**D1 allows at most 100 bound parameters per statement.** That is low enough to be hit by ordinary
+data, and the failure is a runtime error on production volumes rather than anything a local SQLite
+run will show you. There are two established ways round it, and which one applies depends on whether
+you are reading or writing.
+
+*Reading — bind a subquery, not an id list.* `server/api/reservations/index.get.ts` never binds the
+ids it filters on: `showPerformances` and `matchingUsers` are `IN (SELECT …)` subqueries, so the
+number of parameters is fixed no matter how many rows match. Only the page's own ids are bound as a
+list, and only because `limit` is capped. `server/api/shows/index.get.ts` avoids id lists the other
+way, by grouping the whole table and stitching in memory.
+
+*Writing — chunk.* `server/api/shows/[id]/index.put.ts` inserts content-warning links `CHUNK = 30` at
+a time because each row binds three parameters and one imported show carries 72 warnings;
+`server/api/_hooks/auth/last-activity.post.ts` chunks at 90 for one parameter per row. Divide 100 by
+the parameters per row and leave headroom.
 
 **There are no long-running jobs.** No cron, no queue consumer, no scheduled dyno. `waitUntil` lets
 you finish something after the response, within the request's lifetime — that is all. Anything that
