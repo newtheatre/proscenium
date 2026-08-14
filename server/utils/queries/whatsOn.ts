@@ -29,6 +29,29 @@ export const publicShowColumns = {
   seasonId: true,
 } as const
 
+/**
+ * Content warning link columns the public may see — the level, and nothing else.
+ *
+ * The link row carries `id`, `showId` and `contentWarningId`, none of which mean
+ * anything outside the admin section, and all of which used to ship because this
+ * relation was the one place that spread the raw row.
+ */
+export const publicContentWarningLinkColumns = {
+  level: true,
+} as const
+
+/** Vocabulary columns the public may see. */
+export const publicContentWarningColumns = {
+  id: true,
+  slug: true,
+  title: true,
+  kind: true,
+  category: true,
+  description: true,
+  icon: true,
+  sort: true,
+} as const
+
 /** Performance columns the public may see. Note the absence of `notes`. */
 export const publicPerformanceColumns = {
   id: true,

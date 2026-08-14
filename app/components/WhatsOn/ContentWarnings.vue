@@ -2,54 +2,64 @@
 /**
  * Content warnings for a show.
  *
- * The schema distinguishes three states and so does this component, because
- * conflating the last two is the failure that matters: "the company checked and
- * there are none" is a reassurance, "nobody has filled this in" is an absence of
- * information, and showing silence as though it meant safety is how someone ends
- * up in the room for something they needed to know about.
+ * Three states, and the distinction between the last two is the point: "the
+ * company checked and there are none" is a reassurance, "nobody has filled this
+ * in" is an absence of information, and showing silence as though it meant
+ * safety is how someone ends up in the room for something they needed to know
+ * about.
  *
- * Warnings sit on one of three axes — what happens on stage, what is discussed,
- * and what the production does technically (strobe, haze, loud noise). They are
- * grouped that way because the distinction changes what someone needs to decide.
+ * Warnings are grouped the way the theatre thinks about them. Technical effects
+ * come first — strobe and haze have an immediate physical consequence for
+ * someone who needs to avoid them, and no amount of context changes that.
+ * Everything else is grouped by how strongly it features: depicted, discussed,
+ * then mentioned. Someone deciding whether to book needs the difference between
+ * a murder shown on stage and a murder referred to in the second act.
  */
-
-interface ShowContentWarning {
-  kind: 'ACTION' | 'DIALOGUE' | 'TECHNICAL'
-  contentWarning: { id: string, title: string, icon: string | null }
-}
+import type { PublicShowContentWarning } from '~~/shared/types/shows'
 
 const props = defineProps<{
-  warnings: ShowContentWarning[]
+  warnings: PublicShowContentWarning[]
   notes: string | null
   confirmedNone: boolean
 }>()
 
-const AXES = [
-  { kind: 'TECHNICAL' as const, label: 'Technical effects', hint: 'Strobe lighting, haze, loud noise and similar', icon: 'i-lucide-zap' },
-  { kind: 'ACTION' as const, label: 'Depicted on stage', hint: 'Shown as part of the action', icon: 'i-lucide-drama' },
-  { kind: 'DIALOGUE' as const, label: 'Referred to', hint: 'Discussed or described rather than shown', icon: 'i-lucide-message-circle' },
-]
+/**
+ * Technical first, then the three levels strongest-first.
+ *
+ * Sorted here rather than in the query: the response is one flat list and the
+ * grouping reshuffles it anyway, so ordering it in SQL would buy nothing.
+ */
+const groups = computed(() => {
+  const technical = props.warnings
+    .filter(link => link.contentWarning?.kind === 'TECHNICAL')
+    .map(link => link.contentWarning)
+    .sort(compareContentWarnings)
 
-const groups = computed(() =>
-  AXES
-    .map(axis => ({
-      ...axis,
-      items: props.warnings
-        .filter(w => w.kind === axis.kind)
-        .map(w => w.contentWarning)
-        // The same warning can be linked twice through different legacy rows.
-        .filter((w, i, all) => all.findIndex(o => o.id === w.id) === i)
-        .sort((a, b) => a.title.localeCompare(b.title)),
-    }))
-    .filter(group => group.items.length > 0),
-)
+  const levelled = CONTENT_WARNING_LEVELS.map(level => ({
+    key: level.value,
+    label: level.label,
+    hint: level.hint,
+    icon: level.icon,
+    items: props.warnings
+      .filter(link => link.level === level.value)
+      .map(link => link.contentWarning)
+      .sort(compareContentWarnings),
+  }))
 
-const hasWarnings = computed(() => groups.value.length > 0)
+  return [
+    {
+      key: 'TECHNICAL',
+      label: CONTENT_WARNING_TECHNICAL_GROUP.label,
+      hint: CONTENT_WARNING_TECHNICAL_GROUP.hint,
+      icon: CONTENT_WARNING_TECHNICAL_GROUP.icon,
+      items: technical,
+    },
+    ...levelled,
+  ].filter(group => group.items.length > 0)
+})
 
-// Technical effects go first: strobe and haze are the ones with an immediate
-// physical consequence for someone who needs to avoid them.
 const state = computed(() => {
-  if (hasWarnings.value) return 'listed'
+  if (groups.value.length > 0) return 'listed'
   if (props.confirmedNone) return 'none'
   return 'unknown'
 })
@@ -88,7 +98,7 @@ const state = computed(() => {
       <div class="space-y-4">
         <div
           v-for="group in groups"
-          :key="group.kind"
+          :key="group.key"
         >
           <div class="flex items-baseline gap-2 mb-2">
             <UIcon
@@ -111,6 +121,7 @@ const state = computed(() => {
                 variant="subtle"
                 :icon="warning.icon ?? undefined"
                 :label="warning.title"
+                :title="warning.description ?? undefined"
               />
             </li>
           </ul>

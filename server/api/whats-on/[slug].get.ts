@@ -34,11 +34,13 @@ export default defineEventHandler(async (event) => {
           venue: { columns: { id: true, name: true, address: true, capacity: true } },
         },
       },
-      // The import loaded 1,001 show-to-warning links across 424 warnings and
-      // none of it reached the page where someone decides whether to attend.
+      // Allow-listed on both sides. The link row itself used to be spread whole,
+      // publishing `id`, `showId` and `contentWarningId` into an edge-cached
+      // public response — the exact leak queries/whatsOn.ts exists to prevent.
       contentWarnings: {
+        columns: publicContentWarningLinkColumns,
         with: {
-          contentWarning: { columns: { id: true, title: true, icon: true } },
+          contentWarning: { columns: publicContentWarningColumns },
         },
       },
       category: { columns: { id: true, name: true, slug: true } },

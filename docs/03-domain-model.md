@@ -230,5 +230,9 @@ Worth stating explicitly, because their absence shapes what you can build:
 - **No multi-performance product** — see passes.
 - **No show categories or seasons.** Both are being added by the legacy migration; see
   [ADR-0003](./decisions/0003-legacy-ticketing-import.md).
-- **No content warnings.** Also added by the migration. The legacy system had 424 definitions across
-  three axes and a decade of show links.
+- **Content warnings** are modelled as a curated vocabulary (`content_warnings`) plus per-show links
+  carrying a level. A warning is either a technical effect — strobe, haze, loud noise, no level — or a
+  theme recorded as mentioned, discussed or depicted. `shows.warningsConfirmedNone` distinguishes
+  "the company checked and there are none" from "nobody filled this in", and the public page says
+  which. Manageable at `/admin/content-warnings`; see
+  [ADR-0004](./decisions/0004-content-warning-model.md).

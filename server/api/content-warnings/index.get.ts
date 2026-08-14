@@ -1,30 +1,65 @@
 import { db, schema } from '@nuxthub/db'
-import { asc, eq } from 'drizzle-orm'
-import { updateShow } from '~~/shared/utils/abilities'
+import { asc, eq, sql, and, type SQL } from 'drizzle-orm'
+import { z } from 'zod/v4'
+import { listContentWarnings } from '~~/shared/utils/abilities'
+
+const querySchema = z.object({
+  /** Include archived entries. The admin page wants them; the show editor does not. */
+  includeArchived: z.enum(['true', 'false']).optional().default('false'),
+  kind: z.enum(['TECHNICAL', 'GENERAL']).optional(),
+})
 
 /**
- * GET /api/content-warnings — the warning vocabulary, for the show editor.
- * Admin/Manager only.
+ * GET /api/content-warnings — the warning vocabulary. Staff only.
  *
- * The list is shared across shows rather than free text, so that "Strobe
- * lighting" means the same thing on every production and a customer filtering
- * on it gets a complete answer. The import brought 384 of these across from the
- * legacy site.
+ * Shared across shows rather than free text, so "Strobe and flashing lights"
+ * means the same thing on every production and someone filtering on it gets a
+ * complete answer. Free entry is what left the legacy site with six separate
+ * spellings of "alcohol".
  *
- * Archived entries are excluded: they stay in the table so existing shows keep
- * rendering, but should not be offered for new ones.
+ * `showCount` is a correlated subquery rather than a join + GROUP BY: the
+ * vocabulary is ~65 rows, and the admin page needs it to tell the difference
+ * between an entry nobody uses and one it must not delete.
+ *
+ * Ordered technical-first to match how both the editor and the public page group
+ * them; `sort` then title within each kind.
  */
 export default defineEventHandler(async (event) => {
-  await authorize(event, updateShow)
+  await authorize(event, listContentWarnings)
+
+  const query = await getValidatedQuery(event, querySchema.parse)
+
+  const filters: SQL[] = []
+  if (query.includeArchived !== 'true') filters.push(eq(schema.contentWarnings.archived, false))
+  if (query.kind) filters.push(eq(schema.contentWarnings.kind, query.kind))
 
   return db
     .select({
       id: schema.contentWarnings.id,
+      slug: schema.contentWarnings.slug,
       title: schema.contentWarnings.title,
+      kind: schema.contentWarnings.kind,
+      category: schema.contentWarnings.category,
+      description: schema.contentWarnings.description,
       icon: schema.contentWarnings.icon,
-      legacyCategory: schema.contentWarnings.legacyCategory,
+      sort: schema.contentWarnings.sort,
+      archived: schema.contentWarnings.archived,
+      // Table and column names written out rather than interpolated. Drizzle
+      // renders a column reference inside a `sql` template *unqualified* — this
+      // came out as `WHERE "content_warning_id" = "id"`, where both names
+      // resolve against the subquery's own table, so the comparison was never
+      // true and every entry reported zero shows.
+      showCount: sql<number>`(
+        SELECT COUNT(*) FROM "show_content_warnings"
+        WHERE "show_content_warnings"."content_warning_id" = "content_warnings"."id"
+      )`.as('show_count'),
     })
     .from(schema.contentWarnings)
-    .where(eq(schema.contentWarnings.archived, false))
-    .orderBy(asc(schema.contentWarnings.title))
+    .where(filters.length ? and(...filters) : undefined)
+    .orderBy(
+      // Technical first — not `asc(kind)`, which would sort GENERAL above it.
+      sql`CASE ${schema.contentWarnings.kind} WHEN 'TECHNICAL' THEN 0 ELSE 1 END`,
+      asc(schema.contentWarnings.sort),
+      asc(schema.contentWarnings.title),
+    )
 })

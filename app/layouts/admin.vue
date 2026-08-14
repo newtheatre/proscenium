@@ -78,6 +78,7 @@ const navigation = computed<NavigationMenuItem[][]>(() => {
       { label: 'Ticket Types', icon: 'i-lucide-ticket', to: '/admin/ticket-types' },
       { label: 'Passes', icon: 'i-lucide-credit-card', to: '/admin/passes' },
       { label: 'Shows', icon: 'i-lucide-calendar', to: '/admin/shows' },
+      { label: 'Content Warnings', icon: 'i-lucide-triangle-alert', to: '/admin/content-warnings' },
       { label: 'Reservations', icon: 'i-lucide-bookmark-check', to: '/admin/reservations' },
     ])
   }

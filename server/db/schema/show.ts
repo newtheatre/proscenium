@@ -2,7 +2,8 @@ import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqli
 import { sql, relations } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { venues } from './venue'
-import { showCategories, showContentWarnings } from './legacy'
+import { showCategories } from './legacy'
+import { showContentWarnings } from './contentWarnings'
 import { seasons } from './passes'
 
 // A show is a production — the top-level entity for a run of performances.
@@ -29,7 +30,8 @@ export const shows = sqliteTable('shows', {
   // externals and one-offs do not belong to one.
   seasonId: text('season_id').references(() => seasons.id, { onDelete: 'set null' }),
 
-  // Free-text notes accompanying the content warnings.
+  // Free-text notes accompanying the content warnings — timings, intensity, how
+  // to avoid a particular moment. Anything the vocabulary cannot express.
   contentWarningNotes: text('content_warning_notes'),
   // TRUE means "checked, there are none" — meaningfully different from the
   // absence of any showContentWarnings rows, which means "nobody filled it in".
@@ -56,9 +58,10 @@ export const showsRelations = relations(shows, ({ one, many }) => ({
     fields: [shows.categoryId],
     references: [showCategories.id],
   }),
-  // The link rows, each carrying its axis (ACTION / DIALOGUE / TECHNICAL).
-  // legacy.ts declares the reverse side; without this side a show cannot load
-  // its own warnings, which is why 1,001 imported links had no read path.
+  // The link rows, each carrying its level (null for technical effects).
+  // contentWarnings.ts declares the reverse side; without this side a show
+  // cannot load its own warnings, which is why 1,001 imported links initially
+  // had no read path.
   contentWarnings: many(showContentWarnings),
   // ticketTypeOverrides and tickets relations are defined in ticket.ts to avoid circular imports
 }))
