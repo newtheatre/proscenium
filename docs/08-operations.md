@@ -139,6 +139,17 @@ Migrations are **never** applied automatically in production — not at build, n
 1. Take a backup (§6). Non-negotiable.
 2. Check there is no performance on sale in the next hour or so — `/admin` shows what is upcoming.
 3. Read the generated `.sql`. If it contains `PRAGMA foreign_keys=OFF` and a `__new_*` table, it is a full table rebuild: SQLite copies the data across via an explicit `INSERT … SELECT`, and **any column omitted from that list is silently dropped**. On a large `tickets` or `reservations` table this is also the slowest and riskiest kind of migration.
+4. If that rebuild touches a table other tables reference, read the next section before going any further.
+
+### `PRAGMA foreign_keys=OFF` does nothing on D1
+
+Drizzle opens every table rebuild with `PRAGMA foreign_keys=OFF` and closes it with `=ON`. **On D1 both lines are inert.** Cloudflare runs each migration inside an implicit transaction with foreign keys enforced, and documents that a query cannot change that; `PRAGMA defer_foreign_keys = ON` does not stop `ON DELETE CASCADE` either.
+
+That matters when the rebuilt table is a **parent**. `DROP TABLE parent` with enforcement on deletes its rows first, which fires `ON DELETE CASCADE` and empties the children — before any later statement in the same file gets to look at them. Every rebuild in this repo up to `0015` happened to touch a child table, which is why this had never bitten.
+
+Locally the opposite is true: migrations run statement-by-statement with no transaction and the pragma is honoured. **A migration of this shape succeeding in dev proves very little about production.** Rehearse it against a throwaway D1 database loaded from a production export.
+
+If you need to rebuild a parent table, hand-edit the generated file (permitted before it has been applied anywhere — see `CONTRIBUTING.md`) to drop the child first, then the parent, then recreate parent-then-child. `0016_lying_maverick.sql` is the worked example, and [ADR-0004](decisions/0004-content-warning-model.md) explains why.
 
 ### Option A — NuxtHub CLI over the D1 HTTP API (preferred)
 

@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { z } from 'zod/v4'
 import type { BatchItem } from 'drizzle-orm/batch'
 import { updateShow } from '~~/shared/utils/abilities'
@@ -16,11 +16,17 @@ const bodySchema = z.object({
   categoryId: z.string().optional().nullable(),
   contentWarningNotes: z.string().max(2000).optional().nullable(),
   warningsConfirmedNone: z.boolean().optional(),
-  /** Full replacement of the show's warning links. Omit to leave them alone. */
+  /**
+   * Full replacement of the show's warning links. Omit to leave them alone.
+   *
+   * `level` must be null for a technical warning and set for a general one.
+   * That depends on the vocabulary row, which zod cannot see, so it is checked
+   * against the database below.
+   */
   contentWarnings: z.array(z.object({
     contentWarningId: z.string().min(1),
-    kind: z.enum(['ACTION', 'DIALOGUE', 'TECHNICAL']),
-  })).max(120).optional(),
+    level: z.enum(['MENTIONED', 'DISCUSSED', 'DEPICTED']).nullable(),
+  })).max(80).optional(),
   status: z.enum(['DRAFT', 'PUBLISHED']).optional(),
 })
 
@@ -66,18 +72,51 @@ export default defineEventHandler(async (event) => {
   // Warning links are replaced wholesale rather than diffed: the editor sends
   // the full set, and doing it in one batch keeps the show from being left
   // briefly warningless if a later statement fails.
-  //
-  // Chunked because D1 allows at most 100 bound parameters per statement and
-  // each row binds three. One imported show carries 72 warnings, which would be
-  // 216 — so a single insert would have failed on real data.
   if (body.contentWarnings !== undefined) {
-    const CHUNK = 30
-    const links = body.contentWarnings.map(w => ({
-      showId,
-      contentWarningId: w.contentWarningId,
-      kind: w.kind,
-    }))
+    // Last id wins on a repeat. `show_content_warnings` is unique on
+    // (show, warning) now that the axis has gone from the key, so a duplicated
+    // id would fail mid-batch rather than being quietly absorbed as it was
+    // under the old three-column index.
+    const submitted = new Map(body.contentWarnings.map(w => [w.contentWarningId, w.level]))
 
+    if (submitted.size > 0) {
+      const ids = [...submitted.keys()]
+      const vocabulary = await db
+        .select({ id: schema.contentWarnings.id, kind: schema.contentWarnings.kind, title: schema.contentWarnings.title })
+        .from(schema.contentWarnings)
+        .where(inArray(schema.contentWarnings.id, ids))
+
+      const byId = new Map(vocabulary.map(row => [row.id, row]))
+
+      // "level is null iff the warning is technical" spans two tables, so
+      // SQLite cannot express it as a CHECK. This is where it lives.
+      for (const [id, level] of submitted) {
+        const warning = byId.get(id)
+        if (!warning) {
+          throw createError({ statusCode: 400, statusMessage: `Unknown content warning: ${id}` })
+        }
+        if (warning.kind === 'TECHNICAL' && level !== null) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `"${warning.title}" is a technical effect and cannot have a level`,
+          })
+        }
+        if (warning.kind === 'GENERAL' && level === null) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: `"${warning.title}" needs a level: mentioned, discussed or depicted`,
+          })
+        }
+      }
+    }
+
+    const links = [...submitted].map(([contentWarningId, level]) => ({ showId, contentWarningId, level }))
+
+    // Chunked because D1 allows at most 100 bound parameters per statement and
+    // each row binds three (show, warning, level). The old limit of 30 was
+    // sized for the same three columns; keep the headroom rather than pushing
+    // to 33, since one imported show carried 72 warnings.
+    const CHUNK = 30
     const statements: BatchItem<'sqlite'>[] = [
       db.delete(schema.showContentWarnings).where(eq(schema.showContentWarnings.showId, showId)),
     ]

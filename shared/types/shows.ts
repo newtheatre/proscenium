@@ -13,6 +13,10 @@
  * docs/09-known-issues.md #16.
  */
 
+// Imported explicitly: Nuxt's auto-imports cover app/ and server/, not files
+// inside shared/ itself.
+import type { ContentWarningKind, ContentWarningLevel } from '../utils/contentWarnings'
+
 export interface VenueRef {
   id: string
   name: string
@@ -64,12 +68,49 @@ export interface ShowListItem {
   lastPerformanceAt: string | null
 }
 
-/** One linked content warning, with its vocabulary entry resolved. */
+/** A vocabulary entry as it reaches the client. */
+export interface ContentWarningRef {
+  id: string
+  slug: string
+  title: string
+  kind: ContentWarningKind
+  category?: string | null
+  description?: string | null
+  icon?: string | null
+  sort?: number
+}
+
+/**
+ * One linked content warning, with its vocabulary entry resolved.
+ *
+ * `level` is null exactly when the warning is TECHNICAL — a strobe sequence is
+ * not "mentioned" or "depicted", it happens or it does not.
+ */
 export interface ShowContentWarningLink {
   id: string
   contentWarningId: string
-  kind: 'ACTION' | 'DIALOGUE' | 'TECHNICAL'
-  contentWarning?: { id: string, title: string }
+  level: ContentWarningLevel | null
+  contentWarning?: ContentWarningRef
+}
+
+/**
+ * A linked warning as the public show page receives it.
+ *
+ * Narrower than `ShowContentWarningLink` on purpose: `/api/whats-on/:slug`
+ * allow-lists the link row down to `level`, because `id`, `showId` and
+ * `contentWarningId` mean nothing outside the admin section and that response
+ * is cached at the edge for anyone to fetch.
+ */
+export interface PublicShowContentWarning {
+  level: ContentWarningLevel | null
+  contentWarning: ContentWarningRef
+}
+
+/** A pre-rework link that migration 0016 could not map onto the new vocabulary. */
+export interface LegacyContentWarningLink {
+  title: string
+  /** The axis it sat on: ACTION, DIALOGUE or TECHNICAL. */
+  kind: string
 }
 
 /**

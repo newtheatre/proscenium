@@ -46,7 +46,7 @@ app/            Vue: pages, components, layouts, middleware. One composable.
 server/
   api/          62 Nitro handlers, file-based routing (plus one blob route under server/routes/)
   db/schema/    Drizzle tables — the source of truth for the data model
-  db/migrations/sqlite/   0000–0008
+  db/migrations/sqlite/   0000–0016
   utils/        Shared server logic: auth, email, images, tickets, validation
   tasks/        Nitro tasks. Only `db:seed`
   routes/       Non-API routes. Only blob serving
@@ -223,7 +223,8 @@ list, and only because `limit` is capped. `server/api/shows/index.get.ts` avoids
 way, by grouping the whole table and stitching in memory.
 
 *Writing — chunk.* `server/api/shows/[id]/index.put.ts` inserts content-warning links `CHUNK = 30` at
-a time because each row binds three parameters and one imported show carries 72 warnings;
+a time because each row binds three parameters (show, warning, level) and one imported show carried
+72 warnings;
 `server/api/_hooks/auth/last-activity.post.ts` chunks at 90 for one parameter per row. Divide 100 by
 the parameters per row and leave headroom.
 

@@ -14,9 +14,13 @@ const bodySchema = z.object({
   categoryId: z.string().optional().nullable(),
   contentWarningNotes: z.string().max(2000).optional().nullable(),
   warningsConfirmedNone: z.boolean().optional(),
-  /** Full replacement of the show's warning links. Omit to leave them alone. */
   status: z.enum(['DRAFT', 'PUBLISHED']).optional().default('DRAFT'),
 })
+
+// Warning links are not settable here. The create modal collects the handful of
+// fields needed to make a show exist; warnings are their own section on the
+// detail page, where the vocabulary and the level control have room. A comment
+// here used to claim otherwise.
 
 /** POST /api/shows — create a new show. Admin/Manager only. */
 export default defineEventHandler(async (event) => {

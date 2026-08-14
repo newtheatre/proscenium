@@ -211,6 +211,16 @@ Authenticated by the SHA-256 of this app's `AUTH_SERVICE_TOKEN`, compared consta
 | PUT | `/api/shows/:id/performances/:performanceId` | ADMIN/MANAGER (`updatePerformance`) | Update a performance |
 | DELETE | `/api/shows/:id/performances/:performanceId` | ADMIN/MANAGER (`deletePerformance`) | Delete a performance |
 
+### Content warnings
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/content-warnings` | Staff (`listContentWarnings`) | The vocabulary, with a usage count per entry |
+| POST | `/api/content-warnings` | ADMIN/MANAGER (`createContentWarning`) | Add a vocabulary entry |
+| PUT | `/api/content-warnings/:id` | ADMIN/MANAGER (`updateContentWarning`) | Edit, archive or restore an entry |
+| DELETE | `/api/content-warnings/:id` | ADMIN (`deleteContentWarning`) | Delete an entry; refused while any show uses it |
+| GET | `/api/shows/:id/legacy-content-warnings` | Staff (`readShow`) | Pre-rework warnings the remap could not place |
+
 ### Ticket types and price overrides
 
 | Method | Path | Auth | Purpose |
@@ -845,11 +855,31 @@ the parameter cost is fixed however long the run.
   subtitle:    z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   posterUrl:   z.string().optional().nullable(),   // raw blob pathname; prefer the poster endpoints
+  longDescription:       z.string().max(20000).optional().nullable(),
+  programmeUrl:          z.url().max(2048).optional().nullable(),
+  externalUrl:           z.url().max(2048).optional().nullable(),
+  categoryId:            z.string().optional().nullable(),
+  contentWarningNotes:   z.string().max(2000).optional().nullable(),
+  warningsConfirmedNone: z.boolean().optional(),
+  contentWarnings: z.array(z.object({          // full replacement; omit to leave alone
+    contentWarningId: z.string().min(1),
+    level: z.enum(['MENTIONED','DISCUSSED','DEPICTED']).nullable(),
+  })).max(80).optional(),
   status:      z.enum(['DRAFT','PUBLISHED']).optional(),
 }
 ```
 
 Only present keys are written. An empty body returns the existing row unchanged with `200`.
+
+`contentWarnings` replaces the show's links wholesale, in one `db.batch` chunked at 30 rows (D1 caps
+bound parameters at 100 and each link binds three). Repeated ids are deduped before the write —
+the unique index is `(show_id, content_warning_id)`, so a duplicate would otherwise fail mid-batch.
+
+`level` must be `null` for a technical warning and set for a general one. That spans two tables, so
+SQLite cannot express it as a CHECK; the handler looks the submitted ids up and rejects a mismatch
+with `400 "<title>" is a technical effect and cannot have a level` or
+`400 "<title>" needs a level: mentioned, discussed or depicted`. An id not in the vocabulary is
+`400 Unknown content warning: <id>`.
 
 **Response** `200` — the updated `shows` row.
 
@@ -1015,6 +1045,88 @@ The performance is looked up by `id` **and** `showId`, so a mismatched pair retu
 | 403 | Not ADMIN/MANAGER |
 
 **Side effects** `performance_ticket_type_overrides` cascade. Reservations pointing at the performance block the delete via `reservations.performanceId` restrict, which is also caught and reported as the same 409.
+
+---
+
+### 3.5a Content warnings
+
+The shared vocabulary every show picks from. A warning is either a **technical effect** — strobe,
+haze, loud noise, no level — or a **general** theme recorded on each show as `MENTIONED`,
+`DISCUSSED` or `DEPICTED`. See [ADR-0004](./decisions/0004-content-warning-model.md).
+
+#### `GET /api/content-warnings`
+
+**Source** `server/api/content-warnings/index.get.ts` · **Auth** `authorize(event, listContentWarnings)` — staff
+
+**Query** `includeArchived` (`'true'`/`'false'`, default `'false'`) · `kind` (`TECHNICAL`/`GENERAL`)
+
+**Response** `200` — an array of `{ id, slug, title, kind, category, description, icon, sort, archived, showCount }`,
+ordered technical-first then by `(sort, title)`. `showCount` is a correlated subquery counting the
+shows that carry the entry; it is what the admin page uses to warn before a rename and what blocks a
+delete.
+
+> The show editor and the admin page must not share a `useFetch` key. The editor caches the live
+> vocabulary under `content-warnings` and reads it back through `getCachedData`; the admin page asks
+> for archived entries and keys itself `admin-content-warnings` so the editor never offers them.
+
+#### `POST /api/content-warnings`
+
+**Source** `server/api/content-warnings/index.post.ts` · **Auth** `authorize(event, createContentWarning)` — ADMIN or MANAGER
+
+```ts
+{
+  title:       z.string().min(1).max(80),
+  slug:        z.string().max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),  // derived from title if absent
+  kind:        z.enum(['TECHNICAL','GENERAL']),
+  category:    z.string().max(60).optional().nullable(),   // forced null when kind is TECHNICAL
+  description: z.string().max(300).optional().nullable(),
+  icon:        z.string().max(80).optional().nullable(),
+  sort:        z.number().int().min(0).max(9999).optional(),
+}
+```
+
+**Response** `200` — the created row.
+
+**Errors** `400 A content warning with the slug "…" already exists`; `400 A content warning with this title already exists`; `400 Title must contain at least one letter or number`; `403`.
+
+#### `PUT /api/content-warnings/:id`
+
+**Source** `server/api/content-warnings/[id]/index.put.ts` · **Auth** `authorize(event, updateContentWarning)` — ADMIN or MANAGER
+
+Same body as `POST`, every key optional, plus `archived: z.boolean().optional()`. Only present keys
+are written; an empty body returns the existing row.
+
+**Errors** `404 Content warning not found`; the two uniqueness `400`s above; `403`; and
+`409 Cannot change the type of this warning while N show(s) use it` — `kind` decides whether a link
+carries a level, and the existing links were written under the old answer, so there is no correct
+level to invent on their behalf.
+
+#### `DELETE /api/content-warnings/:id`
+
+**Source** `server/api/content-warnings/[id]/index.delete.ts` · **Auth** `authorize(event, deleteContentWarning)` — **ADMIN only**
+
+**Response** `200` — `{ message: 'Content warning deleted successfully' }`
+
+**Errors** `404 Content warning not found`; `403`;
+`409 Cannot delete "<title>" because N show(s) use it. Archive it instead…`.
+
+> The foreign key is `onDelete: 'restrict'`, deliberately. Under a cascade, deleting an entry would
+> have stripped it from every show carrying it with nothing to show a customer or an auditor that it
+> was ever there. Archiving is the retirement path: the entry stops being offered on new shows and
+> keeps rendering on the ones that have it.
+
+#### `GET /api/shows/:id/legacy-content-warnings`
+
+**Source** `server/api/shows/[id]/legacy-content-warnings.get.ts` · **Auth** `authorize(event, readShow)` — staff
+
+**Response** `200` — `[{ title, kind }]`: the warnings this show carried before the rework that
+migration 0016 could not map onto the new vocabulary, ordered by title. Empty for most shows; 30 have
+entries. The show editor renders them under "Not carried over from the old system".
+
+Read from `show_content_warnings_archive.mapped_to_warning_id IS NULL` — the migration's own record —
+rather than derived by looking for archive ids missing from the live table. The remap collapses rows
+(`Sexism` and `Misogyny` both became `sexism`), so only one of the two ids survives and the other
+would look dropped.
 
 ---
 

@@ -42,6 +42,13 @@ export {
 } from './shows'
 
 export {
+  listContentWarnings,
+  createContentWarning,
+  updateContentWarning,
+  deleteContentWarning,
+} from './contentWarnings'
+
+export {
   listTicketTypes,
   createTicketType,
   readTicketType,

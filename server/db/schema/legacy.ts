@@ -2,9 +2,10 @@
  * Tables required to import the legacy Heroku/Django ticketing database
  * without loss. Split into two groups:
  *
- *   1. Live model extensions — show categories, content warnings, venue
- *      aliases. These are real features the box office and website should use,
- *      not import scaffolding.
+ *   1. Live model extensions — show categories and venue aliases. These are
+ *      real features the box office and website should use, not import
+ *      scaffolding. (Content warnings started here too; they now have their own
+ *      file, server/db/schema/contentWarnings.ts.)
  *   2. Archive layer — legacyRecords / legacyIdMap. Verbatim insurance that
  *      makes every mapping decision reversible.
  *
@@ -43,52 +44,9 @@ export const showCategoriesRelations = relations(showCategories, ({ many }) => (
   shows: many(shows),
 }))
 
-/**
- * A content warning definition, e.g. "Strobe lighting", "Strong language".
- * Legacy source: tickets_contentwarning (424 rows, 384 distinct titles).
- *
- * A warning can appear on more than one axis, so the axis lives on the link
- * row rather than here; legacy's own `category` column is kept as
- * `legacyCategory` for provenance.
- */
-export const contentWarnings = sqliteTable('content_warnings', {
-  id: text('id').primaryKey().$defaultFn(() => nanoid()),
-  title: text('title').notNull(),
-  icon: text('icon'),
-  legacyCategory: text('legacy_category'),
-  archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
-
-  createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
-  updatedAt: text('updated_at').notNull().$onUpdate(() => sql`(current_timestamp)`),
-}, table => [
-  uniqueIndex('content_warnings_title_unique').on(table.title),
-])
-
-/**
- * Show ↔ content warning, on one of three axes.
- * Legacy source: tickets_show_warnings_{action,dialogue,technical} (~1,001 rows).
- */
-export const showContentWarnings = sqliteTable('show_content_warnings', {
-  id: text('id').primaryKey().$defaultFn(() => nanoid()),
-  showId: text('show_id').notNull().references(() => shows.id, { onDelete: 'cascade' }),
-  contentWarningId: text('content_warning_id').notNull().references(() => contentWarnings.id, { onDelete: 'cascade' }),
-  kind: text('kind', { enum: ['ACTION', 'DIALOGUE', 'TECHNICAL'] }).notNull(),
-
-  createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
-}, table => [
-  index('show_content_warnings_show_id_idx').on(table.showId),
-  index('show_content_warnings_warning_id_idx').on(table.contentWarningId),
-  uniqueIndex('show_content_warnings_unique').on(table.showId, table.contentWarningId, table.kind),
-])
-
-export const contentWarningsRelations = relations(contentWarnings, ({ many }) => ({
-  shows: many(showContentWarnings),
-}))
-
-export const showContentWarningsRelations = relations(showContentWarnings, ({ one }) => ({
-  show: one(shows, { fields: [showContentWarnings.showId], references: [shows.id] }),
-  contentWarning: one(contentWarnings, { fields: [showContentWarnings.contentWarningId], references: [contentWarnings.id] }),
-}))
+// Content warnings used to live here. They outgrew "import scaffolding" — the
+// axis model came from legacy but the current kind/level model does not — so
+// they now have their own file: server/db/schema/contentWarnings.ts.
 
 /**
  * Alternative spellings a venue has been known by. Legacy stored venue as free

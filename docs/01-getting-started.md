@@ -212,7 +212,7 @@ What happens on the first run, so nothing surprises you:
 | Path | Purpose |
 | --- | --- |
 | `server/db/schema/*.ts` | Drizzle table definitions — `user.ts`, `venue.ts`, `show.ts`, `ticket.ts`, `reservation.ts`. **This is the source of truth.** |
-| `server/db/migrations/sqlite/*.sql` | Generated SQL, applied in numeric order. Currently `0000` through `0008`. Never hand-edit an already-applied file. |
+| `server/db/migrations/sqlite/*.sql` | Generated SQL, applied in numeric order. Currently `0000` through `0016`. Never hand-edit an already-applied file. |
 | `server/db/migrations/sqlite/meta/` | Drizzle's snapshots and `_journal.json`. Committed; generated. Do not edit. |
 | `_hub_migrations` (table, in the database) | Ledger of which migrations have been applied. Both NuxtHub and Wrangler use this same table name. |
 

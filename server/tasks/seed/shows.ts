@@ -1,6 +1,8 @@
 import { db } from '@nuxthub/db'
+import { eq } from 'drizzle-orm'
 import { shows, performances } from '~~/server/db/schema/show'
 import { showTicketTypeOverrides, ticketTypes as ticketTypesTable } from '~~/server/db/schema/ticket'
+import { contentWarnings, showContentWarnings } from '~~/server/db/schema/contentWarnings'
 
 type SeededVenues = Array<{ id: string, name: string, capacity: number | null }>
 type TicketType = { id: string, name: string, price: number, activeByDefault: boolean }
@@ -288,6 +290,50 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
     await db.insert(showTicketTypeOverrides).values(overridesToCreate)
     console.log(`  ✅ Created ${overridesToCreate.length} ticket type overrides for Oscar Night (free event)`)
   }
+
+  // ── Content Warnings ──────────────────────────────────────────────────────
+  //
+  // Enough to exercise all three public states, because the difference between
+  // them is the whole design and none of it was visible locally before: the
+  // vocabulary arrives from migration 0016 and the seed never linked anything,
+  // so every seeded show rendered "no information recorded".
+  //
+  //   Hamlet        — warnings listed, across all four groups
+  //   Earnest       — checked, and there are none (the reassuring state)
+  //   Into the Woods, Oscar Night — untouched (the "nobody filled this in" state)
+  //
+  // Looked up by slug rather than id: the migration seeds literal `cw_<slug>`
+  // ids, but going through the column is what the application does.
+  const vocabulary = await db.select({ id: contentWarnings.id, slug: contentWarnings.slug })
+    .from(contentWarnings)
+  const warningId = (slug: string) => vocabulary.find(w => w.slug === slug)?.id
+
+  const hamletWarnings = [
+    { slug: 'sudden-noise', level: null },
+    { slug: 'naked-flame', level: null },
+    { slug: 'murder', level: 'DEPICTED' as const },
+    { slug: 'suicide', level: 'DISCUSSED' as const },
+    { slug: 'grief', level: 'DEPICTED' as const },
+    { slug: 'mental-illness', level: 'DISCUSSED' as const },
+    { slug: 'incest', level: 'MENTIONED' as const },
+    { slug: 'violence', level: 'DEPICTED' as const },
+  ]
+    .map(w => ({ showId: hamlet.id, contentWarningId: warningId(w.slug), level: w.level }))
+    .filter((w): w is { showId: string, contentWarningId: string, level: typeof w.level } => !!w.contentWarningId)
+
+  if (hamletWarnings.length > 0) {
+    await db.insert(showContentWarnings).values(hamletWarnings)
+    await db.update(shows)
+      .set({ contentWarningNotes: 'The graveyard scene includes an open grave and handled remains. Ophelia\'s drowning is described but not staged.' })
+      .where(eq(shows.id, hamlet.id))
+    console.log(`  ✅ Created ${hamletWarnings.length} content warnings for Hamlet`)
+  }
+  else {
+    console.log('  ⚠️  No content warning vocabulary found — run migrations first')
+  }
+
+  await db.update(shows).set({ warningsConfirmedNone: true }).where(eq(shows.id, earnest.id))
+  console.log('  ✅ Marked The Importance of Being Earnest as confirmed-no-warnings')
 
   return { seededShows, seededPerformances }
 }

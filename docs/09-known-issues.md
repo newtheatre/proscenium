@@ -99,9 +99,10 @@ Three things made it survive review: the fields were absent rather than wrong, s
 `?? ''` turned the absence into a plausible value; and the damage only showed on the public site.
 
 The fix is on the client, not in the PUT — `null` really does mean "clear this" and that contract is
-correct. `ShowEditModal` now loads the full record from `GET /api/shows/:id` and **omits those five
-keys from the body entirely** unless that load succeeded. That is the same guard `warningsFailed`
-already applied to the content-warning links three lines away.
+correct. `ShowEditModal` has since been replaced by the editable sections on `/admin/shows/:id`
+(`Admin/Shows/DetailsSection.vue`, `ContentWarningsSection.vue`, `TicketTypesSection.vue`), which
+structurally cannot reproduce this: each section is mounted on the detail page, which loads the full
+record from `GET /api/shows/:id`, and each sends only the keys it owns.
 
 **The general rule: a projected list row is not an edit source.** If a form can write a field, it
 must have read that field from something that actually returns it.
