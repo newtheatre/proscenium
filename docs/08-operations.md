@@ -164,6 +164,34 @@ That is survivable for an additive migration and not for a destructive one. So:
 A destructive migration is also the case where you want a human watching, which is the other reason
 not to leave it to a push trigger.
 
+### `nuxt db migrate` exits 0 when it fails — use `nuxt-db`
+
+The `db` subcommand on the main Nuxt CLI **swallows the exit code**. A migration that errors outright
+logs `[error] Failed to create migrations table` and then exits `0`, so a CI step wrapping it goes
+green having applied nothing. Reproduced on both `@nuxthub/core` 0.10.6 and 0.10.8:
+
+```
+nuxt db migrate   →  exit 0   ✗
+nuxt-db migrate   →  exit 1   ✓
+```
+
+`nuxt-db` and `nuxt-hub` are the binaries `@nuxthub/core` installs, and they propagate properly.
+`.github/workflows/migrate.yml` uses `./node_modules/.bin/nuxt-db migrate`, and then re-reads the
+ledger anyway via `.github/scripts/pending-migrations.sh` — the CLI's word is not accepted as proof
+that anything landed. This is the same class of failure as the `migrations_dir` bug below: not an
+error, just a cheerful exit code and nothing done.
+
+### `@nuxthub/core` must be at least 0.10.8 for the CLI to reach D1
+
+0.10.6's CLI posts to `https://api.cloudflare.com/client/v4/accounts/{account}/d1/db/{id}/raw`.
+Cloudflare's D1 API is `/d1/**database**/{id}/raw`, and the wrong path answers with
+`{"code":10001,"message":"Unable to authenticate request"}` — which reads like a credentials problem
+and is not one. The same package's *runtime* template had the correct path all along, so only the
+CLI was affected. Fixed in 0.10.8.
+
+If migrations start failing to authenticate while `wrangler d1 execute` works with the same token,
+check this first.
+
 ### Applying one by hand
 
 Still the right move for anything destructive, and the fallback when the workflow is broken.

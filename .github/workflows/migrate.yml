@@ -63,30 +63,18 @@ jobs:
             exit 1
           fi
 
-      # `nuxt db migrate` has no dry-run, so this diffs the files on disk against
-      # the ledger by hand. Informational only — it never fails the job, because
-      # a hiccup reading the ledger is not a reason to skip the migration.
-      #
-      # Both spellings are folded: `nuxt db migrate` records `0016_lying_maverick`
-      # and wrangler records `0016_lying_maverick.sql`, and production carries
-      # both for every migration applied so far.
+      # Informational. `continue-on-error` because a hiccup reading the ledger
+      # here is not a reason to skip the migration — the check that matters runs
+      # after the apply and is not forgiving.
       - name: Show what is pending
         continue-on-error: true
         run: |
-          applied=$(bunx wrangler d1 execute proscenium --remote --json \
-            --command "SELECT name FROM _hub_migrations" 2>/dev/null \
-            | grep -oE '"name": *"[^"]+"' | sed 's/.*: *"//; s/"$//; s/\.sql$//' | sort -u)
-          echo "Applied: $(echo "$applied" | grep -c . || true)"
-          pending=0
-          for f in server/db/migrations/sqlite/[0-9]*.sql; do
-            tag=$(basename "$f" .sql)
-            if ! echo "$applied" | grep -qx "$tag"; then
-              echo "  PENDING  $tag"
-              pending=$((pending + 1))
-            fi
-          done
-          [ "$pending" -eq 0 ] && echo "  (nothing pending)"
-          echo "pending=$pending" >> "$GITHUB_STEP_SUMMARY"
+          pending=$(./.github/scripts/pending-migrations.sh)
+          if [ -z "$pending" ]; then
+            echo "Nothing pending."
+          else
+            echo "Pending:"; echo "$pending" | sed 's/^/  /'
+          fi
 
       # Captured *before* anything is applied, so a bad migration always has a
       # recorded restore point in this run's output. Time Travel keeps 30 days,
@@ -113,10 +101,31 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # `nuxt-db`, not `nuxt db`. The `nuxt db` proxy swallows the exit code —
+      # verified on both 0.10.6 and 0.10.8, a failed migration still exits 0 —
+      # which is how the first run of this workflow reported success while
+      # applying nothing. The bin that @nuxthub/core installs propagates it.
       - name: Apply migrations
-        run: NODE_ENV=production bunx nuxt db migrate --verbose
+        run: NODE_ENV=production ./node_modules/.bin/nuxt-db migrate --verbose
+
+      # The real gate. Whatever the CLI claimed, the ledger is the truth: if
+      # anything is still pending, the migration did not land and this job must
+      # be red. Belt and braces against the CLI going quiet again in a future
+      # release.
+      - name: Verify nothing is still pending
+        run: |
+          if ! pending=$(./.github/scripts/pending-migrations.sh); then
+            echo "::error::Could not read the migration ledger to confirm the result. Check production by hand."
+            exit 1
+          fi
+          if [ -n "$pending" ]; then
+            echo "::error::Migrations are still pending after the apply step — it failed silently:"
+            echo "$pending" | sed 's/^/  /'
+            exit 1
+          fi
+          echo "Ledger confirms nothing is pending."
 
       - name: Report the restore point on failure
         if: failure() && steps.bookmark.outputs.bookmark != ''
         run: |
-          echo "::error::Migration failed. Restore with: bunx wrangler d1 time-travel restore proscenium --bookmark=${{ steps.bookmark.outputs.bookmark }}"
+          echo "::error::Migration failed or did not land. Restore with: bunx wrangler d1 time-travel restore proscenium --bookmark=${{ steps.bookmark.outputs.bookmark }}"
