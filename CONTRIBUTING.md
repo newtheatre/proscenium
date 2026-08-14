@@ -92,6 +92,25 @@ next maintainer cannot ask you. Follow the conventions in [docs/README.md](docs/
 When you fix something listed in [docs/09-known-issues.md](docs/09-known-issues.md), update or remove
 that entry in the same change.
 
+## Comments
+
+A comment carries what the code cannot: a constraint, a trap, a contract that is not obvious from
+the signature. It does not narrate, and it does not argue.
+
+- **State the rule, not the story.** "Must not throw — `authorize()` swallows any other error and
+  then runs the handler unchecked" is a comment. "An earlier version threw a 401, which meant a
+  staff member could not see their own bookings after fifteen minutes" is an ADR.
+- **Reasoning goes to [docs/decisions/](docs/decisions/).** If the *why* needs a paragraph, it needs
+  an ADR; the comment then cites it — `(ADR-0008)` — and stops.
+- **Do not restate the code.** `@param count — Number of rooms selected` says nothing the signature
+  does not. A component header listing "Features:" is out of date by the next release, and nothing
+  fails when it is.
+- **No unprovenanced figures.** A comment cannot honestly carry "45,563 tickets", because nothing
+  updates it. Put the number in the ADR, dated, and refer to the shape of the problem here.
+- **Say plainly when something is not implemented**, at the thing that is not implemented.
+
+One to five lines is the usual size. Past about ten, ask whether you are writing an ADR.
+
 ## Architecture decisions
 
 Record significant decisions as ADRs in [docs/decisions/](docs/decisions/) — see

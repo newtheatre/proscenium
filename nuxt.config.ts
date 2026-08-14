@@ -84,8 +84,11 @@ export default defineNuxtConfig({
     // password is estate-wide — set the dedicated secret so booking links
     // don't die with estate-wide seal rotations.
     bookingTokenSecret: '',
-    // Service token for server-to-server calls to the auth service
-    // (AUTH_SERVICE_TOKEN worker secret) — guest checkout shadow accounts.
+    // Server-to-server calls to the auth service (guest-checkout shadow
+    // accounts) and the inbound GDPR hook bearer. Worker secret
+    // NUXT_AUTH_SERVICE_TOKEN — the NUXT_ prefix is load-bearing, since Nuxt
+    // only maps NUXT_* env onto runtimeConfig. A secret named
+    // AUTH_SERVICE_TOKEN is silently ignored.
     authServiceToken: '',
     public: {
       authBaseURL: 'https://auth.newtheatre.org.uk',
