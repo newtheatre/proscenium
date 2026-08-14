@@ -2,6 +2,18 @@
  * Copies Cloudflare Secrets Store values into runtimeConfig at the start of
  * every request.
  *
+ * ⚠️ THE `0.` PREFIX IS LOAD-BEARING — DO NOT RENAME THIS FILE. Nitro sorts
+ * `server/plugins/` with `localeCompare` on the filename and calls their
+ * `request` hooks in that order, so this must sort ahead of every other
+ * plugin. `authorization-resolver.ts` calls `getUserSession()` inside its own
+ * `request` hook, and nuxt-auth-utils memoises its session config — password
+ * included — on that first call, for the life of the isolate. Registered as
+ * plain `secrets-store.ts` it sorted *after* `authorization-resolver.ts`, so
+ * every isolate memoised the empty default password and the app was
+ * permanently, silently logged out: h3's `getSession` swallows unseal failures
+ * (`.catch(() => {})`), so `/api/_auth/session` still answered 200 with an
+ * anonymous `{ id }` and nothing appeared in the logs.
+ *
  * `NUXT_SESSION_PASSWORD` is shared by every app on the estate (stage-door
  * docs/session-contract.md), so it lives in the account Secrets Store rather
  * than as four worker secrets that have to be rotated in lockstep. The
