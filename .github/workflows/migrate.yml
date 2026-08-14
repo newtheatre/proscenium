@@ -1,0 +1,122 @@
+# Apply pending database migrations to production.
+#
+# Runs on pushes to main only — never on a pull request. A PR must not touch the
+# production database, and `pull_request` events do not get repository secrets
+# from forks anyway.
+#
+# This does NOT deploy. Cloudflare Workers Builds deploys the Worker on its own
+# when main moves, and the two cannot be sequenced from here — see the note on
+# ordering in docs/08-operations.md §5.
+name: Migrate
+
+on:
+  push:
+    branches: [main]
+    # Nothing else can change what needs applying, so skip the run entirely for
+    # commits that only touch app code, docs or config.
+    paths:
+      - 'server/db/migrations/**'
+      - '.github/workflows/migrate.yml'
+  # Manual runs for when a migration is committed alongside something else, or
+  # when a run needs repeating after a failure.
+  workflow_dispatch:
+
+# One migration at a time. Two runs applying the same file concurrently would
+# race on the `_hub_migrations` ledger; `cancel-in-progress: false` because
+# cancelling a half-applied migration is worse than queueing behind it.
+concurrency:
+  group: migrate-production
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      # `nuxt db migrate` reads the NUXT_HUB_* triplet; wrangler (used for the
+      # Time Travel bookmark) reads the CLOUDFLARE_* pair. Same credentials,
+      # two naming conventions.
+      NUXT_HUB_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NUXT_HUB_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # Not a secret: the same id is committed in nuxt.config.ts.
+      NUXT_HUB_CLOUDFLARE_DATABASE_ID: 01a75263-87a9-452a-a4a0-b3b9db71dfe5
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # postinstall runs `nuxt prepare`, which generates the drizzle config and
+      # schema that `nuxt db migrate` reads. No full build is needed — this job
+      # only touches the database.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Fail fast if credentials are missing
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID must be set as repository secrets."
+            exit 1
+          fi
+
+      # `nuxt db migrate` has no dry-run, so this diffs the files on disk against
+      # the ledger by hand. Informational only — it never fails the job, because
+      # a hiccup reading the ledger is not a reason to skip the migration.
+      #
+      # Both spellings are folded: `nuxt db migrate` records `0016_lying_maverick`
+      # and wrangler records `0016_lying_maverick.sql`, and production carries
+      # both for every migration applied so far.
+      - name: Show what is pending
+        continue-on-error: true
+        run: |
+          applied=$(bunx wrangler d1 execute proscenium --remote --json \
+            --command "SELECT name FROM _hub_migrations" 2>/dev/null \
+            | grep -oE '"name": *"[^"]+"' | sed 's/.*: *"//; s/"$//; s/\.sql$//' | sort -u)
+          echo "Applied: $(echo "$applied" | grep -c . || true)"
+          pending=0
+          for f in server/db/migrations/sqlite/[0-9]*.sql; do
+            tag=$(basename "$f" .sql)
+            if ! echo "$applied" | grep -qx "$tag"; then
+              echo "  PENDING  $tag"
+              pending=$((pending + 1))
+            fi
+          done
+          [ "$pending" -eq 0 ] && echo "  (nothing pending)"
+          echo "pending=$pending" >> "$GITHUB_STEP_SUMMARY"
+
+      # Captured *before* anything is applied, so a bad migration always has a
+      # recorded restore point in this run's output. Time Travel keeps 30 days,
+      # but finding the right bookmark after the fact means guessing at
+      # timestamps — this pins the exact one.
+      - name: Record a Time Travel restore point
+        id: bookmark
+        run: |
+          set -o pipefail
+          out=$(bunx wrangler d1 time-travel info proscenium 2>&1 | tee /dev/stderr)
+          mark=$(echo "$out" | grep -oE "[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}" | head -1)
+          if [ -z "$mark" ]; then
+            echo "::error::Could not read a Time Travel bookmark — refusing to migrate without a restore point."
+            exit 1
+          fi
+          echo "bookmark=$mark" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Database restore point"
+            echo
+            echo "Taken before this run applied anything."
+            echo
+            echo '```bash'
+            echo "bunx wrangler d1 time-travel restore proscenium --bookmark=$mark"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply migrations
+        run: NODE_ENV=production bunx nuxt db migrate --verbose
+
+      - name: Report the restore point on failure
+        if: failure() && steps.bookmark.outputs.bookmark != ''
+        run: |
+          echo "::error::Migration failed. Restore with: bunx wrangler d1 time-travel restore proscenium --bookmark=${{ steps.bookmark.outputs.bookmark }}"

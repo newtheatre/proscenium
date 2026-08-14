@@ -64,10 +64,19 @@ bun run build       # the production Worker bundle must build
 3. Restart `bun run dev`; the dev plugin applies the migration locally.
 4. Commit the schema change, the new `.sql` file, **and** the `meta/` snapshot **together** —
    splitting them across commits corrupts the migration history for everyone else.
-5. Applying migrations to production is a deliberate, separate step — see
-   [docs/08-operations.md](docs/08-operations.md).
+5. **Merging to `main` applies it to production.** `.github/workflows/migrate.yml` runs
+   `nuxt db migrate` on any push to `main` that touches `server/db/migrations/**`. Nothing runs on a
+   pull request.
 
-Never hand-edit an already-applied migration file.
+That last point changes what review is for. Additive changes — a new nullable column, a new table, a
+new index — can just be merged. **Anything destructive** (dropping or renaming a column or table,
+narrowing a constraint, rewriting data) **should be applied by hand before merging**, because the
+workflow cannot sequence itself against Cloudflare's deploy and a destructive migration is where that
+race hurts. See [docs/08-operations.md](docs/08-operations.md) §5, which spells out the ordering and
+the manual sequence.
+
+Never hand-edit an already-applied migration file. Editing one *before* it has been applied anywhere
+is fine, and sometimes necessary — `0016_lying_maverick.sql` is the worked example.
 
 ## Documentation
 
