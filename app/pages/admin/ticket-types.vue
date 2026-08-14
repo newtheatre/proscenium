@@ -64,7 +64,7 @@ interface TicketType {
 // `rows` below.
 const columnVisibility = ref({})
 const rowSelection = ref<Record<string, boolean>>({})
-const pagination = ref({ pageSize: 15, pageIndex: 0 })
+const { pagination, page, resetPage } = useTablePagination(15)
 const showArchived = ref(false)
 
 // `includeArchived` because this is the one screen that has to see retired
@@ -124,15 +124,7 @@ const filteredRows = computed<TicketType[]>(() => {
   )
 })
 
-// UPagination counts from 1; TanStack indexes from 0.
-const page = computed({
-  get: () => pagination.value.pageIndex + 1,
-  set: (value: number) => { pagination.value.pageIndex = value - 1 },
-})
-
-watch([search, showArchived], () => {
-  pagination.value.pageIndex = 0
-})
+watch([search, showArchived], resetPage)
 
 const selectedCount = computed(() => Object.keys(rowSelection.value).length)
 

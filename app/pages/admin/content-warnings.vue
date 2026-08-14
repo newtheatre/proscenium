@@ -54,7 +54,7 @@ const table = useTemplateRef<any>('table')
 // parent-render-during-child-setup than this page can afford. See `rows` below.
 const columnVisibility = ref({})
 const rowSelection = ref<Record<string, boolean>>({})
-const pagination = ref({ pageSize: 20, pageIndex: 0 })
+const { pagination, page, resetPage } = useTablePagination(20)
 const showArchived = ref(false)
 const kindFilter = ref<'ALL' | ContentWarningKind>('ALL')
 
@@ -108,15 +108,7 @@ const filteredRows = computed<AdminContentWarning[]>(() => {
   )
 })
 
-// UPagination counts from 1; TanStack indexes from 0.
-const page = computed({
-  get: () => pagination.value.pageIndex + 1,
-  set: (value: number) => { pagination.value.pageIndex = value - 1 },
-})
-
-watch([search, showArchived, kindFilter], () => {
-  pagination.value.pageIndex = 0
-})
+watch([search, showArchived, kindFilter], resetPage)
 
 const selectedCount = computed(() => Object.keys(rowSelection.value).length)
 

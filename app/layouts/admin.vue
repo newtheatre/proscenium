@@ -35,7 +35,19 @@
       </template>
     </UDashboardSidebar>
 
-    <UDashboardPanel>
+    <!--
+      Breathing room under the last element of every admin page — most visibly
+      the pagination footer, which otherwise ends flush against the bottom edge.
+
+      On the panel body rather than on AdminPage, because the two box-office
+      pages do not use AdminPage and would have been missed.
+
+      Both breakpoints are needed. The body's own classes are `p-4 sm:p-6`, and
+      `sm:p-6` lives in a media-query block that comes after every base utility
+      in the stylesheet — so a bare `pb-8` is overridden back to 24px above the
+      `sm` breakpoint, which is every screen this is used on.
+    -->
+    <UDashboardPanel :ui="{ body: 'pb-8 sm:pb-10' }">
       <template #header>
         <UDashboardNavbar :title="route.meta.title as string || 'Admin'">
           <template #leading>
