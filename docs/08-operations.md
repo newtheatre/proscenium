@@ -434,9 +434,17 @@ D1 has no transactional multi-statement migrations, so a migration can leave the
 **Not from here.** The key is shared by every app on the estate and lives in the
 account Secrets Store, so it is rotated once, centrally — follow stage-door
 `docs/operations.md` §"Rotating the session seal secret". Doing it per-app is
-what the Secrets Store move (ADR-0016) removed; a `wrangler secret put
-NUXT_SESSION_PASSWORD --name proscenium` today would be shadowed by the binding
-and achieve nothing except confusing the next person.
+what the Secrets Store move (ADR-0016) removed.
+
+⚠️ **Never set `NUXT_SESSION_PASSWORD` as a worker secret on this app.** It does
+not merely duplicate the store value — it *overrides* it. `nuxt-auth-utils`
+resolves the password as `defu({ password: process.env.NUXT_SESSION_PASSWORD },
+runtimeConfig.session)`, and `defu` gives its first argument priority, so the
+worker secret wins over the binding. The symptom is confusing and points
+nowhere near the cause: login on `auth.newtheatre.org.uk` succeeds, and this app
+bounces the user straight back to the login page, because the two are sealing
+with different keys. `server/plugins/secrets-store.ts` now logs a loud error
+when it sees both, so check the logs (§7) before theorising.
 
 **Rotating invalidates every existing session.** Every logged-in user — customers and staff alike — is signed out and must log in again. Nothing is lost, but do not do it fifteen minutes before curtain-up. Rotate at a quiet time, then confirm you can still log in yourself. Workers pick the new value up as isolates recycle rather than instantly, so allow a few minutes for the estate to settle.
 

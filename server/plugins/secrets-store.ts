@@ -38,6 +38,7 @@ interface SecretsStoreSecret {
 // when it is recycled — the same staleness plain worker secrets have, since
 // nuxt-auth-utils memoises its own session config on first use regardless.
 let sessionPassword: Promise<string> | undefined
+let warnedAboutWorkerSecret = false
 
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('request', async (event) => {
@@ -46,6 +47,25 @@ export default defineNitroPlugin((nitroApp) => {
       | undefined
     const secret = env?.SESSION_PASSWORD
     if (!secret) return
+
+    // A leftover worker secret of this name BEATS the store. nuxt-auth-utils
+    // resolves the password as
+    //   defu({ password: process.env.NUXT_SESSION_PASSWORD }, runtimeConfig.session)
+    // and defu gives its first argument priority, so whatever we write below
+    // loses. The failure is silent and looks nothing like its cause: this app
+    // seals with the stale key, auth seals with the store key, and a user who
+    // logs in successfully is bounced straight back to the login page. It cost
+    // an evening on 2026-08-14 (ADR-0016). Say so loudly rather than let the
+    // next person derive it from first principles.
+    if (!warnedAboutWorkerSecret && process.env.NUXT_SESSION_PASSWORD) {
+      warnedAboutWorkerSecret = true
+      console.error(
+        '[secrets-store] NUXT_SESSION_PASSWORD is set as a worker secret and takes '
+        + 'priority over the SESSION_PASSWORD store binding — this app is sealing '
+        + 'sessions with the wrong key. Run `wrangler secret delete '
+        + 'NUXT_SESSION_PASSWORD --name proscenium`, then redeploy.',
+      )
+    }
 
     try {
       sessionPassword ??= secret.get()
