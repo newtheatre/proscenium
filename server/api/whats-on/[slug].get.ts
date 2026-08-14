@@ -52,11 +52,8 @@ export default defineEventHandler(async (event) => {
   }
 
   // The performances this response covers, as a subquery rather than a bound id
-  // list. D1 allows at most 100 bound parameters per statement, and a Fringe
-  // show can have well over 100 performances on sale at once — binding the ids
-  // (and the ticket-type ids alongside them) made this public page fail
-  // outright for exactly the busiest shows. /api/whats-on already avoids this;
-  // this handler did the opposite next door to it.
+  // list — a Fringe show can have well over 100 performances on sale at once
+  // (ADR-0006).
   const showPerformances = db
     .select({ id: schema.performances.id })
     .from(schema.performances)

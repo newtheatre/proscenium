@@ -62,12 +62,10 @@ export default defineEventHandler(async (event) => {
     .slice(0, quantity)
     .map(t => t.id)
 
-  // `refundedAt IS NULL` in the WHERE, not just in the SELECT above: the read
-  // and the write are separate statements, so a double-click or two staff
-  // refunding at once both select the same rows and both report success while
-  // only one stamp lands — cash out twice, recorded once. With the guard the
-  // loser updates nothing, and `returning()` tells us how many rows this call
-  // actually refunded rather than how many it intended to.
+  // `refundedAt IS NULL` in the WHERE, not only in the SELECT above: read and
+  // write are separate statements, so two concurrent refunds would both report
+  // success while one stamp lands — cash out twice, recorded once. `returning()`
+  // then reports what this call actually refunded (ADR-0011).
   const refunded = await db
     .update(schema.tickets)
     .set({ refundedAt: new Date() })

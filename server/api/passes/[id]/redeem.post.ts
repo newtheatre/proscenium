@@ -13,10 +13,9 @@ const bodySchema = z.object({
 /**
  * POST /api/passes/:id/redeem — admit a pass holder to a performance.
  *
- * Creates an ordinary £0 ticket on a reservation, plus the pass_admissions row
- * that links the two. That is the whole design: because the admission *is* a
- * ticket, capacity, the door list, "my bookings" and the treasurer's export all
- * keep working with no special-casing.
+ * Creates an ordinary £0 ticket plus the pass_admissions row linking the two.
+ * Because the admission *is* a ticket, capacity, the door list, "my bookings"
+ * and the treasurer's export need no special-casing (ADR-0002).
  *
  * `:id` accepts the pass id or its 6-character public reference.
  */

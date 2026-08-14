@@ -12,17 +12,10 @@ const querySchema = z.object({
 /**
  * GET /api/content-warnings — the warning vocabulary. Staff only.
  *
- * Shared across shows rather than free text, so "Strobe and flashing lights"
- * means the same thing on every production and someone filtering on it gets a
- * complete answer. Free entry is what left the legacy site with six separate
- * spellings of "alcohol".
- *
- * `showCount` is a correlated subquery rather than a join + GROUP BY: the
- * vocabulary is ~65 rows, and the admin page needs it to tell the difference
- * between an entry nobody uses and one it must not delete.
- *
- * Ordered technical-first to match how both the editor and the public page group
- * them; `sort` then title within each kind.
+ * `showCount` is a correlated subquery rather than a join + GROUP BY; the
+ * admin page needs it to tell an unused entry from one it must not delete.
+ * Ordered technical-first to match how the editor and the public page group
+ * them, then `sort`, then title.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listContentWarnings)

@@ -1,15 +1,13 @@
 <!--
-  Content warnings for a show, editable in place.
+Content warnings for a show, editable in place (ADR-0017).
 
-  Its own section rather than a block inside the details form, because it is its
-  own concern: a checklist of technical effects, a themed vocabulary where each
-  entry carries a level, free text, and the "confirmed none" flag.
-  `PUT /api/shows/:id` accepts a partial body, so this saves warnings without
-  touching the fields the details form owns.
+Its own section rather than part of the details form: a separate concern
+with a separate vocabulary, and `PUT /api/shows/:id` takes a partial body so
+each section saves only what it owns.
 
-  The "confirmed none" checkbox is the point of the whole section. A show with no
-  warnings listed and no confirmation tells a customer nothing, and the public
-  page says exactly that rather than implying the show is free of them.
+The "confirmed none" checkbox is the point of the section. A show with no
+warnings listed and no confirmation tells a customer nothing, and the public
+page says exactly that rather than implying there are none (ADR-0004).
 -->
 <script setup lang="ts">
 import type { ContentWarningRef, LegacyContentWarningLink, ShowDetail } from '~~/shared/types/shows'
@@ -24,13 +22,12 @@ interface WarningOption extends ContentWarningRef {
 }
 
 /**
- * The shared vocabulary, fetched only once a reader opens the editor.
+ * The shared vocabulary, fetched only once a reader opens the editor — the
+ * detail record already carries each link's resolved entry.
  *
- * The section can render what a show already has without it — the detail record
- * carries each link's resolved entry — so there is no reason to pay for the list
- * until someone is choosing from it. The key is shared across shows, and is
- * deliberately *not* the key the admin vocabulary page uses: that one fetches
- * archived entries too, and a shared key would have this editor offer them.
+ * Deliberately not the key the admin vocabulary page uses: that one fetches
+ * archived entries too, and a shared key would have this editor offer them
+ * (ADR-0013).
  */
 const { data: vocabulary, status: vocabularyStatus, refresh: loadVocabulary } = useFetch<WarningOption[]>(
   '/api/content-warnings',
@@ -55,12 +52,9 @@ const isSubmitting = ref(false)
 const technicalIds = ref<string[]>([])
 const generalIds = ref<string[]>([])
 /**
- * contentWarningId -> level. Deliberately has no entry for a newly picked
- * warning: nothing is defaulted, so `unassigned` can tell the difference
- * between "not looked at yet" and a level someone actually chose.
- *
- * A reactive Map rather than an object, so removing a warning is `.delete()`
- * on a real key instead of a dynamic property delete.
+ * contentWarningId → level. Deliberately has no entry for a newly picked
+ * warning, so `unassigned` can tell "not looked at yet" from a level someone
+ * chose. A reactive Map, so removing one is `.delete()` on a real key.
  */
 const levels = reactive(new Map<string, ContentWarningLevel>())
 const notes = ref('')

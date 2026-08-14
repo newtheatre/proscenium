@@ -1,35 +1,5 @@
 /**
- * Admin: Manage Venues Page
- *
- * Administrative interface for venue and feature management.
- *
- * Features:
- * - Table view of all venues with selection
- * - Search by name or address
- * - View venue details (capacity, features, status)
- * - Create new venues
- * - Update venue information and features
- * - Upload/manage venue images
- * - Delete venue(s) (confirmation required)
- * - Manage venue features (accessibility, amenities)
- *
- * Data Loading:
- * - GET /api/venues
- * - GET /api/venue-features
- *
- * Data Mutations:
- * - POST /api/venues (create venue)
- * - PUT /api/venues/:id (update venue)
- * - DELETE /api/venues/:id (delete venue)
- * - POST /api/venues/:id/image (upload image)
- * - DELETE /api/venues/:id/image (delete image)
- * - POST /api/venue-features (create feature)
- * - PUT /api/venue-features/:id (update feature)
- * - DELETE /api/venue-features/:id (delete feature)
- *
- * @route /admin/venues
- * @authenticated
- * @admin-only
+ * Admin: venues, their images, and the shared venue-feature vocabulary.
  */
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
@@ -102,11 +72,10 @@ const { data, status, error, refresh } = await useAsyncData(
 const rows = computed<Venue[]>(() => data.value ?? [])
 
 /**
- * Search is done here rather than through TanStack's `columnFilters` so the
- * footer can report the match count without asking the table to re-walk its row
- * model, and so the input is a plain `v-model` instead of the find-and-mutate
- * dance the template used to do. It also lets the search cover address, which
- * the placeholder always claimed and the name-column filter never did.
+ * Search here rather than through TanStack's `columnFilters`, so the footer can
+ * report the match count without the table re-walking its row model
+ * (ADR-0012). It also lets the search cover address, which a name-column
+ * filter could not.
  */
 const search = ref('')
 const filteredRows = computed<Venue[]>(() => {

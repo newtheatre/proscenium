@@ -25,3 +25,5 @@ logs
 
 # Cloudflare wrangler emulation
 .wrangler
+.claude/worktrees/optimistic-margulis-8d8dd5/.data
+.claude/worktrees/content-warnings-redesign-d3b595/.data

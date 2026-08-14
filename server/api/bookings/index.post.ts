@@ -46,12 +46,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Guest checkout sends a confirmation to whatever address the caller supplies,
-  // carrying their name and notes — so the theatre's own domain will deliver
-  // whatever a script puts in them. The per-IP limit in the rate-limit
-  // middleware is set generously for shared connections, which leaves this
-  // narrower bucket to bound how often one *address* can be mailed. A real
-  // person booking for several performances in an evening stays well inside it.
+  // Guest checkout mails whatever address the caller supplies, from the
+  // theatre's own domain. The per-IP middleware limit is generous for shared
+  // connections, so this narrower bucket bounds how often one *address* can be
+  // mailed (ADR-0015).
   const guestEmail = (body.email ?? loggedInUser?.email)?.trim().toLowerCase()
   if (guestEmail) {
     await assertRateLimit(

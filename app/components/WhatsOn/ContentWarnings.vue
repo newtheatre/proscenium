@@ -1,19 +1,14 @@
 <script setup lang="ts">
 /**
- * Content warnings for a show.
+ * Content warnings for a show, in three states. The distinction between the
+ * last two is the point: "the company checked and there are none" is a
+ * reassurance, "nobody has filled this in" is an absence of information, and
+ * showing silence as safety is how someone ends up in the room for something
+ * they needed to know about (ADR-0004).
  *
- * Three states, and the distinction between the last two is the point: "the
- * company checked and there are none" is a reassurance, "nobody has filled this
- * in" is an absence of information, and showing silence as though it meant
- * safety is how someone ends up in the room for something they needed to know
- * about.
- *
- * Warnings are grouped the way the theatre thinks about them. Technical effects
- * come first — strobe and haze have an immediate physical consequence for
- * someone who needs to avoid them, and no amount of context changes that.
- * Everything else is grouped by how strongly it features: depicted, discussed,
- * then mentioned. Someone deciding whether to book needs the difference between
- * a murder shown on stage and a murder referred to in the second act.
+ * Technical effects come first — they have an immediate physical consequence
+ * for someone avoiding them. Everything else is grouped by how strongly it
+ * features: depicted, discussed, then mentioned.
  */
 import type { PublicShowContentWarning } from '~~/shared/types/shows'
 

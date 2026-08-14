@@ -24,30 +24,17 @@ const querySchema = paginationSchema.omit({ limit: true, q: true }).extend({
 })
 
 /**
- * GET /api/performances — a flat, chronological list of performances. Staff only.
+ * GET /api/performances — a flat, chronological list of performances. Staff
+ * only. Exists so the box office does not have to walk the show archive to
+ * build a navigator (ADR-0018).
  *
- * Performances previously existed only nested under a show, so the box office —
- * which wants a chronological list and nothing else — had to download every show
- * in the archive, 498 of them with 1,304 performances, to build a navigator.
+ * `near` returns the performances closest to a date — half before, half after
+ * — rather than a fixed window, which is sometimes empty over the summer. In
+ * `near` mode the response is one centred window, so `page` is always 1 and
+ * `total` is the window size. Use `from`/`to` to page a range.
  *
- * ## `near`, and why it exists
- *
- * A date window is the wrong primitive for "show me what's on around now". The
- * theatre goes quiet over the summer, so any fixed window is sometimes empty,
- * and an empty navigator on the door is worse than an old one. `near` asks for
- * the performances *closest to* a date — half before, half after — so it returns
- * something whenever anything exists at all, and the caller needs no fallback.
- *
- * In `near` mode the response is one centred window rather than a page: `page`
- * is always 1 and `total` is the size of that window. Use `from`/`to` when you
- * genuinely want to page a range.
- *
- * ## Bound parameters
- *
- * D1 allows 100 per statement. The page's own ids are never bound: ticket counts
- * scope through a subquery over the time span the page covers, which costs two
- * parameters whether the page holds five performances or two hundred. See
- * `countOccupiedSeats`.
+ * Ticket counts scope through a subquery over the page's time span, never its
+ * ids (ADR-0006).
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listShows)
@@ -117,11 +104,9 @@ export default defineEventHandler(async (event) => {
 
   if (rows.length === 0) return paginated([], total, { page, limit })
 
-  // Seats occupied, by the shared rule so the box office agrees with what the
-  // booking path allows. Scoped by the time span this page covers rather than by
-  // its ids: two bound parameters instead of up to two hundred. It counts a few
-  // performances we are not returning, which is harmless — only the ids below
-  // are ever read out of the map.
+  // Seats occupied, by the shared rule (ADR-0007), scoped by the time span this
+  // page covers rather than its ids. It counts a few performances we are not
+  // returning, which is harmless — only the ids below are read back out.
   const spanStart = rows.reduce((min, r) => (r.startsAt < min ? r.startsAt : min), rows[0]!.startsAt)
   const spanEnd = rows.reduce((max, r) => (r.startsAt > max ? r.startsAt : max), rows[0]!.startsAt)
 

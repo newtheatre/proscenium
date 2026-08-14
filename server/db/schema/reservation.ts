@@ -8,21 +8,21 @@ import { users } from './user'
 const bookingRefId = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6)
 
 /**
- * A reservation is a customer's booking for one or more tickets to a specific performance.
+ * A customer's booking for one or more tickets to a performance.
  *
- * Every reservation belongs to a user account. Customers without accounts are given a
- * shadow account (no password set) so that all reservations have consistent ownership
- * and can be upgraded to a full account later.
+ * Every reservation belongs to a user account; customers without one get a
+ * shadow account from the auth service, so ownership is consistent and can be
+ * claimed later.
  *
  * Status lifecycle:
- *   PENDING    — reservation made, awaiting collection / payment at the box office
- *   COLLECTED  — tickets collected and payment received in-person
- *   DOOR       — purchased on the door (walk-up, not pre-booked)
- *   CANCELLED  — cancelled by the customer or by staff; see cancelledBy for who
- *   NO_SHOW    — reservation held but customer did not collect or attend
+ *   PENDING   — booked, awaiting collection and payment at the box office
+ *   COLLECTED — tickets collected and paid for in person
+ *   DOOR      — bought on the door, not pre-booked
+ *   CANCELLED — cancelled by the customer or staff; see cancelledBy
+ *   NO_SHOW   — held but never collected
  *
- * Status is tracked at the reservation level only. Individual tickets can be
- * independently refunded via their refundedAt field.
+ * Status is per reservation. Individual tickets refund independently via
+ * `refundedAt` (ADR-0011).
  */
 export const reservations = sqliteTable('reservations', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -31,11 +31,9 @@ export const reservations = sqliteTable('reservations', {
   // e.g. "A3KP7X" — uses an unambiguous character set to avoid misreads
   bookingRef: text('booking_ref').notNull().$defaultFn(() => bookingRefId()),
 
-  // The legacy 16-hex code. It was the reservation's public handle: every
-  // confirmation email since 2016 carried a /cancel/<code>/ link, and it was
-  // the value front-of-house typed to collect. Keeping it lets those URLs be
-  // redirected instead of 404ing, and makes "what did legacy row N become?"
-  // answerable. (It was never a QR code — the legacy app generated none.)
+  // The legacy 16-hex code — the reservation's public handle before the import.
+  // Every confirmation email since 2016 carried a `/cancel/<code>/` link, so
+  // keeping it lets those URLs be redirected rather than 404.
   legacyRef: text('legacy_ref'),
 
   // How the booking reached us. LEGACY_IMPORT marks rows whose provenance is
@@ -46,12 +44,10 @@ export const reservations = sqliteTable('reservations', {
 
   // How many seats were originally booked.
   //
-  // Legacy destroyed this: on collection, Django copied `quantity` into
-  // `initial_quantity` and OVERWROTE `quantity` with the number actually
-  // collected, so a legacy reservation's `quantity` means "seats booked" before
-  // collection and "seats collected" after. 662 bookings were genuinely reduced
-  // at the door. Proscenium models tickets as rows, so the original figure has
-  // nowhere else to live.
+  // Legacy overwrote `quantity` with the collected count on collection, so a
+  // legacy row's `quantity` means "booked" before collection and "collected"
+  // after. Proscenium models tickets as rows, so the original figure has nowhere
+  // else to live.
   originalQuantity: integer('original_quantity'),
 
   // Set when the owning user was anonymised under the retention policy.
@@ -87,12 +83,10 @@ export const reservations = sqliteTable('reservations', {
   index('reservations_user_id_idx').on(table.userId),
   index('reservations_status_idx').on(table.status),
 
-  // Every reservation list sorts by createdAt DESC. Without an index SQLite
-  // reads and sorts all 30,110 rows before returning a page, so pagination on
-  // its own does not reduce the work — these have to land together.
-  //
-  // The composites let one index satisfy both the filter and the ordering, for
-  // the admin status filter and the box-office per-performance list.
+  // Every reservation list sorts by createdAt DESC, so without an index SQLite
+  // reads and sorts the whole table before returning a page — paginating alone
+  // does not reduce the work. The composites let one index satisfy both the
+  // filter and the ordering.
   index('reservations_created_at_idx').on(table.createdAt),
   index('reservations_status_created_idx').on(table.status, table.createdAt),
   index('reservations_perf_created_idx').on(table.performanceId, table.createdAt),

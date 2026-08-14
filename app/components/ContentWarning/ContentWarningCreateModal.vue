@@ -1,16 +1,8 @@
 /**
- * Create Content Warning Modal Component
+ * Add an entry to the shared warning vocabulary. Admin/Manager only.
  *
- * Modal for adding an entry to the shared warning vocabulary (admin/manager only).
- *
- * Features:
- * - Form validation with Zod schema
- * - Slug derived from the title until edited by hand
- * - Technical vs general, which decides whether shows assign it a level
- * - Creates the entry via POST /api/content-warnings
- * - Toast notifications for success/error
- *
- * @emits refresh - Emitted after successful creation
+ * Whether it is technical or general decides whether shows assign it a level,
+ * and cannot be changed once anything links to it (ADR-0004).
  */
 <script setup lang="ts">
 import * as z from 'zod'

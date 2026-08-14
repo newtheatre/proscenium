@@ -1,24 +1,9 @@
 /**
- * Reservation Ticket Management Slideover
+ * View and adjust the ticket composition of a reservation. Staff only.
  *
- * Allows admins and staff to view and modify the ticket composition of a
- * reservation — adding, increasing, or decreasing each ticket type.
- *
- * Features:
- * - Shows all active (non-refunded) tickets grouped by type with stepper controls
- * - Shows refunded tickets read-only, separately
- * - Loads available ticket types (active for the performance) for adding new types
- * - Dirty-state detection with confirmation before closing
- * - Submits desired quantities via PUT /api/reservations/:id/tickets
- *
- * Data loading:
- * - GET /api/reservations/:id          (current ticket composition)
- * - GET /api/reservations/:id/available-ticket-types  (addable types + prices)
- *
- * @props reservationId  - ID of the reservation to manage (null = closed)
- * @props bookingRef     - Human-readable ref shown in the title
- * @emits refresh        - After a successful save
- * @emits close          - When the slideover should close
+ * Refunded tickets are shown separately and read-only: they are a record of a
+ * transaction, not part of the editable composition (ADR-0011). The body sends
+ * desired totals per type, which the server diffs.
  */
 <script setup lang="ts">
 // ── Types ──────────────────────────────────────────────────────────────────────

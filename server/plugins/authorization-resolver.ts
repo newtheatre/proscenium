@@ -9,14 +9,12 @@ export default defineNitroPlugin((nitroApp) => {
       resolveServerUser: () => sessionUserForAuthorization(event),
     }
 
-    // Keep the local user mirror fresh for FK integrity (reservations
-    // require an owner row). Never blocks the request on failure.
+    // Keep the local user mirror fresh for FK integrity (reservations require an
+    // owner row). Never blocks the request on failure.
     //
-    // NOTE: this is the estate's first session read of the request, and
-    // nuxt-auth-utils memoises the session password on it for the life of the
-    // isolate. `server/plugins/0.secrets-store.ts` must therefore have run
-    // first — its `0.` prefix is what guarantees that. If you add a plugin
-    // that reads the session, or rename that file, read its header first.
+    // This is the first session read of the request, which is where
+    // nuxt-auth-utils memoises the session password — so
+    // `server/plugins/0.secrets-store.ts` must have run first (ADR-0016).
     const { user } = await getUserSession(event)
     if (user) {
       try {

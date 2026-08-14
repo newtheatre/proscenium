@@ -1,17 +1,9 @@
 /**
- * Create Show Modal Component
+ * Create a show, optionally with its first performances.
  *
- * Multi-step wizard for creating a new show with optional performances.
- *
- * Steps:
- *   1. Show details  — title, slug (auto-derived), subtitle, description
- *   2. Performances  — schedule one or more performances with venue and time
- *   3. Review        — confirm details and choose initial publish status
- *
- * On confirm, the show is created first (POST /api/shows), then each
- * pending performance is created in sequence (POST /api/shows/[id]/performances).
- *
- * @emits refresh — emitted after successful creation
+ * The show is created first, then each pending performance in sequence — so a
+ * failure part-way leaves a real show with fewer performances than asked for,
+ * not a half-written one.
  */
 <script setup lang="ts">
 import * as z from 'zod'

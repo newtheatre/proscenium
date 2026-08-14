@@ -1,16 +1,6 @@
 /**
- * Generic Confirm Modal Component
- *
- * A reusable destructive-action confirmation dialog.
- * Intended to be used programmatically via the `useConfirm` composable.
- *
- * @props title        - Modal heading
- * @props description  - Supporting text shown below the heading
- * @props confirmLabel - Label for the confirm button (default: "Confirm")
- * @props confirmColor - Color for the confirm button (default: "error")
- * @props cancelLabel  - Label for the cancel button (default: "Cancel")
- * @props icon         - Icon shown in the modal header
- * @emits close        - Emitted with `true` (confirmed) or `false` (cancelled)
+ * Confirmation dialog for a destructive action. Use it through `useConfirm()`
+ * rather than mounting it directly; `close` is emitted with the answer.
  */
 <script setup lang="ts">
 import { computed } from 'vue'

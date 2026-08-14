@@ -1,10 +1,7 @@
 <!--
-  Shows over their performances: shows at depth 0, each show's performances as
-  sub-rows at depth 1.
-
-  Lifted out of the 798-line shows page so all three tabs — now & next, drafts,
-  archive — render the same table with the same row actions, and so the page
-  itself is about fetching and tabs rather than about `h()` calls.
+Shows over their performances: shows at depth 0, their performances as
+sub-rows at depth 1. Shared by all three tabs so they render the same table
+with the same row actions.
 -->
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
@@ -63,15 +60,10 @@ watchEffect(() => {
 })
 
 /**
- * performanceId → its show.
- *
- * Built once per data change, because the alternative is doing it per rendered
- * row: the actions column used to resolve a performance's parent by scanning
- * every show and every one of its performances, re-run by TanStack for each
- * performance row on every sort, expand and filter. That was over a million
- * comparisons per render at archive scale, on the main thread, and is what froze
- * the admin area. Pages are bounded now, but the shape of the fix is still
- * right and costs nothing.
+ * performanceId → its show, built once per data change rather than per
+ * rendered row. Resolving a parent by scanning every show inside the actions
+ * column is re-run by TanStack on every sort, expand and filter, which is what
+ * froze the admin area at archive scale.
  */
 const showByPerformanceId = computed(() => {
   const map = new Map<string, ShowListItem>()

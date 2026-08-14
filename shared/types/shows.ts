@@ -1,16 +1,14 @@
 /**
  * The shapes `/api/shows` actually puts on the wire.
  *
- * Hand-written rather than derived with `InferSelectModel`, deliberately. The
- * Drizzle model is the *table*: `performances.startsAt` is a `Date` there and an
- * ISO string here, and these rows carry computed fields (`ticketsSold`,
- * `performanceCount`, the run window) that no column corresponds to. Deriving
- * from the schema would describe something the client never receives.
+ * Hand-written rather than derived with `InferSelectModel`, deliberately: the
+ * Drizzle model describes the *table*, where `performances.startsAt` is a
+ * `Date` rather than an ISO string, and these rows carry computed fields
+ * (`ticketsSold`, `performanceCount`, the run window) that no column
+ * corresponds to.
  *
- * They live in `shared/` so the page, the tree table and the row-action handlers
- * agree on one definition — `app/pages/admin/shows.vue` used to declare its own
- * `Show` and `Performance`, and so did four of the six modals it mounted. See
- * docs/09-known-issues.md #16.
+ * In `shared/` so the page, the tree table and the row-action handlers agree
+ * on one definition.
  */
 
 // Imported explicitly: Nuxt's auto-imports cover app/ and server/, not files

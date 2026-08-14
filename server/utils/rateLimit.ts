@@ -3,18 +3,11 @@ import { eq, lt, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
 /**
- * Fixed-window rate limiting, backed by D1.
+ * Fixed-window rate limiting, backed by D1 (ADR-0015).
  *
- * The KV namespace is disabled and there are no Durable Objects, so D1 is the
- * only shared store. The counter is a single upsert with `RETURNING`, which
- * SQLite executes atomically, so two simultaneous requests cannot both read the
- * same count and each write back one more than it.
- *
- * A fixed window rather than a sliding one: it can let through up to twice the
- * limit across a window boundary, which is the wrong trade for billing but the
- * right one here, where the aim is to stop a script making thousands of attempts
- * and the cost of being approximate is that an attacker gets ten tries instead
- * of five.
+ * The counter is a single upsert with `RETURNING`, which SQLite executes
+ * atomically. A fixed window can let through up to twice the limit across a
+ * boundary; that is the accepted trade.
  */
 
 export interface RateLimitRule {
@@ -33,14 +26,10 @@ export interface RateLimitResult {
 }
 
 /**
- * The caller's IP, from Cloudflare's own header, or `null` when there isn't one.
- *
- * `CF-Connecting-IP` is set by the edge and cannot be spoofed by the client on a
- * Cloudflare-fronted origin, unlike `X-Forwarded-For`. Its **absence** means the
- * request did not come from outside — an SSR render calling its own API, or
- * local dev — so callers should skip limiting rather than fall back to a shared
- * bucket: every such request would share it, and a busy evening's page renders
- * would exhaust the bucket and start rejecting real customers.
+ * The caller's IP from `CF-Connecting-IP`, which the edge sets and a client
+ * cannot spoof. Null means the request did not come from outside (SSR calling
+ * its own API, or local dev) — callers must skip limiting rather than share
+ * one bucket between all of them (ADR-0015).
  */
 export function clientIp(event: H3Event): string | null {
   return getRequestHeader(event, 'cf-connecting-ip') ?? null

@@ -26,17 +26,8 @@ interface ImageUploadResult {
 
 /**
  * Validate and upload an image from multipart form data to blob storage.
- *
- * Handles:
- * - Extracting the file from form data
- * - MIME type validation (JPEG, PNG, WebP)
- * - Size validation (max 5 MB)
- * - Deleting the previous image (if any)
- * - Uploading to blob storage with public access
- *
- * @param event  The H3 event (used to read multipart data)
- * @param opts   Upload configuration
- * @returns      The blob pathname of the uploaded file
+ * JPEG, PNG or WebP, 5 MB maximum. Replaces and deletes any previous image.
+ * Returns the blob pathname.
  */
 export async function validateAndUploadImage(
   event: Parameters<typeof readMultipartFormData>[0],

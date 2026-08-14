@@ -4,14 +4,7 @@ import { deleteContentWarning } from '~~/shared/utils/abilities'
 
 /**
  * DELETE /api/content-warnings/:id — remove a vocabulary entry. Admin only.
- *
- * Refused if any show carries it. The foreign key is `onDelete: 'restrict'`
- * precisely so this cannot happen quietly: under the old cascade, deleting
- * "Strobe lighting" would have stripped it from every production that had it,
- * with nothing to show a customer or an auditor that it was ever there.
- *
- * Archiving is the retirement path — the entry stops being offered for new
- * shows and keeps rendering on the ones that already have it.
+ * Refused while any show carries it; archive instead (ADR-0010).
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')

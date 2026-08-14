@@ -1,19 +1,12 @@
 /**
  * Content warnings: a curated vocabulary, and the shows that carry each entry.
+ * The schema mirrors how the theatre splits them (ADR-0004):
  *
- * The NNT thinks about this in two parts, and the schema mirrors that split:
- *
- *   TECHNICAL — a small closed set of production effects (strobe, loud noise,
- *     haze). Either the show does it or it does not; there is no intensity, so
- *     the link carries no level.
- *   GENERAL — a theme (murder, suicide, racism), which appears at one of three
- *     levels: MENTIONED (referred to in passing), DISCUSSED (talked about at
- *     length), DEPICTED (shown on stage). One level per warning per show.
- *
- * This replaces the ACTION / DIALOGUE / TECHNICAL "axis" model inherited from
- * the legacy Django import, which conflated a *category of warning* with an
- * *intensity* and could only express two points of the latter. See
- * docs/decisions/0004-content-warning-model.md.
+ * TECHNICAL — a closed set of production effects (strobe, loud noise, haze).
+ *             Either the show does it or it does not, so the link carries no
+ *             level.
+ * GENERAL   — a theme, at one of MENTIONED / DISCUSSED / DEPICTED. One level
+ *             per warning per show.
  *
  * The archive tables at the bottom hold the pre-rework rows verbatim.
  */
@@ -29,15 +22,14 @@ import { shows } from './show'
 /**
  * One thing a show can be warned for.
  *
- * `slug` is the stable key. Migrations and seeds reference a warning by slug,
- * never by id, so the same entry means the same thing in dev and production —
- * the seeded rows use a literal `cw_<slug>` id for exactly that reason.
+ * `slug` is the stable key: migrations and seeds reference a warning by slug,
+ * never by id, so an entry means the same thing in every environment (the
+ * seeded rows use a literal `cw_<slug>` id for that reason).
  *
- * `category` groups GENERAL entries in the picker and on the show page. It is
- * plain text rather than an enum so the committee can add one without a deploy;
- * `CONTENT_WARNING_CATEGORIES` in shared/utils/contentWarnings.ts is the
- * suggested list, and drives sort order. Always null for TECHNICAL entries,
- * which are their own group.
+ * `category` groups GENERAL entries. Plain text rather than an enum so the
+ * committee can add one without a deploy; `CONTENT_WARNING_CATEGORIES` in
+ * shared/utils/contentWarnings.ts is the suggested list and drives sort order.
+ * Always null for TECHNICAL.
  */
 export const contentWarnings = sqliteTable('content_warnings', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -67,18 +59,14 @@ export const contentWarnings = sqliteTable('content_warnings', {
  * ------------------------------------------------------------------ */
 
 /**
- * Show ↔ warning, at one level.
+ * Show ↔ warning, at one level. `level` is null exactly when the warning is
+ * TECHNICAL.
  *
- * `level` is null exactly when the warning is TECHNICAL. SQLite CHECK
- * constraints may only reference columns of the same row, so that half of the
- * invariant cannot live here — `PUT /api/shows/:id` looks up the submitted
- * warnings' kinds and rejects a mismatch. The check below is still worth having
- * because it is the only thing constraining the enum in SQL.
+ * SQLite CHECK constraints may only reference columns of the same row, so that
+ * half of the invariant is enforced in `PUT /api/shows/:id`. The CHECK below
+ * is still the only thing constraining the enum in SQL.
  *
- * `onDelete: 'restrict'` on the warning, deliberately. Cascade would let a
- * delete from the admin vocabulary page silently strip that warning from every
- * show carrying it, with no warning and no trace. Archiving is the retirement
- * path, exactly as it is for ticket types.
+ * `onDelete: 'restrict'` on the warning, deliberately (ADR-0010).
  */
 export const showContentWarnings = sqliteTable('show_content_warnings', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -110,16 +98,14 @@ export const showContentWarningsRelations = relations(showContentWarnings, ({ on
  * ------------------------------------------------------------------ */
 
 /**
- * The pre-rework rows, verbatim: 424 vocabulary entries and ~1,001 links as they
- * stood before migration 0016 wiped and reseeded them.
+ * The pre-rework rows, verbatim, as they stood before migration 0016 wiped and
+ * reseeded them.
  *
- * Declared here rather than existing only in hand-written migration SQL so they
- * appear in the Drizzle snapshot and a future maintainer can find them. No
- * foreign keys — the tables they referenced have been rebuilt — and no unique
- * indexes, because the point is to hold what was there, not to judge it.
- *
- * Never written by the application. `GET /api/shows/:id/legacy-content-warnings`
- * reads them so the show editor can show what did not carry over.
+ * Declared here rather than only in migration SQL so they appear in the
+ * Drizzle snapshot. No foreign keys — the tables they referenced have been
+ * rebuilt — and no unique indexes, because the point is to hold what was
+ * there, not to judge it. Never written by the application;
+ * `GET /api/shows/:id/legacy-content-warnings` reads them.
  */
 export const contentWarningsArchive = sqliteTable('content_warnings_archive', {
   id: text('id').primaryKey(),
@@ -138,17 +124,13 @@ export const showContentWarningsArchive = sqliteTable('show_content_warnings_arc
   /** The axis the link sat on: ACTION, DIALOGUE or TECHNICAL. */
   kind: text('kind').notNull(),
   /**
-   * The new vocabulary entry this row was remapped onto, or null if the alias
-   * map had no target for its title.
+   * The new vocabulary entry this row was remapped onto, or null if the alias map
+   * had no target. Written once by migration 0016.
    *
-   * Written once by migration 0016 and never again. It exists because the
-   * remap collapses rows — "Sexism" and "Misogyny" both became `sexism`, so
-   * only one of the two archive ids survives as a live row. Without this column
-   * the other looks unmapped, and the show editor would tell staff a warning
-   * had been dropped when it is sitting right there under its new name.
-   *
-   * No foreign key: the archive must stay readable even if the entry it points
-   * at is later deleted.
+   * It exists because the remap collapses rows: two archive titles can share one
+   * live entry, so only one archive id survives as a live row and the other
+   * would otherwise look dropped. No foreign key — the archive must stay
+   * readable even if the entry it points at is later deleted.
    */
   mappedToWarningId: text('mapped_to_warning_id'),
   createdAt: text('created_at'),

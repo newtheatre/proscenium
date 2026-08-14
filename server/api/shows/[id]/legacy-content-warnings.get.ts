@@ -3,17 +3,12 @@ import { and, asc, eq, isNull } from 'drizzle-orm'
 import { readShow } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/shows/:id/legacy-content-warnings — what this show carried before the
- * warning rework, and did not carry over. Staff only.
+ * GET /api/shows/:id/legacy-content-warnings — warnings this show carried
+ * before the rework that did not carry over. Staff only.
  *
- * Migration 0016 remapped 963 of 998 links onto the new vocabulary. The 35 it
- * could not place were titles too vague to restate — "Adult content", "Political
- * Themes" — and inventing a mapping for them would have been worse than
- * dropping them. But a company wrote them down for a reason, so the show editor
- * shows them and asks a human to decide.
- *
- * Returns only the unmapped ones: a title still present on the show under its
- * new name is noise here, not information.
+ * Returns only the unmapped ones: a title still on the show under its new name
+ * is noise here. The show editor surfaces these for a human to replace
+ * (ADR-0004).
  */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')

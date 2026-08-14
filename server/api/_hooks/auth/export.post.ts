@@ -32,13 +32,10 @@ export default defineEventHandler(async (event) => {
     .leftJoin(schema.shows, eq(schema.performances.showId, schema.shows.id))
     .where(eq(schema.reservations.userId, userId))
 
-  // No reservations→tickets relation is declared; aggregate separately.
-  //
-  // Joined on the owner rather than on a list of reservation ids: D1 allows at
-  // most 100 bound parameters per statement, and a decade of legacy bookings
-  // puts regular attendees well past 100 reservations — exactly the people most
-  // likely to file a subject-access request. `inArray(..., reservations.map(...))`
-  // would fail the request for them. This binds one parameter at any volume.
+  // No reservations→tickets relation is declared, so aggregate separately.
+  // Joined on the owner rather than a bound list of reservation ids: a regular
+  // attendee is well past 100 reservations, and they are the people most likely
+  // to file a subject-access request (ADR-0006).
   const ticketTotals = new Map<string, { count: number, total: number }>()
   if (reservations.length) {
     const ticketRows = await db.select({

@@ -4,17 +4,17 @@ import { z } from 'zod/v4'
 import { listShows } from '~~/shared/utils/abilities'
 
 /**
- * The four disjoint slices of the archive the admin UI navigates by.
+ * The four disjoint slices of the archive the admin UI navigates by. They
+ * partition every show exactly once, so the shows page can show a count per
+ * tab without double-counting or losing one:
  *
- * They partition every show exactly once, which is what lets the shows page show
- * a count per tab without double-counting or losing one:
- *  - `draft`    — not published, whatever its dates
- *  - `current`  — published, and the run spans today
- *  - `upcoming` — published, and the run has not started
- *  - `archive`  — published, and the run has finished (or there are no dates yet)
+ *   draft    — not published, whatever its dates
+ *   current  — published, and the run spans today
+ *   upcoming — published, and the run has not started
+ *   archive  — published, and the run has finished (or has no dates yet)
  *
- * `active` is `current ∪ upcoming`, so "now and next" is one request rather than
- * two. `all` applies no scope predicate at all.
+ * `active` is current ∪ upcoming, so "now and next" is one request. `all`
+ * applies no scope predicate.
  */
 const SCOPES = ['all', 'active', 'current', 'upcoming', 'archive', 'draft'] as const
 
@@ -47,22 +47,12 @@ function unixSeconds(date: Date): number {
 
 /**
  * GET /api/shows — list shows. Staff only; the public uses /api/whats-on.
+ * Filtered and paged in SQL, returning the standard envelope (ADR-0005).
  *
- * Always returns the standard `{ rows, total, page, limit }` envelope, filtered
- * and paged in SQL. It briefly also had a no-query-string mode that returned
- * every show with every performance nested, kept alive only for the box office
- * navigator; that now uses `/api/performances?near=`, so the exception is gone
- * and the rule in server/utils/pagination.ts holds without one.
- *
- * ## Staying inside D1's 100 bound parameters
- *
- * Every *filter* is a correlated subquery or a scalar, never an id list — an
- * `IN` built from a result set is a latent hard failure as the archive grows,
- * and this endpoint sees the whole archive. The only list bound is the page's
- * own ≤50 show ids. Performance ids are never bound: 50 shows carry ~150
- * performances, which would blow the budget on its own, so the per-performance
- * lookups take a subquery instead. `countOccupiedSeats` documents that same
- * requirement at its own call site.
+ * This endpoint sees the whole archive, so every filter is a correlated
+ * subquery or a scalar, never an id list. The only list bound is the page's
+ * own ≤50 show ids; performance ids are never bound, since 50 shows carry
+ * roughly 150 performances (ADR-0006).
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listShows)
@@ -160,12 +150,10 @@ export default defineEventHandler(async (event) => {
     ? [direction === 'asc' ? asc(schema.shows.title) : desc(schema.shows.title)]
     : [direction === 'asc' ? asc(firstAt) : desc(firstAt), asc(schema.shows.title)]
 
-  // Ids only. The correlated scalars above are used to *filter* and *order*
-  // here, not to project: selecting them alongside `shows` columns returns null,
-  // because the relational builder resolves the outer reference differently in a
-  // projection than it does in a predicate. The run window is derived from the
-  // performances that come back with each row instead, which costs nothing —
-  // they are already loaded.
+  // Ids only. The correlated scalars above filter and order but cannot be
+  // projected — the relational builder resolves the outer reference differently
+  // in a projection than in a predicate, and the column comes back null. The run
+  // window is derived from the performances already loaded with each row.
   const pageRows = await db
     .select({ id: schema.shows.id })
     .from(schema.shows)

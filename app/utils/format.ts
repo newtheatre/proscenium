@@ -1,16 +1,10 @@
 /**
- * Display formatting for dates, times and money.
+ * Display formatting for dates, times and money, with `en-GB` and
+ * `Europe/London` fixed. The Worker runs in UTC, so an omitted `timeZone` is
+ * an hour wrong for the whole of British Summer Time.
  *
- * Every admin page had grown its own copies of these — eight `formatDate`s and
- * several `formatPrice`s, all reaching for `en-GB` and `Europe/London` and not
- * all of them agreeing. The theatre is in Nottingham and the Worker runs in UTC,
- * so an omitted `timeZone` is an hour wrong for the whole of British Summer
- * Time; that has already caused confirmation emails to quote the wrong time
- * (see docs/09-known-issues.md). Locale and zone are fixed here on purpose.
- *
- * These are presentation helpers for the browser. They deliberately live in
- * `app/utils/` rather than `shared/`, which is auto-imported into the server
- * build too — nothing server-side should be formatting for a UK reader.
+ * In `app/utils/` rather than `shared/`, which is auto-imported into the
+ * server build too — nothing server-side should be formatting for a UK reader.
  */
 
 const TIME_ZONE = 'Europe/London'
@@ -21,12 +15,9 @@ const EMPTY = '—'
 
 /**
  * Coerce the several shapes a timestamp arrives in to a Date.
- *
- * `performances.startsAt` comes back as **Unix seconds**, while `createdAt` and
- * friends are SQLite `current_timestamp` strings. Every copy of this logic
- * open-coded `typeof val === 'number' ? val * 1000 : val`, which is the bit
- * worth having in one place: forget the ×1000 and you get January 1970 rather
- * than an error.
+ * `performances.startsAt` is Unix **seconds**, while `createdAt` and friends
+ * are SQLite `current_timestamp` strings. Forget the ×1000 and you get January
+ * 1970 rather than an error, which is why this lives in one place.
  */
 export function toDate(value: string | number | Date | null | undefined): Date | null {
   if (value === null || value === undefined || value === '') return null

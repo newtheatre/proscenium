@@ -1,13 +1,10 @@
 <!--
-  Box Office: Walk-in / On-the-door Reservation
+Box office: create an on-the-door reservation for someone who has not
+pre-booked. Emits `created` so the parent can open CollectModal immediately
+and take payment in one flow.
 
-  Creates an on-the-door reservation for a customer who hasn't pre-booked.
-  After creation, emits `created` so the parent can immediately open
-  the CollectModal to process payment in one flow.
-
-  The server resolves the user by email (finds existing or creates a shadow
-  account), and resolves effective ticket prices through show/performance
-  overrides — so the client only needs to collect name, email, and quantities.
+The server resolves the user by email and the effective prices through the
+override chain, so this collects only name, email and quantities.
 -->
 <script setup lang="ts">
 interface TicketType {

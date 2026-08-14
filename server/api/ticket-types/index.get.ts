@@ -15,15 +15,9 @@ const querySchema = z.object({
 })
 
 /**
- * GET /api/ticket-types — list ticket types. Public.
- *
- * Archived types are excluded unless asked for. Archiving is how a type is
- * retired for good: after a decade of imports there are far more dead Fringe
- * and StuFF types than live ones, and they were cluttering every screen that
- * lists types while remaining necessary for pricing historic tickets.
- *
- * Not the same as `activeByDefault`, which only decides whether a live type is
- * pre-selected on new shows.
+ * GET /api/ticket-types — list ticket types. Public. Archived types are
+ * excluded unless asked for (ADR-0010); they remain necessary for pricing
+ * historic tickets.
  */
 export default defineEventHandler(async (event) => {
   const { includeArchived } = await getValidatedQuery(event, querySchema.parse)

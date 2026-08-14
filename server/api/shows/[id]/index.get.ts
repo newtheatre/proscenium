@@ -3,17 +3,15 @@ import { asc, count, eq, inArray } from 'drizzle-orm'
 import { readShow } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/shows/:id — one show, in full. Staff only; the public uses /api/whats-on.
+ * GET /api/shows/:id — one show, in full. Staff only; the public uses
+ * /api/whats-on.
  *
- * Unlike `/api/shows`, this returns **every column** — including
- * `longDescription`, `programmeUrl`, `externalUrl`, `contentWarningNotes` and
- * `warningsConfirmedNone`, which the list projection deliberately omits. That is
- * the point of it: anything that *edits* a show has to read it from here, or it
- * will write nulls over the fields it never received. See docs/09-known-issues.md
- * "Editing a show wiped its write-up".
+ * Returns **every** column, unlike the list projection. That is the point of
+ * it: anything that edits a show reads it from here, or it writes nulls over
+ * the fields it never received (ADR-0017).
  *
- * All the counts scope through a subquery on this show's performances rather
- * than binding their ids — one bound parameter each, whatever the run length.
+ * Counts scope through a subquery on this show's performances rather than
+ * binding their ids (ADR-0006).
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, readShow)

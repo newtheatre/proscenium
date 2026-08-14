@@ -3,18 +3,15 @@ import { onUnmounted, readonly, ref, watch } from '#imports'
 
 /**
  * A ref that trails another one, settling only once it has stopped changing.
+ * For search boxes feeding a server query: bind the input to `source` and put
+ * the returned ref in the fetch's `watch` array.
  *
- * For search boxes whose value feeds a server query: bind the input to `source`
- * and put the returned ref in the fetch's `watch` array, so a request goes out
- * per pause rather than per keystroke.
+ * Hand-written rather than taken from `@vueuse/core`, which is only a
+ * transitive dependency here.
  *
- * Written by hand rather than reached for from `@vueuse/core`, which is only a
- * transitive dependency here — importing from it directly would work until
- * something upstream stopped depending on it.
- *
- * `onSettle` runs on the same tick the value lands, which is where a paginated
- * caller resets to page 1: doing it in a separate watcher on the debounced value
- * races with the fetch and can request page 7 of a two-page result.
+ * `onSettle` runs on the tick the value lands, which is where a paginated
+ * caller resets to page 1 — doing that in a separate watcher races with the
+ * fetch and can request page 7 of a two-page result.
  */
 export function useDebouncedRef<T>(
   source: Ref<T>,

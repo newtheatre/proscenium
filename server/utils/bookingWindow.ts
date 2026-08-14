@@ -1,14 +1,13 @@
 /**
  * When online booking closes for a performance.
  *
- * `performances.bookingClosesHoursBefore` came across from the legacy system's
- * `hours_til_close` and is set on 1,254 imported performances — 789 at two
- * hours, 440 at one, 25 at zero — but nothing read it, so the only guard on the
- * public booking path was "has it started yet". A customer could book online at
- * curtain-up on a performance front-of-house had closed two hours earlier.
+ * `performances.bookingClosesHoursBefore` came across from the legacy system
+ * and is set on most imported performances, but nothing read it — so the only
+ * guard on the public booking path was "has it started yet", and a customer
+ * could book at curtain-up on a performance front-of-house had closed hours
+ * earlier.
  *
- * Null means no cutoff beyond the performance itself, which is also what zero
- * means. Both leave booking open until `startsAt`.
+ * Null and zero both mean no cutoff beyond `startsAt`.
  */
 
 export interface BookingWindowPerformance {

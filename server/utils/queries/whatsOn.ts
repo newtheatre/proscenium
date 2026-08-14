@@ -1,15 +1,13 @@
 /**
  * Column allow-lists for the public What's On endpoints.
  *
- * `/api/whats-on` and `/api/whats-on/:slug` are unauthenticated and served with
- * `Cache-Control: public, s-maxage=300`, so whatever they return is also cached
- * at the edge for anyone to fetch. Both used to spread the raw rows
- * (`...show`, `...perf`), which published `performances.notes` — declared in the
- * schema as "Internal production notes, not shown to customers" — along with
- * every other column added to either table since.
+ * Both are unauthenticated and served with `s-maxage=300`, so anything they
+ * return is cached at the edge for anyone to fetch. Spreading the raw rows
+ * published `performances.notes` — "Internal production notes" — along with
+ * every column since added.
  *
- * Allow-list rather than deny-list, so a new column is private until someone
- * decides otherwise, and shared between the two endpoints so they cannot drift.
+ * Allow-list, not deny-list, so a new column is private until someone decides
+ * otherwise; shared between the two endpoints so they cannot drift.
  */
 
 /** Show columns the public may see. */

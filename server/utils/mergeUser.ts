@@ -2,32 +2,23 @@ import { db, schema } from '@nuxthub/db'
 import { eq, sql } from 'drizzle-orm'
 
 /**
- * Re-point everything this app holds for one auth account onto another —
- * this app's share of an estate-wide account merge (stage-door ADR-0015).
+ * Re-point everything this app holds for one auth account onto another — this
+ * app's share of an estate-wide account merge (stage-door ADR-0015).
  *
- * SCOPE: like anonymiseUser, this is the implementation behind a hook
- * (`POST /api/_hooks/auth/merge`) and only makes sense as part of the
- * centrally-orchestrated merge: stage-door calls every app's merge hook
- * first, and only when all succeed does it union roles, move credentials,
- * and erase the losing identity. Calling this directly re-points bookings
- * but leaves two live central identities.
+ * SCOPE: the implementation behind `POST /api/_hooks/auth/merge`. Calling it
+ * directly re-points bookings but leaves two live central identities.
  *
- * Four columns reference users — reservations.userId, passes.userId, and
- * the two staff-attribution columns (passes.issuedByUserId,
- * pass_admissions.redeemedByUserId). All four re-point. Each statement
- * binds exactly two parameters however many rows move, so D1's 100-bound-
- * parameter cap is irrelevant here — do not "fix" this into the chunked
- * pattern last-activity uses.
+ * All four user-referencing columns re-point: reservations.userId,
+ * passes.userId, passes.issuedByUserId, pass_admissions.redeemedByUserId.
+ * Each statement binds two parameters however many rows move, so this is
+ * already within D1's limit — do not convert it to the chunked pattern
+ * last-activity uses (ADR-0006).
  *
- * The losing mirror row is then deleted: with nothing referencing it the
- * `restrict` FKs are satisfied, and deletion frees its unique email. This
- * does not bend the anonymise-never-delete rule — that rule protects the
- * sales record, which now lives intact on the winner's row. (If a stale
- * session re-upserts the loser's mirror before its epoch bump lands, the
- * resurrected row owns nothing and is harmless.)
+ * Deleting the losing mirror row afterwards does not bend ADR-0014: the sales
+ * record lives on intact under the winner.
  *
- * Idempotent: re-running after a partial failure re-points whatever is
- * left (possibly zero rows) and re-deletes an already-absent row.
+ * Idempotent: a re-run re-points whatever is left and re-deletes an
+ * already-absent row.
  */
 
 export interface MergeCounts {

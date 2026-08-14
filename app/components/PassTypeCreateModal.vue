@@ -1,10 +1,6 @@
 <!--
-  Create a pass product.
-
-  The show scope is stored explicitly rather than as a rule (season + category),
-  because shows get added and pulled mid-season and a rule cannot express
-  "everything except that one". Pick the shows here; the list stays editable
-  afterwards, and adding a show later grants it to every existing holder.
+Create a pass product. Pick the covered shows explicitly — the scope is a
+list, not a rule, and stays editable afterwards (ADR-0002).
 -->
 <script setup lang="ts">
 interface ShowOption {

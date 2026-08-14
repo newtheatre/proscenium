@@ -1,14 +1,7 @@
 /**
- * Performance Ticket Types Modal Component
- *
- * Manages performance-level ticket type overrides.
- * All edits are buffered locally and only committed when "Save" is pressed.
- *
- * @prop performance — The performance to configure (null = closed)
- * @prop performanceLabel — Display label, e.g. "Performance 3"
- * @prop showTitle — Parent show name for the modal title
- * @emits close — Emitted when the modal should close
- * @emits refresh — Emitted after a successful save
+ * Performance-level ticket type overrides. Edits are buffered and committed
+ * together on save, since a row can mean "delete the override" as readily as
+ * "write one".
  */
 <script setup lang="ts">
 interface PerformanceMeta {

@@ -2,14 +2,13 @@ import { db } from '@nuxthub/db'
 import { isStaff, readReservation } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/reservations/:id — get a reservation by ID. Staff or reservation owner.
+ * GET /api/reservations/:id — one reservation. Staff or the owner.
  *
- * `readReservation` admits the owner as well as staff, so this cannot return the
- * staff shape unconditionally: `reservationDetailWith` carries no `columns`
- * allow-list, and Drizzle then returns every reservation column — including
- * `staffNotes` ("Internal box-office notes — not visible to the customer") and
- * `legacyRef`, which re-identifies anonymised bookers. Customers get the same
- * allow-listed shape /api/bookings/* serves them.
+ * `readReservation` admits the owner too, so this cannot return the staff
+ * shape unconditionally: `reservationDetailWith` has no `columns` allow-list,
+ * so Drizzle returns every column — including `staffNotes` and `legacyRef`,
+ * which re-identifies anonymised bookers. Customers get the allow-listed shape
+ * /api/bookings/* serves them.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')

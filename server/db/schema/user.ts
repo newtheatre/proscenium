@@ -3,12 +3,12 @@ import { sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 
 /**
- * Thin mirror of the central NNT identity store (stage-door).
+ * Thin mirror of the central NNT identity store (stage-door). Ids are the
+ * canonical auth-service ids.
  *
- * Ids equal canonical auth-service ids: upserted from the shared session on
- * authenticated requests (ensureLocalUser), or created via the auth
- * service's shadow endpoint for guest checkout. Credentials, roles, and
- * verification live in the auth service — roles ride in the sealed session
+ * Rows are upserted from the shared session (ensureLocalUser) or created via
+ * the auth service's shadow endpoint for guest checkout. Credentials, roles
+ * and verification live in the auth service; roles ride in the sealed session
  * and are read through the ability layer, never from this table.
  */
 export const users = sqliteTable('users', {

@@ -39,12 +39,9 @@ export const deleteUser = defineAbility((user: AbilityUser, resource: OwnedResou
 
 /*
  * Deliberately absent: `updateUser`, `updateUserRoles`, `updateUserVerified`,
- * `resetUserPassword` and `anonymiseUserAccount`.
- *
- * Credentials, roles, verification and erasure all live in the central auth
- * service (stage-door) — this app holds a read-only mirror and must not carry
- * role-editing or credential UI (stage-door CLAUDE.md invariants 1 and 4).
- * Erasure arrives via `POST /api/_hooks/auth/anonymise`, not a local route.
- * These abilities guarded endpoints that no longer exist, so leaving them
- * exported implied a permission model this app does not enforce.
+ * `resetUserPassword`, `anonymiseUserAccount`. Credentials, roles,
+ * verification and erasure all belong to the auth service; this app holds a
+ * read-only mirror and must not carry role-editing or credential UI
+ * (stage-door CLAUDE.md invariants 1 and 4). Erasure arrives via
+ * `POST /api/_hooks/auth/anonymise` (ADR-0014).
  */

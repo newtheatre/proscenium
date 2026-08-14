@@ -13,29 +13,23 @@ const querySchema = z.object({
 })
 
 /**
- * GET /api/admin/export/tickets — download ticket data as a CSV file.
- * ADMIN and MANAGER only. Intended for the treasurer / financial reporting.
+ * GET /api/admin/export/tickets — ticket data as CSV, for the treasurer.
+ * ADMIN and MANAGER only.
  *
- * Query params — at least one bound is required:
- *   performanceId — a single performance (takes precedence over showId)
+ * At least one bound is required, and this is not optional: unfiltered, the
+ * six-way join reads on the order of 320,000 rows and builds ~10 MB of CSV in
+ * Worker memory against a 30 s query cap.
+ *
+ *   performanceId — one performance (takes precedence over showId)
  *   showId        — every performance of one show
  *   from / to     — inclusive performance-date range, YYYY-MM-DD
  *
- * The bound is not optional. Unfiltered, this six-way join covers all 45,563
- * tickets, reads roughly 320,000 rows and concatenates about 10 MB of CSV in
- * Worker memory against a 30 s query cap — and "All shows" used to be the
- * default choice in the admin UI, one click away.
- *
- * All statuses are included so the treasurer has a full audit trail. Refunded
- * tickets are marked in the "Refunded" column.
- *
- * On money: the legacy import brought in prices of varying trustworthiness, so
- * the export states which is which rather than presenting them all as fact.
- * "Price Confidence" is EXACT, DERIVED (apportioned from a booking total) or
- * UNKNOWN (never recorded). UNKNOWN rows leave the price cell empty instead of
- * writing 0.00, which was indistinguishable from a genuine comp. "Ticket Kind"
- * separates PASS_SALE (the sale of a pass) from PASS_ADMISSION (an entry it
- * paid for), which must not be added together.
+ * Every status is included so the audit trail is complete; refunds are marked
+ * in their own column. "Price Confidence" carries the legacy import's
+ * EXACT/DERIVED/UNKNOWN distinction (ADR-0003) rather than presenting all
+ * prices as fact — UNKNOWN leaves the cell empty, because 0.00 is
+ * indistinguishable from a genuine comp. "Ticket Kind" separates PASS_SALE
+ * from PASS_ADMISSION, which must never be summed together.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, defineAbility((user: AbilityUser) => isAdminOrManager(user)))

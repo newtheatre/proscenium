@@ -1,13 +1,10 @@
 /**
- * The vocabulary of content warnings, as the UI and the API both need to speak it.
+ * The content-warning vocabulary, as the UI and the API both need to speak it
+ * (ADR-0004).
  *
- * Everything here used to be written out four times: the Drizzle enum, the zod
- * enum in the show PUT, the type in shared/types/shows.ts, and a local copy in
- * each of the two Vue components — which is how the admin editor and the public
- * page came to describe the same axis with different words.
- *
- * Auto-imported on both client and server (shared/utils is a Nuxt auto-import
- * directory), so nothing needs to import from here explicitly.
+ * One definition rather than five: the Drizzle enum, the zod enum in the show
+ * PUT, the shared type and a copy in each Vue component all described the same
+ * thing, in different words. Auto-imported on both sides.
  */
 
 export type ContentWarningKind = 'TECHNICAL' | 'GENERAL'

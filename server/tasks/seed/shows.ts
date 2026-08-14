@@ -100,12 +100,12 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
   // ── Performances ──────────────────────────────────────────────────────────
 
   // ── Performances ──────────────────────────────────────────────────────────
-  // Offsets are relative to today so the spread of past/current/future is
-  // always the same regardless of when the seed runs.
+  // Offsets are relative to today so the spread of past/current/future is the
+  // same regardless of when the seed runs.
   //
-  // Earnest  — completed run,  days -35 to -31  (~5 weeks ago)
-  // Hamlet   — currently live, days  -1 to  +9  (yesterday → next weekend)
-  // Into the Woods — upcoming, days +49 to +53  (~7 weeks from now)
+  //   Earnest        — completed run, days -35 to -31
+  //   Hamlet         — currently live, days  -1 to  +9
+  //   Into the Woods — upcoming,      days +49 to +53
 
   const performancesToCreate = [
     // The Importance of Being Earnest — completed run at New Theatre
@@ -292,18 +292,14 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
   }
 
   // ── Content Warnings ──────────────────────────────────────────────────────
+  // Enough to exercise all three public states, since the difference between
+  // them is the whole design (ADR-0004):
   //
-  // Enough to exercise all three public states, because the difference between
-  // them is the whole design and none of it was visible locally before: the
-  // vocabulary arrives from migration 0016 and the seed never linked anything,
-  // so every seeded show rendered "no information recorded".
+  //   Hamlet                      — warnings listed, across all four groups
+  //   Earnest                     — checked, and there are none
+  //   Into the Woods, Oscar Night — untouched, nobody filled this in
   //
-  //   Hamlet        — warnings listed, across all four groups
-  //   Earnest       — checked, and there are none (the reassuring state)
-  //   Into the Woods, Oscar Night — untouched (the "nobody filled this in" state)
-  //
-  // Looked up by slug rather than id: the migration seeds literal `cw_<slug>`
-  // ids, but going through the column is what the application does.
+  // Looked up by slug rather than id, which is what the application does.
   const vocabulary = await db.select({ id: contentWarnings.id, slug: contentWarnings.slug })
     .from(contentWarnings)
   const warningId = (slug: string) => vocabulary.find(w => w.slug === slug)?.id

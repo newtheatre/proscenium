@@ -9,12 +9,9 @@ const bodySchema = z.object({
   price: z.number().int().nonnegative('Price must be a non-negative integer (in pence)').optional(),
   activeByDefault: z.boolean().optional(),
   /**
-   * Retire a type. Distinct from `activeByDefault`, which only decides whether
-   * a *live* type is pre-selected on new shows — an inactive type is still
-   * offered and can be switched on per show or performance. Archiving says the
-   * type will never be sold again: it disappears from every picker and every
-   * override screen, while its historic tickets keep resolving their price and
-   * name. That is what the legacy Fringe and StuFF types need.
+   * Retire a type (ADR-0010). Distinct from `activeByDefault`, which only
+   * decides whether a live type is pre-selected on new shows — an inactive type
+   * is still offered and can be switched on per show or performance.
    */
   archived: z.boolean().optional(),
 })

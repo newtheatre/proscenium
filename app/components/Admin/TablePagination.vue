@@ -1,14 +1,11 @@
 <!--
-  The footer under an admin table: what you are looking at on the left, the pager
-  on the right.
+The footer under an admin table: what you are looking at on the left, the
+pager on the right.
 
-  Note the props are plain numbers rather than a handle on the table. The pages
-  this replaces read `table?.tableApi?.getFilteredRowModel().rows.length`
-  *in the template*, which re-walks TanStack's whole row model on every render —
-  the same class of problem as the render loop documented in
-  docs/02-architecture.md, and the reason `/admin/shows` once locked the tab.
-  Every caller already owns its `pagination` and `rowSelection` refs, so it can
-  pass counts it knows without asking the table to recompute them.
+Props are plain numbers rather than a handle on the table: reading
+`table?.tableApi?.getFilteredRowModel()` in a template re-walks the whole
+row model on every render (ADR-0012). Callers already own their `pagination`
+and `rowSelection` refs, so they can pass counts they know.
 -->
 <script setup lang="ts">
 const props = defineProps<{

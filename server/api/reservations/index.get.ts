@@ -12,15 +12,9 @@ const querySchema = paginationSchema.extend({
 })
 
 /**
- * GET /api/reservations — list reservations. Staff only.
- *
- * Paginated in SQL, returning a `{ rows, total, page, limit }` envelope. There
- * are 30,000+ reservations, so returning the whole table and filtering in the
- * browser is not viable — it was ~18 MB of JSON per page load, assembled inside
- * a Worker.
- *
- * Search covers booking reference, holder name and holder email, in SQL for the
- * same reason.
+ * GET /api/reservations — list reservations. Staff only. Filtered, searched
+ * and paged in SQL, returning the standard envelope (ADR-0005). Search covers
+ * booking reference, holder name and holder email.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listReservations)

@@ -133,27 +133,21 @@ export default defineNuxtConfig({
             binding: 'DB',
             database_name: 'proscenium',
             database_id: '01a75263-87a9-452a-a4a0-b3b9db71dfe5',
-            // Set here rather than left to NuxtHub, whose default is
-            // `.output/server/db/migrations/` — wrong twice over, and silently.
+            // Set here rather than left to NuxtHub, whose default is silently wrong twice
+            // over. Wrangler resolves this relative to the config file, and the generated
+            // config lives at `.output/server/wrangler.json` — so the default expands to
+            // `.output/server/.output/server/db/migrations`, and pointing it at the
+            // project root lands on a directory holding no `.sql` files at all. Wrangler
+            // then reports "No migrations to apply!" and exits 0: a false success on the
+            // one command whose job is telling you whether production is up to date.
             //
-            // Wrangler resolves this **relative to the config file**, and the
-            // generated config lives at `.output/server/wrangler.json`, so that
-            // default expands to `.output/server/.output/server/db/migrations`.
-            // Point it at the project root instead and it lands on a directory
-            // that holds only a `sqlite/` subdirectory, no `.sql` files — at
-            // which point wrangler reports "✅ No migrations to apply!" and
-            // exits 0. A false success on the one command whose whole job is
-            // telling you whether production is up to date.
-            //
-            // NuxtHub sets it with `||=` (module.mjs), so this wins. Nothing
-            // else reads it: the dev-time migrator resolves its own paths, so
-            // this only affects the wrangler CLI.
+            // NuxtHub sets it with `||=`, so this wins. Only the wrangler CLI reads it;
+            // the dev-time migrator resolves its own paths.
             migrations_dir: 'db/migrations/sqlite',
           },
         ],
-        // Estate-wide secrets live in the account Secrets Store so a rotation
-        // is one write rather than four worker secrets updated in lockstep
-        // (docs/08-operations.md#secrets). server/plugins/secrets-store.ts
+        // Estate-wide secrets live in the account Secrets Store (stage-door
+        // ADR-0016; docs/08-operations.md#secrets). server/plugins/0.secrets-store.ts
         // turns the binding into runtimeConfig.session.password — read its
         // header before adding another entry here, the binding name matters.
         //
@@ -182,8 +176,9 @@ export default defineNuxtConfig({
       // Baseline security headers on every response.
       '/**': {
         headers: {
-          // Booking references are bearer secrets and still appear in some URLs
-          // (?ref=), so keep them out of the Referer sent to other origins.
+          // Guest booking links carry a signed access token in `?t=` until the
+          // page swaps it for a cookie, so keep the query string out of the
+          // Referer sent to other origins (ADR-0009).
           'Referrer-Policy': 'strict-origin-when-cross-origin',
           'X-Content-Type-Options': 'nosniff',
           'X-Frame-Options': 'DENY',

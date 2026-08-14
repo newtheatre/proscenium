@@ -17,12 +17,9 @@ const bodySchema = z.object({
  * PUT /api/pass-types/:id — edit a pass product, including putting it on sale.
  * Admin/Manager only.
  *
- * This route is what makes passes sellable at all. `POST /api/pass-types`
- * creates every product as DRAFT, the box office only offers types whose status
- * is ON_SALE, and nothing else in the app writes `passTypes.status` — so before
- * this existed, the empty state in the Sell tab ("A pass type must be set to
- * ON_SALE in the admin area before it can be sold") pointed at a control that
- * did not exist, and the whole passes feature was unreachable end to end.
+ * This is the only route that writes `passTypes.status`, and the box office
+ * only offers ON_SALE types — so without it every product stays DRAFT and the
+ * passes feature is unreachable end to end.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, managePassTypes)

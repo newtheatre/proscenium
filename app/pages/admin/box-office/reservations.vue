@@ -1,23 +1,9 @@
 <!--
-  Box Office: FoH Reservations
+Box office: front-of-house reservations for one performance.
 
-  Front-of-house reservation management for Box Office Staff.
-
-  Features:
-  - Performance navigator over upcoming on-sale performances only, with a date
-    picker to jump ahead without arrowing there
-  - Defaults to today's performance, else the next one; says so plainly when
-    there is neither. It never selects a performance that has already been —
-    those are looked up in Reservations
-  - "Collect" slideover: confirms tickets + marks COLLECTED
-  - "Walk-in" modal: creates on-the-door reservation then immediately collects
-  - Status summary pills (Pending, Collected, Door, No-Show, Cancelled)
-  - Search by booking ref or customer name/email
-  - "Mark all as No-Show" per performance (fun toast if show hasn't started)
-
-  Data:
-  - GET /api/performances?from=today&status=ON_SALE → performance navigator
-  - GET /api/reservations?performanceId=:id&withCounts=true → reservations table
+The navigator covers on-sale performances from today onwards and nothing
+else (ADR-0018). Collect confirms tickets and marks the booking COLLECTED;
+Walk-in creates an on-the-door reservation and collects it immediately.
 -->
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
@@ -120,32 +106,12 @@ const today = londonDateOnly(new Date())
 const NAVIGATOR_LIMIT = 200
 
 /**
- * On-sale performances from today onwards, and nothing else.
+ * On-sale performances from today onwards, and nothing else (ADR-0018). The
+ * date picker below re-selects within this list rather than re-fetching, so
+ * there is no window to slide backwards.
  *
- * The box office is a forward-looking tool: it exists to work tonight's door.
- * Past performances are deliberately unreachable from this screen — landing on
- * a show that finished last March invites collecting tickets against the wrong
- * night, and there is no workflow here that needs one. The reservations list
- * (/admin/reservations) is where a historical booking is looked up.
- *
- * `status=ON_SALE` for the same reason. A DRAFT performance is one nobody can
- * book, so its door list is empty by definition and its capacity figures are
- * meaningless — putting it in the navigator only creates a way to sell a walk-in
- * against a night that is not on sale. Publishing a show does not publish its
- * performances, so a published show can perfectly well have draft ones; they
- * appear here once they are actually selling.
- *
- * That also means the date picker below re-selects within this list rather than
- * re-fetching, so there is no window to slide and no way to slide it backwards.
- *
- * This page used to load `/api/shows` with no parameters — every show in the
- * archive, 498 of them with 1,304 performances nested, to render one navigator.
- *
- * requestFetch, not a plain useFetch: this endpoint is behind authorize(), and a
- * plain useFetch running on the server does not forward the session cookie — the
- * picker came back 403 and empty on every hard load, filling in only once
- * something triggered a client-side refetch. Same rule for the reservation pages
- * fetched below. See docs/02-architecture.md §Fetching in the admin area.
+ * `useRequestFetch()` is not optional — this endpoint is behind authorize()
+ * (ADR-0013). Same for the reservation pages fetched below.
  */
 const requestFetch = useRequestFetch()
 const { data: performancePage, status: showsStatus, error: showsError, refresh: refreshShows } = await useAsyncData(
@@ -169,12 +135,8 @@ const sortedPerformances = computed(() =>
 
 /**
  * The performance a volunteer wants for a given day: one on that day, else the
- * next one after it.
- *
- * There is deliberately no fallback to the most recent past performance. Every
- * candidate is already today or later, so this can only ever move forwards —
- * and when there is nothing left ahead, the answer is nothing and the page says
- * so, rather than quietly presenting a finished show as if it were tonight's.
+ * next after it. Never the most recent past one — when there is nothing ahead
+ * the answer is nothing, and the page says so (ADR-0018).
  */
 function pickPerformance(
   perfs: typeof sortedPerformances.value,
@@ -288,11 +250,10 @@ const nothingScheduled = computed(() =>
 // ── Reservations data ─────────────────────────────────────────────────────────
 
 /**
- * The door list must be complete — a silently truncated one sends someone away
- * who has actually booked. `/api/reservations` is paginated and caps a page at
- * 100; the busiest performance on record has 94 reservations, so this is
- * normally a single request, but it follows pages until it has them all rather
- * than relying on that staying true.
+ * The door list must be complete — a silently truncated one turns away someone
+ * who has booked. `/api/reservations` caps a page at 100, which is normally
+ * one request, but this follows pages until it has them all rather than
+ * relying on that staying true.
  */
 async function fetchAllForPerformance(performanceId: string): Promise<Reservation[]> {
   const limit = 100

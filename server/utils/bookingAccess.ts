@@ -5,13 +5,9 @@ import { isStaff } from '~~/shared/utils/abilities'
 
 /**
  * Cookie carrying a signed access token, for a guest who arrived from a link
- * that carried one in its query string.
- *
- * A token in the URL reaches browser history, any intermediary's logs, and the
- * Referer of every outbound link on the booking page. Moving it into a cookie on
- * first use — and letting the page drop it from the address bar — keeps a live
- * credential out of all three. The token is already scoped to one booking and
- * already expires; the cookie is only a better place to keep it.
+ * that carried one in its query string. A token left in the URL reaches
+ * browser history, intermediary logs and the `Referer` of every outbound link
+ * on the page (ADR-0009).
  */
 export const BOOKING_TOKEN_COOKIE = 'nnt_booking_token'
 
@@ -30,12 +26,7 @@ export function setBookingTokenCookie(event: H3Event, token: string): void {
 
 /**
  * Whether the caller presents a valid access token for this booking, from `?t=`
- * or from the cookie.
- *
- * `?ref=` is deliberately no longer accepted. The booking reference is a
- * customer-facing identifier — printed on emails, read aloud at the box office,
- * quoted in messages — and treating it as a credential meant every one of those
- * places was handing out access.
+ * or from the cookie. `?ref=` is deliberately not accepted (ADR-0009).
  */
 export async function hasBookingToken(event: H3Event, bookingId: string): Promise<boolean> {
   const query = getQuery(event)

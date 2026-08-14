@@ -1,27 +1,8 @@
 /**
- * Admin: Reservation Management Page
+ * Admin: every reservation, paged and searched on the server (ADR-0005).
  *
- * Administrative interface for viewing and managing all reservations.
- *
- * Features:
- * - Table view of all reservations with selection
- * - Filter by status and search by booking reference or customer name
- * - View show, performance, venue and customer details inline
- * - Status badges (PENDING, COLLECTED, DOOR, CANCELLED, NO_SHOW)
- * - Edit reservation status and notes via modal
- * - Copy booking reference / reservation ID
- * - Pagination
- *
- * Data Loading:
- * - GET /api/reservations (server-side paginated, filtered and searched)
- * - GET /api/admin/reservation-counts (status tallies)
- *
- * Data Mutations:
- * - PUT /api/reservations/:id (update status/notes)
- *
- * @route /admin/reservations
- * @authenticated
- * @admin-only
+ * This is where a historical booking is looked up; the box-office screen is
+ * deliberately forward-looking only (ADR-0018).
  */
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'

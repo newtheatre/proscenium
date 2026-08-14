@@ -1,18 +1,5 @@
 /**
- * Edit Venue Modal Component
- *
- * Modal for editing existing venues (admin/manager only).
- *
- * Features:
- * - Form validation with Zod schema
- * - Pre-filled with existing venue data
- * - Image upload and management
- * - Feature selection
- * - Updates venue via PUT /api/venues/:id
- * - Toast notifications for success/error
- *
- * @props venue - Venue object to edit (null/undefined means modal is closed)
- * @emits refresh - Emitted after successful venue update
+ * Edit a venue, its features and its image. Admin/Manager only.
  */
 <script setup lang="ts">
 import * as z from 'zod'

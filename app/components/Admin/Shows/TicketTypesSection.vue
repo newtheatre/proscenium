@@ -1,14 +1,12 @@
 <!--
-  Show-level ticket type availability and price overrides, editable in place.
+Show-level ticket type availability and price overrides, editable in place
+(ADR-0017).
 
-  Converted from a modal. Edits are still buffered locally and committed together
-  on save — that part was right, because a row here can mean "delete the
-  override" as easily as "write one", and applying each toggle immediately would
-  make a half-finished price change permanent.
+Edits are buffered and committed together on save: a row here can mean
+"delete the override" as readily as "write one", so applying each toggle
+immediately would make a half-finished price change permanent.
 
-  What changed is that it no longer opens and closes: a show's prices are a
-  property of the show, so they sit on the show's page. Prices set here apply to
-  every performance unless a performance overrides them itself.
+Prices set here apply to every performance unless one overrides them.
 -->
 <script setup lang="ts">
 interface Override {

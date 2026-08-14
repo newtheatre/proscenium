@@ -1,19 +1,8 @@
 /**
- * Edit Reservation Modal Component
+ * Edit a reservation's status and notes. Staff only.
  *
- * Modal for updating a reservation's status and notes (admin/staff only).
- *
- * Features:
- * - Status transitions (PENDING, COLLECTED, DOOR, CANCELLED, NO_SHOW)
- * - Conditional cancelledBy field when status is CANCELLED
- * - Customer-facing notes and internal staff notes
- * - Zod form validation
- * - Updates via PUT /api/reservations/:id
- * - Toast notifications for success/error
- *
- * @props reservation - Reservation to edit (null closes the modal)
- * @emits refresh - After a successful update
- * @emits close   - When the modal should close
+ * `cancelledBy` is required when the status becomes CANCELLED. `staffNotes` is
+ * internal and never reaches the customer.
  */
 <script setup lang="ts">
 import * as z from 'zod'

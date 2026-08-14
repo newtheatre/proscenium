@@ -1,11 +1,9 @@
 <!--
-  The fields of a content warning, shared by the create and edit modals.
+The fields of a content warning, shared by the create and edit modals.
 
-  One component rather than two copies, because the rules about which fields
-  apply are not obvious and are easy to get subtly different: a technical
-  warning has no category, and `slug` is a stable key that other things may
-  reference by name, so changing it on an existing entry deserves a warning
-  rather than a silent text input.
+One component rather than two, because the rules are easy to get subtly
+different: a technical warning has no category, and `slug` is a stable key
+other things reference by name.
 -->
 <script setup lang="ts">
 const model = defineModel<{

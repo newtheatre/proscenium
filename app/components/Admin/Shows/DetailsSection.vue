@@ -1,17 +1,9 @@
 <!--
-  A show's core details, editable in place.
+A show's core details, editable in place on the show's own page (ADR-0017).
 
-  This was a 600-line modal opened from a read-only summary card, so managing a
-  show meant looking at its details, opening a dialog containing the same details
-  again, editing, saving, and watching the dialog close. The detail page already
-  exists to be the place a show is managed; the fields belong on it.
-
-  Two things fell out of the move. The modal had to guard against being opened
-  with a projected list row that was missing five columns — the page fetches the
-  full record, so that guard is gone. And content warnings are now their own
-  section: they are a separate concern with a separate vocabulary, and
-  `PUT /api/shows/:id` takes a partial body, so each section saves only what it
-  owns.
+The page fetches the full record, so this form cannot null a field it never
+received. `PUT /api/shows/:id` takes a partial body, so it saves only the
+fields it owns.
 -->
 <script setup lang="ts">
 import * as z from 'zod'

@@ -76,14 +76,10 @@ interface BookingEmailData {
 /**
  * Escape a value for interpolation into an email's HTML body.
  *
- * `customerName` and `customerNotes` arrive from the unauthenticated booking
- * endpoint, where the caller also chooses the recipient address. Unescaped, that
- * lets anyone put arbitrary markup — a payment link, say — inside a DKIM-signed
- * message from the theatre's own domain.
- *
- * Show, venue and ticket-type names are staff-entered rather than public, but
- * they are escaped too: an apostrophe in a show title is common enough on its
- * own, and a rule with exceptions is one someone will later apply wrongly.
+ * `customerName` and `customerNotes` come from the unauthenticated booking
+ * endpoint, where the caller also chooses the recipient — unescaped, that puts
+ * attacker markup inside a DKIM-signed message from the theatre's domain.
+ * Staff-entered values are escaped too; a rule with exceptions gets misapplied.
  */
 function escapeHtml(value: string): string {
   return value
@@ -100,13 +96,9 @@ function escapeMultiline(value: string): string {
 }
 
 /*
- * Performance times are instants, and these run inside a Cloudflare Worker,
- * whose system timezone is UTC. Without an explicit `timeZone` a 19:30 BST
- * curtain-up renders as "18:30" — so for roughly eight months of the year every
- * confirmation, reminder and cancellation email quoted a time an hour earlier
- * than the website, and a post-midnight fringe slot came out on the wrong day
- * entirely. Every other formatter of this field in the app already pins
- * Europe/London; these two were the exception.
+ * The Worker's system timezone is UTC, so every formatter of a performance
+ * time must pin Europe/London explicitly or a 19:30 BST curtain-up renders as
+ * 18:30 for eight months of the year.
  */
 const THEATRE_TIME_ZONE = 'Europe/London'
 

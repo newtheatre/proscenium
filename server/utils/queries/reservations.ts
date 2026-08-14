@@ -58,19 +58,16 @@ export const reservationDetailWith = {
   tickets: ticketsConfig,
 } satisfies ReservationWith
 
-/* ------------------------------------------------------------------ *
+/*
+ * ----------------------------------------------------------------
  * Customer-facing shapes
  *
  * The shapes above are for staff. Customer endpoints must not reuse them:
- * without an explicit `columns` list Drizzle returns every reservation column,
- * which includes `staffNotes` ("Internal box-office notes — not visible to the
- * customer") and `legacyRef`.
- *
- * `legacyRef` matters especially: 21,804 imported reservations belong to
- * anonymised bookers and every one carries the legacy code that, together with
- * the import artifacts, re-identifies them. And 12 imported `staffNotes` quote
- * another customer's name verbatim.
- * ------------------------------------------------------------------ */
+ * without an explicit `columns` list Drizzle returns every reservation
+ * column, including `staffNotes` and `legacyRef` — and `legacyRef`
+ * re-identifies anonymised bookers (ADR-0014).
+ * ----------------------------------------------------------------
+ */
 
 /** Reservation columns a customer may see. Allow-list, so new columns are private by default. */
 export const reservationCustomerColumns = {

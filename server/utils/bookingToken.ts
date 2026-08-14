@@ -1,20 +1,11 @@
 /**
- * Signed, expiring access tokens for guest booking links.
+ * Signed, expiring access tokens for guest booking links. The booking
+ * reference is not a credential (ADR-0009).
  *
- * `bookingRef` used to be both the reference a customer quotes at the box
- * office and the bearer secret that unlocked their booking. Six characters from
- * a 32-symbol alphabet is about 1.07e9 values, and with 28,879 live rows a blind
- * guess hit a real booking roughly once in 37,000 — enumerable, and the payload
- * is a name, an email and a phone-adjacent set of notes.
- *
- * These tokens separate the two jobs. The reference goes back to being a
- * reference; access is granted by something signed, scoped to one booking, and
- * expiring on its own.
- *
- * Format: `<base64url payload>.<base64url HMAC-SHA256>`. Compact enough for a
- * URL, verifiable without a database round trip, and revocable in bulk by
- * rotating the secret. HMAC rather than encryption because nothing in the
- * payload is secret — the booking id is already in the path.
+ * Format: `<base64url payload>.<base64url HMAC-SHA256>` — verifiable without a
+ * database round trip, revocable in bulk by rotating the secret. HMAC rather
+ * than encryption: nothing in the payload is secret, the booking id is already
+ * in the path.
  */
 
 interface TokenPayload {
@@ -43,9 +34,9 @@ function b64urlDecode(value: string): Uint8Array<ArrayBuffer> {
 
 function secret(): string {
   const config = useRuntimeConfig()
-  // Falls back to the session password so this works on an existing deployment
-  // without a new environment variable. Set bookingTokenSecret to rotate booking
-  // links independently of sessions.
+  // Falls back to the session password so an existing deployment works without
+  // a new variable. Set bookingTokenSecret in production to rotate booking
+  // links independently of the estate seal (ADR-0009).
   const value = config.bookingTokenSecret || (config as { session?: { password?: string } }).session?.password
   if (!value) {
     throw createError({ statusCode: 500, statusMessage: 'Booking token secret is not configured' })

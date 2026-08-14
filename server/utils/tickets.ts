@@ -3,20 +3,12 @@ import type { SQL } from 'drizzle-orm'
 import { and, count, eq, inArray, isNull, ne } from 'drizzle-orm'
 
 /**
- * Ticket types a human may choose to sell, and the filter that enforces it.
+ * Ticket types a human may choose to sell: `SINGLE`, not archived.
  *
- * `SINGLE` is an ordinary seat. The other two kinds are bookkeeping and must
- * never appear in a picker or a quantity stepper:
- *
- * - `PASS_SALE` records the purchase of a pass, not a seat.
- * - `PASS_ADMISSION` is the £0 row created by redeeming a pass. It is created
- *   and removed by redemption, never by a stepper — and because
- *   `pass_admissions.ticket_id` cascades, deleting one silently erases the
- *   redemption ledger row, which is what makes a used pass redeemable again.
- *
- * `archived` types are legacy-only (Fringe 2021, StuFF passes): still valid for
- * historic tickets, never offered for new ones. The column existed and was read
- * nowhere, so retired types stayed in the walk-in picker at their legacy prices.
+ * `PASS_SALE` and `PASS_ADMISSION` are bookkeeping and must never reach a
+ * picker or a stepper — deleting a PASS_ADMISSION ticket cascades to the
+ * redemption ledger row and makes a used pass redeemable again (ADR-0002).
+ * Archived types stay valid for historic tickets (ADR-0010).
  */
 export function sellableTicketTypes() {
   return and(
@@ -93,11 +85,9 @@ export function resolveEffectivePrice(
  * Validate that every ID in `ticketTypeIds` exists in `ctx.baseTypes` and is one
  * a human may sell. Throws a 400 on the first bad type.
  *
- * The sellability check lives here rather than at the four call sites because
- * every ticket write path goes through this function (`validateTicketTypesActive`
- * calls it first), so a fifth one cannot be added without inheriting the guard.
- * The pass redemption path creates its `PASS_ADMISSION` row directly and does
- * not come through here, which is the intended asymmetry.
+ * The sellability check lives here, not at the call sites, so a new ticket
+ * write path inherits it. Pass redemption creates its `PASS_ADMISSION` row
+ * directly and deliberately does not come through here.
  */
 export function validateTicketTypesExist(
   ticketTypeIds: string[],
@@ -113,11 +103,8 @@ export function validateTicketTypesExist(
 /**
  * Reject any requested type a human is not allowed to sell.
  *
- * Hiding these in the pickers is not enough: every write path takes ticket type
- * ids from the request body, so a stale tab or a hand-made call can still name
- * one. The `PASS_ADMISSION` case is the dangerous one — stepping it down to
- * zero deletes the ticket, `pass_admissions.ticket_id` cascades, and the pass
- * becomes redeemable again with the audit row gone.
+ * Hiding these in the pickers is not enough: write paths take type ids from
+ * the request body, so a stale tab or a hand-made call can still name one.
  */
 export function validateTicketTypesSellable(
   ticketTypeIds: string[],
@@ -206,26 +193,16 @@ export function validateTicketTypesActive(
 }
 
 /**
- * The single definition of "this ticket occupies a seat", for the given scope.
+ * The single definition of "this ticket occupies a seat" (ADR-0007). Every
+ * seat count in the app comes through here — do not add a parallel path.
  *
- * Every seat count in the app must come through here. There used to be four
- * copies of this rule with three different filter sets, and they disagreed in
- * ways that were invisible until someone was turned away at the door: the pass
- * redemption check counted cancelled reservations (rejecting pass holders at a
- * half-empty house), and the public listings counted PASS_SALE rows (showing
- * sold out while the booking path would still sell). `server/db/schema/passes.ts`
- * says it plainly — "Do not add a parallel seat-counting path".
+ * A ticket occupies a seat when it is not refunded, sits on a
+ * PENDING/COLLECTED/DOOR reservation, and is not a `PASS_SALE` (which records
+ * the purchase of a pass; the seat is the separate PASS_ADMISSION ticket).
  *
- * Two filters carry the meaning:
- * - reservation status in PENDING/COLLECTED/DOOR — cancelled and no-show
- *   bookings release their seats.
- * - `ticketTypes.kind != 'PASS_SALE'` — a PASS_SALE row records the *purchase*
- *   of a pass, not a seat at this performance; the seat is the separate
- *   PASS_ADMISSION ticket. Counting both makes one buyer consume two seats.
- *
- * `performanceScope` is a condition on `tickets.performanceId` — an `eq` for one
- * performance, or an `inArray` against a subquery for a listing. Pass a subquery
- * rather than an id list: D1 binds at most 100 parameters per statement.
+ * `performanceScope` is a condition on `tickets.performanceId`. Pass a
+ * subquery rather than an id list — D1 binds at most 100 parameters per
+ * statement (ADR-0006).
  */
 export async function countOccupiedSeats(performanceScope: SQL): Promise<Map<string, number>> {
   const rows = await db
@@ -290,13 +267,12 @@ export function releasesSeats(status: string): boolean {
  * exceeding its capacity, counting active (non-refunded) tickets on
  * PENDING/COLLECTED/DOOR reservations.
  *
- * Capacity is `performances.capacityOverride ?? venues.capacity`; a null
- * capacity means uncapped. Raising `capacityOverride` is the deliberate way for
- * staff to oversell, rather than bypassing this check.
+ * Capacity is `performances.capacityOverride ?? venues.capacity`; null means
+ * uncapped. Raising the override is the sanctioned way to oversell (ADR-0007).
  *
  * Throws 404 if the performance is unknown, 409 if the request would oversell.
- * Note: this is a read-then-write check with no lock, so two concurrent writes
- * can still both pass — accepted at this booking volume.
+ * Read-then-write with no lock, so two concurrent writes can both pass —
+ * accepted at this volume (docs/09-known-issues.md).
  */
 export async function assertCapacity(performanceId: string, additional: number): Promise<void> {
   if (additional <= 0) return

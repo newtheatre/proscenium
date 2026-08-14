@@ -1,15 +1,13 @@
 /**
  * Tables required to import the legacy Heroku/Django ticketing database
- * without loss. Split into two groups:
+ * without loss (ADR-0003). Two groups:
  *
- *   1. Live model extensions — show categories and venue aliases. These are
- *      real features the box office and website should use, not import
- *      scaffolding. (Content warnings started here too; they now have their own
- *      file, server/db/schema/contentWarnings.ts.)
- *   2. Archive layer — legacyRecords / legacyIdMap. Verbatim insurance that
- *      makes every mapping decision reversible.
+ * 1. Live model extensions — show categories and venue aliases. Real features,
+ *    not import scaffolding.
+ * 2. Archive layer — legacyRecords / legacyIdMap. Verbatim insurance that
+ *    makes every mapping decision reversible.
  *
- * Column additions to the existing tables live alongside those tables.
+ * Column additions to existing tables live alongside those tables.
  */
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql, relations } from 'drizzle-orm'
@@ -75,18 +73,13 @@ export const venueAliasesRelations = relations(venueAliases, ({ one }) => ({
  * ------------------------------------------------------------------ */
 
 /**
- * Every row of the legacy database, verbatim, as JSON.
+ * Every row of the legacy database, verbatim, as JSON — so a mapping decision
+ * can be re-derived without going back to a pg_dump on someone's laptop. That
+ * matters because most named legacy sales are matched to a reservation by
+ * fuzzy name rather than a foreign key.
  *
- * This is the insurance policy. If a mapping decision in the import later turns
- * out to be wrong, the original is still here and the import can be re-derived
- * without going back to a pg_dump on someone's laptop. That matters because
- * 12,251 of 13,025 named legacy sales are matched to a reservation by fuzzy
- * name rather than a foreign key.
- *
- * Excludes django_session (expired sessions, no value) and any column carrying
- * a credential (auth_user.password is redacted on write).
- *
- * ~48,000 rows. Never written by the application — import only.
+ * Excludes django_session, and any column carrying a credential
+ * (auth_user.password is redacted on write). Never written by the application.
  */
 export const legacyRecords = sqliteTable('legacy_records', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -109,7 +102,7 @@ export const legacyRecords = sqliteTable('legacy_records', {
  *
  * `confidence` records how the link was established:
  *   DIRECT    — deterministic mapping from a legacy primary key
- *   MATCHED   — inferred, e.g. sale.ticket free-text matched to a reservation
+ *   MATCHED   — inferred, e.g. sale.ticket free text matched to a reservation
  *   SYNTHETIC — target row invented to satisfy a NOT NULL constraint
  */
 export const legacyIdMap = sqliteTable('legacy_id_map', {

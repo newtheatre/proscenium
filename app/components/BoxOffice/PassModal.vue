@@ -1,14 +1,10 @@
 <!--
-  Box Office: passes at the door.
+Box office: passes at the door. Looking a holder up and selling a new pass
+sit together because that is how the desk works.
 
-  Two jobs in one place, because that is how the desk works:
-   - Look up a holder and admit them to tonight's performance.
-   - Sell a new pass.
-
-  Admitting creates an ordinary £0 ticket, so the holder appears on the door list
-  like any other customer. `canRedeem` on the server decides whether a pass is
-  valid; this component only renders the reason it gives back, so there is one
-  copy of the rule.
+Admitting creates an ordinary £0 ticket, so the holder appears on the door
+list like any other customer (ADR-0002). The server decides whether a pass
+is valid; this only renders the reason it gives back.
 -->
 <script setup lang="ts">
 interface RedeemCheck {
@@ -133,14 +129,9 @@ const buyerEmail = ref('')
 const selling = ref(false)
 
 /**
- * Clear everything when the modal opens.
- *
- * These refs live for the lifetime of the page, and only a *successful* sale
- * reset any of them — so reopening the modal for the next person at the door
- * still showed the previous holder's name, email and pass reference in the
- * results list, with the previous buyer's details pre-filled in the Sell tab
- * ready to be submitted against the new customer. WalkInModal already guards
- * this; this one had no reset at all.
+ * Clear everything when the modal opens. These refs live for the lifetime of
+ * the page and only a successful sale reset them, so the next person at the
+ * door saw the previous holder's details still filled in.
  */
 watch(modelOpen, (isOpen) => {
   if (!isOpen) return

@@ -49,15 +49,10 @@ export async function ensureLocalUser(user: User): Promise<void> {
         name: user.name,
         updatedAt: sql`(current_timestamp)`,
       },
-      // Never resurrect an erased account. stage-door's eraseUser bumps
-      // session_epoch and disables the auth row, but this app cannot see the
-      // epoch — it only learns of revocation when a *role-holding* session
-      // goes stale (15 min). A customer holds no roles, so their sealed cookie
-      // stays readable for the full 30-day maxAge, and this hook runs on every
-      // request. Without this guard the erased person's own browser writes
-      // their real name and email straight back over the scrubbed row, while
-      // `anonymisedAt` stays set so the row remains hidden from listings — the
-      // erasure looks done and silently is not.
+      // Never resurrect an erased account (ADR-0014). This app cannot see
+      // session_epoch, and a role-less customer's cookie stays readable for
+      // the full 30-day maxAge — without this guard their own next page load
+      // writes their details back over the scrubbed row.
       setWhere: isNull(schema.users.anonymisedAt),
     })
   rememberUpsert(user.id, now)

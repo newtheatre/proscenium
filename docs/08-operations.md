@@ -102,7 +102,7 @@ bunx wrangler secret put NUXT_RESEND_API_KEY --name proscenium
 shared with every other app on the estate, so it lives in the account Secrets
 Store and this Worker binds it as `SESSION_PASSWORD`
 (`nuxt.config.ts` → `secrets_store_secrets`, hydrated by
-`server/plugins/secrets-store.ts`). The auth service's runbook owns rotation —
+`server/plugins/0.secrets-store.ts`). The auth service's runbook owns rotation —
 stage-door `docs/operations.md`, ADR-0016. Rotating it there needs no deploy
 here.
 

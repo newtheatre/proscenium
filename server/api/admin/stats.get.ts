@@ -20,27 +20,18 @@ function currentSeason(now: Date): { from: string, to: string } {
 }
 
 /**
- * GET /api/admin/stats — aggregate dashboard statistics.
- * ADMIN and MANAGER only.
+ * GET /api/admin/stats — aggregate dashboard statistics. ADMIN and MANAGER
+ * only, bounded to a season by default.
  *
- * Bounded to a season by default. These aggregates used to have no date bound at
- * all, so after the import the dashboard presented £105,245.50 of takings going
- * back to 2016, and 23,889 legacy tickets, as though they were the current
- * year's — with no indication that most of it was a decade old.
+ * Two counting rules, both of which have been got wrong before:
  *
- * Two further corrections to what gets counted:
- *
- * - PASS_SALE tickets are money but not admissions, and PASS_ADMISSION rows are
- *   admissions but not money. Counting both in both places double-counted the
- *   135 pass sales against the 1,186 entries they paid for, which is exactly
- *   what ticket.ts warns about. Revenue therefore excludes PASS_ADMISSION, and
- *   the admissions count excludes PASS_SALE.
- *
- * - 20,234 imported tickets have priceConfidence UNKNOWN and pricePaid 0: the
- *   price was never recorded. They are real admissions and still counted as
- *   such, but they contribute nothing to revenue, so revenue-per-ticket read
- *   about half true with no hint why. The counts are returned alongside so the
- *   dashboard can say so.
+ * - PASS_SALE is money but not an admission; PASS_ADMISSION is an admission
+ *   but not money. Revenue excludes PASS_ADMISSION, admissions exclude
+ *   PASS_SALE, or one pass is counted twice.
+ * - Imported tickets with priceConfidence UNKNOWN have pricePaid 0 because the
+ *   price was never recorded. They are real admissions and are counted as
+ *   such, but they drag revenue-per-ticket down; their count is returned
+ *   alongside so the dashboard can say so.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, defineAbility((user: AbilityUser) => isAdminOrManager(user)))
@@ -75,11 +66,10 @@ export default defineEventHandler(async (event) => {
     revenueByShowResult,
     recentReservations,
   ] = await Promise.all([
-    // Published shows *in the window*. This used to count every published show
-    // ever, so a dashboard headed "2026/27 season" reported 488 — the whole
-    // imported archive — next to a season's takings. A show counts if it has a
-    // performance inside the window; the subquery keeps the bound-parameter cost
-    // fixed rather than growing with the archive.
+    // Published shows *in the window* — a show counts if it has a performance
+    // inside it. Unbounded, this counts the whole imported archive next to a
+    // single season's takings. The subquery keeps the parameter cost fixed
+    // (ADR-0006).
     db.select({ count: count() })
       .from(schema.shows)
       .where(and(
@@ -163,18 +153,12 @@ export default defineEventHandler(async (event) => {
 
   const totals = revenueAndTicketsResult[0]
 
-  // Private, browser-only, and short: a dashboard does not need to be
-  // second-accurate, and this stops a reload or a tab switch re-running the
-  // aggregates.
+  // Private, browser-only and short: a dashboard need not be second-accurate,
+  // and this stops a reload re-running the aggregates.
   //
-  // Deliberately not defineCachedEventHandler. That caches the handler's result
-  // and skips the handler on a hit — including the authorize() call above — so
-  // an unauthenticated request could be served a cached copy of the theatre's
-  // finances. Keying the cache on the session cookie would fix that and also
-  // make it per-user, which is what this header already does without the
-  // footgun. The row counts that motivated caching here were mostly the missing
-  // date bound, and that is fixed: the aggregates now read about 1,100 ticket
-  // rows for a season rather than 25,006 for all time.
+  // Deliberately not defineCachedEventHandler, which skips the handler on a hit
+  // — including the authorize() call above — so an unauthenticated request could
+  // be served a cached copy of the theatre's finances.
   setHeader(event, 'Cache-Control', 'private, max-age=30')
 
   return {

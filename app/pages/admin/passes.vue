@@ -1,13 +1,9 @@
 <!--
-  Admin: Passes
+Admin: pass products and issued passes.
 
-  Two things live here:
-   - Pass products (pass types) — the thing you sell: name, validity window,
-     price variants, and the list of shows it covers.
-   - Issued passes — searchable, so a holder can be found by reference, name or
-     email, and cancelled if need be.
-
-  Selling and admitting happen at the box office, not here.
+Products carry the validity window, price variants and the list of shows
+covered; issued passes are searchable by reference, name or email and can be
+cancelled. Selling and admitting happen at the box office, not here.
 -->
 <script setup lang="ts">
 definePageMeta({

@@ -1,16 +1,6 @@
 /**
- * Create Ticket Type Modal Component
- *
- * Modal for creating new ticket types (admin/manager only).
- *
- * Features:
- * - Form validation with Zod schema
- * - Price entered in £ (pounds) and converted to pence for the API
- * - activeByDefault toggle
- * - Creates ticket type via POST /api/ticket-types
- * - Toast notifications for success/error
- *
- * @emits refresh - Emitted after successful ticket type creation
+ * Create a ticket type. Admin/Manager only. Price is entered in pounds and
+ * sent in pence.
  */
 <script setup lang="ts">
 import * as z from 'zod'

@@ -1,21 +1,14 @@
 <!--
-  Admin: Shows & Performances
+Admin: shows and performances, as three tabs over one tree table.
 
-  Three tabs over one tree table:
-   - Now & next — published shows whose run has not finished. Server-rendered.
-   - Drafts     — unpublished, whatever the dates. Server-rendered.
-   - Archive    — everything that has finished, paged and searched on the server.
+  Now & next — published, run not finished. Server-rendered.
+  Drafts     — unpublished, whatever the dates. Server-rendered.
+  Archive    — finished, paged and searched on the server.
 
-  Tabs rather than stacked sections on purpose: stacking would mount three
-  UTables at once, tripling the TanStack instances and the surface for the render
-  loop documented in docs/02-architecture.md. The two server-rendered tabs are
-  fetched regardless, so switching between them is instant.
-
-  This replaces a single unpaginated tree over the whole archive — 498 shows and
-  1,304 performances in one table, filtered in the browser.
-
-  @route /admin/shows
-  @admin-only
+Tabs rather than stacked sections: stacking mounts three UTables at once,
+tripling the TanStack instances and the surface for the render loop
+(ADR-0012). Both server-rendered tabs are fetched regardless, so switching
+between them is instant.
 -->
 <script setup lang="ts">
 import type { PerformanceListItem, ShowListItem, ShowRowAction } from '~~/shared/types/shows'

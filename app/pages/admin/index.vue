@@ -132,12 +132,13 @@ const exportShowId = ref<string>('')
 const exportFrom = ref<string>('')
 const exportTo = ref<string>('')
 
-// No "All shows" option. Unfiltered, the export joins all 45,563 tickets and
-// builds around 10 MB of CSV inside a Worker — it was the default choice, one
-// click away. A date range covers the same need for a season's accounts.
-// No empty-valued "Choose a show…" entry: the `placeholder` prop covers that,
-// and USelect refuses an item whose value is '' — an empty string is how the
-// selection is *cleared*, so it cannot also identify an option.
+// No "All shows" option: unfiltered, the export joins every ticket and builds
+// around 10 MB of CSV inside a Worker. A date range covers a season's
+// accounts.
+//
+// No empty-valued "Choose a show…" entry either — USelect refuses an item
+// whose value is '', since that is how a selection is cleared. Use
+// `placeholder`.
 const showOptions = computed(() => (shows.value?.rows ?? []).map(s => ({ label: s.title, value: s.id })))
 
 /** The season the theatre is currently in: 1 August to 31 July. */

@@ -107,13 +107,11 @@ const performance = computed(() =>
 const ticketTypes = computed(() => performance.value?.ticketTypes ?? [])
 
 /**
- * Refunds only exist after collection, and a collected booking cannot be edited
- * at all — so on this screen (PENDING only) there should be no refunded tickets
- * to begin with. Filtered anyway: the server diffs on `isNull(refundedAt)`, so
- * if the two sides ever disagree about which tickets count, an unchanged Save
- * asks for more of a type than the server can see and it issues a replacement
- * for one that was refunded. Cheap insurance against a real money bug, and
- * legacy imported rows are not bound by the new invariant.
+ * On this screen (PENDING only) there should be no refunded tickets at all.
+ * Filtered anyway: the server diffs on `isNull(refundedAt)`, so if the two
+ * sides disagree an unchanged Save asks for more of a type than the server can
+ * see and it issues a replacement for a refunded ticket. Legacy imported rows
+ * are not bound by the invariant (ADR-0011).
  */
 const activeTickets = computed(() => props.booking.tickets.filter(t => !t.refundedAt))
 
@@ -127,13 +125,10 @@ const remainingCapacity = computed(() => {
 })
 
 /**
- * Types the booking currently holds, remembered when editing starts.
- *
- * Needed at save time because the stepper drops an entry once its quantity
- * reaches zero, and the server only diffs the types named in the request
- * ("requested types only; others untouched"). Removing a whole type therefore
- * sent a body that never mentioned it, and the tickets silently stayed —
- * the UI said "Booking updated" and nothing had changed.
+ * Types the booking held when editing started. Needed at save time because the
+ * stepper drops an entry at quantity zero and the server only diffs the types
+ * named in the request — so removing a whole type sends a body that never
+ * mentions it, and the tickets silently stay.
  */
 const editedTypeIds = ref<string[]>([])
 

@@ -1,30 +1,10 @@
 /**
- * Admin: Manage Content Warnings Page
+ * Admin: the shared content-warning vocabulary every show picks from
+ * (ADR-0004). Before this page existed the list could only be changed by a
+ * migration.
  *
- * The shared vocabulary every show picks from. Before this page existed the
- * list could only be changed by a database migration, which is how the legacy
- * import's 384 titles — six spellings of "alcohol" among them — stayed put.
- *
- * Features:
- * - Table view of the vocabulary (archived entries hidden until asked for)
- * - Search by title, category or slug
- * - Filter to technical effects or themes
- * - See how many shows use each entry
- * - Archive an entry that should not be offered again, or restore one
- * - Create and edit entries
- * - Delete an entry (refused while any show uses it — archive instead)
- *
- * Data Loading:
- * - GET /api/content-warnings?includeArchived=true
- *
- * Data Mutations:
- * - POST /api/content-warnings (create)
- * - PUT /api/content-warnings/:id (update, archive, restore)
- * - DELETE /api/content-warnings/:id (delete)
- *
- * @route /admin/content-warnings
- * @authenticated
- * @admin-only
+ * Deleting an entry is refused while any show carries it; archiving is the
+ * retirement path (ADR-0010).
  */
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
@@ -59,15 +39,9 @@ const showArchived = ref(false)
 const kindFilter = ref<'ALL' | ContentWarningKind>('ALL')
 
 /**
- * Server-rendered, and deliberately *not* keyed `content-warnings`.
- *
- * The show editor caches the live vocabulary under that key and reads it back
- * through `getCachedData`. Sharing it here would have the editor offer archived
- * entries, because this page asks for them.
- *
- * `$fetch: useRequestFetch()` is not optional: every admin endpoint is behind
- * authorize(), and a plain useFetch running on the server does not forward the
- * incoming session cookie. See docs/02-architecture.md §Fetching in the admin area.
+ * Server-rendered, and deliberately not keyed `content-warnings`: the show
+ * editor caches the live vocabulary under that key, and this page asks for
+ * archived entries too. `useRequestFetch()` is not optional (ADR-0013).
  */
 const requestFetch = useRequestFetch()
 const { data: rawData, status, error, refresh } = await useAsyncData(
@@ -76,13 +50,9 @@ const { data: rawData, status, error, refresh } = await useAsyncData(
 )
 
 /**
- * Rows for the table. **Always an array, never null.**
- *
- * Load-bearing, not tidiness: binding a fresh array per render makes UTable
- * rebuild its TanStack row models, which writes back through the v-model props,
- * which re-renders this page. That is a render loop with no fixed point. A
- * computed caches, so the identity only changes when its dependencies do — do
- * not reintroduce `?? []` at the binding.
+ * Rows for the table. **Always an array, never null** — binding a fresh array
+ * per render sends UTable into a render loop with no fixed point. Do not
+ * reintroduce `?? []` at the binding (ADR-0012).
  */
 const rows = computed<AdminContentWarning[]>(() => {
   const all = rawData.value ?? []
@@ -163,13 +133,9 @@ async function deleteWarning(warning: AdminContentWarning) {
 const isArchiving = ref(false)
 
 /**
- * Retire an entry, or bring it back.
- *
- * Deliberately not a delete. DELETE is refused once any show references the
- * warning, and those references are the whole point — a customer looking at a
- * 2019 production still needs to see what it carried. Archiving is the answer
- * for "stop offering this": it disappears from the show editor's pickers while
- * the shows that already have it keep rendering it.
+ * Retire an entry, or bring it back — deliberately not a delete (ADR-0010).
+ * It disappears from the show editor's pickers while the shows that already
+ * carry it keep rendering it.
  */
 async function setArchived(warning: AdminContentWarning, archived: boolean) {
   if (isArchiving.value) return

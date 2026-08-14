@@ -174,7 +174,7 @@ Authenticated by the SHA-256 of this app's `AUTH_SERVICE_TOKEN`, compared consta
 | --- | --- | --- | --- |
 | POST | `/api/bookings` | Public | Public booking flow — capacity-checked, sends a confirmation email |
 | GET | `/api/bookings/my` | Logged in | The current user's bookings, split into upcoming and past |
-| GET | `/api/bookings/:id` | Owner, staff, or `?ref=` | Full booking detail for a confirmation page |
+| GET | `/api/bookings/:id` | Owner, staff, or a signed `?t=` token | Booking detail for a confirmation page, customer shape |
 | GET | `/api/bookings/available-ticket-types` | Staff (`createReservation`) | Effective ticket prices for a performance before a reservation exists |
 
 ### Reservations (staff box office)
@@ -452,19 +452,25 @@ A booking is **upcoming** when the performance starts in the future *and* the st
 
 #### `GET /api/bookings/:id`
 
-**Source** `server/api/bookings/[id]/index.get.ts` · **Auth** owner, staff, **or** a matching `?ref=`
+**Source** `server/api/bookings/[id]/index.get.ts` · **Auth** owner, staff, **or** a valid signed access token
+
+`:id` may be the nanoid primary key or the six-character `bookingRef`, because confirmation emails link with the reference.
 
 **Query**
 
 | Name | Type | Notes |
 | --- | --- | --- |
-| `ref` | string, optional | The 6-character `bookingRef`. Read with plain `getQuery`, not a Zod schema. |
+| `t` | string, optional | A signed, expiring booking access token ([ADR-0009](decisions/0009-signed-booking-access-tokens.md)). On first use the handler moves it into an httpOnly cookie so the page can drop it from the address bar. |
 
-Access is granted, in order: (1) session user is the booking's `userId`; (2) session user holds ADMIN, MANAGER, or BOX_OFFICE; (3) `query.ref === booking.bookingRef`. **The `?ref=` path requires no session at all** — it is what makes the emailed confirmation link work for guests. Booking references are 6 characters from a 32-symbol alphabet, so treat them as low-entropy secrets.
+Access is granted, in order: (1) session user is the booking's `userId`; (2) session user holds ADMIN, MANAGER or BOX_OFFICE; (3) a valid `?t=` token, or the cookie it was swapped for.
+
+**`?ref=` is not an access path.** The booking reference is a customer-facing identifier — printed on emails, read aloud at the box office — and was previously accepted as a bearer credential; it is not, and must not be reintroduced as one.
+
+A stale session keeps its identity but loses its roles, so the owner branch keeps working while the staff branch fails closed until the browser refreshes ([ADR-0008](decisions/0008-roles-go-stale-identity-does-not.md)).
 
 Note that the booking is loaded from the database *before* the access check, so a wrong `id` yields 404 and a right `id` with no credentials yields 403 — which confirms the id exists.
 
-**Response** `200` — reservation with `user` (id, name, email), `performance` → `show` (id, title, slug, posterUrl) and `venue` (id, name, address), and `tickets` → `ticketType` (id, name). Includes `staffNotes`.
+**Response** `200` — the **customer** shape, allow-listed by `reservationCustomerColumns`: `id`, `bookingRef`, `status`, `cancelledBy`, `customerNotes`, `performanceId`, timestamps, plus `performance` → `show` and `venue`, and `tickets` → `ticketType`. It does **not** include `staffNotes`, `legacyRef` or `userId`; the staff shape is `GET /api/reservations/:id`.
 
 **Errors**
 

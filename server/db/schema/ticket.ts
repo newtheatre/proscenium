@@ -12,13 +12,12 @@ export const ticketTypes = sqliteTable('ticket_types', {
   price: integer('price').notNull(), // Price in pence (smallest currency unit) to avoid floating point issues
 
   // SINGLE         — one admission to one performance (the normal case)
-  // PASS_SALE      — the sale of a multi-performance pass (season, day,
-  //                  festival, performer). Carries the money.
-  // PASS_ADMISSION — an admission redeemed against a previously sold pass.
-  //                  Carries zero money; still counts against capacity.
+  // PASS_SALE      — the sale of a pass. Carries the money, not a seat.
+  // PASS_ADMISSION — an admission redeemed against a pass. Zero money, but it
+  //                  does occupy a seat.
   //
-  // Without this split, importing the legacy pass counters either double-counts
-  // revenue or loses the fact a pass existed.
+  // Summing across the three double-counts revenue or admissions — see ADR-0007
+  // for which side each falls on.
   kind: text('kind', {
     enum: ['SINGLE', 'PASS_SALE', 'PASS_ADMISSION'],
   }).notNull().default('SINGLE'),
@@ -115,12 +114,11 @@ export const tickets = sqliteTable('tickets', {
   // Snapshot of the price paid at time of booking; important since prices can be overridden and change over time
   pricePaid: integer('price_paid').notNull(),
 
-  // EXACT   — the legacy sale had a single ticket category, so the unit price is
-  //           price ÷ count with no inference (94.6% of legacy sales)
-  // DERIVED — apportioned from a mixed-category sale using prices observed in
-  //           single-category sales of the same show and era (5.4%)
-  // UNKNOWN — a reservation never settled by a sale, so no price was ever
-  //           recorded. Stored as 0.
+  // How far a legacy price can be trusted (ADR-0003):
+  //   EXACT   — single-category sale, so unit price is price ÷ count
+  //   DERIVED — apportioned from a mixed-category sale using prices observed in
+  //             single-category sales of the same show and era
+  //   UNKNOWN — never recorded. Stored as 0, and must not be read as a comp.
   priceConfidence: text('price_confidence', {
     enum: ['EXACT', 'DERIVED', 'UNKNOWN'],
   }).notNull().default('EXACT'),

@@ -1,28 +1,8 @@
 /**
- * Admin: Manage Ticket Types Page
+ * Admin: ticket types. Archived ones are hidden until asked for; this is the
+ * screen where they are archived and restored (ADR-0010).
  *
- * Administrative interface for managing ticket types.
- *
- * Features:
- * - Table view of ticket types (archived ones hidden until asked for)
- * - Search by name
- * - View price, active-by-default status, and description
- * - Archive a type that will never be sold again, or restore one
- * - Create new ticket types
- * - Edit existing ticket types
- * - Delete ticket types (blocked if issued tickets reference them)
- *
- * Data Loading:
- * - GET /api/ticket-types
- *
- * Data Mutations:
- * - POST /api/ticket-types (create)
- * - PUT /api/ticket-types/:id (update)
- * - DELETE /api/ticket-types/:id (delete)
- *
- * @route /admin/ticket-types
- * @authenticated
- * @admin-only
+ * Deleting is refused once any issued ticket references the type.
  */
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
@@ -68,13 +48,7 @@ const { pagination, page, resetPage } = useTablePagination(15)
 const showArchived = ref(false)
 
 // `includeArchived` because this is the one screen that has to see retired
-// types — it is where they are archived and restored. Everything else gets the
-// live ones by default.
-// Server-rendered, so the table arrives populated instead of appearing a moment
-// later. `$fetch: useRequestFetch()` is not optional here: every admin endpoint
-// is behind authorize(), and a plain useFetch running on the server does not
-// forward the incoming session cookie — it would 403 during SSR. See
-// docs/02-architecture.md §Fetching in the admin area.
+// types. Server-rendered, and `useRequestFetch()` is not optional (ADR-0013).
 const requestFetch = useRequestFetch()
 const { data: rawData, status, error, refresh } = await useAsyncData(
   'admin-ticket-types',
@@ -82,27 +56,13 @@ const { data: rawData, status, error, refresh } = await useAsyncData(
 )
 
 /**
- * Rows for the table. **Always an array, never null.**
+ * Rows for the table. **Always an array, never null** — binding a fresh array
+ * per render sends UTable into a render loop with no fixed point, which locks
+ * the tab up. A computed caches, so its identity changes only when its
+ * dependencies do. Do not reintroduce `?? []` at the binding (ADR-0012).
  *
- * This is load-bearing, not tidiness. The template used to bind
- * `:data="data ?? []"` against a computed that returned `null` until the fetch
- * resolved — so every render produced a *brand-new* empty array. UTable rebuilds
- * its TanStack row models whenever `data` changes identity, and rebuilding
- * writes back through `v-model:pagination` / `:row-selection` /
- * `:column-visibility`, which re-renders this page, which allocates another new
- * array. That is a render loop with no fixed point, and it locked the tab up.
- *
- * It bit hardest arriving by client-side navigation, because there was no
- * server-rendered payload to land on and the fetch was `lazy`, guaranteeing a
- * window where the data was null — exactly the "navigate to ticket types and
- * everything freezes" report. The fetch is server-rendered now, which closes
- * that window, but the binding must still never allocate per render.
- *
- * A computed caches, so this identity only changes when its dependencies do.
- * Keep it that way: do not reintroduce `?? []` at the binding.
- *
- * (Hiding is by `archived`, not `activeByDefault` — the two answer different
- * questions; see docs/06-pricing-and-ticket-types.md.)
+ * Hiding is by `archived`, not `activeByDefault`; the two answer different
+ * questions (docs/06-pricing-and-ticket-types.md).
  */
 const rows = computed<TicketType[]>(() => {
   const all = rawData.value ?? []
@@ -176,13 +136,8 @@ async function deleteTicketType(ticketType: TicketType) {
 const isArchiving = ref(false)
 
 /**
- * Retire a type, or bring it back.
- *
- * Deliberately not a delete: DELETE is refused once any ticket references the
- * type, and those references are exactly what make the historic data readable —
- * a 2019 ticket still has to resolve its name and price. Archiving is the
- * answer for "we are never selling this again": it disappears from the pickers
- * and the override screens while the history keeps working.
+ * Retire a type, or bring it back — deliberately not a delete (ADR-0010).
+ * A 2019 ticket still has to resolve its name and price.
  */
 async function setArchived(tt: TicketType, archived: boolean) {
   if (isArchiving.value) return

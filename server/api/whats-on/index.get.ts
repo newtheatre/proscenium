@@ -2,27 +2,21 @@ import { db, schema } from '@nuxthub/db'
 import { and, asc, eq, gt, inArray, min } from 'drizzle-orm'
 
 /**
- * GET /api/whats-on — list published shows with upcoming on-sale performances.
+ * GET /api/whats-on — published shows with upcoming on-sale performances.
  *
- * Public endpoint — no authentication required, and the highest-traffic one in
- * the app (it backs both the homepage and What's On).
- *
- * It used to load all 498 published shows with their performances and then
- * discard the historical majority in JavaScript, reading a couple of thousand
- * rows per anonymous hit to return the handful of shows actually on sale. The
- * filtering now happens in SQL, so only the current shows are read at all.
+ * Public, unauthenticated, and the highest-traffic endpoint in the app: it
+ * backs both the homepage and What's On. Filtered in SQL so only the current
+ * shows are read at all (ADR-0005).
  */
 export default defineEventHandler(async (event) => {
   const now = new Date()
 
-  // Set before any return, including the empty one below. Placed after it, the
-  // header was skipped whenever nothing was on sale — which is the cheapest
-  // response of all to cache, and the state the site sits in between seasons.
+  // Set before any return, including the empty one below — placed after it, the
+  // header is skipped exactly when nothing is on sale, which is the cheapest
+  // response of all to cache and the state the site sits in between seasons.
   //
-  // Public and slow-changing, so let Cloudflare serve it from the edge. The one
-  // thing that moves quickly is ticketsSold, and a minute-old sold-out badge is
-  // harmless: capacity is enforced when the booking is written, not from this
-  // response.
+  // A minute-old sold-out badge is harmless: capacity is enforced when the
+  // booking is written, not from this response.
   setHeader(event, 'Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
 
   // Which published shows have at least one future ON_SALE performance, and when

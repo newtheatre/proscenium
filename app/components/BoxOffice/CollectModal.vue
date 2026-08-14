@@ -1,23 +1,9 @@
 <!--
-  Box Office: Collect Reservation Slideover
+Box office: collect a reservation. Adjusting the tickets and marking the
+booking COLLECTED are one step, because that is one interaction at the desk.
 
-  FoH workflow for collecting a customer's reservation at the box office.
-  Combines ticket management and status update into one step.
-
-  Flow:
-  1. Staff clicks "Collect" on the reservations list
-  2. Slideover opens — shows customer, booking ref, ticket breakdown
-  3. Staff adjusts ticket quantities if needed
-  4. Staff confirms total, presses "Collect" to finalise
-  5. Optionally mark as No-Show (with confirmation)
-
-  Data:
-  - GET /api/reservations/:id → current tickets + customer
-  - GET /api/reservations/:id/available-ticket-types → addable types + effective prices
-
-  Mutations:
-  - PUT /api/reservations/:id/tickets → save ticket changes
-  - PUT /api/reservations/:id → update status
+Collection is the payment boundary, so this is the last point at which the
+composition can be edited (ADR-0011).
 -->
 <script setup lang="ts">
 // ── Types ──────────────────────────────────────────────────────────────────────

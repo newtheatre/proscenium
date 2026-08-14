@@ -1,17 +1,12 @@
 /**
- * Turning the dates staff type into the instants a pass is actually valid for.
+ * Turning the `YYYY-MM-DD` dates staff type into the instants a pass is valid
+ * for.
  *
- * The admin form uses `<input type="date">`, so the wire value is `YYYY-MM-DD`.
- * `new Date('2026-07-31')` is parsed by ECMAScript as **UTC midnight**, and
- * `canRedeem` compares it against a performance's `startsAt`. A 19:30 show on
- * 31 July is 18:30Z, which is after 00:00Z on the same date — so the pass was
- * rejected for the whole of its final day, and a single-day pass (validFrom ===
- * validTo, which is exactly what the StuFF Day Pass is) never validated at all.
- *
- * A validity *date* means the whole of that day in the theatre's timezone, so
- * `validTo` has to become the last instant of it. Both bounds are resolved in
- * Europe/London: the Worker runs in UTC, and "valid from the 1st" means from
- * midnight in Nottingham, not midnight UTC — an hour's difference through BST.
+ * A validity *date* means the whole of that day in Europe/London, so `validTo`
+ * becomes the last instant of it. Both bounds are resolved in London, not UTC:
+ * the Worker runs in UTC, and `new Date('2026-07-31')` is UTC midnight, which
+ * is before a 19:30 curtain-up on the same date. Taking that literally rejects
+ * a pass for the whole of its final day, and never validates a single-day one.
  */
 
 /** `YYYY-MM-DD` — the shape `<input type="date">` submits. */
