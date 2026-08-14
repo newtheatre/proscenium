@@ -176,6 +176,8 @@ Authenticated by the SHA-256 of this app's `AUTH_SERVICE_TOKEN`, compared consta
 | GET | `/api/bookings/my` | Logged in | The current user's bookings, split into upcoming and past |
 | GET | `/api/bookings/:id` | Owner, staff, or a signed `?t=` token | Booking detail for a confirmation page, customer shape |
 | GET | `/api/bookings/available-ticket-types` | Staff (`createReservation`) | Effective ticket prices for a performance before a reservation exists |
+| PUT | `/api/bookings/:id/tickets` | Owner, or a signed `?t=` token | Customer self-service edit of their own ticket composition |
+| POST | `/api/bookings/:id/cancel` | Owner, or a signed `?t=` token | Customer cancels their own PENDING booking |
 
 ### Reservations (staff box office)
 
@@ -291,6 +293,7 @@ and no password-reset route here.
 | --- | --- | --- | --- |
 | GET | `/api/admin/stats` | ADMIN/MANAGER (inline ability) | Dashboard aggregates: revenue, counts, recent reservations |
 | GET | `/api/admin/export/tickets` | ADMIN/MANAGER (inline ability) | CSV export of every ticket, for the treasurer |
+| GET | `/api/admin/reservation-counts` | Staff (`listReservations`) | Reservation totals by status, for the box-office status pills |
 
 ### Media
 
@@ -479,6 +482,53 @@ Note that the booking is loaded from the database *before* the access check, so 
 | 400 | `Booking ID is required` |
 | 404 | `Booking not found` |
 | 403 | `You do not have access to this booking` |
+
+---
+
+#### `PUT /api/bookings/:id/tickets`
+
+**Source** `server/api/bookings/[id]/tickets.put.ts` · **Auth** owner, or a valid signed access token — same check as `GET /api/bookings/:id`
+
+Customer self-service edit of their own ticket composition. The same desired-quantity diff as the staff route (`PUT /api/reservations/:id/tickets`), with self-service guards on top.
+
+**Body**
+
+| Name | Type | Notes |
+| --- | --- | --- |
+| `tickets` | array, required, min 1 | `{ ticketTypeId, quantity }`, where `quantity` is the desired **total** for that type, 0–10 |
+
+A ticket type may appear only once. The handler reads each type's current count from a map it does not update, so two entries for one type would compound rather than replace.
+
+**Guards** the booking must be `PENDING` ([ADR-0011](decisions/0011-collection-is-the-payment-boundary.md)); the performance must be `ON_SALE`, in the future, and inside its booking window (`bookingClosesHoursBefore`); only active ticket types may be added; capacity is enforced; and the booking cannot be emptied — cancel it instead.
+
+**Errors**
+
+| Code | Cause |
+| --- | --- |
+| 400 | Validation, performance not `ON_SALE`, booking window closed, inactive ticket type, or an attempt to empty the booking |
+| 403 | Not the owner and no valid token |
+| 404 | `Booking not found` |
+| 409 | Already collected, or the change would oversell |
+
+---
+
+#### `POST /api/bookings/:id/cancel`
+
+**Source** `server/api/bookings/[id]/cancel.post.ts` · **Auth** owner, or a valid signed access token
+
+Lets a customer cancel their own booking. Only a `PENDING` booking for a future performance may be cancelled.
+
+**Side effects** sets `status = 'CANCELLED'`, `cancelledBy = 'CUSTOMER'`, and sends a cancellation email best-effort via `waitUntil`. Cancelling releases the seats ([ADR-0007](decisions/0007-one-seat-counting-rule.md)).
+
+**Response** `200` — `{ "status": "CANCELLED" }`
+
+**Errors**
+
+| Code | Cause |
+| --- | --- |
+| 400 | Not `PENDING`, or the performance has already started |
+| 403 | Not the owner and no valid token |
+| 404 | `Booking not found` |
 
 ---
 
@@ -1741,6 +1791,29 @@ await authorize(event, defineAbility((user: AbilityUser) => isAdminOrManager(use
 ```
 
 Effective access is ADMIN or MANAGER. BOX_OFFICE is excluded. If you add another admin endpoint, consider promoting this into a named ability instead of repeating it.
+
+---
+
+#### `GET /api/admin/reservation-counts`
+
+**Source** `server/api/admin/reservation-counts.get.ts` · **Auth** `authorize(event, listReservations)` — staff
+
+Reservation totals by status, as one `GROUP BY` returning at most five rows. It backs the box-office status pills, which would otherwise be five `filter().length` passes over every reservation in the browser.
+
+**Query**
+
+| Name | Type | Notes |
+| --- | --- | --- |
+| `performanceId` | string, optional | Count one performance |
+| `showId` | string, optional | Count every performance of one show, via a subquery ([ADR-0006](decisions/0006-d1-bound-parameter-limit.md)) |
+
+Both are optional; with neither, the counts cover every reservation.
+
+**Response** `200` — `byStatus` always carries all five keys, zero-filled, so a caller need not handle a missing status:
+
+```jsonc
+{ "byStatus": { "PENDING": 12, "COLLECTED": 40, "DOOR": 3, "CANCELLED": 1, "NO_SHOW": 0 }, "total": 56 }
+```
 
 ---
 
