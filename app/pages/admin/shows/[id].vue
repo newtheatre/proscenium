@@ -59,8 +59,6 @@ async function deleteShow() {
 
 // ── Modals ───────────────────────────────────────────────────────────────────
 
-const editOpen = ref(false)
-const ticketTypesOpen = ref(false)
 const addPerformanceOpen = ref(false)
 const performanceToEdit = ref<PerformanceListItem | null>(null)
 const performanceForTicketTypes = ref<PerformanceListItem | null>(null)
@@ -116,25 +114,6 @@ const totals = computed(() => {
   }
   return { sold, capacity, hasCapacity }
 })
-
-const WARNING_AXES = {
-  TECHNICAL: 'Technical effects',
-  ACTION: 'Depicted on stage',
-  DIALOGUE: 'Referred to',
-} as const
-
-const warningsByAxis = computed(() => {
-  const grouped: Record<keyof typeof WARNING_AXES, string[]> = { TECHNICAL: [], ACTION: [], DIALOGUE: [] }
-  for (const link of show.value?.contentWarnings ?? []) {
-    const title = link.contentWarning?.title
-    if (title) grouped[link.kind].push(title)
-  }
-  return grouped
-})
-
-const hasAnyWarning = computed(() =>
-  Object.values(warningsByAxis.value).some(list => list.length > 0),
-)
 
 const breadcrumb = computed(() => [
   { label: 'Shows', to: '/admin/shows', icon: 'i-lucide-calendar' },
@@ -333,18 +312,6 @@ const performanceColumns: TableColumn<PerformanceListItem>[] = [
 
         <div class="flex flex-wrap items-center gap-2">
           <UButton
-            label="Edit show"
-            icon="i-lucide-pencil"
-            @click="editOpen = true"
-          />
-          <UButton
-            label="Ticket types"
-            icon="i-lucide-ticket"
-            color="neutral"
-            variant="outline"
-            @click="ticketTypesOpen = true"
-          />
-          <UButton
             v-if="show.status === 'DRAFT'"
             label="Publish"
             icon="i-lucide-badge-check"
@@ -366,151 +333,20 @@ const performanceColumns: TableColumn<PerformanceListItem>[] = [
         </div>
       </section>
 
-      <!-- ── Details ────────────────────────────────────────────────────────
-           The five fields below `description` are the ones the list projection
-           omits. They are shown, not just editable, so that losing them is
-           visible here rather than months later on the public site. -->
-      <section class="space-y-3">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-muted">
-          Details
-        </h2>
+      <AdminShowsDetailsSection
+        :show="show"
+        @refresh="refresh"
+      />
 
-        <UCard>
-          <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-            <div class="sm:col-span-2">
-              <dt class="text-muted mb-1">
-                Short description
-              </dt>
-              <dd class="text-highlighted whitespace-pre-line">
-                {{ show.description || '—' }}
-              </dd>
-            </div>
-            <div class="sm:col-span-2">
-              <dt class="text-muted mb-1">
-                Full description
-              </dt>
-              <dd class="text-highlighted whitespace-pre-line">
-                {{ show.longDescription || '—' }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-muted mb-1">
-                Digital programme
-              </dt>
-              <dd>
-                <ULink
-                  v-if="show.programmeUrl"
-                  :to="show.programmeUrl"
-                  external
-                  target="_blank"
-                  class="text-primary break-all"
-                >{{ show.programmeUrl }}</ULink>
-                <span
-                  v-else
-                  class="text-highlighted"
-                >—</span>
-              </dd>
-            </div>
-            <div>
-              <dt class="text-muted mb-1">
-                External booking link
-              </dt>
-              <dd>
-                <ULink
-                  v-if="show.externalUrl"
-                  :to="show.externalUrl"
-                  external
-                  target="_blank"
-                  class="text-primary break-all"
-                >{{ show.externalUrl }}</ULink>
-                <span
-                  v-else
-                  class="text-highlighted"
-                >—</span>
-              </dd>
-            </div>
-            <div>
-              <dt class="text-muted mb-1">
-                URL slug
-              </dt>
-              <dd class="font-mono text-highlighted">
-                {{ show.slug }}
-              </dd>
-            </div>
-          </dl>
-        </UCard>
-      </section>
+      <AdminShowsContentWarningsSection
+        :show="show"
+        @refresh="refresh"
+      />
 
-      <!-- ── Content warnings ───────────────────────────────────────────── -->
-      <section class="space-y-3">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-muted">
-          Content warnings
-        </h2>
-
-        <UCard>
-          <UAlert
-            v-if="!hasAnyWarning && show.warningsConfirmedNone"
-            color="success"
-            variant="subtle"
-            icon="i-lucide-check-circle"
-            title="Confirmed: this production has no content warnings"
-            description="The company has checked. The show page says so explicitly."
-          />
-          <UAlert
-            v-else-if="!hasAnyWarning"
-            color="warning"
-            variant="subtle"
-            icon="i-lucide-alert-triangle"
-            title="Nothing recorded"
-            description="Nobody has filled this in, which is different from there being none. The public show page says no information was recorded."
-          />
-
-          <div
-            v-else
-            class="space-y-3"
-          >
-            <div
-              v-for="(label, kind) in WARNING_AXES"
-              :key="kind"
-            >
-              <p class="text-muted text-sm mb-1">
-                {{ label }}
-              </p>
-              <div
-                v-if="warningsByAxis[kind].length"
-                class="flex flex-wrap gap-1.5"
-              >
-                <UBadge
-                  v-for="title in warningsByAxis[kind]"
-                  :key="title"
-                  :label="title"
-                  color="neutral"
-                  variant="subtle"
-                  size="sm"
-                />
-              </div>
-              <p
-                v-else
-                class="text-sm text-highlighted"
-              >
-                —
-              </p>
-            </div>
-          </div>
-
-          <div
-            v-if="show.contentWarningNotes"
-            class="mt-4 pt-4 border-t border-default"
-          >
-            <p class="text-muted text-sm mb-1">
-              Notes
-            </p>
-            <p class="text-sm text-highlighted whitespace-pre-line">
-              {{ show.contentWarningNotes }}
-            </p>
-          </div>
-        </UCard>
-      </section>
+      <AdminShowsTicketTypesSection
+        :show-id="show.id"
+        @refresh="refresh"
+      />
 
       <!-- ── Performances ───────────────────────────────────────────────── -->
       <section class="space-y-3">
@@ -573,18 +409,6 @@ const performanceColumns: TableColumn<PerformanceListItem>[] = [
       </section>
 
       <!-- ── Modals ─────────────────────────────────────────────────────── -->
-
-      <ShowEditModal
-        :show="editOpen ? show : null"
-        @close="editOpen = false"
-        @refresh="() => { refresh(); editOpen = false }"
-      />
-
-      <ShowTicketTypesModal
-        :show="ticketTypesOpen ? show : null"
-        @close="ticketTypesOpen = false"
-        @refresh="refresh"
-      />
 
       <ShowPerformanceCreateModal
         :show-id="addPerformanceOpen ? show.id : null"

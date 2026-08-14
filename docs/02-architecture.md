@@ -169,6 +169,34 @@ compute their own counts, which is also why search is a plain `v-model` rather t
 it, not a hand-built div after the table. Destructive confirmations are `useConfirm()`, not a
 hand-rolled `UModal` — there were four of those.
 
+**Two layout rules the flexbox defaults get wrong.** `AdminPage` sets `min-w-0` and `shrink-0` on
+its children, and both are load-bearing. A flex item defaults to `min-width: auto`, so a wide table
+refuses to be narrower than its content and pushes the whole panel sideways instead of scrolling
+itself; and a column flex container shrinks its children vertically, which silently squashed a
+two-line alert to one and cut the second line in half. Relatedly, **do not put `table-fixed` on a
+table**: fixed layout ignores content and divides the width evenly, so with `whitespace-nowrap` cells
+a long email is clipped mid-word while a status column sits half empty. Auto layout plus the table
+root's own `overflow-auto` is what makes these usable on a phone.
+
+## Modals versus sections
+
+The rule that came out of rebuilding the shows area: **a modal is for a drill-in, not for a
+property.**
+
+A show's details, its content warnings and its ticket prices are properties of the show, so they are
+sections of `/admin/shows/[id]` — three editable cards, each saving only the fields it owns through
+the partial `PUT /api/shows/:id`. They were previously a 600-line `ShowEditModal` and a
+`ShowTicketTypesModal` opened from a read-only summary of the same data, so managing a show meant
+reading its details, opening a dialog containing those details again, and editing them there.
+
+What legitimately stays a modal: creating a show (a wizard launched from the list), and anything
+scoped to one row of a table — editing a performance, or setting a performance's ticket-type
+overrides. Those are drill-ins from a list, and a section per row would be noise.
+
+One consequence worth knowing: because the sections live on the detail page, the list page's
+"Ticket types" row action **navigates** to `/admin/shows/:id#ticket-types` rather than opening
+anything. One place to manage a show beats two entry points to the same form.
+
 ## The constraints Workers and D1 impose
 
 These are the things that make this codebase look odd if you come from a Node/Postgres background.

@@ -4,8 +4,10 @@
   Front-of-house reservation management for Box Office Staff.
 
   Features:
-  - Performance navigator: prev/next arrows cycle through all shows chronologically
-  - Defaults to today's performance; shows banner when no show today
+  - Performance navigator: prev/next through a window around the chosen date,
+    with a date picker to jump outside it
+  - Defaults to today's performance, else the next one; says so plainly when
+    there is neither, rather than landing on a show that finished months ago
   - "Collect" slideover: confirms tickets + marks COLLECTED
   - "Walk-in" modal: creates on-the-door reservation then immediately collects
   - Status summary pills (Pending, Collected, Door, No-Show, Cancelled)
@@ -13,7 +15,7 @@
   - "Mark all as No-Show" per performance (fun toast if show hasn't started)
 
   Data:
-  - GET /api/shows  → build performance navigator
+  - GET /api/performances?near=  → build performance navigator
   - GET /api/reservations?performanceId=:id&withCounts=true → reservations table
 -->
 <script setup lang="ts">
@@ -152,14 +154,20 @@ const sortedPerformances = computed(() =>
 
 /**
  * The performance a volunteer most likely wants for a given day: one on that
- * day, else the next one after it, else the most recent before it.
+ * day, else the next one after it.
  *
- * Takes a target rather than assuming today, so jumping to a date reselects
- * around that date instead of snapping back to tonight.
+ * `allowPast` is the whole subtlety. Opening the box office and landing on a
+ * show that finished last March is disorienting and, worse, invites someone to
+ * start collecting tickets against the wrong night — so on a normal load, if
+ * there is nothing today and nothing coming up, the answer is *nothing*, and the
+ * page says so. Falling back to the most recent past performance is only right
+ * when the volunteer has explicitly asked for a date, where "nearest to what I
+ * picked" is exactly what they meant.
  */
-function pickNearestPerformance(
+function pickPerformance(
   perfs: typeof sortedPerformances.value,
   target: Date,
+  { allowPast }: { allowPast: boolean },
 ): string | undefined {
   if (perfs.length === 0) return undefined
 
@@ -170,8 +178,10 @@ function pickNearestPerformance(
   if (onTheDay) return onTheDay.id
 
   const targetMs = target.getTime()
-  const upcoming = perfs.find(p => (toDate(p.startsAt)?.getTime() ?? 0) >= targetMs)
-  return (upcoming ?? perfs[perfs.length - 1])?.id
+  const next = perfs.find(p => (toDate(p.startsAt)?.getTime() ?? 0) >= targetMs)
+  if (next) return next.id
+
+  return allowPast ? perfs[perfs.length - 1]?.id : undefined
 }
 
 /** Midday, so a same-day comparison cannot be tipped over by an hour of BST. */
@@ -179,9 +189,12 @@ function centreAsDate(): Date {
   return new Date(`${centreDate.value}T12:00:00`)
 }
 
+/** True while the navigator is centred on today rather than a chosen date. */
+const isViewingToday = computed(() => centreDate.value === today)
+
 // Set synchronously — available during SSR, since the window is already resolved.
 const selectedPerformanceId = ref<string | undefined>(
-  pickNearestPerformance(sortedPerformances.value, new Date()),
+  pickPerformance(sortedPerformances.value, new Date(), { allowPast: false }),
 )
 
 /**
@@ -205,13 +218,17 @@ function jumpTo(date: string) {
 // refresh after a walk-in does not move the volunteer off the performance they
 // are working.
 watch(sortedPerformances, (perfs) => {
+  // Reaching into the past is right only when a date was asked for. Centred on
+  // today, "nothing coming up" has to stay visible as nothing.
+  const allowPast = !isViewingToday.value
+
   if (jumpPending.value) {
     jumpPending.value = false
-    selectedPerformanceId.value = pickNearestPerformance(perfs, centreAsDate())
+    selectedPerformanceId.value = pickPerformance(perfs, centreAsDate(), { allowPast })
     return
   }
   if (perfs.some(p => p.id === selectedPerformanceId.value)) return
-  selectedPerformanceId.value = pickNearestPerformance(perfs, centreAsDate())
+  selectedPerformanceId.value = pickPerformance(perfs, centreAsDate(), { allowPast })
 })
 
 const currentIndex = computed(() =>
@@ -260,6 +277,18 @@ const noPerformanceToday = computed(() => {
     return d ? isSameDay(d, rightNow) : false
   })
 })
+
+/**
+ * Nothing today and nothing ahead of today. Distinct from "no performance
+ * today", which used to cover both and then quietly showed last spring's door
+ * list underneath it.
+ */
+const nothingScheduled = computed(() =>
+  showsStatus.value !== 'pending'
+  && isViewingToday.value
+  && noPerformanceToday.value
+  && !selectedPerformanceId.value,
+)
 
 // ── Reservations data ─────────────────────────────────────────────────────────
 
@@ -787,7 +816,7 @@ const todayFormatted = computed(() =>
         <!-- Performance details -->
         <div
           v-if="selectedPerformance"
-          class="flex items-center gap-4 px-4 py-2 border-t border-default text-sm text-muted flex-wrap"
+          class="flex items-center gap-x-4 gap-y-1 px-4 py-2 border-t border-default text-sm text-muted flex-wrap"
         >
           <span class="inline-flex items-center gap-1.5">
             <UIcon
@@ -796,23 +825,22 @@ const todayFormatted = computed(() =>
             />
             {{ selectedPerformance.venue.name }}
           </span>
-          <span class="inline-flex items-center gap-1.5">
+          <span class="inline-flex items-center gap-1.5 whitespace-nowrap">
             <UIcon
               name="i-lucide-clock"
               class="size-3.5 shrink-0"
             />
             Doors {{ formatTime(selectedPerformance.doorsAt) }}
-            · Curtain
+          </span>
+          <span class="whitespace-nowrap">
+            Curtain
             <strong class="text-highlighted">{{ formatTime(selectedPerformance.startsAt) }}</strong>
-            <template v-if="selectedPerformance.durationMinutes">
-              · ~{{ selectedPerformance.durationMinutes }} min
-            </template>
-            <template v-if="selectedPerformance.intervalCount > 0">
-              with {{ selectedPerformance.intervalCount }}
-              interval<template v-if="selectedPerformance.intervalMinutes">
-                ({{ selectedPerformance.intervalMinutes }} min)
-              </template>
-            </template>
+          </span>
+          <span
+            v-if="selectedPerformance.durationMinutes"
+            class="whitespace-nowrap"
+          >
+            ~{{ selectedPerformance.durationMinutes }} min<template v-if="selectedPerformance.intervalCount > 0">, {{ selectedPerformance.intervalCount }} interval<template v-if="selectedPerformance.intervalMinutes"> ({{ selectedPerformance.intervalMinutes }} min)</template></template>
           </span>
         </div>
 
@@ -825,14 +853,25 @@ const todayFormatted = computed(() =>
         </div>
       </div>
 
-      <!-- No show today banner -->
+      <!-- Nothing today, but something ahead: say which one is being shown. -->
       <UAlert
-        v-if="noPerformanceToday && selectedPerformanceId"
+        v-if="noPerformanceToday && selectedPerformanceId && isViewingToday"
         title="No performance today"
-        description="No shows scheduled for today — showing the nearest available performance."
+        description="Nothing is scheduled for today — showing the next one."
         color="neutral"
         variant="subtle"
         icon="i-lucide-calendar-x"
+      />
+
+      <!-- Nothing today and nothing ahead. Say so plainly rather than dropping
+           a volunteer onto a show that finished months ago. -->
+      <UAlert
+        v-else-if="nothingScheduled"
+        title="No performances today or coming up"
+        description="Nothing is scheduled from today onwards. Use the date picker in the navigator to look back at a past performance."
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-calendar-off"
       />
 
       <template v-if="selectedPerformanceId">
@@ -902,7 +941,7 @@ const todayFormatted = computed(() =>
     <!-- Scrollable table area -->
     <div
       v-if="selectedPerformanceId"
-      class="flex-1 min-h-0 overflow-y-auto px-6 pb-6 flex flex-col gap-4"
+      class="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pb-6 flex flex-col gap-4 [&>*]:shrink-0 [&>*]:min-w-0"
     >
       <!-- Reservations table -->
       <UTable
