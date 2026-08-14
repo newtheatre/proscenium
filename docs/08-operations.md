@@ -132,7 +132,41 @@ Rolling back also does not revert secrets or R2 contents.
 
 ## 5. Running a migration against production
 
-Migrations are **never** applied automatically in production — not at build, not at deploy, not at boot. They are a deliberate manual act.
+**Migrations apply automatically when `main` moves.** `.github/workflows/migrate.yml` runs
+`nuxt db migrate` on any push to `main` that touches `server/db/migrations/**`, and records a Time
+Travel bookmark in the run summary before it applies anything. It never runs on a pull request.
+
+Migrations are still **not** applied at build, at deploy, or at boot — `applyMigrationsDuringBuild`
+is `false`, and Cloudflare's deploy does not touch the database. The workflow is the only automatic
+path.
+
+### The ordering problem
+
+The workflow does not deploy, and it cannot sequence itself against the deploy. Cloudflare Workers
+Builds reacts to the same push independently, so on every merge two things start at once:
+
+| | typical |
+| --- | --- |
+| `migrate` workflow | ~1 minute |
+| Cloudflare build + deploy | ~3–5 minutes |
+
+The migration almost always lands first, which is the order NuxtHub requires — but **it is a race,
+not a guarantee**. If the deploy wins, the new Worker runs against the old schema until the
+migration catches up.
+
+That is survivable for an additive migration and not for a destructive one. So:
+
+- **Additive changes** (new nullable column, new table, new index) — just merge.
+- **Destructive changes** (dropping or renaming a column or table, narrowing a constraint, rewriting
+  data) — apply by hand *before* merging, with the manual sequence below, then merge. The workflow
+  will find nothing pending and no-op. This is what was done for `0016_lying_maverick`.
+
+A destructive migration is also the case where you want a human watching, which is the other reason
+not to leave it to a push trigger.
+
+### Applying one by hand
+
+Still the right move for anything destructive, and the fallback when the workflow is broken.
 
 ### Before you start
 
@@ -197,11 +231,26 @@ So they do **not** interoperate, whatever an earlier version of this document sa
 with one and the other still considers it pending, and will re-run it. That is survivable for a
 migration that happens to be idempotent and fatal for one that is not.
 
-**Option B (wrangler) is the route in use**, because it authenticates with the wrangler login the
-committee already has, while Option A needs `NUXT_HUB_CLOUDFLARE_*` API credentials set separately.
-If you ever deliberately switch, backfill the other format for every migration first.
+**Option A (`nuxt db migrate`) is now the route of record**, because that is what
+`.github/workflows/migrate.yml` runs. It needs `NUXT_HUB_CLOUDFLARE_*` credentials, which live as
+repository secrets rather than on anyone's laptop.
+
+Option B (wrangler) remains the practical choice for a manual, destructive migration, because it
+authenticates with the wrangler login the committee already has. **If you apply one that way, record
+the Option A name too, or the workflow will re-run it on the next push:**
+
+```bash
+# after `wrangler d1 migrations apply` recorded `0017_name.sql`
+bunx wrangler d1 execute proscenium --remote \
+  --command "INSERT INTO \"_hub_migrations\" (name) values ('0017_name')"
+```
+
+That is exactly what `nuxt db mark-as-migrated 0017_name` writes — one row, nothing else — and it is
+the supported command when you have the API credentials to hand.
 
 The 2026-08-13 ledger recovery wrote both formats for `0000`–`0014` for exactly this reason.
+`0016_lying_maverick` was applied with wrangler on 2026-08-14 and its Option A name backfilled the
+same day, when the workflow was introduced.
 
 ### The ledger was recovered on 2026-08-13 — history
 
