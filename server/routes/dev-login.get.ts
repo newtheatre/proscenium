@@ -22,7 +22,13 @@ export default defineEventHandler(async (event) => {
           : []
 
   const now = Date.now()
-  await setUserSession(event, {
+
+  // replaceUserSession, NOT setUserSession: the latter merges into whatever
+  // session already exists, and defu concatenates arrays — so switching
+  // ?staff= swapped the id while keeping the previous tier's role. Cycling
+  // admin → manager → box-office accumulated all three, and local
+  // authorisation testing quietly ran with more authority than asked for.
+  await replaceUserSession(event, {
     user: {
       id: `dev-${staff || 'user'}`,
       email: `dev-${staff || 'user'}@proscenium.test`,
