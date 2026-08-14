@@ -710,7 +710,7 @@ office used to download all 498 shows and 1,304 performances to render one navig
 | `near` | `YYYY-MM-DD` | the `limit` performances **closest to** that date, roughly half either side |
 | `from`, `to` | `YYYY-MM-DD` | inclusive window, Europe/London |
 | `showId` | | one show's performances |
-| `includeCancelled` | `true` \| `false` | cancelled are **excluded** by default |
+| `status` | `DRAFT` \| `ON_SALE` \| `CANCELLED` | exact match; omitted, cancelled are excluded and DRAFT ones are **included** |
 | `order` | `asc` \| `desc` | default `asc`; ignored with `near` |
 | `page`, `limit` | | default limit 50, max 200 |
 

@@ -4,8 +4,8 @@
   Front-of-house reservation management for Box Office Staff.
 
   Features:
-  - Performance navigator over upcoming performances only, with a date picker
-    to jump ahead without arrowing there
+  - Performance navigator over upcoming on-sale performances only, with a date
+    picker to jump ahead without arrowing there
   - Defaults to today's performance, else the next one; says so plainly when
     there is neither. It never selects a performance that has already been —
     those are looked up in Reservations
@@ -16,7 +16,7 @@
   - "Mark all as No-Show" per performance (fun toast if show hasn't started)
 
   Data:
-  - GET /api/performances?from=today → build performance navigator
+  - GET /api/performances?from=today&status=ON_SALE → performance navigator
   - GET /api/reservations?performanceId=:id&withCounts=true → reservations table
 -->
 <script setup lang="ts">
@@ -120,13 +120,20 @@ const today = londonDateOnly(new Date())
 const NAVIGATOR_LIMIT = 200
 
 /**
- * Everything from today onwards, and nothing before it.
+ * On-sale performances from today onwards, and nothing else.
  *
  * The box office is a forward-looking tool: it exists to work tonight's door.
  * Past performances are deliberately unreachable from this screen — landing on
  * a show that finished last March invites collecting tickets against the wrong
  * night, and there is no workflow here that needs one. The reservations list
  * (/admin/reservations) is where a historical booking is looked up.
+ *
+ * `status=ON_SALE` for the same reason. A DRAFT performance is one nobody can
+ * book, so its door list is empty by definition and its capacity figures are
+ * meaningless — putting it in the navigator only creates a way to sell a walk-in
+ * against a night that is not on sale. Publishing a show does not publish its
+ * performances, so a published show can perfectly well have draft ones; they
+ * appear here once they are actually selling.
  *
  * That also means the date picker below re-selects within this list rather than
  * re-fetching, so there is no window to slide and no way to slide it backwards.
@@ -144,14 +151,14 @@ const requestFetch = useRequestFetch()
 const { data: performancePage, status: showsStatus, error: showsError, refresh: refreshShows } = await useAsyncData(
   'box-office-performances',
   () => requestFetch<Paginated<PerformanceRow>>('/api/performances', {
-    query: { from: today, order: 'asc', limit: NAVIGATOR_LIMIT },
+    query: { from: today, status: 'ON_SALE', order: 'asc', limit: NAVIGATOR_LIMIT },
   }),
   {
     default: (): Paginated<PerformanceRow> => ({ rows: [], total: 0, page: 1, limit: NAVIGATOR_LIMIT }),
   },
 )
 
-// Already chronological and already free of cancelled performances — the
+// Already chronological, already on-sale-only and already from today — the
 // endpoint sorts and filters. `showTitle` is flattened on for the template,
 // which reads it in half a dozen places.
 const sortedPerformances = computed(() =>
@@ -789,7 +796,7 @@ const todayFormatted = computed(() =>
                   @update:model-value="(value: string | number) => jumpTo(String(value))"
                 />
                 <p class="text-xs text-muted">
-                  Upcoming performances only. Past ones are looked up in Reservations.
+                  Upcoming on-sale performances only.
                 </p>
                 <UButton
                   v-if="jumpDate !== today"
@@ -861,7 +868,7 @@ const todayFormatted = computed(() =>
       <UAlert
         v-else-if="nothingScheduled"
         title="No performances today or coming up"
-        description="Nothing is scheduled from today onwards. Past performances are looked up in Reservations, not here."
+        description="Nothing is on sale from today onwards. Draft performances appear here once they go on sale; past ones are looked up in Reservations."
         color="neutral"
         variant="subtle"
         icon="i-lucide-calendar-off"

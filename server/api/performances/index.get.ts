@@ -13,8 +13,12 @@ const querySchema = paginationSchema.omit({ limit: true, q: true }).extend({
    */
   near: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   showId: z.string().optional(),
-  /** Cancelled performances are excluded unless you ask for them. */
-  includeCancelled: z.enum(['true', 'false']).optional(),
+  /**
+   * Exact match. Omitted, cancelled performances are excluded and the rest are
+   * returned — a sensible default for "what is scheduled", but note that DRAFT
+   * ones are in that set: pass `status=ON_SALE` for "what is actually selling".
+   */
+  status: z.enum(['DRAFT', 'ON_SALE', 'CANCELLED']).optional(),
   order: z.enum(['asc', 'desc']).optional().default('asc'),
   limit: z.coerce.number().int().min(1).max(200).optional().default(50),
 })
@@ -48,12 +52,13 @@ const querySchema = paginationSchema.omit({ limit: true, q: true }).extend({
 export default defineEventHandler(async (event) => {
   await authorize(event, listShows)
 
-  const { from, to, near, showId, includeCancelled, order, page, limit }
+  const { from, to, near, showId, status, order, page, limit }
     = await getValidatedQuery(event, querySchema.parse)
 
   const filters = []
   if (showId) filters.push(eq(schema.performances.showId, showId))
-  if (includeCancelled !== 'true') filters.push(ne(schema.performances.status, 'CANCELLED'))
+  if (status) filters.push(eq(schema.performances.status, status))
+  else filters.push(ne(schema.performances.status, 'CANCELLED'))
   if (from) filters.push(gte(schema.performances.startsAt, validityStart(from)))
   if (to) filters.push(lte(schema.performances.startsAt, validityEnd(to)))
 
