@@ -4,10 +4,11 @@
   Front-of-house reservation management for Box Office Staff.
 
   Features:
-  - Performance navigator: prev/next through a window around the chosen date,
-    with a date picker to jump outside it
+  - Performance navigator over upcoming performances only, with a date picker
+    to jump ahead without arrowing there
   - Defaults to today's performance, else the next one; says so plainly when
-    there is neither, rather than landing on a show that finished months ago
+    there is neither. It never selects a performance that has already been —
+    those are looked up in Reservations
   - "Collect" slideover: confirms tickets + marks COLLECTED
   - "Walk-in" modal: creates on-the-door reservation then immediately collects
   - Status summary pills (Pending, Collected, Door, No-Show, Cancelled)
@@ -15,7 +16,7 @@
   - "Mark all as No-Show" per performance (fun toast if show hasn't started)
 
   Data:
-  - GET /api/performances?near=  → build performance navigator
+  - GET /api/performances?from=today → build performance navigator
   - GET /api/reservations?performanceId=:id&withCounts=true → reservations table
 -->
 <script setup lang="ts">
@@ -110,36 +111,43 @@ function londonDateOnly(date: Date): string {
   }).format(date)
 }
 
+const today = londonDateOnly(new Date())
+
 /**
- * The date the navigator is centred on. Today, until someone jumps elsewhere.
+ * Roughly eighteen months of programming at this theatre's rate, which is more
+ * than a door volunteer will ever arrow through.
+ */
+const NAVIGATOR_LIMIT = 200
+
+/**
+ * Everything from today onwards, and nothing before it.
+ *
+ * The box office is a forward-looking tool: it exists to work tonight's door.
+ * Past performances are deliberately unreachable from this screen — landing on
+ * a show that finished last March invites collecting tickets against the wrong
+ * night, and there is no workflow here that needs one. The reservations list
+ * (/admin/reservations) is where a historical booking is looked up.
+ *
+ * That also means the date picker below re-selects within this list rather than
+ * re-fetching, so there is no window to slide and no way to slide it backwards.
  *
  * This page used to load `/api/shows` with no parameters — every show in the
  * archive, 498 of them with 1,304 performances nested, to render one navigator.
- * `/api/performances?near=` returns the performances closest to a date instead,
- * so the payload is a season rather than three decades. Nothing became
- * unreachable: the date picker jumps straight to any night, which beats clicking
- * the previous arrow a thousand times.
+ *
+ * requestFetch, not a plain useFetch: this endpoint is behind authorize(), and a
+ * plain useFetch running on the server does not forward the session cookie — the
+ * picker came back 403 and empty on every hard load, filling in only once
+ * something triggered a client-side refetch. Same rule for the reservation pages
+ * fetched below. See docs/02-architecture.md §Fetching in the admin area.
  */
-const today = londonDateOnly(new Date())
-const centreDate = ref(today)
-
-/** Enough either side of the pivot to page a run without another request. */
-const NAVIGATOR_WINDOW = 120
-
-// requestFetch, not a plain useFetch: this endpoint is behind authorize(), and a
-// plain useFetch running on the server does not forward the session cookie — the
-// performance picker came back 403 and empty on every hard load, filling in only
-// once something triggered a client-side refetch. Same rule for the reservation
-// pages fetched below. See docs/02-architecture.md §Fetching in the admin area.
 const requestFetch = useRequestFetch()
 const { data: performancePage, status: showsStatus, error: showsError, refresh: refreshShows } = await useAsyncData(
   'box-office-performances',
   () => requestFetch<Paginated<PerformanceRow>>('/api/performances', {
-    query: { near: centreDate.value, limit: NAVIGATOR_WINDOW },
+    query: { from: today, order: 'asc', limit: NAVIGATOR_LIMIT },
   }),
   {
-    default: (): Paginated<PerformanceRow> => ({ rows: [], total: 0, page: 1, limit: NAVIGATOR_WINDOW }),
-    watch: [centreDate],
+    default: (): Paginated<PerformanceRow> => ({ rows: [], total: 0, page: 1, limit: NAVIGATOR_LIMIT }),
   },
 )
 
@@ -153,24 +161,18 @@ const sortedPerformances = computed(() =>
 // ── Performance navigation ────────────────────────────────────────────────────
 
 /**
- * The performance a volunteer most likely wants for a given day: one on that
- * day, else the next one after it.
+ * The performance a volunteer wants for a given day: one on that day, else the
+ * next one after it.
  *
- * `allowPast` is the whole subtlety. Opening the box office and landing on a
- * show that finished last March is disorienting and, worse, invites someone to
- * start collecting tickets against the wrong night — so on a normal load, if
- * there is nothing today and nothing coming up, the answer is *nothing*, and the
- * page says so. Falling back to the most recent past performance is only right
- * when the volunteer has explicitly asked for a date, where "nearest to what I
- * picked" is exactly what they meant.
+ * There is deliberately no fallback to the most recent past performance. Every
+ * candidate is already today or later, so this can only ever move forwards —
+ * and when there is nothing left ahead, the answer is nothing and the page says
+ * so, rather than quietly presenting a finished show as if it were tonight's.
  */
 function pickPerformance(
   perfs: typeof sortedPerformances.value,
   target: Date,
-  { allowPast }: { allowPast: boolean },
 ): string | undefined {
-  if (perfs.length === 0) return undefined
-
   const onTheDay = perfs.find((p) => {
     const d = toDate(p.startsAt)
     return d ? isSameDay(d, target) : false
@@ -178,57 +180,46 @@ function pickPerformance(
   if (onTheDay) return onTheDay.id
 
   const targetMs = target.getTime()
-  const next = perfs.find(p => (toDate(p.startsAt)?.getTime() ?? 0) >= targetMs)
-  if (next) return next.id
-
-  return allowPast ? perfs[perfs.length - 1]?.id : undefined
+  return perfs.find(p => (toDate(p.startsAt)?.getTime() ?? 0) >= targetMs)?.id
 }
 
 /** Midday, so a same-day comparison cannot be tipped over by an hour of BST. */
-function centreAsDate(): Date {
-  return new Date(`${centreDate.value}T12:00:00`)
+function asLocalDate(dateOnly: string): Date {
+  return new Date(`${dateOnly}T12:00:00`)
 }
 
-/** True while the navigator is centred on today rather than a chosen date. */
-const isViewingToday = computed(() => centreDate.value === today)
+/** The date shown in the picker. Selection only — it does not refetch. */
+const jumpDate = ref(today)
 
-// Set synchronously — available during SSR, since the window is already resolved.
+// Set synchronously — available during SSR, since the list is already resolved.
 const selectedPerformanceId = ref<string | undefined>(
-  pickPerformance(sortedPerformances.value, new Date(), { allowPast: false }),
+  pickPerformance(sortedPerformances.value, new Date()),
 )
 
 /**
- * Set when the volunteer picks a date, cleared once that window has landed.
- *
- * Without it a jump can appear to do nothing: windows are wide, so the
- * performance you were already on is usually still in the new one, and "keep the
- * current selection if it is still present" would keep it. A refresh and a jump
- * want opposite things from the same watcher.
+ * Jumping selects within the list already loaded, so it is instant and cannot
+ * reach backwards. A date before today, or after the last performance, has
+ * nothing to land on — the input is bounded to the range that does.
  */
-const jumpPending = ref(false)
-
 function jumpTo(date: string) {
   if (!date) return
-  centreDate.value = date
-  jumpPending.value = true
+  jumpDate.value = date
+  const id = pickPerformance(sortedPerformances.value, asLocalDate(date))
+  if (id) selectedPerformanceId.value = id
 }
 
-// Re-pick when the window changes. After a jump, always — that is the point of
-// jumping. Otherwise only if the current selection fell out of the window, so a
-// refresh after a walk-in does not move the volunteer off the performance they
-// are working.
-watch(sortedPerformances, (perfs) => {
-  // Reaching into the past is right only when a date was asked for. Centred on
-  // today, "nothing coming up" has to stay visible as nothing.
-  const allowPast = !isViewingToday.value
+/** The window the picker can usefully address. */
+const lastPerformanceDate = computed(() => {
+  const last = sortedPerformances.value.at(-1)
+  const date = last ? toDate(last.startsAt) : null
+  return date ? londonDateOnly(date) : undefined
+})
 
-  if (jumpPending.value) {
-    jumpPending.value = false
-    selectedPerformanceId.value = pickPerformance(perfs, centreAsDate(), { allowPast })
-    return
-  }
+// After a refresh — a walk-in, a collection — keep the volunteer on the
+// performance they are working, and only re-pick if it has gone.
+watch(sortedPerformances, (perfs) => {
   if (perfs.some(p => p.id === selectedPerformanceId.value)) return
-  selectedPerformanceId.value = pickPerformance(perfs, centreAsDate(), { allowPast })
+  selectedPerformanceId.value = pickPerformance(perfs, asLocalDate(jumpDate.value))
 })
 
 const currentIndex = computed(() =>
@@ -279,15 +270,12 @@ const noPerformanceToday = computed(() => {
 })
 
 /**
- * Nothing today and nothing ahead of today. Distinct from "no performance
- * today", which used to cover both and then quietly showed last spring's door
- * list underneath it.
+ * Nothing today and nothing ahead. Distinct from "no performance today", which
+ * used to cover both and then quietly showed last spring's door list underneath
+ * it. The list only ever holds today onwards, so an empty one says it plainly.
  */
 const nothingScheduled = computed(() =>
-  showsStatus.value !== 'pending'
-  && isViewingToday.value
-  && noPerformanceToday.value
-  && !selectedPerformanceId.value,
+  showsStatus.value !== 'pending' && sortedPerformances.value.length === 0,
 )
 
 // ── Reservations data ─────────────────────────────────────────────────────────
@@ -787,19 +775,24 @@ const todayFormatted = computed(() =>
               aria-label="Jump to a date"
             />
             <template #content>
-              <div class="p-3 space-y-2 w-60">
+              <div class="p-3 space-y-2 w-64">
                 <p class="text-sm font-medium text-highlighted">
                   Jump to a date
                 </p>
                 <UInput
-                  :model-value="centreDate"
+                  :model-value="jumpDate"
                   type="date"
+                  :min="today"
+                  :max="lastPerformanceDate"
                   class="w-full"
                   aria-label="Date to jump to"
                   @update:model-value="(value: string | number) => jumpTo(String(value))"
                 />
+                <p class="text-xs text-muted">
+                  Upcoming performances only. Past ones are looked up in Reservations.
+                </p>
                 <UButton
-                  v-if="centreDate !== today"
+                  v-if="jumpDate !== today"
                   label="Back to today"
                   icon="i-lucide-rotate-ccw"
                   color="neutral"
@@ -855,7 +848,7 @@ const todayFormatted = computed(() =>
 
       <!-- Nothing today, but something ahead: say which one is being shown. -->
       <UAlert
-        v-if="noPerformanceToday && selectedPerformanceId && isViewingToday"
+        v-if="noPerformanceToday && selectedPerformanceId"
         title="No performance today"
         description="Nothing is scheduled for today — showing the next one."
         color="neutral"
@@ -868,7 +861,7 @@ const todayFormatted = computed(() =>
       <UAlert
         v-else-if="nothingScheduled"
         title="No performances today or coming up"
-        description="Nothing is scheduled from today onwards. Use the date picker in the navigator to look back at a past performance."
+        description="Nothing is scheduled from today onwards. Past performances are looked up in Reservations, not here."
         color="neutral"
         variant="subtle"
         icon="i-lucide-calendar-off"
