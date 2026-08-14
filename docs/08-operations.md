@@ -93,21 +93,30 @@ If the change includes a schema change, apply the migration **before** deploying
 Secrets live on the Worker, not in the repository, and survive deploys. Set or rotate one with:
 
 ```bash
-bunx wrangler --cwd .output secret put NUXT_SESSION_PASSWORD
+bunx wrangler --cwd .output secret put NUXT_RESEND_API_KEY
 # or, without a build present:
-bunx wrangler secret put NUXT_SESSION_PASSWORD --name proscenium
+bunx wrangler secret put NUXT_RESEND_API_KEY --name proscenium
 ```
+
+**`NUXT_SESSION_PASSWORD` is the exception — it is not a worker secret.** It is
+shared with every other app on the estate, so it lives in the account Secrets
+Store and this Worker binds it as `SESSION_PASSWORD`
+(`nuxt.config.ts` → `secrets_store_secrets`, hydrated by
+`server/plugins/secrets-store.ts`). The auth service's runbook owns rotation —
+stage-door `docs/operations.md`, ADR-0016. Rotating it there needs no deploy
+here.
 
 | Secret | Consequence if missing in production |
 | --- | --- |
 | `RESEND_API_KEY` | **The entire site goes down.** `server/utils/resend.ts` throws at module load, so the Worker fails to start and every request errors. See `docs/01-getting-started.md` §5. |
-| `NUXT_SESSION_PASSWORD` | Nobody can log in; sessions cannot be sealed. Must be at least 32 characters |
+| `NUXT_SESSION_PASSWORD` (Secrets Store) | Nobody can log in; `/api/_auth/session` returns 500 while the homepage still serves, which makes it easy to miss. Must be at least 32 characters |
 | `NUXT_RESEND_FROM_EMAIL` | Falls back to `no-reply@tickets.newtheatre.org.uk`; sends fail if that address is not verified in Resend |
 
 List what is currently set (names only — values cannot be read back):
 
 ```bash
-bunx wrangler secret list --name proscenium
+bunx wrangler secret list --name proscenium                  # worker secrets
+bunx wrangler versions view <version-id> --name proscenium   # includes store bindings
 ```
 
 ---
@@ -334,12 +343,14 @@ D1 has no transactional multi-statement migrations, so a migration can leave the
 
 `NUXT_SESSION_PASSWORD` is the key that seals the login cookie. Rotate it when a committee member with production access leaves, if you suspect it has leaked, and at handover each year.
 
-```bash
-openssl rand -hex 32                                       # generate; needs 32+ characters
-bunx wrangler secret put NUXT_SESSION_PASSWORD --name proscenium
-```
+**Not from here.** The key is shared by every app on the estate and lives in the
+account Secrets Store, so it is rotated once, centrally — follow stage-door
+`docs/operations.md` §"Rotating the session seal secret". Doing it per-app is
+what the Secrets Store move (ADR-0016) removed; a `wrangler secret put
+NUXT_SESSION_PASSWORD --name proscenium` today would be shadowed by the binding
+and achieve nothing except confusing the next person.
 
-**Rotating invalidates every existing session immediately.** Every logged-in user — customers and staff alike — is signed out and must log in again. Nothing is lost, but do not do it fifteen minutes before curtain-up. Rotate at a quiet time, then confirm you can still log in yourself.
+**Rotating invalidates every existing session.** Every logged-in user — customers and staff alike — is signed out and must log in again. Nothing is lost, but do not do it fifteen minutes before curtain-up. Rotate at a quiet time, then confirm you can still log in yourself. Workers pick the new value up as isolates recycle rather than instantly, so allow a few minutes for the estate to settle.
 
 ### Adding a staff account and granting roles
 

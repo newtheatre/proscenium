@@ -151,6 +151,24 @@ export default defineNuxtConfig({
             migrations_dir: 'db/migrations/sqlite',
           },
         ],
+        // Estate-wide secrets live in the account Secrets Store so a rotation
+        // is one write rather than four worker secrets updated in lockstep
+        // (docs/08-operations.md#secrets). server/plugins/secrets-store.ts
+        // turns the binding into runtimeConfig.session.password — read its
+        // header before adding another entry here, the binding name matters.
+        //
+        // Cast: `secrets_store_secrets` is valid wrangler config but missing
+        // from the wrangler types Nitro 2.13 bundles. Drop it once Nitro
+        // catches up.
+        ...({
+          secrets_store_secrets: [
+            {
+              binding: 'SESSION_PASSWORD',
+              store_id: 'fdfe08b6b01f498fbddbc08c2891cadb',
+              secret_name: 'NUXT_SESSION_PASSWORD',
+            },
+          ],
+        } as object),
         observability: {
           logs: {
             enabled: true,
