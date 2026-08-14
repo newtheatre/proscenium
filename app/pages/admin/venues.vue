@@ -43,10 +43,14 @@ const UCheckbox = resolveComponent('UCheckbox')
 definePageMeta({
   layout: 'admin',
   middleware: ['admin'],
-  title: 'Venue Management',
+  // The layout renders this as the page's only <h1> (UDashboardNavbar). It must
+  // match the sidebar nav entry; it used to say "Venue Management" while the
+  // page's own heading said "Venues".
+  title: 'Venues',
 })
 
 const toast = useToast()
+const confirm = useConfirm()
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const table = useTemplateRef<any>('table')
 
@@ -71,10 +75,6 @@ interface Venue {
 }
 
 // Table state
-const columnFilters = ref([{
-  id: 'name',
-  value: '',
-}])
 const columnVisibility = ref({})
 // Hoisted, not inline in the template: an inline object builds a fresh options
 // bag and row-model function per render, which makes the table rebuild every
@@ -92,29 +92,70 @@ const pagination = ref({
 // server — and /api/venues is behind authorize() for writes. See
 // docs/02-architecture.md §Fetching in the admin area.
 const requestFetch = useRequestFetch()
-const { data, status, refresh } = await useAsyncData(
+const { data, status, error, refresh } = await useAsyncData(
   'admin-venues', () => requestFetch<Venue[]>('/api/venues'))
+
+/**
+ * Rows for the table. **Always an array, never null** — binding `data ?? []`
+ * mints a new array identity per render, which makes UTable rebuild its
+ * TanStack row models, which writes back through the `v-model:` bindings and
+ * re-renders. See docs/02-architecture.md §Never build the table's data prop in
+ * the template.
+ */
+const rows = computed<Venue[]>(() => data.value ?? [])
+
+/**
+ * Search is done here rather than through TanStack's `columnFilters` so the
+ * footer can report the match count without asking the table to re-walk its row
+ * model, and so the input is a plain `v-model` instead of the find-and-mutate
+ * dance the template used to do. It also lets the search cover address, which
+ * the placeholder always claimed and the name-column filter never did.
+ */
+const search = ref('')
+const filteredRows = computed<Venue[]>(() => {
+  const query = search.value.trim().toLowerCase()
+  if (!query) return rows.value
+  return rows.value.filter(venue =>
+    venue.name.toLowerCase().includes(query)
+    || (venue.address ?? '').toLowerCase().includes(query),
+  )
+})
+
+// UPagination counts from 1; TanStack indexes from 0.
+const page = computed({
+  get: () => pagination.value.pageIndex + 1,
+  set: (value: number) => { pagination.value.pageIndex = value - 1 },
+})
+
+// Reset to the first page when the result set shrinks under the cursor,
+// otherwise a search from page 3 lands on an empty table.
+watch(search, () => {
+  pagination.value.pageIndex = 0
+})
+
+const selectedCount = computed(() => Object.keys(rowSelection.value).length)
 
 // Selected venue for editing or deletion
 const venueToEdit = ref<Venue | null>(null)
-const venueToDelete = ref<Venue | null>(null)
-const deleteModalOpen = ref(false)
 const manageFeaturesOpen = ref(false)
 
-// Delete single venue
-async function deleteSingleVenue() {
-  if (!venueToDelete.value) return
+async function deleteVenue(venue: Venue) {
+  const confirmed = await confirm({
+    title: `Delete ${venue.name}?`,
+    description: 'This permanently deletes the venue and its images, and may affect performances already scheduled there. It cannot be undone.',
+    confirmLabel: 'Delete venue',
+    confirmColor: 'error',
+  })
+  if (!confirmed) return
 
   try {
-    await $fetch(`/api/venues/${venueToDelete.value.id}`, { method: 'DELETE' })
+    await $fetch(`/api/venues/${venue.id}`, { method: 'DELETE' })
     toast.add({
       title: 'Venue deleted',
-      description: `${venueToDelete.value.name} has been removed`,
+      description: `${venue.name} has been removed`,
       icon: 'i-lucide-check',
       color: 'success',
     })
-    deleteModalOpen.value = false
-    venueToDelete.value = null
     await refresh()
   }
   catch (error: unknown) {
@@ -165,8 +206,7 @@ function getRowItems(row: Row<Venue>) {
       icon: 'i-lucide-trash',
       color: 'error' as const,
       onSelect() {
-        venueToDelete.value = venue
-        deleteModalOpen.value = true
+        deleteVenue(venue)
       },
     },
   ]
@@ -272,163 +312,87 @@ const columns: TableColumn<Venue>[] = [
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col gap-4 p-6">
-    <div class="flex w-full items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight">
-          Venues
-        </h1>
+  <AdminPage>
+    <AdminTableToolbar>
+      <template #left>
         <p class="text-muted">
           Manage venue locations and features
         </p>
-      </div>
-
-      <div class="flex gap-2">
+      </template>
+      <template #right>
         <UButton
-          label="Manage Features"
+          label="Manage features"
           color="neutral"
           variant="outline"
           icon="i-lucide-list"
           @click="manageFeaturesOpen = true"
         />
         <VenueCreateModal @refresh="refresh" />
-      </div>
-    </div>
+      </template>
+    </AdminTableToolbar>
 
-    <div class="flex gap-3">
-      <UInput
-        :model-value="columnFilters.find((filter) => filter.id ==='name')?.value"
-        placeholder="Search venues..."
-        icon="i-lucide-search"
-        class="flex-1"
-        @update:model-value="(value: string) => {
-          const filter = columnFilters.find((filter) => filter.id === 'name')
-          if (filter) filter.value = value
-        }"
-      />
+    <AdminFetchError
+      v-if="error"
+      :error="error"
+      title="Could not load venues"
+      :on-retry="refresh"
+    />
 
-      <UDropdownMenu
-        :items="
-          table?.tableApi
-            ?.getAllColumns()
-            .filter((column: any) => column.getCanHide())
-            .map((column: any) => ({
-              label: column.id === 'name' ? 'Venue' : column.id.charAt(0).toUpperCase() + column.id.slice(1),
-              type: 'checkbox' as const,
-              checked: column.getIsVisible(),
-              onUpdateChecked(checked: boolean) {
-                table?.tableApi?.getColumn(column.id)?.toggleVisibility(!!checked)
-              },
-              onSelect(e?: Event) {
-                e?.preventDefault()
-              },
-            }))
-        "
-        :content="{ align: 'end' }"
-      >
-        <UButton
-          label="Display"
-          color="neutral"
-          variant="outline"
-          trailing-icon="i-lucide-settings-2"
+    <AdminTableToolbar>
+      <template #left>
+        <UInput
+          v-model="search"
+          placeholder="Search venues…"
+          icon="i-lucide-search"
+          class="flex-1"
         />
-      </UDropdownMenu>
-    </div>
+      </template>
+      <template #right>
+        <AdminTableColumnToggle
+          :table="table"
+          :labels="{ name: 'Venue' }"
+        />
+      </template>
+    </AdminTableToolbar>
 
     <UTable
       ref="table"
-      v-model:column-filters="columnFilters"
       v-model:column-visibility="columnVisibility"
       v-model:row-selection="rowSelection"
       v-model:pagination="pagination"
       :pagination-options="paginationOptions"
       class="shrink-0"
-      :data="data"
+      :data="filteredRows"
       :columns="columns"
       :loading="status === 'pending'"
-      :ui="{
-        base: 'table-fixed border-separate border-spacing-0',
-        thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-        tbody: '[&>tr]:last:[&>td]:border-b-0',
-        th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-        td: 'border-b border-default',
-      }"
+    >
+      <template #empty>
+        <UEmpty
+          icon="i-lucide-building"
+          :title="search ? 'No venues match your search' : 'No venues yet'"
+          :description="search ? 'Try a different name or address.' : 'Create a venue to start scheduling performances.'"
+        />
+      </template>
+    </UTable>
+
+    <AdminTablePagination
+      v-model:page="page"
+      :total="filteredRows.length"
+      :limit="pagination.pageSize"
+      :selected="selectedCount"
+      label="venue"
+      :suffix="search ? 'matching' : undefined"
     />
 
-    <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-      <div class="text-sm text-muted">
-        {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }} of
-        {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} row(s) selected.
-      </div>
-
-      <div class="flex gap-1.5">
-        <UPagination
-          :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
-          :items-per-page="table?.tableApi?.getState().pagination.pageSize"
-          :total="table?.tableApi?.getFilteredRowModel().rows.length"
-          @update:page="(p: number) => table?.tableApi?.setPageIndex(p - 1)"
-        />
-      </div>
-    </div>
-
-    <!-- Edit Venue Modal -->
     <VenueEditModal
       :venue="venueToEdit"
       @close="venueToEdit = null"
       @refresh="() => { refresh(); venueToEdit = null }"
     />
 
-    <!-- Delete Venue Modal -->
-    <UModal
-      v-model:open="deleteModalOpen"
-      :title="`Delete ${venueToDelete?.name ||'venue'}`"
-      :description="`Are you sure? This action cannot be undone.`"
-    >
-      <template #body>
-        <div
-          v-if="venueToDelete"
-          class="space-y-4"
-        >
-          <div class="p-3 rounded-md bg-error/10 border border-error/20">
-            <div class="flex gap-2">
-              <UIcon
-                name="i-lucide-info"
-                class="text-error shrink-0 mt-0.5"
-              />
-              <div class="text-sm text-error">
-                <p class="font-medium mb-1">
-                  What happens when you delete this venue:
-                </p>
-                <ul class="list-disc list-inside space-y-1">
-                  <li>Venue will be permanently deleted</li>
-                  <li>All associated images will be removed</li>
-                  <li>Related performances may be affected</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex justify-end gap-2 mt-4">
-          <UButton
-            label="Cancel"
-            color="neutral"
-            variant="subtle"
-            @click="deleteModalOpen = false"
-          />
-          <UButton
-            label="Delete Venue"
-            color="error"
-            @click="deleteSingleVenue"
-          />
-        </div>
-      </template>
-    </UModal>
-
-    <!-- Manage Features Modal -->
     <VenueFeatureModal
       v-model:open="manageFeaturesOpen"
       @refresh="refresh"
     />
-  </div>
+  </AdminPage>
 </template>

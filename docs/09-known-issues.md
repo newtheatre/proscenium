@@ -44,6 +44,7 @@ Kept as a record of what changed and why, so nobody re-fixes them.
 | 19 | Dependency hygiene | Deps declared; build tooling moved to `devDependencies` |
 | 20 | No CI, no lint script | `.github/workflows/ci.yml`; `lint` / `lint:fix` scripts |
 | 21 | Production migration ledger empty; `d1 migrations list` always said "nothing to apply" | `migrations_dir` pinned in `nuxt.config.ts`; ledger backfilled and `0015` applied 2026-08-13 |
+| 22 | [Editing a show wiped its write-up](#editing-a-show-wiped-its-write-up) | `ShowEditModal` loads the full record from `GET /api/shows/:id`; the five projected-away fields are omitted from the PUT unless it succeeded |
 
 ### Fixed in the August 2026 full-repo review
 
@@ -79,6 +80,31 @@ Also fixed, and worth knowing about because several were silent:
 - Refunds are bounded by the lifecycle rule below, and can no longer be double-applied.
 - D1's 100-bound-parameter limit: fixed in the GDPR export hook and the public show page.
 - `ticket_types.archived` and the pass bookkeeping kinds are no longer offered for sale.
+
+---
+
+### Editing a show wiped its write-up
+
+Worth reading even though it is fixed, because the shape of it will recur.
+
+`GET /api/shows` was narrowed to a column projection to stop shipping a paragraph per show across
+498 of them. The projection dropped `longDescription`, `programmeUrl`, `externalUrl`,
+`contentWarningNotes` and `warningsConfirmedNone`. Nothing on the admin table rendered those fields,
+so the change looked safe — but `/admin/shows` passed the **list row itself** into `ShowEditModal`,
+whose watcher read `show.longDescription ?? ''` on five now-absent keys and whose submit sent them
+unconditionally as `null`. `PUT /api/shows/:id` guards on `!== undefined`, so `null` is a legitimate
+clear and went straight through. Editing a show's *title* silently emptied its public write-up.
+
+Three things made it survive review: the fields were absent rather than wrong, so nothing threw;
+`?? ''` turned the absence into a plausible value; and the damage only showed on the public site.
+
+The fix is on the client, not in the PUT — `null` really does mean "clear this" and that contract is
+correct. `ShowEditModal` now loads the full record from `GET /api/shows/:id` and **omits those five
+keys from the body entirely** unless that load succeeded. That is the same guard `warningsFailed`
+already applied to the content-warning links three lines away.
+
+**The general rule: a projected list row is not an edit source.** If a form can write a field, it
+must have read that field from something that actually returns it.
 
 ---
 
@@ -154,6 +180,18 @@ have been a silent money bug rather than a compile error.
 
 **Fix:** derive types from the Drizzle schema (`InferSelectModel`) into `shared/types/`, and stop
 casting.
+
+**Partly done.** `shared/types/` now exists and holds `pagination.ts` (the `Paginated<T>` envelope,
+which `admin/users.vue` had hand-copied) and `shows.ts` (the show and performance shapes, which the
+shows page and four of its modals each declared separately). The reservation family is untouched and
+is the bigger half.
+
+One correction to the fix as written: **do not derive the wire types with `InferSelectModel`.** The
+Drizzle model describes the *table*, and the API is not the table — `performances.startsAt` is a
+`Date` in the model and an ISO string in the response, and the rows carry computed fields
+(`ticketsSold`, `performanceCount`, the run window) that no column corresponds to. Deriving from the
+schema would describe something the client never receives. `shared/types/shows.ts` is hand-written
+for that reason, and says so.
 
 ### No tests
 

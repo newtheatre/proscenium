@@ -18,7 +18,7 @@ import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({
   layout: 'admin',
-  middleware: 'admin',
+  middleware: ['admin'],
   title: 'Dashboard',
 })
 
@@ -82,7 +82,7 @@ const STATUS_CONFIG = {
 // session cookie — it would 403 during SSR. See
 // docs/02-architecture.md#fetching-in-the-admin-area.
 const requestFetch = useRequestFetch()
-const { data: stats, status: statsStatus } = await useAsyncData(
+const { data: stats, status: statsStatus, error: statsError, refresh: refreshStats } = await useAsyncData(
   'admin-stats', () => requestFetch<Stats>('/api/admin/stats'))
 
 /** e.g. "2025/26 season" — or the explicit dates when a custom range is set. */
@@ -111,20 +111,16 @@ const statsCaveat = computed(() => {
   if (derived) parts.push(`${derived.toLocaleString('en-GB')} estimated`)
   return `Includes ${parts.join(', ')}`
 })
+// `view=options` — id, slug, title, status and nothing else. This dropdown used
+// to pull the entire nested archive, performances and all, to render a list of
+// titles.
 const { data: shows } = await useAsyncData(
-  'admin-show-options', () => requestFetch<Show[]>('/api/shows'), { default: () => [] })
+  'admin-show-options',
+  () => requestFetch<Paginated<Show>>('/api/shows', { query: { view: 'options', limit: 500 } }),
+  { default: (): Paginated<Show> => ({ rows: [], total: 0, page: 1, limit: 500 }) },
+)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatPounds(pence: number): string {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(pence / 100)
-}
-
-function formatDate(val: string | number | null | undefined): string {
-  if (!val) return '—'
-  const d = typeof val === 'number' ? new Date(val * 1000) : new Date(val)
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })
-}
 
 function statusCount(status: string): number {
   return stats.value?.reservationsByStatus?.find(r => r.status === status)?.count ?? 0
@@ -139,10 +135,10 @@ const exportTo = ref<string>('')
 // No "All shows" option. Unfiltered, the export joins all 45,563 tickets and
 // builds around 10 MB of CSV inside a Worker — it was the default choice, one
 // click away. A date range covers the same need for a season's accounts.
-const showOptions = computed(() => [
-  { label: 'Choose a show…', value: '' },
-  ...(shows.value ?? []).map(s => ({ label: s.title, value: s.id })),
-])
+// No empty-valued "Choose a show…" entry: the `placeholder` prop covers that,
+// and USelect refuses an item whose value is '' — an empty string is how the
+// selection is *cleared*, so it cannot also identify an option.
+const showOptions = computed(() => (shows.value?.rows ?? []).map(s => ({ label: s.title, value: s.id })))
 
 /** The season the theatre is currently in: 1 August to 31 July. */
 function currentSeason(): { from: string, to: string } {
@@ -183,7 +179,7 @@ const revenueColumns: TableColumn<RevenueByShow>[] = [
   {
     accessorKey: 'totalRevenuePence',
     header: 'Revenue',
-    cell: ({ row }) => formatPounds(row.original.totalRevenuePence),
+    cell: ({ row }) => formatMoney(row.original.totalRevenuePence),
   },
 ]
 
@@ -218,21 +214,28 @@ const recentColumns: TableColumn<RecentReservation>[] = [
   {
     id: 'performance',
     header: 'Performance',
-    cell: ({ row }) => formatDate(row.original.performance?.startsAt),
+    cell: ({ row }) => formatDateTime(row.original.performance?.startsAt),
   },
   {
     accessorKey: 'createdAt',
     header: 'Reserved At',
-    cell: ({ row }) => formatDate(row.original.createdAt),
+    cell: ({ row }) => formatDateTime(row.original.createdAt),
   },
 ]
 </script>
 
 <template>
-  <div class="p-6 space-y-8">
+  <AdminPage>
+    <AdminFetchError
+      v-if="statsError"
+      :error="statsError"
+      title="Could not load the dashboard figures"
+      :on-retry="refreshStats"
+    />
+
     <!-- Loading state -->
     <div
-      v-if="statsStatus === 'pending'"
+      v-else-if="statsStatus === 'pending'"
       class="flex items-center justify-center py-20"
     >
       <UIcon
@@ -276,7 +279,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
                 Total Revenue
               </p>
               <p class="mt-1 text-2xl font-bold tracking-tight text-highlighted truncate">
-                {{ formatPounds(stats.totalRevenuePence) }}
+                {{ formatMoney(stats.totalRevenuePence) }}
               </p>
               <p class="mt-1 text-xs text-muted">
                 Collected &amp; door, {{ windowLabel }}
@@ -427,7 +430,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
               </div>
               <div class="shrink-0 flex items-center gap-3 text-right">
                 <span class="text-muted text-xs">{{ show.totalTickets }} tickets</span>
-                <span class="font-semibold text-highlighted">{{ formatPounds(show.totalRevenuePence) }}</span>
+                <span class="font-semibold text-highlighted">{{ formatMoney(show.totalRevenuePence) }}</span>
               </div>
             </div>
             <div class="h-2 w-full rounded-full bg-elevated overflow-hidden">
@@ -546,9 +549,9 @@ const recentColumns: TableColumn<RecentReservation>[] = [
         >
           <USelect
             v-model="exportShowId"
-            :options="showOptions"
-            value-attribute="value"
-            option-attribute="label"
+            :items="showOptions"
+            value-key="value"
+            label-key="label"
             placeholder="Choose a show…"
             class="w-full"
           />
@@ -607,7 +610,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
         Imported tickets carry a price confidence: EXACT, DERIVED (estimated by apportioning a booking total) or UNKNOWN (never recorded by the old system, so the price cell is left empty rather than showing £0.00).
       </p>
     </UCard>
-  </div>
+  </AdminPage>
 </template>
 
 <style></style>

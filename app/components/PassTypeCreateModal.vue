@@ -44,18 +44,18 @@ const slug = computed(() =>
 )
 
 // Only shows with a future performance are plausible pass scope — the imported
-// archive is 477 historical shows and would otherwise swamp the picker.
-const { data: shows } = useFetch<ShowOption[]>('/api/shows', { lazy: true, default: () => [] })
-
-const showOptions = computed(() => {
-  const now = Date.now()
-  return (shows.value ?? [])
-    .filter(s => s.performances?.some((p) => {
-      const t = typeof p.startsAt === 'number' ? p.startsAt * 1000 : Date.parse(String(p.startsAt))
-      return t > now
-    }))
-    .map(s => ({ label: s.title, value: s.id }))
+// archive is 477 historical shows and would otherwise swamp the picker. The
+// server does that filtering now (`scope=upcoming`); this used to download the
+// whole nested archive and sift it in the browser on every visit to /admin/passes.
+const { data: shows } = useFetch<Paginated<ShowOption>>('/api/shows', {
+  query: { scope: 'upcoming', view: 'options', limit: 500 },
+  lazy: true,
+  default: (): Paginated<ShowOption> => ({ rows: [], total: 0, page: 1, limit: 500 }),
 })
+
+const showOptions = computed(() =>
+  (shows.value?.rows ?? []).map(s => ({ label: s.title, value: s.id })),
+)
 
 function addPrice() {
   prices.value = [...prices.value, { label: '', price: '0.00' }]

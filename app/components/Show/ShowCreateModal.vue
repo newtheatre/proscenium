@@ -21,13 +21,7 @@ const emit = defineEmits<{
   refresh: []
 }>()
 
-interface Venue {
-  id: string
-  name: string
-  capacity?: number | null
-}
-
-const { data: venues } = await useFetch<Venue[]>('/api/venues')
+const { data: venues } = useVenues()
 const toast = useToast()
 const open = ref(false)
 const currentStep = ref(0)

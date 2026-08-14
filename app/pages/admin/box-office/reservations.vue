@@ -88,18 +88,8 @@ const STATUS_CONFIG = {
 } as const
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function toDate(val: string | number | null | undefined): Date | null {
-  if (!val) return null
-  const d = new Date(typeof val === 'number' ? val * 1000 : val)
-  return Number.isNaN(d.getTime()) ? null : d
-}
-
-function formatTime(val: string | number | null | undefined): string {
-  const d = toDate(val)
-  if (!d) return '—'
-  return d.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false })
-}
+// `toDate` and `formatTime` come from app/utils/format.ts — every page had its
+// own copy of both, and an omitted timeZone is an hour wrong all summer.
 
 function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear()
@@ -109,9 +99,14 @@ function isSameDay(a: Date, b: Date): boolean {
 
 // ── Shows data ────────────────────────────────────────────────────────────────
 
-const { data: shows, status: showsStatus, refresh: refreshShows } = await useFetch<Show[]>('/api/shows', {
-  key: 'box-office-shows',
-})
+// requestFetch, not a plain useFetch: `/api/shows` is behind authorize(), and a
+// plain useFetch running on the server does not forward the session cookie — the
+// performance picker came back 403 and empty on every hard load, filling in only
+// once something triggered a client-side refetch. Same rule for the reservation
+// pages fetched below. See docs/02-architecture.md §Fetching in the admin area.
+const requestFetch = useRequestFetch()
+const { data: shows, status: showsStatus, error: showsError, refresh: refreshShows } = await useAsyncData(
+  'box-office-shows', () => requestFetch<Show[]>('/api/shows'))
 
 // Flatten all performances, sorted chronologically (past → future)
 const sortedPerformances = computed(() => {
@@ -207,7 +202,7 @@ async function fetchAllForPerformance(performanceId: string): Promise<Reservatio
   let total = 0
 
   do {
-    const res = await $fetch<{ rows: Reservation[], total: number }>('/api/reservations', {
+    const res = await requestFetch<{ rows: Reservation[], total: number }>('/api/reservations', {
       query: { performanceId, withCounts: 'true', page, limit },
     })
     rows.push(...res.rows)
@@ -567,10 +562,11 @@ const todayFormatted = computed(() =>
       <!-- Header -->
       <div class="flex w-full items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 class="text-2xl font-semibold tracking-tight">
-            Box Office
-          </h1>
-          <p class="text-muted text-sm">
+          <!-- The date, not the screen name: UDashboardNavbar already renders
+               "Box Office" as the page's <h1>, and a second one on the same
+               page is exactly what @nuxt/a11y flags. The date is the part a
+               volunteer on the door actually needs at a glance. -->
+          <p class="text-2xl font-semibold tracking-tight text-highlighted">
             {{ todayFormatted }}
           </p>
         </div>
@@ -603,6 +599,13 @@ const todayFormatted = computed(() =>
           />
         </div>
       </div>
+
+      <AdminFetchError
+        v-if="showsError"
+        :error="showsError"
+        title="Could not load the performance list"
+        :on-retry="refreshShows"
+      />
 
       <!-- Performance navigator -->
       <div class="rounded-xl border border-default bg-elevated/60 overflow-hidden">
@@ -794,28 +797,15 @@ const todayFormatted = computed(() =>
         :data="filteredReservations"
         :columns="columns"
         :loading="reservationsStatus === 'pending'"
-        :ui="{
-          base: 'table-fixed border-separate border-spacing-0',
-          thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-          tbody: '[&>tr]:last:[&>td]:border-b-0',
-          th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-          td: 'border-b border-default',
-        }"
-      />
-
-      <!-- Empty state -->
-      <div
-        v-if="filteredReservations.length === 0 && reservationsStatus !== 'pending'"
-        class="text-center py-12 text-muted"
       >
-        <UIcon
-          name="i-lucide-ticket"
-          class="size-10 mb-3 opacity-30 mx-auto"
-        />
-        <p class="text-sm">
-          {{ searchQuery || statusFilter !== 'ALL' ? 'No reservations match your filter.' : 'No reservations for this performance.' }}
-        </p>
-      </div>
+        <template #empty>
+          <UEmpty
+            icon="i-lucide-ticket"
+            :title="searchQuery || statusFilter !== 'ALL' ? 'No reservations match your filter' : 'No reservations for this performance'"
+            :description="searchQuery || statusFilter !== 'ALL' ? 'Try a different name, reference or status.' : 'Walk-ins can still be added from here.'"
+          />
+        </template>
+      </UTable>
 
       <!-- Footer count -->
       <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto text-sm text-muted">

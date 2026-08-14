@@ -23,12 +23,9 @@ export const paginationSchema = z.object({
 
 export type PaginationQuery = z.infer<typeof paginationSchema>
 
-export interface Paginated<T> {
-  rows: T[]
-  total: number
-  page: number
-  limit: number
-}
+// `Paginated<T>` is declared in `shared/types/pagination.ts` and auto-imported
+// on both sides. It is not re-exported from here: two auto-imports of one name
+// is a build warning, and the client needs the type as much as the handler does.
 
 /** Rows to skip for the requested page. */
 export function offsetFor({ page, limit }: { page: number, limit: number }): number {
