@@ -82,10 +82,7 @@ const columnVisibility = ref({})
 // admin/ticket-types.vue.
 const paginationOptions = { getPaginationRowModel: getPaginationRowModel() }
 const rowSelection = ref<Record<string, boolean>>({})
-const pagination = ref({
-  pageSize: 10,
-  pageIndex: 0,
-})
+const { pagination, page, resetPage } = useTablePagination(10)
 
 // Server-rendered, so the table arrives populated. `$fetch: useRequestFetch()`
 // forwards the session cookie, which a plain useFetch does not do on the
@@ -121,17 +118,9 @@ const filteredRows = computed<Venue[]>(() => {
   )
 })
 
-// UPagination counts from 1; TanStack indexes from 0.
-const page = computed({
-  get: () => pagination.value.pageIndex + 1,
-  set: (value: number) => { pagination.value.pageIndex = value - 1 },
-})
-
 // Reset to the first page when the result set shrinks under the cursor,
 // otherwise a search from page 3 lands on an empty table.
-watch(search, () => {
-  pagination.value.pageIndex = 0
-})
+watch(search, resetPage)
 
 const selectedCount = computed(() => Object.keys(rowSelection.value).length)
 
