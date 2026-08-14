@@ -270,12 +270,12 @@ const recentColumns: TableColumn<RecentReservation>[] = [
       </div>
 
       <!-- ── Stat cards ─────────────────────────────────────────────────── -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- Total Revenue -->
         <UCard class="hover:ring-1 hover:ring-primary transition-shadow">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-sm text-muted truncate">
+              <p class="text-sm text-muted text-balance">
                 Total Revenue
               </p>
               <p class="mt-1 text-2xl font-bold tracking-tight text-highlighted truncate">
@@ -298,7 +298,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
         <UCard class="hover:ring-1 hover:ring-primary transition-shadow">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-sm text-muted truncate">
+              <p class="text-sm text-muted text-balance">
                 Tickets Sold
               </p>
               <p class="mt-1 text-2xl font-bold tracking-tight text-highlighted">
@@ -321,14 +321,14 @@ const recentColumns: TableColumn<RecentReservation>[] = [
         <UCard class="hover:ring-1 hover:ring-primary transition-shadow">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-sm text-muted truncate">
+              <p class="text-sm text-muted text-balance">
                 Published Shows
               </p>
               <p class="mt-1 text-2xl font-bold tracking-tight text-highlighted">
                 {{ stats.activeShows }}
               </p>
               <p class="mt-1 text-xs text-muted">
-                Currently live
+                {{ windowLabel ? `Playing in ${windowLabel}` : 'Playing this season' }}
               </p>
             </div>
             <div class="shrink-0 rounded-lg bg-info/10 p-2">
@@ -344,7 +344,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
         <UCard class="hover:ring-1 hover:ring-primary transition-shadow">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-sm text-muted truncate">
+              <p class="text-sm text-muted text-balance">
                 Upcoming Performances
               </p>
               <p class="mt-1 text-2xl font-bold tracking-tight text-highlighted">

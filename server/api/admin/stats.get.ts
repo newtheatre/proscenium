@@ -75,10 +75,25 @@ export default defineEventHandler(async (event) => {
     revenueByShowResult,
     recentReservations,
   ] = await Promise.all([
-    // Published shows count
+    // Published shows *in the window*. This used to count every published show
+    // ever, so a dashboard headed "2026/27 season" reported 488 — the whole
+    // imported archive — next to a season's takings. A show counts if it has a
+    // performance inside the window; the subquery keeps the bound-parameter cost
+    // fixed rather than growing with the archive.
     db.select({ count: count() })
       .from(schema.shows)
-      .where(eq(schema.shows.status, 'PUBLISHED')),
+      .where(and(
+        eq(schema.shows.status, 'PUBLISHED'),
+        inArray(
+          schema.shows.id,
+          db.select({ id: schema.performances.showId })
+            .from(schema.performances)
+            .where(and(
+              gte(schema.performances.startsAt, windowFrom),
+              lte(schema.performances.startsAt, windowTo),
+            )),
+        ),
+      )),
 
     // Upcoming on-sale performances
     db.select({ count: count() })
@@ -88,9 +103,16 @@ export default defineEventHandler(async (event) => {
         gt(schema.performances.startsAt, now),
       )),
 
-    // Reservation counts grouped by status
+    // Reservation counts by status, for performances in the window. Unbounded
+    // like the show count was, this reported every reservation since 2016 under
+    // a season heading.
     db.select({ status: schema.reservations.status, count: count() })
       .from(schema.reservations)
+      .innerJoin(schema.performances, eq(schema.reservations.performanceId, schema.performances.id))
+      .where(and(
+        gte(schema.performances.startsAt, windowFrom),
+        lte(schema.performances.startsAt, windowTo),
+      ))
       .groupBy(schema.reservations.status),
 
     // Revenue (pence), admissions, and how much of it we can vouch for

@@ -350,10 +350,8 @@ const columns: TableColumn<ShowTreeRow>[] = [
     :loading="loading"
     :ui="{
       // Only what the tree needs on top of the shared table theme in
-      // app.config.ts: no `table-fixed` (the title column has to breathe), and a
-      // row-group rule so a performance row's empty cells do not draw a rule
-      // across the table.
-      base: 'border-separate border-spacing-0',
+      // app.config.ts: a row-group rule so a performance row's empty cells do
+      // not draw a rule across the table.
       tr: 'group',
       td: 'empty:p-0 group-has-[td:not(:empty)]:border-b border-default',
     }"
