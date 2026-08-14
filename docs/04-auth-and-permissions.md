@@ -122,10 +122,13 @@ Two things that are easy to get wrong here:
 - **There is no app-local erasure endpoint**, deliberately. One used to exist and produced a half
   erasure — this app scrubbed, the central identity untouched — which is worse than none.
 
-The other two hooks are `export` (subject-access contribution) and `last-activity` (feeds the
+The other hooks are `export` (subject-access contribution), `last-activity` (feeds the
 retention sweep; stage-door batches ids at 90 and so do we, because D1 binds at most 100 parameters
-per statement). All three authenticate with the SHA-256 of this app's own `AUTH_SERVICE_TOKEN`,
-compared constant-time — see `server/utils/hookAuth.ts`.
+per statement) and `merge` (stage-door ADR-0015: re-points every user-referencing column —
+reservations, passes, and the two staff-attribution columns — onto the winning account and deletes
+the losing mirror row; the losing central identity is erased by stage-door afterwards). All four
+authenticate with the SHA-256 of this app's own `AUTH_SERVICE_TOKEN`, compared constant-time — see
+`server/utils/hookAuth.ts`.
 
 Full policy: stage-door's
 [gdpr-retention](https://github.com/newtheatre/stage-door/blob/main/docs/gdpr-retention.md).

@@ -69,13 +69,16 @@ The FIXME means: **this pin is a workaround, and when the upstream pull request 
 
 ## 3. Deploying
 
-There is no CI. Deploys are run by hand from a developer machine, from a clean, up-to-date `main`.
+CI runs on every pull request and push to `main` (`.github/workflows/ci.yml`: install → build →
+typecheck → lint, all hard gates), and Cloudflare builds and deploys the Worker automatically when
+`main` moves. The manual sequence below remains the fallback for when the automatic pipeline is
+unavailable — and steps 1–5 are still what you run locally before opening a PR.
 
 | Step | Command | Notes |
 | --- | --- | --- |
 | 1. Sync | `git checkout main && git pull` | Deploy from `main`, never from a feature branch |
 | 2. Install | `bun install` | Ensures the lockfile's dependency tree |
-| 3. Lint | `bunx eslint .` | There is no CI to catch this for you |
+| 3. Lint | `bunx eslint .` | CI also catches this, but red CI after pushing is slower than a local check |
 | 4. Build | `bun run build` | Produces `.output/`, including the generated `wrangler.json` and the copied migrations |
 | 5. Smoke test locally | `bun run preview` | Runs the built Worker through Wrangler locally |
 | 6. Deploy | `bunx wrangler --cwd .output deploy` | `--cwd .output` is what makes Wrangler read the generated config |
@@ -402,7 +405,7 @@ Things that do not exist. None of these are hypothetical improvements — each o
 
 | Gap | Consequence | Recommendation |
 | --- | --- | --- |
-| **No CI** | Nothing checks a pull request. Lint failures and broken builds are found by whoever deploys next, by hand | Add a GitHub Actions workflow on pull requests running `bun install`, `bunx eslint .` and `bun run build` — perhaps an hour's work, and it catches most of what currently reaches production |
+
 | **No automated backups** | The only backups are ones a human remembered to take. D1 Time Travel covers 30 days, which mitigates but does not replace this | Add a scheduled GitHub Actions job running `wrangler d1 export` weekly and uploading the artefact to committee storage, with a retention window agreed against the data policy |
 | **No staging environment** | Every change is tested for the first time in production, against real bookings and real customers | Create a second D1 database and a `proscenium-staging` Worker on a `staging.` subdomain, deployed from `main` before production. This is the single highest-value item on this list |
 | **No uptime monitoring** | If the site goes down at 02:00 nobody knows until someone tries to buy a ticket. Discovery is currently "a customer emails us" | Point a free monitor (UptimeRobot, Better Stack, or a Cloudflare Health Check) at `https://newtheatre.org.uk/whats-on` at five-minute intervals, alerting the IT Manager and the duty box office phone |
