@@ -443,8 +443,22 @@ runtimeConfig.session)`, and `defu` gives its first argument priority, so the
 worker secret wins over the binding. The symptom is confusing and points
 nowhere near the cause: login on `auth.newtheatre.org.uk` succeeds, and this app
 bounces the user straight back to the login page, because the two are sealing
-with different keys. `server/plugins/secrets-store.ts` now logs a loud error
+with different keys. `server/plugins/0.secrets-store.ts` now logs a loud error
 when it sees both, so check the logs (§7) before theorising.
+
+**"Logged in on auth, but this app never shows me as logged in"** has a second
+cause worth knowing, because it looks identical and produces no errors at all.
+`nuxt-auth-utils` memoises the session password on the *first* session read an
+isolate performs, and h3's `getSession` swallows unseal failures — so if
+anything reads the session before `0.secrets-store.ts` has hydrated the
+password, that isolate is anonymous for its whole life while
+`/api/_auth/session` cheerfully answers `200` with a bare `{ id }`. The `0.`
+prefix on that plugin is what orders it ahead of `authorization-resolver.ts`;
+Nitro sorts `server/plugins/` by filename. Do not rename it, and read its
+header before adding a plugin that touches sessions.
+
+A logged-out `{ id }` with no `user` key is the signature — `curl` alone will
+not distinguish it from health, so check the body, not just the status.
 
 **Rotating invalidates every existing session.** Every logged-in user — customers and staff alike — is signed out and must log in again. Nothing is lost, but do not do it fifteen minutes before curtain-up. Rotate at a quiet time, then confirm you can still log in yourself. Workers pick the new value up as isolates recycle rather than instantly, so allow a few minutes for the estate to settle.
 
