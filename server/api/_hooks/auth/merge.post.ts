@@ -7,11 +7,8 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/_hooks/auth/merge — account merge, this app's share
- * (stage-door ADR-0015). Delegates to mergeUser, which re-points every
- * user-referencing column onto the winner and deletes the losing mirror
- * row. `dryRun: true` returns the affected-row counts without writing —
- * stage-door shows them in its pre-merge report. Idempotent.
+ * POST /api/_hooks/auth/merge — account merge, this app's share (stage-door
+ * ADR-0015).
  */
 export default defineEventHandler(async (event) => {
   requireHookAuth(event)

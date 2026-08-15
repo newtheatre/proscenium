@@ -1,9 +1,7 @@
 <script setup lang="ts">
 /**
- * Customer self-service management for their own booking: cancel it, or change
- * the ticket composition. Only shown for a PENDING booking on a future
- * performance. Authorises with the same access token the page was opened with (or the
- * logged-in owner's session).
+ * Customer self-service: cancel, or change the ticket composition. Shown only
+ * for a PENDING booking on a future performance (ADR-0011).
  */
 interface BookingTicket {
   id: string
@@ -107,11 +105,8 @@ const performance = computed(() =>
 const ticketTypes = computed(() => performance.value?.ticketTypes ?? [])
 
 /**
- * On this screen (PENDING only) there should be no refunded tickets at all.
- * Filtered anyway: the server diffs on `isNull(refundedAt)`, so if the two
- * sides disagree an unchanged Save asks for more of a type than the server can
- * see and it issues a replacement for a refunded ticket. Legacy imported rows
- * are not bound by the invariant (ADR-0011).
+ * There should be no refunded tickets here at all; filtered anyway, because the
+ * server diffs on `isNull(refundedAt)` (ADR-0011).
  */
 const activeTickets = computed(() => props.booking.tickets.filter(t => !t.refundedAt))
 
@@ -125,10 +120,8 @@ const remainingCapacity = computed(() => {
 })
 
 /**
- * Types the booking held when editing started. Needed at save time because the
- * stepper drops an entry at quantity zero and the server only diffs the types
- * named in the request — so removing a whole type sends a body that never
- * mentions it, and the tickets silently stay.
+ * Types held when editing started. The stepper drops an entry at zero and the
+ * server only diffs the types named, so removal needs this.
  */
 const editedTypeIds = ref<string[]>([])
 

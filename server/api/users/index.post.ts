@@ -9,12 +9,6 @@ const bodySchema = z.object({
 
 /**
  * POST /api/users — create a user to attach a reservation to (staff).
- *
- * Identity lives in the central auth service: this asks it for a shadow
- * account (match-or-create by email, idempotent, service-token
- * authenticated) and mirrors the canonical id locally. No passwords,
- * roles, or verified flags here — full account management is the auth
- * service admin's job; the person can claim the account themselves later.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, createUser)

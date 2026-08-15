@@ -14,11 +14,7 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/content-warnings — add a vocabulary entry. Admin/Manager only.
- *
- * `slug` and `title` are both unique and both checked here, so neither
- * surfaces as a 500 from the index. The slug is derived from the title when
- * not given. A TECHNICAL warning has no category (ADR-0004).
+ * POST /api/content-warnings — add a vocabulary entry.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, createContentWarning)

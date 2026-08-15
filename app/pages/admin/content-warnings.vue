@@ -1,10 +1,6 @@
 /**
- * Admin: the shared content-warning vocabulary every show picks from
- * (ADR-0004). Before this page existed the list could only be changed by a
- * migration.
- *
- * Deleting an entry is refused while any show carries it; archiving is the
- * retirement path (ADR-0010).
+ * Admin: the shared content-warning vocabulary (ADR-0004). Deleting is refused
+ * while any show carries an entry; archive instead (ADR-0010).
  */
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
@@ -29,9 +25,8 @@ const confirm = useConfirm()
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const table = useTemplateRef<any>('table')
 
-// `{}` rather than `undefined`: an undefined v-model means the table's first
-// internal sync writes a value back to the parent, which is one more
-// parent-render-during-child-setup than this page can afford. See `rows` below.
+// `{}` rather than `undefined`: an undefined v-model makes the table's first
+// internal sync write back to the parent (ADR-0012).
 const columnVisibility = ref({})
 const rowSelection = ref<Record<string, boolean>>({})
 const { pagination, page, resetPage } = useTablePagination(20)
@@ -39,9 +34,8 @@ const showArchived = ref(false)
 const kindFilter = ref<'ALL' | ContentWarningKind>('ALL')
 
 /**
- * Server-rendered, and deliberately not keyed `content-warnings`: the show
- * editor caches the live vocabulary under that key, and this page asks for
- * archived entries too. `useRequestFetch()` is not optional (ADR-0013).
+ * Deliberately not keyed `content-warnings` — the show editor caches the live
+ * vocabulary there, and this page asks for archived ones (ADR-0013).
  */
 const requestFetch = useRequestFetch()
 const { data: rawData, status, error, refresh } = await useAsyncData(
@@ -50,9 +44,8 @@ const { data: rawData, status, error, refresh } = await useAsyncData(
 )
 
 /**
- * Rows for the table. **Always an array, never null** — binding a fresh array
- * per render sends UTable into a render loop with no fixed point. Do not
- * reintroduce `?? []` at the binding (ADR-0012).
+ * **Always an array, never null** — a fresh array per render sends UTable into
+ * a loop with no fixed point (ADR-0012).
  */
 const rows = computed<AdminContentWarning[]>(() => {
   const all = rawData.value ?? []
@@ -83,9 +76,8 @@ watch([search, showArchived, kindFilter], resetPage)
 const selectedCount = computed(() => Object.keys(rowSelection.value).length)
 
 /**
- * Hoisted for the same reason as `rows`: an inline `:pagination-options="{ … }"`
- * builds a fresh options object and row-model function on every render, which
- * on its own is enough to make the table rebuild in a loop.
+ * Hoisted for the same reason as `rows`: an inline options object builds a
+ * fresh row-model function every render (ADR-0012).
  */
 const paginationOptions = { getPaginationRowModel: getPaginationRowModel() }
 
@@ -133,9 +125,7 @@ async function deleteWarning(warning: AdminContentWarning) {
 const isArchiving = ref(false)
 
 /**
- * Retire an entry, or bring it back — deliberately not a delete (ADR-0010).
- * It disappears from the show editor's pickers while the shows that already
- * carry it keep rendering it.
+ * Retire an entry or bring it back — deliberately not a delete (ADR-0010).
  */
 async function setArchived(warning: AdminContentWarning, archived: boolean) {
   if (isArchiving.value) return

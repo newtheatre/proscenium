@@ -8,21 +8,8 @@ import { users } from './user'
 const bookingRefId = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6)
 
 /**
- * A customer's booking for one or more tickets to a performance.
- *
- * Every reservation belongs to a user account; customers without one get a
- * shadow account from the auth service, so ownership is consistent and can be
- * claimed later.
- *
- * Status lifecycle:
- *   PENDING   — booked, awaiting collection and payment at the box office
- *   COLLECTED — tickets collected and paid for in person
- *   DOOR      — bought on the door, not pre-booked
- *   CANCELLED — cancelled by the customer or staff; see cancelledBy
- *   NO_SHOW   — held but never collected
- *
- * Status is per reservation. Individual tickets refund independently via
- * `refundedAt` (ADR-0011).
+ * A customer's booking for a performance. Every one belongs to a user account;
+ * status lifecycle: docs/03-domain-model.md#reservations
  */
 export const reservations = sqliteTable('reservations', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -31,9 +18,8 @@ export const reservations = sqliteTable('reservations', {
   // e.g. "A3KP7X" — uses an unambiguous character set to avoid misreads
   bookingRef: text('booking_ref').notNull().$defaultFn(() => bookingRefId()),
 
-  // The legacy 16-hex code — the reservation's public handle before the import.
-  // Every confirmation email since 2016 carried a `/cancel/<code>/` link, so
-  // keeping it lets those URLs be redirected rather than 404.
+  // The legacy public handle. Every confirmation email since 2016 carried a
+  // `/cancel/<code>/` link, so keeping it lets those URLs be redirected.
   legacyRef: text('legacy_ref'),
 
   // How the booking reached us. LEGACY_IMPORT marks rows whose provenance is
@@ -42,12 +28,8 @@ export const reservations = sqliteTable('reservations', {
     enum: ['WEB', 'BOX_OFFICE', 'DOOR', 'LEGACY_IMPORT'],
   }).notNull().default('WEB'),
 
-  // How many seats were originally booked.
-  //
-  // Legacy overwrote `quantity` with the collected count on collection, so a
-  // legacy row's `quantity` means "booked" before collection and "collected"
-  // after. Proscenium models tickets as rows, so the original figure has nowhere
-  // else to live.
+  // Legacy overwrote `quantity` with the collected count, so its meaning changes
+  // at collection. Proscenium models tickets as rows, so this has nowhere else to live.
   originalQuantity: integer('original_quantity'),
 
   // Set when the owning user was anonymised under the retention policy.
@@ -83,10 +65,8 @@ export const reservations = sqliteTable('reservations', {
   index('reservations_user_id_idx').on(table.userId),
   index('reservations_status_idx').on(table.status),
 
-  // Every reservation list sorts by createdAt DESC, so without an index SQLite
-  // reads and sorts the whole table before returning a page — paginating alone
-  // does not reduce the work. The composites let one index satisfy both the
-  // filter and the ordering.
+  // Every list sorts by createdAt DESC, so without an index SQLite sorts the
+  // whole table before returning a page.
   index('reservations_created_at_idx').on(table.createdAt),
   index('reservations_status_created_idx').on(table.status, table.createdAt),
   index('reservations_perf_created_idx').on(table.performanceId, table.createdAt),

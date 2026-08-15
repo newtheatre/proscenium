@@ -10,8 +10,7 @@ const bodySchema = z.object({
   activeByDefault: z.boolean().optional(),
   /**
    * Retire a type (ADR-0010). Distinct from `activeByDefault`, which only
-   * decides whether a live type is pre-selected on new shows — an inactive type
-   * is still offered and can be switched on per show or performance.
+   * decides whether a live type is pre-selected on new shows.
    */
   archived: z.boolean().optional(),
 })

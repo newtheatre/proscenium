@@ -25,9 +25,8 @@ interface ImageUploadResult {
 }
 
 /**
- * Validate and upload an image from multipart form data to blob storage.
- * JPEG, PNG or WebP, 5 MB maximum. Replaces and deletes any previous image.
- * Returns the blob pathname.
+ * Validate and upload an image to blob storage: JPEG, PNG or WebP, 5 MB max.
+ * Replaces and deletes any previous image; returns the blob pathname.
  */
 export async function validateAndUploadImage(
   event: Parameters<typeof readMultipartFormData>[0],

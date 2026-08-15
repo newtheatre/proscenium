@@ -1,11 +1,6 @@
 /**
- * Authorization abilities — re-exported by domain.
- *
- * Consumers can import from the barrel:
- *   import { updateShow } from '~~/shared/utils/abilities'
- *
- * Or from the domain file directly:
- *   import { updateShow } from '~~/shared/utils/abilities/shows'
+ * Authorization abilities, re-exported by domain. Import from the barrel or
+ * the domain file; both work.
  */
 export type { AbilityUser, OwnedResource } from './types'
 export { hasRole, isAdminOrManager, isStaff } from './types'

@@ -2,16 +2,8 @@ import type { Ref } from 'vue'
 import { onUnmounted, readonly, ref, watch } from '#imports'
 
 /**
- * A ref that trails another one, settling only once it has stopped changing.
- * For search boxes feeding a server query: bind the input to `source` and put
- * the returned ref in the fetch's `watch` array.
- *
- * Hand-written rather than taken from `@vueuse/core`, which is only a
- * transitive dependency here.
- *
- * `onSettle` runs on the tick the value lands, which is where a paginated
- * caller resets to page 1 — doing that in a separate watcher races with the
- * fetch and can request page 7 of a two-page result.
+ * A ref that trails another, settling once it stops changing. `onSettle` fires
+ * on the same tick, which is where a paginated caller resets to page 1.
  */
 export function useDebouncedRef<T>(
   source: Ref<T>,

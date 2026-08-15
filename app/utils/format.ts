@@ -1,10 +1,6 @@
 /**
- * Display formatting for dates, times and money, with `en-GB` and
- * `Europe/London` fixed. The Worker runs in UTC, so an omitted `timeZone` is
- * an hour wrong for the whole of British Summer Time.
- *
- * In `app/utils/` rather than `shared/`, which is auto-imported into the
- * server build too — nothing server-side should be formatting for a UK reader.
+ * Display formatting with `en-GB` and `Europe/London` fixed — the Worker runs
+ * in UTC. In app/utils, not shared/, which is auto-imported server-side too.
  */
 
 const TIME_ZONE = 'Europe/London'
@@ -14,10 +10,8 @@ const LOCALE = 'en-GB'
 const EMPTY = '—'
 
 /**
- * Coerce the several shapes a timestamp arrives in to a Date.
- * `performances.startsAt` is Unix **seconds**, while `createdAt` and friends
- * are SQLite `current_timestamp` strings. Forget the ×1000 and you get January
- * 1970 rather than an error, which is why this lives in one place.
+ * `performances.startsAt` is Unix seconds while `createdAt` is a SQLite
+ * timestamp string; forgetting the ×1000 gives January 1970, not an error.
  */
 export function toDate(value: string | number | Date | null | undefined): Date | null {
   if (value === null || value === undefined || value === '') return null
@@ -67,16 +61,17 @@ export function formatTime(value: string | number | Date | null | undefined): st
 }
 
 /**
- * `£12.50`. Takes **pence**, because money is stored as integer pence
- * everywhere in this codebase and converting earlier than the last possible
- * moment is how rounding errors get in (see docs/02-architecture.md).
+ * Takes **pence** — money is stored as integer pence everywhere, and converting
+ * earlier than the last moment is how rounding errors start.
  */
 export function formatMoney(pence: number | null | undefined): string {
   if (pence === null || pence === undefined || Number.isNaN(pence)) return EMPTY
   return new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'GBP' }).format(pence / 100)
 }
 
-/** `1,304` — thousands separators for counts shown to a reader. */
+/**
+ * Thousands separators, for counts shown to a reader.
+ */
 export function formatCount(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return EMPTY
   return value.toLocaleString(LOCALE)

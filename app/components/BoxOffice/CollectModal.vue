@@ -1,9 +1,6 @@
 <!--
-Box office: collect a reservation. Adjusting the tickets and marking the
-booking COLLECTED are one step, because that is one interaction at the desk.
-
-Collection is the payment boundary, so this is the last point at which the
-composition can be edited (ADR-0011).
+Box office: collect a reservation. Adjusting tickets and marking COLLECTED
+are one step, because that is one interaction at the desk (ADR-0011).
 -->
 <script setup lang="ts">
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -226,9 +223,8 @@ const totalCount = computed(() => {
   return n
 })
 
-// Subtotal for a type: existing tickets kept are charged at the price they were
-// booked at (pricePaid); tickets newly added at the door are charged at the
-// current effective price.
+// Kept tickets are charged at the price they were booked at; tickets added at
+// the door are charged at today's effective price.
 function rowSubtotal(typeId: string): number {
   const desired = getQty(typeId)
   const existing = activeTickets.value.filter(t => t.ticketTypeId === typeId)
@@ -261,8 +257,7 @@ const isDirty = computed(() => {
 })
 
 // DOOR belongs here too: a door sale is collected and paid for, so its tickets
-// are no longer editable — the server refuses the diff either way, and without
-// DOOR in this list the UI offered an edit that could only fail.
+// are no longer editable (ADR-0011).
 const alreadyActioned = computed(() =>
   !!reservation.value && ['COLLECTED', 'DOOR', 'CANCELLED', 'NO_SHOW'].includes(reservation.value.status),
 )

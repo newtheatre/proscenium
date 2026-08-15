@@ -1,13 +1,6 @@
 /**
- * Rate limits for the endpoints reachable without a session, declared against
- * route patterns so a new public route is covered by adding a line here rather
- * than by remembering (ADR-0015).
- *
- * Buckets are per-IP. Limits are deliberately generous — student halls and the
- * theatre's wifi put many genuine customers behind one address — so these stop
- * a script rather than police a busy on-sale. The narrower case, guest
- * checkout mailing an address the attacker chose, is bounded per address
- * inside the booking handler.
+ * Rate limits for session-less endpoints, declared against route patterns so a
+ * new public route is covered by adding a line here (ADR-0015).
  */
 
 import type { H3Event } from 'h3'
@@ -61,10 +54,8 @@ export default defineEventHandler(async (event: H3Event) => {
   const route = PUBLIC_ROUTES.find(r => r.methods.includes(method) && r.pattern.test(path))
   if (!route) return
 
-  // No `CF-Connecting-IP` means the request did not come from outside — an SSR
-  // render calling its own API, or local dev. Those must not be limited: they
-  // would share one bucket and a busy evening's renders would exhaust it. The
-  // header cannot be removed by a client, so skipping here is not a bypass.
+  // No `CF-Connecting-IP` means the request did not come from outside, so skip
+  // rather than share one bucket between every SSR render.
   const ip = clientIp(event)
   if (!ip) return
 

@@ -20,18 +20,7 @@ function currentSeason(now: Date): { from: string, to: string } {
 }
 
 /**
- * GET /api/admin/stats — aggregate dashboard statistics. ADMIN and MANAGER
- * only, bounded to a season by default.
- *
- * Two counting rules, both of which have been got wrong before:
- *
- * - PASS_SALE is money but not an admission; PASS_ADMISSION is an admission
- *   but not money. Revenue excludes PASS_ADMISSION, admissions exclude
- *   PASS_SALE, or one pass is counted twice.
- * - Imported tickets with priceConfidence UNKNOWN have pricePaid 0 because the
- *   price was never recorded. They are real admissions and are counted as
- *   such, but they drag revenue-per-ticket down; their count is returned
- *   alongside so the dashboard can say so.
+ * GET /api/admin/stats — aggregate dashboard statistics.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, defineAbility((user: AbilityUser) => isAdminOrManager(user)))
@@ -67,9 +56,7 @@ export default defineEventHandler(async (event) => {
     recentReservations,
   ] = await Promise.all([
     // Published shows *in the window* — a show counts if it has a performance
-    // inside it. Unbounded, this counts the whole imported archive next to a
-    // single season's takings. The subquery keeps the parameter cost fixed
-    // (ADR-0006).
+    // inside it. The subquery keeps the parameter cost fixed (ADR-0006).
     db.select({ count: count() })
       .from(schema.shows)
       .where(and(
@@ -93,9 +80,8 @@ export default defineEventHandler(async (event) => {
         gt(schema.performances.startsAt, now),
       )),
 
-    // Reservation counts by status, for performances in the window. Unbounded
-    // like the show count was, this reported every reservation since 2016 under
-    // a season heading.
+    // Reservation counts by status, for performances in the window. Unbounded,
+    // this reports every reservation since 2016 under a season heading.
     db.select({ status: schema.reservations.status, count: count() })
       .from(schema.reservations)
       .innerJoin(schema.performances, eq(schema.reservations.performanceId, schema.performances.id))
@@ -153,12 +139,8 @@ export default defineEventHandler(async (event) => {
 
   const totals = revenueAndTicketsResult[0]
 
-  // Private, browser-only and short: a dashboard need not be second-accurate,
-  // and this stops a reload re-running the aggregates.
-  //
-  // Deliberately not defineCachedEventHandler, which skips the handler on a hit
-  // — including the authorize() call above — so an unauthenticated request could
-  // be served a cached copy of the theatre's finances.
+  // Not defineCachedEventHandler, which skips the handler on a hit — including
+  // the authorize() above, so the finances could be served unauthenticated.
   setHeader(event, 'Cache-Control', 'private, max-age=30')
 
   return {

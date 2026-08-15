@@ -1,14 +1,6 @@
 /**
- * The shapes `/api/shows` actually puts on the wire.
- *
- * Hand-written rather than derived with `InferSelectModel`, deliberately: the
- * Drizzle model describes the *table*, where `performances.startsAt` is a
- * `Date` rather than an ISO string, and these rows carry computed fields
- * (`ticketsSold`, `performanceCount`, the run window) that no column
- * corresponds to.
- *
- * In `shared/` so the page, the tree table and the row-action handlers agree
- * on one definition.
+ * The shapes /api/shows puts on the wire. Hand-written, not derived: these
+ * rows carry computed fields no column corresponds to.
  */
 
 // Imported explicitly: Nuxt's auto-imports cover app/ and server/, not files
@@ -42,9 +34,8 @@ export interface PerformanceListItem {
   ticketTypeOverrideCount: number
   ticketsSold: number
   /**
-   * Sub-row anchor. Never present on a real performance — it exists so the
-   * tree table's `getSubRows` can be typed over the union without a cast at
-   * every call site.
+   * Sub-row anchor, never present on a real performance — it exists so
+   * `getSubRows` can be typed over the union without a cast.
    */
   performances?: never
 }
@@ -79,10 +70,8 @@ export interface ContentWarningRef {
 }
 
 /**
- * One linked content warning, with its vocabulary entry resolved.
- *
- * `level` is null exactly when the warning is TECHNICAL — a strobe sequence is
- * not "mentioned" or "depicted", it happens or it does not.
+ * One linked warning with its vocabulary entry resolved. `level` is null
+ * exactly when the warning is TECHNICAL (ADR-0004).
  */
 export interface ShowContentWarningLink {
   id: string
@@ -92,12 +81,8 @@ export interface ShowContentWarningLink {
 }
 
 /**
- * A linked warning as the public show page receives it.
- *
- * Narrower than `ShowContentWarningLink` on purpose: `/api/whats-on/:slug`
- * allow-lists the link row down to `level`, because `id`, `showId` and
- * `contentWarningId` mean nothing outside the admin section and that response
- * is cached at the edge for anyone to fetch.
+ * As the public show page receives it — narrower on purpose, since the link
+ * row's ids mean nothing outside the admin section.
  */
 export interface PublicShowContentWarning {
   level: ContentWarningLevel | null
@@ -112,11 +97,8 @@ export interface LegacyContentWarningLink {
 }
 
 /**
- * What `GET /api/shows/:id` returns: every column, not the list projection.
- *
- * The five fields below `description` are the ones `/api/shows` omits. Anything
- * that edits a show must read them from here — writing back what a list row did
- * not contain is what silently wiped shows' write-ups.
+ * What GET /api/shows/:id returns: every column, not the list projection.
+ * Anything that edits a show must read from there (ADR-0017).
  */
 export interface ShowDetail extends ShowListItem {
   longDescription?: string | null
@@ -133,11 +115,8 @@ export interface ShowDetail extends ShowListItem {
 export type ShowTreeRow = ShowListItem | PerformanceListItem
 
 /**
- * Everything the tree table can ask the page to do.
- *
- * One discriminated union and one `action` event, rather than nine separate
- * emits: the page gets a `switch` the compiler can check for exhaustiveness, and
- * the modals stay mounted at page level where `refresh` lives.
+ * One discriminated union and one `action` event rather than nine emits, so
+ * the page gets a `switch` the compiler can check for exhaustiveness.
  */
 export type ShowRowAction
   = | { type: 'open-show', show: ShowListItem }

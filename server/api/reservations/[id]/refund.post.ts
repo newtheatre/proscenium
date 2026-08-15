@@ -5,19 +5,14 @@ import { refundTicket } from '~~/shared/utils/abilities'
 
 const bodySchema = z.object({
   ticketTypeId: z.string().min(1),
-  // Bounded because `quantity` becomes the length of an `inArray` id list and
-  // D1 binds at most 100 parameters per statement. Refunding more than 50
-  // tickets of one type in a single call is a data-repair job, not a box-office
-  // action.
+  // Bounded because `quantity` becomes the length of an `inArray` id list and D1
+  // binds at most 100 parameters (ADR-0006).
   quantity: z.int().min(1).max(50),
 })
 
 /**
- * POST /api/reservations/:id/refund
- *
- * Marks `quantity` active (non-refunded) tickets of a given type on the
- * reservation as refunded by stamping `refundedAt`. Refunded tickets are
- * retained for audit but excluded from capacity and revenue. Admin/Manager only.
+ * POST /api/reservations/:id/refund — stamp `refundedAt` on `quantity` active
+ * tickets of a type.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, refundTicket)
@@ -62,10 +57,8 @@ export default defineEventHandler(async (event) => {
     .slice(0, quantity)
     .map(t => t.id)
 
-  // `refundedAt IS NULL` in the WHERE, not only in the SELECT above: read and
-  // write are separate statements, so two concurrent refunds would both report
-  // success while one stamp lands — cash out twice, recorded once. `returning()`
-  // then reports what this call actually refunded (ADR-0011).
+  // `refundedAt IS NULL` in the WHERE, not only the SELECT: two concurrent
+  // refunds would otherwise both report success (ADR-0011).
   const refunded = await db
     .update(schema.tickets)
     .set({ refundedAt: new Date() })

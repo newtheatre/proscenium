@@ -1,11 +1,6 @@
 /**
- * Signed, expiring access tokens for guest booking links. The booking
- * reference is not a credential (ADR-0009).
- *
- * Format: `<base64url payload>.<base64url HMAC-SHA256>` — verifiable without a
- * database round trip, revocable in bulk by rotating the secret. HMAC rather
- * than encryption: nothing in the payload is secret, the booking id is already
- * in the path.
+ * Signed, expiring access tokens for guest booking links; the booking
+ * reference is not a credential (ADR-0009). Format: `<payload>.<HMAC>`.
  */
 
 interface TokenPayload {
@@ -34,9 +29,8 @@ function b64urlDecode(value: string): Uint8Array<ArrayBuffer> {
 
 function secret(): string {
   const config = useRuntimeConfig()
-  // Falls back to the session password so an existing deployment works without
-  // a new variable. Set bookingTokenSecret in production to rotate booking
-  // links independently of the estate seal (ADR-0009).
+  // Falls back to the session password. Set bookingTokenSecret in production to
+  // rotate booking links independently of the estate seal (ADR-0009).
   const value = config.bookingTokenSecret || (config as { session?: { password?: string } }).session?.password
   if (!value) {
     throw createError({ statusCode: 500, statusMessage: 'Booking token secret is not configured' })
@@ -55,9 +49,8 @@ async function key(): Promise<CryptoKey> {
 }
 
 /**
- * Expiry for a booking's token: a day after the performance, but never less
- * than a week away. Tying it to the performance means the credential stops
- * working once it can no longer be acted on.
+ * A day after the performance, but never less than a week away — the
+ * credential stops working once it can no longer be acted on.
  */
 export function bookingTokenExpiry(performanceStartsAt: Date, now = new Date()): number {
   const afterPerformance = performanceStartsAt.getTime() + GRACE_AFTER_PERFORMANCE_MS
@@ -72,11 +65,8 @@ export async function signBookingToken(bookingId: string, expiresAt: number): Pr
 }
 
 /**
- * Verify a token and return the booking id it grants access to, or null.
- *
- * Returns null for every failure — bad shape, bad signature, expired, wrong
- * booking — rather than distinguishing them, so this cannot be used to probe
- * which booking ids exist.
+ * Null for every failure — bad shape, signature, expiry or booking — so a
+ * caller cannot tell which of them it was.
  */
 export async function verifyBookingToken(token: string, bookingId: string, now = new Date()): Promise<boolean> {
   const separator = token.lastIndexOf('.')

@@ -1,10 +1,6 @@
 <!--
-Box office: create an on-the-door reservation for someone who has not
-pre-booked. Emits `created` so the parent can open CollectModal immediately
-and take payment in one flow.
-
-The server resolves the user by email and the effective prices through the
-override chain, so this collects only name, email and quantities.
+Box office: an on-the-door reservation for someone who has not pre-booked.
+Emits `created` so the parent can collect payment immediately.
 -->
 <script setup lang="ts">
 interface TicketType {
@@ -105,11 +101,8 @@ const nameFromLookup = ref(false)
 async function lookupEmail() {
   const e = email.value.trim()
 
-  // Cleared BEFORE the early return, not after it. With the reset below the
-  // guard, typing a value with no "@" (a partial address, a phone number) left
-  // `existingUserId` pointing at the *previous* customer — and since a non-empty
-  // email and the retained name satisfy `canSubmit`, the walk-in was then
-  // attached to that person's account.
+  // Cleared BEFORE the early return: below the guard, a partial address would
+  // leave the previous customer's match on screen.
   existingUserId.value = null
   if (nameFromLookup.value) {
     // Only clear a name the lookup filled in — never one the volunteer typed.

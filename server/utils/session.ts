@@ -12,12 +12,8 @@ function holdsAppRoles(user: User): boolean {
 }
 
 /**
- * The user nuxt-authorization evaluates abilities against.
- *
- * **MUST NOT throw.** `authorize()` swallows any error that is not an
- * `AuthorizationError` and then resolves successfully, running the handler
- * with no authorization check at all — so throwing here grants rather than
- * denies. Staleness is expressed as data instead (ADR-0008).
+ * **MUST NOT throw** — authorize() swallows anything that is not an
+ * AuthorizationError and then runs the handler unchecked (ADR-0008).
  */
 export async function sessionUserForAuthorization(event: H3Event): Promise<User | null> {
   try {

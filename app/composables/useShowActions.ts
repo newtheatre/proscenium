@@ -4,12 +4,8 @@ import { formatDateTime } from '~/utils/format'
 import { useConfirm } from '~/composables/useConfirm'
 
 /**
- * The destructive and status-changing operations on shows and performances, so
- * the list and the detail page do the same thing — including asking the same
- * question first, via `useConfirm()`.
- *
- * `onChanged` runs after any successful mutation, so the caller decides what to
- * refresh: one list, three tabs, or a detail page.
+ * Destructive and status-changing show operations, so the list and the detail
+ * page do the same thing and ask the same question first.
  */
 export function useShowActions(onChanged: () => void | Promise<void>) {
   const toast = useToast()

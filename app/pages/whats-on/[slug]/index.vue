@@ -80,9 +80,10 @@ function formatDuration(minutes: number): string {
       <WhatsOnShowHero :show="show">
         <template #actions>
           <div class="flex flex-wrap items-center gap-4">
-            <!-- externalUrl marks a show the theatre hosts but does not sell
-                 for. Sending someone into our booking flow for one would take a
-                 booking we cannot honour. -->
+            <!--
+            externalUrl marks a show the theatre hosts but does not sell for, so the
+            booking flow must not be offered.
+            -->
             <UButton
               v-if="show.externalUrl"
               label="Book on the organiser's site"

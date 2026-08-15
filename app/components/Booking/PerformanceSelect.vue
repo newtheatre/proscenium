@@ -1,9 +1,6 @@
 <script setup lang="ts">
 /**
- * Performance selection step.
- *
- * Shows all available performances grouped by date with availability indicators.
- * The user selects one performance to proceed to ticket selection.
+ * Performance selection step, grouped by date with availability.
  */
 interface Venue {
   id: string

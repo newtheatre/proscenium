@@ -15,12 +15,7 @@ const bodySchema = z.object({
 })
 
 /**
- * PUT /api/content-warnings/:id — edit a vocabulary entry. Admin/Manager only.
- * Partial body: an absent key is left alone, an explicit null clears.
- *
- * Changing `kind` while the warning is linked is refused — kind decides
- * whether a link carries a level, and the existing links were written under
- * the old answer (ADR-0010).
+ * PUT /api/content-warnings/:id — edit a vocabulary entry.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')

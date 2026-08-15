@@ -1,11 +1,6 @@
 <!--
-The footer under an admin table: what you are looking at on the left, the
-pager on the right.
-
-Props are plain numbers rather than a handle on the table: reading
-`table?.tableApi?.getFilteredRowModel()` in a template re-walks the whole
-row model on every render (ADR-0012). Callers already own their `pagination`
-and `rowSelection` refs, so they can pass counts they know.
+The footer under an admin table. Props are plain numbers, not a table handle,
+so nothing re-walks the row model to report a count (ADR-0012).
 -->
 <script setup lang="ts">
 const props = defineProps<{
@@ -26,9 +21,7 @@ const page = defineModel<number>('page', { required: true })
 
 /**
  * The count always reads the same way — "12 venues" — with selection folded in
- * only when something is actually selected. Pages used to disagree here: two
- * showed "0 of 12 row(s) selected." permanently, on tables that have no bulk
- * action to perform on a selection, while a third showed the plain count.
+ * only when something is selected.
  */
 const summary = computed(() => {
   const singular = props.label ?? 'row'

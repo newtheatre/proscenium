@@ -1,10 +1,8 @@
 import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core'
 
 /**
- * Fixed-window request counters, one row per bucket (ADR-0015).
- *
- * `key` encodes both the action and the subject — `login:ip:1.2.3.4`,
- * `forgot:email:someone@example.com` — so one table serves every limit.
+ * Fixed-window counters, one row per bucket (ADR-0015). `key` encodes both the
+ * action and the subject, so one table serves every limit.
  */
 export const rateLimits = sqliteTable('rate_limits', {
   key: text('key').primaryKey(),

@@ -2,13 +2,8 @@ import { db } from '@nuxthub/db'
 import { users } from '~~/server/db/schema/user'
 
 /**
- * Seed Users (mirror rows)
- *
- * Identity lives in the central auth service; locally we only mirror
- * `{ id, email, name }` so reservations have owners. Dev sessions come from
- * `/dev-login` (which mints scoped roles without any password), so no
- * credentials are seeded here — the known-password seed accounts of the old
- * auth stack must not recur (stage-door docs/development.md#seeds).
+ * Mirror rows only — identity is central. No credentials are seeded; dev
+ * sessions come from /dev-login.
  */
 export async function seedUsers() {
   console.log('👥 Seeding user mirrors...')

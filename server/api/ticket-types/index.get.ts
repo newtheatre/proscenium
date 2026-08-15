@@ -4,20 +4,14 @@ import { z } from 'zod/v4'
 
 const querySchema = z.object({
   /**
-   * Include retired types. Off by default, so every caller that just wants
-   * "the ticket types" gets the live ones without having to remember.
-   *
-   * The management screen passes `true` for its "Show archived" toggle — it is
-   * the one place that has to see them, since it is where they are archived and
-   * restored.
+   * Off by default, so a caller that just wants the ticket types gets the live
+   * ones. Only the management screen asks for retired ones.
    */
   includeArchived: z.enum(['true', 'false']).optional().default('false'),
 })
 
 /**
- * GET /api/ticket-types — list ticket types. Public. Archived types are
- * excluded unless asked for (ADR-0010); they remain necessary for pricing
- * historic tickets.
+ * GET /api/ticket-types — list ticket types.
  */
 export default defineEventHandler(async (event) => {
   const { includeArchived } = await getValidatedQuery(event, querySchema.parse)

@@ -17,10 +17,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
 
-  // Performances cascade-delete with the show, but tickets and reservations
-  // reference the performance with onDelete: 'restrict', so a show that ever
-  // sold anything cannot be removed. Check and explain rather than letting the
-  // foreign key surface as a raw 500.
+  // Performances cascade, but tickets and reservations reference them with
+  // `restrict`, so a show that ever sold anything cannot be removed.
   const [bookings] = await db
     .select({ n: count() })
     .from(schema.reservations)

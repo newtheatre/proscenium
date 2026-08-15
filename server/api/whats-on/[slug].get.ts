@@ -2,12 +2,8 @@ import { db, schema } from '@nuxthub/db'
 import { and, asc, eq, gt, inArray } from 'drizzle-orm'
 
 /**
- * GET /api/whats-on/:slug — get a published show by slug with performances and ticket types.
- *
- * Public endpoint — no authentication required.
- *
- * Returns the show with all ON_SALE future performances, venue details,
- * and the available ticket types with effective prices for each performance.
+ * GET /api/whats-on/:slug — get a published show by slug with performances
+ * and ticket types.
  */
 export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, 'slug')
@@ -34,9 +30,8 @@ export default defineEventHandler(async (event) => {
           venue: { columns: { id: true, name: true, address: true, capacity: true } },
         },
       },
-      // Allow-listed on both sides. The link row itself used to be spread whole,
-      // publishing `id`, `showId` and `contentWarningId` into an edge-cached
-      // public response — the exact leak queries/whatsOn.ts exists to prevent.
+      // Allow-listed on both sides — the link row's ids mean nothing publicly and
+      // would be edge-cached along with everything else.
       contentWarnings: {
         columns: publicContentWarningLinkColumns,
         with: {
@@ -51,9 +46,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
 
-  // The performances this response covers, as a subquery rather than a bound id
-  // list — a Fringe show can have well over 100 performances on sale at once
-  // (ADR-0006).
+  // A subquery, not a bound id list: a Fringe show can have well over 100
+  // performances on sale at once (ADR-0006).
   const showPerformances = db
     .select({ id: schema.performances.id })
     .from(schema.performances)
@@ -71,9 +65,8 @@ export default defineEventHandler(async (event) => {
     db.select().from(schema.showTicketTypeOverrides)
       .where(eq(schema.showTicketTypeOverrides.showId, show.id)),
 
-    // Not filtered by ticket-type id: an override row for a type this response
-    // does not carry is simply never looked up (`resolveEffective*` finds by id),
-    // and dropping the filter is what keeps the statement inside D1's limit.
+    // Not filtered by ticket-type id: an override for a type this response does
+    // not carry is simply never looked up.
     db.select().from(schema.performanceTicketTypeOverrides)
       .where(inArray(schema.performanceTicketTypeOverrides.performanceId, showPerformances)),
 
@@ -114,9 +107,8 @@ export default defineEventHandler(async (event) => {
     }
   })
 
-  // Same reasoning as the listing: fully public, slow-changing, and the only
-  // fast-moving field is ticketsSold, which is advisory here — capacity is
-  // enforced when the booking is written.
+  // Public and slow-changing. The only fast-moving field is ticketsSold, which
+  // is advisory — capacity is enforced at write time.
   setHeader(event, 'Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
 
   return {

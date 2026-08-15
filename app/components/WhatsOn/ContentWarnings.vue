@@ -1,14 +1,7 @@
 <script setup lang="ts">
 /**
- * Content warnings for a show, in three states. The distinction between the
- * last two is the point: "the company checked and there are none" is a
- * reassurance, "nobody has filled this in" is an absence of information, and
- * showing silence as safety is how someone ends up in the room for something
- * they needed to know about (ADR-0004).
- *
- * Technical effects come first — they have an immediate physical consequence
- * for someone avoiding them. Everything else is grouped by how strongly it
- * features: depicted, discussed, then mentioned.
+ * Three states, and the difference between the last two is the point: showing
+ * silence as safety is the failure this exists to prevent (ADR-0004).
  */
 import type { PublicShowContentWarning } from '~~/shared/types/shows'
 
@@ -19,10 +12,8 @@ const props = defineProps<{
 }>()
 
 /**
- * Technical first, then the three levels strongest-first.
- *
- * Sorted here rather than in the query: the response is one flat list and the
- * grouping reshuffles it anyway, so ordering it in SQL would buy nothing.
+ * Technical first, then levels strongest-first. Sorted here because the
+ * response is one flat list and the grouping is a display decision.
  */
 const groups = computed(() => {
   const technical = props.warnings

@@ -14,22 +14,6 @@ const querySchema = z.object({
 
 /**
  * GET /api/admin/export/tickets — ticket data as CSV, for the treasurer.
- * ADMIN and MANAGER only.
- *
- * At least one bound is required, and this is not optional: unfiltered, the
- * six-way join reads on the order of 320,000 rows and builds ~10 MB of CSV in
- * Worker memory against a 30 s query cap.
- *
- *   performanceId — one performance (takes precedence over showId)
- *   showId        — every performance of one show
- *   from / to     — inclusive performance-date range, YYYY-MM-DD
- *
- * Every status is included so the audit trail is complete; refunds are marked
- * in their own column. "Price Confidence" carries the legacy import's
- * EXACT/DERIVED/UNKNOWN distinction (ADR-0003) rather than presenting all
- * prices as fact — UNKNOWN leaves the cell empty, because 0.00 is
- * indistinguishable from a genuine comp. "Ticket Kind" separates PASS_SALE
- * from PASS_ADMISSION, which must never be summed together.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, defineAbility((user: AbilityUser) => isAdminOrManager(user)))
@@ -123,10 +107,8 @@ type TicketRow = {
 function csvCell(val: string | number | null | undefined): string {
   if (val == null) return ''
   let str = String(val)
-  // Neutralise spreadsheet formula injection: Excel/Sheets treat a cell that
-  // begins with = + - @ (optionally after a tab or carriage return) as a
-  // formula. Customer-controlled fields flow into this export, so prefix any
-  // such cell with an apostrophe to force it to be read as text.
+  // Neutralise spreadsheet formula injection: a cell beginning = + - @ is
+  // treated as a formula, and these values are customer-controlled.
   if (/^[=+\-@\t\r]/.test(str)) {
     str = `'${str}`
   }
@@ -170,10 +152,8 @@ function buildCsv(rows: TicketRow[]): string {
     // made it look like a comp; an empty cell sums the same and does not lie.
     const pricePounds = r.priceConfidence === 'UNKNOWN' ? '' : (r.pricePaid / 100).toFixed(2)
 
-    // Two imported rows carry a negative price, from the ETL pushing a rounding
-    // remainder onto a £0 line. Left unflagged they quietly subtract from any
-    // spreadsheet total. The value is preserved rather than clamped — this is an
-    // audit trail, and silently editing the figures would be worse.
+    // Two imported rows carry a negative price from an ETL rounding remainder;
+    // unflagged they quietly subtract from a spreadsheet total.
     const priceNote = r.pricePaid < 0
       ? 'Negative — apportioning remainder, check against the booking total'
       : r.priceConfidence === 'UNKNOWN'

@@ -36,12 +36,8 @@
     </UDashboardSidebar>
 
     <!--
-    Breathing room under the last element of every admin page, most visibly the
-    pagination footer. On the panel body rather than AdminPage, because the two
-    box-office pages do not use AdminPage.
-
-    Both breakpoints are needed: the body's own `sm:p-6` sits in a media query
-    after every base utility, so a bare `pb-8` is overridden above `sm`.
+    Breathing room under the last element of every admin page. Both breakpoints
+    are needed — the body's own `sm:p-6` would otherwise win.
     -->
     <UDashboardPanel :ui="{ body: 'pb-8 sm:pb-10' }">
       <template #header>

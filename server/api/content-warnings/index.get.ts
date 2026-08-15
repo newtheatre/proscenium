@@ -10,12 +10,7 @@ const querySchema = z.object({
 })
 
 /**
- * GET /api/content-warnings — the warning vocabulary. Staff only.
- *
- * `showCount` is a correlated subquery rather than a join + GROUP BY; the
- * admin page needs it to tell an unused entry from one it must not delete.
- * Ordered technical-first to match how the editor and the public page group
- * them, then `sort`, then title.
+ * GET /api/content-warnings — the warning vocabulary.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listContentWarnings)
@@ -37,11 +32,8 @@ export default defineEventHandler(async (event) => {
       icon: schema.contentWarnings.icon,
       sort: schema.contentWarnings.sort,
       archived: schema.contentWarnings.archived,
-      // Table and column names written out rather than interpolated. Drizzle
-      // renders a column reference inside a `sql` template *unqualified* — this
-      // came out as `WHERE "content_warning_id" = "id"`, where both names
-      // resolve against the subquery's own table, so the comparison was never
-      // true and every entry reported zero shows.
+      // Names written out rather than interpolated: Drizzle renders a column
+      // reference inside a `sql` template unqualified.
       showCount: sql<number>`(
         SELECT COUNT(*) FROM "show_content_warnings"
         WHERE "show_content_warnings"."content_warning_id" = "content_warnings"."id"

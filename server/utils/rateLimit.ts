@@ -3,11 +3,8 @@ import { eq, lt, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
 /**
- * Fixed-window rate limiting, backed by D1 (ADR-0015).
- *
- * The counter is a single upsert with `RETURNING`, which SQLite executes
- * atomically. A fixed window can let through up to twice the limit across a
- * boundary; that is the accepted trade.
+ * Fixed-window rate limiting, backed by D1 (ADR-0015). A single atomic upsert;
+ * the window can let through twice the limit across a boundary.
  */
 
 export interface RateLimitRule {
@@ -26,10 +23,8 @@ export interface RateLimitResult {
 }
 
 /**
- * The caller's IP from `CF-Connecting-IP`, which the edge sets and a client
- * cannot spoof. Null means the request did not come from outside (SSR calling
- * its own API, or local dev) — callers must skip limiting rather than share
- * one bucket between all of them (ADR-0015).
+ * Null means the request did not come from outside, so callers must skip
+ * limiting rather than share one bucket between every SSR render.
  */
 export function clientIp(event: H3Event): string | null {
   return getRequestHeader(event, 'cf-connecting-ip') ?? null
@@ -65,10 +60,8 @@ export async function consumeRateLimit({ key, limit, windowSeconds }: RateLimitR
 }
 
 /**
- * Apply one or more rules, and 429 if any is exceeded.
- *
- * Every rule is consumed even when an earlier one has already failed, so a
- * caller cannot keep one bucket artificially low by tripping another first.
+ * Every rule is consumed even after one fails, so a caller cannot keep one
+ * bucket artificially low by tripping another first.
  */
 export async function assertRateLimit(event: H3Event, rules: RateLimitRule[], message?: string): Promise<void> {
   const results = await Promise.all(rules.map(consumeRateLimit))
@@ -93,11 +86,8 @@ export async function resetRateLimit(key: string): Promise<void> {
 }
 
 /**
- * Drop long-expired buckets, occasionally.
- *
- * Called opportunistically rather than on a schedule: it is one indexed delete,
- * it does not need to be timely, and a cron task would be more machinery than a
- * table of short-lived counters deserves.
+ * Opportunistic rather than scheduled: one indexed delete that does not need
+ * to be timely.
  */
 export async function sweepRateLimits(event: H3Event, probability = 0.02): Promise<void> {
   if (Math.random() >= probability) return

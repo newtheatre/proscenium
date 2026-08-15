@@ -13,9 +13,8 @@ const UCheckbox = resolveComponent('UCheckbox')
 definePageMeta({
   layout: 'admin',
   middleware: ['admin'],
-  // The layout renders this as the page's only <h1> (UDashboardNavbar). It must
-  // match the sidebar nav entry; it used to say "Venue Management" while the
-  // page's own heading said "Venues".
+  // The layout renders this as the page's only <h1>, so it must match the sidebar
+  // nav entry.
   title: 'Venues',
 })
 
@@ -46,36 +45,27 @@ interface Venue {
 
 // Table state
 const columnVisibility = ref({})
-// Hoisted, not inline in the template: an inline object builds a fresh options
-// bag and row-model function per render, which makes the table rebuild every
-// time. Harmless here only because `:data` is a stable ref — see the note in
-// admin/ticket-types.vue.
+// Hoisted, not inline: an inline object builds a fresh options bag and
+// row-model function per render (ADR-0012).
 const paginationOptions = { getPaginationRowModel: getPaginationRowModel() }
 const rowSelection = ref<Record<string, boolean>>({})
 const { pagination, page, resetPage } = useTablePagination(10)
 
-// Server-rendered, so the table arrives populated. `$fetch: useRequestFetch()`
-// forwards the session cookie, which a plain useFetch does not do on the
-// server — and /api/venues is behind authorize() for writes. See
-// docs/02-architecture.md §Fetching in the admin area.
+// Server-rendered, with useRequestFetch to forward the session cookie
+// (ADR-0013).
 const requestFetch = useRequestFetch()
 const { data, status, error, refresh } = await useAsyncData(
   'admin-venues', () => requestFetch<Venue[]>('/api/venues'))
 
 /**
- * Rows for the table. **Always an array, never null** — binding `data ?? []`
- * mints a new array identity per render, which makes UTable rebuild its
- * TanStack row models, which writes back through the `v-model:` bindings and
- * re-renders. See docs/02-architecture.md §Never build the table's data prop in
- * the template.
+ * **Always an array, never null** — `data ?? []` mints a new identity per
+ * render and sends UTable into a loop (ADR-0012).
  */
 const rows = computed<Venue[]>(() => data.value ?? [])
 
 /**
- * Search here rather than through TanStack's `columnFilters`, so the footer can
- * report the match count without the table re-walking its row model
- * (ADR-0012). It also lets the search cover address, which a name-column
- * filter could not.
+ * Search here rather than TanStack's `columnFilters`, so the footer can report
+ * the match count without re-walking the row model (ADR-0012).
  */
 const search = ref('')
 const filteredRows = computed<Venue[]>(() => {

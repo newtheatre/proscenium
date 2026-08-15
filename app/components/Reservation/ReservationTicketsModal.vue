@@ -1,9 +1,6 @@
 /**
- * View and adjust the ticket composition of a reservation. Staff only.
- *
- * Refunded tickets are shown separately and read-only: they are a record of a
- * transaction, not part of the editable composition (ADR-0011). The body sends
- * desired totals per type, which the server diffs.
+ * View and adjust a reservation's tickets. Refunded ones are separate and
+ * read-only — they record a transaction (ADR-0011).
  */
 <script setup lang="ts">
 // ── Types ──────────────────────────────────────────────────────────────────────

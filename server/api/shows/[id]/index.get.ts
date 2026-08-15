@@ -3,15 +3,7 @@ import { asc, count, eq, inArray } from 'drizzle-orm'
 import { readShow } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/shows/:id — one show, in full. Staff only; the public uses
- * /api/whats-on.
- *
- * Returns **every** column, unlike the list projection. That is the point of
- * it: anything that edits a show reads it from here, or it writes nulls over
- * the fields it never received (ADR-0017).
- *
- * Counts scope through a subquery on this show's performances rather than
- * binding their ids (ADR-0006).
+ * GET /api/shows/:id — one show, in full.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, readShow)

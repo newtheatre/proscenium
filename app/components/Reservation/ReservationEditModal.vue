@@ -1,8 +1,6 @@
 /**
- * Edit a reservation's status and notes. Staff only.
- *
- * `cancelledBy` is required when the status becomes CANCELLED. `staffNotes` is
- * internal and never reaches the customer.
+ * Edit a reservation's status and notes. Staff only. `cancelledBy` is required
+ * when cancelling; `staffNotes` never reaches the customer.
  */
 <script setup lang="ts">
 import * as z from 'zod'

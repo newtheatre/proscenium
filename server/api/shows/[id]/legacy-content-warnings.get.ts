@@ -4,11 +4,7 @@ import { readShow } from '~~/shared/utils/abilities'
 
 /**
  * GET /api/shows/:id/legacy-content-warnings — warnings this show carried
- * before the rework that did not carry over. Staff only.
- *
- * Returns only the unmapped ones: a title still on the show under its new name
- * is noise here. The show editor surfaces these for a human to replace
- * (ADR-0004).
+ * before the rework that did not carry over.
  */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
@@ -20,10 +16,7 @@ export default defineEventHandler(async (event) => {
   await authorize(event, readShow)
 
   // `mapped_to_warning_id IS NULL` is the migration's own record of what it
-  // could not place. Deriving it here instead — by looking for archive ids
-  // missing from the live table — would be wrong, because the remap collapses
-  // rows: "Sexism" and "Misogyny" both became `sexism`, and only one of the two
-  // ids survives.
+  // could not place — do not re-derive it (ADR-0004).
   return db
     .select({
       title: schema.contentWarningsArchive.title,

@@ -3,15 +3,8 @@ import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod/v4'
 
 /**
- * PUT /api/bookings/:id/tickets
- *
- * Customer self-service edit of their own booking's ticket composition (the
- * logged-in owner, or a guest presenting a valid access token).
- *
- * Same desired-quantity diff as the staff endpoint, but with self-service
- * guards: the booking must be PENDING and the performance ON_SALE and in the
- * future, only active ticket types may be added, capacity is enforced, and the
- * booking cannot be emptied (cancel it instead).
+ * PUT /api/bookings/:id/tickets — customer self-service edit of their own
+ * ticket composition.
  */
 const bodySchema = z.object({
   tickets: z.array(z.object({
@@ -19,10 +12,8 @@ const bodySchema = z.object({
     quantity: z.int().min(0).max(10),
   })).min(1),
 }).refine(
-  // The handler treats each entry as the desired TOTAL for that type and reads
-  // the current count from a map it never updates, so two entries for one type
-  // each computed against the original count and the quantities compounded —
-  // "10 then 10" inserted 20. A repeated type is a client bug either way.
+  // Each entry is the desired TOTAL, read against a map that is never updated —
+  // so two entries for one type would compound rather than replace.
   data => new Set(data.tickets.map(t => t.ticketTypeId)).size === data.tickets.length,
   { message: 'Each ticket type may only appear once' },
 )

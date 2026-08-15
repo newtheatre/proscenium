@@ -3,12 +3,8 @@ import { eq } from 'drizzle-orm'
 import { sendBookingCancellationEmail } from '~~/server/utils/email'
 
 /**
- * POST /api/bookings/:id/cancel
- *
- * Lets a customer cancel their own booking — the logged-in owner, or a guest
- * presenting a valid access token. Only a PENDING booking for a future
- * performance can be cancelled; it is marked CANCELLED / cancelledBy CUSTOMER
- * and a cancellation email is sent.
+ * POST /api/bookings/:id/cancel Lets a customer cancel their own booking —
+ * the logged-in owner, or a guest presenting a valid access token.
  */
 export default defineEventHandler(async (event) => {
   const idOrRef = getRouterParam(event, 'id')

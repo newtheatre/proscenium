@@ -1,8 +1,6 @@
 <!--
-What a page shows when its data did not load.
-
-Without it a failed request leaves an empty table, which reads as "there are
-no venues" — the worst thing to show someone about to create a duplicate.
+What a page shows when its data did not load. An empty table otherwise reads
+as "there are no venues".
 -->
 <script setup lang="ts">
 defineProps<{

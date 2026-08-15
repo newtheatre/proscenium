@@ -3,10 +3,8 @@ import { eq } from 'drizzle-orm'
 import { readShow } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/shows/:id/ticket-types
- *
- * Returns all ticket types with their effective price and active status
- * for a specific show, reflecting any show-level overrides.
+ * GET /api/shows/:id/ticket-types — effective prices and active state,
+ * including show-level overrides.
  */
 /** GET /api/shows/:id/ticket-types — get ticket type overrides for a show. */
 export default defineEventHandler(async (event) => {

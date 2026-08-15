@@ -3,10 +3,8 @@ import { eq, and } from 'drizzle-orm'
 import { updateShow } from '~~/shared/utils/abilities'
 
 /**
- * DELETE /api/shows/:id/ticket-types/:ticketTypeId
- *
- * Removes a show-level ticket type override, reverting that ticket type
- * to its base defaults for this show.
+ * DELETE /api/shows/:id/ticket-types/:ticketTypeId — remove a show-level
+ * override, reverting that type to its base defaults.
  */
 /** DELETE /api/shows/:id/ticket-types/:ticketTypeId — remove a show ticket type override. Admin/Manager only. */
 export default defineEventHandler(async (event) => {

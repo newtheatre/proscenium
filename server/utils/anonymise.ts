@@ -2,22 +2,13 @@ import { db, schema } from '@nuxthub/db'
 import { eq, sql } from 'drizzle-orm'
 
 /**
- * Replace a person's identifying details while keeping their booking rows
- * (ADR-0014).
- *
- * SCOPE: this app's mirror and reservation data only. It is the implementation
- * behind `POST /api/_hooks/auth/anonymise`, which stage-door calls as part of
- * a centrally orchestrated erasure. Calling it directly leaves the central
- * identity intact and is not on its own a fulfilled erasure request — see
- * docs/04-auth-and-permissions.md §erasure.
+ * Replace identifying details while keeping the booking rows (ADR-0014).
+ * This app's share of a stage-door-orchestrated erasure, not a whole one.
  */
 
 /**
- * Non-routable by definition — `.invalid` is reserved (RFC 2606).
- *
- * Byte-identical to what stage-door's `eraseUser` writes, and derived from the
- * user id rather than random bytes so the hook is idempotent. Both properties
- * are load-bearing (ADR-0014).
+ * Byte-identical to what stage-door's eraseUser writes, and derived from the
+ * user id so the hook is idempotent. Both are load-bearing (ADR-0014).
  */
 const ANONYMISED_DOMAIN = 'anonymised.invalid'
 const ANONYMISED_NAME = 'Deleted user'
@@ -32,13 +23,8 @@ export interface AnonymiseResult {
 }
 
 /**
- * Anonymise one account and its bookings.
- *
- * A single batch: a half-applied anonymisation would clear the name and leave
- * the notes, or the reverse, with no record of which.
- *
- * Both note fields are cleared: a staff note naming who collected the tickets
- * identifies the person as well as the name field did.
+ * One batch: a half-applied anonymisation would clear the name and leave the
+ * notes. Both note fields go — a staff note names people too.
  */
 export async function anonymiseUser(userId: string): Promise<AnonymiseResult> {
   const user = await db

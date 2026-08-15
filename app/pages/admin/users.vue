@@ -4,12 +4,8 @@ import type { TableColumn } from '@nuxt/ui'
 const UBadge = resolveComponent('UBadge')
 
 /**
- * Admin Users Page — stage-door integration.
- *
- * Identity, credentials, roles, and verification live in the central auth
- * service; this page is the app-side view of the local user mirror (who
- * exists here for reservations) plus shadow-account creation for walk-ins.
- * Everything else deep-links to the auth service admin.
+ * The app-side view of the local mirror. Identity, credentials and roles live
+ * in the auth service; this page links out.
  */
 interface MirrorUser {
   id: string
@@ -37,9 +33,8 @@ const debouncedQuery = useDebouncedRef(q, {
 })
 
 /**
- * `useRequestFetch()` is not optional — `/api/users` is behind `authorize()`,
- * and a plain `useFetch` on the server does not forward the session cookie
- * (ADR-0013).
+ * `useRequestFetch()` is not optional — a plain useFetch on the server does not
+ * forward the session cookie (ADR-0013).
  */
 const requestFetch = useRequestFetch()
 const { data, status, error, refresh } = await useAsyncData(
@@ -85,9 +80,8 @@ const columns: TableColumn<MirrorUser>[] = [
 ]
 
 /**
- * Always an array, never null (ADR-0012). Columns render from the real record
- * rather than a pre-flattened row of strings, so this page formats dates and
- * badges like every other.
+ * Always an array, never null (ADR-0012). Columns render from the real record,
+ * so dates and badges match every other page.
  */
 const rows = computed<MirrorUser[]>(() => data.value?.rows ?? [])
 const totalCount = computed(() => data.value?.total ?? 0)

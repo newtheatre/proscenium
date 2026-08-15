@@ -1,13 +1,6 @@
 <!--
-Content warnings for a show, editable in place (ADR-0017).
-
-Its own section rather than part of the details form: a separate concern
-with a separate vocabulary, and `PUT /api/shows/:id` takes a partial body so
-each section saves only what it owns.
-
-The "confirmed none" checkbox is the point of the section. A show with no
-warnings listed and no confirmation tells a customer nothing, and the public
-page says exactly that rather than implying there are none (ADR-0004).
+Content warnings for a show, editable in place (ADR-0017). "Confirmed none"
+is the point of the section (ADR-0004).
 -->
 <script setup lang="ts">
 import type { ContentWarningRef, LegacyContentWarningLink, ShowDetail } from '~~/shared/types/shows'
@@ -22,12 +15,8 @@ interface WarningOption extends ContentWarningRef {
 }
 
 /**
- * The shared vocabulary, fetched only once a reader opens the editor — the
- * detail record already carries each link's resolved entry.
- *
- * Deliberately not the key the admin vocabulary page uses: that one fetches
- * archived entries too, and a shared key would have this editor offer them
- * (ADR-0013).
+ * Fetched only when the editor opens, and deliberately not the admin page's
+ * key — that one includes archived entries (ADR-0013).
  */
 const { data: vocabulary, status: vocabularyStatus, refresh: loadVocabulary } = useFetch<WarningOption[]>(
   '/api/content-warnings',
@@ -52,9 +41,8 @@ const isSubmitting = ref(false)
 const technicalIds = ref<string[]>([])
 const generalIds = ref<string[]>([])
 /**
- * contentWarningId → level. Deliberately has no entry for a newly picked
- * warning, so `unassigned` can tell "not looked at yet" from a level someone
- * chose. A reactive Map, so removing one is `.delete()` on a real key.
+ * No entry for a newly picked warning, so `unassigned` can tell "not looked at
+ * yet" from a level someone chose.
  */
 const levels = reactive(new Map<string, ContentWarningLevel>())
 const notes = ref('')
@@ -107,9 +95,8 @@ const technicalOptions = computed(() =>
 )
 
 /**
- * General warnings for the picker, with a `{ type: 'label' }` header per
- * category. Unlabelled separators would tell the reader nothing when the list
- * runs to fifty-odd entries across nine groups.
+ * A `{ type: 'label' }` header per category — unlabelled separators would not
+ * say what the groups are.
  */
 const generalOptions = computed(() => {
   const byCategory = new Map<string, WarningOption[]>()
@@ -149,11 +136,8 @@ const pickedByCategory = computed(() => {
 })
 
 /**
- * Warnings picked but not yet given a level.
- *
- * Nothing is defaulted. A silent "mentioned" on a warning nobody looked at is
- * the same failure the public page's three states exist to prevent, one layer
- * down: it would publish a claim about the production that no one has made.
+ * Picked but not yet levelled. Nothing is defaulted: a silent "mentioned" is a
+ * claim nobody made (ADR-0004).
  */
 const unassigned = computed(() =>
   generalIds.value

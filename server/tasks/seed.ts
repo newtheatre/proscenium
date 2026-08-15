@@ -7,12 +7,8 @@ import { seedShows, printShowsSummary } from './seed/shows'
 import { seedReservations } from './seed/reservations'
 
 /**
- * Main Database Seeding Task
- *
- * Coordinates seeding of all database entities in the correct order.
- * To add new seed data, create a new file in server/tasks/seed/ and import it here.
- *
- * @see server/tasks/seed/README.md for documentation
+ * Seeds every entity in dependency order. Add a file under server/tasks/seed/
+ * and import it here.
  */
 export default defineTask({
   meta: {

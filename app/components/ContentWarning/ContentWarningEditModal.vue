@@ -1,10 +1,6 @@
 /**
- * Edit an entry in the shared warning vocabulary. Admin/Manager only.
- *
- * Renaming changes what every production carrying this warning says — which is
- * the point of a shared vocabulary, and why the modal states how many shows
- * are affected first. Changing the kind is refused while any show uses it
- * (ADR-0010).
+ * Edit an entry in the shared vocabulary. Renaming changes every production
+ * carrying it, which is why the count is shown first (ADR-0010).
  */
 <script setup lang="ts">
 import * as z from 'zod'

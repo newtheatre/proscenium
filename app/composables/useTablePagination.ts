@@ -2,18 +2,8 @@ import { computed, ref } from '#imports'
 import type { PaginationState } from '@tanstack/table-core'
 
 /**
- * Client-side pagination state for a `UTable`, and a 1-based `page` to bind to
- * `AdminTablePagination`.
- *
- * **Every write replaces the state object rather than mutating it.** That is
- * the whole point of this composable: `UTable` exposes pagination through a
- * getter, so TanStack tracks the ref, not the `pageIndex` inside it. Mutating
- * in place changes the number without notifying TanStack, and the table keeps
- * rendering page 1 while the pager highlights page 2 (ADR-0012).
- *
- * @example
- * const { pagination, page, resetPage } = useTablePagination(20)
- * watch([search, showArchived], resetPage)
+ * Pagination state for a UTable. **Every write replaces the state object** —
+ * mutating it does not notify TanStack (ADR-0012).
  */
 export function useTablePagination(pageSize: number) {
   const pagination = ref<PaginationState>({ pageIndex: 0, pageSize })

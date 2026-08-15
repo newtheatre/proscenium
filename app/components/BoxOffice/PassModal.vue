@@ -1,10 +1,6 @@
 <!--
-Box office: passes at the door. Looking a holder up and selling a new pass
-sit together because that is how the desk works.
-
-Admitting creates an ordinary £0 ticket, so the holder appears on the door
-list like any other customer (ADR-0002). The server decides whether a pass
-is valid; this only renders the reason it gives back.
+Box office: passes at the door. Admitting creates an ordinary £0 ticket, so
+the holder appears on the door list like anyone else (ADR-0002).
 -->
 <script setup lang="ts">
 interface RedeemCheck {
@@ -129,9 +125,8 @@ const buyerEmail = ref('')
 const selling = ref(false)
 
 /**
- * Clear everything when the modal opens. These refs live for the lifetime of
- * the page and only a successful sale reset them, so the next person at the
- * door saw the previous holder's details still filled in.
+ * These refs live for the page's lifetime and only a successful sale reset
+ * them, so the next person at the door saw the previous one's details.
  */
 watch(modelOpen, (isOpen) => {
   if (!isOpen) return

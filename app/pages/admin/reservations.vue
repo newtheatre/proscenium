@@ -1,8 +1,6 @@
 /**
- * Admin: every reservation, paged and searched on the server (ADR-0005).
- *
- * This is where a historical booking is looked up; the box-office screen is
- * deliberately forward-looking only (ADR-0018).
+ * Admin: every reservation, paged and searched on the server (ADR-0005). This
+ * is where a historical booking is looked up (ADR-0018).
  */
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
@@ -78,8 +76,7 @@ const statusOptions = [
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
-// Filtering, searching and paging all happen on the server. There are 30,000+
-// reservations: fetching them to filter in the browser was ~18 MB per page load.
+// Filtering, searching and paging all happen on the server (ADR-0005).
 const pageSize = 25
 const currentPage = ref(1)
 
@@ -91,10 +88,8 @@ watch(statusFilter, () => {
   currentPage.value = 1
 })
 
-// requestFetch rather than a bare $fetch: this runs on the server for the first
-// render, where only a forwarded session cookie satisfies authorize().
-// Searching, filtering and paging afterwards re-run it on the client, which
-// does not suspend the page.
+// requestFetch, not a bare $fetch: the first render is server-side, where only
+// a forwarded cookie satisfies authorize() (ADR-0013).
 const requestFetch = useRequestFetch()
 const { data, status, error, refresh } = await useAsyncData(
   'admin-reservations',
@@ -116,9 +111,7 @@ const filteredData = computed(() => data.value?.rows ?? [])
 const totalCount = computed(() => data.value?.total ?? 0)
 const isFiltered = computed(() => Boolean(debouncedSearch.value) || statusFilter.value !== 'ALL')
 
-// ── State summary counts ──────────────────────────────────────────────────────
-// One GROUP BY on the server, rather than five passes over every reservation
-// in the browser.
+// ── State summary counts ──────────────────────────────────────────────────
 const { data: counts, refresh: refreshCounts } = await useAsyncData(
   'admin-reservation-counts',
   () => requestFetch<{ byStatus: Record<string, number>, total: number }>('/api/admin/reservation-counts'),

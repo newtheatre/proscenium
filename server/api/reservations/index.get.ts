@@ -12,9 +12,7 @@ const querySchema = paginationSchema.extend({
 })
 
 /**
- * GET /api/reservations — list reservations. Staff only. Filtered, searched
- * and paged in SQL, returning the standard envelope (ADR-0005). Search covers
- * booking reference, holder name and holder email.
+ * GET /api/reservations — list reservations.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listReservations)
@@ -22,9 +20,8 @@ export default defineEventHandler(async (event) => {
   const { performanceId, showId, userId, status, withCounts, page, limit, q }
     = await getValidatedQuery(event, querySchema.parse)
 
-  // Filtering by show uses a subquery rather than an id list: D1 allows at most
-  // 100 bound parameters, so a list built from a result set is a latent hard
-  // failure as the data grows.
+  // Filtering by show uses a subquery, never an id list built from a result set
+  // (ADR-0006).
   const showPerformances = db
     .select({ id: schema.performances.id })
     .from(schema.performances)

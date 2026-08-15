@@ -1,11 +1,6 @@
 /**
- * Abilities for the content-warning vocabulary.
- *
- * The vocabulary is shared across every show, so editing it is not a per-show
- * action — renaming an entry changes what every production carrying it says.
- * Listing is staff-wide because the box office answers "does this show have
- * strobe?" on the phone; changing is ADMIN/MANAGER; deleting is ADMIN, and the
- * endpoint refuses one any show depends on (ADR-0010).
+ * Abilities for the shared warning vocabulary. Editing it is not a per-show
+ * action — renaming an entry changes every production carrying it.
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser } from './types'

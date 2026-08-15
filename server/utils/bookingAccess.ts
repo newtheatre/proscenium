@@ -4,10 +4,8 @@ import type { H3Event } from 'h3'
 import { isStaff } from '~~/shared/utils/abilities'
 
 /**
- * Cookie carrying a signed access token, for a guest who arrived from a link
- * that carried one in its query string. A token left in the URL reaches
- * browser history, intermediary logs and the `Referer` of every outbound link
- * on the page (ADR-0009).
+ * A token left in the URL reaches browser history, intermediary logs and the
+ * Referer of every outbound link, so move it to a cookie (ADR-0009).
  */
 export const BOOKING_TOKEN_COOKIE = 'nnt_booking_token'
 
@@ -59,12 +57,8 @@ export interface BookingAccess {
 }
 
 /**
- * Load a booking by its id or bookingRef and assert the caller may act on it:
- * the logged-in owner or staff, or a guest presenting a valid access token.
- *
- * Returns the reservation plus its performance's start time, status and show —
- * enough for the self-service guards. Throws 404 if unknown, 403 if the caller
- * is not authorised.
+ * Load a booking by id or bookingRef and assert the caller may act on it:
+ * owner, staff, or a valid access token. 404 if unknown, 403 if not.
  */
 export async function requireBookingAccess(event: H3Event, idOrRef: string): Promise<BookingAccess> {
   const booking = await db
@@ -81,15 +75,12 @@ export async function requireBookingAccess(event: H3Event, idOrRef: string): Pro
 
   if (!booking) throw createError({ statusCode: 404, statusMessage: 'Booking not found' })
 
-  // Roles below are an authorisation decision, so a stale session must not
-  // satisfy them — but it must still satisfy the *owner* check underneath,
-  // which is why this resolver drops roles rather than rejecting the request.
+  // A stale session must not satisfy the role check but must still satisfy the
+  // owner check, which is why the resolver drops roles (ADR-0008).
   const sessionUser = await sessionUserForAuthorization(event)
   const isOwner = sessionUser?.id === booking.userId
-  // isStaff() from the abilities layer rather than a literal role list: roles
-  // arrive app-scoped ('proscenium:BOX_OFFICE'), so matching against bare
-  // 'BOX_OFFICE' was always false and staff could not open, amend or cancel a
-  // booking on a customer's behalf at all.
+  // isStaff(), not a literal role list: roles arrive app-scoped, so matching
+  // bare 'BOX_OFFICE' is always false.
   const staff = sessionUser ? isStaff(sessionUser) : false
   const hasToken = await hasBookingToken(event, booking.id)
 

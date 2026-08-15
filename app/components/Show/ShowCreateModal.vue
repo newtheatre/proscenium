@@ -1,9 +1,6 @@
 /**
- * Create a show, optionally with its first performances.
- *
- * The show is created first, then each pending performance in sequence — so a
- * failure part-way leaves a real show with fewer performances than asked for,
- * not a half-written one.
+ * Create a show, optionally with its first performances. The show is created
+ * first, so a failure part-way leaves a real show with fewer performances.
  */
 <script setup lang="ts">
 import * as z from 'zod'

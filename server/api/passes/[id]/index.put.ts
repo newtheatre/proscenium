@@ -9,11 +9,7 @@ const bodySchema = z.object({
 })
 
 /**
- * PUT /api/passes/:id — update an issued pass. Admin/Manager only.
- *
- * Cancelling leaves any admissions already redeemed in place: those were real
- * attendances and the tickets they created are part of the door record. It only
- * stops the pass being used again.
+ * PUT /api/passes/:id — update an issued pass.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, cancelPass)

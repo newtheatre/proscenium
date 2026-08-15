@@ -4,17 +4,8 @@ import { z } from 'zod/v4'
 import { listShows } from '~~/shared/utils/abilities'
 
 /**
- * The four disjoint slices of the archive the admin UI navigates by. They
- * partition every show exactly once, so the shows page can show a count per
- * tab without double-counting or losing one:
- *
- *   draft    — not published, whatever its dates
- *   current  — published, and the run spans today
- *   upcoming — published, and the run has not started
- *   archive  — published, and the run has finished (or has no dates yet)
- *
- * `active` is current ∪ upcoming, so "now and next" is one request. `all`
- * applies no scope predicate.
+ * The four disjoint slices the admin UI navigates by; they partition every
+ * show exactly once. Definitions: docs/03-domain-model.md
  */
 const SCOPES = ['all', 'active', 'current', 'upcoming', 'archive', 'draft'] as const
 
@@ -32,10 +23,8 @@ const querySchema = paginationSchema.omit({ limit: true }).extend({
 })
 
 /**
- * A `tree` page is capped well below D1's limit on purpose. The page's own show
- * ids are the one thing bound as a list (step 4 below); 50 of those plus the ~11
- * a fully-loaded filter costs leaves real headroom under 100. A cap of 100 would
- * not.
+ * A `tree` page is capped well below D1's limit: the page's own show ids are
+ * the one thing bound as a list (ADR-0006).
  */
 const MAX_TREE_LIMIT = 50
 const MAX_OPTIONS_LIMIT = 500
@@ -46,13 +35,7 @@ function unixSeconds(date: Date): number {
 }
 
 /**
- * GET /api/shows — list shows. Staff only; the public uses /api/whats-on.
- * Filtered and paged in SQL, returning the standard envelope (ADR-0005).
- *
- * This endpoint sees the whole archive, so every filter is a correlated
- * subquery or a scalar, never an id list. The only list bound is the page's
- * own ≤50 show ids; performance ids are never bound, since 50 shows carry
- * roughly 150 performances (ADR-0006).
+ * GET /api/shows — list shows.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listShows)
@@ -64,16 +47,13 @@ export default defineEventHandler(async (event) => {
   const limit = Math.min(rawLimit ?? (view === 'options' ? MAX_OPTIONS_LIMIT : 25), maxLimit)
   const direction = order ?? (scope === 'archive' ? 'desc' : 'asc')
 
-  // Correlated scalars over this show's performances. Raw SQL because Drizzle
-  // has no expression for a correlated aggregate, and because written this way
-  // they bind nothing at all — the run window costs zero parameters whether the
-  // archive holds 500 shows or 50,000.
+  // Correlated scalars over this show's performances. Raw SQL, because written
+  // this way they bind nothing at all.
   const firstAt = sql<number | null>`(select min(${schema.performances.startsAt}) from ${schema.performances} where ${schema.performances.showId} = ${schema.shows.id})`
   const lastAt = sql<number | null>`(select max(${schema.performances.startsAt}) from ${schema.performances} where ${schema.performances.showId} = ${schema.shows.id})`
 
-  // "Today" in Nottingham, not in the Worker's UTC — an hour's difference right
-  // through British Summer Time, which is enough to file tonight's show under
-  // the archive.
+  // "Today" in Nottingham, not the Worker's UTC — an hour's difference through
+  // BST is enough to file tonight's show under the archive.
   const todayLondon = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/London',
     year: 'numeric',
@@ -99,9 +79,8 @@ export default defineEventHandler(async (event) => {
       filters.push(eq(schema.shows.status, 'PUBLISHED'), gte(lastAt, dayStart))
       break
     case 'archive':
-      // A published show with no performances yet belongs here rather than
-      // nowhere: it is the only scope with an `IS NULL` arm, and without it the
-      // four scopes would not add up to the whole.
+      // The only scope with an `IS NULL` arm: without it a published show with no
+      // performances would belong to none of the four.
       filters.push(eq(schema.shows.status, 'PUBLISHED'), or(lt(lastAt, dayStart), isNull(lastAt)))
       break
     case 'all':
@@ -123,9 +102,8 @@ export default defineEventHandler(async (event) => {
   }
 
   if (q) {
-    // Venue is matched through a subquery for the same reason as everything else
-    // here — and because "which shows were in the Djanogly" is a question the
-    // archive gets asked, and the old client-side filter could not answer it.
+    // Venue matched through a subquery for the same reason as everything else
+    // here (ADR-0006).
     const atMatchingVenue = db
       .select({ id: schema.performances.showId })
       .from(schema.performances)
@@ -150,10 +128,8 @@ export default defineEventHandler(async (event) => {
     ? [direction === 'asc' ? asc(schema.shows.title) : desc(schema.shows.title)]
     : [direction === 'asc' ? asc(firstAt) : desc(firstAt), asc(schema.shows.title)]
 
-  // Ids only. The correlated scalars above filter and order but cannot be
-  // projected — the relational builder resolves the outer reference differently
-  // in a projection than in a predicate, and the column comes back null. The run
-  // window is derived from the performances already loaded with each row.
+  // Ids only. The correlated scalars filter and order but cannot be projected —
+  // the outer reference resolves differently in a projection.
   const pageRows = await db
     .select({ id: schema.shows.id })
     .from(schema.shows)
@@ -166,9 +142,8 @@ export default defineEventHandler(async (event) => {
   if (pageIds.length === 0) return paginated([], total, { page, limit })
 
   if (view === 'options') {
-    // No run window here on purpose: deriving one would mean binding up to 500
-    // show ids, and a picker only needs to name the show. Filter by `scope`
-    // instead if you want, say, only shows with a future performance.
+    // No run window here: deriving one would mean binding up to 500 show ids, and
+    // a picker only needs the show's name.
     const options = await db
       .select({
         id: schema.shows.id,
@@ -212,9 +187,8 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  // Every per-performance lookup scopes through this rather than binding
-  // performance ids: ~150 of them for a 50-show page, which alone exceeds D1's
-  // budget. Only the ≤50 show ids are bound.
+  // Every per-performance lookup scopes through this rather than binding ids —
+  // ~150 for a 50-show page would exceed D1's budget (ADR-0006).
   const pagePerformances = db
     .select({ id: schema.performances.id })
     .from(schema.performances)
@@ -229,9 +203,8 @@ export default defineEventHandler(async (event) => {
       .from(schema.performanceTicketTypeOverrides)
       .where(inArray(schema.performanceTicketTypeOverrides.performanceId, pagePerformances))
       .groupBy(schema.performanceTicketTypeOverrides.performanceId),
-    // Seats occupied per performance, by the shared rule so this listing agrees
-    // with what the booking path will actually allow. Scoped to the page, which
-    // is also why this no longer joins every ticket ever issued.
+    // Seats occupied by the shared rule, so the listing agrees with what the
+    // booking path allows (ADR-0007).
     countOccupiedSeats(inArray(schema.tickets.performanceId, pagePerformances)),
   ])
 

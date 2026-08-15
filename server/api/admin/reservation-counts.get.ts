@@ -9,11 +9,7 @@ const querySchema = z.object({
 })
 
 /**
- * GET /api/admin/reservation-counts — reservation totals by status. Staff only.
- *
- * The status pills used to be computed by five `Array.filter().length` passes
- * over every reservation in the browser, which required downloading all 30,000
- * of them. This is one `GROUP BY` returning at most five rows.
+ * GET /api/admin/reservation-counts — reservation totals by status.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listReservations)

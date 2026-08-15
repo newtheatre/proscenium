@@ -32,10 +32,8 @@ export default defineEventHandler(async (event) => {
     .leftJoin(schema.shows, eq(schema.performances.showId, schema.shows.id))
     .where(eq(schema.reservations.userId, userId))
 
-  // No reservations→tickets relation is declared, so aggregate separately.
-  // Joined on the owner rather than a bound list of reservation ids: a regular
-  // attendee is well past 100 reservations, and they are the people most likely
-  // to file a subject-access request (ADR-0006).
+  // Joined on the owner rather than a bound list of reservation ids — a regular
+  // attendee is well past 100 of them (ADR-0006).
   const ticketTotals = new Map<string, { count: number, total: number }>()
   if (reservations.length) {
     const ticketRows = await db.select({

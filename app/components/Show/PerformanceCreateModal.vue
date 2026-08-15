@@ -1,11 +1,5 @@
 /**
- * Create Performance Modal Component
- *
- * Modal for adding a new performance to an existing show.
- *
- * @prop showId — The show to add the performance to
- * @emits close — Emitted when the modal should close
- * @emits refresh — Emitted after successful creation
+ * Add a performance to an existing show.
  */
 <script setup lang="ts">
 import * as z from 'zod'

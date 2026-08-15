@@ -1,8 +1,6 @@
 /**
- * Add an entry to the shared warning vocabulary. Admin/Manager only.
- *
- * Whether it is technical or general decides whether shows assign it a level,
- * and cannot be changed once anything links to it (ADR-0004).
+ * Add an entry to the shared vocabulary. Technical or general decides whether
+ * shows assign it a level, and cannot change once linked (ADR-0004).
  */
 <script setup lang="ts">
 import * as z from 'zod'

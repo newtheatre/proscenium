@@ -1,35 +1,19 @@
 /**
- * Content warnings: a curated vocabulary, and the shows that carry each entry.
- * The schema mirrors how the theatre splits them (ADR-0004):
- *
- * TECHNICAL — a closed set of production effects (strobe, loud noise, haze).
- *             Either the show does it or it does not, so the link carries no
- *             level.
- * GENERAL   — a theme, at one of MENTIONED / DISCUSSED / DEPICTED. One level
- *             per warning per show.
- *
- * The archive tables at the bottom hold the pre-rework rows verbatim.
+ * A curated vocabulary and the shows that carry each entry. TECHNICAL has no
+ * level; GENERAL has one of three (ADR-0004).
  */
 import { sqliteTable, text, integer, index, uniqueIndex, check } from 'drizzle-orm/sqlite-core'
 import { sql, relations } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { shows } from './show'
 
-/* ------------------------------------------------------------------ *
- * The vocabulary
- * ------------------------------------------------------------------ */
+/*
+ * ── The vocabulary ────────────────────────────────────────────────────────
+ */
 
 /**
- * One thing a show can be warned for.
- *
- * `slug` is the stable key: migrations and seeds reference a warning by slug,
- * never by id, so an entry means the same thing in every environment (the
- * seeded rows use a literal `cw_<slug>` id for that reason).
- *
- * `category` groups GENERAL entries. Plain text rather than an enum so the
- * committee can add one without a deploy; `CONTENT_WARNING_CATEGORIES` in
- * shared/utils/contentWarnings.ts is the suggested list and drives sort order.
- * Always null for TECHNICAL.
+ * `slug` is the stable key — migrations and seeds reference a warning by slug,
+ * never by id. `category` is plain text so it needs no deploy; null if TECHNICAL.
  */
 export const contentWarnings = sqliteTable('content_warnings', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -54,19 +38,13 @@ export const contentWarnings = sqliteTable('content_warnings', {
   check('content_warnings_kind_domain', sql`"kind" IN ('TECHNICAL', 'GENERAL')`),
 ])
 
-/* ------------------------------------------------------------------ *
- * The links
- * ------------------------------------------------------------------ */
+/*
+ * ── The links ─────────────────────────────────────────────────────────────
+ */
 
 /**
- * Show ↔ warning, at one level. `level` is null exactly when the warning is
- * TECHNICAL.
- *
- * SQLite CHECK constraints may only reference columns of the same row, so that
- * half of the invariant is enforced in `PUT /api/shows/:id`. The CHECK below
- * is still the only thing constraining the enum in SQL.
- *
- * `onDelete: 'restrict'` on the warning, deliberately (ADR-0010).
+ * `level` is null exactly when the warning is TECHNICAL; SQLite CHECK cannot
+ * see the other row, so PUT /api/shows/:id enforces that half. `restrict` per ADR-0010.
  */
 export const showContentWarnings = sqliteTable('show_content_warnings', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -93,19 +71,13 @@ export const showContentWarningsRelations = relations(showContentWarnings, ({ on
   contentWarning: one(contentWarnings, { fields: [showContentWarnings.contentWarningId], references: [contentWarnings.id] }),
 }))
 
-/* ------------------------------------------------------------------ *
- * Archive
- * ------------------------------------------------------------------ */
+/*
+ * ── Archive ───────────────────────────────────────────────────────────────
+ */
 
 /**
- * The pre-rework rows, verbatim, as they stood before migration 0016 wiped and
- * reseeded them.
- *
- * Declared here rather than only in migration SQL so they appear in the
- * Drizzle snapshot. No foreign keys — the tables they referenced have been
- * rebuilt — and no unique indexes, because the point is to hold what was
- * there, not to judge it. Never written by the application;
- * `GET /api/shows/:id/legacy-content-warnings` reads them.
+ * The pre-rework rows, verbatim. Declared here so they appear in the Drizzle
+ * snapshot; never written by the application (ADR-0004).
  */
 export const contentWarningsArchive = sqliteTable('content_warnings_archive', {
   id: text('id').primaryKey(),
@@ -124,13 +96,8 @@ export const showContentWarningsArchive = sqliteTable('show_content_warnings_arc
   /** The axis the link sat on: ACTION, DIALOGUE or TECHNICAL. */
   kind: text('kind').notNull(),
   /**
-   * The new vocabulary entry this row was remapped onto, or null if the alias map
-   * had no target. Written once by migration 0016.
-   *
-   * It exists because the remap collapses rows: two archive titles can share one
-   * live entry, so only one archive id survives as a live row and the other
-   * would otherwise look dropped. No foreign key — the archive must stay
-   * readable even if the entry it points at is later deleted.
+   * What this archive row was remapped onto, or null. The remap collapses rows,
+   * so a missing id does not mean it was dropped (ADR-0004).
    */
   mappedToWarningId: text('mapped_to_warning_id'),
   createdAt: text('created_at'),

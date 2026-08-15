@@ -14,12 +14,8 @@ const bodySchema = z.object({
 })
 
 /**
- * PUT /api/pass-types/:id — edit a pass product, including putting it on sale.
- * Admin/Manager only.
- *
- * This is the only route that writes `passTypes.status`, and the box office
- * only offers ON_SALE types — so without it every product stays DRAFT and the
- * passes feature is unreachable end to end.
+ * PUT /api/pass-types/:id — edit a pass product, including putting it on
+ * sale.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, managePassTypes)
@@ -57,10 +53,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'No valid fields provided for update' })
   }
 
-  // Putting a product on sale is the point at which its scope has to be real:
-  // a pass covering no shows is redeemable nowhere, and the volunteer holding
-  // it at the door gets SHOW_NOT_COVERED with no way to tell it was a setup
-  // mistake rather than the customer's.
+  // Putting a product on sale is where its scope has to be real: a pass covering
+  // no shows is redeemable nowhere.
   if (body.status === 'ON_SALE' && existing.status !== 'ON_SALE') {
     const [scope] = await db.select({ n: count() })
       .from(schema.passTypeShows)
@@ -73,9 +67,8 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Lowering maxIssued below what has already been issued would leave the cap
-  // permanently breached and silently block nothing — the check in
-  // POST /api/passes compares against ACTIVE passes.
+  // Lowering maxIssued below what is already issued would leave the cap
+  // permanently breached and block nothing.
   if (update.maxIssued != null) {
     const [issued] = await db.select({ n: count() })
       .from(schema.passes)

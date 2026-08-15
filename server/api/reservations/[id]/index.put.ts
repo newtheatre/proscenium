@@ -25,10 +25,8 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, bodySchema.parse)
 
-  // Reinstating a reservation re-takes its seats, so it must pass the same
-  // capacity check a fresh booking would. Cancelling releases seats, which are
-  // then resold; without this, an "undo" puts the performance over capacity
-  // silently (ADR-0007).
+  // Reinstating re-takes seats that cancelling released, so it must pass the
+  // same capacity check a fresh booking would (ADR-0007).
   if (body.status && body.status !== existing.status
     && releasesSeats(existing.status) && !releasesSeats(body.status)) {
     const seats = await countReservationSeats(id)

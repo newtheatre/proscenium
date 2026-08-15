@@ -1,9 +1,6 @@
 <script setup lang="ts">
 /**
- * Ticket selection step.
- *
- * Shows available ticket types with quantity selectors.
- * Displays running total and enforces capacity limits.
+ * Ticket selection step: quantities, running total, capacity limit.
  */
 interface TicketType {
   id: string

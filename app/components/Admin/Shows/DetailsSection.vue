@@ -1,9 +1,6 @@
 <!--
-A show's core details, editable in place on the show's own page (ADR-0017).
-
-The page fetches the full record, so this form cannot null a field it never
-received. `PUT /api/shows/:id` takes a partial body, so it saves only the
-fields it owns.
+A show's core details, edited in place from the full record, so this form
+cannot null a field it never received (ADR-0017).
 -->
 <script setup lang="ts">
 import * as z from 'zod'
@@ -52,10 +49,7 @@ watch(() => props.show, (show) => {
   clearPoster()
 })
 
-// ── Poster ───────────────────────────────────────────────────────────────────
-// Staged, not applied on pick: the upload is a separate request from the field
-// save, and doing it immediately would leave a half-applied edit if the form
-// then failed validation.
+// ── Poster ────────────────────────────────────────────────────────────────
 
 const pendingImageAction = ref<'replace' | 'delete' | null>(null)
 const imageFile = ref<File | null>(null)
@@ -93,9 +87,7 @@ function handlePosterSelect(event: Event) {
   reader.readAsDataURL(file)
 }
 
-// ── Dirty tracking ───────────────────────────────────────────────────────────
-// Without it a section that is permanently a form gives no signal about whether
-// there is anything to save.
+// ── Dirty tracking ────────────────────────────────────────────────────────
 
 const isDirty = computed(() => {
   if (pendingImageAction.value) return true
@@ -157,9 +149,8 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     clearPoster()
     emit('refresh')
 
-    // Publishing a show does not publish its performances, which is the right
-    // default and the wrong surprise — offer it rather than leaving a published
-    // show with nothing on sale.
+    // Publishing a show does not publish its performances — the right default, and
+    // the wrong surprise, so offer it explicitly.
     if (wasDraft && event.data.status === 'PUBLISHED' && props.show.performances.length > 0) {
       publishConfirmOpen.value = true
     }

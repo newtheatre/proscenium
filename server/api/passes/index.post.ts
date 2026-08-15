@@ -75,9 +75,8 @@ export default defineEventHandler(async (event) => {
     userId = existing.id
   }
   else {
-    // Identity is central (stage-door ADR-0007): match-or-create a shadow
-    // account by email in the auth service, mirror the canonical id locally
-    // in the batch below.
+    // Identity is central (stage-door ADR-0007): match-or-create a shadow account
+    // by email, then mirror the canonical id in the batch below.
     const config = useRuntimeConfig(event)
     if (!config.authServiceToken) {
       throw createError({ statusCode: 502, statusMessage: 'Auth service token not configured' })

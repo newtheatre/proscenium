@@ -1,10 +1,6 @@
 /**
- * Show and performance abilities.
- *
- * The public reads shows through `/api/whats-on`, which returns only PUBLISHED
- * shows and hides internal fields. The raw `/api/shows` endpoints expose every
- * show including DRAFT, with internal notes and sales figures, so listing and
- * reading directly is staff-only.
+ * The public reads shows through /api/whats-on. The raw endpoints expose DRAFT
+ * shows and internal notes, so they are staff-only.
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser } from './types'

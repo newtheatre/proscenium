@@ -3,25 +3,16 @@ import { and, asc, eq, gt, inArray, min } from 'drizzle-orm'
 
 /**
  * GET /api/whats-on — published shows with upcoming on-sale performances.
- *
- * Public, unauthenticated, and the highest-traffic endpoint in the app: it
- * backs both the homepage and What's On. Filtered in SQL so only the current
- * shows are read at all (ADR-0005).
  */
 export default defineEventHandler(async (event) => {
   const now = new Date()
 
-  // Set before any return, including the empty one below — placed after it, the
-  // header is skipped exactly when nothing is on sale, which is the cheapest
-  // response of all to cache and the state the site sits in between seasons.
-  //
-  // A minute-old sold-out badge is harmless: capacity is enforced when the
-  // booking is written, not from this response.
+  // Set before any return, including the empty one — placed after, the header is
+  // skipped exactly when nothing is on sale.
   setHeader(event, 'Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
 
-  // Which published shows have at least one future ON_SALE performance, and when
-  // does each one open? Ordering by the earliest performance is what the list
-  // wants, and doing it here means the rest of the work is already narrowed.
+  // Which published shows have a future ON_SALE performance, and when each
+  // opens. Ordering by earliest performance is what the list wants.
   const candidates = await db
     .select({
       showId: schema.performances.showId,
@@ -74,9 +65,7 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  // Ticket counts scoped by subquery rather than a list of performance ids:
-  // D1 allows at most 100 bound parameters, and a festival with more than 100
-  // performances on sale at once would have exceeded that.
+  // Scoped by subquery rather than a list of performance ids (ADR-0006).
   const onSalePerformances = db
     .select({ id: schema.performances.id })
     .from(schema.performances)
@@ -85,10 +74,8 @@ export default defineEventHandler(async (event) => {
       gt(schema.performances.startsAt, now),
     ))
 
-  // The shared rule, so the sold-out badge shown to the public and the capacity
-  // check that accepts the booking always agree. This count previously omitted
-  // the PASS_SALE exclusion, so every pass sold read as an occupied seat and a
-  // show could display "sold out" while seats were still on sale.
+  // The shared rule, so the public sold-out badge and the capacity check that
+  // accepts the booking always agree (ADR-0007).
   const ticketCountMap = await countOccupiedSeats(
     inArray(schema.tickets.performanceId, onSalePerformances),
   )

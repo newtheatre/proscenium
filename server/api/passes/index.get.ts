@@ -15,10 +15,7 @@ const querySchema = z.object({
 })
 
 /**
- * GET /api/passes — search issued passes. Staff only.
- *
- * Paginated in SQL: there will be thousands of these and D1 bills by rows read,
- * so the door search must not pull the table into the Worker to filter it.
+ * GET /api/passes — search issued passes.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listPasses)

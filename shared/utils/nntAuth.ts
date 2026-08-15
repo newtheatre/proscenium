@@ -1,8 +1,6 @@
 /**
- * The NNT session contract — copied from stage-door `packages/auth-types`
- * v1.0 (docs/session-contract.md in that repo). DO NOT EDIT HERE: change it
- * there and re-copy. This app reads the session; only the auth service at
- * auth.newtheatre.org.uk writes it.
+ * The NNT session contract, v1.0 — copied from stage-door
+ * `packages/auth-types`. DO NOT EDIT HERE: change it there and re-copy.
  */
 
 declare module '#auth-utils' {

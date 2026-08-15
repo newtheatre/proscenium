@@ -2,13 +2,8 @@ import { db, schema } from '@nuxthub/db'
 import { and, eq } from 'drizzle-orm'
 
 /**
- * Pass redemption rules. `decideRedeem` is the only copy of the entitlement
- * rule; every caller ends there.
- *
- * The once-per-performance rule is enforced in SQL by
- * `UNIQUE (pass_id, performance_id)` on pass_admissions. D1 has no interactive
- * transactions, so that index is what holds under a double-submit — this file
- * exists to give a human a reason, not for safety.
+ * Pass redemption. `decideRedeem` is the only copy of the entitlement rule;
+ * the once-per-performance half is enforced by a UNIQUE index, not here.
  */
 
 export type PassRejection
@@ -58,12 +53,8 @@ interface PerformanceFacts {
 }
 
 /**
- * The entitlement rule. Pure — every input is already loaded, so `canRedeem`
- * (one pass) and `redeemabilityForPage` (many) can share it.
- *
- * Checked in the order a human would explain it: is the pass alive, is it in
- * date, does it cover this show, has it already been used tonight, is the
- * performance sellable, and is there room.
+ * The entitlement rule. Pure, so canRedeem and redeemabilityForPage share it.
+ * Checked in the order a human would explain it.
  */
 export function decideRedeem(input: {
   pass: PassFacts
@@ -76,10 +67,8 @@ export function decideRedeem(input: {
 
   if (pass.status !== 'ACTIVE') return reject('PASS_NOT_ACTIVE')
 
-  // Validity is judged against the performance, not "now" — admitting someone
-  // at 19:25 to a 19:30 show on the pass's last day should work. That only
-  // holds because validTo is stored as the last instant of its day; see
-  // server/utils/validityWindow.ts.
+  // Judged against the performance, not "now", which only holds because validTo
+  // is the last instant of its day — see server/utils/validityWindow.ts.
   const startsAt = performance.startsAt.getTime()
   if (startsAt < pass.validFrom.getTime() || startsAt > pass.validTo.getTime()) {
     return reject('OUTSIDE_VALIDITY')
@@ -170,13 +159,8 @@ async function isSoldOut(performance: { id: string, capacityOverride: number | n
 }
 
 /**
- * Redeemability for a whole page of passes against one performance: four
- * queries for the page rather than five per pass, which at `limit=100` would
- * exceed the Worker subrequest cap.
- *
- * Neither bulk query binds an id list (ADR-0006) — coverage is fetched for the
- * show and admissions for the performance, then matched in memory. Both sets
- * are small: a pass type covers a season, admissions are bounded by capacity.
+ * Four queries for the page rather than five per pass, which at limit=100
+ * would exceed the subrequest cap. Neither binds an id list (ADR-0006).
  */
 export async function redeemabilityForPage(
   performanceId: string,

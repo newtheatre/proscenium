@@ -1,9 +1,6 @@
 <!--
-Search and date-range controls for the archive tab.
-
-The archive is paged on the server (ADR-0005), so these are the only way to
-reach a show from 2014 — a client-side filter would only see the page you
-are already on. Search runs in SQL over title, subtitle, slug and venue.
+Search and date-range controls for the archive tab, which is paged on the
+server — so these are the only way to reach an old show (ADR-0005).
 -->
 <script setup lang="ts">
 const search = defineModel<string>('search', { required: true })

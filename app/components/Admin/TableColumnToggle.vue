@@ -1,8 +1,6 @@
 <!--
-The "Display" menu that shows and hides a table's columns (ADR-0012).
-
-One copy rather than three because reading TanStack's column model needs an
-`any`-typed handle on the table instance and an eslint exemption with it.
+The "Display" menu (ADR-0012). One copy, because reading TanStack's column
+model needs an `any`-typed handle and an eslint exemption.
 -->
 <script setup lang="ts">
 const props = defineProps<{

@@ -1,19 +1,6 @@
 /**
- * Copies Cloudflare Secrets Store values into runtimeConfig at the start of
- * every request. No-op in dev, where the password comes from `.env`.
- *
- * ⚠️ THE `0.` PREFIX IS LOAD-BEARING — DO NOT RENAME THIS FILE. Nitro orders
- * `request` hooks by filename, and nuxt-auth-utils memoises the session
- * password on the first session read of the isolate. Sorting after a plugin
- * that reads the session pins the empty default, permanently and silently.
- *
- * ⚠️ The binding is `SESSION_PASSWORD`, NOT `NUXT_SESSION_PASSWORD`: Nitro's
- * `applyEnv` would copy a `NUXT_*` binding object into `session.password`.
- *
- * Both traps, and the worker-secret conflict below: ADR-0016.
- *
- * Scheduled tasks do not run the request hook. A task needing a store-backed
- * secret must read the binding itself.
+ * ⚠️ The `0.` prefix is load-bearing: this must hydrate the session password
+ * before any plugin reads a session. Both traps: ADR-0016.
  */
 interface SecretsStoreSecret {
   get: () => Promise<string>
@@ -32,9 +19,8 @@ export default defineNitroPlugin((nitroApp) => {
     const secret = env?.SESSION_PASSWORD
     if (!secret) return
 
-    // A leftover worker secret of this name beats the store — defu gives
-    // process.env priority over runtimeConfig.session — and the resulting
-    // key mismatch looks nothing like its cause. Warn loudly (ADR-0016).
+    // A leftover worker secret of this name beats the store and the key mismatch
+    // looks nothing like its cause, so warn loudly (ADR-0016).
     if (!warnedAboutWorkerSecret && process.env.NUXT_SESSION_PASSWORD) {
       warnedAboutWorkerSecret = true
       console.error(

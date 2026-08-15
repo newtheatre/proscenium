@@ -1,8 +1,6 @@
 <!--
-Admin: one show, managed in sections on its own page (ADR-0017).
-
-The record is fetched in full here, so a section cannot write nulls over a
-field it never received.
+Admin: one show, managed in sections on its own page. The record is fetched
+in full, so a section cannot null what it never received (ADR-0017).
 -->
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'

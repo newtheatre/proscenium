@@ -2,23 +2,8 @@ import { db, schema } from '@nuxthub/db'
 import { eq, sql } from 'drizzle-orm'
 
 /**
- * Re-point everything this app holds for one auth account onto another — this
- * app's share of an estate-wide account merge (stage-door ADR-0015).
- *
- * SCOPE: the implementation behind `POST /api/_hooks/auth/merge`. Calling it
- * directly re-points bookings but leaves two live central identities.
- *
- * All four user-referencing columns re-point: reservations.userId,
- * passes.userId, passes.issuedByUserId, pass_admissions.redeemedByUserId.
- * Each statement binds two parameters however many rows move, so this is
- * already within D1's limit — do not convert it to the chunked pattern
- * last-activity uses (ADR-0006).
- *
- * Deleting the losing mirror row afterwards does not bend ADR-0014: the sales
- * record lives on intact under the winner.
- *
- * Idempotent: a re-run re-points whatever is left and re-deletes an
- * already-absent row.
+ * This app's share of an estate-wide account merge (stage-door ADR-0015).
+ * All four user-referencing columns re-point. Idempotent.
  */
 
 export interface MergeCounts {
@@ -55,9 +40,8 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
     return { ok: true, notMirrored: !loser, counts }
   }
 
-  // The winner needs a mirror row before rows point at it (FK). A minimal
-  // one built from the loser's row is fine — ensureLocalUser overwrites it
-  // with the canonical identity on the winner's next session.
+  // The winner needs a mirror row before anything points at it; ensureLocalUser
+  // replaces this minimal one on their next session.
   const winner = await db.select({ id: schema.users.id }).from(schema.users)
     .where(eq(schema.users.id, toUserId)).get()
   if (!winner) {

@@ -1,8 +1,6 @@
 /**
- * Admin: ticket types. Archived ones are hidden until asked for; this is the
- * screen where they are archived and restored (ADR-0010).
- *
- * Deleting is refused once any issued ticket references the type.
+ * Admin: ticket types. Archived ones are hidden until asked for; this is where
+ * they are archived and restored (ADR-0010).
  */
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
@@ -37,11 +35,8 @@ interface TicketType {
   updatedAt: string
 }
 
-// Table state
-// `{}` rather than `undefined`: an undefined v-model means the table's first
-// internal sync writes a value back to the parent, which is one more
-// parent-render-during-child-setup than this page can afford. See the note on
-// `rows` below.
+// `{}` rather than `undefined`: an undefined v-model makes the table's first
+// internal sync write back to the parent (ADR-0012).
 const columnVisibility = ref({})
 const rowSelection = ref<Record<string, boolean>>({})
 const { pagination, page, resetPage } = useTablePagination(15)
@@ -56,13 +51,8 @@ const { data: rawData, status, error, refresh } = await useAsyncData(
 )
 
 /**
- * Rows for the table. **Always an array, never null** — binding a fresh array
- * per render sends UTable into a render loop with no fixed point, which locks
- * the tab up. A computed caches, so its identity changes only when its
- * dependencies do. Do not reintroduce `?? []` at the binding (ADR-0012).
- *
- * Hiding is by `archived`, not `activeByDefault`; the two answer different
- * questions (docs/06-pricing-and-ticket-types.md).
+ * **Always an array, never null** — a fresh array per render sends UTable into
+ * a loop, which locks the tab up (ADR-0012).
  */
 const rows = computed<TicketType[]>(() => {
   const all = rawData.value ?? []
@@ -70,9 +60,8 @@ const rows = computed<TicketType[]>(() => {
 })
 
 /**
- * Search here rather than through TanStack's `columnFilters`, so the footer can
- * report the match count without re-walking the table's row model and the input
- * is a plain `v-model` instead of a find-and-mutate on a filter array.
+ * Search here rather than TanStack's `columnFilters`, so the footer can report
+ * the match count without re-walking the row model (ADR-0012).
  */
 const search = ref('')
 const filteredRows = computed<TicketType[]>(() => {
@@ -89,9 +78,8 @@ watch([search, showArchived], resetPage)
 const selectedCount = computed(() => Object.keys(rowSelection.value).length)
 
 /**
- * Hoisted for the same reason: an inline `:pagination-options="{ ... }"` builds
- * a fresh options object *and* a fresh row-model function on every render,
- * which is enough on its own to make the table rebuild in a loop.
+ * Hoisted: an inline options object builds a fresh row-model function every
+ * render (ADR-0012).
  */
 const paginationOptions = { getPaginationRowModel: getPaginationRowModel() }
 

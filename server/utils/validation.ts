@@ -1,13 +1,8 @@
 import { z } from 'zod/v4'
 
 /**
- * Reusable Zod password schema with standard strength requirements.
- *
- * Rules:
- * - Minimum 8 characters
- * - At least one lowercase letter
- * - At least one uppercase letter
- * - At least one digit
+ * Password strength rules. Unused since identity moved to the auth service —
+ * this app has no credentials.
  */
 export const passwordSchema = z.string()
   .min(8, 'Password must be at least 8 characters long')

@@ -3,14 +3,8 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { updateReservation } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/reservations/:id/available-ticket-types
- *
- * Returns all ticket types that are active for this reservation's performance,
- * with their effective price resolved through the override chain:
- *   performance override → show override → base price
- *
- * Used by the ticket management UI to know which types can be added
- * and what they would cost at the current moment.
+ * GET /api/reservations/:id/available-ticket-types — types active for this
+ * reservation's performance, with effective prices.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, updateReservation)

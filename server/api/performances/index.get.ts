@@ -14,9 +14,8 @@ const querySchema = paginationSchema.omit({ limit: true, q: true }).extend({
   near: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   showId: z.string().optional(),
   /**
-   * Exact match. Omitted, cancelled performances are excluded and the rest are
-   * returned — a sensible default for "what is scheduled", but note that DRAFT
-   * ones are in that set: pass `status=ON_SALE` for "what is actually selling".
+   * Exact match. Omitted, cancelled performances are excluded and the rest
+   * returned — note that DRAFT ones are in that set.
    */
   status: z.enum(['DRAFT', 'ON_SALE', 'CANCELLED']).optional(),
   order: z.enum(['asc', 'desc']).optional().default('asc'),
@@ -24,17 +23,7 @@ const querySchema = paginationSchema.omit({ limit: true, q: true }).extend({
 })
 
 /**
- * GET /api/performances — a flat, chronological list of performances. Staff
- * only. Exists so the box office does not have to walk the show archive to
- * build a navigator (ADR-0018).
- *
- * `near` returns the performances closest to a date — half before, half after
- * — rather than a fixed window, which is sometimes empty over the summer. In
- * `near` mode the response is one centred window, so `page` is always 1 and
- * `total` is the window size. Use `from`/`to` to page a range.
- *
- * Ticket counts scope through a subquery over the page's time span, never its
- * ids (ADR-0006).
+ * GET /api/performances — a flat, chronological list of performances.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listShows)
@@ -62,16 +51,12 @@ export default defineEventHandler(async (event) => {
 
   let rows
   if (near) {
-    // Half either side of the pivot, then stitched back into one ascending run.
-    // Two bounded queries rather than one clever window function, because SQLite
-    // in D1 and Drizzle's relational builder do not make the clever version any
-    // more readable.
+    // Half either side of the pivot, stitched into one ascending run. Two bounded
+    // queries rather than a window function.
     const pivot = validityEnd(near)
 
-    // Each side asks for the full limit so it can cover for the other. Ask for
-    // half each and a pivot outside the season returns half a window: on the
-    // door in September, "near today" would show four performances when twelve
-    // were available and the navigator would look broken.
+    // Each side asks for the full limit so it can cover for the other; asking for
+    // half each returns half a window when the pivot is outside the season.
     const [before, after] = await Promise.all([
       db.query.performances.findMany({
         where: () => (where ? and(where, lte(schema.performances.startsAt, pivot)) : lte(schema.performances.startsAt, pivot)),
@@ -104,9 +89,8 @@ export default defineEventHandler(async (event) => {
 
   if (rows.length === 0) return paginated([], total, { page, limit })
 
-  // Seats occupied, by the shared rule (ADR-0007), scoped by the time span this
-  // page covers rather than its ids. It counts a few performances we are not
-  // returning, which is harmless — only the ids below are read back out.
+  // Seats occupied by the shared rule (ADR-0007), scoped by time span rather
+  // than ids. Counting a few extra is harmless.
   const spanStart = rows.reduce((min, r) => (r.startsAt < min ? r.startsAt : min), rows[0]!.startsAt)
   const spanEnd = rows.reduce((max, r) => (r.startsAt > max ? r.startsAt : max), rows[0]!.startsAt)
 

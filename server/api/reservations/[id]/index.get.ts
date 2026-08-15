@@ -2,21 +2,14 @@ import { db } from '@nuxthub/db'
 import { isStaff, readReservation } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/reservations/:id — one reservation. Staff or the owner.
- *
- * `readReservation` admits the owner too, so this cannot return the staff
- * shape unconditionally: `reservationDetailWith` has no `columns` allow-list,
- * so Drizzle returns every column — including `staffNotes` and `legacyRef`,
- * which re-identifies anonymised bookers. Customers get the allow-listed shape
- * /api/bookings/* serves them.
+ * GET /api/reservations/:id — one reservation.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Reservation ID is required' })
 
-  // Non-throwing, and drops roles from a stale session — so a staff member
-  // whose session needs refreshing is served the customer shape rather than
-  // internal notes. See server/utils/session.ts.
+  // Non-throwing, and drops roles from a stale session, so a staff member
+  // needing refresh gets the customer shape rather than internal notes.
   const actor = await sessionUserForAuthorization(event)
   const staff = actor ? isStaff(actor) : false
 

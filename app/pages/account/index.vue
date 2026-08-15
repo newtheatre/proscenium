@@ -1,10 +1,7 @@
 <script lang="ts" setup>
 /**
- * Account overview — stage-door integration.
- *
- * Name and email belong to the central NNT account (shared across every NNT
- * site) and are edited there; this page shows what this site sees via the
- * shared session.
+ * Name and email belong to the central NNT account and are edited there; this
+ * shows what the session carries.
  */
 const { user } = useUserSession()
 const config = useRuntimeConfig()

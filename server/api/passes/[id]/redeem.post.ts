@@ -12,12 +12,6 @@ const bodySchema = z.object({
 
 /**
  * POST /api/passes/:id/redeem — admit a pass holder to a performance.
- *
- * Creates an ordinary £0 ticket plus the pass_admissions row linking the two.
- * Because the admission *is* a ticket, capacity, the door list, "my bookings"
- * and the treasurer's export need no special-casing (ADR-0002).
- *
- * `:id` accepts the pass id or its 6-character public reference.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, redeemPass)
@@ -53,8 +47,7 @@ export default defineEventHandler(async (event) => {
   const ticketTypeId = await getPassAdmissionTicketTypeId()
 
   // Admit against an existing reservation for this holder and performance if
-  // there is one, rather than creating a second — the door list should show one
-  // party, not two.
+  // there is one — the door list should show one party, not two.
   const existingReservation = await db.select({ id: schema.reservations.id })
     .from(schema.reservations)
     .where(and(

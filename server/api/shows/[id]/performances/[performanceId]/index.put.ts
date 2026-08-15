@@ -37,10 +37,8 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, bodySchema.parse)
 
-  // Capacity cannot be set below what is already sold. This route moves the
-  // other side of the comparison every write path checks, so lowering it under
-  // the sold count would make assertCapacity refuse every subsequent change for
-  // that performance. Raising it is the sanctioned way to oversell (ADR-0007).
+  // Capacity cannot go below what is already sold, or assertCapacity refuses
+  // every later change for this performance (ADR-0007).
   if (body.capacityOverride !== undefined && body.capacityOverride !== null) {
     const sold = await countOccupiedSeatsFor(performanceId)
     if (body.capacityOverride < sold) {

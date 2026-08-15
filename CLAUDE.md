@@ -23,7 +23,7 @@ There is no test suite. CI gates on typecheck, lint and build ([.github/workflow
 ## Source of truth & docs discipline
 
 - **Code is truth; docs follow it.** A PR that changes behaviour updates the matching doc in the same PR. Schema → `docs/03-domain-model.md`; endpoints → `docs/07-api-reference.md`; anything an operator does → `docs/08-operations.md`; a bug you did not fix → `docs/09-known-issues.md`.
-- **Reasoning lives in `docs/decisions/`, not in comments.** See [CONTRIBUTING.md](CONTRIBUTING.md) §Comments — this repo previously carried ~33k words of comments against 3k of ADRs, and the long ones rotted into references to deleted files.
+- **Reasoning lives in `docs/decisions/`, not in comments.** Comments are capped at two lines and CI enforces it — see [CONTRIBUTING.md](CONTRIBUTING.md) §Comments.
 - New architectural choice, or reversing an old one → an ADR in `docs/decisions/` (template in that folder's README). Never edit an accepted ADR; supersede it.
 
 ## Invariants — do not break these
@@ -55,4 +55,4 @@ There is no test suite. CI gates on typecheck, lint and build ([.github/workflow
 - Any new capacity-consuming path that does not call `assertCapacity`.
 - Any customer-facing response built without a `columns` allow-list.
 - Drift between `docs/07-api-reference.md` and the actual routes.
-- A comment growing past ten lines — that is an ADR asking to be written.
+- A comment over two lines — see [CONTRIBUTING.md](CONTRIBUTING.md) §Comments; `bun run check:comments` catches it.

@@ -40,9 +40,7 @@ const slug = computed(() =>
 )
 
 // Only shows with a future performance are plausible pass scope — the imported
-// archive is 477 historical shows and would otherwise swamp the picker. The
-// server does that filtering now (`scope=upcoming`); this used to download the
-// whole nested archive and sift it in the browser on every visit to /admin/passes.
+// archive would otherwise swamp the picker.
 const { data: shows } = useFetch<Paginated<ShowOption>>('/api/shows', {
   query: { scope: 'upcoming', view: 'options', limit: 500 },
   lazy: true,

@@ -1,10 +1,6 @@
 /**
- * When a reservation's tickets may be changed, and when money may be given
- * back. Nothing is paid until the tickets are collected (ADR-0011):
- *
- * - `PENDING` — edit the composition freely (`PUT .../tickets`).
- * - `COLLECTED`, `DOOR` — refund only (`POST .../refund`).
- * - `CANCELLED`, `NO_SHOW` — terminal for both.
+ * Nothing is paid until the tickets are collected (ADR-0011): PENDING edits
+ * freely, COLLECTED/DOOR refunds only, CANCELLED/NO_SHOW neither.
  */
 
 /** Statuses meaning the customer has the tickets and has paid. */
