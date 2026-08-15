@@ -1,35 +1,5 @@
 /**
- * Admin: Manage Venues Page
- *
- * Administrative interface for venue and feature management.
- *
- * Features:
- * - Table view of all venues with selection
- * - Search by name or address
- * - View venue details (capacity, features, status)
- * - Create new venues
- * - Update venue information and features
- * - Upload/manage venue images
- * - Delete venue(s) (confirmation required)
- * - Manage venue features (accessibility, amenities)
- *
- * Data Loading:
- * - GET /api/venues
- * - GET /api/venue-features
- *
- * Data Mutations:
- * - POST /api/venues (create venue)
- * - PUT /api/venues/:id (update venue)
- * - DELETE /api/venues/:id (delete venue)
- * - POST /api/venues/:id/image (upload image)
- * - DELETE /api/venues/:id/image (delete image)
- * - POST /api/venue-features (create feature)
- * - PUT /api/venue-features/:id (update feature)
- * - DELETE /api/venue-features/:id (delete feature)
- *
- * @route /admin/venues
- * @authenticated
- * @admin-only
+ * Admin: venues, their images, and the shared venue-feature vocabulary.
  */
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
@@ -43,9 +13,8 @@ const UCheckbox = resolveComponent('UCheckbox')
 definePageMeta({
   layout: 'admin',
   middleware: ['admin'],
-  // The layout renders this as the page's only <h1> (UDashboardNavbar). It must
-  // match the sidebar nav entry; it used to say "Venue Management" while the
-  // page's own heading said "Venues".
+  // The layout renders this as the page's only <h1>, so it must match the sidebar
+  // nav entry.
   title: 'Venues',
 })
 
@@ -76,37 +45,27 @@ interface Venue {
 
 // Table state
 const columnVisibility = ref({})
-// Hoisted, not inline in the template: an inline object builds a fresh options
-// bag and row-model function per render, which makes the table rebuild every
-// time. Harmless here only because `:data` is a stable ref — see the note in
-// admin/ticket-types.vue.
+// Hoisted, not inline: an inline object builds a fresh options bag and
+// row-model function per render (ADR-0012).
 const paginationOptions = { getPaginationRowModel: getPaginationRowModel() }
 const rowSelection = ref<Record<string, boolean>>({})
 const { pagination, page, resetPage } = useTablePagination(10)
 
-// Server-rendered, so the table arrives populated. `$fetch: useRequestFetch()`
-// forwards the session cookie, which a plain useFetch does not do on the
-// server — and /api/venues is behind authorize() for writes. See
-// docs/02-architecture.md §Fetching in the admin area.
+// Server-rendered, with useRequestFetch to forward the session cookie
+// (ADR-0013).
 const requestFetch = useRequestFetch()
 const { data, status, error, refresh } = await useAsyncData(
   'admin-venues', () => requestFetch<Venue[]>('/api/venues'))
 
 /**
- * Rows for the table. **Always an array, never null** — binding `data ?? []`
- * mints a new array identity per render, which makes UTable rebuild its
- * TanStack row models, which writes back through the `v-model:` bindings and
- * re-renders. See docs/02-architecture.md §Never build the table's data prop in
- * the template.
+ * **Always an array, never null** — `data ?? []` mints a new identity per
+ * render and sends UTable into a loop (ADR-0012).
  */
 const rows = computed<Venue[]>(() => data.value ?? [])
 
 /**
- * Search is done here rather than through TanStack's `columnFilters` so the
- * footer can report the match count without asking the table to re-walk its row
- * model, and so the input is a plain `v-model` instead of the find-and-mutate
- * dance the template used to do. It also lets the search cover address, which
- * the placeholder always claimed and the name-column filter never did.
+ * Search here rather than TanStack's `columnFilters`, so the footer can report
+ * the match count without re-walking the row model (ADR-0012).
  */
 const search = ref('')
 const filteredRows = computed<Venue[]>(() => {

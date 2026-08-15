@@ -12,11 +12,8 @@ type SeededPerformances = Awaited<ReturnType<typeof seedShows>>['seededPerforman
 type SeededTicketTypes = Awaited<ReturnType<typeof seedTicketTypes>>
 
 /**
- * Seed Reservations
- *
- * Creates a realistic spread of reservations against past and upcoming shows.
- * Includes reservations from full account holders and shadow (guest) accounts.
- * Covers all status values: PENDING, COLLECTED, DOOR, CANCELLED, NO_SHOW.
+ * A spread of reservations over past and upcoming shows, from both full and
+ * shadow accounts, covering every status.
  */
 export async function seedReservations(
   seededUsers: SeededUsers,

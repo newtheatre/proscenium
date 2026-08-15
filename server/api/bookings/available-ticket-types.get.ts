@@ -3,14 +3,8 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { createReservation } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/bookings/available-ticket-types?performanceId=:id
- *
- * Returns all ticket types with their effective price and active status
- * for a given performance, resolved through the override chain:
- *   performance override → show override → base price
- *
- * Used by the walk-in modal to show override-aware ticket types
- * before a reservation exists.
+ * GET /api/bookings/available-ticket-types — effective prices and active state
+ * for a performance, before any reservation exists.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, createReservation)

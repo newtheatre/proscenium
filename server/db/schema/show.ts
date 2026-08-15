@@ -25,9 +25,8 @@ export const shows = sqliteTable('shows', {
   // The strand this show belongs to — In House, Fringe, StuFF, External, …
   categoryId: text('category_id').references(() => showCategories.id, { onDelete: 'restrict' }),
 
-  // The programming period this show sits in — "Autumn 2026". Orthogonal to
-  // category: category is what kind of show, season is when. Nullable, because
-  // externals and one-offs do not belong to one.
+  // The programming period this show sits in. Nullable — externals and one-offs
+  // do not belong to one.
   seasonId: text('season_id').references(() => seasons.id, { onDelete: 'set null' }),
 
   // Free-text notes accompanying the content warnings — timings, intensity, how
@@ -58,10 +57,8 @@ export const showsRelations = relations(shows, ({ one, many }) => ({
     fields: [shows.categoryId],
     references: [showCategories.id],
   }),
-  // The link rows, each carrying its level (null for technical effects).
-  // contentWarnings.ts declares the reverse side; without this side a show
-  // cannot load its own warnings, which is why 1,001 imported links initially
-  // had no read path.
+  // The link rows, each carrying its level. contentWarnings.ts declares the
+  // reverse side; both are needed for a show to load its own warnings.
   contentWarnings: many(showContentWarnings),
   // ticketTypeOverrides and tickets relations are defined in ticket.ts to avoid circular imports
 }))

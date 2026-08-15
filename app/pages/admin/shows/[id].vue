@@ -1,17 +1,6 @@
 <!--
-  Admin: one show.
-
-  Everything about a production on one page, in sections: what it is, what is
-  written about it, when it is on, and how to get rid of it.
-
-  It also closes a data-loss hole. The list page used to open the editor with the
-  *list row*, which is a column projection — so five fields the form could write
-  were never read, and saving a title change wrote nulls over them. Editing
-  starts here now, from a record fetched in full, and those five fields are on
-  screen where a wipe would be obvious. See docs/09-known-issues.md.
-
-  @route /admin/shows/:id
-  @admin-only
+Admin: one show, managed in sections on its own page. The record is fetched
+in full, so a section cannot null what it never received (ADR-0017).
 -->
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'

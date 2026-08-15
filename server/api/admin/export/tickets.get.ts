@@ -13,29 +13,7 @@ const querySchema = z.object({
 })
 
 /**
- * GET /api/admin/export/tickets — download ticket data as a CSV file.
- * ADMIN and MANAGER only. Intended for the treasurer / financial reporting.
- *
- * Query params — at least one bound is required:
- *   performanceId — a single performance (takes precedence over showId)
- *   showId        — every performance of one show
- *   from / to     — inclusive performance-date range, YYYY-MM-DD
- *
- * The bound is not optional. Unfiltered, this six-way join covers all 45,563
- * tickets, reads roughly 320,000 rows and concatenates about 10 MB of CSV in
- * Worker memory against a 30 s query cap — and "All shows" used to be the
- * default choice in the admin UI, one click away.
- *
- * All statuses are included so the treasurer has a full audit trail. Refunded
- * tickets are marked in the "Refunded" column.
- *
- * On money: the legacy import brought in prices of varying trustworthiness, so
- * the export states which is which rather than presenting them all as fact.
- * "Price Confidence" is EXACT, DERIVED (apportioned from a booking total) or
- * UNKNOWN (never recorded). UNKNOWN rows leave the price cell empty instead of
- * writing 0.00, which was indistinguishable from a genuine comp. "Ticket Kind"
- * separates PASS_SALE (the sale of a pass) from PASS_ADMISSION (an entry it
- * paid for), which must not be added together.
+ * GET /api/admin/export/tickets — ticket data as CSV, for the treasurer.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, defineAbility((user: AbilityUser) => isAdminOrManager(user)))
@@ -129,10 +107,8 @@ type TicketRow = {
 function csvCell(val: string | number | null | undefined): string {
   if (val == null) return ''
   let str = String(val)
-  // Neutralise spreadsheet formula injection: Excel/Sheets treat a cell that
-  // begins with = + - @ (optionally after a tab or carriage return) as a
-  // formula. Customer-controlled fields flow into this export, so prefix any
-  // such cell with an apostrophe to force it to be read as text.
+  // Neutralise spreadsheet formula injection: a cell beginning = + - @ is
+  // treated as a formula, and these values are customer-controlled.
   if (/^[=+\-@\t\r]/.test(str)) {
     str = `'${str}`
   }
@@ -176,10 +152,8 @@ function buildCsv(rows: TicketRow[]): string {
     // made it look like a comp; an empty cell sums the same and does not lie.
     const pricePounds = r.priceConfidence === 'UNKNOWN' ? '' : (r.pricePaid / 100).toFixed(2)
 
-    // Two imported rows carry a negative price, from the ETL pushing a rounding
-    // remainder onto a £0 line. Left unflagged they quietly subtract from any
-    // spreadsheet total. The value is preserved rather than clamped — this is an
-    // audit trail, and silently editing the figures would be worse.
+    // Two imported rows carry a negative price from an ETL rounding remainder;
+    // unflagged they quietly subtract from a spreadsheet total.
     const priceNote = r.pricePaid < 0
       ? 'Negative — apportioning remainder, check against the booking total'
       : r.priceConfidence === 'UNKNOWN'

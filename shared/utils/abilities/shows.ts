@@ -1,12 +1,6 @@
 /**
- * Show and performance authorization abilities.
- *
- * The public reads shows through `/api/whats-on`, which returns only PUBLISHED
- * shows and hides internal fields. The raw `/api/shows` endpoints expose every
- * show — including DRAFT — with internal notes and sales figures, so listing
- * and reading a show directly is staff-only.
- * ADMIN / MANAGER can create, update, and manage performances.
- * ADMIN only can delete shows.
+ * The public reads shows through /api/whats-on. The raw endpoints expose DRAFT
+ * shows and internal notes, so they are staff-only.
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser } from './types'

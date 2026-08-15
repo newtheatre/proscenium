@@ -1,10 +1,6 @@
 /**
- * Pass and season authorization abilities.
- *
- * Pass *products* (seasons, pass types, prices, scope) are configuration —
- * ADMIN / MANAGER only. Issuing and redeeming a pass is box-office work, so any
- * staff member can do it. Cancelling an issued pass moves money, so it matches
- * the refund rule: ADMIN / MANAGER.
+ * Pass products are configuration (ADMIN/MANAGER). Issuing and redeeming is
+ * box-office work.
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser } from './types'

@@ -1,10 +1,6 @@
 <!--
-  Shows over their performances: shows at depth 0, each show's performances as
-  sub-rows at depth 1.
-
-  Lifted out of the 798-line shows page so all three tabs — now & next, drafts,
-  archive — render the same table with the same row actions, and so the page
-  itself is about fetching and tabs rather than about `h()` calls.
+Shows at depth 0, their performances as sub-rows. Shared by all three tabs so
+they render the same table with the same actions.
 -->
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
@@ -17,11 +13,8 @@ import type {
 
 const props = withDefaults(defineProps<{
   /**
-   * Must be a caller-owned `computed` or `ref`, never an expression built in the
-   * template. UTable rebuilds its TanStack row models whenever `data` changes
-   * identity, and rebuilding writes back through the `v-model:` bindings, which
-   * re-renders the parent — an expression that allocates per render has no fixed
-   * point and locks the tab. See docs/02-architecture.md.
+   * Must be a caller-owned computed or ref, never built in the template — a new
+   * array identity per render sends UTable into a loop (ADR-0012).
    */
   rows: ShowListItem[]
   loading?: boolean
@@ -63,15 +56,8 @@ watchEffect(() => {
 })
 
 /**
- * performanceId → its show.
- *
- * Built once per data change, because the alternative is doing it per rendered
- * row: the actions column used to resolve a performance's parent by scanning
- * every show and every one of its performances, re-run by TanStack for each
- * performance row on every sort, expand and filter. That was over a million
- * comparisons per render at archive scale, on the main thread, and is what froze
- * the admin area. Pages are bounded now, but the shape of the fix is still
- * right and costs nothing.
+ * performanceId → its show, built once per data change. Resolving it inside the
+ * actions column is re-run on every sort, expand and filter.
  */
 const showByPerformanceId = computed(() => {
   const map = new Map<string, ShowListItem>()
@@ -349,9 +335,8 @@ const columns: TableColumn<ShowTreeRow>[] = [
     :get-sub-rows="getSubRows"
     :loading="loading"
     :ui="{
-      // Only what the tree needs on top of the shared table theme in
-      // app.config.ts: a row-group rule so a performance row's empty cells do
-      // not draw a rule across the table.
+      // Only what the tree needs on top of the shared theme: a row-group rule so a
+      // performance row's empty cells do not draw dividers.
       tr: 'group',
       td: 'empty:p-0 group-has-[td:not(:empty)]:border-b border-default',
     }"

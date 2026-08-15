@@ -21,26 +21,6 @@ function currentSeason(now: Date): { from: string, to: string } {
 
 /**
  * GET /api/admin/stats — aggregate dashboard statistics.
- * ADMIN and MANAGER only.
- *
- * Bounded to a season by default. These aggregates used to have no date bound at
- * all, so after the import the dashboard presented £105,245.50 of takings going
- * back to 2016, and 23,889 legacy tickets, as though they were the current
- * year's — with no indication that most of it was a decade old.
- *
- * Two further corrections to what gets counted:
- *
- * - PASS_SALE tickets are money but not admissions, and PASS_ADMISSION rows are
- *   admissions but not money. Counting both in both places double-counted the
- *   135 pass sales against the 1,186 entries they paid for, which is exactly
- *   what ticket.ts warns about. Revenue therefore excludes PASS_ADMISSION, and
- *   the admissions count excludes PASS_SALE.
- *
- * - 20,234 imported tickets have priceConfidence UNKNOWN and pricePaid 0: the
- *   price was never recorded. They are real admissions and still counted as
- *   such, but they contribute nothing to revenue, so revenue-per-ticket read
- *   about half true with no hint why. The counts are returned alongside so the
- *   dashboard can say so.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, defineAbility((user: AbilityUser) => isAdminOrManager(user)))
@@ -75,11 +55,8 @@ export default defineEventHandler(async (event) => {
     revenueByShowResult,
     recentReservations,
   ] = await Promise.all([
-    // Published shows *in the window*. This used to count every published show
-    // ever, so a dashboard headed "2026/27 season" reported 488 — the whole
-    // imported archive — next to a season's takings. A show counts if it has a
-    // performance inside the window; the subquery keeps the bound-parameter cost
-    // fixed rather than growing with the archive.
+    // Published shows *in the window* — a show counts if it has a performance
+    // inside it. The subquery keeps the parameter cost fixed (ADR-0006).
     db.select({ count: count() })
       .from(schema.shows)
       .where(and(
@@ -103,9 +80,8 @@ export default defineEventHandler(async (event) => {
         gt(schema.performances.startsAt, now),
       )),
 
-    // Reservation counts by status, for performances in the window. Unbounded
-    // like the show count was, this reported every reservation since 2016 under
-    // a season heading.
+    // Reservation counts by status, for performances in the window. Unbounded,
+    // this reports every reservation since 2016 under a season heading.
     db.select({ status: schema.reservations.status, count: count() })
       .from(schema.reservations)
       .innerJoin(schema.performances, eq(schema.reservations.performanceId, schema.performances.id))
@@ -163,18 +139,8 @@ export default defineEventHandler(async (event) => {
 
   const totals = revenueAndTicketsResult[0]
 
-  // Private, browser-only, and short: a dashboard does not need to be
-  // second-accurate, and this stops a reload or a tab switch re-running the
-  // aggregates.
-  //
-  // Deliberately not defineCachedEventHandler. That caches the handler's result
-  // and skips the handler on a hit — including the authorize() call above — so
-  // an unauthenticated request could be served a cached copy of the theatre's
-  // finances. Keying the cache on the session cookie would fix that and also
-  // make it per-user, which is what this header already does without the
-  // footgun. The row counts that motivated caching here were mostly the missing
-  // date bound, and that is fixed: the aggregates now read about 1,100 ticket
-  // rows for a season rather than 25,006 for all time.
+  // Not defineCachedEventHandler, which skips the handler on a hit — including
+  // the authorize() above, so the finances could be served unauthenticated.
   setHeader(event, 'Cache-Control', 'private, max-age=30')
 
   return {

@@ -10,19 +10,7 @@ const querySchema = z.object({
 })
 
 /**
- * GET /api/content-warnings — the warning vocabulary. Staff only.
- *
- * Shared across shows rather than free text, so "Strobe and flashing lights"
- * means the same thing on every production and someone filtering on it gets a
- * complete answer. Free entry is what left the legacy site with six separate
- * spellings of "alcohol".
- *
- * `showCount` is a correlated subquery rather than a join + GROUP BY: the
- * vocabulary is ~65 rows, and the admin page needs it to tell the difference
- * between an entry nobody uses and one it must not delete.
- *
- * Ordered technical-first to match how both the editor and the public page group
- * them; `sort` then title within each kind.
+ * GET /api/content-warnings — the warning vocabulary.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listContentWarnings)
@@ -44,11 +32,8 @@ export default defineEventHandler(async (event) => {
       icon: schema.contentWarnings.icon,
       sort: schema.contentWarnings.sort,
       archived: schema.contentWarnings.archived,
-      // Table and column names written out rather than interpolated. Drizzle
-      // renders a column reference inside a `sql` template *unqualified* — this
-      // came out as `WHERE "content_warning_id" = "id"`, where both names
-      // resolve against the subquery's own table, so the comparison was never
-      // true and every entry reported zero shows.
+      // Names written out rather than interpolated: Drizzle renders a column
+      // reference inside a `sql` template unqualified.
       showCount: sql<number>`(
         SELECT COUNT(*) FROM "show_content_warnings"
         WHERE "show_content_warnings"."content_warning_id" = "content_warnings"."id"

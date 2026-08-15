@@ -1,18 +1,6 @@
 /**
- * Venue Features Management Slideover Component
- *
- * Slideover for managing venue features (admin/manager only).
- *
- * Features:
- * - List all venue features
- * - Create new features
- * - Edit existing features
- * - Delete features
- * - Toast notifications for success/error
- *
- * @props open - Whether the slideover is open
- * @emits update:open - Emitted when slideover open state changes
- * @emits refresh - Emitted when venues should be refreshed
+ * Manage the venue feature vocabulary (accessibility, amenities). Admin/Manager
+ * only.
  */
 <script setup lang="ts">
 import * as z from 'zod'

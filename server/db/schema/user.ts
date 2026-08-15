@@ -3,23 +3,16 @@ import { sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 
 /**
- * Thin mirror of the central NNT identity store (stage-door).
- *
- * Ids equal canonical auth-service ids: upserted from the shared session on
- * authenticated requests (ensureLocalUser), or created via the auth
- * service's shadow endpoint for guest checkout. Credentials, roles, and
- * verification live in the auth service — roles ride in the sealed session
- * and are read through the ability layer, never from this table.
+ * Thin mirror of the central identity store; ids are the canonical auth-service
+ * ids. Credentials and roles live there, never here.
  */
 export const users = sqliteTable('users', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   email: text('email').notNull().unique(), // lowercased, mirrors the canonical store
   name: text('name').notNull(),
 
-  // Set when this user's identifying fields were replaced under the retention
-  // policy. The row is kept so reservation history, repeat-booker counts and
-  // revenue analysis survive; the person does not. (App-local scrub — central
-  // erasure orchestration is stage-door Phase 7.)
+  // Set when identifying fields were replaced under the retention policy. The row
+  // survives so booking history and revenue analysis do (ADR-0014).
   anonymisedAt: text('anonymised_at'),
 
   // Metadata

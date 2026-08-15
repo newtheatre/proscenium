@@ -1,10 +1,6 @@
 /**
- * Mirror upsert (stage-door docs/integrating-an-app.md §mirror).
- *
- * `reservations.user_id` FKs a local `users` row (NOT NULL/restrict);
- * identity lives centrally. Authenticated requests upsert the session user
- * into the local mirror — an idempotent primary-key upsert, since the
- * migration made local ids canonical. Debounced per isolate.
+ * Mirror upsert: reservations.user_id FKs a local row (NOT NULL/restrict)
+ * while identity lives centrally. Ids are never minted here.
  */
 
 import { db, schema } from '@nuxthub/db'
@@ -14,9 +10,8 @@ import type { User } from '#auth-utils'
 const lastUpserted = new Map<string, number>()
 const UPSERT_INTERVAL_MS = 60_000
 /**
- * Cap the debounce map so a long-lived isolate serving many distinct users
- * cannot grow it without bound inside a 128 MB Worker. Entries are worthless
- * once older than UPSERT_INTERVAL_MS anyway, so evicting is free.
+ * Cap the debounce map so a long-lived isolate cannot grow it without bound.
+ * Entries older than UPSERT_INTERVAL_MS are worthless anyway.
  */
 const MAX_DEBOUNCE_ENTRIES = 5_000
 
@@ -49,15 +44,8 @@ export async function ensureLocalUser(user: User): Promise<void> {
         name: user.name,
         updatedAt: sql`(current_timestamp)`,
       },
-      // Never resurrect an erased account. stage-door's eraseUser bumps
-      // session_epoch and disables the auth row, but this app cannot see the
-      // epoch — it only learns of revocation when a *role-holding* session
-      // goes stale (15 min). A customer holds no roles, so their sealed cookie
-      // stays readable for the full 30-day maxAge, and this hook runs on every
-      // request. Without this guard the erased person's own browser writes
-      // their real name and email straight back over the scrubbed row, while
-      // `anonymisedAt` stays set so the row remains hidden from listings — the
-      // erasure looks done and silently is not.
+      // Never resurrect an erased account (ADR-0014): a role-less customer's cookie
+      // stays readable for 30 days and would write their details back.
       setWhere: isNull(schema.users.anonymisedAt),
     })
   rememberUpsert(user.id, now)

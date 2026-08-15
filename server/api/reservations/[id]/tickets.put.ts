@@ -4,19 +4,8 @@ import { z } from 'zod/v4'
 import { updateReservation } from '~~/shared/utils/abilities'
 
 /**
- * PUT /api/reservations/:id/tickets
- *
- * Adjusts the active (non-refunded) ticket composition of a reservation.
- *
- * The caller specifies the **desired total quantity** of each ticket type.
- * The server diffs against the current active state and INSERTs or DELETEs rows.
- *
- * - Increasing quantity: INSERTs new rows, resolving pricePaid via the current
- *   override chain (performance → show → base).
- * - Decreasing quantity: DELETEs the newest rows first (LIFO).
- * - Setting quantity to 0: DELETEs all active rows for that type.
- * - Ticket types omitted from the body are left untouched.
- * - Refunded tickets (refundedAt IS NOT NULL) are never touched.
+ * PUT /api/reservations/:id/tickets Adjusts the active (non-refunded) ticket
+ * composition of a reservation.
  */
 const bodySchema = z.object({
   tickets: z.array(z.object({
@@ -24,10 +13,8 @@ const bodySchema = z.object({
     quantity: z.int().min(0).max(50),
   })).min(1),
 }).refine(
-  // The handler treats each entry as the desired TOTAL for that type and reads
-  // the current count from a map it never updates, so two entries for one type
-  // each computed against the original count and the quantities compounded —
-  // "10 then 10" inserted 20. A repeated type is a client bug either way.
+  // Each entry is the desired TOTAL, read against a map that is never updated —
+  // so two entries for one type would compound rather than replace.
   data => new Set(data.tickets.map(t => t.ticketTypeId)).size === data.tickets.length,
   { message: 'Each ticket type may only appear once' },
 )
@@ -52,8 +39,7 @@ export default defineEventHandler(async (event) => {
   if (!reservation) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
 
   // Collected tickets are a record of a completed transaction, not a working
-  // draft: changing them here would delete paid-for tickets with nothing to show
-  // that anything was returned. After collection the only route is a refund.
+  // draft — the only reversal is a refund (ADR-0011).
   assertTicketsEditable(reservation.status)
 
   const { performanceId } = reservation

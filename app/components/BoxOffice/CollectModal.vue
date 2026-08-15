@@ -1,23 +1,6 @@
 <!--
-  Box Office: Collect Reservation Slideover
-
-  FoH workflow for collecting a customer's reservation at the box office.
-  Combines ticket management and status update into one step.
-
-  Flow:
-  1. Staff clicks "Collect" on the reservations list
-  2. Slideover opens — shows customer, booking ref, ticket breakdown
-  3. Staff adjusts ticket quantities if needed
-  4. Staff confirms total, presses "Collect" to finalise
-  5. Optionally mark as No-Show (with confirmation)
-
-  Data:
-  - GET /api/reservations/:id → current tickets + customer
-  - GET /api/reservations/:id/available-ticket-types → addable types + effective prices
-
-  Mutations:
-  - PUT /api/reservations/:id/tickets → save ticket changes
-  - PUT /api/reservations/:id → update status
+Box office: collect a reservation. Adjusting tickets and marking COLLECTED
+are one step, because that is one interaction at the desk (ADR-0011).
 -->
 <script setup lang="ts">
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -240,9 +223,8 @@ const totalCount = computed(() => {
   return n
 })
 
-// Subtotal for a type: existing tickets kept are charged at the price they were
-// booked at (pricePaid); tickets newly added at the door are charged at the
-// current effective price.
+// Kept tickets are charged at the price they were booked at; tickets added at
+// the door are charged at today's effective price.
 function rowSubtotal(typeId: string): number {
   const desired = getQty(typeId)
   const existing = activeTickets.value.filter(t => t.ticketTypeId === typeId)
@@ -275,8 +257,7 @@ const isDirty = computed(() => {
 })
 
 // DOOR belongs here too: a door sale is collected and paid for, so its tickets
-// are no longer editable — the server refuses the diff either way, and without
-// DOOR in this list the UI offered an edit that could only fail.
+// are no longer editable (ADR-0011).
 const alreadyActioned = computed(() =>
   !!reservation.value && ['COLLECTED', 'DOOR', 'CANCELLED', 'NO_SHOW'].includes(reservation.value.status),
 )

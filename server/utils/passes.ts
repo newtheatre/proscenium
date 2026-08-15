@@ -2,17 +2,8 @@ import { db, schema } from '@nuxthub/db'
 import { and, eq } from 'drizzle-orm'
 
 /**
- * Pass redemption rules.
- *
- * `canRedeem` is the ONLY place the entitlement rule lives. The booking flow,
- * the box office and any future API all call it. There are already five copies
- * of the ticket-price resolution rule in this codebase's history — do not start
- * a sixth family here.
- *
- * Note the database enforces the once-per-performance rule too, via
- * `UNIQUE (pass_id, performance_id)` on pass_admissions. D1 has no interactive
- * transactions, so that index is what actually holds under a double-submit;
- * this function is for giving a human a reason, not for safety.
+ * Pass redemption. `decideRedeem` is the only copy of the entitlement rule;
+ * the once-per-performance half is enforced by a UNIQUE index, not here.
  */
 
 export type PassRejection
@@ -62,16 +53,8 @@ interface PerformanceFacts {
 }
 
 /**
- * THE entitlement rule. Pure — every input is already loaded.
- *
- * Kept separate from loading so the door search can decide a whole page of
- * passes from four queries instead of five per pass, without growing a second
- * copy of the rule. `canRedeem` loads for one pass; `redeemabilityForPage`
- * loads for many; both end here.
- *
- * Checked in the order a human would explain it: is the pass alive, is it in
- * date, does it cover this show, has it already been used tonight, is the
- * performance sellable, and is there room.
+ * The entitlement rule. Pure, so canRedeem and redeemabilityForPage share it.
+ * Checked in the order a human would explain it.
  */
 export function decideRedeem(input: {
   pass: PassFacts
@@ -84,10 +67,8 @@ export function decideRedeem(input: {
 
   if (pass.status !== 'ACTIVE') return reject('PASS_NOT_ACTIVE')
 
-  // Validity is judged against the performance, not "now" — admitting someone
-  // at 19:25 to a 19:30 show on the pass's last day should work. That only
-  // holds because validTo is stored as the last instant of its day; see
-  // server/utils/validityWindow.ts.
+  // Judged against the performance, not "now", which only holds because validTo
+  // is the last instant of its day — see server/utils/validityWindow.ts.
   const startsAt = performance.startsAt.getTime()
   if (startsAt < pass.validFrom.getTime() || startsAt > pass.validTo.getTime()) {
     return reject('OUTSIDE_VALIDITY')
@@ -168,11 +149,8 @@ export async function canRedeem(passId: string, performanceId: string): Promise<
 }
 
 /**
- * A pass grants entitlement, not a reserved seat: it is still subject to
- * capacity like any other ticket. Counted by the shared rule so the door and
- * the booking path can never disagree about how full the house is — this check
- * used to count cancelled reservations and pass purchases, and turned holders
- * away from houses that were half empty.
+ * A pass grants entitlement, not a reserved seat, so it is still subject to
+ * capacity. Counted by the shared rule (ADR-0007).
  */
 async function isSoldOut(performance: { id: string, capacityOverride: number | null, venueCapacity: number | null }): Promise<boolean> {
   const capacity = performance.capacityOverride ?? performance.venueCapacity
@@ -181,17 +159,8 @@ async function isSoldOut(performance: { id: string, capacityOverride: number | n
 }
 
 /**
- * Redeemability for a whole page of passes against one performance.
- *
- * Four queries for the page rather than five per pass. The door search runs on
- * every keystroke and the admin list allows `limit=100`, which meant up to 500
- * D1 subrequests in a single request — well past what a Worker should spend and
- * an outright failure on the free plan's 50-subrequest cap.
- *
- * Neither bulk query binds an id list: coverage is fetched for the show and
- * admissions for the performance, then matched in memory. Both sets are small
- * (a pass type covers a season; admissions are bounded by house capacity) and
- * it keeps the statements inside D1's 100-parameter limit at any page size.
+ * Four queries for the page rather than five per pass, which at limit=100
+ * would exceed the subrequest cap. Neither binds an id list (ADR-0006).
  */
 export async function redeemabilityForPage(
   performanceId: string,

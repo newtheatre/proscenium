@@ -1,17 +1,6 @@
 <!--
-  A show's core details, editable in place.
-
-  This was a 600-line modal opened from a read-only summary card, so managing a
-  show meant looking at its details, opening a dialog containing the same details
-  again, editing, saving, and watching the dialog close. The detail page already
-  exists to be the place a show is managed; the fields belong on it.
-
-  Two things fell out of the move. The modal had to guard against being opened
-  with a projected list row that was missing five columns — the page fetches the
-  full record, so that guard is gone. And content warnings are now their own
-  section: they are a separate concern with a separate vocabulary, and
-  `PUT /api/shows/:id` takes a partial body, so each section saves only what it
-  owns.
+A show's core details, edited in place from the full record, so this form
+cannot null a field it never received (ADR-0017).
 -->
 <script setup lang="ts">
 import * as z from 'zod'
@@ -60,10 +49,7 @@ watch(() => props.show, (show) => {
   clearPoster()
 })
 
-// ── Poster ───────────────────────────────────────────────────────────────────
-// Staged, not applied on pick: the upload is a separate request from the field
-// save, and doing it immediately would leave a half-applied edit if the form
-// then failed validation.
+// ── Poster ────────────────────────────────────────────────────────────────
 
 const pendingImageAction = ref<'replace' | 'delete' | null>(null)
 const imageFile = ref<File | null>(null)
@@ -101,9 +87,7 @@ function handlePosterSelect(event: Event) {
   reader.readAsDataURL(file)
 }
 
-// ── Dirty tracking ───────────────────────────────────────────────────────────
-// Without it a section that is permanently a form gives no signal about whether
-// there is anything to save.
+// ── Dirty tracking ────────────────────────────────────────────────────────
 
 const isDirty = computed(() => {
   if (pendingImageAction.value) return true
@@ -165,9 +149,8 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     clearPoster()
     emit('refresh')
 
-    // Publishing a show does not publish its performances, which is the right
-    // default and the wrong surprise — offer it rather than leaving a published
-    // show with nothing on sale.
+    // Publishing a show does not publish its performances — the right default, and
+    // the wrong surprise, so offer it explicitly.
     if (wasDraft && event.data.status === 'PUBLISHED' && props.show.performances.length > 0) {
       publishConfirmOpen.value = true
     }

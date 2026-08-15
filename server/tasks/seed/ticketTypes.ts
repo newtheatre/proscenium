@@ -15,10 +15,7 @@ export default defineTask({
 })
 
 /**
- * Seed Ticket Types
- *
- * Creates a standard set of ticket types covering the most common pricing tiers
- * used at the NNT. Prices are stored in pence.
+ * The common pricing tiers. Prices are in pence.
  */
 export async function seedTicketTypes() {
   console.log('🎟️  Seeding ticket types...')

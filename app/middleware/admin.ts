@@ -1,8 +1,7 @@
 import { isAdminOrManager } from '~~/shared/utils/abilities'
 
-// ADMIN/MANAGER pages. Roles ride in the sealed estate cookie, so a session
-// older than the staleness window bounces through the auth service's refresh
-// (re-reads roles; rejects revoked/disabled users) before being honoured.
+// ADMIN/MANAGER pages. A session older than the staleness window bounces
+// through the auth service's refresh (ADR-0008).
 export default defineNuxtRouteMiddleware((to) => {
   const { loggedIn, user, session } = useUserSession()
   const config = useRuntimeConfig()

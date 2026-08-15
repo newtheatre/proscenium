@@ -9,12 +9,8 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/shows/:id/publish
- *
- * Sets the show status to PUBLISHED and optionally transitions all
- * non-cancelled performances from DRAFT → ON_SALE.
- *
- * Requires both updateShow and updatePerformance abilities.
+ * POST /api/shows/:id/publish — publish a show, optionally putting its
+ * performances on sale.
  */
 /** POST /api/shows/:id/publish — toggle show published status. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
@@ -44,10 +40,8 @@ export default defineEventHandler(async (event) => {
   if (body.markPerformancesOnSale) {
     await authorize(event, updatePerformance)
 
-    // Put every not-yet-on-sale performance on sale, but leave cancelled ones
-    // cancelled — without the CANCELLED filter, publishing a show would put its
-    // cancelled performances back on sale. Excluding already-ON_SALE rows keeps
-    // updatedPerformanceCount to the performances actually changed.
+    // Leave cancelled performances cancelled — without the filter, publishing
+    // would put them on sale.
     const result = await db.update(schema.performances)
       .set({ status: 'ON_SALE' })
       .where(and(

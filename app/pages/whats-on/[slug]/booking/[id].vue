@@ -1,9 +1,7 @@
 <script setup lang="ts">
 /**
- * Booking lookup and confirmation page.
- *
- * Accessible via /whats-on/:slug/booking/:id?t=<signed access token>
- * Shows booking details for confirmation emails and post-booking access.
+ * Booking lookup and confirmation, reached from the emailed link with a signed
+ * `?t=` access token (ADR-0009).
  */
 
 interface BookingDetail {
@@ -32,14 +30,12 @@ interface BookingDetail {
 
 const route = useRoute()
 const bookingId = route.params.id as string
-// A signed, expiring access token from the confirmation email. The booking
-// reference is no longer accepted as a credential — it is quoted at the box
-// office and printed on every email, so it could not also be the key.
+// A signed, expiring token from the confirmation email. The booking reference
+// is no longer accepted as a credential (ADR-0009).
 const accessToken = route.query.t as string | undefined
 
-// A guest arriving from a legacy /cancel/:code link carries their token in a
-// cookie rather than in the URL, so the server-rendered request has to forward
-// the incoming cookies. Plain useFetch does not.
+// A guest arriving from a legacy /cancel/:code link carries the token in a
+// cookie, so the server-rendered request must forward it.
 const { data: booking, status, error, refresh } = await useFetch<BookingDetail>(`/api/bookings/${bookingId}`, {
   key: `booking-${bookingId}`,
   query: accessToken ? { t: accessToken } : undefined,
@@ -55,8 +51,7 @@ if (error.value) {
 }
 
 // The server moved the token into a cookie on first use, so take it out of the
-// address bar. Without this it stays in browser history and in the Referer of
-// any outbound link on this page — for a live credential.
+// address bar — it would otherwise sit in history and Referer.
 onMounted(() => {
   if (!accessToken) return
   const url = new URL(window.location.href)

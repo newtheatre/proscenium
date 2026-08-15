@@ -1,10 +1,6 @@
 /**
- * DEV ONLY — the single sanctioned exception to "apps never write the
- * session" (stage-door docs/development.md §localhost-cookie-story).
- *
- * GET /dev-login seals a local session so app work needs no running auth
- * service. `?staff=admin|manager|box-office` grants the matching scoped
- * role. Guarded by import.meta.dev — absent from production builds.
+ * DEV ONLY — the one sanctioned exception to "apps never write the session".
+ * Guarded by import.meta.dev, so it does not exist in production.
  */
 export default defineEventHandler(async (event) => {
   if (!import.meta.dev) {
@@ -23,11 +19,8 @@ export default defineEventHandler(async (event) => {
 
   const now = Date.now()
 
-  // replaceUserSession, NOT setUserSession: the latter merges into whatever
-  // session already exists, and defu concatenates arrays — so switching
-  // ?staff= swapped the id while keeping the previous tier's role. Cycling
-  // admin → manager → box-office accumulated all three, and local
-  // authorisation testing quietly ran with more authority than asked for.
+  // replaceUserSession, NOT setUserSession: set merges with defu, which
+  // concatenates arrays, so switching persona would keep the old roles.
   await replaceUserSession(event, {
     user: {
       id: `dev-${staff || 'user'}`,

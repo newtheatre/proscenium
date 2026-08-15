@@ -1,14 +1,6 @@
 /**
- * Season and festival passes. Design and rationale:
- * docs/10-passes-design.md and docs/decisions/0002-passes-as-first-class-entities.md
- *
- * The one thing to understand before changing anything here: redeeming a pass
- * creates an ordinary `tickets` row priced at zero, and `pass_admissions` links
- * that ticket back to the pass. Capacity, the door list, "my bookings" and the
- * treasurer's export all keep working untouched because a pass admission *is* a
- * ticket. Do not add a parallel seat-counting path.
- *
- * Depends on `ticket_types.kind`, added by the legacy-import migration (0010).
+ * Season and festival passes. Redeeming one creates an ordinary £0 ticket, so
+ * nothing else needs special-casing (ADR-0002). Design: docs/10-passes-design.md
  */
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql, relations } from 'drizzle-orm'
@@ -22,17 +14,13 @@ import { reservations } from './reservation'
 // Pass references get read aloud across a foyer desk.
 const passRefId = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6)
 
-/* ------------------------------------------------------------------ *
- * Seasons
- * ------------------------------------------------------------------ */
+/*
+ * ── Seasons ───────────────────────────────────────────────────────────────
+ */
 
 /**
- * A programming period — "Autumn 2026", "Spring 2027".
- *
- * Orthogonal to show_categories (In House / Studio / StuFF / External), which
- * says what kind of show it is. Season says when. A pass is usually scoped to
- * one season and one or two categories, but it stores the resulting show list
- * explicitly rather than the rule — see passTypeShows.
+ * A programming period. Orthogonal to category: category is what kind of show,
+ * season is when.
  */
 export const seasons = sqliteTable('seasons', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -57,17 +45,13 @@ export const seasonsRelations = relations(seasons, ({ many }) => ({
   passTypes: many(passTypes),
 }))
 
-/* ------------------------------------------------------------------ *
- * Pass products
- * ------------------------------------------------------------------ */
+/*
+ * ── Pass products ─────────────────────────────────────────────────────────
+ */
 
 /**
- * A pass product — "Autumn 2026 Season Pass", "StuFF 2027 Festival Pass".
- *
- * Entitlement is unlimited within scope: one admission to every covered show,
- * for as long as the pass is valid. It does NOT reserve a seat — holders book
- * or turn up like anyone else and are subject to capacity. That is a terms-of-
- * sale matter as much as a code one.
+ * A pass product. Entitlement is unlimited within scope but reserves no seat —
+ * holders are subject to capacity like anyone else (ADR-0002).
  */
 export const passTypes = sqliteTable('pass_types', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -80,9 +64,8 @@ export const passTypes = sqliteTable('pass_types', {
   status: text('status', { enum: ['DRAFT', 'ON_SALE', 'CLOSED'] }).notNull().default('DRAFT'),
 
   /**
-   * The window in which admissions may be redeemed. This is what makes a StuFF
-   * Day Pass a normal pass rather than a special case: same scope as the
-   * festival pass, validity of one calendar day.
+   * The window admissions may be redeemed in. This is what makes a day pass a
+   * normal pass rather than a special case.
    */
   validFrom: integer('valid_from', { mode: 'timestamp' }).notNull(),
   validTo: integer('valid_to', { mode: 'timestamp' }).notNull(),
@@ -108,12 +91,8 @@ export const passTypes = sqliteTable('pass_types', {
 ])
 
 /**
- * Price variants — "Public £35", "NNT Member £28".
- *
- * Variants rather than separate pass types, so there is exactly one show list
- * per product and no way for the member and public versions to drift apart in
- * what they cover. Legacy kept these as two unrelated till counters, which is
- * precisely why the historic data cannot be analysed.
+ * Price variants, not separate pass types, so there is one show list per
+ * product and the member and public versions cannot drift apart.
  */
 export const passTypePrices = sqliteTable('pass_type_prices', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -131,12 +110,8 @@ export const passTypePrices = sqliteTable('pass_type_prices', {
 ])
 
 /**
- * The scope: which shows this pass covers.
- *
- * Explicit rows rather than a stored rule (season + category), because shows get
- * added and pulled mid-season and a rule cannot say "everything except that one".
- * Seed it from a season, then edit. Adding a show after passes are sold grants it
- * to every existing holder — which is the behaviour you want, and it is one row.
+ * Explicit rows rather than a stored rule: shows get added and pulled
+ * mid-season, and a rule cannot say "everything except that one".
  */
 export const passTypeShows = sqliteTable('pass_type_shows', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -166,20 +141,13 @@ export const passTypeShowsRelations = relations(passTypeShows, ({ one }) => ({
   show: one(shows, { fields: [passTypeShows.showId], references: [shows.id] }),
 }))
 
-/* ------------------------------------------------------------------ *
- * Issued passes
- * ------------------------------------------------------------------ */
+/*
+ * ── Issued passes ─────────────────────────────────────────────────────────
+ */
 
 /**
- * An issued pass, belonging to a person.
- *
- * The legacy system recorded no holder at all — 135 sales and 1,186 admissions
- * across a decade, all anonymous. Binding a pass to a user is the whole point of
- * doing this properly: renewals, replacement of a lost reference, and the first
- * answer the theatre has ever had to "who are our regulars?".
- *
- * userId uses `restrict` for the same reason reservations do: deleting a
- * customer must not silently destroy the record that they bought something.
+ * An issued pass. `userId` is `restrict` for the same reason reservations are:
+ * deleting a customer must not destroy the record of a purchase (ADR-0014).
  */
 export const passes = sqliteTable('passes', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -215,32 +183,15 @@ export const passes = sqliteTable('passes', {
 ])
 
 /**
- * The redemption ledger. One row per admission.
- *
- * `UNIQUE (pass_id, performance_id)` IS the entitlement rule. D1 has no
- * interactive transactions, so this index is the only thing that holds under a
- * double-submit — do not move this check into application code.
- *
- * `ticketId` is UNIQUE: one ticket is one admission, and the ticket is what
- * makes the admission visible to capacity, the door list and reporting.
+ * The redemption ledger. `UNIQUE (pass_id, performance_id)` IS the entitlement
+ * rule — D1 has no interactive transactions, so the index is what holds.
  */
 export const passAdmissions = sqliteTable('pass_admissions', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   passId: text('pass_id').notNull().references(() => passes.id, { onDelete: 'cascade' }),
   /**
-   * `restrict`, not `cascade`: this row IS the record that a pass was used, and
-   * the UNIQUE (pass_id, performance_id) below is the only thing stopping the
-   * same pass admitting a second person to the same performance. Under
-   * `cascade`, deleting the admission ticket — which the box-office ticket
-   * stepper could do, since the £0 PASS_ADMISSION type appeared in its picker —
-   * silently took the ledger row with it and made the pass redeemable again,
-   * with nothing left to show it had ever been used.
-   *
-   * The application refuses those deletions first (`validateTicketTypesSellable`
-   * on every ticket write path, and a 409 from `DELETE /api/reservations/:id`),
-   * so a volunteer gets an explanation rather than a constraint error. This is
-   * the backstop for the paths nobody has thought of yet. To un-redeem a pass,
-   * delete the admission row and then its ticket, in that order.
+   * `restrict`, not `cascade`: under cascade, deleting the admission ticket takes
+   * the ledger row and makes the pass redeemable again (ADR-0010).
    */
   ticketId: text('ticket_id').notNull().references(() => tickets.id, { onDelete: 'restrict' }),
   performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),

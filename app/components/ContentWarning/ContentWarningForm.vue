@@ -1,11 +1,6 @@
 <!--
-  The fields of a content warning, shared by the create and edit modals.
-
-  One component rather than two copies, because the rules about which fields
-  apply are not obvious and are easy to get subtly different: a technical
-  warning has no category, and `slug` is a stable key that other things may
-  reference by name, so changing it on an existing entry deserves a warning
-  rather than a silent text input.
+The fields, shared by the create and edit modals — the rules about which
+apply are easy to get subtly different.
 -->
 <script setup lang="ts">
 const model = defineModel<{
@@ -44,10 +39,8 @@ const categoryItems = computed(() => [...CONTENT_WARNING_CATEGORIES])
 const iconItems = computed(() => [...CONTENT_WARNING_ICONS])
 
 /**
- * The model stores `null` for "not set", because that is what the column holds
- * and what the API expects. Nuxt UI's inputs work in `undefined`. These two
- * bridge that rather than letting `null` leak into the form and come back as
- * the string "null".
+ * The model stores `null` for "not set", which is what the column holds and the
+ * API expects; Nuxt UI's inputs work in `undefined`.
  */
 const category = computed({
   get: () => model.value.category ?? undefined,

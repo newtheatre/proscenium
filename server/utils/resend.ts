@@ -3,13 +3,8 @@ import { Resend } from 'resend'
 let client: Resend | null | undefined
 
 /**
- * Lazily construct the Resend client.
- *
- * The key is read from `runtimeConfig.resendApiKey` (env `NUXT_RESEND_API_KEY`),
- * falling back to the bare `RESEND_API_KEY` environment variable for backwards
- * compatibility. When no key is configured this returns `null` rather than
- * throwing, so a missing key degrades email to a no-op instead of taking the
- * whole Worker down at import time.
+ * Returns null rather than throwing when no key is set, so a missing key
+ * disables email instead of taking the Worker down at import time.
  */
 export function getResend(): Resend | null {
   if (client !== undefined) return client

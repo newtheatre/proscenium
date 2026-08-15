@@ -92,6 +92,35 @@ next maintainer cannot ask you. Follow the conventions in [docs/README.md](docs/
 When you fix something listed in [docs/09-known-issues.md](docs/09-known-issues.md), update or remove
 that entry in the same change.
 
+## Comments
+
+Enforced by `bun run check:comments`, which CI runs. There are no exemptions.
+
+1. **Two lines of text, maximum.** Delimiters do not count. Most comments should
+   be a few words. Past two lines you are writing a doc, not a comment.
+2. **Route headers are one line: what it does.** The method and path are the
+   filename, and the auth is the guard on the line below.
+3. **No JSDoc block tags.** No `@param`, `@returns`, `@props`, `@emits`,
+   `@route`, `@example`. The signature and the types already say it.
+4. **No narrated history.** Not "used to", "originally", "an earlier version".
+   The rule is a comment; the incident that taught it is an ADR.
+5. **No figures a comment cannot keep true.** Row counts and percentages go in
+   `docs/`, dated, where something updates them.
+
+Anything that does not fit has somewhere to go:
+
+| What it is | Where it goes |
+| --- | --- |
+| A reason that needs a paragraph | an ADR in `docs/decisions/` |
+| An enum, a lifecycle, a column list | `docs/` — the data model or API reference |
+| An endpoint's full contract | `docs/` — the API reference |
+| A trap that would cost someone an evening | an ADR, cited from a one-line comment |
+
+The comment then states the constraint and cites where the argument lives:
+```
+// MUST NOT throw — authorize() would run the handler unchecked (ADR-0008).
+```
+
 ## Architecture decisions
 
 Record significant decisions as ADRs in [docs/decisions/](docs/decisions/) — see

@@ -1,20 +1,6 @@
 /**
- * Signed, expiring access tokens for guest booking links.
- *
- * `bookingRef` used to be both the reference a customer quotes at the box
- * office and the bearer secret that unlocked their booking. Six characters from
- * a 32-symbol alphabet is about 1.07e9 values, and with 28,879 live rows a blind
- * guess hit a real booking roughly once in 37,000 — enumerable, and the payload
- * is a name, an email and a phone-adjacent set of notes.
- *
- * These tokens separate the two jobs. The reference goes back to being a
- * reference; access is granted by something signed, scoped to one booking, and
- * expiring on its own.
- *
- * Format: `<base64url payload>.<base64url HMAC-SHA256>`. Compact enough for a
- * URL, verifiable without a database round trip, and revocable in bulk by
- * rotating the secret. HMAC rather than encryption because nothing in the
- * payload is secret — the booking id is already in the path.
+ * Signed, expiring access tokens for guest booking links; the booking
+ * reference is not a credential (ADR-0009). Format: `<payload>.<HMAC>`.
  */
 
 interface TokenPayload {
@@ -43,9 +29,8 @@ function b64urlDecode(value: string): Uint8Array<ArrayBuffer> {
 
 function secret(): string {
   const config = useRuntimeConfig()
-  // Falls back to the session password so this works on an existing deployment
-  // without a new environment variable. Set bookingTokenSecret to rotate booking
-  // links independently of sessions.
+  // Falls back to the session password. Set bookingTokenSecret in production to
+  // rotate booking links independently of the estate seal (ADR-0009).
   const value = config.bookingTokenSecret || (config as { session?: { password?: string } }).session?.password
   if (!value) {
     throw createError({ statusCode: 500, statusMessage: 'Booking token secret is not configured' })
@@ -64,9 +49,8 @@ async function key(): Promise<CryptoKey> {
 }
 
 /**
- * Expiry for a booking's token: a day after the performance, but never less
- * than a week away. Tying it to the performance means the credential stops
- * working once it can no longer be acted on.
+ * A day after the performance, but never less than a week away — the
+ * credential stops working once it can no longer be acted on.
  */
 export function bookingTokenExpiry(performanceStartsAt: Date, now = new Date()): number {
   const afterPerformance = performanceStartsAt.getTime() + GRACE_AFTER_PERFORMANCE_MS
@@ -81,11 +65,8 @@ export async function signBookingToken(bookingId: string, expiresAt: number): Pr
 }
 
 /**
- * Verify a token and return the booking id it grants access to, or null.
- *
- * Returns null for every failure — bad shape, bad signature, expired, wrong
- * booking — rather than distinguishing them, so this cannot be used to probe
- * which booking ids exist.
+ * Null for every failure — bad shape, signature, expiry or booking — so a
+ * caller cannot tell which of them it was.
  */
 export async function verifyBookingToken(token: string, bookingId: string, now = new Date()): Promise<boolean> {
   const separator = token.lastIndexOf('.')

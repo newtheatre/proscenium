@@ -5,9 +5,8 @@ import { z } from 'zod/v4'
 const bodySchema = z.object({ userIds: z.array(z.string().min(1)).max(500) })
 
 /**
- * POST /api/_hooks/auth/last-activity — feeds the retention sweep
- * (stage-door docs/gdpr-retention.md): epoch ms of the user's most recent
- * reservation or pass, null where none is known.
+ * Feeds the retention sweep: epoch ms of the user's most recent reservation or
+ * pass, null where none is known.
  */
 export default defineEventHandler(async (event) => {
   requireHookAuth(event)

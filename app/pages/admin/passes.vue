@@ -1,13 +1,6 @@
 <!--
-  Admin: Passes
-
-  Two things live here:
-   - Pass products (pass types) — the thing you sell: name, validity window,
-     price variants, and the list of shows it covers.
-   - Issued passes — searchable, so a holder can be found by reference, name or
-     email, and cancelled if need be.
-
-  Selling and admitting happen at the box office, not here.
+Admin: pass products and issued passes. Selling and admitting happen at the
+box office, not here.
 -->
 <script setup lang="ts">
 definePageMeta({
@@ -54,11 +47,6 @@ const toast = useToast()
 const confirm = useConfirm()
 
 // ── Pass products ─────────────────────────────────────────────────────────
-// Server-rendered, so the table arrives populated instead of appearing a moment
-// later. requestFetch, not a bare $fetch: every admin endpoint is behind
-// authorize(), and a plain server-side fetch does not forward the incoming
-// session cookie — it would 403 during SSR. See
-// docs/02-architecture.md#fetching-in-the-admin-area.
 const requestFetch = useRequestFetch()
 const { data: passTypes, status: typesStatus, error: typesError, refresh: refreshTypes } = await useAsyncData(
   'admin-pass-types', () => requestFetch<PassType[]>('/api/pass-types'), { default: () => [] })
@@ -102,8 +90,6 @@ async function setPassTypeStatus(passType: PassType, status: PassType['status'])
 }
 
 // ── Issued passes ─────────────────────────────────────────────────────────
-// Server-side search and pagination: there will be thousands of these and D1
-// bills by rows read, so the browser never receives the whole table.
 const search = ref('')
 const page = ref(1)
 const limit = 25
@@ -258,9 +244,10 @@ async function cancelPass(pass: IssuedPass) {
                 </div>
               </div>
 
-              <!-- Until this existed a pass product could only ever be DRAFT,
-                   and the box office's Sell tab — which lists ON_SALE types
-                   only — was permanently empty. -->
+              <!--
+              Without this a pass product could only ever be DRAFT, and the box office's
+              Sell tab was permanently empty.
+              -->
               <UButton
                 v-if="pt.status !== 'ON_SALE'"
                 :loading="statusSaving === pt.id"

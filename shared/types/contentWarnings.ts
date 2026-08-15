@@ -1,10 +1,6 @@
 /**
- * The shapes `/api/content-warnings` puts on the wire.
- *
- * Hand-written rather than derived with `InferSelectModel`, matching the
- * convention in shared/types/shows.ts: `showCount` is a computed subquery that
- * no column corresponds to, so deriving from the schema would describe
- * something the client never receives.
+ * The shapes /api/content-warnings puts on the wire. Hand-written rather than
+ * derived, matching shared/types/shows.ts.
  */
 import type { ContentWarningKind } from '../utils/contentWarnings'
 

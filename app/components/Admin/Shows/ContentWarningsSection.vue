@@ -1,15 +1,6 @@
 <!--
-  Content warnings for a show, editable in place.
-
-  Its own section rather than a block inside the details form, because it is its
-  own concern: a checklist of technical effects, a themed vocabulary where each
-  entry carries a level, free text, and the "confirmed none" flag.
-  `PUT /api/shows/:id` accepts a partial body, so this saves warnings without
-  touching the fields the details form owns.
-
-  The "confirmed none" checkbox is the point of the whole section. A show with no
-  warnings listed and no confirmation tells a customer nothing, and the public
-  page says exactly that rather than implying the show is free of them.
+Content warnings for a show, editable in place (ADR-0017). "Confirmed none"
+is the point of the section (ADR-0004).
 -->
 <script setup lang="ts">
 import type { ContentWarningRef, LegacyContentWarningLink, ShowDetail } from '~~/shared/types/shows'
@@ -24,13 +15,8 @@ interface WarningOption extends ContentWarningRef {
 }
 
 /**
- * The shared vocabulary, fetched only once a reader opens the editor.
- *
- * The section can render what a show already has without it — the detail record
- * carries each link's resolved entry — so there is no reason to pay for the list
- * until someone is choosing from it. The key is shared across shows, and is
- * deliberately *not* the key the admin vocabulary page uses: that one fetches
- * archived entries too, and a shared key would have this editor offer them.
+ * Fetched only when the editor opens, and deliberately not the admin page's
+ * key — that one includes archived entries (ADR-0013).
  */
 const { data: vocabulary, status: vocabularyStatus, refresh: loadVocabulary } = useFetch<WarningOption[]>(
   '/api/content-warnings',
@@ -55,12 +41,8 @@ const isSubmitting = ref(false)
 const technicalIds = ref<string[]>([])
 const generalIds = ref<string[]>([])
 /**
- * contentWarningId -> level. Deliberately has no entry for a newly picked
- * warning: nothing is defaulted, so `unassigned` can tell the difference
- * between "not looked at yet" and a level someone actually chose.
- *
- * A reactive Map rather than an object, so removing a warning is `.delete()`
- * on a real key instead of a dynamic property delete.
+ * No entry for a newly picked warning, so `unassigned` can tell "not looked at
+ * yet" from a level someone chose.
  */
 const levels = reactive(new Map<string, ContentWarningLevel>())
 const notes = ref('')
@@ -113,9 +95,8 @@ const technicalOptions = computed(() =>
 )
 
 /**
- * General warnings for the picker, with a `{ type: 'label' }` header per
- * category. Unlabelled separators would tell the reader nothing when the list
- * runs to fifty-odd entries across nine groups.
+ * A `{ type: 'label' }` header per category — unlabelled separators would not
+ * say what the groups are.
  */
 const generalOptions = computed(() => {
   const byCategory = new Map<string, WarningOption[]>()
@@ -155,11 +136,8 @@ const pickedByCategory = computed(() => {
 })
 
 /**
- * Warnings picked but not yet given a level.
- *
- * Nothing is defaulted. A silent "mentioned" on a warning nobody looked at is
- * the same failure the public page's three states exist to prevent, one layer
- * down: it would publish a claim about the production that no one has made.
+ * Picked but not yet levelled. Nothing is defaulted: a silent "mentioned" is a
+ * claim nobody made (ADR-0004).
  */
 const unassigned = computed(() =>
   generalIds.value

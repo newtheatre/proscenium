@@ -12,12 +12,8 @@ export default defineEventHandler(async (event) => {
   const existing = await db.select().from(schema.reservations).where(eq(schema.reservations.id, id)).get()
   if (!existing) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
 
-  // A pass was admitted into this reservation, so deleting it would take the
-  // redemption ledger with it: `pass_admissions.ticket_id` cascades, and the
-  // UNIQUE (pass_id, performance_id) row that stops a pass being used twice for
-  // one performance is what would disappear. Cancel the reservation instead —
-  // the record is the point. Matches how the show and user delete routes refuse
-  // rather than let a cascade quietly destroy referenced rows.
+  // pass_admissions.ticket_id cascades, so deleting this would take the
+  // redemption ledger row with it. Cancel instead (ADR-0010).
   const [admissions] = await db
     .select({ n: count() })
     .from(schema.passAdmissions)
@@ -31,9 +27,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Delete tickets first (onDelete: 'restrict' on the reservation FK prevents
-  // deleting the parent first), atomically, so a failure can't leave a
-  // reservation stripped of its tickets or vice versa.
+  // Tickets first — the reservation FK is `restrict` — and atomically, so a
+  // failure cannot strip a reservation of its tickets.
   await db.batch([
     db.delete(schema.tickets).where(eq(schema.tickets.reservationId, id)),
     db.delete(schema.reservations).where(eq(schema.reservations.id, id)),

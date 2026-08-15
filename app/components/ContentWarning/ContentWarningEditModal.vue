@@ -1,18 +1,6 @@
 /**
- * Edit Content Warning Modal Component
- *
- * Modal for editing an entry in the shared warning vocabulary (admin/manager only).
- *
- * Renaming here changes what every production carrying this warning says, which
- * is the point of a shared vocabulary — and the reason the modal says how many
- * shows are affected before anyone types.
- *
- * Changing the type is refused by the API while any show uses the warning: the
- * type decides whether a link carries a level, and the existing links were
- * written under the old answer.
- *
- * @emits refresh - Emitted after a successful update
- * @emits close - Emitted when the modal is dismissed
+ * Edit an entry in the shared vocabulary. Renaming changes every production
+ * carrying it, which is why the count is shown first (ADR-0010).
  */
 <script setup lang="ts">
 import * as z from 'zod'

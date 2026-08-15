@@ -37,13 +37,8 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, bodySchema.parse)
 
-  // Capacity cannot be set below what is already sold. Every write path checks
-  // tickets against capacity, but this is the route that moves the *other* side
-  // of that comparison: lowering the override under the current sold count puts
-  // the performance permanently over capacity, so assertCapacity then refuses
-  // every subsequent ticket change, pass redemption and door sale for it, while
-  // the listing reports more sold than the house holds. Raising the override is
-  // still the sanctioned way to oversell deliberately.
+  // Capacity cannot go below what is already sold, or assertCapacity refuses
+  // every later change for this performance (ADR-0007).
   if (body.capacityOverride !== undefined && body.capacityOverride !== null) {
     const sold = await countOccupiedSeatsFor(performanceId)
     if (body.capacityOverride < sold) {

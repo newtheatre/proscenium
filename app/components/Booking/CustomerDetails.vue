@@ -1,9 +1,6 @@
 <script setup lang="ts">
 /**
- * Customer details step.
- *
- * Collects name, email, and optional notes from the customer.
- * Auto-fills from the user's session if they are logged in.
+ * Customer details step. Auto-fills from the session when signed in.
  */
 import { z } from 'zod/v4'
 

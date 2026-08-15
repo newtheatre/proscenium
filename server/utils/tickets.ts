@@ -3,20 +3,8 @@ import type { SQL } from 'drizzle-orm'
 import { and, count, eq, inArray, isNull, ne } from 'drizzle-orm'
 
 /**
- * Ticket types a human may choose to sell, and the filter that enforces it.
- *
- * `SINGLE` is an ordinary seat. The other two kinds are bookkeeping and must
- * never appear in a picker or a quantity stepper:
- *
- * - `PASS_SALE` records the purchase of a pass, not a seat.
- * - `PASS_ADMISSION` is the £0 row created by redeeming a pass. It is created
- *   and removed by redemption, never by a stepper — and because
- *   `pass_admissions.ticket_id` cascades, deleting one silently erases the
- *   redemption ledger row, which is what makes a used pass redeemable again.
- *
- * `archived` types are legacy-only (Fringe 2021, StuFF passes): still valid for
- * historic tickets, never offered for new ones. The column existed and was read
- * nowhere, so retired types stayed in the walk-in picker at their legacy prices.
+ * Types a human may sell: SINGLE, not archived. PASS_SALE and PASS_ADMISSION
+ * are bookkeeping and must never reach a picker (ADR-0002, ADR-0010).
  */
 export function sellableTicketTypes() {
   return and(
@@ -35,12 +23,7 @@ export interface TicketPriceContext {
 }
 
 /**
- * Load the ticket-type base rows plus show- and performance-level overrides
- * for a set of ticket type IDs.
- *
- * @param ticketTypeIds  IDs of the ticket types to resolve
- * @param showId         Show context (for show-level overrides)
- * @param performanceId  Performance context (for performance-level overrides)
+ * Base rows plus show- and performance-level overrides for a set of type ids.
  */
 export async function loadTicketPriceContext(
   ticketTypeIds: string[],
@@ -67,10 +50,8 @@ export async function loadTicketPriceContext(
 }
 
 /**
- * Resolve the effective price for a ticket type through the override chain:
- *   performance override → show override → base price.
- *
- * Throws a 400 error if the ticket type is not found in the base types.
+ * Effective price through the override chain: performance → show → base.
+ * 400 if the type is not in the base rows.
  */
 export function resolveEffectivePrice(
   ticketTypeId: string,
@@ -90,14 +71,8 @@ export function resolveEffectivePrice(
 }
 
 /**
- * Validate that every ID in `ticketTypeIds` exists in `ctx.baseTypes` and is one
- * a human may sell. Throws a 400 on the first bad type.
- *
- * The sellability check lives here rather than at the four call sites because
- * every ticket write path goes through this function (`validateTicketTypesActive`
- * calls it first), so a fifth one cannot be added without inheriting the guard.
- * The pass redemption path creates its `PASS_ADMISSION` row directly and does
- * not come through here, which is the intended asymmetry.
+ * Existence plus sellability, checked here rather than at the call sites so a
+ * new write path inherits both. Pass redemption deliberately bypasses it.
  */
 export function validateTicketTypesExist(
   ticketTypeIds: string[],
@@ -111,13 +86,8 @@ export function validateTicketTypesExist(
 }
 
 /**
- * Reject any requested type a human is not allowed to sell.
- *
- * Hiding these in the pickers is not enough: every write path takes ticket type
- * ids from the request body, so a stale tab or a hand-made call can still name
- * one. The `PASS_ADMISSION` case is the dangerous one — stepping it down to
- * zero deletes the ticket, `pass_admissions.ticket_id` cascades, and the pass
- * becomes redeemable again with the audit row gone.
+ * Hiding these in the pickers is not enough: write paths take type ids from
+ * the request body, so a stale tab can still name one.
  */
 export function validateTicketTypesSellable(
   ticketTypeIds: string[],
@@ -149,10 +119,8 @@ export function validateTicketTypesSellable(
 }
 
 /**
- * Resolve whether a ticket type is active for this show/performance through the
- * override chain: performance override → show override → base `activeByDefault`.
- *
- * Throws a 400 error if the ticket type is not found in the base types.
+ * Effective active state through the override chain: performance → show →
+ * base `activeByDefault`. 400 if the type is not in the base rows.
  */
 export function resolveEffectiveActive(
   ticketTypeId: string,
@@ -172,9 +140,8 @@ export function resolveEffectiveActive(
 }
 
 /**
- * Resolve both the effective price and active status for a ticket type through
- * the override chain (performance → show → base). The single source of truth for
- * the resolution rule; endpoints should use this rather than re-implementing it.
+ * Price and active state together — the single source of the resolution rule.
+ * Endpoints use this rather than re-implementing either half.
  */
 export function resolveEffectiveTicketType(
   ticketTypeId: string,
@@ -187,12 +154,8 @@ export function resolveEffectiveTicketType(
 }
 
 /**
- * Validate that every requested ticket type is active for this show/performance.
- * Existence is checked first. Throws a 400 on the first inactive type.
- *
- * This guards the public booking path: inactive types are hidden in the UI but
- * still reachable by ID, so the write path must reject them rather than trust
- * the client to only send active ones.
+ * Guards the public booking path: inactive types are hidden in the UI but
+ * still reachable by id, so the write path must reject them.
  */
 export function validateTicketTypesActive(
   ticketTypeIds: string[],
@@ -206,26 +169,8 @@ export function validateTicketTypesActive(
 }
 
 /**
- * The single definition of "this ticket occupies a seat", for the given scope.
- *
- * Every seat count in the app must come through here. There used to be four
- * copies of this rule with three different filter sets, and they disagreed in
- * ways that were invisible until someone was turned away at the door: the pass
- * redemption check counted cancelled reservations (rejecting pass holders at a
- * half-empty house), and the public listings counted PASS_SALE rows (showing
- * sold out while the booking path would still sell). `server/db/schema/passes.ts`
- * says it plainly — "Do not add a parallel seat-counting path".
- *
- * Two filters carry the meaning:
- * - reservation status in PENDING/COLLECTED/DOOR — cancelled and no-show
- *   bookings release their seats.
- * - `ticketTypes.kind != 'PASS_SALE'` — a PASS_SALE row records the *purchase*
- *   of a pass, not a seat at this performance; the seat is the separate
- *   PASS_ADMISSION ticket. Counting both makes one buyer consume two seats.
- *
- * `performanceScope` is a condition on `tickets.performanceId` — an `eq` for one
- * performance, or an `inArray` against a subquery for a listing. Pass a subquery
- * rather than an id list: D1 binds at most 100 parameters per statement.
+ * The single definition of "this ticket occupies a seat" (ADR-0007) — do not
+ * add a parallel path. Pass a subquery, never an id list (ADR-0006).
  */
 export async function countOccupiedSeats(performanceScope: SQL): Promise<Map<string, number>> {
   const rows = await db
@@ -253,11 +198,8 @@ export async function countOccupiedSeatsFor(performanceId: string): Promise<numb
 }
 
 /**
- * How many seats one reservation's tickets occupy, ignoring its status.
- *
- * Used when a reservation moves back into an active status: those tickets are
- * about to start counting against the house again, so they have to be capacity
- * -checked as if they were being booked now.
+ * One reservation's seats, ignoring its status — for reinstatement, where the
+ * tickets are about to start counting against the house again.
  */
 export async function countReservationSeats(reservationId: string): Promise<number> {
   const [row] = await db
@@ -273,11 +215,8 @@ export async function countReservationSeats(reservationId: string): Promise<numb
 }
 
 /**
- * Reservation statuses whose tickets no longer hold seats.
- *
- * `assertCapacity` counts only PENDING/COLLECTED/DOOR, so cancelling a booking
- * releases its seats to be resold — which means moving a reservation *back* out
- * of one of these statuses re-takes seats that may already be gone.
+ * Cancelling releases seats to be resold, so moving a reservation back out of
+ * one of these statuses must be capacity-checked (ADR-0007).
  */
 export const SEAT_RELEASING_STATUSES = ['CANCELLED', 'NO_SHOW'] as const
 
@@ -286,17 +225,8 @@ export function releasesSeats(status: string): boolean {
 }
 
 /**
- * Assert that `additional` more tickets can be sold for a performance without
- * exceeding its capacity, counting active (non-refunded) tickets on
- * PENDING/COLLECTED/DOOR reservations.
- *
- * Capacity is `performances.capacityOverride ?? venues.capacity`; a null
- * capacity means uncapped. Raising `capacityOverride` is the deliberate way for
- * staff to oversell, rather than bypassing this check.
- *
- * Throws 404 if the performance is unknown, 409 if the request would oversell.
- * Note: this is a read-then-write check with no lock, so two concurrent writes
- * can still both pass — accepted at this booking volume.
+ * Capacity is `capacityOverride ?? venue.capacity`; null is uncapped. 409 if
+ * it would oversell. Read-then-write with no lock (ADR-0007).
  */
 export async function assertCapacity(performanceId: string, additional: number): Promise<void> {
   if (additional <= 0) return

@@ -3,18 +3,8 @@ import { eq, lt, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
 /**
- * Fixed-window rate limiting, backed by D1.
- *
- * The KV namespace is disabled and there are no Durable Objects, so D1 is the
- * only shared store. The counter is a single upsert with `RETURNING`, which
- * SQLite executes atomically, so two simultaneous requests cannot both read the
- * same count and each write back one more than it.
- *
- * A fixed window rather than a sliding one: it can let through up to twice the
- * limit across a window boundary, which is the wrong trade for billing but the
- * right one here, where the aim is to stop a script making thousands of attempts
- * and the cost of being approximate is that an attacker gets ten tries instead
- * of five.
+ * Fixed-window rate limiting, backed by D1 (ADR-0015). A single atomic upsert;
+ * the window can let through twice the limit across a boundary.
  */
 
 export interface RateLimitRule {
@@ -33,14 +23,8 @@ export interface RateLimitResult {
 }
 
 /**
- * The caller's IP, from Cloudflare's own header, or `null` when there isn't one.
- *
- * `CF-Connecting-IP` is set by the edge and cannot be spoofed by the client on a
- * Cloudflare-fronted origin, unlike `X-Forwarded-For`. Its **absence** means the
- * request did not come from outside — an SSR render calling its own API, or
- * local dev — so callers should skip limiting rather than fall back to a shared
- * bucket: every such request would share it, and a busy evening's page renders
- * would exhaust the bucket and start rejecting real customers.
+ * Null means the request did not come from outside, so callers must skip
+ * limiting rather than share one bucket between every SSR render.
  */
 export function clientIp(event: H3Event): string | null {
   return getRequestHeader(event, 'cf-connecting-ip') ?? null
@@ -76,10 +60,8 @@ export async function consumeRateLimit({ key, limit, windowSeconds }: RateLimitR
 }
 
 /**
- * Apply one or more rules, and 429 if any is exceeded.
- *
- * Every rule is consumed even when an earlier one has already failed, so a
- * caller cannot keep one bucket artificially low by tripping another first.
+ * Every rule is consumed even after one fails, so a caller cannot keep one
+ * bucket artificially low by tripping another first.
  */
 export async function assertRateLimit(event: H3Event, rules: RateLimitRule[], message?: string): Promise<void> {
   const results = await Promise.all(rules.map(consumeRateLimit))
@@ -104,11 +86,8 @@ export async function resetRateLimit(key: string): Promise<void> {
 }
 
 /**
- * Drop long-expired buckets, occasionally.
- *
- * Called opportunistically rather than on a schedule: it is one indexed delete,
- * it does not need to be timely, and a cron task would be more machinery than a
- * table of short-lived counters deserves.
+ * Opportunistic rather than scheduled: one indexed delete that does not need
+ * to be timely.
  */
 export async function sweepRateLimits(event: H3Event, probability = 0.02): Promise<void> {
   if (Math.random() >= probability) return

@@ -29,9 +29,8 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, bodySchema.parse)
 
-  // Whole days in Europe/London, not UTC midnights — see validityWindow.ts.
-  // Stored as instants so `canRedeem` can compare them to a performance's
-  // startsAt directly.
+  // Whole days in Europe/London, not UTC midnights (see validityWindow.ts).
+  // Stored as instants so canRedeem can compare them to startsAt directly.
   const validFrom = validityStart(body.validFrom)
   const validTo = validityEnd(body.validTo)
   if (Number.isNaN(validFrom.getTime()) || Number.isNaN(validTo.getTime())) {

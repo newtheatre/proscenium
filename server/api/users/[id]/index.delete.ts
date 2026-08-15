@@ -20,11 +20,8 @@ export default defineEventHandler(async (event) => {
   // Check if user has permission to delete this user
   await authorize(event, deleteUser, { id: userId })
 
-  // reservations.userId is onDelete: 'restrict', so a user with any booking
-  // history cannot be deleted. Since the legacy import that is almost everyone,
-  // so check first and explain, rather than letting the foreign key surface as
-  // a raw 500. Note this is a genuine dead end for a customer asking to remove
-  // their own account — the answer there is anonymisation, not deletion.
+  // reservations.userId is `restrict`, so anyone with booking history cannot be
+  // deleted. The answer there is anonymisation (ADR-0014).
   const [bookings] = await db
     .select({ n: count() })
     .from(schema.reservations)

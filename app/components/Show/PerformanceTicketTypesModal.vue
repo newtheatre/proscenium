@@ -1,14 +1,6 @@
 /**
- * Performance Ticket Types Modal Component
- *
- * Manages performance-level ticket type overrides.
- * All edits are buffered locally and only committed when "Save" is pressed.
- *
- * @prop performance — The performance to configure (null = closed)
- * @prop performanceLabel — Display label, e.g. "Performance 3"
- * @prop showTitle — Parent show name for the modal title
- * @emits close — Emitted when the modal should close
- * @emits refresh — Emitted after a successful save
+ * Performance-level overrides. Buffered, since a row can mean "delete the
+ * override" as readily as "write one".
  */
 <script setup lang="ts">
 interface PerformanceMeta {
@@ -151,9 +143,8 @@ async function handleDone() {
       }
       else {
         const pricePence = Math.round(parseFloat(d.priceStr) * 100)
-        // Only persist a price override when it differs from the inherited
-        // show/base price; otherwise send null so toggling active alone doesn't
-        // pin the current price as a performance-level override.
+        // Persist a price override only when it differs from the inherited price, so
+        // toggling active alone does not freeze today's price.
         const inheritedPrice = tt.showOverride?.price ?? tt.price
         const priceToSend = pricePence === inheritedPrice ? null : pricePence
         if (d.active !== tt.effectiveActive || pricePence !== tt.effectivePrice) {

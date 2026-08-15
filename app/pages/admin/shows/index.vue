@@ -1,21 +1,6 @@
 <!--
-  Admin: Shows & Performances
-
-  Three tabs over one tree table:
-   - Now & next — published shows whose run has not finished. Server-rendered.
-   - Drafts     — unpublished, whatever the dates. Server-rendered.
-   - Archive    — everything that has finished, paged and searched on the server.
-
-  Tabs rather than stacked sections on purpose: stacking would mount three
-  UTables at once, tripling the TanStack instances and the surface for the render
-  loop documented in docs/02-architecture.md. The two server-rendered tabs are
-  fetched regardless, so switching between them is instant.
-
-  This replaces a single unpaginated tree over the whole archive — 498 shows and
-  1,304 performances in one table, filtered in the browser.
-
-  @route /admin/shows
-  @admin-only
+Admin: shows and performances, three tabs over one tree table. Tabs rather
+than stacked sections, which would mount three UTables (ADR-0012).
 -->
 <script setup lang="ts">
 import type { PerformanceListItem, ShowListItem, ShowRowAction } from '~~/shared/types/shows'
@@ -39,9 +24,8 @@ const tab = ref<'active' | 'draft' | 'archive'>('active')
 type ShowPage = Paginated<ShowListItem>
 const emptyPage = (): ShowPage => ({ rows: [], total: 0, page: 1, limit: 50 })
 
-// requestFetch, not a plain useFetch: every admin endpoint is behind
-// authorize(), and a plain useFetch running on the server does not forward the
-// session cookie — it would 403 during SSR. See docs/02-architecture.md.
+// requestFetch, not a plain useFetch: a plain one does not forward the session
+// cookie during SSR (ADR-0013).
 const requestFetch = useRequestFetch()
 
 const {
@@ -70,9 +54,7 @@ const {
   { default: emptyPage },
 )
 
-// ── Archive ──────────────────────────────────────────────────────────────────
-// Deferred until the tab is opened: it is the only one that costs a request the
-// reader has not asked for, and most visits never leave "Now & next".
+// ── Archive ───────────────────────────────────────────────────────────────
 
 const archiveSearch = ref('')
 const archiveFrom = ref('')
@@ -134,9 +116,8 @@ const archiveFiltered = computed(() =>
 )
 
 /**
- * A show can move between tabs when it is published, cancelled or deleted, so a
- * mutation refreshes every tab that has been loaded rather than guessing which
- * one it landed in.
+ * A show can move between tabs, so a mutation refreshes every loaded tab rather
+ * than guessing which.
  */
 async function refreshAll() {
   await Promise.all([
@@ -157,9 +138,8 @@ const performanceForTicketTypesLabel = ref('')
 const performanceForTicketTypesShowTitle = ref('')
 
 /**
- * One handler for every row action, exhaustive over the union — adding a case to
- * `ShowRowAction` without handling it here is a type error rather than a menu
- * item that silently does nothing.
+ * One handler, exhaustive over the union — adding a case to `ShowRowAction`
+ * without handling it is a type error rather than a dead button.
  */
 function onRowAction(action: ShowRowAction) {
   switch (action.type) {

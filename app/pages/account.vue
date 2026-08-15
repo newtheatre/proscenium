@@ -1,11 +1,5 @@
 /**
- * Account Parent Page
- *
- * Parent route for account pages with navigation.
- * Uses the default layout and provides navigation between account sections.
- *
- * @route /account
- * @authenticated
+ * Parent route for the account pages, with the navigation between them.
  */
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'

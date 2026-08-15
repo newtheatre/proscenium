@@ -1,14 +1,6 @@
 <!--
-  Show-level ticket type availability and price overrides, editable in place.
-
-  Converted from a modal. Edits are still buffered locally and committed together
-  on save — that part was right, because a row here can mean "delete the
-  override" as easily as "write one", and applying each toggle immediately would
-  make a half-finished price change permanent.
-
-  What changed is that it no longer opens and closes: a show's prices are a
-  property of the show, so they sit on the show's page. Prices set here apply to
-  every performance unless a performance overrides them itself.
+Show-level availability and price overrides, edited in place (ADR-0017).
+Buffered: a row can mean "delete the override" as readily as "write one".
 -->
 <script setup lang="ts">
 interface Override {
@@ -145,9 +137,8 @@ async function save() {
       }
 
       const pence = Math.round(Number.parseFloat(d.priceStr) * 100)
-      // Only persist a price override when it differs from the inherited base
-      // price; otherwise send null, so toggling availability alone does not pin
-      // today's price as an override that outlives the next price change.
+      // Persist a price override only when it differs from the inherited base, so
+      // toggling availability alone does not freeze today's price.
       const priceToSend = pence === entry.price ? null : pence
       if (d.active !== entry.effectiveActive || pence !== entry.effectivePrice) {
         ops.push($fetch(`/api/shows/${props.showId}/ticket-types`, {

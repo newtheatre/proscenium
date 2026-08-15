@@ -1,17 +1,6 @@
 /**
- * Admin: Dashboard
- *
- * Overview of key operational and financial metrics for NNT.
- * Includes revenue summary, ticket sales, recent reservations, and a CSV export
- * tool designed for the treasurer.
- *
- * Data Loading:
- * - GET /api/admin/stats
- * - GET /api/shows (for the export show selector)
- *
- * @route /admin
- * @authenticated
- * @admin-only
+ * Admin dashboard: revenue, ticket sales, recent reservations and the CSV
+ * export.
  */
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
@@ -76,11 +65,8 @@ const STATUS_CONFIG = {
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
-// Server-rendered, so the table arrives populated instead of appearing a moment
-// later. requestFetch, not a bare $fetch: every admin endpoint is behind
-// authorize(), and a plain server-side fetch does not forward the incoming
-// session cookie — it would 403 during SSR. See
-// docs/02-architecture.md#fetching-in-the-admin-area.
+// Server-rendered, and requestFetch rather than a bare $fetch — every admin
+// endpoint is behind authorize() (ADR-0013).
 const requestFetch = useRequestFetch()
 const { data: stats, status: statsStatus, error: statsError, refresh: refreshStats } = await useAsyncData(
   'admin-stats', () => requestFetch<Stats>('/api/admin/stats'))
@@ -98,9 +84,8 @@ const windowLabel = computed(() => {
 })
 
 /**
- * Imported tickets whose price was never recorded still count as admissions but
- * contribute nothing to revenue, so revenue-per-ticket reads low. Say so rather
- * than letting someone draw the wrong conclusion from the two cards together.
+ * Imported tickets with no recorded price count as admissions but add nothing
+ * to revenue, so say so rather than letting the average read low.
  */
 const statsCaveat = computed(() => {
   const unknown = stats.value?.unknownPricedTickets ?? 0
@@ -111,9 +96,8 @@ const statsCaveat = computed(() => {
   if (derived) parts.push(`${derived.toLocaleString('en-GB')} estimated`)
   return `Includes ${parts.join(', ')}`
 })
-// `view=options` — id, slug, title, status and nothing else. This dropdown used
-// to pull the entire nested archive, performances and all, to render a list of
-// titles.
+// `view=options` — id, slug, title, status and nothing else, rather than the
+// whole nested archive.
 const { data: shows } = await useAsyncData(
   'admin-show-options',
   () => requestFetch<Paginated<Show>>('/api/shows', { query: { view: 'options', limit: 500 } }),
@@ -132,12 +116,8 @@ const exportShowId = ref<string>('')
 const exportFrom = ref<string>('')
 const exportTo = ref<string>('')
 
-// No "All shows" option. Unfiltered, the export joins all 45,563 tickets and
-// builds around 10 MB of CSV inside a Worker — it was the default choice, one
-// click away. A date range covers the same need for a season's accounts.
-// No empty-valued "Choose a show…" entry: the `placeholder` prop covers that,
-// and USelect refuses an item whose value is '' — an empty string is how the
-// selection is *cleared*, so it cannot also identify an option.
+// No "All shows": unfiltered, the export builds around 10 MB of CSV inside a
+// Worker. USelect also refuses an item whose value is ''.
 const showOptions = computed(() => (shows.value?.rows ?? []).map(s => ({ label: s.title, value: s.id })))
 
 /** The season the theatre is currently in: 1 August to 31 July. */
@@ -245,9 +225,10 @@ const recentColumns: TableColumn<RecentReservation>[] = [
     </div>
 
     <template v-else-if="stats">
-      <!-- The figures below are for one season, not all time. Before this was
-           bounded the dashboard showed a decade of imported takings as though
-           they were the current year's. -->
+      <!--
+      These figures are for one season, not all time — say so, or a decade of
+      imported takings reads as the current year's.
+      -->
       <div class="flex flex-wrap items-center gap-2 text-sm">
         <UIcon
           name="i-lucide-calendar-range"

@@ -1,24 +1,14 @@
 /**
- * The vocabulary of content warnings, as the UI and the API both need to speak it.
- *
- * Everything here used to be written out four times: the Drizzle enum, the zod
- * enum in the show PUT, the type in shared/types/shows.ts, and a local copy in
- * each of the two Vue components — which is how the admin editor and the public
- * page came to describe the same axis with different words.
- *
- * Auto-imported on both client and server (shared/utils is a Nuxt auto-import
- * directory), so nothing needs to import from here explicitly.
+ * The content-warning vocabulary, spoken by both the UI and the API
+ * (ADR-0004). One definition rather than five. Auto-imported on both sides.
  */
 
 export type ContentWarningKind = 'TECHNICAL' | 'GENERAL'
 export type ContentWarningLevel = 'MENTIONED' | 'DISCUSSED' | 'DEPICTED'
 
 /**
- * How intensely a general warning features, weakest to strongest.
- *
- * `rank` orders them for display and resolves collisions when two sources
- * disagree about the same warning — lowest rank wins, i.e. the strongest
- * claim, because under-warning is the failure that matters.
+ * How intensely a general warning features, weakest to strongest. `rank`
+ * orders them and resolves collisions — lowest wins.
  */
 export const CONTENT_WARNING_LEVELS = [
   {
@@ -57,12 +47,8 @@ export const CONTENT_WARNING_KINDS = [
 ]
 
 /**
- * Suggested groupings for GENERAL warnings, in display order.
- *
- * `content_warnings.category` is plain text, not an enum, so a category can be
- * added from the admin page without a deploy. This list is what the form offers
- * and what `contentWarningCategoryRank` sorts by; anything unrecognised sorts
- * last, alphabetically.
+ * Suggested groupings for GENERAL warnings, in display order. The column is
+ * plain text, so a category can be added without a deploy.
  */
 export const CONTENT_WARNING_CATEGORIES = [
   'Violence and death',
@@ -77,11 +63,8 @@ export const CONTENT_WARNING_CATEGORIES = [
 ]
 
 /**
- * Icons the admin form offers.
- *
- * A shortlist rather than free text because the value is rendered straight into
- * `UBadge :icon` on the public show page, where a typo is not an error — it is
- * a blank space where an icon should be.
+ * A shortlist rather than free text: the value is rendered straight into
+ * `UBadge :icon`, where a typo is a blank space, not an error.
  */
 export const CONTENT_WARNING_ICONS = [
   'i-lucide-zap',

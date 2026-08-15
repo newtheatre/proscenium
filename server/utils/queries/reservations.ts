@@ -1,13 +1,8 @@
 import type { db } from '@nuxthub/db'
 
 /**
- * Shared Drizzle relational query includes for reservation responses.
- *
- * These objects define the `with` clause shapes used across reservation endpoints
- * so every consumer returns a consistent shape.
- *
- * Types are extracted from the actual `db.query` signatures via `import type`,
- * ensuring they stay in sync with the schema.
+ * Shared relational `with` shapes, so every reservation endpoint returns a
+ * consistent payload.
  */
 
 type ReservationQuery = NonNullable<Parameters<(typeof db)['query']['reservations']['findMany']>[0]>
@@ -27,10 +22,8 @@ const ticketsConfig = {
  * `with` clause for reservation list/summary views (no tickets).
  */
 export const reservationSummaryWith = {
-  // `password`/`verified` are deliberately not listed: migration 0014 dropped
-  // both columns when identity moved to the auth service. Naming them here read
-  // as a security decision about columns that no longer exist, and `verified`
-  // silently resolved to undefined in consumers typed to expect a boolean.
+  // `password`/`verified` are not listed because migration 0014 dropped them —
+  // naming them would read as a decision about columns that no longer exist.
   user: { columns: { id: true, name: true, email: true } },
   performance: {
     with: {
@@ -44,10 +37,8 @@ export const reservationSummaryWith = {
  * `with` clause for detailed reservation views (with tickets).
  */
 export const reservationDetailWith = {
-  // `password`/`verified` are deliberately not listed: migration 0014 dropped
-  // both columns when identity moved to the auth service. Naming them here read
-  // as a security decision about columns that no longer exist, and `verified`
-  // silently resolved to undefined in consumers typed to expect a boolean.
+  // `password`/`verified` are not listed because migration 0014 dropped them —
+  // naming them would read as a decision about columns that no longer exist.
   user: { columns: { id: true, name: true, email: true } },
   performance: {
     with: {
@@ -58,19 +49,10 @@ export const reservationDetailWith = {
   tickets: ticketsConfig,
 } satisfies ReservationWith
 
-/* ------------------------------------------------------------------ *
- * Customer-facing shapes
- *
- * The shapes above are for staff. Customer endpoints must not reuse them:
- * without an explicit `columns` list Drizzle returns every reservation column,
- * which includes `staffNotes` ("Internal box-office notes — not visible to the
- * customer") and `legacyRef`.
- *
- * `legacyRef` matters especially: 21,804 imported reservations belong to
- * anonymised bookers and every one carries the legacy code that, together with
- * the import artifacts, re-identifies them. And 12 imported `staffNotes` quote
- * another customer's name verbatim.
- * ------------------------------------------------------------------ */
+/*
+ * Customer-facing shapes. The staff shapes above must not be reused: without
+ * an explicit `columns` list Drizzle returns staffNotes and legacyRef.
+ */
 
 /** Reservation columns a customer may see. Allow-list, so new columns are private by default. */
 export const reservationCustomerColumns = {

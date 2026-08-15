@@ -8,9 +8,8 @@ interface BookingPerformance {
 }
 
 /**
- * The customer-facing shape. Deliberately narrower than the reservation row:
- * `staffNotes`, `legacyRef`, `source`, `originalQuantity` and `anonymisedAt` are
- * internal and must not reach the browser — see reservationCustomerColumns.
+ * Customer-facing shape: staffNotes, legacyRef, source, originalQuantity and
+ * anonymisedAt are internal and must not reach it.
  */
 interface BookingRow {
   id: string
@@ -38,9 +37,8 @@ interface BookingRow {
  * Requires authentication. Returns upcoming and past bookings.
  */
 export default defineEventHandler(async (event) => {
-  // Identity only — this handler never reads a role, so it must not be gated on
-  // role staleness. It used to be, which meant any staff member's own bookings
-  // page went blank fifteen minutes after signing in.
+  // Identity only — this handler reads no role, so it must not be gated on role
+  // staleness (ADR-0008).
   const { id: userId } = await requireSessionUser(event)
   const now = new Date()
 

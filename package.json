@@ -8,6 +8,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "lint": "eslint .",
+    "check:comments": "node scripts/check-comments.mjs",
     "lint:fix": "eslint . --fix",
     "typecheck": "nuxt typecheck",
     "postinstall": "nuxt prepare"

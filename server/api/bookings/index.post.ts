@@ -7,9 +7,8 @@ import { sendBookingConfirmationEmail } from '~~/server/utils/email'
 const bodySchema = z.object({
   performanceId: z.string().min(1),
 
-  // Customer details — not required if the user is logged in.
-  // Both are bounded: this endpoint is unauthenticated, and both values are
-  // stored and later rendered into an email whose recipient the caller chooses.
+  // Bounded because this endpoint is unauthenticated and both values are stored
+  // and later rendered into an email the caller also addresses.
   name: z.string().trim().min(1).max(100).optional(),
   email: z.email().max(254).optional(),
 
@@ -26,10 +25,6 @@ const bodySchema = z.object({
 
 /**
  * POST /api/bookings — create a new public booking.
- *
- * Public endpoint — anyone can book. If the user is logged in, their account
- * details are used. Otherwise, name + email are required and a shadow account
- * is created or matched.
  */
 export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, bodySchema.parse)
@@ -46,12 +41,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Guest checkout sends a confirmation to whatever address the caller supplies,
-  // carrying their name and notes — so the theatre's own domain will deliver
-  // whatever a script puts in them. The per-IP limit in the rate-limit
-  // middleware is set generously for shared connections, which leaves this
-  // narrower bucket to bound how often one *address* can be mailed. A real
-  // person booking for several performances in an evening stays well inside it.
+  // The per-IP middleware limit is generous for shared connections, so this
+  // narrower bucket bounds how often one address can be mailed (ADR-0015).
   const guestEmail = (body.email ?? loggedInUser?.email)?.trim().toLowerCase()
   if (guestEmail) {
     await assertRateLimit(
@@ -79,9 +70,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Show is not currently published' })
   }
 
-  // Online booking closes at startsAt minus bookingClosesHoursBefore, which the
-  // legacy import populated for 1,254 performances. Staff endpoints do not call
-  // this — the box office still takes walk-ups after the online cutoff.
+  // Staff endpoints do not call this — the box office takes walk-ups after
+  // online booking closes, which is the point of closing it early.
   assertBookingOpen(performance)
 
   // ── Check capacity ─────────────────────────────────────────────────────────
@@ -91,11 +81,8 @@ export default defineEventHandler(async (event) => {
 
   // ── Resolve user ───────────────────────────────────────────────────────────
 
-  // Identity lives in the central auth service (stage-door ADR-0007): guest
-  // checkout asks it to match-or-create a shadow account by email, then the
-  // canonical id is mirrored locally in the same atomic batch as the booking
-  // (reservations.user_id FKs the mirror). Idempotent on the auth side, so a
-  // retried request is safe.
+  // Identity is central (stage-door ADR-0007): ask for a shadow account by
+  // email, then mirror the canonical id locally.
   let resolvedUserId: string
   let needShadowUser = false
 
@@ -120,9 +107,8 @@ export default defineEventHandler(async (event) => {
       )
     }
     catch (error) {
-      // Bookings/min is tiny; fail the booking with a retry message rather
-      // than inventing local identity that would diverge from the canonical
-      // store (plan §4.8).
+      // Fail the booking with a retry message rather than inventing a local id that
+      // would diverge from the canonical store.
       console.error('[bookings] shadow-account call failed:', error)
       throw createError({ statusCode: 502, statusMessage: 'Booking is temporarily unavailable — please try again shortly' })
     }
@@ -142,9 +128,8 @@ export default defineEventHandler(async (event) => {
 
   const requestedTypeIds = body.tickets.map(t => t.ticketTypeId)
   const priceCtx = await loadTicketPriceContext(requestedTypeIds, performance.show.id, body.performanceId)
-  // Reject types that are inactive for this show/performance. They are hidden in
-  // the UI but reachable by ID, so a crafted request must not be able to book a
-  // disabled or comp-only type at its (possibly £0) price.
+  // Inactive types are hidden in the UI but reachable by id, so a crafted
+  // request must not be able to book a disabled or comp-only type.
   validateTicketTypesActive(requestedTypeIds, priceCtx)
 
   // ── Create shadow user (if needed) + reservation + tickets, atomically ─────

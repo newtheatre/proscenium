@@ -1,11 +1,5 @@
 /**
- * Edit Performance Modal Component
- *
- * Modal for editing an existing performance's details.
- *
- * @prop performance — The performance to edit (null = modal closed)
- * @emits close — Emitted when the modal should close
- * @emits refresh — Emitted after successful update
+ * Edit an existing performance.
  */
 <script setup lang="ts">
 import * as z from 'zod'

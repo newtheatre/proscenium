@@ -36,9 +36,8 @@ interface PricedTicket {
 }
 
 /**
- * Refunded tickets come back from the API (the customer query selects
- * `refundedAt`) but are no longer held. Counting them showed a ticket count and
- * a total that contradicted the refund the customer had already been given.
+ * Refunded tickets come back from the API but are no longer held, so counting
+ * them overstates both the ticket count and the total.
  */
 function activeTickets<T extends PricedTicket>(tickets: T[]): T[] {
   return tickets.filter(t => !t.refundedAt)
@@ -50,12 +49,8 @@ function formatPrice(pence: number): string {
 }
 
 /**
- * What a booking cost, as a string.
- *
- * Imported legacy bookings can carry `priceConfidence: 'UNKNOWN'` with
- * `pricePaid: 0` — the old box office never recorded what was taken. Showing
- * that as "Free" tells someone who paid £8 in 2019 that they paid nothing, so
- * an unpriced booking says so instead of inventing a total.
+ * An imported booking can carry priceConfidence UNKNOWN with pricePaid 0, so
+ * show it as unrecorded rather than as £0.
  */
 function formatBookingTotal(allTickets: PricedTicket[]): string {
   const tickets = activeTickets(allTickets)

@@ -12,15 +12,7 @@ const querySchema = paginationSchema.extend({
 })
 
 /**
- * GET /api/reservations — list reservations. Staff only.
- *
- * Paginated in SQL, returning a `{ rows, total, page, limit }` envelope. There
- * are 30,000+ reservations, so returning the whole table and filtering in the
- * browser is not viable — it was ~18 MB of JSON per page load, assembled inside
- * a Worker.
- *
- * Search covers booking reference, holder name and holder email, in SQL for the
- * same reason.
+ * GET /api/reservations — list reservations.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listReservations)
@@ -28,9 +20,8 @@ export default defineEventHandler(async (event) => {
   const { performanceId, showId, userId, status, withCounts, page, limit, q }
     = await getValidatedQuery(event, querySchema.parse)
 
-  // Filtering by show uses a subquery rather than an id list: D1 allows at most
-  // 100 bound parameters, so a list built from a result set is a latent hard
-  // failure as the data grows.
+  // Filtering by show uses a subquery, never an id list built from a result set
+  // (ADR-0006).
   const showPerformances = db
     .select({ id: schema.performances.id })
     .from(schema.performances)

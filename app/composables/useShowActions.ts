@@ -4,16 +4,8 @@ import { formatDateTime } from '~/utils/format'
 import { useConfirm } from '~/composables/useConfirm'
 
 /**
- * The destructive and status-changing operations on shows and performances.
- *
- * Extracted from the shows page so the list and the detail page do the same
- * thing — including asking the same question before doing it. The list page used
- * to carry two hand-rolled confirmation `UModal`s with their own open/loading
- * refs; `useConfirm()` already existed and was already used elsewhere for
- * exactly this.
- *
- * `onChanged` is called after any successful mutation, so the caller decides
- * what to refresh — one list, three tabs, or a detail page.
+ * Destructive and status-changing show operations, so the list and the detail
+ * page do the same thing and ask the same question first.
  */
 export function useShowActions(onChanged: () => void | Promise<void>) {
   const toast = useToast()

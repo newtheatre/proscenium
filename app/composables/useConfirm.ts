@@ -11,13 +11,7 @@ interface ConfirmOptions {
 }
 
 /**
- * Programmatically show a confirmation modal for destructive actions.
- *
- * @example
- * const confirm = useConfirm()
- * if (await confirm({ title: 'Delete item?', description: 'This cannot be undone.' })) {
- *   // proceed
- * }
+ * Programmatically show a confirmation modal for a destructive action.
  */
 export function useConfirm() {
   const overlay = useOverlay()

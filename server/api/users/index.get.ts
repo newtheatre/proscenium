@@ -3,23 +3,10 @@ import { and, asc, count, isNull, isNotNull, or, sql } from 'drizzle-orm'
 import { listUsers } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/users — list local user mirrors. Staff only.
- *
- * Identity (credentials, roles, verification) lives in the central auth
- * service; this lists the app-side mirror — who exists here, for reservation
- * attachment and lookup. Role filtering left with the role columns; use the
- * auth service admin for identity questions.
- *
- * Two modes:
- *  - `?email=` returns at most the one matching user. Used by the box-office
- *    walk-in lookup, which must not pull the user table into a volunteer's
- *    browser.
- *  - otherwise a paginated `{ rows, total, page, limit }` envelope, optionally
- *    filtered by `q` against name and email.
+ * GET /api/users — list local user mirrors.
  */
-// Anonymised bookers (retention policy / account closure) and legacy
-// placeholder rows are records, not people — they never load in listings or
-// lookups, and surface only as a count.
+// Anonymised bookers and legacy placeholder rows are records, not people:
+// never in listings or lookups, surfaced only as a count.
 const notAnonymised = and(
   isNull(schema.users.anonymisedAt),
   sql`${schema.users.email} NOT LIKE '%.invalid'`,

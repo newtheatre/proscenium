@@ -1,9 +1,6 @@
 /**
- * Reservation authorization abilities.
- *
- * Staff (ADMIN / MANAGER / BOX_OFFICE) can list, create, read, and update reservations.
- * Customers can only read their own reservations.
- * Only ADMIN / MANAGER can delete reservations.
+ * Staff list, create, read and update reservations; customers may read only
+ * their own.
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser } from './types'

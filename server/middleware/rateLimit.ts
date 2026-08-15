@@ -1,18 +1,6 @@
 /**
- * Rate limiting for the endpoints anyone can reach without a session.
- *
- * Declared here against route patterns rather than called from each handler, so
- * a new public route is covered by adding a line to one table instead of by
- * remembering. `server/utils/rateLimit.ts` had been written, tested and then
- * never called from anywhere — the limiter existed, the limits did not, and its
- * comments read as though protection were in place.
- *
- * Buckets are per-IP via `CF-Connecting-IP` (set by the edge, not spoofable by
- * the client). Limits are deliberately generous: student halls and the theatre's
- * own wifi put many genuine customers behind one address, so these are sized to
- * stop a script, not to police a busy on-sale. The narrower abuse case — using
- * guest checkout to send mail to an address the attacker chose — is bounded per
- * email address inside the booking handler, where the address is known.
+ * Rate limits for session-less endpoints, declared against route patterns so a
+ * new public route is covered by adding a line here (ADR-0015).
  */
 
 import type { H3Event } from 'h3'
@@ -66,12 +54,8 @@ export default defineEventHandler(async (event: H3Event) => {
   const route = PUBLIC_ROUTES.find(r => r.methods.includes(method) && r.pattern.test(path))
   if (!route) return
 
-  // No `CF-Connecting-IP` means this is not an external request: an SSR render
-  // calling its own API, or local dev. Those must not be limited — they would
-  // all share one "unknown" bucket, so a busy evening's page renders would
-  // exhaust it and 429 real customers. The header is set by the edge on every
-  // request that reaches the Worker from outside and cannot be removed by a
-  // client, so skipping here is not a bypass.
+  // No `CF-Connecting-IP` means the request did not come from outside, so skip
+  // rather than share one bucket between every SSR render.
   const ip = clientIp(event)
   if (!ip) return
 

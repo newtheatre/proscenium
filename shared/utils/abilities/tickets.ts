@@ -1,8 +1,6 @@
 /**
- * Ticket-type authorization abilities.
- *
- * Ticket types are public data (anyone can list/read).
- * ADMIN / MANAGER can create and update. ADMIN only can delete.
+ * Ticket types are public to read. ADMIN/MANAGER create and update; ADMIN
+ * deletes.
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser } from './types'

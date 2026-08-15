@@ -1,9 +1,7 @@
 <script setup lang="ts">
 /**
- * Booking confirmation display.
- *
- * Shows the booking reference, performance details, and ticket summary
- * after a successful booking. Provides actions for the user.
+ * Booking confirmation: reference, performance and ticket summary, plus the
+ * link back to the booking.
  */
 interface Ticket {
   id: string
@@ -16,10 +14,8 @@ interface Ticket {
 }
 
 /**
- * Refunded tickets are returned (the customer query selects `refundedAt`
- * deliberately) but are no longer held or owed. Counting them listed tickets the
- * customer does not have and quoted a total higher than they actually paid —
- * on the very page they read out at the box office.
+ * Refunded tickets are returned by the query but are no longer held or owed,
+ * so they must not be counted.
  */
 function active(tickets: Ticket[]): Ticket[] {
   return tickets.filter(t => !t.refundedAt)
@@ -72,9 +68,8 @@ function formatPrice(pence: number): string {
 
 function getTicketSummary(allTickets: Ticket[]) {
   const tickets = active(allTickets)
-  // Group by ticket type AND price paid, so a type sold at more than one price
-  // (e.g. after a price change) shows one line per price and the line totals
-  // sum to the grand total.
+  // Group by type AND price paid, so a type sold at two prices shows one line per
+  // price and the lines sum to the total.
   const grouped = new Map<string, { name: string, count: number, unitPrice: number }>()
   for (const ticket of tickets) {
     const key = `${ticket.ticketType.id}:${ticket.pricePaid}`
@@ -98,11 +93,8 @@ function getTotal(tickets: Ticket[]) {
 }
 
 /**
- * The booking total as a string.
- *
- * An imported legacy booking can carry `priceConfidence: 'UNKNOWN'` with
- * `pricePaid: 0`, because the old box office never recorded what was taken.
- * Rendering that as "Free" would tell someone who paid that they did not.
+ * An imported booking can carry priceConfidence UNKNOWN with pricePaid 0, so
+ * the total is shown as unrecorded rather than as £0.
  */
 function formatTotal(allTickets: Ticket[]): string {
   const tickets = active(allTickets)

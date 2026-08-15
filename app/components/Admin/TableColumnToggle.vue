@@ -1,11 +1,6 @@
 <!--
-  The "Display" menu that shows and hides a table's columns.
-
-  Three pages carried their own copy, each rebuilding the item list inline in the
-  template and each with slightly different label capitalisation. The real reason
-  to have one copy is narrower than tidiness: reading TanStack's column model
-  requires an `any`-typed handle on the table instance and an eslint exemption to
-  go with it. Better that lives in one file than in three templates.
+The "Display" menu (ADR-0012). One copy, because reading TanStack's column
+model needs an `any`-typed handle and an eslint exemption.
 -->
 <script setup lang="ts">
 const props = defineProps<{

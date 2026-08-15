@@ -1,14 +1,6 @@
 <script setup lang="ts">
 /**
- * Booking Flow Page
- *
- * Multi-step booking flow:
- * 1. Select performance (pre-selected if arriving from show page)
- * 2. Select ticket types and quantities
- * 3. Enter customer details (auto-filled if logged in)
- * 4. Review and confirm
- *
- * After confirmation, shows the booking confirmation with reference number.
+ * The multi-step booking flow: performance, tickets, details, confirmation.
  */
 
 interface BookingResult {

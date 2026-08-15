@@ -16,9 +16,8 @@ export default defineNuxtConfig({
 
   $production: {
     runtimeConfig: {
-      // The estate cookie is scoped to the parent domain so every
-      // *.newtheatre.org.uk app reads the same session. Production only —
-      // localhost has no subdomains.
+      // Production only — localhost has no subdomains, so a domain'd cookie breaks
+      // dev.
       session: {
         name: 'nnt-session',
         password: '',
@@ -35,12 +34,6 @@ export default defineNuxtConfig({
       },
       // KV namespace (binding defaults to 'KV')
       kv: false,
-      // Cache KV namespace (binding defaults to 'CACHE')
-      // cache: {
-      //   driver: 'cloudflare-kv-binding',
-      //   namespaceId: 'c6d3be0190414e1ab170a0788ec51fb6',
-      // },
-      // R2 bucket (binding defaults to 'BLOB')
       blob: {
         driver: 'cloudflare-r2',
         bucketName: 'proscenium-blob',
@@ -67,10 +60,8 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    // Estate SSO (stage-door docs/session-contract.md): this app READS the
-    // nnt-session cookie sealed by auth.newtheatre.org.uk and never writes
-    // it (dev-only exception: /dev-login). NUXT_SESSION_PASSWORD is the
-    // shared estate seal secret.
+    // This app READS the nnt-session cookie and never writes it (dev-only
+    // exception: /dev-login). Shape: stage-door docs/session-contract.md
     session: {
       name: 'nnt-session',
       password: '',
@@ -78,14 +69,11 @@ export default defineNuxtConfig({
     },
     resendApiKey: '',
     resendFromEmail: '',
-    // Signs guest booking-access tokens. Falls back to the session password when
-    // unset; set NUXT_BOOKING_TOKEN_SECRET to rotate booking links on their own,
-    // which invalidates every outstanding one. NOTE: post-SSO the session
-    // password is estate-wide — set the dedicated secret so booking links
-    // don't die with estate-wide seal rotations.
+    // Signs guest booking-access tokens. Set NUXT_BOOKING_TOKEN_SECRET in
+    // production so links do not die with an estate seal rotation (ADR-0009).
     bookingTokenSecret: '',
-    // Service token for server-to-server calls to the auth service
-    // (AUTH_SERVICE_TOKEN worker secret) — guest checkout shadow accounts.
+    // Worker secret NUXT_AUTH_SERVICE_TOKEN. The NUXT_ prefix is load-bearing —
+    // a secret named AUTH_SERVICE_TOKEN is silently ignored.
     authServiceToken: '',
     public: {
       authBaseURL: 'https://auth.newtheatre.org.uk',
@@ -133,33 +121,13 @@ export default defineNuxtConfig({
             binding: 'DB',
             database_name: 'proscenium',
             database_id: '01a75263-87a9-452a-a4a0-b3b9db71dfe5',
-            // Set here rather than left to NuxtHub, whose default is
-            // `.output/server/db/migrations/` — wrong twice over, and silently.
-            //
-            // Wrangler resolves this **relative to the config file**, and the
-            // generated config lives at `.output/server/wrangler.json`, so that
-            // default expands to `.output/server/.output/server/db/migrations`.
-            // Point it at the project root instead and it lands on a directory
-            // that holds only a `sqlite/` subdirectory, no `.sql` files — at
-            // which point wrangler reports "✅ No migrations to apply!" and
-            // exits 0. A false success on the one command whose whole job is
-            // telling you whether production is up to date.
-            //
-            // NuxtHub sets it with `||=` (module.mjs), so this wins. Nothing
-            // else reads it: the dev-time migrator resolves its own paths, so
-            // this only affects the wrangler CLI.
+            // NuxtHub's default resolves to a directory with no `.sql` files, so wrangler
+            // reports "No migrations to apply!" and exits 0. Set it explicitly.
             migrations_dir: 'db/migrations/sqlite',
           },
         ],
-        // Estate-wide secrets live in the account Secrets Store so a rotation
-        // is one write rather than four worker secrets updated in lockstep
-        // (docs/08-operations.md#secrets). server/plugins/secrets-store.ts
-        // turns the binding into runtimeConfig.session.password — read its
-        // header before adding another entry here, the binding name matters.
-        //
-        // Cast: `secrets_store_secrets` is valid wrangler config but missing
-        // from the wrangler types Nitro 2.13 bundles. Drop it once Nitro
-        // catches up.
+        // Estate secrets come from the Secrets Store (stage-door ADR-0016); the
+        // binding name matters — read server/plugins/0.secrets-store.ts first.
         ...({
           secrets_store_secrets: [
             {
@@ -182,20 +150,17 @@ export default defineNuxtConfig({
       // Baseline security headers on every response.
       '/**': {
         headers: {
-          // Booking references are bearer secrets and still appear in some URLs
-          // (?ref=), so keep them out of the Referer sent to other origins.
+          // Guest booking links carry a signed token in `?t=` until the page swaps it
+          // for a cookie, so keep the query string out of the Referer (ADR-0009).
           'Referrer-Policy': 'strict-origin-when-cross-origin',
           'X-Content-Type-Options': 'nosniff',
           'X-Frame-Options': 'DENY',
-          // No subdomain rules and no preload: this header is served from the
-          // ticketing host, and the society's other subdomains are not ours to
-          // commit to HTTPS from here.
+          // No subdomain rules and no preload: this is served from the ticketing host,
+          // and the society's other subdomains are not ours to commit.
           'Strict-Transport-Security': 'max-age=15552000',
           'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
-          // Deliberately no script-src. Nuxt emits inline hydration scripts, so
-          // a script policy needs per-request nonces rather than a static rule —
-          // worth doing, but as its own change. These three directives are the
-          // part that can be set statically without breaking the app.
+          // Deliberately no script-src: Nuxt emits inline hydration scripts, so a
+          // script policy needs per-request nonces rather than a static rule.
           'Content-Security-Policy': 'frame-ancestors \'none\'; object-src \'none\'; base-uri \'self\'',
         },
       },

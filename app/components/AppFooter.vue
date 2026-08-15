@@ -103,14 +103,6 @@ const socials: SocialLink[] = [
 const links: FooterColumn[] = [{
   label: 'Quick Links',
   children: [
-  // {
-  //   label: 'Wiki & Resources',
-  //   to: '/wiki',
-  // },
-  // {
-  //   label: 'Branding',
-  //   to: '/wiki/governance/brand',
-  // },
     {
       label: 'Mailing List',
       to: '/mailing-list',

@@ -1,16 +1,5 @@
 /**
- * Create Venue Modal Component
- *
- * Modal for creating new venues (admin/manager only).
- *
- * Features:
- * - Form validation with Zod schema
- * - Name, address, capacity, description, and status
- * - Feature selection
- * - Creates venue via POST /api/venues
- * - Toast notifications for success/error
- *
- * @emits refresh - Emitted after successful venue creation
+ * Create a venue. Admin/Manager only.
  */
 <script setup lang="ts">
 import * as z from 'zod'

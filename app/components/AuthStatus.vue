@@ -31,10 +31,8 @@ import { isStaff } from '~~/shared/utils/abilities'
 const { loggedIn, user, clear } = useUserSession()
 const config = useRuntimeConfig()
 const route = useRoute()
-// useRequestURL resolves on both server and client — window.location does
-// not, and this header is server-rendered on every first page load, so a
-// window-only origin silently dropped the redirect for pre-hydration
-// clicks and dumped people at the apex after logging in (#107).
+// useRequestURL resolves on both server and client; window.location does not,
+// and this header is server-rendered on first load.
 const requestURL = useRequestURL()
 
 // Hosted login (stage-door), returning to the current page. Dev: /dev-login.
@@ -67,9 +65,8 @@ const menuItems = computed(() => {
     icon: 'i-lucide-log-out',
     color: 'error',
     async onSelect() {
-      // Logout is estate-wide, owned by the auth service. Same-site form
-      // POST carries the cookie; the service clears it domain-wide and
-      // bounces back. Dev sessions are local — clear locally.
+      // Logout is estate-wide and owned by the auth service. A same-site form POST
+      // carries the cookie; dev sessions clear locally.
       if (import.meta.dev) {
         await clear()
         await navigateTo('/')

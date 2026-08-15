@@ -1,8 +1,6 @@
 /**
- * Venue and venue-feature authorization abilities.
- *
- * Venues and features are public data (anyone can list/read).
- * ADMIN / MANAGER can create and update. ADMIN only can delete.
+ * Venues and features are public to read. ADMIN/MANAGER create and update;
+ * ADMIN deletes.
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser } from './types'

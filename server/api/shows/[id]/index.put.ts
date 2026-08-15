@@ -17,11 +17,8 @@ const bodySchema = z.object({
   contentWarningNotes: z.string().max(2000).optional().nullable(),
   warningsConfirmedNone: z.boolean().optional(),
   /**
-   * Full replacement of the show's warning links. Omit to leave them alone.
-   *
-   * `level` must be null for a technical warning and set for a general one.
-   * That depends on the vocabulary row, which zod cannot see, so it is checked
-   * against the database below.
+   * Full replacement of the warning links; omit to leave them alone. `level`
+   * must be null for a technical warning and set for a general one.
    */
   contentWarnings: z.array(z.object({
     contentWarningId: z.string().min(1),
@@ -69,14 +66,11 @@ export default defineEventHandler(async (event) => {
   if (body.warningsConfirmedNone !== undefined) updateData.warningsConfirmedNone = body.warningsConfirmedNone
   if (body.status !== undefined) updateData.status = body.status
 
-  // Warning links are replaced wholesale rather than diffed: the editor sends
-  // the full set, and doing it in one batch keeps the show from being left
-  // briefly warningless if a later statement fails.
+  // Replaced wholesale rather than diffed, in one batch, so the show is never
+  // left briefly warningless.
   if (body.contentWarnings !== undefined) {
-    // Last id wins on a repeat. `show_content_warnings` is unique on
-    // (show, warning) now that the axis has gone from the key, so a duplicated
-    // id would fail mid-batch rather than being quietly absorbed as it was
-    // under the old three-column index.
+    // Last id wins on a repeat: the table is unique on (show, warning), so a
+    // duplicate would fail mid-batch.
     const submitted = new Map(body.contentWarnings.map(w => [w.contentWarningId, w.level]))
 
     if (submitted.size > 0) {
@@ -112,10 +106,8 @@ export default defineEventHandler(async (event) => {
 
     const links = [...submitted].map(([contentWarningId, level]) => ({ showId, contentWarningId, level }))
 
-    // Chunked because D1 allows at most 100 bound parameters per statement and
-    // each row binds three (show, warning, level). The old limit of 30 was
-    // sized for the same three columns; keep the headroom rather than pushing
-    // to 33, since one imported show carried 72 warnings.
+    // Chunked: each row binds three parameters and D1 allows 100 per statement
+    // (ADR-0006).
     const CHUNK = 30
     const statements: BatchItem<'sqlite'>[] = [
       db.delete(schema.showContentWarnings).where(eq(schema.showContentWarnings.showId, showId)),

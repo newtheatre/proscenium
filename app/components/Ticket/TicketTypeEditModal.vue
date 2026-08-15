@@ -1,18 +1,6 @@
 /**
- * Edit Ticket Type Modal Component
- *
- * Modal for editing existing ticket types (admin/manager only).
- *
- * Features:
- * - Form validation with Zod schema
- * - Pre-filled with existing ticket type data
- * - Price displayed in £ (pounds), converted to pence for the API
- * - Updates ticket type via PUT /api/ticket-types/:id
- * - Toast notifications for success/error
- *
- * @props ticketType - Ticket type to edit (null means modal is closed)
- * @emits refresh - Emitted after successful update
- * @emits close - Emitted when the modal is dismissed
+ * Edit a ticket type. Admin/Manager only. Price is entered in pounds and sent
+ * in pence.
  */
 <script setup lang="ts">
 import * as z from 'zod'

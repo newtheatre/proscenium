@@ -4,12 +4,8 @@ import type { TableColumn } from '@nuxt/ui'
 const UBadge = resolveComponent('UBadge')
 
 /**
- * Admin Users Page — stage-door integration.
- *
- * Identity, credentials, roles, and verification live in the central auth
- * service; this page is the app-side view of the local user mirror (who
- * exists here for reservations) plus shadow-account creation for walk-ins.
- * Everything else deep-links to the auth service admin.
+ * The app-side view of the local mirror. Identity, credentials and roles live
+ * in the auth service; this page links out.
  */
 interface MirrorUser {
   id: string
@@ -37,12 +33,8 @@ const debouncedQuery = useDebouncedRef(q, {
 })
 
 /**
- * `useRequestFetch()` is not optional. `/api/users` is behind
- * `authorize(event, listUsers)`, and a plain `useFetch` running on the server
- * does **not** forward the incoming session cookie — so the handler saw no
- * session, returned 403, and this table arrived empty on every hard load,
- * filling in only if something later triggered a client-side refetch. See
- * docs/02-architecture.md §Fetching in the admin area.
+ * `useRequestFetch()` is not optional — a plain useFetch on the server does not
+ * forward the session cookie (ADR-0013).
  */
 const requestFetch = useRequestFetch()
 const { data, status, error, refresh } = await useAsyncData(
@@ -88,13 +80,8 @@ const columns: TableColumn<MirrorUser>[] = [
 ]
 
 /**
- * Always an array, never null — see docs/02-architecture.md on why binding
- * `?? []` straight at the table sends UTable into a render loop.
- *
- * The rows used to be pre-flattened into a `{ name, email, status, created }`
- * object of plain strings, which is why this page alone had no badges and its
- * dates were formatted differently from every other page. The columns render
- * from the real record now, like everywhere else.
+ * Always an array, never null (ADR-0012). Columns render from the real record,
+ * so dates and badges match every other page.
  */
 const rows = computed<MirrorUser[]>(() => data.value?.rows ?? [])
 const totalCount = computed(() => data.value?.total ?? 0)

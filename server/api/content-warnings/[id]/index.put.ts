@@ -15,17 +15,7 @@ const bodySchema = z.object({
 })
 
 /**
- * PUT /api/content-warnings/:id — edit a vocabulary entry. Admin/Manager only.
- *
- * Partial body, same contract as the other update endpoints: an absent key is
- * left alone, an explicit null clears.
- *
- * Changing `kind` while the warning is linked is refused. Kind decides whether a
- * link carries a level, and the existing links were written under the old
- * answer: flipping GENERAL to TECHNICAL would strand rows with a level that the
- * show page will not render, and the reverse would strand rows with none. There
- * is no correct level to invent on their behalf, so the endpoint says no and
- * leaves the decision with a human.
+ * PUT /api/content-warnings/:id — edit a vocabulary entry.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')

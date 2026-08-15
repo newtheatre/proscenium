@@ -1,9 +1,7 @@
 <script setup lang="ts">
 /**
- * Customer self-service management for their own booking: cancel it, or change
- * the ticket composition. Only shown for a PENDING booking on a future
- * performance. Authorises with the same access token the page was opened with (or the
- * logged-in owner's session).
+ * Customer self-service: cancel, or change the ticket composition. Shown only
+ * for a PENDING booking on a future performance (ADR-0011).
  */
 interface BookingTicket {
   id: string
@@ -107,13 +105,8 @@ const performance = computed(() =>
 const ticketTypes = computed(() => performance.value?.ticketTypes ?? [])
 
 /**
- * Refunds only exist after collection, and a collected booking cannot be edited
- * at all — so on this screen (PENDING only) there should be no refunded tickets
- * to begin with. Filtered anyway: the server diffs on `isNull(refundedAt)`, so
- * if the two sides ever disagree about which tickets count, an unchanged Save
- * asks for more of a type than the server can see and it issues a replacement
- * for one that was refunded. Cheap insurance against a real money bug, and
- * legacy imported rows are not bound by the new invariant.
+ * There should be no refunded tickets here at all; filtered anyway, because the
+ * server diffs on `isNull(refundedAt)` (ADR-0011).
  */
 const activeTickets = computed(() => props.booking.tickets.filter(t => !t.refundedAt))
 
@@ -127,13 +120,8 @@ const remainingCapacity = computed(() => {
 })
 
 /**
- * Types the booking currently holds, remembered when editing starts.
- *
- * Needed at save time because the stepper drops an entry once its quantity
- * reaches zero, and the server only diffs the types named in the request
- * ("requested types only; others untouched"). Removing a whole type therefore
- * sent a body that never mentioned it, and the tickets silently stayed —
- * the UI said "Booking updated" and nothing had changed.
+ * Types held when editing started. The stepper drops an entry at zero and the
+ * server only diffs the types named, so removal needs this.
  */
 const editedTypeIds = ref<string[]>([])
 

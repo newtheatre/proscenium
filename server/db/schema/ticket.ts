@@ -11,14 +11,8 @@ export const ticketTypes = sqliteTable('ticket_types', {
   description: text('description'),
   price: integer('price').notNull(), // Price in pence (smallest currency unit) to avoid floating point issues
 
-  // SINGLE         — one admission to one performance (the normal case)
-  // PASS_SALE      — the sale of a multi-performance pass (season, day,
-  //                  festival, performer). Carries the money.
-  // PASS_ADMISSION — an admission redeemed against a previously sold pass.
-  //                  Carries zero money; still counts against capacity.
-  //
-  // Without this split, importing the legacy pass counters either double-counts
-  // revenue or loses the fact a pass existed.
+  // SINGLE is a seat; PASS_SALE is money without a seat; PASS_ADMISSION is a seat
+  // without money. Which side each falls on: ADR-0007.
   kind: text('kind', {
     enum: ['SINGLE', 'PASS_SALE', 'PASS_ADMISSION'],
   }).notNull().default('SINGLE'),
@@ -101,11 +95,8 @@ export const performanceTicketTypeOverridesRelations = relations(performanceTick
   }),
 }))
 
-// An individual issued ticket, created when a customer books a seat.
-// Belongs to a reservation and is tied to a specific performance and ticket type.
-//
-// Status is managed at the reservation level. The only per-ticket state is whether
-// it has been individually refunded (e.g., a partial refund within a larger booking).
+// One issued ticket, tied to a performance and a ticket type. Status is per
+// reservation; only `refundedAt` is per ticket (ADR-0011).
 export const tickets = sqliteTable('tickets', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   reservationId: text('reservation_id').notNull().references(() => reservations.id, { onDelete: 'restrict' }),
@@ -115,12 +106,8 @@ export const tickets = sqliteTable('tickets', {
   // Snapshot of the price paid at time of booking; important since prices can be overridden and change over time
   pricePaid: integer('price_paid').notNull(),
 
-  // EXACT   — the legacy sale had a single ticket category, so the unit price is
-  //           price ÷ count with no inference (94.6% of legacy sales)
-  // DERIVED — apportioned from a mixed-category sale using prices observed in
-  //           single-category sales of the same show and era (5.4%)
-  // UNKNOWN — a reservation never settled by a sale, so no price was ever
-  //           recorded. Stored as 0.
+  // How far a legacy price can be trusted: EXACT, DERIVED or UNKNOWN.
+  // Definitions: docs/decisions/0003-legacy-ticketing-import.md
   priceConfidence: text('price_confidence', {
     enum: ['EXACT', 'DERIVED', 'UNKNOWN'],
   }).notNull().default('EXACT'),
@@ -136,16 +123,13 @@ export const tickets = sqliteTable('tickets', {
   index('tickets_performance_id_idx').on(table.performanceId),
   index('tickets_ticket_type_id_idx').on(table.ticketTypeId),
 
-  // Covers the hot capacity count — COUNT(*) WHERE performance_id = ? AND
-  // refunded_at IS NULL — which runs on every booking, walk-in and ticket edit,
-  // and the per-reservation ticket counts on the box-office list.
+  // Covers the hot capacity count, which runs on every booking, walk-in and
+  // ticket edit.
   index('tickets_perf_refunded_idx').on(table.performanceId, table.refundedAt),
   index('tickets_res_refunded_idx').on(table.reservationId, table.refundedAt),
 ])
 
-// Augments reservationsRelations with the tickets many-relation.
-// Defined here (not in reservation.ts) to avoid a circular import,
-// since ticket.ts already imports from reservation.ts.
+// Declared here, not in reservation.ts, to avoid a circular import.
 export const reservationsTicketsRelation = relations(reservations, ({ many }) => ({
   tickets: many(tickets),
 }))

@@ -1,15 +1,6 @@
 /**
- * Column allow-lists for the public What's On endpoints.
- *
- * `/api/whats-on` and `/api/whats-on/:slug` are unauthenticated and served with
- * `Cache-Control: public, s-maxage=300`, so whatever they return is also cached
- * at the edge for anyone to fetch. Both used to spread the raw rows
- * (`...show`, `...perf`), which published `performances.notes` — declared in the
- * schema as "Internal production notes, not shown to customers" — along with
- * every other column added to either table since.
- *
- * Allow-list rather than deny-list, so a new column is private until someone
- * decides otherwise, and shared between the two endpoints so they cannot drift.
+ * Allow-lists for the public, edge-cached What's On endpoints. Allow-list,
+ * not deny-list, so a new column is private until someone decides otherwise.
  */
 
 /** Show columns the public may see. */
@@ -30,11 +21,8 @@ export const publicShowColumns = {
 } as const
 
 /**
- * Content warning link columns the public may see — the level, and nothing else.
- *
- * The link row carries `id`, `showId` and `contentWarningId`, none of which mean
- * anything outside the admin section, and all of which used to ship because this
- * relation was the one place that spread the raw row.
+ * The level and nothing else — the link row's ids mean nothing outside the
+ * admin section.
  */
 export const publicContentWarningLinkColumns = {
   level: true,

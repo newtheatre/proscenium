@@ -1,12 +1,6 @@
 /**
- * User authorization abilities — for the local mirror only.
- *
- * - ADMIN / MANAGER / BOX_OFFICE can list and read mirror rows.
- * - ADMIN / MANAGER can create one (guest checkout's shadow user).
- * - ADMIN can delete one (except their own).
- * - Users can read their own.
- *
- * Credentials, roles and verification are the auth service's, not ours.
+ * For the local mirror only. Credentials, roles and verification belong to the
+ * auth service.
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser, OwnedResource } from './types'
@@ -38,13 +32,6 @@ export const deleteUser = defineAbility((user: AbilityUser, resource: OwnedResou
 })
 
 /*
- * Deliberately absent: `updateUser`, `updateUserRoles`, `updateUserVerified`,
- * `resetUserPassword` and `anonymiseUserAccount`.
- *
- * Credentials, roles, verification and erasure all live in the central auth
- * service (stage-door) — this app holds a read-only mirror and must not carry
- * role-editing or credential UI (stage-door CLAUDE.md invariants 1 and 4).
- * Erasure arrives via `POST /api/_hooks/auth/anonymise`, not a local route.
- * These abilities guarded endpoints that no longer exist, so leaving them
- * exported implied a permission model this app does not enforce.
+ * Deliberately absent: updateUser, updateUserRoles, updateUserVerified,
+ * resetUserPassword, anonymiseUserAccount — all the auth service's (ADR-0014).
  */

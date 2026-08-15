@@ -21,14 +21,8 @@ export default defineTask({
 })
 
 /**
- * Seed Shows and Performances
- *
- * Creates a realistic spread of shows across all three lifecycle stages:
- * - A completed past show (PUBLISHED, all performances past)
- * - A currently running show (PUBLISHED, performances ON_SALE)
- * - An upcoming show still in preparation (DRAFT)
- *
- * Dates are specified in UTC. startsAt/doorsAt use unix timestamps (seconds).
+ * Shows across all three lifecycle stages, so the admin tabs and the public
+ * listings both have something to render.
  */
 export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]) {
   console.log('🎭 Seeding shows and performances...')
@@ -99,13 +93,8 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
 
   // ── Performances ──────────────────────────────────────────────────────────
 
-  // ── Performances ──────────────────────────────────────────────────────────
-  // Offsets are relative to today so the spread of past/current/future is
-  // always the same regardless of when the seed runs.
-  //
-  // Earnest  — completed run,  days -35 to -31  (~5 weeks ago)
-  // Hamlet   — currently live, days  -1 to  +9  (yesterday → next weekend)
-  // Into the Woods — upcoming, days +49 to +53  (~7 weeks from now)
+  // Offsets are relative to today, so the past/current/future spread is the same
+  // whenever the seed runs.
 
   const performancesToCreate = [
     // The Importance of Being Earnest — completed run at New Theatre
@@ -291,19 +280,8 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
     console.log(`  ✅ Created ${overridesToCreate.length} ticket type overrides for Oscar Night (free event)`)
   }
 
-  // ── Content Warnings ──────────────────────────────────────────────────────
-  //
-  // Enough to exercise all three public states, because the difference between
-  // them is the whole design and none of it was visible locally before: the
-  // vocabulary arrives from migration 0016 and the seed never linked anything,
-  // so every seeded show rendered "no information recorded".
-  //
-  //   Hamlet        — warnings listed, across all four groups
-  //   Earnest       — checked, and there are none (the reassuring state)
-  //   Into the Woods, Oscar Night — untouched (the "nobody filled this in" state)
-  //
-  // Looked up by slug rather than id: the migration seeds literal `cw_<slug>`
-  // ids, but going through the column is what the application does.
+  // Enough to exercise all three public warning states, which is the whole
+  // design (ADR-0004). Looked up by slug, as the application does.
   const vocabulary = await db.select({ id: contentWarnings.id, slug: contentWarnings.slug })
     .from(contentWarnings)
   const warningId = (slug: string) => vocabulary.find(w => w.slug === slug)?.id

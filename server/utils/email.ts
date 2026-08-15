@@ -1,11 +1,6 @@
 /**
- * Email sending utilities using Resend.
- *
- * The API key is read from `runtimeConfig.resendApiKey` (env
- * `NUXT_RESEND_API_KEY`), falling back to the bare `RESEND_API_KEY` env var.
- * The sender address comes from `runtimeConfig.resendFromEmail` (env
- * `NUXT_RESEND_FROM_EMAIL`). When no key is configured, sends become no-ops
- * with a logged warning rather than errors.
+ * Email via Resend. The key comes from runtimeConfig.resendApiKey, falling
+ * back to a bare RESEND_API_KEY.
  */
 
 import { getResend } from './resend'
@@ -18,15 +13,6 @@ interface SendEmailOptions {
 
 /**
  * Send an email via Resend.
- *
- * @example
- * ```ts
- * await sendEmail({
- *   to: 'user@example.com',
- *   subject: 'Welcome',
- *   html: '<p>Hello!</p>',
- * })
- * ```
  */
 export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<void> {
   const resend = getResend()
@@ -74,16 +60,8 @@ interface BookingEmailData {
 }
 
 /**
- * Escape a value for interpolation into an email's HTML body.
- *
- * `customerName` and `customerNotes` arrive from the unauthenticated booking
- * endpoint, where the caller also chooses the recipient address. Unescaped, that
- * lets anyone put arbitrary markup — a payment link, say — inside a DKIM-signed
- * message from the theatre's own domain.
- *
- * Show, venue and ticket-type names are staff-entered rather than public, but
- * they are escaped too: an apostrophe in a show title is common enough on its
- * own, and a rule with exceptions is one someone will later apply wrongly.
+ * customerName and customerNotes come from the unauthenticated booking
+ * endpoint, so unescaped they put attacker markup in a DKIM-signed message.
  */
 function escapeHtml(value: string): string {
   return value
@@ -100,13 +78,8 @@ function escapeMultiline(value: string): string {
 }
 
 /*
- * Performance times are instants, and these run inside a Cloudflare Worker,
- * whose system timezone is UTC. Without an explicit `timeZone` a 19:30 BST
- * curtain-up renders as "18:30" — so for roughly eight months of the year every
- * confirmation, reminder and cancellation email quoted a time an hour earlier
- * than the website, and a post-midnight fringe slot came out on the wrong day
- * entirely. Every other formatter of this field in the app already pins
- * Europe/London; these two were the exception.
+ * The Worker runs in UTC, so every performance-time formatter must pin
+ * Europe/London or a 19:30 BST curtain-up renders as 18:30.
  */
 const THEATRE_TIME_ZONE = 'Europe/London'
 
@@ -179,17 +152,12 @@ function buildTicketTable(tickets: BookingTicket[]): string {
 }
 
 /**
- * Send a booking confirmation email.
- *
- * Sent immediately after a new reservation is created. Contains the booking
- * reference, show / performance details, ticket breakdown, and a link to
- * view the booking online.
+ * Booking confirmation, sent immediately after a reservation is created.
  */
 export async function sendBookingConfirmationEmail(data: BookingEmailData): Promise<void> {
   const { public: { baseURL } } = useRuntimeConfig()
-  // A signed, expiring token rather than the booking reference. The reference is
-  // printed below for the customer to quote at the box office, which is exactly
-  // why it cannot also be the thing that unlocks the booking.
+  // A signed token, not the booking reference — the reference is printed below
+  // for the customer to quote, which is why it cannot also unlock the booking.
   const token = await signBookingToken(data.bookingId, bookingTokenExpiry(data.performanceDate))
   const bookingUrl = `${baseURL}/whats-on/${data.showSlug}/booking/${data.bookingRef}?t=${encodeURIComponent(token)}`
 
@@ -293,11 +261,7 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData): Prom
 }
 
 /**
- * Send a booking cancellation email.
- *
- * Sent when a reservation is moved to CANCELLED status. Notifies the
- * customer that their booking has been cancelled and they no longer need
- * to attend.
+ * Booking cancellation, sent when a reservation moves to CANCELLED.
  */
 export async function sendBookingCancellationEmail(data: Omit<BookingEmailData, 'customerNotes'>): Promise<void> {
   const { public: { baseURL } } = useRuntimeConfig()
@@ -367,16 +331,12 @@ export async function sendBookingCancellationEmail(data: Omit<BookingEmailData, 
 }
 
 /**
- * Send a booking reminder email.
- *
- * Optional — could be triggered by a scheduled task (e.g. 24 hours before
- * the performance). Reminds the customer about their upcoming booking.
+ * Booking reminder. Not currently triggered by anything.
  */
 export async function sendBookingReminderEmail(data: BookingEmailData): Promise<void> {
   const { public: { baseURL } } = useRuntimeConfig()
-  // A signed, expiring token rather than the booking reference. The reference is
-  // printed below for the customer to quote at the box office, which is exactly
-  // why it cannot also be the thing that unlocks the booking.
+  // A signed token, not the booking reference — the reference is printed below
+  // for the customer to quote, which is why it cannot also unlock the booking.
   const token = await signBookingToken(data.bookingId, bookingTokenExpiry(data.performanceDate))
   const bookingUrl = `${baseURL}/whats-on/${data.showSlug}/booking/${data.bookingRef}?t=${encodeURIComponent(token)}`
 

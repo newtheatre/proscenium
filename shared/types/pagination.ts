@@ -1,11 +1,6 @@
 /**
- * The envelope every paginated list endpoint returns.
- *
- * Declared in `shared/` because both sides need it: the handler builds it (see
- * `server/utils/pagination.ts`, which re-exports this) and the page consuming it
- * has to describe what it is fetching. It used to be declared server-side only,
- * so `app/pages/admin/users.vue` hand-wrote its own copy — the start of exactly
- * the drift that docs/09-known-issues.md #16 is about.
+ * The envelope every paginated list endpoint returns (ADR-0005). In `shared/`
+ * because the handler builds it and the page consuming it describes it.
  */
 export interface Paginated<T> {
   rows: T[]

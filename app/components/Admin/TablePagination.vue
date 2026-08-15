@@ -1,14 +1,6 @@
 <!--
-  The footer under an admin table: what you are looking at on the left, the pager
-  on the right.
-
-  Note the props are plain numbers rather than a handle on the table. The pages
-  this replaces read `table?.tableApi?.getFilteredRowModel().rows.length`
-  *in the template*, which re-walks TanStack's whole row model on every render —
-  the same class of problem as the render loop documented in
-  docs/02-architecture.md, and the reason `/admin/shows` once locked the tab.
-  Every caller already owns its `pagination` and `rowSelection` refs, so it can
-  pass counts it knows without asking the table to recompute them.
+The footer under an admin table. Props are plain numbers, not a table handle,
+so nothing re-walks the row model to report a count (ADR-0012).
 -->
 <script setup lang="ts">
 const props = defineProps<{
@@ -29,9 +21,7 @@ const page = defineModel<number>('page', { required: true })
 
 /**
  * The count always reads the same way — "12 venues" — with selection folded in
- * only when something is actually selected. Pages used to disagree here: two
- * showed "0 of 12 row(s) selected." permanently, on tables that have no bulk
- * action to perform on a selection, while a third showed the plain count.
+ * only when something is selected.
  */
 const summary = computed(() => {
   const singular = props.label ?? 'row'

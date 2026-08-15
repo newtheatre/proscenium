@@ -1,9 +1,7 @@
 <script lang="ts" setup>
 /**
- * Security — stage-door integration.
- *
- * Passwords, Google sign-in, logging out everywhere, and account closure
- * live in the central NNT account service.
+ * Passwords, Google sign-in and account closure live in the central account
+ * service; this page links out.
  */
 const config = useRuntimeConfig()
 
