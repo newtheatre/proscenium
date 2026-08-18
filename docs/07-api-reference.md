@@ -180,9 +180,13 @@ It sits under `_hooks/` because it uses exactly the same auth as the GDPR hooks:
 SHA-256 of this app's own service token.
 
 Permissions are lowercase and dotted (`money.refund`) where roles are uppercase (`BOX_OFFICE`), so
-the two can never be confused in a single string. The current vocabulary reproduces the three-tier
-truth table in `shared/utils/abilities/types.ts` exactly; the ability layer moves onto it in a
-separate change.
+the two can never be confused in a single string.
+
+The ability layer resolves through it. `shared/utils/abilities/types.ts` holds the three shorthands
+every `defineAbility` routes through, and each is now a permission: `isStaff` is `staff.access`,
+`isAdminOrManager` is `programme.manage`, `isAdmin` is `catalogue.delete`. The individual abilities
+are unchanged, so the truth table is identical; naming each one for the capability it actually means
+is a separate, incremental job, one domain file at a time.
 
 ### Bookings (public-facing box office)
 

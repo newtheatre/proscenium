@@ -4,7 +4,7 @@
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser } from './types'
-import { hasRole, isAdminOrManager } from './types'
+import { isAdmin, isAdminOrManager } from './types'
 
 // ── Venue abilities ──────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ export const readVenue = defineAbility(() => true)
 export const updateVenue = defineAbility((user: AbilityUser) => isAdminOrManager(user))
 
 /** Delete a venue — ADMIN only. */
-export const deleteVenue = defineAbility((user: AbilityUser) => hasRole(user, 'ADMIN'))
+export const deleteVenue = defineAbility((user: AbilityUser) => isAdmin(user))
 
 // ── Venue feature abilities ──────────────────────────────────────
 
@@ -38,4 +38,4 @@ export const readVenueFeature = defineAbility(() => true)
 export const updateVenueFeature = defineAbility((user: AbilityUser) => isAdminOrManager(user))
 
 /** Delete a venue feature — ADMIN only. */
-export const deleteVenueFeature = defineAbility((user: AbilityUser) => hasRole(user, 'ADMIN'))
+export const deleteVenueFeature = defineAbility((user: AbilityUser) => isAdmin(user))

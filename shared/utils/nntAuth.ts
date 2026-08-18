@@ -1,11 +1,11 @@
 /**
- * The NNT session contract, v1.0 — copied from stage-door
- * `packages/auth-types`. DO NOT EDIT HERE: change it there and re-copy.
+ * The NNT session contract, v1.0 — source of truth. Copied into each consumer
+ * app; change it here and re-copy. See docs/session-contract.md.
  */
 
 declare module '#auth-utils' {
   interface User {
-    /** Canonical user id — stable forever, our bookings FK against it. */
+    /** Canonical user id — stable forever, apps FK against it. */
     id: string
     /** Lowercased. */
     email: string
@@ -52,6 +52,32 @@ export function hasAnyRole(user: RoleHolder | null | undefined, app: string, ...
 }
 
 /**
+ * The part of an app's own manifest the permission resolver reads. Apps pass
+ * their local APP_MANIFEST; nothing here is fetched or cached.
+ */
+export interface PermissionSource {
+  namespace: string
+  roles: readonly { readonly role: string, readonly permissions: readonly string[] }[]
+}
+
+/**
+ * Build an app's permission check from its manifest. Permissions are a pure
+ * function of the role strings already in the session, so nothing new is sealed.
+ */
+export function permissionResolver(manifest: PermissionSource) {
+  const byRole = new Map(manifest.roles.map(r => [r.role, new Set<string>(r.permissions)]))
+  const prefix = `${manifest.namespace}:`
+
+  return function can(user: RoleHolder | null | undefined, permission: string): boolean {
+    for (const scoped of user?.roles ?? []) {
+      if (!scoped.startsWith(prefix)) continue
+      if (byRole.get(scoped.slice(prefix.length))?.has(permission)) return true
+    }
+    return false
+  }
+}
+
+/**
  * True if the session's roles are too stale to honour on a privileged route.
  * Negative ages (clock skew) count as stale — defensive per the contract.
  */
@@ -60,3 +86,5 @@ export function isStale(session: StaleCheckable | null | undefined, maxAgeMs: nu
   const age = Date.now() - session.refreshedAt
   return age < 0 || age > maxAgeMs
 }
+
+export {}

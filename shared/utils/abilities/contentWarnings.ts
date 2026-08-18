@@ -4,7 +4,7 @@
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser } from './types'
-import { hasRole, isAdminOrManager, isStaff } from './types'
+import { isAdmin, isAdminOrManager, isStaff } from './types'
 
 /** List the vocabulary — staff. */
 export const listContentWarnings = defineAbility((user: AbilityUser) => isStaff(user))
@@ -16,4 +16,4 @@ export const createContentWarning = defineAbility((user: AbilityUser) => isAdmin
 export const updateContentWarning = defineAbility((user: AbilityUser) => isAdminOrManager(user))
 
 /** Delete a vocabulary entry outright — ADMIN only. */
-export const deleteContentWarning = defineAbility((user: AbilityUser) => hasRole(user, 'ADMIN'))
+export const deleteContentWarning = defineAbility((user: AbilityUser) => isAdmin(user))

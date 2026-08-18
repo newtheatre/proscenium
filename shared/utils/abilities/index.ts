@@ -3,7 +3,7 @@
  * the domain file; both work.
  */
 export type { AbilityUser, OwnedResource } from './types'
-export { hasRole, isAdminOrManager, isStaff } from './types'
+export { isAdmin, isAdminOrManager, isStaff } from './types'
 
 export {
   listUsers,

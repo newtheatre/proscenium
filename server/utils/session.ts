@@ -1,14 +1,17 @@
 import type { H3Event } from 'h3'
 import type { User } from '#auth-utils'
+import { APP_MANIFEST } from '../../shared/utils/appManifest'
+
+const NAMESPACE_PREFIX = `${APP_MANIFEST.namespace}:`
 
 /**
- * Session reads for this app. Staleness applies to roles, not to identity —
- * a stale session keeps `user.id` and loses its `proscenium:` roles (ADR-0008).
+ * Session reads for this app. Staleness applies to roles, not identity: a
+ * stale session keeps `user.id` and loses this app's roles, and so its permissions.
  */
 
 /** True if the session carries any role in this app's namespace. */
 function holdsAppRoles(user: User): boolean {
-  return user.roles?.some(role => role.startsWith('proscenium:')) ?? false
+  return user.roles?.some(role => role.startsWith(NAMESPACE_PREFIX)) ?? false
 }
 
 /**
@@ -22,7 +25,7 @@ export async function sessionUserForAuthorization(event: H3Event): Promise<User 
     if (!sessionUser) return null
 
     if (holdsAppRoles(sessionUser) && isStale(session)) {
-      return { ...sessionUser, roles: sessionUser.roles.filter(r => !r.startsWith('proscenium:')) }
+      return { ...sessionUser, roles: sessionUser.roles.filter(r => !r.startsWith(NAMESPACE_PREFIX)) }
     }
 
     return sessionUser

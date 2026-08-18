@@ -4,7 +4,7 @@
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser } from './types'
-import { hasRole, isAdminOrManager, isStaff } from './types'
+import { isAdmin, isAdminOrManager, isStaff } from './types'
 
 // ── Show abilities ───────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ export const readShow = defineAbility((user: AbilityUser) => isStaff(user))
 export const updateShow = defineAbility((user: AbilityUser) => isAdminOrManager(user))
 
 /** Delete a show — ADMIN only. */
-export const deleteShow = defineAbility((user: AbilityUser) => hasRole(user, 'ADMIN'))
+export const deleteShow = defineAbility((user: AbilityUser) => isAdmin(user))
 
 // ── Performance abilities ────────────────────────────────────────
 
