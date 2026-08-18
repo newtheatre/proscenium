@@ -9,6 +9,7 @@ export {
   listUsers,
   createUser,
   readUser,
+  updateUser,
   deleteUser,
 } from './users'
 
