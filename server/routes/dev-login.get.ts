@@ -10,11 +10,11 @@ export default defineEventHandler(async (event) => {
   const { staff } = getQuery(event)
   const roles
     = staff === 'admin'
-      ? ['proscenium:ADMIN']
+      ? [`${APP_MANIFEST.namespace}:ADMIN`]
       : staff === 'manager'
-        ? ['proscenium:MANAGER']
+        ? [`${APP_MANIFEST.namespace}:MANAGER`]
         : staff === 'box-office'
-          ? ['proscenium:BOX_OFFICE']
+          ? [`${APP_MANIFEST.namespace}:BOX_OFFICE`]
           : []
 
   const now = Date.now()

@@ -4,7 +4,8 @@
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser, OwnedResource } from './types'
-import { hasRole, isAdminOrManager, isStaff } from './types'
+import { isAdminOrManager, isStaff } from './types'
+import { can } from '../permissions'
 
 /** List all users — staff only. */
 export const listUsers = defineAbility((user: AbilityUser) => isStaff(user))
@@ -26,8 +27,8 @@ export const updateUser = defineAbility((user: AbilityUser, resource: OwnedResou
 
 /** Delete a user — ADMIN can delete others, users can delete themselves (except ADMINs). */
 export const deleteUser = defineAbility((user: AbilityUser, resource: OwnedResource) => {
-  if (user.id === resource.id && !hasRole(user, 'ADMIN')) return true
-  if (hasRole(user, 'ADMIN') && user.id !== resource.id) return true
+  if (user.id === resource.id && !can(user, 'user.delete.any')) return true
+  if (can(user, 'user.delete.any') && user.id !== resource.id) return true
   return false
 })
 

@@ -167,6 +167,26 @@ Authenticated by the SHA-256 of this app's `AUTH_SERVICE_TOKEN`, compared consta
 | POST | `/api/_hooks/auth/anonymise` | Service token | GDPR erasure: scrub the mirror row and reservation notes. Idempotent |
 | POST | `/api/_hooks/auth/last-activity` | Service token | Most recent booking or pass per user, feeding the retention sweep |
 | POST | `/api/_hooks/auth/merge` | Service token | Account merge: re-point every user-referencing row onto the winner, delete the losing mirror row. Idempotent |
+| GET | `/api/_hooks/auth/manifest` | Service token | This app's role and permission declaration, polled by the auth service (stage-door ADR-0017) |
+
+### The app manifest
+
+`GET /api/_hooks/auth/manifest` returns `shared/utils/appManifest.ts` verbatim: the role namespace
+(`proscenium`), the roles this app reads, and the permissions each carries. The auth service polls it
+and turns it into role definitions, so **adding a role here is what makes it grantable** — nobody
+types it into the auth admin UI.
+
+It sits under `_hooks/` because it uses exactly the same auth as the GDPR hooks: the bearer is the
+SHA-256 of this app's own service token.
+
+Permissions are lowercase and dotted (`money.refund`) where roles are uppercase (`BOX_OFFICE`), so
+the two can never be confused in a single string.
+
+The ability layer resolves through it. `shared/utils/abilities/types.ts` holds the three shorthands
+every `defineAbility` routes through, and each is now a permission: `isStaff` is `staff.access`,
+`isAdminOrManager` is `programme.manage`, `isAdmin` is `catalogue.delete`. The individual abilities
+are unchanged, so the truth table is identical; naming each one for the capability it actually means
+is a separate, incremental job, one domain file at a time.
 
 ### Bookings (public-facing box office)
 

@@ -4,7 +4,7 @@
  */
 import { defineAbility } from '#imports'
 import type { AbilityUser } from './types'
-import { hasRole, isAdminOrManager } from './types'
+import { isAdmin, isAdminOrManager } from './types'
 
 /** List ticket types — public. */
 export const listTicketTypes = defineAbility(() => true)
@@ -19,4 +19,4 @@ export const readTicketType = defineAbility(() => true)
 export const updateTicketType = defineAbility((user: AbilityUser) => isAdminOrManager(user))
 
 /** Delete a ticket type — ADMIN only. */
-export const deleteTicketType = defineAbility((user: AbilityUser) => hasRole(user, 'ADMIN'))
+export const deleteTicketType = defineAbility((user: AbilityUser) => isAdmin(user))

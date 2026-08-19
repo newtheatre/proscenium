@@ -1,3 +1,5 @@
+import { can } from '../permissions'
+
 /**
  * User shape available during authorization checks.
  * Matches the session user provided by nuxt-auth-utils.
@@ -16,19 +18,18 @@ export interface OwnedResource {
 }
 
 /**
- * Roles arrive from the auth service as scoped strings, so this matches
- * `app:ROLE` rather than a bare role name.
+ * The three shorthands every ability routes through. They resolve permissions
+ * from appManifest.ts, which is the same object served to the auth service.
  */
-export function hasRole(user: AbilityUser, role: string): boolean {
-  return user.roles?.includes(`proscenium:${role}`) || false
-}
-
-/** Shorthand: user is ADMIN or MANAGER. */
-export function isAdminOrManager(user: AbilityUser): boolean {
-  return hasRole(user, 'ADMIN') || hasRole(user, 'MANAGER')
-}
-
-/** Shorthand: user is ADMIN, MANAGER, or BOX_OFFICE. */
 export function isStaff(user: AbilityUser): boolean {
-  return isAdminOrManager(user) || hasRole(user, 'BOX_OFFICE')
+  return can(user, 'staff.access')
+}
+
+export function isAdminOrManager(user: AbilityUser): boolean {
+  return can(user, 'programme.manage')
+}
+
+/** Destructive deletes, held by ADMIN alone. */
+export function isAdmin(user: AbilityUser): boolean {
+  return can(user, 'catalogue.delete')
 }
