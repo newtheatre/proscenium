@@ -22,8 +22,20 @@ set -euo pipefail
 DB_NAME="${D1_DATABASE_NAME:-proscenium}"
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-server/db/migrations/sqlite}"
 
-applied=$(bunx wrangler d1 execute "$DB_NAME" --remote --json \
-  --command "SELECT name FROM _hub_migrations" 2>/dev/null \
+# Prefer the installed wrangler: `bunx wrangler` fetches on a version bump,
+# and the install chatter lands on stdout and corrupts the parse below.
+if [ -x ./node_modules/.bin/wrangler ]; then
+  WRANGLER=./node_modules/.bin/wrangler
+else
+  WRANGLER="bunx wrangler@4"
+fi
+
+# Slice from the first `[` so any banner ahead of the JSON is discarded rather
+# than grepped for `"name"`.
+raw=$($WRANGLER d1 execute "$DB_NAME" --remote --json \
+  --command "SELECT name FROM _hub_migrations" 2>/dev/null) || true
+json=${raw#*[}
+applied=$(printf '%s' "[$json" \
   | grep -oE '"name": *"[^"]+"' \
   | sed 's/.*: *"//; s/"$//; s/\.sql$//' \
   | sort -u) || true
