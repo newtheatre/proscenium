@@ -66,7 +66,10 @@ const state = reactive<Partial<Schema>>({
 const toast = useToast()
 
 // Fetch available features
-const { data: features } = await useFetch<VenueFeature[]>('/api/venue-features')
+const { data: features } = await useFetch('/api/venue-features', {
+  query: { limit: 100 },
+  transform: (res: Paginated<VenueFeature>) => res.rows,
+})
 
 const featureOptions = computed(() => {
   return (features.value || []).map(feature => ({

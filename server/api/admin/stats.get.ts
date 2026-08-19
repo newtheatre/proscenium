@@ -28,8 +28,10 @@ export default defineEventHandler(async (event) => {
   const now = new Date()
   const { from, to } = await getValidatedQuery(event, querySchema.parse)
   const season = currentSeason(now)
-  const windowFrom = new Date(`${from ?? season.from}T00:00:00Z`)
-  const windowTo = new Date(`${to ?? season.to}T23:59:59Z`)
+  // Whole days in Europe/London, not UTC midnights — the Worker runs in UTC and
+  // an unpinned bound moves the season boundary by an hour through BST.
+  const windowFrom = validityStart(from ?? season.from)
+  const windowTo = validityEnd(to ?? season.to)
 
   // Only count revenue for tickets that have actually been paid at the box office.
   // PENDING reservations are pre-bookings that have not yet exchanged money.

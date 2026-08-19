@@ -48,8 +48,10 @@ const state = reactive<Partial<Schema>>({
 })
 
 // Fetch features
-const { data: features, refresh: refreshFeatures } = await useFetch<VenueFeature[]>('/api/venue-features', {
+const { data: features, refresh: refreshFeatures } = await useFetch('/api/venue-features', {
   lazy: true,
+  query: { limit: 100 },
+  transform: (res: Paginated<VenueFeature>) => res.rows,
 })
 
 function resetForm() {

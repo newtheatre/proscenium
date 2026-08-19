@@ -63,6 +63,8 @@ export default defineEventHandler(async (event) => {
 
   // ── Load current active (non-refunded) tickets for the reservation ─────────
 
+  // Every active ticket, not only the requested types: the minimum-ticket guard
+  // below counts the whole reservation.
   const existingActive = await db
     .select()
     .from(schema.tickets)
@@ -70,13 +72,13 @@ export default defineEventHandler(async (event) => {
       and(
         eq(schema.tickets.reservationId, id),
         isNull(schema.tickets.refundedAt),
-        inArray(schema.tickets.ticketTypeId, requestedTypeIds),
       ),
     )
 
-  // Group by ticketTypeId, sorted oldest-first (so deletions take newest rows)
+  // Oldest-first so deletions take the newest rows. Ties broken on id: a batch
+  // shares one whole-second `current_timestamp`, so createdAt alone is not total.
   const byType = new Map<string, typeof existingActive>()
-  for (const ticket of existingActive.sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1))) {
+  for (const ticket of existingActive.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))) {
     if (!byType.has(ticket.ticketTypeId)) byType.set(ticket.ticketTypeId, [])
     byType.get(ticket.ticketTypeId)!.push(ticket)
   }
@@ -115,22 +117,27 @@ export default defineEventHandler(async (event) => {
     // quantity === currentCount → no-op
   }
 
+  // A reservation must keep at least one ticket — to remove them all, cancel it.
+  // Same rule as the customer route in server/api/bookings/[id]/tickets.put.ts.
+  if (existingActive.length + toInsert.length - toDelete.length < 1) {
+    throw createError({ statusCode: 400, statusMessage: 'A reservation must have at least one ticket. Cancel it instead.' })
+  }
+
   // Enforce capacity on the net increase before applying. Staff who need to
   // oversell raise the performance's capacityOverride rather than bypassing this.
   await assertCapacity(performanceId, toInsert.length - toDelete.length)
 
-  // Execute mutations atomically so a diff can't half-apply (deletions land but
-  // insertions fail, or vice versa).
-  const del = toDelete.length > 0
-    ? db.delete(schema.tickets).where(inArray(schema.tickets.id, toDelete))
-    : null
-  const ins = toInsert.length > 0
-    ? db.insert(schema.tickets).values(toInsert)
-    : null
+  // Chunked so no statement's parameter count grows with the reservation, and
+  // batched so a diff cannot half-apply (ADR-0006).
+  const statements = [
+    ...chunked(toDelete, IDS_PER_STATEMENT)
+      .map(ids => db.delete(schema.tickets).where(inArray(schema.tickets.id, ids))),
+    ...chunked(toInsert, TICKET_ROWS_PER_INSERT)
+      .map(rows => db.insert(schema.tickets).values(rows)),
+  ]
 
-  if (del && ins) await db.batch([del, ins])
-  else if (del) await del
-  else if (ins) await ins
+  const [first, ...rest] = statements
+  if (first) await db.batch([first, ...rest])
 
   // ── Return the updated reservation with full ticket list ───────────────────
 

@@ -13,6 +13,12 @@ const querySchema = z.object({
 })
 
 /**
+ * The whole CSV is built in memory in one Worker, so the row count is capped
+ * rather than left to whichever filter the caller happened to supply.
+ */
+const MAX_EXPORT_ROWS = 20_000
+
+/**
  * GET /api/admin/export/tickets — ticket data as CSV, for the treasurer.
  */
 export default defineEventHandler(async (event) => {
@@ -62,14 +68,22 @@ export default defineEventHandler(async (event) => {
     .where(and(
       performanceId ? eq(schema.tickets.performanceId, performanceId) : undefined,
       !performanceId && showId ? inArray(schema.tickets.performanceId, showPerformances) : undefined,
-      from ? gte(schema.performances.startsAt, new Date(`${from}T00:00:00Z`)) : undefined,
-      to ? lte(schema.performances.startsAt, new Date(`${to}T23:59:59Z`)) : undefined,
+      from ? gte(schema.performances.startsAt, validityStart(from)) : undefined,
+      to ? lte(schema.performances.startsAt, validityEnd(to)) : undefined,
     ))
     .orderBy(
       asc(schema.shows.title),
       asc(schema.performances.startsAt),
       asc(schema.reservations.bookingRef),
     )
+    .limit(MAX_EXPORT_ROWS + 1)
+
+  if (rows.length > MAX_EXPORT_ROWS) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `That covers more than ${MAX_EXPORT_ROWS} tickets, which is too large to build in one request. Narrow the dates, or export one show at a time.`,
+    })
+  }
 
   const slug = performanceId
     ? `perf-${performanceId.slice(0, 8)}`

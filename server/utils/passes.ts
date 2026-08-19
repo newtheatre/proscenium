@@ -54,7 +54,7 @@ interface PerformanceFacts {
 
 /**
  * The entitlement rule. Pure, so canRedeem and redeemabilityForPage share it.
- * Checked in the order a human would explain it.
+ * Order is load-bearing where a reason is staff-overridable (STAFF_OVERRIDABLE).
  */
 export function decideRedeem(input: {
   pass: PassFacts
@@ -76,8 +76,10 @@ export function decideRedeem(input: {
 
   if (!coversShow) return reject('SHOW_NOT_COVERED')
   if (alreadyRedeemed) return reject('ALREADY_REDEEMED')
-  if (performance.status !== 'ON_SALE') return reject('PERFORMANCE_NOT_ON_SALE')
+  // Ahead of PERFORMANCE_NOT_ON_SALE, which staff may override: the other way
+  // round, overriding a closed performance also admits into a full house.
   if (soldOut) return reject('SOLD_OUT')
+  if (performance.status !== 'ON_SALE') return reject('PERFORMANCE_NOT_ON_SALE')
 
   return { ok: true }
 }

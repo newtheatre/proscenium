@@ -53,7 +53,7 @@ export default defineEventHandler(async (event) => {
 
   // Refund the newest tickets first, consistent with how removals pick tickets.
   const toRefund = active
-    .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
     .slice(0, quantity)
     .map(t => t.id)
 

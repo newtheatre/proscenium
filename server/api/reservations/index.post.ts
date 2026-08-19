@@ -120,7 +120,10 @@ export default defineEventHandler(async (event) => {
     staffNotes: body.staffNotes ?? null,
     status: 'PENDING',
   })
-  const ticketsInsert = db.insert(schema.tickets).values(ticketRows)
+  // One statement per chunk: a 20-ticket block booking would otherwise bind
+  // 100+ parameters in a single insert, which D1 refuses (ADR-0006).
+  const ticketInserts = chunked(ticketRows, TICKET_ROWS_PER_INSERT)
+    .map(rows => db.insert(schema.tickets).values(rows))
 
   if (needShadowUser) {
     await db.batch([
@@ -130,11 +133,11 @@ export default defineEventHandler(async (event) => {
         name: body.name!,
       }),
       reservationInsert,
-      ticketsInsert,
+      ...ticketInserts,
     ])
   }
   else {
-    await db.batch([reservationInsert, ticketsInsert])
+    await db.batch([reservationInsert, ...ticketInserts])
   }
 
   // Return the full reservation with related data
