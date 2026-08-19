@@ -1686,7 +1686,9 @@ Venue responses come from `formatVenueResponse` (`server/utils/queries/venues.ts
 
 **Source** `server/api/venue-features/index.get.ts` · **Auth** **Public**
 
-**Response** `200` — all `venue_features` rows ordered by name: `{ id, name, description, icon, createdAt, updatedAt }`.
+**Query** `page`, `limit` (max 100, default 25) and optional `q`, matching `name`.
+
+**Response** `200` — the `Paginated<T>` envelope, rows ordered by name: `{ rows: [{ id, name, description, icon, createdAt, updatedAt }], total, page, limit }`.
 
 ---
 
@@ -1787,7 +1789,7 @@ Looked up by `slug` **and** `status = 'PUBLISHED'`, so a DRAFT show is a 404 on 
 
 ```jsonc
 {
-  "ticketTypes": [                       // only active types, cheapest first
+  "ticketTypes": [                       // active + sellable types only, cheapest first
     { "id": "…", "name": "Student", "description": null, "effectivePrice": 500, "active": true }
   ],
   "ticketsSold": 12,
@@ -1877,15 +1879,19 @@ Both are optional; with neither, the counts cover every reservation.
 {
   showId:        z.string().optional(),
   performanceId: z.string().optional(),
+  from:          z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 }
 ```
 
-`performanceId` **takes precedence** over `showId`: when both are supplied the query filters on the performance alone, though the download filename is still derived from `showId`. With neither, every ticket in the database is exported.
+`performanceId` **takes precedence** over `showId`: when both are supplied the query filters on the performance alone, though the download filename is still derived from `showId`. `from` and `to` are inclusive performance-date bounds, whole days in `Europe/London`.
+
+**`400`** if none of the four is supplied — the whole archive is too large to build in one request. **`400`** again if the filters still match more than 20,000 tickets, which the CSV is assembled in memory in a single Worker.
 
 **Response** `200` — a CSV body, not JSON, with:
 
 - `Content-Type: text/csv; charset=utf-8`
-- `Content-Disposition: attachment; filename="nnt-tickets-<slug>-<YYYY-MM-DD>.csv"`, where `<slug>` is `show-<first 8 chars of showId>`, `perf-<first 8 chars of performanceId>`, or `all`.
+- `Content-Disposition: attachment; filename="nnt-tickets-<slug>-<YYYY-MM-DD>.csv"`, where `<slug>` is `perf-<first 8 chars of performanceId>`, `show-<first 8 chars of showId>`, or `<from|start>-to-<to|end>`.
 
 Columns, in order:
 

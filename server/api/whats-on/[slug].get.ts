@@ -58,9 +58,9 @@ export default defineEventHandler(async (event) => {
     ))
 
   const [allTicketTypes, showOverrides, perfOverrides, ticketCountMap] = await Promise.all([
-    // Archived types are legacy-only: valid for historic tickets, hidden from
-    // anything that sells.
-    db.select().from(schema.ticketTypes).where(eq(schema.ticketTypes.archived, false)),
+    // The shared filter: archived legacy types and the pass bookkeeping kinds
+    // must never reach a picker (ADR-0002, ADR-0010).
+    db.select().from(schema.ticketTypes).where(sellableTicketTypes()),
 
     db.select().from(schema.showTicketTypeOverrides)
       .where(eq(schema.showTicketTypeOverrides.showId, show.id)),

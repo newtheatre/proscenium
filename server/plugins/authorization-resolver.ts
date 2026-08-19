@@ -6,16 +6,14 @@ export default defineNitroPlugin((nitroApp) => {
       resolveServerUser: () => sessionUserForAuthorization(event),
     }
 
-    // Keeps the mirror fresh for FK integrity; never blocks the request. This is
+    // Keeps the mirror fresh for FK integrity, off the response path. This is
     // the first session read, so 0.secrets-store.ts must run first (ADR-0016).
     const { user } = await getUserSession(event)
     if (user) {
-      try {
-        await ensureLocalUser(user)
-      }
-      catch (error) {
+      const upsert = ensureLocalUser(user).catch((error: unknown) => {
         console.error('[mirror] upsert failed:', error)
-      }
+      })
+      event.context.cloudflare?.context.waitUntil(upsert)
     }
   })
 })

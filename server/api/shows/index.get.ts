@@ -128,6 +128,25 @@ export default defineEventHandler(async (event) => {
     ? [direction === 'asc' ? asc(schema.shows.title) : desc(schema.shows.title)]
     : [direction === 'asc' ? asc(firstAt) : desc(firstAt), asc(schema.shows.title)]
 
+  if (view === 'options') {
+    // Selected by the page's own where/order, never by binding its ids: an
+    // options page runs to 500, five times D1's parameter cap (ADR-0006).
+    const options = await db
+      .select({
+        id: schema.shows.id,
+        slug: schema.shows.slug,
+        title: schema.shows.title,
+        status: schema.shows.status,
+      })
+      .from(schema.shows)
+      .where(where)
+      .orderBy(...orderBy)
+      .limit(limit)
+      .offset(offsetFor({ page, limit }))
+
+    return paginated(options, total, { page, limit })
+  }
+
   // Ids only. The correlated scalars filter and order but cannot be projected —
   // the outer reference resolves differently in a projection.
   const pageRows = await db
@@ -140,27 +159,6 @@ export default defineEventHandler(async (event) => {
 
   const pageIds = pageRows.map(r => r.id)
   if (pageIds.length === 0) return paginated([], total, { page, limit })
-
-  if (view === 'options') {
-    // No run window here: deriving one would mean binding up to 500 show ids, and
-    // a picker only needs the show's name.
-    const options = await db
-      .select({
-        id: schema.shows.id,
-        slug: schema.shows.slug,
-        title: schema.shows.title,
-        status: schema.shows.status,
-      })
-      .from(schema.shows)
-      .where(inArray(schema.shows.id, pageIds))
-
-    const byId = new Map(options.map(o => [o.id, o]))
-    return paginated(
-      pageIds.map(id => byId.get(id)).filter(row => row !== undefined),
-      total,
-      { page, limit },
-    )
-  }
 
   const rows = await db.query.shows.findMany({
     where: (shows, { inArray: within }) => within(shows.id, pageIds),

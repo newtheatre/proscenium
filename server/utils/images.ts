@@ -22,11 +22,13 @@ interface ImageUploadOptions {
 interface ImageUploadResult {
   /** The stored blob pathname (use this to persist in the DB). */
   pathname: string
+  /** Best-effort removal of the replaced image. Call once the row is updated. */
+  deletePrevious: () => Promise<void>
 }
 
 /**
  * Validate and upload an image to blob storage: JPEG, PNG or WebP, 5 MB max.
- * Replaces and deletes any previous image; returns the blob pathname.
+ * Returns the pathname plus a cleanup to run after the row is repointed.
  */
 export async function validateAndUploadImage(
   event: Parameters<typeof readMultipartFormData>[0],
@@ -50,21 +52,25 @@ export async function validateAndUploadImage(
     throw createError({ statusCode: 400, statusMessage: 'File size exceeds 5MB limit' })
   }
 
-  // Delete existing image if present
-  if (opts.existingPath) {
-    try {
-      await blob.delete(opts.existingPath)
-    }
-    catch (err) {
-      console.error('Failed to delete old image:', err)
-    }
-  }
-
   const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
   const blobResult = await blob.put(`${opts.pathPrefix}/image-${Date.now()}.${ext}`, file.data, {
     contentType: file.type,
     access: 'public',
   })
 
-  return { pathname: blobResult.pathname }
+  // Removed only once the caller has repointed the row: deleting first leaves the
+  // row addressing a blob that no longer exists if the upload or update fails.
+  const previous = opts.existingPath
+  return {
+    pathname: blobResult.pathname,
+    deletePrevious: async () => {
+      if (!previous || previous === blobResult.pathname) return
+      try {
+        await blob.delete(previous)
+      }
+      catch (err) {
+        console.error('Failed to delete old image:', err)
+      }
+    },
+  }
 }

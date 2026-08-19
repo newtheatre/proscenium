@@ -53,7 +53,9 @@ export default defineEventHandler(async (event) => {
     ))
 
   const byType = new Map<string, typeof allActive>()
-  for (const ticket of allActive.sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1))) {
+  // Oldest-first so deletions take the newest rows. Ties broken on id: a batch
+  // shares one whole-second `current_timestamp`, so createdAt alone is not total.
+  for (const ticket of allActive.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))) {
     if (!byType.has(ticket.ticketTypeId)) byType.set(ticket.ticketTypeId, [])
     byType.get(ticket.ticketTypeId)!.push(ticket)
   }
@@ -86,16 +88,17 @@ export default defineEventHandler(async (event) => {
 
   await assertCapacity(performanceId, toInsert.length - toDelete.length)
 
-  const del = toDelete.length > 0
-    ? db.delete(schema.tickets).where(inArray(schema.tickets.id, toDelete))
-    : null
-  const ins = toInsert.length > 0
-    ? db.insert(schema.tickets).values(toInsert)
-    : null
+  // Chunked so no statement's parameter count grows with the booking, and
+  // batched so a diff cannot half-apply (ADR-0006).
+  const statements = [
+    ...chunked(toDelete, IDS_PER_STATEMENT)
+      .map(ids => db.delete(schema.tickets).where(inArray(schema.tickets.id, ids))),
+    ...chunked(toInsert, TICKET_ROWS_PER_INSERT)
+      .map(rows => db.insert(schema.tickets).values(rows)),
+  ]
 
-  if (del && ins) await db.batch([del, ins])
-  else if (del) await del
-  else if (ins) await ins
+  const [first, ...rest] = statements
+  if (first) await db.batch([first, ...rest])
 
   return { updated: true }
 })

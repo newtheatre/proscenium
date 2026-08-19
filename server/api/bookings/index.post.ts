@@ -41,9 +41,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // The per-IP middleware limit is generous for shared connections, so this
-  // narrower bucket bounds how often one address can be mailed (ADR-0015).
-  const guestEmail = (body.email ?? loggedInUser?.email)?.trim().toLowerCase()
+  // Narrower than the per-IP limit, and keyed on the session's own address:
+  // body.email is ignored for a signed-in caller, so it is free to vary (ADR-0015).
+  const guestEmail = (loggedInUser?.email ?? body.email)?.trim().toLowerCase()
   if (guestEmail) {
     await assertRateLimit(
       event,
@@ -153,7 +153,10 @@ export default defineEventHandler(async (event) => {
     customerNotes: body.customerNotes ?? null,
     status: 'PENDING',
   })
-  const ticketsInsert = db.insert(schema.tickets).values(ticketRows)
+  // One statement per chunk: a 17-ticket group booking would otherwise bind
+  // 100+ parameters in a single insert, which D1 refuses (ADR-0006).
+  const ticketInserts = chunked(ticketRows, TICKET_ROWS_PER_INSERT)
+    .map(rows => db.insert(schema.tickets).values(rows))
 
   if (needShadowUser) {
     await db.batch([
@@ -163,11 +166,11 @@ export default defineEventHandler(async (event) => {
         name: body.name!,
       }),
       reservationInsert,
-      ticketsInsert,
+      ...ticketInserts,
     ])
   }
   else {
-    await db.batch([reservationInsert, ticketsInsert])
+    await db.batch([reservationInsert, ...ticketInserts])
   }
 
   // Return the full booking details
@@ -189,22 +192,12 @@ export default defineEventHandler(async (event) => {
     }>
   }
 
+  // Allow-listed: without `columns` Drizzle returns staffNotes and legacyRef,
+  // and this response goes straight to the customer.
   const booking = await db.query.reservations.findFirst({
     where: (r, { eq }) => eq(r.id, reservationId),
-    with: {
-      user: { columns: { id: true, name: true, email: true } },
-      performance: {
-        with: {
-          show: { columns: { id: true, title: true, slug: true } },
-          venue: { columns: { id: true, name: true, address: true } },
-        },
-      },
-      tickets: {
-        with: {
-          ticketType: { columns: { id: true, name: true } },
-        },
-      },
-    },
+    columns: reservationCustomerColumns,
+    with: reservationCustomerWith,
   }) as BookingResult | undefined
 
   // Send confirmation email (don't block the response, but keep the worker alive)

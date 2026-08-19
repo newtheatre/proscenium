@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Show not found' })
   }
 
-  const { pathname } = await validateAndUploadImage(event, {
+  const { pathname, deletePrevious } = await validateAndUploadImage(event, {
     fieldName: 'poster',
     pathPrefix: `shows/${showId}`,
     existingPath: show.posterUrl,
@@ -27,6 +27,8 @@ export default defineEventHandler(async (event) => {
     .set({ posterUrl: pathname })
     .where(eq(schema.shows.id, showId))
     .returning()
+
+  await deletePrevious()
 
   return updated
 })

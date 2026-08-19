@@ -169,6 +169,22 @@ export function validateTicketTypesActive(
 }
 
 /**
+ * D1 binds at most 100 parameters per statement and a ticket row costs six, so
+ * rows go in several statements rather than one (ADR-0006).
+ */
+export const TICKET_ROWS_PER_INSERT = 16
+
+/** Id lists are split below D1's 100-parameter cap, with headroom (ADR-0006). */
+export const IDS_PER_STATEMENT = 90
+
+/** Fixed-size chunks, so no statement's parameter count grows with the data. */
+export function chunked<T>(items: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+  return out
+}
+
+/**
  * The single definition of "this ticket occupies a seat" (ADR-0007) — do not
  * add a parallel path. Pass a subquery, never an id list (ADR-0006).
  */
