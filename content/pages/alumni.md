@@ -93,20 +93,22 @@ Whether you graduated last year or decades ago, we'd love to have you as part of
 
 ## Register for the Alumni Network
 
-Complete the form below to join our growing network of over 200 alumni members:
+Registration lives on the Alumni Network's own site, [alumni.newtheatre.org.uk](https://alumni.newtheatre.org.uk), and takes a couple of minutes. Once you have signed up you will receive the bi-annual newsletter, invitations to network events, and we will be able to reach you if you contribute to the History Project.
 
-<div class="my-8">
-<iframe 
-  src="https://docs.google.com/forms/d/1PGgm8JgVqds4nJkBeRnvHgq4NFQ4hnavMO7vdaJThy8/viewform?embedded=true" 
-  width="100%" 
-  height="600" 
-  frameborder="0" 
-  marginheight="0" 
-  marginwidth="0"
->
-  Loading...
-</iframe>
-</div>
+::u-page-c-t-a
+---
+title: "Join our growing network"
+description: "Sign up on the Alumni Network site: over 200 members, the earliest of them graduating in 1953."
+links:
+  - label: "Register for the Alumni Network"
+    to: "https://alumni.newtheatre.org.uk/register"
+    icon: "i-lucide-user-plus"
+    color: "primary"
+    size: "xl"
+    external: true
+class: "my-12"
+---
+::
 
 ::u-page-c-t-a
 ---
