@@ -1,4 +1,8 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+
+// Signup belongs to the Alumni Network's own site (newtheatre/lumina), not here.
+const ALUMNI_SIGNUP_URL = 'https://alumni.newtheatre.org.uk/register'
+
 export default defineNuxtConfig({
 
   modules: [
@@ -146,6 +150,13 @@ export default defineNuxtConfig({
     },
     routeRules: {
       '/mailing-list/': { redirect: 'https://newtheatre.us3.list-manage.com/subscribe?u=ce5311ce46fe45638f90f4022&id=97e4899eb8' },
+
+      // The history site and the old Jekyll site both send alumni to these URLs,
+      // and neither is ours to edit; keep all four alive.
+      '/alumni/registration': { redirect: ALUMNI_SIGNUP_URL },
+      '/alumni/registration/': { redirect: ALUMNI_SIGNUP_URL },
+      '/alumni/register': { redirect: ALUMNI_SIGNUP_URL },
+      '/alumni/register/': { redirect: ALUMNI_SIGNUP_URL },
 
       // Baseline security headers on every response.
       '/**': {

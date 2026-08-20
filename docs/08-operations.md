@@ -42,6 +42,7 @@ There is no `wrangler.toml` in the repository. The Wrangler configuration is **g
 | Migrations table | `_hub_migrations` | Injected by NuxtHub into the generated Wrangler config |
 | Migrations directory | `.output/server/db/migrations/` | Same |
 | Redirect | `/mailing-list/` → Mailchimp signup | `nitro.routeRules` |
+| Redirect | `/alumni/registration`, `/alumni/register` (with and without a trailing slash) → `alumni.newtheatre.org.uk/register` | `nitro.routeRules`, via the `ALUMNI_SIGNUP_URL` constant at the top of `nuxt.config.ts` |
 
 `custom_domain: true` means Cloudflare routes the whole hostname to the Worker and manages the DNS record and certificate for it. Both hostnames hit the same Worker and therefore the same database.
 
@@ -502,6 +503,27 @@ and calls this app's anonymise hook, retrying until it succeeds. Do not try to s
 by hand: an erasure that does not go through the auth service leaves the central identity intact,
 and the mirror will be repopulated from the next request that person's browser makes.
 
+### Where alumni signup lives
+
+Alumni signup belongs to the Alumni Network's own site, `alumni.newtheatre.org.uk`
+([newtheatre/lumina](https://github.com/newtheatre/lumina)). There is no registration form, table
+or endpoint in this codebase, and there should not be one. This app links to it from `/alumni`, and
+four redirects carry the historical URLs there:
+
+| URL | Who sends people there |
+| --- | --- |
+| `/alumni/registration`, `/alumni/registration/` | `history.newtheatre.org.uk`: the report form, both submission forms and their thank-you pages ([newtheatre/history-project](https://github.com/newtheatre/history-project)) |
+| `/alumni/register`, `/alumni/register/` | The old Jekyll site's own page, so anything bookmarked or indexed before the Nuxt rebuild |
+
+Before the alumni site existed the signup was a Google Form, embedded on `/alumni` and reachable at
+none of those URLs; that form is no longer linked from this app.
+
+If the signup path moves, it is in two places: `ALUMNI_SIGNUP_URL` at the top of `nuxt.config.ts`
+for the redirects, and the call-to-action link in `content/pages/alumni.md`. Do not drop the
+redirects instead: the history site is a separate project on a separate release cycle, and its
+links would start 404ing the moment this deploys. If a redirect must go, raise it on
+`newtheatre/history-project` first and wait for their change to ship.
+
 ### Annual handover checklist for this app
 
 Do this in the summer, alongside the wider IT handover.
@@ -515,6 +537,7 @@ Do this in the summer, alongside the wider IT handover.
 - [ ] Confirm GitHub access to `newtheatre/proscenium` for the incoming holder, and confirm it is not the only copy of anything.
 - [ ] Take a full D1 backup and store it in the committee Drive; verify you can actually read the file.
 - [ ] Check the R2 bucket size and whether orphaned images (§7) need clearing.
+- [ ] Open `/alumni/registration` and confirm it lands on a working signup on `alumni.newtheatre.org.uk`.
 - [ ] Walk the incident checklists in §8 end to end, on paper, with the incoming holder.
 - [ ] Re-read this document and correct anything that has drifted. A runbook nobody edits is a runbook nobody trusts.
 
