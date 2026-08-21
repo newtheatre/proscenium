@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-82 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+83 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -334,6 +334,12 @@ and no password-reset route here.
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | GET | `/images/**` | **Public** | Stream a blob out of R2 by pathname |
+
+### Show night
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/foh/tonight` | `foh.work` (`workFoh`) | Tonight's performances this user may work, scoped by the rota |
 
 ### Short booking links
 
@@ -2102,6 +2108,47 @@ Why it exists rather than returning a bare `ok`: migrations apply from CI but ca
 against the deploy, so the ordering is a race won on timing
 ([08-operations](./08-operations.md) §5). This is the alarm for the case where it is lost, and it is
 the second half of stage-door ADR-0021 — the first half being the workflow this repo already had.
+### 3.10a2 Show night
+
+---
+
+#### `GET /api/foh/tonight`
+
+**Source** `server/api/foh/tonight.get.ts` · **Auth** `authorize(event, workFoh)` — `foh.work`
+
+The scope the `/foh` screen renders. The role gets you the endpoint; **the rota decides what is in
+it** ([ADR-0019](./decisions/0019-the-rota-scopes-the-front-of-house-role.md)).
+
+**Response** `200`:
+
+```ts
+{
+  night: string                 // `YYYY-MM-DD`, the show night this instant belongs to
+  performances: Array<{
+    id, startsAt, doorsAt, showTitle, showSlug, venueName,
+    shiftRole: 'DUTY_MANAGER' | 'DOOR' | 'BAR' | null   // the caller's own confirmed role
+  }>
+  bypassedRota: boolean         // true for BOX_OFFICE and above
+  rosteredOnNothing: boolean    // true when they could work tonight but hold no shift
+}
+```
+
+Three behaviours worth knowing:
+
+- **A `FRONT_OF_HOUSE` holder sees only performances they are `CONFIRMED` on, tonight.** Not
+  rostered is an empty list with `rosteredOnNothing: true`, never an error: the screen says so, and
+  the resolver returns data rather than throwing (the same reasoning as
+  [ADR-0008](./decisions/0008-roles-go-stale-identity-does-not.md)).
+- **`BOX_OFFICE` and above see every performance tonight**, with `bypassedRota: true` and
+  `shiftRole: null` where they hold no shift of their own.
+- **The night rolls over at 04:00**, not midnight, so a screen open at 00:30 still shows the night
+  that is ending. `showNightDate()` in `server/utils/foh.ts` is the only definition of that.
+
+Anyone without `foh.work` gets `403`, including anonymous callers — `defineAbility` with a single
+argument denies guests (§1).
+
+---
+
 ### 3.10b Short booking links
 
 ---

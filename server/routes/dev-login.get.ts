@@ -8,14 +8,17 @@ export default defineEventHandler(async (event) => {
   }
 
   const { staff } = getQuery(event)
-  const roles
-    = staff === 'admin'
-      ? [`${APP_MANIFEST.namespace}:ADMIN`]
-      : staff === 'manager'
-        ? [`${APP_MANIFEST.namespace}:MANAGER`]
-        : staff === 'box-office'
-          ? [`${APP_MANIFEST.namespace}:BOX_OFFICE`]
-          : []
+  // Keyed by the `?staff=` value. A persona per role in the manifest, so a
+  // rota-scoped screen can be seen as the person it was built for.
+  const PERSONAS: Record<string, string[]> = {
+    'admin': ['ADMIN'],
+    'manager': ['MANAGER'],
+    'box-office': ['BOX_OFFICE'],
+    'foh-manager': ['FOH_MANAGER'],
+    'front-of-house': ['FRONT_OF_HOUSE'],
+  }
+  const roles = (PERSONAS[String(staff ?? '')] ?? [])
+    .map(role => `${APP_MANIFEST.namespace}:${role}`)
 
   const now = Date.now()
 

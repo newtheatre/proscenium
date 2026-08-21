@@ -162,6 +162,12 @@ write the session", guarded by `import.meta.dev` so it does not exist in a produ
 | `/dev-login?staff=box-office` | `proscenium:BOX_OFFICE` |
 | `/dev-login?staff=manager` | `proscenium:MANAGER` |
 | `/dev-login?staff=admin` | `proscenium:ADMIN` |
+| `/dev-login?staff=foh-manager` | `proscenium:FOH_MANAGER` |
+| `/dev-login?staff=front-of-house` | `proscenium:FRONT_OF_HOUSE` |
+
+`front-of-house` is the one worth using deliberately: `/foh` is scoped by the rota, so that persona
+sees only what it is confirmed on, and `db:seed` rosters it on the door of a performance tonight so
+there is something to see ([ADR-0019](./decisions/0019-the-rota-scopes-the-front-of-house-role.md)).
 
 The client middleware sends logged-out visitors here in dev and to the hosted login in production.
 
