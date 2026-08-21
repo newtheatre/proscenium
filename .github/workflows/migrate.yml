@@ -32,6 +32,11 @@ jobs:
   migrate:
     runs-on: ubuntu-latest
     environment: production
+    # `packages: read` reads @newtheatre/auth-types from GitHub Packages. Without
+    # it `bun install` 401s and this job dies before it reaches the database.
+    permissions:
+      contents: read
+      packages: read
     env:
       # `nuxt db migrate` reads the NUXT_HUB_* triplet; wrangler (used for the
       # Time Travel bookmark) reads the CLOUDFLARE_* pair. Same credentials,
@@ -55,6 +60,8 @@ jobs:
       # only touches the database.
       - name: Install dependencies
         run: bun install --frozen-lockfile
+        env:
+          GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Fail fast if credentials are missing
         run: |
