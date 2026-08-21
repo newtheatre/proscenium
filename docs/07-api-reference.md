@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-126 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+130 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -364,6 +364,10 @@ and no password-reset route here.
 | GET | `/api/foh/incidents` | `foh.work` (`workFoh`) | The incident log for a performance |
 | GET | `/api/foh/age-checks` | `foh.work` (`workFoh`) | Tonight's Challenge 25 register and its two counters |
 | POST | `/api/foh/age-checks` | `foh.work` (`workFoh`) | Record an ID check. **There is no update or delete** |
+| GET | `/api/bar/tonight` | `foh.work` + a `BAR` shift | The till's opening state: session, products, prices, discounts |
+| GET | `/api/bar/lookup` | `foh.work` + a `BAR` shift | Find a booking to take payment for. **Not night-scoped** |
+| POST | `/api/bar/sessions` | `foh.work` + a `BAR` shift | Open the bar for tonight |
+| POST | `/api/bar/transactions` | `foh.work` + a `BAR` shift | One tap, one transaction, one figure |
 | GET | `/api/admin/bar/reconciliation` | `bar.manage` (`manageBar`) | What the reader's daily total should read |
 | GET | `/api/admin/bar/catalogue` | `bar.manage` (`manageBar`) | Categories, products and today's prices |
 | POST | `/api/admin/bar/categories` | `bar.manage` | Add a category |
@@ -1999,6 +2003,30 @@ Any manager edit clears `needsEligibilityReview` — that review is exactly what
 for ([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md)).
 
 **Response** `200` — the updated row. `409` on a second confirmed duty manager.
+
+---
+
+#### `POST /api/bar/transactions`
+
+**Source** `server/api/bar/transactions.post.ts` · **Auth** `workFoh` then `requireBarScope` — a
+`BAR` shift tonight, or `BOX_OFFICE`+
+
+One tap writes **one transaction**, whatever mix of ticket payments and bar items it covers, in a
+single `db.batch()` alongside the collection transitions. A `DOOR` shift gets `403` from every
+`/api/bar/*` route: the door never sells (docs/13 §5).
+
+- **The discount applies to the bar subtotal only.** Ticket lines are never discounted — ticket
+  prices have their own override chain. Line amounts stay **gross**, so product reports are honest
+  and "what did we give away" is one sum.
+- **Prices are snapshotted** onto the line, exactly as a ticket's `pricePaid` is.
+- **The gold figure is checked, not trusted**: a mismatch is `409` naming both amounts, nothing
+  written.
+- **Comp is not a tender here yet.** It creates a request and needs duty-manager approval before
+  anything is recorded, which is #166; the button is present and disabled until then.
+
+**`GET /api/bar/lookup` is deliberately not night-scoped.** Paying in advance for Saturday is a
+designed case (docs/13 §2.2), so a booking for another performance is found, flagged *not tonight*
+on its card, and still payable. It returns a first name and what is owed, never an email.
 
 ---
 

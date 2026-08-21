@@ -17,6 +17,13 @@ export interface TicketPaymentLine {
   amountPence: number
 }
 
+export interface BarItemLine {
+  productId: string
+  qty: number
+  unitPricePence: number
+  priceId: string
+}
+
 export interface TransactionDraft {
   source: (typeof schema.TRANSACTION_SOURCES)[number]
   tender: (typeof schema.TENDERS)[number]
@@ -24,6 +31,9 @@ export interface TransactionDraft {
   ticketLines?: TicketPaymentLine[]
   /** `WALK_UP` rather than `TICKET_PAYMENT`: a new sale, not a debt settled. */
   walkUpLines?: TicketPaymentLine[]
+  barLines?: BarItemLine[]
+  /** Applies to the bar subtotal only. Ticket lines are never discounted. */
+  discount?: { id: string, percent: number } | null
   compReason?: string | null
   compApprovedByUserId?: string | null
   barSessionId?: string | null
@@ -32,7 +42,11 @@ export interface TransactionDraft {
 
 export interface BuiltTransaction {
   transactionId: string
+  /** After discount: the figure to type into the reader. */
   totalPence: number
+  ticketSubtotal: number
+  barSubtotal: number
+  discountPence: number
   statements: BatchItem<'sqlite'>[]
 }
 
@@ -50,12 +64,22 @@ export function buildTransaction(draft: TransactionDraft): BuiltTransaction {
   const takenAt = draft.takenAt ?? new Date()
   const transactionId = nanoid()
 
-  const lines = [
+  const ticketRows = [
     ...(draft.ticketLines ?? []).map(line => ({ ...line, kind: 'TICKET_PAYMENT' as const })),
     ...(draft.walkUpLines ?? []).map(line => ({ ...line, kind: 'WALK_UP' as const })),
   ]
+  const barRows = (draft.barLines ?? []).map(line => ({
+    ...line,
+    kind: 'BAR_ITEM' as const,
+    amountPence: line.unitPricePence * line.qty,
+  }))
 
-  const totalPence = lines.reduce((total, line) => total + line.amountPence, 0)
+  const ticketSubtotal = ticketRows.reduce((total, line) => total + line.amountPence, 0)
+  // Gross, because the discount lives on the transaction: product reports stay
+  // honest and "what did we give away" is one sum (docs/13 §4.1.1).
+  const barSubtotal = barRows.reduce((total, line) => total + line.amountPence, 0)
+  const discountPence = applyDiscount(barSubtotal, draft.discount?.percent)
+  const totalPence = ticketSubtotal + barSubtotal - discountPence
 
   const statements: BatchItem<'sqlite'>[] = [
     db.insert(schema.transactions).values({
@@ -69,12 +93,14 @@ export function buildTransaction(draft: TransactionDraft): BuiltTransaction {
       compReason: draft.compReason ?? null,
       compApprovedByUserId: draft.compApprovedByUserId ?? null,
       compApprovedAt: draft.tender === 'COMP' ? takenAt : null,
-      discountPence: 0,
+      discountId: draft.discount?.id ?? null,
+      discountPercent: draft.discount?.percent ?? null,
+      discountPence,
       totalPence: draft.tender === 'COMP' ? 0 : totalPence,
     }),
   ]
 
-  for (const group of chunked(lines, LINES_PER_INSERT)) {
+  for (const group of chunked(ticketRows, LINES_PER_INSERT)) {
     statements.push(db.insert(schema.transactionLines).values(group.map(line => ({
       transactionId,
       kind: line.kind,
@@ -84,7 +110,19 @@ export function buildTransaction(draft: TransactionDraft): BuiltTransaction {
     }))))
   }
 
-  return { transactionId, totalPence, statements }
+  for (const group of chunked(barRows, LINES_PER_INSERT)) {
+    statements.push(db.insert(schema.transactionLines).values(group.map(line => ({
+      transactionId,
+      kind: line.kind,
+      amountPence: line.amountPence,
+      productId: line.productId,
+      qty: line.qty,
+      unitPricePence: line.unitPricePence,
+      priceId: line.priceId,
+    }))))
+  }
+
+  return { transactionId, totalPence, ticketSubtotal, barSubtotal, discountPence, statements }
 }
 
 /**

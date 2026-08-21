@@ -363,8 +363,26 @@ transaction handle; the builders return statements and the caller batches them.
   the others — confusing them is the bug this shape exists to prevent.
 - **Line amounts are gross.** The discount lives on the transaction, so "how much of that did we
   sell" stays honest and "how much did we give away" is one sum.
-- **`bar_session_id` carries no foreign key.** `bar_sessions` arrives with the till, and SQLite
-  cannot add a constraint later without rebuilding the table.
+- **`bar_session_id` carries no foreign key.** It was written before `bar_sessions` existed, and
+  SQLite cannot add a constraint later without rebuilding the table.
+
+### `bar_sessions`, `bar_session_performances`, `day_reconciliations`
+
+A **bar session** is one night's trading at one counter: who opened it, when, and which
+performances it covered. A partial unique index allows **one open session at a time** (`WHERE
+closed_at IS NULL`), so two volunteers tapping *Open the bar* cannot produce two sets of figures for
+the same night.
+
+- **The session is a container, not a total.** Every figure is derived from `transactions` at read
+  time. Nothing is accumulated onto the session row, so a correction to a transaction is reflected
+  without a rebuild, and a crashed till loses no money.
+- **`bar_session_performances` is many-to-many on purpose.** A double bill is one bar session across
+  two performances; a session with no performance (a social, a bar-only night) is legal and holds no
+  rows here.
+- **`day_reconciliations` records what the reader actually said**, once, at close, against what the
+  transactions say it should have said. It is the operator's record of a discrepancy, not a
+  correction to the sales: a short till is a fact to investigate, and overwriting the sales to make
+  it balance destroys the evidence.
 
 ## Status lifecycles
 
