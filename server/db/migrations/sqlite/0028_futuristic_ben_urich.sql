@@ -1,0 +1,1 @@
+ALTER TABLE `ticket_types` ADD `access_kind` text;

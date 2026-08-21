@@ -17,6 +17,10 @@ export const ticketTypes = sqliteTable('ticket_types', {
     enum: ['SINGLE', 'PASS_SALE', 'PASS_ADMISSION'],
   }).notNull().default('SINGLE'),
 
+  // Marks the two access types so one function can gate them. Null is an
+  // ordinary type; both of these are still SINGLE and occupy a seat.
+  accessKind: text('access_kind', { enum: ['ACCESS', 'COMPANION'] }),
+
   // Legacy-only types (Fringe 2021, StuFF passes) should not clutter the
   // box-office picker but must remain valid for historic tickets.
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),

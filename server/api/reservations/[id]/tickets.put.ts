@@ -38,6 +38,10 @@ export default defineEventHandler(async (event) => {
 
   if (!reservation) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
 
+  // Editing is another way to add tickets, so it needs the same gate as
+  // creating them: the entitlement is the booker's (docs/12 §2.6).
+  await assertAccessTicketsAllowed(reservation.userId, body.tickets)
+
   // Collected tickets are a record of a completed transaction, not a working
   // draft — the only reversal is a refund (ADR-0011).
   assertTicketsEditable(reservation.status)
