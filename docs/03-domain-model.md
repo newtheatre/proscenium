@@ -282,6 +282,19 @@ authenticated ([ADR-0020](./decisions/0020-backstage-joins-by-a-nightly-code.md)
 reason the board exists instead of a group chat. You cannot acknowledge your own side's message:
 the value is one side seeing that the other has read it.
 
+### `age_checks`
+
+The Challenge 25 register ([ADR-0027](./decisions/0027-the-refusals-register-is-append-only.md)).
+
+`ACCEPTED` rows are a **bare tally** and carry no detail at all: the ratio of accepted to refused is
+the evidence that the policy is operated rather than merely displayed. Only refusals carry a reason,
+what was asked for, and a description — which is *"tall man, grey coat"* and **never a name**. There
+is nowhere to put a photograph, and there must not be.
+
+Append-only, enforced by triggers in migration `0025`, **scoped to the content columns** so an
+estate merge can still re-point `checked_by_user_id` — see the `incident_log` note above for why
+that scoping is not optional.
+
 ## Status lifecycles
 
 ### Reservation

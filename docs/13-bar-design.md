@@ -306,7 +306,13 @@ register, not a name"), notes. Staff member, time, performance and the on-duty D
 context. The night's entries list below in reverse order.
 
 Design rules: no names, no photos, append-only, corrections by new entry
-([ADR-0027](./decisions/0027-the-refusals-register-is-append-only.md)). Admin export produces
+([ADR-0027](./decisions/0027-the-refusals-register-is-append-only.md)).
+
+**The export is CSV first, PDF later.** Workers has no PDF renderer and adding one for a register
+printed a few times a year is not a good trade, so the built export is CSV with a column layout that
+matches the paper book. The across-the-counter artefact an inspection wants should be a
+print-stylesheet page rendered by the browser, which lands with the reports work rather than here.
+Admin export produces
 one PDF per performance or date range laid out like the paper register — that export is what
 goes across the counter at an inspection. Until the data-protection policy lands, retention
 defaults to whatever the FOH incident log adopts.
