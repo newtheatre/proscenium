@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-83 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+84 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -340,6 +340,7 @@ and no password-reset route here.
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | GET | `/api/foh/tonight` | `foh.work` (`workFoh`) | Tonight's performances this user may work, scoped by the rota |
+| GET | `/api/foh/lookup` | `foh.work` (`workFoh`) | Find a booking on tonight's performances, by reference, name or email |
 
 ### Short booking links
 
@@ -2146,6 +2147,45 @@ Three behaviours worth knowing:
 
 Anyone without `foh.work` gets `403`, including anonymous callers — `defineAbility` with a single
 argument denies guests (§1).
+
+---
+
+#### `GET /api/foh/lookup`
+
+**Source** `server/api/foh/lookup.get.ts` · **Auth** `authorize(event, workFoh)` — `foh.work`
+
+```ts
+{ q: z.string().trim().min(2).max(100) }
+```
+
+A six-character alphanumeric `q` is matched as an exact booking reference; anything else searches
+customer name and email. At most 10 results.
+
+**Scoped to tonight, and to the caller's own shifts.** Both scopes are subqueries, never id lists
+([ADR-0006](./decisions/0006-d1-bound-parameter-limit.md)), and the tickets come from a second query
+filtered by the *same predicate* rather than by the ids just returned, for the same reason.
+
+**The response shape depends on the role**, and this is the part to preserve:
+
+| | `FRONT_OF_HOUSE` | `BOX_OFFICE` and above |
+|---|---|---|
+| `standing.state`, `standing.partySize` | ✅ | ✅ |
+| `standing.amountOwedPence` | — | ✅ |
+| `firstName` | ✅ | — |
+| `customerName`, `customerEmail` | — | ✅ |
+| `tickets` with `pricePaid` | — | ✅ |
+
+The door's job is admit or redirect, so it gets the verdict and the head count and **no money at
+all, including what is owed** — that figure is the bar's
+([11-show-night-screen-design](./11-show-night-screen-design.md) §2.1). Allow-listed rather than
+deleted, so a column added later is private until someone decides otherwise.
+
+`standing` comes from `bookingStanding()`, the single definition of paid versus unpaid
+([ADR-0011](./decisions/0011-collection-is-the-payment-boundary.md)). The bar till will call the
+same function; do not write a second one.
+
+**Response** `200` — an array, possibly empty. A booking for another night is simply not found here,
+which is deliberate: the rota scope is a boundary, not a convenience.
 
 ---
 

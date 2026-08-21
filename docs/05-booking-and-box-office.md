@@ -100,7 +100,16 @@ pass. There is **no database constraint** backing capacity — it is advisory ap
 
 ## 4. The door: collection and no-shows
 
-**Screen:** `app/pages/admin/box-office/reservations.vue`. Requires `BOX_OFFICE` or above.
+**Screen:** `app/pages/admin/box-office/reservations.vue`. Requires `BOX_OFFICE` or above. The
+show-night screen at `/foh/scan` is a second way in for door volunteers
+([11-show-night-screen-design](./11-show-night-screen-design.md) §2.1); it looks a booking up but
+does not collect.
+
+**"Is this paid?" has exactly one answer**, `bookingStanding()` in
+`server/utils/reservationLifecycle.ts`, derived from the status lifecycle rather than re-read per
+screen. The door, the scanner and later the bar till all call it. The door and the bar disagreeing
+about whether a booking is paid is the worst show-night bug available, which is why it is one
+function and not three.
 
 It opens on today's performance, or warns if there isn't one. Prev/next walks every non-cancelled
 performance chronologically, wrapping around. There is a status summary, a search by reference, name
