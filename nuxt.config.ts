@@ -109,6 +109,9 @@ export default defineNuxtConfig({
       '*/15 * * * *': ['comps:sweep'],
       // Late morning, so a reminder for tomorrow lands in waking hours.
       '0 10 * * *': ['shifts:remind'],
+      // 12:00 UTC: noon in winter, an hour after it in summer. Never early,
+      // which is what matters when the deadline is the duty manager's.
+      '0 12 * * *': ['reports:auto-close'],
     },
     rollupConfig: {
       plugins: [
@@ -165,7 +168,7 @@ export default defineNuxtConfig({
           },
         },
         triggers: {
-          crons: ['*/15 * * * *', '0 4 * * *', '0 10 * * *'],
+          crons: ['*/15 * * * *', '0 4 * * *', '0 10 * * *', '0 12 * * *'],
         },
       },
     },
