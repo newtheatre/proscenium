@@ -409,6 +409,27 @@ half: the content columns cannot be updated and no row can be deleted.
 `stock_delivery_lines.cost_pence_per_unit` is per whole unit. The most recent delivery cost is what
 stock is valued at, which is the closing-stock figure the Treasurer needs at the end of term.
 
+### `comp_requests`
+
+**The approval is the control, so the request is a row and the transaction is not.** A `PENDING`
+request records nothing: no transaction, no stock movement, no money. Only an approval writes those,
+and it writes them in one batch (ADR-0026).
+
+- **Expiry is derived, never trusted to the sweep.** A request older than ten minutes reads as
+  `EXPIRED` and is refused at approval whether or not `comps:sweep` has run. The task only tidies
+  the row up, so a missed cron cannot leave a stale request approvable.
+- **`lines` is a snapshot**, including the price id, because a price may change between asking and
+  approving and the comp should record what was actually given away.
+- **The transaction is `taken_by` the requester and `comp_approved_by` the approver.** Both names
+  appear in the end-of-night report: who asked and who agreed are different facts.
+- **`total_pence` is 0 but the lines stay gross.** What was given away is a real figure that product
+  reporting needs; what was taken is nothing.
+- **`bar_session_id` carries no foreign key**, because a comp can be asked for before the bar is
+  formally opened.
+
+Who may approve: tonight's confirmed `DUTY_MANAGER`, or `BOX_OFFICE`+ when there is none. If nobody
+can, there are no comps tonight, which is the correct outcome rather than a fallback.
+
 ## Status lifecycles
 
 ### Reservation

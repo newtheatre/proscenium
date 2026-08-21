@@ -58,6 +58,30 @@ const buttons = computed(() => [
   { key: 'till', label: 'Till', icon: 'i-lucide-shopping-cart', to: '/foh/bar/till', note: '' },
   { key: 'age-checks', label: 'Challenge 25', icon: 'i-lucide-shield-check', to: '/foh/age-checks', note: '' },
 ])
+
+/**
+ * Only the duty manager is shown a comp queue, and only tonight's. The till
+ * carries the approve buttons; this is the badge that gets them there.
+ */
+const pendingComps = ref(0)
+async function pollComps() {
+  try {
+    const res = await requestFetch<{ mayApprove: boolean, awaitingApproval: unknown[] }>('/api/bar/comps')
+    pendingComps.value = res.mayApprove ? res.awaitingApproval.length : 0
+  }
+  catch {
+    // Not everyone on the FOH home can work the bar: a 403 here is expected.
+  }
+}
+
+let compTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  pollComps()
+  compTimer = setInterval(pollComps, 8000)
+})
+onBeforeUnmount(() => {
+  if (compTimer) clearInterval(compTimer)
+})
 </script>
 
 <template>
@@ -168,10 +192,18 @@ const buttons = computed(() => [
               ? 'border-neutral-700 bg-neutral-900 hover:border-violet-600'
               : 'cursor-not-allowed border-neutral-900 bg-neutral-900/40 text-neutral-500'"
           >
-            <UIcon
-              :name="button.icon"
-              class="size-7"
-            />
+            <div class="flex items-start justify-between">
+              <UIcon
+                :name="button.icon"
+                class="size-7"
+              />
+              <span
+                v-if="button.key === 'till' && pendingComps"
+                class="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-neutral-950"
+              >
+                {{ pendingComps }} to approve
+              </span>
+            </div>
             <span>
               <span class="block text-base font-medium leading-tight">{{ button.label }}</span>
               <span

@@ -36,6 +36,8 @@ const REVIEWED = {
   'stockDeliveries.receivedByUserId': { kind: 'attribution', note: 'Who signed the delivery in.' },
   'stocktakes.startedByUserId': { kind: 'attribution', note: 'Who started the count.' },
   'stocktakes.finishedByUserId': { kind: 'attribution', note: 'Who applied or abandoned it.' },
+  'compRequests.requestedByUserId': { kind: 'attribution', note: 'Who asked for the comp. The end-of-night report names them.' },
+  'compRequests.decidedByUserId': { kind: 'attribution', note: 'Which duty manager approved or declined it.' },
 }
 
 /** Columns deliberately not re-pointed by a merge, each with a reason. */

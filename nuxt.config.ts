@@ -102,6 +102,8 @@ export default defineNuxtConfig({
       // Backstage free text is chatter, not record: 30 days, then gone
       // (docs/11 §5.5). Runs off the wrangler cron trigger below.
       '0 4 * * *': ['backstage:sweep', 'access:sweep'],
+      // Comp requests expire in ten minutes; this only tidies the row up.
+      '*/15 * * * *': ['comps:sweep'],
       // Late morning, so a reminder for tomorrow lands in waking hours.
       '0 10 * * *': ['shifts:remind'],
     },
@@ -160,7 +162,7 @@ export default defineNuxtConfig({
           },
         },
         triggers: {
-          crons: ['0 4 * * *', '0 10 * * *'],
+          crons: ['*/15 * * * *', '0 4 * * *', '0 10 * * *'],
         },
       },
     },

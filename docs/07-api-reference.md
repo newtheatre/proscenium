@@ -368,6 +368,10 @@ and no password-reset route here.
 | GET | `/api/bar/lookup` | `foh.work` + a `BAR` shift | Find a booking to take payment for. **Not night-scoped** |
 | POST | `/api/bar/sessions` | `foh.work` + a `BAR` shift | Open the bar for tonight |
 | POST | `/api/bar/transactions` | `foh.work` + a `BAR` shift | One tap, one transaction, one figure |
+| GET | `/api/bar/comps` | `foh.work` + a `BAR` shift **or** approver | Your own requests, and the approver's queue |
+| POST | `/api/bar/comps` | `foh.work` + a `BAR` shift | Ask for a comp. Records nothing |
+| POST | `/api/bar/comps/:id/approve` | Tonight's `DUTY_MANAGER`, or `BOX_OFFICE`+ | The approval writes the record |
+| POST | `/api/bar/comps/:id/decline` | Tonight's `DUTY_MANAGER`, or `BOX_OFFICE`+ | No, and nothing is recorded |
 | GET | `/api/admin/bar/reconciliation` | `bar.manage` (`manageBar`) | What the reader's daily total should read |
 | GET | `/api/admin/bar/stock` | `bar.manage` (`manageBar`) | On-hand, par flags and value, all derived |
 | POST | `/api/admin/bar/stock/adjust` | `bar.manage` (`manageBar`) | Wastage, transfers and corrections |
@@ -2012,6 +2016,27 @@ Any manager edit clears `needsEligibilityReview` — that review is exactly what
 for ([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md)).
 
 **Response** `200` — the updated row. `409` on a second confirmed duty manager.
+
+---
+
+#### The comp endpoints
+
+**Source** `server/api/bar/comps/**` · **Auth** see below, and note it is **not** `requireBarScope`
+throughout
+
+`POST /api/bar/comps` needs a `BAR` shift: asking for a comp is bar work. **Approving is not.**
+The duty manager is frequently not rostered on the bar, so `GET`, `approve` and `decline` scope on
+front-of-house tonight and then on being an approver. Guarding those with the bar scope locks the
+only person who can approve out of the queue.
+
+- A `PENDING` request writes **nothing**: no transaction, no movement, no stock change.
+- The requester approving their own request is `403` unless they are themselves tonight's duty
+  manager or `BOX_OFFICE`+, in which case it is the sanctioned inline self-approval and is still
+  recorded as approved by them.
+- Approval after ten minutes is `409`, derived from `requested_at` rather than from the sweep.
+- Approving or declining twice is `409` naming the decision already made.
+- `reason: 'OTHER'` without a note is `400`.
+- A request from another night is `409`, not `404`: it exists, it is simply not tonight's problem.
 
 ---
 
