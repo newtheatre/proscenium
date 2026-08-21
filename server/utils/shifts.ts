@@ -97,3 +97,22 @@ export async function performancesMissingDutyManager(days = DUTY_MANAGER_WARNING
     ))
     .orderBy(asc(schema.performances.startsAt))
 }
+
+/** The single settings row, created on first read. */
+export async function rotaSettings() {
+  const existing = await db.select().from(schema.rotaSettings)
+    .where(eq(schema.rotaSettings.id, 'current')).get()
+  if (existing) return existing
+
+  const [created] = await db.insert(schema.rotaSettings).values({ id: 'current' })
+    .onConflictDoNothing().returning()
+  return created ?? (await db.select().from(schema.rotaSettings)
+    .where(eq(schema.rotaSettings.id, 'current')).get())!
+}
+
+/** Which rule gates which shift role (docs/13 §5). */
+export const SHIFT_ELIGIBILITY: Record<'DUTY_MANAGER' | 'DOOR' | 'BAR', EligibilityRule> = {
+  DUTY_MANAGER: 'duty-manager',
+  DOOR: 'door',
+  BAR: 'bar',
+}
