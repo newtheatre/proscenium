@@ -369,6 +369,15 @@ and no password-reset route here.
 | POST | `/api/bar/sessions` | `foh.work` + a `BAR` shift | Open the bar for tonight |
 | POST | `/api/bar/transactions` | `foh.work` + a `BAR` shift | One tap, one transaction, one figure |
 | GET | `/api/admin/bar/reconciliation` | `bar.manage` (`manageBar`) | What the reader's daily total should read |
+| GET | `/api/admin/bar/stock` | `bar.manage` (`manageBar`) | On-hand, par flags and value, all derived |
+| POST | `/api/admin/bar/stock/adjust` | `bar.manage` (`manageBar`) | Wastage, transfers and corrections |
+| GET | `/api/admin/bar/deliveries` | `bar.manage` (`manageBar`) | What came in |
+| POST | `/api/admin/bar/deliveries` | `bar.manage` (`manageBar`) | Stock in, with the movements it causes |
+| POST | `/api/admin/bar/stocktakes` | `bar.manage` (`manageBar`) | Start a count |
+| GET | `/api/admin/bar/stocktakes/:id` | `bar.manage` (`manageBar`) | The count sheet and its variance |
+| PATCH | `/api/admin/bar/stocktakes/:id/lines` | `bar.manage` (`manageBar`) | Record counts as they happen |
+| POST | `/api/admin/bar/stocktakes/:id/finish` | `bar.manage` (`manageBar`) | Apply the count as movements |
+| POST | `/api/admin/bar/stocktakes/:id/abandon` | `bar.manage` (`manageBar`) | Walk away, writing nothing |
 | GET | `/api/admin/bar/catalogue` | `bar.manage` (`manageBar`) | Categories, products and today's prices |
 | POST | `/api/admin/bar/categories` | `bar.manage` | Add a category |
 | POST | `/api/admin/bar/products` | `bar.manage` | Add a product, with its first price |
@@ -2003,6 +2012,25 @@ Any manager edit clears `needsEligibilityReview` — that review is exactly what
 for ([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md)).
 
 **Response** `200` — the updated row. `409` on a second confirmed duty manager.
+
+---
+
+#### The stock endpoints
+
+**Source** `server/api/admin/bar/stock/**`, `deliveries/**`, `stocktakes/**` · **Auth** `manageBar`
+
+Every level is derived: there is no endpoint that sets on-hand, because there is no column to set.
+
+- **`POST /api/admin/bar/deliveries`** writes the delivery, its lines and one `DELIVERY` movement
+  per line in a single batch, one statement each so the parameter count cannot grow with the
+  delivery (ADR-0006). `qtyUnits` is whole units; three cases of twelve is `36`.
+- **`POST /api/admin/bar/stocktakes`** refuses if one is already open, and snapshots
+  `expected_milli` for every active stock product.
+- **`POST .../finish`** writes one `STOCKTAKE` movement per line whose count differs from on-hand
+  **now**, and refuses if nothing was counted, pointing the caller at abandon instead.
+- **`POST .../abandon`** writes no movement at all.
+- **`POST /api/admin/bar/stock/adjust`** refuses an adjustment aimed at a measure rather than the
+  product that holds the stock, and requires a reason.
 
 ---
 

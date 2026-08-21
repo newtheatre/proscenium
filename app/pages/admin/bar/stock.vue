@@ -1,0 +1,420 @@
+<!--
+Admin: the stock ledger. On hand is always the sum of the movements, so every
+figure here is derived and nothing on this page writes a level directly.
+-->
+<script setup lang="ts">
+definePageMeta({
+  layout: 'admin',
+  middleware: ['admin'],
+  title: 'Bar stock',
+})
+
+interface StockRow {
+  id: string
+  name: string
+  unit: string
+  stockProductId: string | null
+  parMilli: number | null
+  onHandMilli: number
+  onHandUnits: number
+  lastCostPence: number | null
+  valuePence: number | null
+  belowPar: boolean
+}
+
+interface StockResponse {
+  rows: StockRow[]
+  stockAtCostPence: number
+  belowParCount: number
+  lastDelivery: { id: string, supplier: string, deliveredOn: string } | null
+  openStocktake: { id: string, startedAt: string } | null
+}
+
+const toast = useToast()
+
+function statusMessage(error: unknown): string | undefined {
+  return (error as { data?: { statusMessage?: string } }).data?.statusMessage
+}
+const requestFetch = useRequestFetch()
+const { data, refresh } = await useAsyncData('admin-bar-stock', () =>
+  requestFetch<StockResponse>('/api/admin/bar/stock'))
+
+const rows = computed(() => data.value?.rows ?? [])
+
+const columns = [
+  { accessorKey: 'name', header: 'Product' },
+  { accessorKey: 'onHandUnits', header: 'On hand' },
+  { accessorKey: 'parMilli', header: 'Par' },
+  { accessorKey: 'lastCostPence', header: 'Last cost' },
+  { accessorKey: 'valuePence', header: 'Value' },
+  { id: 'actions', header: '' },
+]
+
+// Deliveries
+const deliveryOpen = ref(false)
+const delivery = reactive({ supplier: '', invoiceRef: '', lines: [] as { productId: string, qtyUnits: number | null, costPencePerUnit: number | null }[] })
+const saving = ref(false)
+
+function openDelivery() {
+  delivery.supplier = ''
+  delivery.invoiceRef = ''
+  delivery.lines = [{ productId: rows.value[0]?.id ?? '', qtyUnits: null, costPencePerUnit: null }]
+  deliveryOpen.value = true
+}
+
+const productOptions = computed(() => rows.value.map(r => ({ label: r.name, value: r.id })))
+
+async function saveDelivery() {
+  saving.value = true
+  try {
+    const lines = delivery.lines.filter(l => l.productId && l.qtyUnits)
+    if (!lines.length) throw new Error('Add at least one line.')
+    await $fetch('/api/admin/bar/deliveries', {
+      method: 'POST',
+      body: {
+        supplier: delivery.supplier,
+        invoiceRef: delivery.invoiceRef || null,
+        lines,
+      },
+    })
+    toast.add({ title: 'Delivery recorded', icon: 'i-lucide-check', color: 'success' })
+    deliveryOpen.value = false
+    await refresh()
+  }
+  catch (error) {
+    toast.add({ title: 'Not recorded', description: statusMessage(error), color: 'error' })
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+// Adjustments
+const adjustOpen = ref(false)
+const adjust = reactive({ productId: '', qtyUnits: null as number | null, kind: 'WASTAGE' as 'WASTAGE' | 'TRANSFER' | 'ADJUST', reason: '' })
+
+function openAdjust(row: StockRow) {
+  adjust.productId = row.id
+  adjust.qtyUnits = null
+  adjust.kind = 'WASTAGE'
+  adjust.reason = ''
+  adjustOpen.value = true
+}
+
+async function saveAdjust() {
+  saving.value = true
+  try {
+    // Wastage is a loss however it is typed, so the sign is not the user's to get wrong.
+    const magnitude = Math.abs(adjust.qtyUnits ?? 0)
+    await $fetch('/api/admin/bar/stock/adjust', {
+      method: 'POST',
+      body: {
+        productId: adjust.productId,
+        qtyUnits: adjust.kind === 'WASTAGE' ? -magnitude : adjust.qtyUnits,
+        kind: adjust.kind,
+        reason: adjust.reason,
+      },
+    })
+    toast.add({ title: 'Recorded', icon: 'i-lucide-check', color: 'success' })
+    adjustOpen.value = false
+    await refresh()
+  }
+  catch (error) {
+    toast.add({ title: 'Not recorded', description: statusMessage(error), color: 'error' })
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+async function startStocktake() {
+  try {
+    const res = await $fetch<{ id: string }>('/api/admin/bar/stocktakes', { method: 'POST' })
+    await navigateTo(`/admin/bar/stocktakes/${res.id}`)
+  }
+  catch (error) {
+    toast.add({ title: 'Could not start a stocktake', description: statusMessage(error), color: 'error' })
+  }
+}
+</script>
+
+<template>
+  <UContainer class="py-6 space-y-6">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap gap-3">
+        <UCard>
+          <div class="text-xs text-muted uppercase tracking-wide">
+            Stock at cost
+          </div>
+          <div class="text-2xl font-semibold tabular-nums">
+            {{ formatMoney(data?.stockAtCostPence ?? 0) }}
+          </div>
+        </UCard>
+        <UCard>
+          <div class="text-xs text-muted uppercase tracking-wide">
+            Below par
+          </div>
+          <div class="text-2xl font-semibold tabular-nums">
+            {{ data?.belowParCount ?? 0 }}
+          </div>
+        </UCard>
+        <UCard>
+          <div class="text-xs text-muted uppercase tracking-wide">
+            Last delivery
+          </div>
+          <div class="text-sm font-medium">
+            <template v-if="data?.lastDelivery">
+              {{ data.lastDelivery.supplier }}<br>
+              <span class="text-muted">{{ formatDate(data.lastDelivery.deliveredOn) }}</span>
+            </template>
+            <span
+              v-else
+              class="text-muted"
+            >None recorded</span>
+          </div>
+        </UCard>
+      </div>
+
+      <div class="flex gap-2">
+        <UButton
+          icon="i-lucide-truck"
+          @click="openDelivery"
+        >
+          Record delivery
+        </UButton>
+        <UButton
+          v-if="data?.openStocktake"
+          icon="i-lucide-clipboard-list"
+          color="warning"
+          :to="`/admin/bar/stocktakes/${data.openStocktake.id}`"
+        >
+          Resume stocktake
+        </UButton>
+        <UButton
+          v-else
+          icon="i-lucide-clipboard-list"
+          variant="subtle"
+          @click="startStocktake"
+        >
+          Start stocktake
+        </UButton>
+      </div>
+    </div>
+
+    <UTable
+      :data="rows"
+      :columns="columns"
+    >
+      <template #name-cell="{ row }">
+        <div class="font-medium">
+          {{ row.original.name }}
+        </div>
+        <div class="text-xs text-muted">
+          per {{ row.original.unit }}
+        </div>
+      </template>
+      <template #onHandUnits-cell="{ row }">
+        <span
+          class="tabular-nums"
+          :class="row.original.belowPar ? 'text-warning font-semibold' : ''"
+        >
+          {{ row.original.onHandUnits.toFixed(2) }}
+        </span>
+        <UBadge
+          v-if="row.original.belowPar"
+          color="warning"
+          variant="subtle"
+          size="sm"
+          class="ml-2"
+        >
+          Below par
+        </UBadge>
+      </template>
+      <template #parMilli-cell="{ row }">
+        <span class="tabular-nums text-muted">
+          {{ row.original.parMilli == null ? '—' : (row.original.parMilli / 1000).toFixed(2) }}
+        </span>
+      </template>
+      <template #lastCostPence-cell="{ row }">
+        <span class="tabular-nums">{{ row.original.lastCostPence == null ? '—' : formatMoney(row.original.lastCostPence) }}</span>
+      </template>
+      <template #valuePence-cell="{ row }">
+        <span class="tabular-nums">{{ row.original.valuePence == null ? '—' : formatMoney(row.original.valuePence) }}</span>
+      </template>
+      <template #actions-cell="{ row }">
+        <UButton
+          size="xs"
+          variant="ghost"
+          icon="i-lucide-pencil"
+          aria-label="Adjust stock"
+          @click="openAdjust(row.original)"
+        />
+      </template>
+    </UTable>
+
+    <UModal
+      v-model:open="deliveryOpen"
+      title="Record a delivery"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UFormField
+            label="Supplier"
+            required
+          >
+            <UInput
+              v-model="delivery.supplier"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField label="Invoice reference">
+            <UInput
+              v-model="delivery.invoiceRef"
+              class="w-full"
+            />
+          </UFormField>
+
+          <div class="space-y-2">
+            <div
+              v-for="(line, i) in delivery.lines"
+              :key="i"
+              class="flex gap-2 items-end"
+            >
+              <UFormField
+                label="Product"
+                class="flex-1"
+              >
+                <USelectMenu
+                  v-model="line.productId"
+                  :items="productOptions"
+                  value-key="value"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField
+                label="Units"
+                class="w-24"
+              >
+                <UInput
+                  v-model.number="line.qtyUnits"
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField
+                label="Cost each (p)"
+                class="w-32"
+              >
+                <UInput
+                  v-model.number="line.costPencePerUnit"
+                  type="number"
+                  min="0"
+                  class="w-full"
+                />
+              </UFormField>
+              <UButton
+                icon="i-lucide-x"
+                variant="ghost"
+                color="neutral"
+                aria-label="Remove line"
+                @click="delivery.lines.splice(i, 1)"
+              />
+            </div>
+            <UButton
+              size="xs"
+              variant="subtle"
+              icon="i-lucide-plus"
+              @click="delivery.lines.push({ productId: '', qtyUnits: null, costPencePerUnit: null })"
+            >
+              Add line
+            </UButton>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2 w-full">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            @click="deliveryOpen = false"
+          >
+            Cancel
+          </UButton>
+          <UButton
+            :loading="saving"
+            @click="saveDelivery"
+          >
+            Record
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="adjustOpen"
+      title="Adjust stock"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UFormField
+            label="What happened"
+            required
+          >
+            <USelectMenu
+              v-model="adjust.kind"
+              :items="[
+                { label: 'Wastage (spillage, breakage, out of date)', value: 'WASTAGE' },
+                { label: 'Transfer in or out', value: 'TRANSFER' },
+                { label: 'Correction', value: 'ADJUST' },
+              ]"
+              value-key="value"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Units"
+            required
+            :help="adjust.kind === 'WASTAGE' ? 'Recorded as a loss.' : 'Negative to take stock out.'"
+          >
+            <UInput
+              v-model.number="adjust.qtyUnits"
+              type="number"
+              step="0.01"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Reason"
+            required
+            help="This is the audit trail. Say what happened."
+          >
+            <UInput
+              v-model="adjust.reason"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2 w-full">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            @click="adjustOpen = false"
+          >
+            Cancel
+          </UButton>
+          <UButton
+            :loading="saving"
+            :disabled="!adjust.reason || !adjust.qtyUnits"
+            @click="saveAdjust"
+          >
+            Record
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+  </UContainer>
+</template>
