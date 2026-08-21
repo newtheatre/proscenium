@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-119 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+124 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -363,6 +363,11 @@ and no password-reset route here.
 | GET | `/api/foh/incidents` | `foh.work` (`workFoh`) | The incident log for a performance |
 | GET | `/api/foh/age-checks` | `foh.work` (`workFoh`) | Tonight's Challenge 25 register and its two counters |
 | POST | `/api/foh/age-checks` | `foh.work` (`workFoh`) | Record an ID check. **There is no update or delete** |
+| GET | `/api/admin/bar/catalogue` | `bar.manage` (`manageBar`) | Categories, products and today's prices |
+| POST | `/api/admin/bar/categories` | `bar.manage` | Add a category |
+| POST | `/api/admin/bar/products` | `bar.manage` | Add a product, with its first price |
+| POST | `/api/admin/bar/products/:id/prices` | `bar.manage` | Set a price from a date. **Append only** |
+| POST | `/api/admin/bar/discounts` | `bar.manage` | Add a discount the till can offer |
 | GET | `/api/admin/bar/age-checks/export` | `bar.manage` (`manageBar`) | The register as CSV, for a date range |
 | POST | `/api/foh/incidents` | `foh.work` (`workFoh`) | Add an entry. **There is no update or delete** |
 | GET | `/api/admin/foh/emergency` | `foh.manage` | Every venue's emergency card, for editing |

@@ -8,6 +8,7 @@ import { seedReservations } from './seed/reservations'
 import { seedShifts } from './seed/shifts'
 import { seedFoh } from './seed/foh'
 import { seedBackstagePresets } from './seed/backstage'
+import { seedBar } from './seed/bar'
 
 /**
  * Seeds every entity in dependency order. Add a file under server/tasks/seed/
@@ -57,6 +58,9 @@ export default defineTask({
 
       // The backstage call list (standalone admin data)
       await seedBackstagePresets()
+
+      // The bar catalogue (standalone admin data)
+      await seedBar()
 
       // Print summary
 
