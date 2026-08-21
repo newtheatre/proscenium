@@ -14,6 +14,8 @@ const bodySchema = z.object({
   programmeUrl: z.url().max(2048).optional().nullable(),
   externalUrl: z.url().max(2048).optional().nullable(),
   categoryId: z.string().optional().nullable(),
+  ageGuidance: z.string().max(200).optional().nullable(),
+  latecomerPolicy: z.string().max(500).optional().nullable(),
   contentWarningNotes: z.string().max(2000).optional().nullable(),
   warningsConfirmedNone: z.boolean().optional(),
   /**
@@ -62,6 +64,8 @@ export default defineEventHandler(async (event) => {
   if (body.programmeUrl !== undefined) updateData.programmeUrl = body.programmeUrl
   if (body.externalUrl !== undefined) updateData.externalUrl = body.externalUrl
   if (body.categoryId !== undefined) updateData.categoryId = body.categoryId
+  if (body.ageGuidance !== undefined) updateData.ageGuidance = body.ageGuidance
+  if (body.latecomerPolicy !== undefined) updateData.latecomerPolicy = body.latecomerPolicy
   if (body.contentWarningNotes !== undefined) updateData.contentWarningNotes = body.contentWarningNotes
   if (body.warningsConfirmedNone !== undefined) updateData.warningsConfirmedNone = body.warningsConfirmedNone
   if (body.status !== undefined) updateData.status = body.status

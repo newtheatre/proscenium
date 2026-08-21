@@ -20,6 +20,8 @@ const schema = z.object({
     .min(1, 'Slug is required')
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Only lowercase letters, numbers, and hyphens'),
   subtitle: z.string().optional(),
+  ageGuidance: z.string().max(200).optional(),
+  latecomerPolicy: z.string().max(500).optional(),
   description: z.string().optional(),
   longDescription: z.string().optional(),
   programmeUrl: z.string().url('Must be a full URL').or(z.literal('')).optional(),
@@ -34,6 +36,8 @@ function stateFromShow(show: ShowDetail): Schema {
     title: show.title,
     slug: show.slug,
     subtitle: show.subtitle ?? '',
+    ageGuidance: show.ageGuidance ?? '',
+    latecomerPolicy: show.latecomerPolicy ?? '',
     description: show.description ?? '',
     longDescription: show.longDescription ?? '',
     programmeUrl: show.programmeUrl ?? '',
@@ -122,6 +126,8 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         title: event.data.title,
         slug: event.data.slug,
         subtitle: event.data.subtitle || null,
+        ageGuidance: event.data.ageGuidance || null,
+        latecomerPolicy: event.data.latecomerPolicy || null,
         description: event.data.description || null,
         longDescription: event.data.longDescription || null,
         programmeUrl: event.data.programmeUrl || null,
@@ -272,6 +278,32 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           <UInput
             v-model="state.subtitle"
             placeholder="Optional subtitle or tagline"
+            class="w-full"
+          />
+        </UFormField>
+
+        <!-- The door gets asked both of these, so they live here (docs/11 §2.2). -->
+        <UFormField
+          label="Age guidance"
+          name="ageGuidance"
+          help="Shown on the show night screen. e.g. 14+, or Suitable for all ages"
+        >
+          <UInput
+            v-model="state.ageGuidance"
+            placeholder="Optional"
+            class="w-full"
+          />
+        </UFormField>
+
+        <UFormField
+          label="Latecomer policy"
+          name="latecomerPolicy"
+          help="What the door should tell someone arriving after the start"
+        >
+          <UTextarea
+            v-model="state.latecomerPolicy"
+            :rows="2"
+            placeholder="e.g. Admitted at a suitable break, at the duty manager's discretion"
             class="w-full"
           />
         </UFormField>

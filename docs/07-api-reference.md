@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-93 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+94 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -341,6 +341,7 @@ and no password-reset route here.
 | --- | --- | --- | --- |
 | GET | `/api/foh/tonight` | `foh.work` (`workFoh`) | Tonight's performances this user may work, scoped by the rota |
 | GET | `/api/foh/lookup` | `foh.work` (`workFoh`) | Find a booking on tonight's performances, by reference, name or email |
+| GET | `/api/foh/glance` | `foh.work` (`workFoh`) | Tonight's numbers, and the questions the door gets asked |
 | GET | `/api/foh/emergency` | `foh.work` (`workFoh`) | The venue's emergency card for a performance |
 | GET | `/api/foh/contacts` | `foh.work` (`workFoh`) | Who is on tonight, and the numbers to call |
 | GET | `/api/foh/incidents` | `foh.work` (`workFoh`) | The incident log for a performance |
@@ -2194,6 +2195,27 @@ same function; do not write a second one.
 
 **Response** `200` — an array, possibly empty. A booking for another night is simply not found here,
 which is deliberate: the rota scope is a boundary, not a convenience.
+
+---
+
+#### `GET /api/foh/glance`
+
+**Source** `server/api/foh/glance.get.ts` · **Auth** `authorize(event, workFoh)` — `foh.work`
+
+`{ performanceId }`, scoped like every other show-night route.
+
+Returns `numbers` and `show`. **Every seat figure goes through `countOccupiedSeatsFor()`**
+([ADR-0007](./decisions/0007-one-seat-counting-rule.md)) — a second count here would be a second
+definition of a full house. `collected` narrows the same set by reservation status rather than
+counting seats a different way.
+
+`capacity` is `capacityOverride ?? venue.capacity`, and **`null` means uncapped, not zero**. The
+screen renders that as `∞` and says walk-ups are a judgement call: reading it as "no room" would
+turn people away from a half-empty house.
+
+`show` carries running time, interval structure, age guidance, latecomer policy and content
+warnings. Where warnings are absent the response distinguishes *confirmed none* from *not recorded*,
+because the door should say which it is rather than guess.
 
 ---
 

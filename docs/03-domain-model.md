@@ -48,6 +48,7 @@ A production. The top-level programming unit.
 | `slug` | **UNIQUE.** URL identity: `/whats-on/<slug>`. Validated against a regex on create |
 | `title`, `subtitle`, `description` | |
 | `posterUrl` | R2 path, served through `/images/**` |
+| `ageGuidance`, `latecomerPolicy` | What the door gets asked, so it is on the record rather than in someone's head. Rendered by `/foh/tonight` |
 | `status` | `DRAFT` \| `PUBLISHED` |
 
 **Invariants and gotchas**

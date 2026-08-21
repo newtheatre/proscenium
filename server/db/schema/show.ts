@@ -29,6 +29,11 @@ export const shows = sqliteTable('shows', {
   // do not belong to one.
   seasonId: text('season_id').references(() => seasons.id, { onDelete: 'set null' }),
 
+  // Questions the door is asked, kept on the record rather than in someone's
+  // head (docs/11 §2.2).
+  ageGuidance: text('age_guidance'),
+  latecomerPolicy: text('latecomer_policy'),
+
   // Free-text notes accompanying the content warnings — timings, intensity, how
   // to avoid a particular moment. Anything the vocabulary cannot express.
   contentWarningNotes: text('content_warning_notes'),
