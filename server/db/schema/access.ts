@@ -45,6 +45,12 @@ export const accessProfiles = sqliteTable('access_profiles', {
   /** Essential companion entitlement: +1 or +2. */
   companions: integer('companions').notNull().default(0),
 
+  /**
+   * What the person themselves said. Feeds the verification conversation and
+   * is never shown to the door: `fohNote` is the agreed wording for that.
+   */
+  requesterNote: text('requester_note'),
+
   /** Written *with* the user and visible *to* them. No surprises. */
   fohNote: text('foh_note'),
 

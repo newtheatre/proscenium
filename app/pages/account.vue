@@ -22,6 +22,16 @@ const navigation: NavigationMenuItem[][] = [
       to: '/account/reservations',
     },
     {
+      label: 'Access requirements',
+      icon: 'i-lucide-accessibility',
+      to: '/account/access',
+    },
+    {
+      label: 'Shifts',
+      icon: 'i-lucide-clipboard-list',
+      to: '/account/shifts',
+    },
+    {
       label: 'Security',
       icon: 'i-lucide-shield',
       to: '/account/security',

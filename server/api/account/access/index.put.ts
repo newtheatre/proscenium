@@ -10,6 +10,8 @@ const bodySchema = z.object({
   ...needs,
   companions: z.coerce.number().int().min(0).max(2).optional(),
   accessCardNumber: z.string().trim().max(60).nullable().optional(),
+  /** Free text, for what they need rather than why. Never shown to the door. */
+  requesterNote: z.string().trim().max(1000).nullable().optional(),
   /**
    * Explicit, and the lawful basis for the whole feature. False withdraws it
    * without deleting the profile (UK GDPR Art 9(2)(a), ADR-0022).
@@ -43,6 +45,9 @@ export default defineEventHandler(async (event) => {
     accessCardNumber: input.accessCardNumber === undefined
       ? existing?.accessCardNumber ?? null
       : input.accessCardNumber,
+    requesterNote: input.requesterNote === undefined
+      ? existing?.requesterNote ?? null
+      : input.requesterNote,
     consentFohAt: input.consentFoh ? existing?.consentFohAt ?? new Date() : null,
     // Any change re-opens verification: what the door is told must be what a
     // human agreed, not what somebody last ticked.

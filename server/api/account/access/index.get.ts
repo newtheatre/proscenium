@@ -19,6 +19,7 @@ export default defineEventHandler(async (event) => {
     audibleInformation: schema.accessProfiles.audibleInformation,
     miscellaneous: schema.accessProfiles.miscellaneous,
     companions: schema.accessProfiles.companions,
+    requesterNote: schema.accessProfiles.requesterNote,
     fohNote: schema.accessProfiles.fohNote,
     consentFohAt: schema.accessProfiles.consentFohAt,
     verifiedAt: schema.accessProfiles.verifiedAt,

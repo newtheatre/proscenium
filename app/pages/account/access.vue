@@ -11,6 +11,7 @@ definePageMeta({
 interface Profile {
   status: 'PENDING' | 'VERIFIED' | 'EXPIRED' | 'DECLINED' | 'WITHDRAWN'
   accessCardNumber: string | null
+  requesterNote: string | null
   difficultyStanding: boolean
   difficultyWithCrowds: boolean
   levelAccess: boolean
@@ -26,15 +27,18 @@ interface Profile {
   expiresAt: string | null
 }
 
+/**
+ * Framed as what someone finds *difficult*, never as what they want provided.
+ * "Visual information" reads as a preference: a deaf person would tick it.
+ */
 const SYMBOLS = [
-  { key: 'levelAccess', label: 'Level access', help: 'Step-free routes, and a space to sit that does not need stairs' },
-  { key: 'difficultyStanding', label: 'Difficulty standing', help: 'Queueing is hard; somewhere to sit while waiting helps' },
-  { key: 'difficultyWithCrowds', label: 'Difficulty with crowds', help: 'Busy foyers are hard; early or quiet entry helps' },
-  { key: 'distance', label: 'Difficulty with distance', help: 'A long walk from the door to the seat is hard' },
-  { key: 'urgentToilet', label: 'Urgent toilet needs', help: 'An aisle seat near the door helps' },
-  { key: 'visualInformation', label: 'Visual information', help: 'Printed or on-screen information is hard to use' },
-  { key: 'audibleInformation', label: 'Audible information', help: 'Spoken announcements are hard to use' },
-  { key: 'miscellaneous', label: 'Something else', help: 'Tell us in the conversation that follows' },
+  { key: 'levelAccess', label: 'Stairs and steps are a barrier for me', help: 'You need a step-free route to your seat' },
+  { key: 'difficultyStanding', label: 'I find standing or queueing difficult', help: 'Somewhere to sit while waiting helps' },
+  { key: 'difficultyWithCrowds', label: 'I find busy or crowded spaces difficult', help: 'Coming in early, or by a quieter route, helps' },
+  { key: 'distance', label: 'I find walking any distance difficult', help: 'A long walk from the door to the seat is hard' },
+  { key: 'urgentToilet', label: 'I may need to leave quickly for the toilet', help: 'An aisle seat near a door helps' },
+  { key: 'audibleInformation', label: 'I find it hard to hear spoken announcements', help: 'You would rather have things in writing' },
+  { key: 'visualInformation', label: 'I find it hard to read printed or on-screen information', help: 'You would rather be told out loud' },
 ] as const
 
 const requestFetch = useRequestFetch()
@@ -49,11 +53,15 @@ const form = reactive({
   urgentToilet: false,
   visualInformation: false,
   audibleInformation: false,
-  miscellaneous: false,
   companions: 0,
   accessCardNumber: '',
+  requesterNote: '',
   consentFoh: false,
 })
+
+/** Verified profiles show a summary; the form is opened deliberately. */
+const editing = ref(false)
+const settled = computed(() => data.value?.status === 'VERIFIED' && !editing.value)
 
 watchEffect(() => {
   const profile = data.value
@@ -61,6 +69,7 @@ watchEffect(() => {
   for (const symbol of SYMBOLS) form[symbol.key] = profile[symbol.key]
   form.companions = profile.companions
   form.accessCardNumber = profile.accessCardNumber ?? ''
+  form.requesterNote = profile.requesterNote ?? ''
   form.consentFoh = profile.consentFohAt !== null
 })
 
@@ -76,8 +85,13 @@ async function save() {
   try {
     await requestFetch('/api/account/access', {
       method: 'PUT',
-      body: { ...form, accessCardNumber: form.accessCardNumber || null },
+      body: {
+        ...form,
+        accessCardNumber: form.accessCardNumber || null,
+        requesterNote: form.requesterNote || null,
+      },
     })
+    editing.value = false
     await refresh()
     toast.add({ title: 'Sent for verification', color: 'success' })
   }
@@ -121,14 +135,14 @@ async function remove() {
       class="mt-6"
       :color="data.status === 'VERIFIED' ? 'success' : 'info'"
       variant="subtle"
-      :title="data.status === 'VERIFIED' ? 'Verified' : 'Waiting to be verified'"
+      :title="data.status === 'VERIFIED' ? 'All set' : 'Waiting to be verified'"
     >
       <template #description>
         <p v-if="data.status === 'VERIFIED'">
           Recorded and in place{{ data.expiresAt ? `, until ${formatDate(data.expiresAt)}` : '' }}.
           <template v-if="data.companions">
             You can book {{ data.companions }} essential companion
-            {{ data.companions === 1 ? 'ticket' : 'tickets' }}.
+            {{ data.companions === 1 ? 'ticket' : 'tickets' }} with your own.
           </template>
         </p>
         <p v-else>
@@ -144,10 +158,65 @@ async function remove() {
       </template>
     </UAlert>
 
-    <UCard class="mt-6">
+    <!-- Settled: a summary and a way back in, not a form to re-read. -->
+    <UCard
+      v-if="settled && data"
+      class="mt-6"
+    >
       <template #header>
         <p class="font-medium">
-          What do you need?
+          What we have recorded
+        </p>
+      </template>
+      <ul class="list-disc space-y-1 pl-5 text-sm">
+        <li
+          v-for="symbol in SYMBOLS.filter(sym => data![sym.key])"
+          :key="symbol.key"
+        >
+          {{ symbol.label }}
+        </li>
+        <li v-if="data.companions">
+          {{ data.companions }} essential companion {{ data.companions === 1 ? 'ticket' : 'tickets' }}
+        </li>
+        <li v-if="!SYMBOLS.some(sym => data![sym.key]) && !data.companions">
+          Nothing ticked — only the note below.
+        </li>
+      </ul>
+      <p
+        v-if="data.requesterNote"
+        class="mt-3 text-sm"
+      >
+        <span class="text-muted">What you told us:</span> {{ data.requesterNote }}
+      </p>
+      <template #footer>
+        <div class="flex flex-wrap items-center gap-3">
+          <UButton
+            variant="subtle"
+            label="Update my requirements"
+            @click="editing = true"
+          />
+          <UButton
+            variant="ghost"
+            color="error"
+            :loading="removing"
+            label="Remove my access profile"
+            @click="remove"
+          />
+        </div>
+      </template>
+    </UCard>
+
+    <UCard
+      v-else
+      class="mt-6"
+    >
+      <template #header>
+        <p class="font-medium">
+          What do you find difficult?
+        </p>
+        <p class="text-sm text-muted">
+          Tick what applies. These are about what is hard, not about what you would like us to
+          provide — so tick the thing you struggle with.
         </p>
       </template>
 
@@ -159,6 +228,18 @@ async function remove() {
           :label="symbol.label"
           :description="symbol.help"
         />
+
+        <UFormField
+          label="Anything else we should know"
+          help="In your own words. Tell us what you need from us rather than why — this goes to the front-of-house manager for the conversation, and is not shown to the team on the night."
+        >
+          <UTextarea
+            v-model="form.requesterNote"
+            :rows="3"
+            placeholder="e.g. I use a wheelchair and transfer to an aisle seat; the chair needs storing somewhere"
+            class="w-full"
+          />
+        </UFormField>
 
         <UFormField
           label="Essential companion"
@@ -205,7 +286,13 @@ async function remove() {
             @click="save"
           />
           <UButton
-            v-if="data && data.status !== 'WITHDRAWN'"
+            v-if="editing"
+            variant="ghost"
+            label="Cancel"
+            @click="editing = false"
+          />
+          <UButton
+            v-else-if="data && data.status !== 'WITHDRAWN'"
             variant="ghost"
             color="error"
             :loading="removing"

@@ -44,6 +44,19 @@ non-holder is verified by conversation and the FOH manager's judgement, recorded
 symbols. **Holding a Nimbus card is a fast path, never a requirement** — not everyone who needs a
 companion seat has £15 and a registration.
 
+**The wording is ours; the vocabulary is theirs.** The symbols are stored under the Access Card's
+names, but presented as *what someone finds difficult* rather than what they would like provided.
+That is not decoration. "Visual information" reads as a preference, so a deaf person will reasonably
+tick it — it is what they *want* — when the symbol means the opposite. Every label is therefore
+phrased "I find it hard to hear spoken announcements", "I find it hard to read printed information",
+and so on.
+
+The ninth symbol, *miscellaneous*, is not offered as a tick at all. A checkbox called "something
+else" tells the verifier nothing, so it is replaced by a free-text box: **what you need from us,
+rather than why**. That text (`requesterNote`) goes to the verifier for the conversation and is
+**never shown to the door** — the door sees the symbols and the agreed `fohNote`, which is the
+distinction that keeps a diagnosis out of a foyer.
+
 Nimbus [registers venues free of charge](https://www.nimbusdisability.com/services/access-card-and-nos/)
 and offers card-number verification to registered venues (there is also a ticketing API). Action
 for the FOH manager: register the theatre and confirm the exact verification mechanism. Until
