@@ -57,6 +57,119 @@ const subLabel = computed(() => {
   return 'Bar only'
 })
 
+// Comps
+interface CompLine { productId: string, name: string, qty: number, unitPricePence: number }
+interface CompRequest {
+  id: string
+  status: 'PENDING' | 'APPROVED' | 'DECLINED' | 'EXPIRED'
+  reason: string
+  note: string | null
+  lines: CompLine[]
+  grossPence: number
+  requestedAt: string
+  requestedBy: string | null
+  decidedBy: string | null
+}
+
+const compOpen = ref(false)
+const compReason = ref<'CAST_CREW' | 'COMMITTEE' | 'SPILLAGE' | 'OTHER'>('CAST_CREW')
+const compNote = ref('')
+const comps = ref<{ mayApprove: boolean, awaitingApproval: CompRequest[], mine: CompRequest[] }>({
+  mayApprove: false,
+  awaitingApproval: [],
+  mine: [],
+})
+
+/** Ticket comps are a ticket type on the desk, not a bar comp (docs/13 §4.1.2). */
+const canComp = computed(() => Boolean(basketBar.value.length) && !basketTickets.value.length)
+const myPending = computed(() => comps.value.mine.find(c => c.status === 'PENDING') ?? null)
+const myDecided = ref<CompRequest | null>(null)
+
+async function pollComps() {
+  try {
+    const next = await $fetch<typeof comps.value>('/api/bar/comps')
+    // A request of mine that has just been answered: show it, then let it go.
+    const wasPending = myPending.value?.id
+    comps.value = next
+    if (wasPending) {
+      const settled = next.mine.find(c => c.id === wasPending && c.status !== 'PENDING')
+      if (settled) {
+        myDecided.value = settled
+        if (settled.status === 'APPROVED') {
+          basketBar.value = []
+          discountId.value = null
+        }
+      }
+    }
+  }
+  catch {
+    // A poll that fails is not worth a toast; the next one will be along.
+  }
+}
+
+// Same short-polling transport as the comms board (ADR-0021).
+let compTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  pollComps()
+  compTimer = setInterval(pollComps, 5000)
+})
+onBeforeUnmount(() => {
+  if (compTimer) clearInterval(compTimer)
+})
+
+async function requestComp() {
+  busy.value = true
+  try {
+    await $fetch('/api/bar/comps', {
+      method: 'POST',
+      body: {
+        items: basketBar.value.map(l => ({ productId: l.product.id, qty: l.qty })),
+        reason: compReason.value,
+        note: compNote.value || null,
+      },
+    })
+    compOpen.value = false
+    compNote.value = ''
+    await pollComps()
+    toast.add({ title: 'Sent to the duty manager', icon: 'i-lucide-send', color: 'info' })
+  }
+  catch (error) {
+    toast.add({
+      title: 'Not sent',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    busy.value = false
+  }
+}
+
+async function decideComp(id: string, decision: 'approve' | 'decline') {
+  busy.value = true
+  try {
+    await $fetch(`/api/bar/comps/${id}/${decision}`, { method: 'POST' })
+    await pollComps()
+  }
+  catch (error) {
+    toast.add({
+      title: 'Not recorded',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    busy.value = false
+  }
+}
+
+const REASON_LABELS: Record<string, string> = {
+  CAST_CREW: 'Cast & crew',
+  COMMITTEE: 'Committee',
+  SPILLAGE: 'Spillage',
+  OTHER: 'Other',
+}
+
 function addProduct(product: Product) {
   const line = basketBar.value.find(l => l.product.id === product.id)
   if (line) line.qty++
@@ -359,12 +472,159 @@ async function openBar() {
             <UButton
               size="xl"
               variant="soft"
-              disabled
-              label="Comp"
+              :disabled="!canComp || busy || Boolean(myPending)"
+              :label="myPending ? 'Waiting…' : 'Comp'"
+              @click="compOpen = true"
             />
           </div>
         </div>
       </div>
     </div>
+
+    <!-- The approver's queue. Inline, because the DM is often the one serving. -->
+    <div
+      v-if="comps.awaitingApproval.length"
+      class="fixed bottom-4 left-4 right-4 z-40 mx-auto max-w-2xl space-y-2 sm:left-auto sm:right-4 sm:mx-0"
+    >
+      <div
+        v-for="request in comps.awaitingApproval"
+        :key="request.id"
+        class="rounded-lg border border-amber-500/40 bg-neutral-900 p-4 shadow-xl"
+      >
+        <p class="text-sm font-semibold text-amber-300">
+          {{ request.requestedBy || 'Someone' }} is asking for a comp
+        </p>
+        <p class="mt-1 text-sm text-neutral-300">
+          {{ request.lines.map(l => `${l.qty} x ${l.name}`).join(', ') }}
+          &middot; {{ formatMoney(request.grossPence) }}
+        </p>
+        <p class="text-xs text-neutral-400">
+          {{ REASON_LABELS[request.reason] ?? request.reason }}<template v-if="request.note">
+            : {{ request.note }}
+          </template>
+        </p>
+        <div class="mt-3 flex gap-2">
+          <UButton
+            size="sm"
+            color="success"
+            :loading="busy"
+            label="Approve"
+            @click="decideComp(request.id, 'approve')"
+          />
+          <UButton
+            size="sm"
+            variant="ghost"
+            color="neutral"
+            :loading="busy"
+            label="Decline"
+            @click="decideComp(request.id, 'decline')"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- What happened to my own request. -->
+    <div
+      v-if="myPending || myDecided"
+      class="fixed bottom-4 left-4 z-40 max-w-sm rounded-lg border border-neutral-700 bg-neutral-900 p-4 shadow-xl"
+    >
+      <template v-if="myPending">
+        <p class="text-sm font-medium text-neutral-200">
+          Waiting for the duty manager
+        </p>
+        <p class="text-xs text-neutral-400">
+          Expires ten minutes after asking. Ring it up properly if nobody answers.
+        </p>
+      </template>
+      <template v-else-if="myDecided">
+        <p
+          class="text-sm font-medium"
+          :class="myDecided.status === 'APPROVED' ? 'text-green-400' : 'text-neutral-300'"
+        >
+          <template v-if="myDecided.status === 'APPROVED'">
+            Approved by {{ myDecided.decidedBy || 'the duty manager' }}
+          </template>
+          <template v-else-if="myDecided.status === 'DECLINED'">
+            Declined by {{ myDecided.decidedBy || 'the duty manager' }}
+          </template>
+          <template v-else>
+            That request expired
+          </template>
+        </p>
+        <UButton
+          size="xs"
+          variant="ghost"
+          color="neutral"
+          class="mt-2"
+          label="Clear"
+          @click="myDecided = null"
+        />
+      </template>
+    </div>
+
+    <UModal
+      v-model:open="compOpen"
+      title="Comp this round"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <p class="text-sm text-muted">
+            {{ basketBar.map(l => `${l.qty} x ${l.product.name}`).join(', ') }}
+            &middot; {{ formatMoney(barSubtotal) }}
+          </p>
+          <UFormField
+            label="What is it for"
+            required
+          >
+            <USelectMenu
+              v-model="compReason"
+              :items="[
+                { label: 'Cast & crew', value: 'CAST_CREW' },
+                { label: 'Committee', value: 'COMMITTEE' },
+                { label: 'Spillage', value: 'SPILLAGE' },
+                { label: 'Other', value: 'OTHER' },
+              ]"
+              value-key="value"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Tell the duty manager more"
+            :required="compReason === 'OTHER'"
+            help="They see this when deciding."
+          >
+            <UInput
+              v-model="compNote"
+              class="w-full"
+            />
+          </UFormField>
+          <UAlert
+            icon="i-lucide-info"
+            color="neutral"
+            variant="subtle"
+            :title="comps.mayApprove ? 'You can approve this yourself' : 'Nothing is recorded yet'"
+            :description="comps.mayApprove
+              ? 'It is still recorded as approved by you.'
+              : 'The duty manager has ten minutes to approve it.'"
+          />
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            label="Cancel"
+            @click="compOpen = false"
+          />
+          <UButton
+            :loading="busy"
+            :disabled="compReason === 'OTHER' && !compNote"
+            :label="comps.mayApprove ? 'Ask, then approve' : 'Ask the duty manager'"
+            @click="requestComp"
+          />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

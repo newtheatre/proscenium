@@ -46,6 +46,27 @@ const NEED_LABELS: Record<string, string> = {
 const { performance, performances } = await useFohTonight()
 const requestFetch = useRequestFetch()
 
+/** Only the duty manager sees a queue; the till is where it is answered. */
+const pendingComps = ref(0)
+async function pollComps() {
+  try {
+    const res = await requestFetch<{ mayApprove: boolean, awaitingApproval: unknown[] }>('/api/bar/comps')
+    pendingComps.value = res.mayApprove ? res.awaitingApproval.length : 0
+  }
+  catch {
+    // Not everyone working tonight can reach the bar: a 403 here is expected.
+  }
+}
+
+let compTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  pollComps()
+  compTimer = setInterval(pollComps, 8000)
+})
+onBeforeUnmount(() => {
+  if (compTimer) clearInterval(compTimer)
+})
+
 const { data } = await useAsyncData(
   'foh-glance',
   () => (performance.value
@@ -98,6 +119,20 @@ const facts = computed(() => [
           Back
         </NuxtLink>
       </header>
+
+      <NuxtLink
+        v-if="pendingComps"
+        to="/foh/bar/till"
+        class="mb-5 flex items-center justify-between rounded-xl border border-amber-500/50 bg-amber-500/10 p-4"
+      >
+        <span class="text-sm font-medium text-amber-300">
+          {{ pendingComps }} comp{{ pendingComps === 1 ? '' : 's' }} awaiting approval
+        </span>
+        <UIcon
+          name="i-lucide-chevron-right"
+          class="size-5 text-amber-300"
+        />
+      </NuxtLink>
 
       <div
         v-if="!performance && performances.length > 1"
