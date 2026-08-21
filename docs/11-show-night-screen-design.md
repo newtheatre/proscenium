@@ -157,18 +157,37 @@ Proscenium generates no QR anywhere today, and legacy never did (see the migrati
 
 Encode a URL, not a bare ref: `https://newtheatre.org.uk/t/<bookingRef>`. Reasons:
 
-- A customer scanning their own email with a normal camera app lands on their booking page —
-  the QR is useful even outside our scanner.
 - The FOH scanner just pattern-matches the trailing ref, so it costs nothing.
 - The ref alone stays typeable; the QR is an accelerator, not a gate.
+- It is short enough to print, read aloud and scan reliably at arm's length.
 
-`/t/<ref>` should behave like the existing public booking-lookup path (whatever
-[05-booking-and-box-office](./05-booking-and-box-office.md) documents as the customer's handle) —
-a redirect, not a new page.
+`/t/<ref>` is a redirect, not a new page: it resolves the reference to its show and sends the
+browser to the canonical booking page. **It performs no access check and grants nothing**, because
+the reference is not a credential ([ADR-0009](./decisions/0009-signed-booking-access-tokens.md)).
 
-Generation is server-side at email-send time (any small QR library that runs on Workers, or
-pre-render to a data URI). No personal data in the QR — the ref only, which is already the public
-handle.
+### What the emailed QR carries
+
+The first draft of this section claimed a customer could scan their own email with a normal camera
+app and land on their booking. That is not true of the bare ref: a guest has no session, the ref
+grants nothing, and they would land on a refusal. Guests are most of the box office, so the claim
+mattered.
+
+The emailed QR therefore encodes **`/t/<ref>?t=<token>`**, the same signed token the email's own
+link already carries. Three consequences, none of which weaken ADR-0009:
+
+- **Nothing new is exposed.** The token is already in that email, in a URL. A machine-readable copy
+  of the same link beside it adds no exposure the email did not already have.
+- **The reference still grants nothing.** Access comes from the token, exactly as before. `?ref=`
+  remains unaccepted everywhere.
+- **The scanner is unaffected.** It pattern-matches `/t/<REF>` and ignores the query, so both the
+  bare and tokenised forms scan identically.
+
+`/t/<ref>` moves a valid token into the booking cookie and drops it from the URL before redirecting,
+so the destination address never carries it. The bare form is what goes on the customer's booking
+page and anywhere printed.
+
+Generation is server-side at email-send time (any small QR library that runs on Workers). No
+personal data in the QR.
 
 Scanner implementation: `getUserMedia` + the `BarcodeDetector` API where available, with a JS
 decoder fallback (e.g. jsQR) for browsers without it. No native app, ever — the whole point is

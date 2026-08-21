@@ -36,6 +36,15 @@ const PUBLIC_ROUTES: PublicRoute[] = [
     windowSeconds: 600,
   },
   {
+    // Public, unauthenticated, and a lookup by reference: an unknown ref 404s,
+    // which makes this an existence oracle over a 6-character space.
+    name: 'booking-shortlink',
+    methods: ['GET'],
+    pattern: /^\/t\/[^/]+\/?$/,
+    limit: 60,
+    windowSeconds: 600,
+  },
+  {
     // Same token, but these change a booking.
     name: 'booking-mutate',
     methods: ['POST', 'PUT'],

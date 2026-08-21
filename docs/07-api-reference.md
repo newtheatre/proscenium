@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-81 handler files under `server/api/` (counted 2026-08-21), plus the blob route and the
+82 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -334,6 +334,12 @@ and no password-reset route here.
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | GET | `/images/**` | **Public** | Stream a blob out of R2 by pathname |
+
+### Short booking links
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/t/:ref` | **Public** | Short booking handle. Resolves the reference and redirects; grants nothing |
 
 ### Health
 
@@ -2096,6 +2102,40 @@ Why it exists rather than returning a bare `ok`: migrations apply from CI but ca
 against the deploy, so the ordering is a race won on timing
 ([08-operations](./08-operations.md) §5). This is the alarm for the case where it is lost, and it is
 the second half of stage-door ADR-0021 — the first half being the workflow this repo already had.
+### 3.10b Short booking links
+
+---
+
+#### `GET /t/:ref`
+
+**Source** `server/routes/t/[ref].get.ts` · **Auth** **Public**
+
+The short, readable form of a booking handle, and what the QR on a confirmation email encodes
+([11-show-night-screen-design](./11-show-night-screen-design.md) §3). It resolves the reference to
+its show and redirects to the canonical booking page:
+
+```
+GET /t/5T3P7T  →  302  /whats-on/importance-of-being-earnest/booking/5T3P7T
+```
+
+**The reference grants nothing.** This route performs no access check and confers no access; the
+booking page and `GET /api/bookings/:id` apply the same rules they always did
+([ADR-0009](./decisions/0009-signed-booking-access-tokens.md)). Following this redirect without a
+token or an owning session ends in the same refusal as visiting the page directly. `?ref=` is still
+not an accepted credential anywhere.
+
+If a valid `?t=` token is present it is **moved into the `nnt_booking_token` cookie and dropped from
+the URL**, so the redirect's `Location` never carries it. That is strictly better than the link in
+today's confirmation email, which leaves the token in the address bar until the page hands it off.
+An invalid or expired token is ignored rather than refused, because the booking page explains the
+problem better than a bare 404 does.
+
+References are matched case-insensitively, so a reference read aloud and typed in lower case works.
+
+**Response** `302` to the booking page, or `404` if no booking has that reference. Rate limited as
+`booking-shortlink` (60 per 10 minutes): an unknown reference 404s, which makes this an existence
+oracle over a six-character space, so it is capped like the other public booking routes
+([ADR-0015](./decisions/0015-rate-limits-declared-in-middleware.md)).
 
 ---
 
