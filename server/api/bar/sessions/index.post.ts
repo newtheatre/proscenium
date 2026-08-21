@@ -14,7 +14,8 @@ export default defineEventHandler(async (event) => {
 
   const { user } = await requireUserSession(event)
   const night = await requireBarScope(user)
-  const input = await readValidatedBody(event, bodySchema.parse)
+  // Every field is optional, so opening the bar with no body at all is valid.
+  const input = await readValidatedBody(event, body => bodySchema.parse(body ?? {}))
 
   const open = await db.select().from(schema.barSessions)
     .where(and(eq(schema.barSessions.night, night), isNull(schema.barSessions.closedAt))).get()

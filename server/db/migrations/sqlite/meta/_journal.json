@@ -253,6 +253,13 @@
       "when": 1787352082828,
       "tag": "0035_green_millenium_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1787354035477,
+      "tag": "0036_jittery_groot",
+      "breakpoints": true
     }
   ]
 }
