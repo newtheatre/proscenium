@@ -138,18 +138,26 @@ apart** in the dashboard or the treasurer's CSV. The fix is one line in the walk
 
 ## 5. What the customer gets
 
+This app sends three emails, all about bookings. Registration, verification and password reset are
+the auth service's and are not sent from here ([04-auth-and-permissions](./04-auth-and-permissions.md)).
+
 | Event | Email | Status |
 |---|---|---|
-| Booking created | Confirmation with reference, show, date, tickets, total | Sent, but **every link in it is broken** |
-| Registration | Verification link | Link broken |
-| Forgot password | Reset link | Link broken |
+| Booking created | Confirmation with reference, show, date, tickets, total, and a QR | Sent |
+| Reservation cancelled by staff or customer | Cancellation notice | Sent |
 | Booking reminder | Written, never called | No scheduler exists |
-| Reservation cancelled by staff | Cancellation notice | Sent |
 
-Both link bugs have the same root cause — `server/utils/email.ts` reads
-`runtimeConfig.public.baseUrl` while `nuxt.config.ts` declares `baseURL`, so every URL renders as
-`undefined/...`. The booking link has a second, independent bug: it uses the 6-character booking
-reference as the path segment, but `GET /api/bookings/:id` looks up by the nanoid primary key.
+**The QR encodes `/t/<ref>?t=<token>`** — the short booking handle, carrying the same signed token
+this email's own link already carries, so it exposes nothing the email did not already contain. The
+reference alone still grants nothing ([ADR-0009](./decisions/0009-signed-booking-access-tokens.md));
+access is the token, as everywhere else. It is attached inline (`cid:`) rather than linked, because
+email clients block remote images by default and Gmail strips `data:` URIs. The design and the
+front-of-house side of it are [11-show-night-screen-design](./11-show-night-screen-design.md) §3.
+
+An earlier revision of this section reported that every link in these emails was broken, from
+`baseUrl` against `baseURL`, and that the booking link 404'd because it used the reference where the
+endpoint wanted a nanoid. **Both were fixed** and are recorded in
+[09-known-issues](./09-known-issues.md) under Fixed, items 1 and 2.
 
 **Customers cannot cancel their own booking.** `updateReservation` is staff-only. The schema and UI
 both support `cancelledBy: 'CUSTOMER'`, but only staff can set it, on the customer's behalf. The

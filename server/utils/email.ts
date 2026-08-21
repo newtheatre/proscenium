@@ -5,16 +5,25 @@
 
 import { getResend } from './resend'
 
+interface EmailAttachment {
+  content: string
+  filename: string
+  contentType: string
+  /** Set to reference the file from the HTML as `cid:<id>`. */
+  contentId?: string
+}
+
 interface SendEmailOptions {
   to: string
   subject: string
   html: string
+  attachments?: EmailAttachment[]
 }
 
 /**
  * Send an email via Resend.
  */
-export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<void> {
+export async function sendEmail({ to, subject, html, attachments }: SendEmailOptions): Promise<void> {
   const resend = getResend()
   if (!resend) {
     console.warn(`[Email] Skipping send (no Resend key configured): "${subject}" to ${to}`)
@@ -27,6 +36,7 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions): Promis
     to,
     subject,
     html,
+    ...(attachments?.length ? { attachments } : {}),
   })
 
   if (error) {
@@ -160,6 +170,9 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData): Prom
   // for the customer to quote, which is why it cannot also unlock the booking.
   const token = await signBookingToken(data.bookingId, bookingTokenExpiry(data.performanceDate))
   const bookingUrl = `${baseURL}/whats-on/${data.showSlug}/booking/${data.bookingRef}?t=${encodeURIComponent(token)}`
+  // Carries the same token this email's own link carries, so it exposes nothing
+  // new; the reference alone still grants nothing (ADR-0009, docs/11 §3).
+  const qr = toBase64(qrPng(`${baseURL}/t/${data.bookingRef}?t=${encodeURIComponent(token)}`))
 
   const html = `
 <!DOCTYPE html>
@@ -186,7 +199,9 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData): Prom
       <!-- Booking reference -->
       <div style="text-align: center; background-color: #faf5ff; border: 2px dashed #7c3aed; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
         <p style="margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #737373;">Booking Reference</p>
-        <p style="margin: 0; font-size: 32px; font-weight: 700; font-family: monospace; letter-spacing: 4px; color: #7c3aed;">${data.bookingRef}</p>
+        <p style="margin: 0 0 16px; font-size: 32px; font-weight: 700; font-family: monospace; letter-spacing: 4px; color: #7c3aed;">${data.bookingRef}</p>
+        <img src="cid:booking-qr" alt="QR code for booking ${data.bookingRef}" width="180" height="180" style="display: block; margin: 0 auto; border: 8px solid #ffffff; border-radius: 4px;">
+        <p style="margin: 12px 0 0; font-size: 13px; color: #737373;">Show this at the door, or read out the reference above.</p>
       </div>
 
       <!-- Show details -->
@@ -257,6 +272,14 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData): Prom
     to: data.customerEmail,
     subject: `Booking Confirmed — ${data.showTitle} (${data.bookingRef})`,
     html,
+    // Inline, not a remote image: clients block those by default, and Gmail
+    // strips `data:` URIs. A cid attachment is the one that renders.
+    attachments: [{
+      content: qr,
+      filename: `booking-${data.bookingRef}.png`,
+      contentType: 'image/png',
+      contentId: 'booking-qr',
+    }],
   })
 }
 
