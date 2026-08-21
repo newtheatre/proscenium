@@ -35,6 +35,10 @@ export default defineEventHandler(async (event) => {
   assertBookingOpen(booking.performance)
 
   const body = await readValidatedBody(event, bodySchema.parse)
+  // Same gate as creating: a customer editing their own booking must not be
+  // able to add an access type they are not entitled to (docs/12 §2.6).
+  await assertAccessTicketsAllowed(booking.userId, body.tickets)
+
   const { performanceId } = booking
   const showId = booking.performance.showId
   const requestedTypeIds = body.tickets.map(t => t.ticketTypeId)

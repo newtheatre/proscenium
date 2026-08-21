@@ -332,7 +332,10 @@ None of these are code, and all of them will be discovered mid-build if they are
 
 ## 6. Open questions
 
-- **Committee:** access ticket pricing, and companion policy (£0 assumed here).
+- **Committee:** access ticket pricing, and companion policy (£0 assumed here). **The mechanism is
+  built and does not wait on this**: both types are ordinary ticket types carrying an `accessKind`,
+  so the price is a number an admin sets through the usual override chain. What is outstanding is
+  the number, not the code.
 - **Nimbus venue registration** — who signs up, and what verification mechanism we actually get.
 - **DM eligibility** — which modules the `duty-manager` rule requires, and what the new `door` and
   `bar` rules require. This is committee policy expressed as data in rehearsal's admin UI, not a

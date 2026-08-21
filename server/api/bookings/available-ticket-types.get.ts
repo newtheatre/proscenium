@@ -51,8 +51,14 @@ export default defineEventHandler(async (event) => {
       : Promise.resolve([]),
   ])
 
+  // Access types are offered only to accounts entitled to them. The gate on
+  // the booking route is the real one; this keeps the picker honest.
+  const session = await getUserSession(event)
+  const rights = await canBookAccessTickets(session?.user?.id)
+
   const ctx = { baseTypes: allTypes, showOverrides, perfOverrides }
   return allTypes
+    .filter(type => !type.accessKind || rights.allowed)
     .map((type) => {
       const { effectivePrice, active } = resolveEffectiveTicketType(type.id, ctx)
       return {
@@ -61,6 +67,9 @@ export default defineEventHandler(async (event) => {
         description: type.description,
         effectivePrice,
         active,
+        accessKind: type.accessKind,
+        /** Companion tickets are capped per performance by the profile. */
+        maxQuantity: type.accessKind === 'COMPANION' ? rights.companions : null,
       }
     })
     .sort((a, b) => a.name.localeCompare(b.name))

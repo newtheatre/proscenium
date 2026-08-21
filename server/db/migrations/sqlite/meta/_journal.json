@@ -197,6 +197,13 @@
       "when": 1787331996224,
       "tag": "0027_overconfident_black_crow",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1787334279700,
+      "tag": "0028_futuristic_ben_urich",
+      "breakpoints": true
     }
   ]
 }
