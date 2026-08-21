@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import { asc, eq, sql, and, type SQL } from 'drizzle-orm'
-import { z } from 'zod/v4'
+import { z } from 'zod'
 import { listContentWarnings } from '~~/shared/utils/abilities'
 
 const querySchema = z.object({

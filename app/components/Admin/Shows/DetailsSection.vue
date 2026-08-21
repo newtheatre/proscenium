@@ -47,6 +47,7 @@ const state = reactive<Schema>(stateFromShow(props.show))
 watch(() => props.show, (show) => {
   Object.assign(state, stateFromShow(show))
   clearPoster()
+  markPerformancesOnSaleToo.value = false
 })
 
 // ── Poster ────────────────────────────────────────────────────────────────
@@ -102,8 +103,7 @@ function reset() {
 
 // ── Publish hand-off ─────────────────────────────────────────────────────────
 
-const publishConfirmOpen = ref(false)
-const isMarkingPerformances = ref(false)
+const markPerformancesOnSaleToo = ref(false)
 
 const statusItems = [
   { label: 'Draft — not visible to the public', value: 'DRAFT' },
@@ -139,21 +139,28 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       await $fetch(`/api/shows/${props.show.id}/poster`, { method: 'DELETE' })
     }
 
+    let updatedPerformanceCount = 0
+    // ADR-0018: publishing never touches performance status by itself.
+    // This call is the opt-in the checkbox above collects.
+    if (wasDraft && event.data.status === 'PUBLISHED' && markPerformancesOnSaleToo.value && props.show.performances.length > 0) {
+      const result = await $fetch<{ updatedPerformanceCount: number }>(`/api/shows/${props.show.id}/publish`, {
+        method: 'POST',
+        body: { markPerformancesOnSale: true },
+      })
+      updatedPerformanceCount = result.updatedPerformanceCount
+    }
+
     toast.add({
       title: 'Show updated',
-      description: `"${event.data.title}" has been saved`,
+      description: updatedPerformanceCount > 0
+        ? `"${event.data.title}" has been saved, ${updatedPerformanceCount} performance(s) marked on sale`
+        : `"${event.data.title}" has been saved`,
       icon: 'i-lucide-check',
       color: 'success',
     })
 
     clearPoster()
     emit('refresh')
-
-    // Publishing a show does not publish its performances — the right default, and
-    // the wrong surprise, so offer it explicitly.
-    if (wasDraft && event.data.status === 'PUBLISHED' && props.show.performances.length > 0) {
-      publishConfirmOpen.value = true
-    }
   }
   catch (error: unknown) {
     toast.add({
@@ -165,35 +172,6 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   }
   finally {
     isSubmitting.value = false
-  }
-}
-
-async function markPerformancesOnSale() {
-  isMarkingPerformances.value = true
-  try {
-    const result = await $fetch<{ updatedPerformanceCount: number }>(`/api/shows/${props.show.id}/publish`, {
-      method: 'POST',
-      body: { markPerformancesOnSale: true },
-    })
-    toast.add({
-      title: 'Performances updated',
-      description: `${result.updatedPerformanceCount} performance(s) marked as on sale`,
-      icon: 'i-lucide-check',
-      color: 'success',
-    })
-  }
-  catch (error: unknown) {
-    toast.add({
-      title: 'Error',
-      description: getErrorMessage(error, 'Failed to mark performances as on sale'),
-      icon: 'i-lucide-x-circle',
-      color: 'error',
-    })
-  }
-  finally {
-    isMarkingPerformances.value = false
-    publishConfirmOpen.value = false
-    emit('refresh')
   }
 }
 </script>
@@ -363,6 +341,12 @@ async function markPerformancesOnSale() {
           />
         </UFormField>
 
+        <UCheckbox
+          v-if="show.status === 'DRAFT' && state.status === 'PUBLISHED' && show.performances.length > 0"
+          v-model="markPerformancesOnSaleToo"
+          label="Also mark all performances as on sale"
+        />
+
         <div class="flex flex-wrap justify-end gap-2 pt-2 border-t border-default">
           <UButton
             label="Discard changes"
@@ -380,36 +364,5 @@ async function markPerformancesOnSale() {
         </div>
       </UForm>
     </UCard>
-
-    <!-- Publishing a show leaves its performances in draft; offer the follow-up. -->
-    <UModal
-      v-model:open="publishConfirmOpen"
-      title="Show published"
-      :description="`Mark all ${show.performances.length} performance(s) as on sale?`"
-    >
-      <template #body>
-        <div class="space-y-4">
-          <p class="text-sm text-muted">
-            Performances are still in <strong>Draft</strong>. Marking them
-            <strong>On sale</strong> makes them available for booking.
-          </p>
-          <div class="flex justify-end gap-2">
-            <UButton
-              label="Leave as draft"
-              color="neutral"
-              variant="subtle"
-              :disabled="isMarkingPerformances"
-              @click="publishConfirmOpen = false"
-            />
-            <UButton
-              label="Mark all as on sale"
-              icon="i-lucide-ticket"
-              :loading="isMarkingPerformances"
-              @click="markPerformancesOnSale"
-            />
-          </div>
-        </div>
-      </template>
-    </UModal>
   </section>
 </template>

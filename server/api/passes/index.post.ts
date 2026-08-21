@@ -1,7 +1,7 @@
 import { db, schema } from '@nuxthub/db'
 import { and, count, eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
-import { z } from 'zod/v4'
+import { z } from 'zod'
 import { issuePass } from '~~/shared/utils/abilities'
 
 const bodySchema = z.object({

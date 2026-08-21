@@ -1,4 +1,4 @@
-import { z } from 'zod/v4'
+import { z } from 'zod'
 
 /**
  * Password strength rules. Unused since identity moved to the auth service —

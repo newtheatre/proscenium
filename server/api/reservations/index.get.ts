@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import { and, count, eq, inArray, isNull, or } from 'drizzle-orm'
-import { z } from 'zod/v4'
+import { z } from 'zod'
 import { listReservations } from '~~/shared/utils/abilities'
 
 const querySchema = paginationSchema.extend({

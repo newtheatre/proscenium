@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import { and, asc, count, desc, eq, gt, gte, inArray, lte, ne } from 'drizzle-orm'
-import { z } from 'zod/v4'
+import { z } from 'zod'
 import { listShows } from '~~/shared/utils/abilities'
 
 const querySchema = paginationSchema.omit({ limit: true, q: true }).extend({

@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import { and, eq, ne, or, sql } from 'drizzle-orm'
-import { z } from 'zod/v4'
+import { z } from 'zod'
 import { updateContentWarning } from '~~/shared/utils/abilities'
 
 const bodySchema = z.object({

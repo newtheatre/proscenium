@@ -53,28 +53,7 @@ const performanceToEdit = ref<PerformanceListItem | null>(null)
 const performanceForTicketTypes = ref<PerformanceListItem | null>(null)
 const performanceForTicketTypesLabel = ref('')
 
-const isPublishing = ref(false)
-
-async function publish() {
-  if (!show.value) return
-  isPublishing.value = true
-  try {
-    await $fetch(`/api/shows/${show.value.id}`, { method: 'PUT', body: { status: 'PUBLISHED' } })
-    toast.add({ title: 'Show published', icon: 'i-lucide-check', color: 'success' })
-    await refresh()
-  }
-  catch (err: unknown) {
-    toast.add({
-      title: 'Could not publish this show',
-      description: getErrorMessage(err, 'Please try again'),
-      icon: 'i-lucide-x-circle',
-      color: 'error',
-    })
-  }
-  finally {
-    isPublishing.value = false
-  }
-}
+const publishOpen = ref(false)
 
 // ── Derived ──────────────────────────────────────────────────────────────────
 
@@ -306,8 +285,7 @@ const performanceColumns: TableColumn<PerformanceListItem>[] = [
             icon="i-lucide-badge-check"
             color="primary"
             variant="soft"
-            :loading="isPublishing"
-            @click="publish"
+            @click="publishOpen = true"
           />
           <UButton
             v-else
@@ -418,6 +396,13 @@ const performanceColumns: TableColumn<PerformanceListItem>[] = [
         :show-title="show.title"
         @close="performanceForTicketTypes = null"
         @refresh="refresh"
+      />
+
+      <ShowPublishModal
+        :show-id="publishOpen ? show.id : null"
+        :performance-count="performances.length"
+        @close="publishOpen = false"
+        @refresh="() => { refresh(); publishOpen = false }"
       />
     </template>
   </AdminPage>
