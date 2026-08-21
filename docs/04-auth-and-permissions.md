@@ -257,12 +257,16 @@ walk-in lookup uses `GET /api/users?email=`, which returns at most one row rathe
 
 ## Client-side guards
 
-`app/middleware/` — `auth`, `admin`, `staff`. These are **user experience only**. They stop someone
+`app/middleware/` — `auth`, `admin`, `staff`, `foh`. These are **user experience only**. They stop someone
 landing on a page they cannot use; they are not a security boundary. The API is the boundary. Each
 checks staleness *before* the role, so a session that is merely out of date is refreshed rather than
 turned away.
 
 `/admin/*` uses `admin` (ADMIN or MANAGER). `/admin/box-office/*` uses `staff` (adds BOX_OFFICE).
+`/foh/*` uses `foh`, which checks `foh.work` and nothing more: **which performances that person may
+see is the rota's answer, not the middleware's**, and it is given server-side
+([ADR-0019](./decisions/0019-the-rota-scopes-the-front-of-house-role.md)). A holder rostered on
+nothing reaches the page and is told so, which is a state rather than a denial.
 
 ## Guest booking access
 

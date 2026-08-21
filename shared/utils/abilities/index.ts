@@ -66,6 +66,8 @@ export {
   manageShifts,
 } from './shifts'
 
+export { workFoh } from './foh'
+
 export {
   listSeasons,
   manageSeasons,
