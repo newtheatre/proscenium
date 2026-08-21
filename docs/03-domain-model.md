@@ -204,6 +204,36 @@ How many of each role a new performance starts with. One row per role per venue;
 is the estate default, used when a venue has no rows of its own. Stamped onto a performance at
 creation, so publishing a rota costs nothing by default.
 
+### `venue_emergency_info`
+
+The emergency card the show night screen renders, one row per venue. Deliberately **not** columns on
+`venues`: that row is read by public pages, and a column added here must never be one missing
+allow-list away from the front page.
+
+Every field is nullable, so a venue with no card still answers rather than failing the request.
+`addressForEmergencyCall` is stored as it should be *spoken* to a 999 handler, which is not always
+the same as the postal address.
+
+### `foh_contacts`
+
+Numbers the door may need, tap-to-call: committee on-call, venue, security, taxi. Not the people
+working tonight, which is the rota's answer, and not anyone's personal number from the mirror,
+which holds none. Archived rather than deleted
+([ADR-0010](./decisions/0010-archive-never-delete-referenced-records.md)): a number that was on the
+card during an incident should still be findable afterwards.
+
+### `incident_log`
+
+The theatre's first structured incident record: performance, author, time, free text.
+
+**Append-only, enforced by the database.** `BEFORE UPDATE` and `BEFORE DELETE` triggers raise, in
+migration `0019`. Corrections are new rows carrying `supersedesId`, and both stay in order. The
+reasoning is [ADR-0027](./decisions/0027-the-refusals-register-is-append-only.md)'s, applied to the
+other register this app keeps: one you can tidy is not a record.
+
+The trigger is hand-authored, because a trigger cannot be expressed in the Drizzle schema. That is
+authoring a new migration, not editing a generated one, which stays forbidden.
+
 ## Status lifecycles
 
 ### Reservation
