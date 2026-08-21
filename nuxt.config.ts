@@ -85,6 +85,9 @@ export default defineNuxtConfig({
     // Reads rehearsal's eligibility rules (ADR-0026). Same prefix rule.
     trainingApiToken: '',
     trainingApiBaseURL: 'https://training.newtheatre.org.uk',
+    // Comma-separated standing recipients of the end-of-night report. The
+    // closing duty manager is added at send time (docs/12 §4.2).
+    nightReportRecipients: '',
     public: {
       authBaseURL: 'https://auth.newtheatre.org.uk',
       baseURL: 'https://newtheatre.org.uk',

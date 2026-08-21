@@ -38,6 +38,7 @@ const REVIEWED = {
   'stocktakes.finishedByUserId': { kind: 'attribution', note: 'Who applied or abandoned it.' },
   'compRequests.requestedByUserId': { kind: 'attribution', note: 'Who asked for the comp. The end-of-night report names them.' },
   'compRequests.decidedByUserId': { kind: 'attribution', note: 'Which duty manager approved or declined it.' },
+  'performanceReports.closedByUserId': { kind: 'attribution', note: 'Which duty manager signed the night off. Null when the job auto-closed it.' },
 }
 
 /** Columns deliberately not re-pointed by a merge, each with a reason. */

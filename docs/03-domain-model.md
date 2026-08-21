@@ -430,6 +430,27 @@ and it writes them in one batch (ADR-0026).
 Who may approve: tonight's confirmed `DUTY_MANAGER`, or `BOX_OFFICE`+ when there is none. If nobody
 can, there are no comps tonight, which is the correct outcome rather than a fallback.
 
+### `performance_reports`
+
+**The stored row is the record; the email is a courtesy copy** (docs/12 §4.2). `payload` is the
+whole report snapshotted as JSON at the moment of closing, not a view re-derived on read: a report
+should say what the night looked like, and a price change or a corrected reservation next week must
+not silently rewrite it.
+
+- **One report per performance**, enforced by a unique index. Closing twice is `409`, which is also
+  what makes the auto-close job safe to run more than once.
+- **`closed_by_user_id` is null exactly when `auto_closed` is true.** Nobody signed it off, and the
+  report says so in a banner rather than leaving the gap silent (docs/12 §4.1).
+- **Access appears as two counts and nothing else.** Not the need, not the name, not the symbol. A
+  report is forwarded by email, and a disability is special category data (ADR-0022).
+- **Milestone timings are read from the messages, not the presets.** The message snapshots its own
+  label, so renaming a preset later cannot rewrite what the night was called at the time.
+- **Bar money is not in the performance takings.** It belongs to the session, and adding it to the
+  performance would count a double bill's takings twice. It has its own section.
+
+Closing also revokes the night's backstage codes by bumping the epoch (docs/11 §5.1), so a code
+handed out at 19:00 stops working the moment the night is signed off.
+
 ## Status lifecycles
 
 ### Reservation

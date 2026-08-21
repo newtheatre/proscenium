@@ -43,8 +43,57 @@ const NEED_LABELS: Record<string, string> = {
   miscellaneous: 'Other',
 }
 
-const { performance, performances } = await useFohTonight()
+const { performance, performances, scope } = await useFohTonight()
 const requestFetch = useRequestFetch()
+
+interface StoredReport {
+  id: string
+  night: string
+  closedAt: string
+  autoClosed: boolean
+  closedBy: string | null
+}
+
+const toast = useToast()
+const closeOpen = ref(false)
+const closing = ref(false)
+const checklist = reactive({ noShowsReleased: false, incidentsReviewed: false })
+const closingNote = ref('')
+
+const { data: reportData, refresh: refreshReport } = await useAsyncData(
+  () => `foh-report-${performance.value?.id ?? 'none'}`,
+  () => performance.value
+    ? requestFetch<{ closed: boolean, report: StoredReport | null }>(`/api/foh/performances/${performance.value.id}/report`)
+    : Promise.resolve({ closed: false, report: null }),
+  { watch: [performance] },
+)
+
+/** Signing the night off is the duty manager's, exactly as approving a comp is. */
+const mayClose = computed(() => performance.value?.shiftRole === 'DUTY_MANAGER' || Boolean(scope.value?.bypassedRota))
+const closed = computed(() => reportData.value?.report ?? null)
+
+async function closeNight() {
+  closing.value = true
+  try {
+    await requestFetch(`/api/foh/performances/${performance.value!.id}/close`, {
+      method: 'POST',
+      body: { checklist: { ...checklist }, closingNote: closingNote.value || null },
+    })
+    closeOpen.value = false
+    await refreshReport()
+    toast.add({ title: 'Night closed and filed', icon: 'i-lucide-check', color: 'success' })
+  }
+  catch (error) {
+    toast.add({
+      title: 'Not closed',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    closing.value = false
+  }
+}
 
 /** Only the duty manager sees a queue; the till is where it is answered. */
 const pendingComps = ref(0)
@@ -119,6 +168,37 @@ const facts = computed(() => [
           Back
         </NuxtLink>
       </header>
+
+      <div
+        v-if="closed"
+        class="mb-5 rounded-xl border border-neutral-800 bg-neutral-900 p-4"
+      >
+        <p class="text-sm font-medium text-neutral-200">
+          Night closed
+          <span
+            v-if="closed.autoClosed"
+            class="text-amber-400"
+          >&mdash; auto-closed, no duty manager sign-off</span>
+          <span
+            v-else-if="closed.closedBy"
+            class="text-neutral-400"
+          >by {{ closed.closedBy }}</span>
+        </p>
+        <p class="text-xs text-neutral-500">
+          {{ formatDateTime(closed.closedAt) }} &middot; the report has been filed and emailed.
+        </p>
+      </div>
+
+      <UButton
+        v-else-if="mayClose && performance"
+        block
+        size="lg"
+        color="primary"
+        class="mb-5"
+        icon="i-lucide-clipboard-check"
+        label="Close the night"
+        @click="closeOpen = true"
+      />
 
       <NuxtLink
         v-if="pendingComps"
@@ -307,5 +387,55 @@ const facts = computed(() => [
         </p>
       </template>
     </div>
+
+    <UModal
+      v-model:open="closeOpen"
+      title="Close the night"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UCheckbox
+            v-model="checklist.noShowsReleased"
+            label="No-shows released"
+          />
+          <UCheckbox
+            v-model="checklist.incidentsReviewed"
+            label="Incidents reviewed"
+          />
+          <UFormField
+            label="Anything to add"
+            help="This goes in the report, which is the record."
+          >
+            <UTextarea
+              v-model="closingNote"
+              :rows="4"
+              class="w-full"
+            />
+          </UFormField>
+          <UAlert
+            icon="i-lucide-info"
+            color="neutral"
+            variant="subtle"
+            title="Closing ends the backstage codes"
+            description="Every backstage session for tonight stops working, and the report is filed and emailed."
+          />
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            label="Not yet"
+            @click="closeOpen = false"
+          />
+          <UButton
+            :loading="closing"
+            label="Close the night"
+            @click="closeNight"
+          />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

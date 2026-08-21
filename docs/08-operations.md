@@ -140,6 +140,15 @@ Rolling back also does not revert secrets or R2 contents.
 
 ---
 
+### The end-of-night report
+
+`NUXT_NIGHT_REPORT_RECIPIENTS` is a comma-separated list of standing recipients (`boxoffice@`, and
+the IT Manager while the system beds in). The duty manager who closed the night is added at send
+time, so they always get a copy of what they signed.
+
+**With nothing configured, no email is sent and the report is still filed.** That is deliberate: the
+stored row is the record, so a missing address loses a courtesy copy, never the night.
+
 ## 4a. Scheduled tasks
 
 **This worker has three cron triggers**, `*/15 * * * *`, `0 4 * * *` and `0 10 * * *`, declared in `nuxt.config.ts` under
