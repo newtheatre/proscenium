@@ -96,3 +96,15 @@ export const shiftTemplatesRelations = relations(shiftTemplates, ({ one }) => ({
     references: [venues.id],
   }),
 }))
+
+/**
+ * One row, `id = 'current'`. Trust levels differ year to year, so whether a
+ * claim confirms itself is a season's decision (docs/12 §3.3).
+ */
+export const rotaSettings = sqliteTable('rota_settings', {
+  id: text('id').primaryKey().$defaultFn(() => 'current'),
+  autoConfirmClaims: integer('auto_confirm_claims', { mode: 'boolean' }).notNull().default(false),
+
+  createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
+  updatedAt: text('updated_at').notNull().$onUpdate(() => sql`(current_timestamp)`),
+})

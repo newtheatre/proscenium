@@ -82,6 +82,9 @@ export default defineNuxtConfig({
     // Worker secret NUXT_AUTH_SERVICE_TOKEN. The NUXT_ prefix is load-bearing —
     // a secret named AUTH_SERVICE_TOKEN is silently ignored.
     authServiceToken: '',
+    // Reads rehearsal's eligibility rules (ADR-0026). Same prefix rule.
+    trainingApiToken: '',
+    trainingApiBaseURL: 'https://training.newtheatre.org.uk',
     public: {
       authBaseURL: 'https://auth.newtheatre.org.uk',
       baseURL: 'https://newtheatre.org.uk',

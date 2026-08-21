@@ -199,6 +199,12 @@ erasure anonymises the person while the shift survives
 **A merge can collide here.** Two accounts confirmed on the same slot would break the duty-manager
 index, so `mergeUser` deletes the loser's duplicate before re-pointing the rest.
 
+### `rota_settings`
+
+One row, `id = 'current'`. Whether a claim confirms itself is a season's decision, because trust
+levels differ year to year (docs/12 §3.3). A claim allowed under the eligibility fail-open path is
+never auto-confirmed, whatever this says: the flag exists to be looked at.
+
 ### `shift_templates`
 
 How many of each role a new performance starts with. One row per role per venue; a null `venueId`

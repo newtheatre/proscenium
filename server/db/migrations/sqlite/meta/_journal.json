@@ -183,6 +183,13 @@
       "when": 1787329739690,
       "tag": "0025_age_checks_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1787330603078,
+      "tag": "0026_woozy_wallop",
+      "breakpoints": true
     }
   ]
 }

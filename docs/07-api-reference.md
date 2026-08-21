@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-108 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+113 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -316,6 +316,10 @@ and no password-reset route here.
 | --- | --- | --- | --- |
 | GET | `/api/shifts` | Staff or `foh.work` (`listShifts`) | Every shift on performances in a date window |
 | GET | `/api/shifts/unstaffed` | Staff or `foh.work` (`listShifts`) | Performances soon with no confirmed duty manager |
+| GET | `/api/shifts/mine` | Any logged-in member | Upcoming performances, their open slots, and who is on |
+| POST | `/api/shifts/:id/claim` | Any logged-in member | Take an open slot, subject to training |
+| POST | `/api/shifts/:id/release` | The claimant | Give back a claim, before it is confirmed |
+| GET/PUT | `/api/shifts/settings` | `listShifts` / `shift.manage` | Whether claims auto-confirm this season |
 | PUT | `/api/shifts/:id` | `shift.manage` (`manageShifts`) | Assign, reassign, confirm or empty a slot |
 | DELETE | `/api/shifts/:id` | `shift.manage` (`manageShifts`) | Remove a slot from the rota |
 | GET | `/api/performances/:id/shifts` | Staff or `foh.work` (`listShifts`) | The rota for one performance |
@@ -1958,6 +1962,29 @@ Any manager edit clears `needsEligibilityReview` — that review is exactly what
 for ([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md)).
 
 **Response** `200` — the updated row. `409` on a second confirmed duty manager.
+
+---
+
+#### `POST /api/shifts/:id/claim`
+
+**Source** `server/api/shifts/[id]/claim.post.ts` · **Auth** any logged-in member
+
+Eligibility is asked of `rehearsal` through **one seam**, `isEligible(userId, ruleKey)`
+([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md)). This app never
+encodes what a rule requires, only that there is one, so the committee can change the requirement in
+rehearsal's admin UI without a deploy on either side.
+
+**It fails open, with a flag.** If rehearsal cannot be reached and no cached answer exists, the claim
+is allowed and `needsEligibilityReview` is set, which the admin rota renders as a *check training*
+badge. Failing closed would empty the rota during a training outage, and an unstaffed performance is
+a real harm tonight; an unqualified claim is a flagged row a human reviews. A claim on that path is
+**never auto-confirmed**, whatever the season's toggle says.
+
+A `404` from rehearsal means a rule was renamed or removed. That is a configuration break, not a
+transient, and it is logged loudly rather than quietly treated as an outage.
+
+**Response** `200` — the updated shift. `409` if somebody got there first, `403` with the missing
+module codes when rehearsal says no.
 
 ---
 
