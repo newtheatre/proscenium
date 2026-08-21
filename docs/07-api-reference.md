@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-124 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+125 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -363,6 +363,7 @@ and no password-reset route here.
 | GET | `/api/foh/incidents` | `foh.work` (`workFoh`) | The incident log for a performance |
 | GET | `/api/foh/age-checks` | `foh.work` (`workFoh`) | Tonight's Challenge 25 register and its two counters |
 | POST | `/api/foh/age-checks` | `foh.work` (`workFoh`) | Record an ID check. **There is no update or delete** |
+| GET | `/api/admin/bar/reconciliation` | `bar.manage` (`manageBar`) | What the reader's daily total should read |
 | GET | `/api/admin/bar/catalogue` | `bar.manage` (`manageBar`) | Categories, products and today's prices |
 | POST | `/api/admin/bar/categories` | `bar.manage` | Add a category |
 | POST | `/api/admin/bar/products` | `bar.manage` | Add a product, with its first price |
@@ -1997,6 +1998,26 @@ Any manager edit clears `needsEligibilityReview` — that review is exactly what
 for ([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md)).
 
 **Response** `200` — the updated row. `409` on a second confirmed duty manager.
+
+---
+
+#### `PUT /api/reservations/:id` — now also records the money
+
+Collection is the payment boundary
+([ADR-0011](./decisions/0011-collection-is-the-payment-boundary.md)) and therefore the moment the
+money is recorded ([ADR-0023](./decisions/0023-money-taken-is-recorded-as-a-transaction.md)). Moving
+a reservation into `COLLECTED` or `DOOR` writes a `transactions` row with a `TICKET_PAYMENT` line,
+**in the same `db.batch()` as the status change** — both, or neither.
+
+Two optional fields:
+
+- **`expectedTotalPence`** — what the screen showed. Checked, not trusted: the customer typed that
+  figure into a card reader, so a disagreement is a real one and returns `409` with both amounts,
+  having written nothing.
+- **`tender`** — `CARD` (default) or `COMP`. A comp records `0` and who approved it.
+
+The amount is the sum of **unrefunded tickets at the price they were sold at**, never the current
+price.
 
 ---
 
