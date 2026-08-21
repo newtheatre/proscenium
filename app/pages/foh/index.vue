@@ -47,17 +47,33 @@ const selected = computed(() => performances.value.find(p => p.id === selectedId
  * The six from docs/11 §2, in that order. Each lands in its own change; a tile
  * with no route says so rather than going missing.
  */
-const buttons = computed(() => [
-  { key: 'scan', label: 'Scan ticket', icon: 'i-lucide-scan-line', to: '/foh/scan', note: '' },
-  { key: 'tonight', label: 'Tonight at a glance', icon: 'i-lucide-gauge', to: '/foh/tonight', note: '' },
-  { key: 'pass', label: 'Admit pass holder', icon: 'i-lucide-credit-card', to: null, note: 'Passes coming 26/27' },
-  { key: 'backstage', label: 'Backstage', icon: 'i-lucide-message-square', to: '/foh/backstage', note: '' },
-  { key: 'emergency', label: 'Emergency', icon: 'i-lucide-triangle-alert', to: '/foh/emergency', note: '' },
-  { key: 'contacts', label: 'Contacts & incidents', icon: 'i-lucide-phone', to: '/foh/contacts', note: '' },
-  // Bar work rather than door work; #169 filters the home by tonight's shift.
-  { key: 'till', label: 'Till', icon: 'i-lucide-shopping-cart', to: '/foh/bar/till', note: '' },
-  { key: 'age-checks', label: 'Challenge 25', icon: 'i-lucide-shield-check', to: '/foh/age-checks', note: '' },
-])
+/**
+ * Which shifts light a tile up. The duty manager and `BOX_OFFICE`+ see the lot;
+ * a `DOOR` shift never sees the till, because the door never sells (§5).
+ */
+const ALL_TILES = [
+  { key: 'scan', label: 'Scan ticket', icon: 'i-lucide-scan-line', to: '/foh/scan', note: '', roles: ['DOOR'] },
+  { key: 'tonight', label: 'Tonight at a glance', icon: 'i-lucide-gauge', to: '/foh/tonight', note: '', roles: ['DOOR', 'BAR'] },
+  { key: 'pass', label: 'Admit pass holder', icon: 'i-lucide-credit-card', to: null, note: 'Passes coming 26/27', roles: ['DOOR'] },
+  { key: 'backstage', label: 'Backstage', icon: 'i-lucide-message-square', to: '/foh/backstage', note: '', roles: ['DOOR'] },
+  { key: 'emergency', label: 'Emergency', icon: 'i-lucide-triangle-alert', to: '/foh/emergency', note: '', roles: ['DOOR', 'BAR'] },
+  { key: 'contacts', label: 'Contacts & incidents', icon: 'i-lucide-phone', to: '/foh/contacts', note: '', roles: ['DOOR', 'BAR'] },
+  { key: 'till', label: 'Till', icon: 'i-lucide-shopping-cart', to: '/foh/bar/till', note: '', roles: ['BAR'] },
+  { key: 'age-checks', label: 'Challenge 25', icon: 'i-lucide-shield-check', to: '/foh/age-checks', note: '', roles: ['BAR'] },
+]
+
+/** Every confirmed role held tonight, across all of tonight's performances. */
+const rolesTonight = computed(() =>
+  new Set(performances.value.map(p => p.shiftRole).filter(Boolean) as string[]))
+
+/** Seeing everything: staff seniority, or the duty manager's whole-night remit. */
+const seesEverything = computed(() =>
+  Boolean(data.value?.bypassedRota) || rolesTonight.value.has('DUTY_MANAGER'))
+
+const buttons = computed(() => {
+  if (seesEverything.value) return ALL_TILES
+  return ALL_TILES.filter(tile => tile.roles.some(role => rolesTonight.value.has(role)))
+})
 
 /**
  * Only the duty manager is shown a comp queue, and only tonight's. The till

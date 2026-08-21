@@ -47,9 +47,14 @@ export default defineEventHandler(async (event) => {
 
   const prices = await currentPrices(products.map(p => p.id))
 
+  // Soft gate: the till warns and still sells (docs/13 §5, §8).
+  const training = await isEligible(user.id, 'bar')
+
   return {
     night,
     session: session ?? null,
+    alcoholTrained: training.eligible,
+    trainingNeedsReview: training.needsReview,
     performances,
     discounts,
     // A product with no price cannot be sold, so it is not offered.

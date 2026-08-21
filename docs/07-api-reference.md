@@ -364,7 +364,7 @@ and no password-reset route here.
 | GET | `/api/foh/incidents` | `foh.work` (`workFoh`) | The incident log for a performance |
 | GET | `/api/foh/age-checks` | `foh.work` (`workFoh`) | Tonight's Challenge 25 register and its two counters |
 | POST | `/api/foh/age-checks` | `foh.work` (`workFoh`) | Record an ID check. **There is no update or delete** |
-| GET | `/api/bar/tonight` | `foh.work` + a `BAR` shift | The till's opening state: session, products, prices, discounts |
+| GET | `/api/bar/tonight` | `foh.work` + a `BAR` shift | The till's opening state: session, products, prices, discounts, training |
 | GET | `/api/bar/lookup` | `foh.work` + a `BAR` shift | Find a booking to take payment for. **Not night-scoped** |
 | POST | `/api/bar/sessions` | `foh.work` + a `BAR` shift | Open the bar for tonight |
 | POST | `/api/bar/transactions` | `foh.work` + a `BAR` shift | One tap, one transaction, one figure |
@@ -2016,6 +2016,18 @@ Any manager edit clears `needsEligibilityReview` — that review is exactly what
 for ([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md)).
 
 **Response** `200` — the updated row. `409` on a second confirmed duty manager.
+
+---
+
+#### `GET /api/bar/tonight` and the training gate
+
+`alcoholTrained` comes from `isEligible(user, 'bar')`, which reads rehearsal behind one seam
+(ADR-0026). The till shows an amber banner on an age-restricted basket when it is false, and
+**still sells**: the gate is soft in v1 (`docs/13` §5, §8).
+
+`trainingNeedsReview` is true on the fail-open path, when rehearsal could not be reached and there
+was no cached answer. **No banner is shown in that case.** Warning during an outage would warn
+everyone at once, which teaches people to ignore the banner precisely when it stops being reliable.
 
 ---
 
