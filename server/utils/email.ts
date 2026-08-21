@@ -48,6 +48,25 @@ export async function sendEmail({ to, subject, html, attachments }: SendEmailOpt
   }
 }
 
+/**
+ * The backstage code was reset. Announced so the kill switch stays free to use
+ * liberally (ADR-0020); the new code is deliberately not in here.
+ */
+export async function sendBackstageResetEmail(data: { night: string, resetBy: string, showTitle: string }): Promise<void> {
+  await sendEmail({
+    to: 'boxoffice@newtheatre.org.uk',
+    subject: `Backstage code reset — ${data.showTitle} (${data.night})`,
+    html: `
+<p><strong>${escapeHtml(data.resetBy)}</strong> reset the backstage code for
+${escapeHtml(data.showTitle)} on ${escapeHtml(data.night)}.</p>
+<p>Every device that had joined is now signed out, and a new code is showing on the
+front-of-house screen. This is a normal thing to do when a device is lost, a message looks wrong,
+or the joined-device count does not match the room.</p>
+<p>The new code is not in this email on purpose. It lives on the front-of-house screen.</p>
+    `.trim(),
+  })
+}
+
 // ── Booking Emails ──────────────────────────────────────────────────────────
 
 interface BookingTicket {

@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-94 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+99 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -342,6 +342,11 @@ and no password-reset route here.
 | GET | `/api/foh/tonight` | `foh.work` (`workFoh`) | Tonight's performances this user may work, scoped by the rota |
 | GET | `/api/foh/lookup` | `foh.work` (`workFoh`) | Find a booking on tonight's performances, by reference, name or email |
 | GET | `/api/foh/glance` | `foh.work` (`workFoh`) | Tonight's numbers, and the questions the door gets asked |
+| GET | `/api/foh/backstage` | `foh.work` (`workFoh`) | Tonight's backstage code, its QR, and the joined devices |
+| POST | `/api/foh/backstage/reset` | `foh.work` (`workFoh`) | The kill switch: rotate the code, sign every device out |
+| POST | `/api/backstage/join` | **Public** | Join tonight's board with the code. Rate limited, and self-rotating |
+| GET | `/api/backstage/session` | Backstage cookie | Is this device still joined? |
+| GET | `/api/backstage/emergency` | **Public** | Tonight's emergency cards. Public on purpose |
 | GET | `/api/foh/emergency` | `foh.work` (`workFoh`) | The venue's emergency card for a performance |
 | GET | `/api/foh/contacts` | `foh.work` (`workFoh`) | Who is on tonight, and the numbers to call |
 | GET | `/api/foh/incidents` | `foh.work` (`workFoh`) | The incident log for a performance |
@@ -2195,6 +2200,37 @@ same function; do not write a second one.
 
 **Response** `200` — an array, possibly empty. A booking for another night is simply not found here,
 which is deliberate: the rota scope is a boundary, not a convenience.
+
+---
+
+#### `/api/backstage/**` and `/api/foh/backstage`
+
+**Source** `server/api/backstage/*`, `server/api/foh/backstage/*` ·
+Design: [11-show-night-screen-design](./11-show-night-screen-design.md) §5,
+[ADR-0020](./decisions/0020-backstage-joins-by-a-nightly-code.md)
+
+A backstage device holds **no user session**. `requireBackstageSession()` reads a separate
+`nnt-backstage` cookie and returns a session with no identity attached, so nothing on this path can
+reach a user even by accident. This app never writes `nnt-session` outside `/dev-login`, and the
+backstage cookie is not that cookie.
+
+**The code is never stored.** It is derived by HMAC from the night and the epoch; the database holds
+only those two. `POST /api/foh/backstage/reset` bumps the epoch, which changes the code and
+invalidates every session in one write, logs an incident entry and emails `boxoffice@` — audited and
+announced, so it stays free to use liberally.
+
+**Two limits guard joining.** The rate limiter caps attempts per caller
+([ADR-0015](./decisions/0015-rate-limits-declared-in-middleware.md)), and the night counts failures
+across *all* devices: past the threshold it rotates its own epoch. A distributed guesser therefore
+achieves a code reset, never a join.
+
+`GET /api/backstage/emergency` is **deliberately public** — no session of either kind. Safety
+information is never behind a lock (§5.1), so a device that has not joined can still read the 999
+address and the assembly point. It is allow-listed to the emergency card and rate limited; nothing
+about who is coming, what was sold or who is working crosses that boundary.
+
+A joined backstage device gets **403 from every `/api/foh/*` and box-office route**, because those
+require a user session it does not have. That is the property to preserve if this ever changes.
 
 ---
 

@@ -51,7 +51,7 @@ const buttons = computed(() => [
   { key: 'scan', label: 'Scan ticket', icon: 'i-lucide-scan-line', to: '/foh/scan', note: '' },
   { key: 'tonight', label: 'Tonight at a glance', icon: 'i-lucide-gauge', to: '/foh/tonight', note: '' },
   { key: 'pass', label: 'Admit pass holder', icon: 'i-lucide-credit-card', to: null, note: 'Passes coming 26/27' },
-  { key: 'backstage', label: 'Backstage', icon: 'i-lucide-message-square', to: null, note: 'Coming with backstage comms' },
+  { key: 'backstage', label: 'Backstage', icon: 'i-lucide-message-square', to: '/foh/backstage', note: '' },
   { key: 'emergency', label: 'Emergency', icon: 'i-lucide-triangle-alert', to: '/foh/emergency', note: '' },
   { key: 'contacts', label: 'Contacts & incidents', icon: 'i-lucide-phone', to: '/foh/contacts', note: '' },
 ])

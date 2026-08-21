@@ -286,8 +286,19 @@ prank *"hold"* is an operational safety problem. Guarantees, in order of importa
    the worst a hostile join achieves is a false message — which acks, visibility (3) and the kill
    switch (4) exist to catch — never data access.
 6. **No secrets in transit or at rest beyond the night.** HTTPS throughout (Workers' default);
-   code entry over POST, never in a URL except the QR join link, which rotation neuters; codes
-   stored hashed server-side like any credential.
+   code entry over POST, never in a URL except the QR join link, which rotation neuters.
+
+   **The code is not stored at all** — not in the clear, and not hashed. An earlier draft of this
+   section said "stored hashed server-side like any credential", which cannot work: the
+   front-of-house screen has to *display* the code for the duty manager to read out, and a hash
+   cannot be displayed. Storing it reversibly to solve that would put tonight's code in the
+   database in recoverable form, which is what hashing was meant to avoid.
+
+   Instead it is **derived**: six digits from an HMAC over the night and the epoch, keyed on a
+   worker secret. The database holds the night and the epoch and nothing else, so a dump reveals
+   nothing without the secret; the screen recomputes it to display; joining recomputes it to
+   compare, in constant time. Resetting bumps the epoch, which changes the derived code and
+   invalidates every session in the same write.
 7. **Emergency information needs no code.** `/backstage` before joining shows one thing besides
    the code prompt: the Emergency button (§2.5, same cached content). Safety information is never
    behind a lock.
