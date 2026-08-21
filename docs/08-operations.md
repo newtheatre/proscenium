@@ -211,6 +211,30 @@ ledger anyway via `.github/scripts/pending-migrations.sh` — the CLI's word is 
 that anything landed. This is the same class of failure as the `migrations_dir` bug below: not an
 error, just a cheerful exit code and nothing done.
 
+### The migrate workflow needs the GitHub Packages token too
+
+On 2026-08-21 the first migration since the auth-types cutover did not apply. The job died at
+`bun install` with a `401` fetching `@newtheatre/auth-types`, before it reached the database:
+
+```
+error: GET https://npm.pkg.github.com/download/@newtheatre/auth-types/1.0.0/… - 401
+```
+
+`bunfig.toml` points the `@newtheatre` scope at GitHub Packages and reads `$GH_PACKAGES_TOKEN`.
+When auth-types became a published package, the token was added to `ci.yml` and **not** to
+`migrate.yml`, so every workflow that installs dependencies needs both the `packages: read`
+permission and that env var on the install step. All four estate repos had the same gap.
+
+It went unnoticed for two days because the workflow only runs on a push that touches
+`server/db/migrations/**`, and nothing had added a migration since. **A workflow that only runs
+when it is needed is a workflow that is only tested when it is needed** — which is the argument for
+`workflow_dispatch` being on it, and for running it by hand after any change to how dependencies
+are installed.
+
+The failure was safe: the job dies before the Time Travel bookmark and before the apply step, so
+nothing is half-applied. What it leaves behind is a deploy whose code is ahead of the schema, which
+is what `GET /api/health` now reports (§5).
+
 ### `@nuxthub/core` must be at least 0.10.8 for the CLI to reach D1
 
 0.10.6's CLI posts to `https://api.cloudflare.com/client/v4/accounts/{account}/d1/db/{id}/raw`.
