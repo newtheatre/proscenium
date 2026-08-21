@@ -32,6 +32,15 @@ ADR; the ADR carries the reasoning and the history. See [CONTRIBUTING.md](../../
 | [0016](0016-hydrate-secrets-before-any-session-read.md) | Hydrate Secrets Store values before any session read | Accepted |
 | [0017](0017-edit-from-the-full-record.md) | Edit from the full record, on the page, not from a list row in a modal | Accepted |
 | [0018](0018-box-office-is-forward-looking.md) | The box office screen is forward-looking only | Accepted |
+| [0019](0019-the-rota-scopes-the-front-of-house-role.md) | The rota scopes the front-of-house role | Accepted |
+| [0020](0020-backstage-joins-by-a-nightly-code.md) | Backstage joins by a nightly code, not an account | Accepted |
+| [0021](0021-show-night-comms-poll-rather-than-hold-a-socket.md) | Show-night comms poll; they do not hold a socket | Accepted |
+| [0022](0022-access-needs-are-special-category-data.md) | Access needs are special category data, visible only to the people working that night | Accepted |
+| [0023](0023-money-taken-is-recorded-as-a-transaction.md) | Money taken is recorded as a transaction; collection remains the boundary | Accepted |
+| [0024](0024-sumup-stays-a-manual-reader.md) | SumUp stays a manual reader; the till records, it does not charge | Accepted |
+| [0025](0025-every-user-reference-joins-the-estate-hooks.md) | Every user-referencing column joins the estate hooks, checked in CI | Accepted |
+| [0026](0026-eligibility-is-read-from-rehearsal-behind-one-seam.md) | Eligibility is read from rehearsal, behind one seam, failing open with a flag | Accepted |
+| [0027](0027-the-refusals-register-is-append-only.md) | The refusals register is append-only, enforced by the database | Accepted |
 
 ## Template
 
