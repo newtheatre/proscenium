@@ -43,3 +43,8 @@ export function canWorkFoh(user: AbilityUser): boolean {
 export function canManageShifts(user: AbilityUser): boolean {
   return can(user, 'shift.manage')
 }
+
+/** Maintain the emergency card and the contact list. */
+export function canManageFoh(user: AbilityUser): boolean {
+  return can(user, 'foh.manage')
+}

@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-84 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+93 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -341,6 +341,14 @@ and no password-reset route here.
 | --- | --- | --- | --- |
 | GET | `/api/foh/tonight` | `foh.work` (`workFoh`) | Tonight's performances this user may work, scoped by the rota |
 | GET | `/api/foh/lookup` | `foh.work` (`workFoh`) | Find a booking on tonight's performances, by reference, name or email |
+| GET | `/api/foh/emergency` | `foh.work` (`workFoh`) | The venue's emergency card for a performance |
+| GET | `/api/foh/contacts` | `foh.work` (`workFoh`) | Who is on tonight, and the numbers to call |
+| GET | `/api/foh/incidents` | `foh.work` (`workFoh`) | The incident log for a performance |
+| POST | `/api/foh/incidents` | `foh.work` (`workFoh`) | Add an entry. **There is no update or delete** |
+| GET | `/api/admin/foh/emergency` | `foh.manage` | Every venue's emergency card, for editing |
+| PUT | `/api/admin/foh/emergency/:venueId` | `foh.manage` | Upsert one venue's card |
+| GET/POST | `/api/admin/foh/contacts` | `foh.manage` | The contact list |
+| PUT | `/api/admin/foh/contacts/:id` | `foh.manage` | Edit or archive a contact |
 
 ### Short booking links
 
@@ -2186,6 +2194,37 @@ same function; do not write a second one.
 
 **Response** `200` — an array, possibly empty. A booking for another night is simply not found here,
 which is deliberate: the rota scope is a boundary, not a convenience.
+
+---
+
+#### `GET /api/foh/emergency`, `GET /api/foh/contacts`, `GET|POST /api/foh/incidents`
+
+**Source** `server/api/foh/*` · **Auth** `authorize(event, workFoh)` — `foh.work`
+
+All take a `performanceId` and run it through `scopedPerformance()`, which **404s anything not in
+tonight's scope**. A performance id from elsewhere is not a way round the rota, so the check is one
+function and every show-night route calls it
+([ADR-0019](./decisions/0019-the-rota-scopes-the-front-of-house-role.md)).
+
+- **`emergency`** returns the venue's card, or `null` where none is recorded. A venue with no card
+  still answers: nothing on this path is worth a failed request, because it is the one screen that
+  has to work when everything else is going wrong.
+- **`contacts`** returns `{ onTonight, contacts }`. `onTonight` is **names and roles only** — the
+  mirror holds no phone numbers, and a colleague's email is not the door's business. The numbers
+  come from the admin list.
+- **`incidents`** lists in reverse order, and `POST` appends. **There is deliberately no update or
+  delete route**, and the database refuses both anyway (migration `0019`). A correction is a new
+  entry carrying `supersedesId`; both stay, in order
+  ([ADR-0027](./decisions/0027-the-refusals-register-is-append-only.md)).
+
+#### `/api/admin/foh/**`
+
+**Auth** `authorize(event, manageFohReference)` — `foh.manage`, held by `ADMIN`, `MANAGER` and
+`FOH_MANAGER`.
+
+The emergency card is upserted per venue, so a first save and an edit are the same call. Contacts
+are **archived, never deleted**: a number that was on the card during an incident should still be
+findable afterwards ([ADR-0010](./decisions/0010-archive-never-delete-referenced-records.md)).
 
 ---
 

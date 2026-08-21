@@ -97,6 +97,18 @@ export async function fohScope(user: AbilityUser | null | undefined, now: Date =
   }
 }
 
+/**
+ * Narrow a scope to one performance. Refuses anything the caller is not on
+ * tonight, so a performance id from elsewhere is not a way round the rota.
+ */
+export function scopedPerformance(scope: FohScope, performanceId: string | undefined): FohPerformance {
+  const performance = scope.performances.find(p => p.id === performanceId)
+  if (!performance) {
+    throw createError({ statusCode: 404, statusMessage: 'That performance is not one of tonight\'s, or you are not working it.' })
+  }
+  return performance
+}
+
 /** Guard for a show-night route. Throws only when the user may not be here at all. */
 export async function requireFohScope(user: AbilityUser | null | undefined, now: Date = new Date()): Promise<FohScope> {
   const scope = await fohScope(user, now)

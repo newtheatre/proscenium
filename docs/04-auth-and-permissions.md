@@ -163,6 +163,7 @@ export function isStaff(user: AbilityUser): boolean            // staff.access
 export function isAdmin(user: AbilityUser): boolean            // catalogue.delete
 export function canWorkFoh(user: AbilityUser): boolean         // foh.work
 export function canManageShifts(user: AbilityUser): boolean    // shift.manage
+export function canManageFoh(user: AbilityUser): boolean       // foh.manage
 ```
 
 ### Permission keys
@@ -185,6 +186,7 @@ nothing else.
 | `shift.manage` | Assign, confirm and reassign shifts |
 | `access.verify` | Verify access profiles, and read them outside show night |
 | `bar.manage` | The bar catalogue, stock, voids and exports |
+| `foh.manage` | The emergency card and the front-of-house contact list |
 
 `access.verify` is deliberately **not** carried by `BOX_OFFICE` or `MANAGER`: selling someone a
 ticket is not a reason to read their access needs
@@ -237,6 +239,7 @@ only where they hold something, which is deliberately little.
 | Admin stats & CSV export | ✅ | ✅ | — | — |
 | Rota: read | ✅ | ✅ | ✅ | — |
 | Rota: assign / confirm / remove | ✅ | ✅ | — | — |
+| Emergency card and contacts: edit | ✅ | ✅ | — | — |
 
 Plus the two front-of-house roles:
 
@@ -245,6 +248,7 @@ Plus the two front-of-house roles:
 | Show night screen (rostered performances only) | ✅ | ✅ |
 | Rota: read | ✅ | ✅ |
 | Rota: assign / confirm / remove | ✅ | — |
+| Emergency card and contacts: edit | ✅ | — |
 | Access profiles: verify and read | ✅ | — |
 | Prices, emails, taking money | — | — |
 

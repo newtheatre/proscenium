@@ -13,6 +13,7 @@ export interface MergeCounts {
   admissionsRedeemed: number
   shiftsWorked: number
   shiftsAssigned: number
+  incidentEntries: number
 }
 
 export interface MergeResult {
@@ -40,6 +41,8 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
       .where(eq(schema.performanceShifts.userId, fromUserId)).get()),
     shiftsAssigned: n(await db.select({ n: sql<number>`count(*)` }).from(schema.performanceShifts)
       .where(eq(schema.performanceShifts.assignedByUserId, fromUserId)).get()),
+    incidentEntries: n(await db.select({ n: sql<number>`count(*)` }).from(schema.incidentLog)
+      .where(eq(schema.incidentLog.authorUserId, fromUserId)).get()),
   }
 
   if (!loser || dryRun) {
@@ -75,6 +78,11 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
       .where(eq(schema.performanceShifts.userId, fromUserId)),
     db.update(schema.performanceShifts).set({ assignedByUserId: toUserId })
       .where(eq(schema.performanceShifts.assignedByUserId, fromUserId)),
+    // Append-only, so the row is never rewritten; only who it points at is.
+    db.update(schema.incidentLog).set({ authorUserId: toUserId })
+      .where(eq(schema.incidentLog.authorUserId, fromUserId)),
+    db.update(schema.venueEmergencyInfo).set({ updatedByUserId: toUserId })
+      .where(eq(schema.venueEmergencyInfo.updatedByUserId, fromUserId)),
     db.update(schema.reservations).set({ userId: toUserId })
       .where(eq(schema.reservations.userId, fromUserId)),
     db.update(schema.passes).set({ userId: toUserId })

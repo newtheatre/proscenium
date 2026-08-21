@@ -22,6 +22,7 @@ export const APP_MANIFEST = {
     { key: 'shift.manage', description: 'Assign, confirm and reassign front-of-house shifts' },
     { key: 'access.verify', description: 'Verify access profiles, and read them outside show night' },
     { key: 'bar.manage', description: 'Manage the bar catalogue, stock, voids and exports' },
+    { key: 'foh.manage', description: 'Maintain the emergency card and the front-of-house contact list' },
   ],
 
   roles: [
@@ -41,6 +42,7 @@ export const APP_MANIFEST = {
         'shift.manage',
         'access.verify',
         'bar.manage',
+        'foh.manage',
       ],
       requiresEligibility: null,
     },
@@ -57,6 +59,7 @@ export const APP_MANIFEST = {
         'foh.work',
         'shift.manage',
         'bar.manage',
+        'foh.manage',
       ],
       requiresEligibility: null,
     },
@@ -72,7 +75,7 @@ export const APP_MANIFEST = {
       role: 'FOH_MANAGER',
       description: 'Runs the rota and verifies access profiles. Not a box-office seller.',
       defaultExpiry: { kind: 'committee-year' },
-      permissions: ['staff.access', 'foh.work', 'shift.manage', 'access.verify'],
+      permissions: ['staff.access', 'foh.work', 'shift.manage', 'access.verify', 'foh.manage'],
       requiresEligibility: null,
     },
     {

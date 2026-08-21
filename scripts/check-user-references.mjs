@@ -18,6 +18,8 @@ const REVIEWED = {
   'passAdmissions.redeemedByUserId': { kind: 'attribution', note: 'Which staff member admitted them.' },
   'performanceShifts.userId': { kind: 'subject', note: 'Who worked. Survives erasure via the anonymised mirror row; the rota is a record.' },
   'performanceShifts.assignedByUserId': { kind: 'attribution', note: 'Which manager assigned or confirmed it.' },
+  'venueEmergencyInfo.updatedByUserId': { kind: 'attribution', note: 'Who last edited the emergency card.' },
+  'incidentLog.authorUserId': { kind: 'attribution', note: 'Who wrote the entry. Append-only, so it survives as written.' },
 }
 
 /** Columns deliberately not re-pointed by a merge, each with a reason. */
