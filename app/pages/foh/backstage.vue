@@ -31,14 +31,25 @@ interface Message {
   createdAt: string
 }
 interface Preset { id: string, label: string, milestone: string | null }
+interface Timing { milestone: string, at: string, calledBy: string | null, acknowledgedAt: string | null }
+
+const MILESTONE_LABELS: Record<string, string> = {
+  CLEARANCE: 'Clearance given',
+  HOUSE_OPEN: 'House open',
+  SHOW_START: 'Show start',
+  INTERVAL: 'Interval',
+  RESTART: 'Restart',
+  END: 'End',
+}
 
 // Server-rendered first, then polled: the duty manager's screen should show
 // the current calls in its first paint, not after hydration (ADR-0013).
 const { data: initialBoard } = await useAsyncData('foh-backstage-board', () =>
-  requestFetch<{ messages: Message[], presets: Preset[] }>('/api/foh/backstage/board').catch(() => null))
+  requestFetch<{ messages: Message[], presets: Preset[], timings: Timing[] }>('/api/foh/backstage/board').catch(() => null))
 
 const messages = ref<Message[]>(initialBoard.value?.messages ?? [])
 const presets = ref<Preset[]>(initialBoard.value?.presets ?? [])
+const timings = ref<Timing[]>(initialBoard.value?.timings ?? [])
 const sending = ref(false)
 const text = ref('')
 
@@ -49,9 +60,10 @@ const latestOurs = computed(() => ordered.value.find(m => m.direction === 'FOH')
 
 async function loadBoard() {
   try {
-    const board = await requestFetch<{ messages: Message[], presets: Preset[] }>('/api/foh/backstage/board')
+    const board = await requestFetch<{ messages: Message[], presets: Preset[], timings: Timing[] }>('/api/foh/backstage/board')
     messages.value = board.messages
     presets.value = board.presets
+    timings.value = board.timings
   }
   catch {
     // The code and the device list still matter if the board fails.
@@ -219,6 +231,24 @@ async function reset() {
               </span>
             </li>
           </ul>
+        </section>
+
+        <!-- The theatre's first curtain-up data, for free (docs/11 §5.5). -->
+        <section
+          v-if="timings.length"
+          class="mb-4 rounded-xl border border-neutral-800 bg-neutral-900 p-4"
+        >
+          <h2 class="mb-2 text-xs uppercase tracking-widest text-neutral-400">
+            Tonight's timings
+          </h2>
+          <p
+            v-for="timing in timings"
+            :key="timing.milestone"
+            class="flex justify-between py-1 text-sm"
+          >
+            <span>{{ MILESTONE_LABELS[timing.milestone] ?? timing.milestone }}</span>
+            <span class="font-mono text-neutral-300">{{ formatTime(timing.at) }}</span>
+          </p>
         </section>
 
         <section class="mb-4 rounded-xl border border-neutral-800 bg-neutral-900 p-4">

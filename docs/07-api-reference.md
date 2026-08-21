@@ -2267,6 +2267,12 @@ again here.
 The FOH side is scoped by the rota like every other show-night route; the backstage side takes a
 code session and never a user.
 
+`GET /api/foh/backstage/board` also returns **`timings`**: the night's curtain-up record, derived
+from preset transitions. The *first* time a milestone was called is the one that counts, and the
+list is ordered as a night runs rather than as calls happened, so a missed call reads as a gap
+instead of reordering the rest. This is what the end-of-night report will read
+([12-access-and-staffing](./12-access-and-staffing-design.md) §4.3).
+
 ---
 
 #### `GET /api/foh/glance`
