@@ -214,6 +214,25 @@ export async function countOccupiedSeatsFor(performanceId: string): Promise<numb
 }
 
 /**
+ * Seats actually admitted: the same set as {@link countOccupiedSeats}, narrowed
+ * by reservation status rather than counted a second way (ADR-0007).
+ */
+export async function countCollectedSeatsFor(performanceId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(schema.tickets)
+    .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
+    .innerJoin(schema.ticketTypes, eq(schema.tickets.ticketTypeId, schema.ticketTypes.id))
+    .where(and(
+      eq(schema.tickets.performanceId, performanceId),
+      inArray(schema.reservations.status, ['COLLECTED', 'DOOR']),
+      isNull(schema.tickets.refundedAt),
+      ne(schema.ticketTypes.kind, 'PASS_SALE'),
+    ))
+  return row?.n ?? 0
+}
+
+/**
  * One reservation's seats, ignoring its status — for reinstatement, where the
  * tickets are about to start counting against the house again.
  */

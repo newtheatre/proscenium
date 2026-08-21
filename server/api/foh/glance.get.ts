@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, count, eq, inArray, isNull, ne } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { workFoh } from '~~/shared/utils/abilities'
 
@@ -39,18 +39,7 @@ export default defineEventHandler(async (event) => {
   // second definition of a full house.
   const sold = await countOccupiedSeatsFor(performanceId)
 
-  // Collected is a subset of sold, by reservation status rather than a
-  // separate count of seats.
-  const [collectedRow] = await db.select({ n: count() })
-    .from(schema.tickets)
-    .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
-    .innerJoin(schema.ticketTypes, eq(schema.tickets.ticketTypeId, schema.ticketTypes.id))
-    .where(and(
-      eq(schema.tickets.performanceId, performanceId),
-      inArray(schema.reservations.status, ['COLLECTED', 'DOOR']),
-      isNull(schema.tickets.refundedAt),
-      ne(schema.ticketTypes.kind, 'PASS_SALE'),
-    ))
+  const collected = await countCollectedSeatsFor(performanceId)
 
   const capacity = performance.capacityOverride ?? performance.venueCapacity
   const remaining = capacity === null ? null : Math.max(0, capacity - sold)
@@ -64,7 +53,7 @@ export default defineEventHandler(async (event) => {
   return {
     numbers: {
       sold,
-      collected: collectedRow?.n ?? 0,
+      collected,
       capacity,
       /** Null means uncapped, not zero: the screen must not read "no room". */
       remaining,
