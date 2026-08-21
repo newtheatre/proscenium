@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-118 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+119 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -346,6 +346,7 @@ and no password-reset route here.
 | GET | `/api/foh/tonight` | `foh.work` (`workFoh`) | Tonight's performances this user may work, scoped by the rota |
 | GET | `/api/foh/lookup` | `foh.work` (`workFoh`) | Find a booking on tonight's performances, by reference, name or email |
 | GET | `/api/foh/glance` | `foh.work` (`workFoh`) | Tonight's numbers, and the questions the door gets asked |
+| GET | `/api/foh/access-tonight` | `foh.work` + the §2.5 rule | Consented access needs for this performance |
 | GET | `/api/foh/backstage` | `foh.work` (`workFoh`) | Tonight's backstage code, its QR, and the joined devices |
 | POST | `/api/foh/backstage/reset` | `foh.work` (`workFoh`) | The kill switch: rotate the code, sign every device out |
 | POST | `/api/backstage/join` | **Public** | Join tonight's board with the code. Rate limited, and self-rotating |
@@ -2331,6 +2332,35 @@ from preset transitions. The *first* time a milestone was called is the one that
 list is ordered as a night runs rather than as calls happened, so a missed call reads as a gap
 instead of reordering the rest. This is what the end-of-night report will read
 ([12-access-and-staffing](./12-access-and-staffing-design.md) §4.3).
+
+---
+
+#### `GET /api/foh/access-tonight`
+
+**Source** `server/api/foh/access-tonight.get.ts` · **Auth** `authorize(event, workFoh)`, then the
+visibility rule in `server/utils/accessVisibility.ts`
+
+**`BOX_OFFICE` gets no bypass here**, and that is the one thing to preserve. Every other show-night
+surface lets `BOX_OFFICE` see past the rota; this one does not, because selling someone a ticket is
+not a reason to read their access needs
+([ADR-0022](./decisions/0022-access-needs-are-special-category-data.md)). The rule is:
+
+1. a **confirmed shift on this performance**, **on the day of that performance**; or
+2. `access.verify`.
+
+and on top of that, the profile must be `VERIFIED`, unexpired, and carry a **consent timestamp**.
+No consent, nothing shown, whatever anyone holds.
+
+**It returns an empty list rather than 403** when the caller is not admitted. A 403 would confirm
+there was something to see; an empty list is what a performance with no access bookings looks like,
+and the two should be indistinguishable.
+
+The same rule decorates the scanner result, asked **per performance** rather than once for the
+night.
+
+Verified: a rostered volunteer sees the symbols, `BOX_OFFICE` sees `[]` and no symbols on scan,
+`FOH_MANAGER` sees them, a joined backstage device gets `403` and its board payload contains no
+access field at all, and withdrawing consent empties it while leaving the profile intact.
 
 ---
 
