@@ -326,6 +326,26 @@ so a future booking stops offering access ticket types. The tombstone is swept a
 **A merge drops the loser's profile rather than moving it.** Merging two sets of access needs is not
 a decision this app should make on someone's behalf.
 
+### `bar_categories`, `bar_products`, `bar_prices`, `bar_discounts`
+
+The bar catalogue. Design: [13-bar-design](./13-bar-design.md) §3.
+
+**Money is integer pence and quantities are thousandths of a unit** (`qty_milli`), so a 25 ml
+measure out of a 70 cl bottle is an exact integer rather than a rounding argument.
+
+**`bar_prices` is append-only and date-effective.** A price change is a new row, never an update, so
+the current price is a query (`effective_from <= today`, latest wins) and the history *is* the audit
+trail. Setting a future date is how a change is planned rather than remembered.
+
+**A product may point at what it depletes**, one level only: a 175 ml glass points at the 750 ml
+bottle with `depletes_milli = 233`; a bottled beer points at itself with `1000`. Pointing at
+something that itself depletes another is refused, because a bundle of bundles is a different design
+(§3.1).
+
+**Discounts are percentage, and bar lines only.** They never touch a ticket line — ticket prices have
+their own override chain — and they are snapshotted onto a transaction when used, so changing the
+committee rate next year does not rewrite history.
+
 ## Status lifecycles
 
 ### Reservation

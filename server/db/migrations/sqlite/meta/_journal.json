@@ -204,6 +204,13 @@
       "when": 1787334279700,
       "tag": "0028_futuristic_ben_urich",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1787334893107,
+      "tag": "0029_sticky_vertigo",
+      "breakpoints": true
     }
   ]
 }
