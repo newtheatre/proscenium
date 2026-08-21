@@ -96,6 +96,7 @@ const navigation = computed<NavigationMenuItem[][]>(() => {
     },
     { label: 'Rota', icon: 'i-lucide-clipboard-list', to: '/admin/rota' },
     { label: 'Front of house', icon: 'i-lucide-life-buoy', to: '/admin/foh' },
+    { label: 'Access', icon: 'i-lucide-accessibility', to: '/admin/access' },
   ])
 
   return sections

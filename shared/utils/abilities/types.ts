@@ -53,3 +53,8 @@ export function canManageFoh(user: AbilityUser): boolean {
 export function canManageBar(user: AbilityUser): boolean {
   return can(user, 'bar.manage')
 }
+
+/** Verify access profiles, and read them outside show night. */
+export function canVerifyAccess(user: AbilityUser): boolean {
+  return can(user, 'access.verify')
+}

@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-116 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+118 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -382,6 +382,27 @@ and no password-reset route here.
 | GET | `/api/account/access` | Any logged-in user | Your own access profile, or null |
 | PUT | `/api/account/access` | Any logged-in user | Request verification, or update what you asked for |
 | DELETE | `/api/account/access` | Any logged-in user | Remove it. No questions asked |
+| GET | `/api/admin/access` | `access.verify` (`verifyAccess`) | Profiles to verify, waiting ones first |
+| PUT | `/api/admin/access/:userId` | `access.verify` (`verifyAccess`) | Record the conclusion of a verification conversation |
+
+#### `PUT /api/admin/access/:userId`
+
+**Source** `server/api/admin/access/[userId]/index.put.ts` · **Auth** `authorize(event, verifyAccess)` — `access.verify`
+
+**Not `staff.access`, and not `MANAGER`.** Selling someone a ticket is not a reason to read their
+access needs, so this is a one-or-two-people privilege held by `ADMIN` and `FOH_MANAGER` only
+([ADR-0022](./decisions/0022-access-needs-are-special-category-data.md)). `BOX_OFFICE` and `MANAGER`
+both get `403`.
+
+The verifier records **the conclusion of a conversation**, never the evidence: sight of a card, a
+letter or a judgement all end in the same eight symbols. There is no field, and no endpoint, that
+would accept a document.
+
+`expiresAt` follows a sighted card's own expiry where one is given, otherwise three years — the
+Access Card's cycle. On `VERIFIED` the person is emailed **exactly what was recorded**, including
+the note the door will see, so nothing is held about them that they have not read.
+
+A withdrawn profile is `409`: it is not the verifier's to reinstate.
 
 ### Health
 
