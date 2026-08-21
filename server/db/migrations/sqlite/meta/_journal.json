@@ -225,6 +225,13 @@
       "when": 1787344240733,
       "tag": "0031_fearless_wolverine",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1787349816514,
+      "tag": "0032_friendly_cerise",
+      "breakpoints": true
     }
   ]
 }
