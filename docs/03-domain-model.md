@@ -235,6 +235,23 @@ other register this app keeps: one you can tidy is not a record.
 The trigger is hand-authored, because a trigger cannot be expressed in the Drizzle schema. That is
 authoring a new migration, not editing a generated one, which stays forbidden.
 
+### `backstage_nights`, `backstage_sessions`
+
+The backstage board's access model ([ADR-0020](./decisions/0020-backstage-joins-by-a-nightly-code.md)).
+
+**No code is stored, in any form.** `backstage_nights` holds a night and an `epoch`; the six-digit
+code is derived from those two by HMAC against a worker secret. A database dump reveals nothing
+without it, the front-of-house screen recomputes the code to display it, and joining recomputes it
+to compare. Bumping `epoch` is therefore a reset *and* a mass sign-out in one write: every session
+records the epoch it joined at, and one below the night's current epoch is dead.
+
+`failedAttempts` counts wrong codes across all devices. Past the threshold the night rotates its own
+epoch, so a distributed guesser achieves a reset rather than a join.
+
+`backstage_sessions` holds no user. The device name is what somebody typed at join, and attribution
+here is social rather than authenticated: the page's ability surface contains nothing the account
+model exists to protect. The bearer token lives in a cookie; only its SHA-256 is stored.
+
 ## Status lifecycles
 
 ### Reservation

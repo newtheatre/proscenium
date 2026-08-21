@@ -45,6 +45,24 @@ const PUBLIC_ROUTES: PublicRoute[] = [
     windowSeconds: 600,
   },
   {
+    // Public by design (safety information), so it carries a plain cap.
+    name: 'backstage-emergency',
+    methods: ['GET'],
+    pattern: /^\/api\/backstage\/emergency\/?$/,
+    limit: 60,
+    windowSeconds: 600,
+  },
+  {
+    // Six digits, guessable only by volume. The handler also rotates the code
+    // once failures pass a threshold, so this is the outer of two limits.
+    name: 'backstage-join',
+    methods: ['POST'],
+    pattern: /^\/api\/backstage\/join\/?$/,
+    limit: 10,
+    windowSeconds: 300,
+    message: 'Too many tries. Ask the duty manager to read the code out again.',
+  },
+  {
     // Same token, but these change a booking.
     name: 'booking-mutate',
     methods: ['POST', 'PUT'],

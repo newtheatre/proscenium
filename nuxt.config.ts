@@ -76,6 +76,9 @@ export default defineNuxtConfig({
     // Signs guest booking-access tokens. Set NUXT_BOOKING_TOKEN_SECRET in
     // production so links do not die with an estate seal rotation (ADR-0009).
     bookingTokenSecret: '',
+    // Derives the nightly backstage code. Nothing is stored, so rotating this
+    // changes tonight's code and nothing else (ADR-0020).
+    backstageCodeSecret: '',
     // Worker secret NUXT_AUTH_SERVICE_TOKEN. The NUXT_ prefix is load-bearing —
     // a secret named AUTH_SERVICE_TOKEN is silently ignored.
     authServiceToken: '',
