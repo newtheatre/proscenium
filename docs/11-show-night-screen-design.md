@@ -39,6 +39,14 @@ smaller set of abilities — is specified in §5.
 | 5 | **Emergency** | Evacuation, first aid, the venue address to read to 999 |
 | 6 | **Contacts & incidents** | Tap-to-call numbers and a timestamped incident log |
 
+**The home is shift-scoped** (`docs/13` §2.3, §5). These six are what a `DOOR` shift sees. A `BAR`
+shift sees **Till** and **Challenge 25** instead of *Scan ticket*, *Admit pass holder* and
+*Backstage*, keeping *Tonight at a glance*, *Emergency* and *Contacts*. The duty manager and
+`BOX_OFFICE`+ see all of them.
+
+Hiding a tile is a convenience, never the control: every bar route refuses a `DOOR` shift
+server-side, because the door never sells.
+
 ### 2.1 Scan ticket
 
 Opens the camera and reads a QR encoding the six-character `bookingRef` (see §3 for where the QR

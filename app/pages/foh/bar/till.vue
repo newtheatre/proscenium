@@ -14,6 +14,8 @@ interface Discount { id: string, name: string, percent: number }
 interface Tonight {
   night: string
   session: { id: string } | null
+  alcoholTrained: boolean
+  trainingNeedsReview: boolean
   performances: Array<{ id: string, startsAt: string, showTitle: string, venueName: string }>
   products: Product[]
   discounts: Discount[]
@@ -50,6 +52,14 @@ const ticketSubtotal = computed(() => basketTickets.value.reduce((t, r) => t + r
 const discountPence = computed(() =>
   discount.value ? Math.floor((barSubtotal.value * discount.value.percent) / 100 + 0.5) : 0)
 const total = computed(() => barSubtotal.value + ticketSubtotal.value - discountPence.value)
+
+// Soft gate (docs/13 §5): blocking a sale over a training record we cannot
+// always reach would shut the bar for an outage.
+
+const showTrainingWarning = computed(() =>
+  tonight.value !== null
+  && !tonight.value.alcoholTrained
+  && basketBar.value.some(line => line.product.ageRestricted))
 
 const subLabel = computed(() => {
   if (barSubtotal.value && ticketSubtotal.value) return 'Bar + tickets in one transaction'
@@ -451,6 +461,12 @@ async function openBar() {
 
         <div class="mt-2 flex items-end justify-between gap-3">
           <div>
+            <p
+              v-if="showTrainingWarning"
+              class="mb-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-300"
+            >
+              You&rsquo;re not recorded as trained to sell alcohol &mdash; ask the DM.
+            </p>
             <p class="text-xs uppercase tracking-widest text-amber-300">
               Type into SumUp
             </p>
