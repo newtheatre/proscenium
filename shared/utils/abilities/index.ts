@@ -3,7 +3,7 @@
  * the domain file; both work.
  */
 export type { AbilityUser, OwnedResource } from './types'
-export { canManageFoh, canManageShifts, canWorkFoh, isAdmin, isAdminOrManager, isStaff } from './types'
+export { canManageBar, canManageFoh, canManageShifts, canWorkFoh, isAdmin, isAdminOrManager, isStaff } from './types'
 
 export {
   listUsers,
@@ -67,6 +67,8 @@ export {
 } from './shifts'
 
 export { manageFohReference, workFoh } from './foh'
+
+export { manageBar } from './bar'
 
 export {
   listSeasons,

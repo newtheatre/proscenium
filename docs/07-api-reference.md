@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-105 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+108 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -356,6 +356,9 @@ and no password-reset route here.
 | GET | `/api/foh/emergency` | `foh.work` (`workFoh`) | The venue's emergency card for a performance |
 | GET | `/api/foh/contacts` | `foh.work` (`workFoh`) | Who is on tonight, and the numbers to call |
 | GET | `/api/foh/incidents` | `foh.work` (`workFoh`) | The incident log for a performance |
+| GET | `/api/foh/age-checks` | `foh.work` (`workFoh`) | Tonight's Challenge 25 register and its two counters |
+| POST | `/api/foh/age-checks` | `foh.work` (`workFoh`) | Record an ID check. **There is no update or delete** |
+| GET | `/api/admin/bar/age-checks/export` | `bar.manage` (`manageBar`) | The register as CSV, for a date range |
 | POST | `/api/foh/incidents` | `foh.work` (`workFoh`) | Add an entry. **There is no update or delete** |
 | GET | `/api/admin/foh/emergency` | `foh.manage` | Every venue's emergency card, for editing |
 | PUT | `/api/admin/foh/emergency/:venueId` | `foh.manage` | Upsert one venue's card |

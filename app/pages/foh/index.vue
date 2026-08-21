@@ -54,6 +54,8 @@ const buttons = computed(() => [
   { key: 'backstage', label: 'Backstage', icon: 'i-lucide-message-square', to: '/foh/backstage', note: '' },
   { key: 'emergency', label: 'Emergency', icon: 'i-lucide-triangle-alert', to: '/foh/emergency', note: '' },
   { key: 'contacts', label: 'Contacts & incidents', icon: 'i-lucide-phone', to: '/foh/contacts', note: '' },
+  // Bar work rather than door work; #169 filters the home by tonight's shift.
+  { key: 'age-checks', label: 'Challenge 25', icon: 'i-lucide-shield-check', to: '/foh/age-checks', note: '' },
 ])
 </script>
 

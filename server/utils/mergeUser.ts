@@ -87,6 +87,9 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
       .where(eq(schema.backstageNights.lastResetByUserId, fromUserId)),
     db.update(schema.backstageMessages).set({ senderUserId: toUserId })
       .where(eq(schema.backstageMessages.senderUserId, fromUserId)),
+    // Append-only, so only who it points at changes, never the row (ADR-0027).
+    db.update(schema.ageChecks).set({ checkedByUserId: toUserId })
+      .where(eq(schema.ageChecks.checkedByUserId, fromUserId)),
     db.update(schema.reservations).set({ userId: toUserId })
       .where(eq(schema.reservations.userId, fromUserId)),
     db.update(schema.passes).set({ userId: toUserId })

@@ -22,6 +22,7 @@ const REVIEWED = {
   'incidentLog.authorUserId': { kind: 'attribution', note: 'Who wrote the entry. Append-only, so it survives as written.' },
   'backstageNights.lastResetByUserId': { kind: 'attribution', note: 'Who last used the kill switch.' },
   'backstageMessages.senderUserId': { kind: 'attribution', note: 'Which FOH member sent the call. Backstage senders are devices, not users.' },
+  'ageChecks.checkedByUserId': { kind: 'attribution', note: 'Who ran the ID check. Append-only, so it survives as written (ADR-0027).' },
 }
 
 /** Columns deliberately not re-pointed by a merge, each with a reason. */

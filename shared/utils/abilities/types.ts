@@ -48,3 +48,8 @@ export function canManageShifts(user: AbilityUser): boolean {
 export function canManageFoh(user: AbilityUser): boolean {
   return can(user, 'foh.manage')
 }
+
+/** The bar catalogue, stock, voids and exports. */
+export function canManageBar(user: AbilityUser): boolean {
+  return can(user, 'bar.manage')
+}
