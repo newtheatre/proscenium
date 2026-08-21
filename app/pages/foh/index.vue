@@ -48,7 +48,7 @@ const selected = computed(() => performances.value.find(p => p.id === selectedId
  * with no route says so rather than going missing.
  */
 const buttons = computed(() => [
-  { key: 'scan', label: 'Scan ticket', icon: 'i-lucide-scan-line', to: null, note: 'Coming with the scanner' },
+  { key: 'scan', label: 'Scan ticket', icon: 'i-lucide-scan-line', to: '/foh/scan', note: '' },
   { key: 'tonight', label: 'Tonight at a glance', icon: 'i-lucide-gauge', to: null, note: 'Coming next' },
   { key: 'pass', label: 'Admit pass holder', icon: 'i-lucide-credit-card', to: null, note: 'Passes coming 26/27' },
   { key: 'backstage', label: 'Backstage', icon: 'i-lucide-message-square', to: null, note: 'Coming with backstage comms' },
