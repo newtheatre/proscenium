@@ -90,6 +90,17 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
     // Append-only, so only who it points at changes, never the row (ADR-0027).
     db.update(schema.ageChecks).set({ checkedByUserId: toUserId })
       .where(eq(schema.ageChecks.checkedByUserId, fromUserId)),
+    // At most one profile per account, so the loser's is dropped rather than
+    // moved: merging two sets of access needs is not ours to decide.
+    db.run(sql`
+      delete from access_profiles
+      where user_id = ${fromUserId}
+        and exists (select 1 from access_profiles winner where winner.user_id = ${toUserId})
+    `),
+    db.update(schema.accessProfiles).set({ userId: toUserId })
+      .where(eq(schema.accessProfiles.userId, fromUserId)),
+    db.update(schema.accessProfiles).set({ verifiedByUserId: toUserId })
+      .where(eq(schema.accessProfiles.verifiedByUserId, fromUserId)),
     db.update(schema.reservations).set({ userId: toUserId })
       .where(eq(schema.reservations.userId, fromUserId)),
     db.update(schema.passes).set({ userId: toUserId })

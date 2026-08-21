@@ -55,6 +55,10 @@ export async function anonymiseUser(userId: string): Promise<AnonymiseResult> {
     db.update(schema.reservations)
       .set({ customerNotes: null, staffNotes: null, anonymisedAt: now })
       .where(eq(schema.reservations.userId, userId)),
+
+    // Deleted outright, not anonymised: special category data held on consent,
+    // and consent is what an erasure withdraws (ADR-0022).
+    db.delete(schema.accessProfiles).where(eq(schema.accessProfiles.userId, userId)),
   ])
 
   return { alreadyAnonymised: false, reservationsAffected: Number(n) }

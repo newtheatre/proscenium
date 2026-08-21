@@ -59,9 +59,30 @@ export default defineEventHandler(async (event) => {
     .leftJoin(schema.passTypes, eq(schema.passes.passTypeId, schema.passTypes.id))
     .where(eq(schema.passes.userId, userId))
 
+  // Special category data, so it is the part of this bundle that matters most
+  // to get right (ADR-0022).
+  const access = await db.select({
+    status: schema.accessProfiles.status,
+    accessCardNumber: schema.accessProfiles.accessCardNumber,
+    difficultyStanding: schema.accessProfiles.difficultyStanding,
+    difficultyWithCrowds: schema.accessProfiles.difficultyWithCrowds,
+    levelAccess: schema.accessProfiles.levelAccess,
+    distance: schema.accessProfiles.distance,
+    urgentToilet: schema.accessProfiles.urgentToilet,
+    visualInformation: schema.accessProfiles.visualInformation,
+    audibleInformation: schema.accessProfiles.audibleInformation,
+    miscellaneous: schema.accessProfiles.miscellaneous,
+    companions: schema.accessProfiles.companions,
+    fohNote: schema.accessProfiles.fohNote,
+    consentGivenAt: schema.accessProfiles.consentFohAt,
+    verifiedAt: schema.accessProfiles.verifiedAt,
+    expiresAt: schema.accessProfiles.expiresAt,
+  }).from(schema.accessProfiles).where(eq(schema.accessProfiles.userId, userId)).get()
+
   return {
     data: {
       profile: user ?? null,
+      accessProfile: access ?? null,
       reservations: reservations.map(r => ({
         bookingRef: r.bookingRef,
         show: r.showTitle,

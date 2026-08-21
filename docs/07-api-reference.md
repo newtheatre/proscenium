@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-113 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+116 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -374,6 +374,14 @@ and no password-reset route here.
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | GET | `/t/:ref` | **Public** | Short booking handle. Resolves the reference and redirects; grants nothing |
+
+### Access requirements
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/account/access` | Any logged-in user | Your own access profile, or null |
+| PUT | `/api/account/access` | Any logged-in user | Request verification, or update what you asked for |
+| DELETE | `/api/account/access` | Any logged-in user | Remove it. No questions asked |
 
 ### Health
 

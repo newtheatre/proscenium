@@ -301,6 +301,31 @@ Append-only, enforced by triggers in migration `0025`, **scoped to the content c
 estate merge can still re-point `checked_by_user_id` — see the `incident_log` note above for why
 that scoping is not optional.
 
+### `access_profiles`
+
+Access needs, one row per account ([ADR-0022](./decisions/0022-access-needs-are-special-category-data.md)).
+Design: [12-access-and-staffing](./12-access-and-staffing-design.md) §2.
+
+**Special category data**, held on explicit consent. Three consequences the schema encodes:
+
+- `consentFohAt` is **null until somebody ticks the box**, and null means nothing is shown to anyone
+  on a show night. It is the lawful basis, so it is never inferred from anything else.
+- The needs are the **eight Access Card symbols plus a companion count**, which are operational
+  statements — "needs level access" — and never a diagnosis. There is no free-text field for one.
+- `accessCardNumber` is recorded only if offered. **Evidence is viewed, never stored**: no document,
+  scan or letter enters this system, and there is nowhere to put one.
+
+**Erasure deletes the row outright** rather than anonymising it, which is a deliberate departure
+from [ADR-0014](./decisions/0014-anonymise-never-delete.md)'s default: the data is held on consent,
+and an erasure withdraws consent. It also joins the subject-access `export` hook, where it is the
+part of the bundle that matters most.
+
+Withdrawal keeps the row as a `WITHDRAWN` tombstone with every symbol, note and card number cleared,
+so a future booking stops offering access ticket types. The tombstone is swept after 30 days.
+
+**A merge drops the loser's profile rather than moving it.** Merging two sets of access needs is not
+a decision this app should make on someone's behalf.
+
 ## Status lifecycles
 
 ### Reservation
