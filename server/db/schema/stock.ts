@@ -1,0 +1,91 @@
+/**
+ * The stock ledger. Quantities in thousandths of a unit, signed: on-hand is
+ * always SUM(qty_milli) and is never stored. Design: docs/13-bar-design.md §3
+ */
+import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { sql } from 'drizzle-orm'
+import { nanoid } from 'nanoid'
+import { users } from './user'
+import { barProducts } from './bar'
+
+export const MOVEMENT_KINDS = ['DELIVERY', 'SALE', 'COMP', 'STOCKTAKE', 'WASTAGE', 'TRANSFER', 'ADJUST'] as const
+export const STOCKTAKE_STATUSES = ['OPEN', 'APPLIED', 'ABANDONED'] as const
+
+/**
+ * Append-only. Every row is written by `movementStatements` and by nothing
+ * else; a mistake is corrected with an opposing movement, never an edit.
+ */
+export const stockMovements = sqliteTable('stock_movements', {
+  id: text('id').primaryKey().$defaultFn(() => nanoid()),
+  /** Always the *stock* product, resolved through `stockProductId` (§3.1). */
+  productId: text('product_id').notNull().references(() => barProducts.id, { onDelete: 'restrict' }),
+  /** Signed: a delivery is positive, a sale negative. */
+  qtyMilli: integer('qty_milli').notNull(),
+  kind: text('kind', { enum: MOVEMENT_KINDS }).notNull(),
+
+  /** What caused it, for tracing back without a foreign key per kind. */
+  refTable: text('ref_table'),
+  refId: text('ref_id'),
+
+  costPencePerUnit: integer('cost_pence_per_unit'),
+  reason: text('reason'),
+
+  createdByUserId: text('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
+}, table => [
+  index('stock_movements_product_idx').on(table.productId),
+  index('stock_movements_ref_idx').on(table.refTable, table.refId),
+  index('stock_movements_created_idx').on(table.createdAt),
+])
+
+export const stockDeliveries = sqliteTable('stock_deliveries', {
+  id: text('id').primaryKey().$defaultFn(() => nanoid()),
+  supplier: text('supplier').notNull(),
+  /** `YYYY-MM-DD` in Europe/London. */
+  deliveredOn: text('delivered_on').notNull(),
+  invoiceRef: text('invoice_ref'),
+  totalPence: integer('total_pence'),
+  notes: text('notes'),
+
+  receivedByUserId: text('received_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
+}, table => [
+  index('stock_deliveries_date_idx').on(table.deliveredOn),
+])
+
+export const stockDeliveryLines = sqliteTable('stock_delivery_lines', {
+  id: text('id').primaryKey().$defaultFn(() => nanoid()),
+  deliveryId: text('delivery_id').notNull().references(() => stockDeliveries.id, { onDelete: 'cascade' }),
+  productId: text('product_id').notNull().references(() => barProducts.id, { onDelete: 'restrict' }),
+  qtyMilli: integer('qty_milli').notNull(),
+  /** Per whole unit, not per milli. The latest one is what stock is valued at. */
+  costPencePerUnit: integer('cost_pence_per_unit'),
+}, table => [
+  index('stock_delivery_lines_delivery_idx').on(table.deliveryId),
+  index('stock_delivery_lines_product_idx').on(table.productId),
+])
+
+export const stocktakes = sqliteTable('stocktakes', {
+  id: text('id').primaryKey().$defaultFn(() => nanoid()),
+  status: text('status', { enum: STOCKTAKE_STATUSES }).notNull().default('OPEN'),
+  notes: text('notes'),
+
+  startedByUserId: text('started_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  startedAt: text('started_at').notNull().default(sql`(current_timestamp)`),
+  finishedByUserId: text('finished_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  finishedAt: text('finished_at'),
+}, table => [
+  index('stocktakes_status_idx').on(table.status),
+])
+
+export const stocktakeLines = sqliteTable('stocktake_lines', {
+  id: text('id').primaryKey().$defaultFn(() => nanoid()),
+  stocktakeId: text('stocktake_id').notNull().references(() => stocktakes.id, { onDelete: 'cascade' }),
+  productId: text('product_id').notNull().references(() => barProducts.id, { onDelete: 'restrict' }),
+  /** On-hand at the moment the take started, so trading during it is visible. */
+  expectedMilli: integer('expected_milli').notNull(),
+  countedMilli: integer('counted_milli'),
+  reason: text('reason'),
+}, table => [
+  index('stocktake_lines_stocktake_idx').on(table.stocktakeId),
+])

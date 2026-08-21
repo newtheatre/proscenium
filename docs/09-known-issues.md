@@ -23,6 +23,7 @@ Severity is about consequences for the theatre, not code aesthetics:
 | 14 | [Customers cannot cancel their own booking](#customers-cannot-cancel) | P2 | Small |
 | 16 | [No shared types](#no-shared-types) | P3 | Medium |
 | 20a | [No tests](#no-tests) | P3 | Medium |
+| 21 | [The dev server loses its D1 binding after a hot reload](#dev-d1-binding) | P3 | Small |
 
 ## Fixed
 
@@ -204,6 +205,21 @@ CI now runs build, typecheck and lint, but there is no test framework and no `te
 ways no type checker would have caught.
 
 ---
+
+### The dev server loses its D1 binding after a hot reload {#dev-d1-binding}
+
+**Local development only. Production is unaffected.**
+
+After editing a `server/` file, the next request sometimes fails with `[nuxt-hub] DB binding not
+found` and a stack ending in `getDb`. Every subsequent request fails the same way until the dev
+server is restarted; the database file itself is fine.
+
+It comes from NuxtHub re-creating the Nitro handler without re-binding the local D1 proxy, so it is
+not something this repo can fix from application code. The workaround is to restart `bun run dev`.
+
+Worth knowing because the failure looks alarming: a 500 from every endpoint that touches the
+database, immediately after a change that was probably unrelated. Check for this before assuming a
+migration or a query broke.
 
 ## Suggested order
 

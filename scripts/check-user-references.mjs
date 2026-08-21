@@ -32,6 +32,10 @@ const REVIEWED = {
   'barSessions.openedByUserId': { kind: 'attribution', note: 'Who opened the bar.' },
   'barSessions.closedByUserId': { kind: 'attribution', note: 'Who closed and reconciled it.' },
   'dayReconciliations.enteredByUserId': { kind: 'attribution', note: 'Who typed the reader total in.' },
+  'stockMovements.createdByUserId': { kind: 'attribution', note: 'Who caused the movement. Append-only, so it survives as written.' },
+  'stockDeliveries.receivedByUserId': { kind: 'attribution', note: 'Who signed the delivery in.' },
+  'stocktakes.startedByUserId': { kind: 'attribution', note: 'Who started the count.' },
+  'stocktakes.finishedByUserId': { kind: 'attribution', note: 'Who applied or abandoned it.' },
 }
 
 /** Columns deliberately not re-pointed by a merge, each with a reason. */

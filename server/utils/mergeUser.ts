@@ -115,6 +115,14 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
       .where(eq(schema.barSessions.closedByUserId, fromUserId)),
     db.update(schema.dayReconciliations).set({ enteredByUserId: toUserId })
       .where(eq(schema.dayReconciliations.enteredByUserId, fromUserId)),
+    db.update(schema.stockMovements).set({ createdByUserId: toUserId })
+      .where(eq(schema.stockMovements.createdByUserId, fromUserId)),
+    db.update(schema.stockDeliveries).set({ receivedByUserId: toUserId })
+      .where(eq(schema.stockDeliveries.receivedByUserId, fromUserId)),
+    db.update(schema.stocktakes).set({ startedByUserId: toUserId })
+      .where(eq(schema.stocktakes.startedByUserId, fromUserId)),
+    db.update(schema.stocktakes).set({ finishedByUserId: toUserId })
+      .where(eq(schema.stocktakes.finishedByUserId, fromUserId)),
     db.update(schema.reservations).set({ userId: toUserId })
       .where(eq(schema.reservations.userId, fromUserId)),
     db.update(schema.passes).set({ userId: toUserId })

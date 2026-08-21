@@ -1,0 +1,226 @@
+<!--
+Admin: counting a stocktake. Variance is applied against on-hand at the moment
+you finish, not the snapshot, so trading during the count is not erased.
+-->
+<script setup lang="ts">
+definePageMeta({
+  layout: 'admin',
+  middleware: ['admin'],
+  title: 'Stocktake',
+})
+
+interface Line {
+  id: string
+  productId: string
+  name: string
+  unit: string
+  expectedMilli: number
+  countedMilli: number | null
+  varianceMilli: number | null
+  reason: string | null
+}
+
+interface Stocktake {
+  id: string
+  status: 'OPEN' | 'APPLIED' | 'ABANDONED'
+  notes: string | null
+  startedAt: string
+  finishedAt: string | null
+  lines: Line[]
+  countedLines: number
+}
+
+const route = useRoute()
+const toast = useToast()
+const requestFetch = useRequestFetch()
+const { data, refresh } = await useAsyncData(`stocktake-${route.params.id}`, () =>
+  requestFetch<Stocktake>(`/api/admin/bar/stocktakes/${route.params.id}`))
+
+function statusMessage(error: unknown): string | undefined {
+  return (error as { data?: { statusMessage?: string } }).data?.statusMessage
+}
+
+const counts = reactive<Record<string, number | null>>({})
+watchEffect(() => {
+  for (const line of data.value?.lines ?? []) {
+    if (!(line.id in counts)) counts[line.id] = line.countedMilli == null ? null : line.countedMilli / 1000
+  }
+})
+
+const rows = computed(() => data.value?.lines ?? [])
+const isOpen = computed(() => data.value?.status === 'OPEN')
+const saving = ref(false)
+
+const columns = [
+  { accessorKey: 'name', header: 'Product' },
+  { accessorKey: 'expectedMilli', header: 'Expected' },
+  { id: 'counted', header: 'Counted' },
+  { id: 'variance', header: 'Variance' },
+]
+
+function variance(line: Line): number | null {
+  const counted = counts[line.id]
+  if (counted == null) return null
+  return Math.round(counted * 1000) - line.expectedMilli
+}
+
+/** Saved in batches, so a long count is not one request per keystroke. */
+async function saveCounts() {
+  saving.value = true
+  try {
+    const lines = rows.value
+      .filter(l => counts[l.id] !== undefined)
+      .map(l => ({ lineId: l.id, countedUnits: counts[l.id] ?? null }))
+    for (let i = 0; i < lines.length; i += 50) {
+      await $fetch(`/api/admin/bar/stocktakes/${route.params.id}/lines`, {
+        method: 'PATCH',
+        body: { lines: lines.slice(i, i + 50) },
+      })
+    }
+    toast.add({ title: 'Counts saved', icon: 'i-lucide-check', color: 'success' })
+    await refresh()
+  }
+  catch (error) {
+    toast.add({ title: 'Not saved', description: statusMessage(error), color: 'error' })
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+async function finish() {
+  saving.value = true
+  try {
+    await saveCounts()
+    const res = await $fetch<{ applied: number }>(`/api/admin/bar/stocktakes/${route.params.id}/finish`, { method: 'POST' })
+    toast.add({ title: `Applied ${res.applied} adjustment${res.applied === 1 ? '' : 's'}`, icon: 'i-lucide-check', color: 'success' })
+    await navigateTo('/admin/bar/stock')
+  }
+  catch (error) {
+    toast.add({ title: 'Not applied', description: statusMessage(error), color: 'error' })
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+async function abandon() {
+  saving.value = true
+  try {
+    await $fetch(`/api/admin/bar/stocktakes/${route.params.id}/abandon`, { method: 'POST' })
+    toast.add({ title: 'Stocktake abandoned. Nothing was changed.', icon: 'i-lucide-check' })
+    await navigateTo('/admin/bar/stock')
+  }
+  catch (error) {
+    toast.add({ title: 'Not abandoned', description: statusMessage(error), color: 'error' })
+  }
+  finally {
+    saving.value = false
+  }
+}
+</script>
+
+<template>
+  <UContainer class="py-6 space-y-6">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-semibold">
+          Stocktake
+        </h2>
+        <p class="text-sm text-muted">
+          Started {{ formatDateTime(data?.startedAt) }} ·
+          {{ data?.countedLines ?? 0 }} of {{ rows.length }} counted
+        </p>
+      </div>
+      <div
+        v-if="isOpen"
+        class="flex gap-2"
+      >
+        <UButton
+          variant="ghost"
+          color="neutral"
+          :loading="saving"
+          @click="abandon"
+        >
+          Abandon
+        </UButton>
+        <UButton
+          variant="subtle"
+          :loading="saving"
+          @click="saveCounts"
+        >
+          Save counts
+        </UButton>
+        <UButton
+          :loading="saving"
+          @click="finish"
+        >
+          Finish and apply
+        </UButton>
+      </div>
+      <UBadge
+        v-else
+        :color="data?.status === 'APPLIED' ? 'success' : 'neutral'"
+        variant="subtle"
+      >
+        {{ data?.status === 'APPLIED' ? 'Applied' : 'Abandoned' }}
+      </UBadge>
+    </div>
+
+    <UAlert
+      v-if="isOpen"
+      icon="i-lucide-info"
+      color="neutral"
+      variant="subtle"
+      title="Count in whole units"
+      description="A part bottle is a decimal: half a bottle is 0.5. Leave a line blank and it is not adjusted."
+    />
+
+    <UTable
+      :data="rows"
+      :columns="columns"
+    >
+      <template #name-cell="{ row }">
+        <div class="font-medium">
+          {{ row.original.name }}
+        </div>
+        <div class="text-xs text-muted">
+          per {{ row.original.unit }}
+        </div>
+      </template>
+      <template #expectedMilli-cell="{ row }">
+        <span class="tabular-nums text-muted">{{ (row.original.expectedMilli / 1000).toFixed(2) }}</span>
+      </template>
+      <template #counted-cell="{ row }">
+        <UInput
+          v-if="isOpen"
+          v-model.number="counts[row.original.id]"
+          type="number"
+          step="0.01"
+          min="0"
+          class="w-28"
+          :aria-label="`Counted ${row.original.name}`"
+        />
+        <span
+          v-else
+          class="tabular-nums"
+        >
+          {{ row.original.countedMilli == null ? '—' : (row.original.countedMilli / 1000).toFixed(2) }}
+        </span>
+      </template>
+      <template #variance-cell="{ row }">
+        <span
+          v-if="variance(row.original) !== null"
+          class="tabular-nums font-medium"
+          :class="variance(row.original)! < 0 ? 'text-error' : variance(row.original)! > 0 ? 'text-success' : 'text-muted'"
+        >
+          {{ variance(row.original)! > 0 ? '+' : '' }}{{ (variance(row.original)! / 1000).toFixed(2) }}
+        </span>
+        <span
+          v-else
+          class="text-muted"
+        >—</span>
+      </template>
+    </UTable>
+  </UContainer>
+</template>

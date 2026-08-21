@@ -84,6 +84,7 @@ const navigation = computed<NavigationMenuItem[][]>(() => {
       { label: 'Shows', icon: 'i-lucide-calendar', to: '/admin/shows' },
       { label: 'Content Warnings', icon: 'i-lucide-triangle-alert', to: '/admin/content-warnings' },
       { label: 'Reservations', icon: 'i-lucide-bookmark-check', to: '/admin/reservations' },
+      { label: 'Bar stock', icon: 'i-lucide-beer', to: '/admin/bar/stock' },
     ])
   }
 

@@ -384,6 +384,31 @@ the same night.
   correction to the sales: a short till is a fact to investigate, and overwriting the sales to make
   it balance destroys the evidence.
 
+### `stock_movements`, `stock_deliveries`, `stocktakes`
+
+A signed, append-only ledger. **`on_hand` is always `SUM(qty_milli)` and is never stored**, so the
+level cannot drift from the movements that explain it. Two SQLite triggers enforce the append-only
+half: the content columns cannot be updated and no row can be deleted.
+
+- **One writer.** Every insert goes through `movementStatements()` in `server/utils/stock.ts`.
+  Nothing else writes the table, which is what makes the ledger a reliable account of why a level is
+  what it is.
+- **`created_by_user_id` is deliberately outside the update trigger.** An estate account merge
+  re-points it, and a blanket `BEFORE UPDATE` would stall the merge hook for ever, which is exactly
+  what happened to `incident_log` (ADR-0025, and migration `0023`).
+- **Movements are always against the stock product.** A 175 ml glass resolves through
+  `bar_products.stock_product_id` and depletes 233 milli of the 750 ml bottle, so no row is ever
+  written against the measure that was sold.
+- **A correction is an opposing movement**, never an edit. `WASTAGE`, `TRANSFER` and `ADJUST` all
+  require a reason, because the reason is the whole value of the row.
+- **Stocktake variance is computed against on-hand at the moment of finishing**, not against the
+  snapshot taken at the start. `expected_milli` is recorded so the sheet can show what was expected
+  when counting began, but correcting to it would erase any sale made during the count.
+- **An `OPEN` stocktake writes nothing.** Abandoning it is free, and only one may be open at a time.
+
+`stock_delivery_lines.cost_pence_per_unit` is per whole unit. The most recent delivery cost is what
+stock is valued at, which is the closing-stock figure the Treasurer needs at the end of term.
+
 ## Status lifecycles
 
 ### Reservation

@@ -65,6 +65,14 @@ export default defineEventHandler(async (event) => {
     )
   }
 
+  // Resolved before anything is built, so a missing rule fails before the money.
+  const rules = barLines.length ? await depletionRules() : new Map()
+  const depleting = barLines.map((line) => {
+    const product = rules.get(line.productId)
+    if (!product) throw createError({ statusCode: 409, statusMessage: 'One of those is no longer on the menu. Reload the till.' })
+    return { product, qty: line.qty }
+  })
+
   const discount = input.discountId
     ? await db.select({ id: schema.barDiscounts.id, percent: schema.barDiscounts.percent })
       .from(schema.barDiscounts)
@@ -89,8 +97,16 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Collections and the money record, together or not at all (ADR-0023).
-  await db.batch([...collections, ...built.statements] as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+  // Stock leaves the shelf in the same batch as the money arrives (docs/13 §3.2).
+  const movements = movementStatements(basketMovements(depleting, {
+    kind: 'SALE',
+    refTable: 'transactions',
+    refId: built.transactionId,
+    createdByUserId: user.id,
+  }))
+
+  // Collections, the money record and the stock, together or not at all (ADR-0023).
+  await db.batch([...collections, ...built.statements, ...movements] as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
 
   return {
     transactionId: built.transactionId,
