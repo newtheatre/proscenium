@@ -67,6 +67,50 @@ or the joined-device count does not match the room.</p>
   })
 }
 
+/**
+ * Tomorrow's shift. A claim is a promise; this is the system keeping its half
+ * (docs/12 §3.3). The ICS rides along so it lands in a calendar.
+ */
+export async function sendShiftReminderEmail(data: {
+  to: string
+  name: string
+  role: string
+  showTitle: string
+  venueName: string
+  startsAt: Date
+  doorsAt: Date | null
+  ics: string
+}): Promise<void> {
+  const { public: { baseURL } } = useRuntimeConfig()
+  const when = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London', dateStyle: 'full', timeStyle: 'short',
+  }).format(data.startsAt)
+
+  await sendEmail({
+    to: data.to,
+    subject: `Tomorrow: ${data.role} for ${data.showTitle}`,
+    html: `
+<p>Hi ${escapeHtml(data.name.split(' ')[0] ?? data.name)},</p>
+<p>You are on <strong>${escapeHtml(data.role.toLowerCase())}</strong> tomorrow for
+<strong>${escapeHtml(data.showTitle)}</strong>.</p>
+<p>${escapeHtml(when)}<br>${escapeHtml(data.venueName)}${
+  data.doorsAt
+    ? `<br>Doors ${escapeHtml(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', timeStyle: 'short' }).format(data.doorsAt))}`
+    : ''
+}</p>
+<p>If you can no longer make it, tell the front-of-house manager as early as you can, so the slot
+can be filled. Your shifts are at <a href="${baseURL}/account/shifts">${baseURL}/account/shifts</a>.</p>
+    `.trim(),
+    attachments: [{
+      // toBase64 over encoded bytes, not btoa: a summary like "DOOR — Hamlet"
+      // has an em dash, and btoa throws above U+00FF.
+      content: toBase64(new TextEncoder().encode(data.ics)),
+      filename: 'shift.ics',
+      contentType: 'text/calendar',
+    }],
+  })
+}
+
 // ── Booking Emails ──────────────────────────────────────────────────────────
 
 interface BookingTicket {
