@@ -38,3 +38,7 @@ jobs:
 
       - name: Comments
         run: bun run check:comments
+
+      # A new users.id reference that skipped the estate hooks (ADR-0025).
+      - name: User references
+        run: bun run check:user-refs

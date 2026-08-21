@@ -3,7 +3,7 @@ import { eq, sql } from 'drizzle-orm'
 
 /**
  * This app's share of an estate-wide account merge (stage-door ADR-0015).
- * All four user-referencing columns re-point. Idempotent.
+ * Every user-referencing column re-points, and CI checks that (ADR-0025).
  */
 
 export interface MergeCounts {
@@ -11,6 +11,8 @@ export interface MergeCounts {
   passes: number
   passesIssued: number
   admissionsRedeemed: number
+  shiftsWorked: number
+  shiftsAssigned: number
 }
 
 export interface MergeResult {
@@ -34,6 +36,10 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
       .where(eq(schema.passes.issuedByUserId, fromUserId)).get()),
     admissionsRedeemed: n(await db.select({ n: sql<number>`count(*)` }).from(schema.passAdmissions)
       .where(eq(schema.passAdmissions.redeemedByUserId, fromUserId)).get()),
+    shiftsWorked: n(await db.select({ n: sql<number>`count(*)` }).from(schema.performanceShifts)
+      .where(eq(schema.performanceShifts.userId, fromUserId)).get()),
+    shiftsAssigned: n(await db.select({ n: sql<number>`count(*)` }).from(schema.performanceShifts)
+      .where(eq(schema.performanceShifts.assignedByUserId, fromUserId)).get()),
   }
 
   if (!loser || dryRun) {
@@ -53,6 +59,22 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
   }
 
   await db.batch([
+    // Both accounts on the same slot would collide on the one-confirmed-DM
+    // index, so the loser's duplicate goes before the rest re-point.
+    db.run(sql`
+      delete from performance_shifts
+      where user_id = ${fromUserId}
+        and exists (
+          select 1 from performance_shifts winner
+          where winner.user_id = ${toUserId}
+            and winner.performance_id = performance_shifts.performance_id
+            and winner.role = performance_shifts.role
+        )
+    `),
+    db.update(schema.performanceShifts).set({ userId: toUserId })
+      .where(eq(schema.performanceShifts.userId, fromUserId)),
+    db.update(schema.performanceShifts).set({ assignedByUserId: toUserId })
+      .where(eq(schema.performanceShifts.assignedByUserId, fromUserId)),
     db.update(schema.reservations).set({ userId: toUserId })
       .where(eq(schema.reservations.userId, fromUserId)),
     db.update(schema.passes).set({ userId: toUserId })

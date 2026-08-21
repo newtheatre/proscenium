@@ -151,7 +151,10 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-69 endpoints under `server/api/`, plus one blob route under `server/routes/`.
+81 handler files under `server/api/` (counted 2026-08-21), plus the blob route and the
+dev-only login under `server/routes/`. The figure in an earlier revision of this document said
+69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
+number written here.
 
 There are **no `/api/auth/*` endpoints**. Registration, login, logout, verification and password reset all live at `auth.newtheatre.org.uk` — this app reads the shared session cookie and never writes it. Anything in an older copy of this document describing `POST /api/auth/login` and friends is describing code that was deleted at the stage-door cutover.
 
@@ -306,6 +309,17 @@ and no password-reset route here.
 | --- | --- | --- | --- |
 | GET | `/api/whats-on` | **Public** | Published shows with future on-sale performances |
 | GET | `/api/whats-on/:slug` | **Public** | One published show with per-performance ticket types and sold-out flags |
+
+### Rota
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/shifts` | Staff or `foh.work` (`listShifts`) | Every shift on performances in a date window |
+| GET | `/api/shifts/unstaffed` | Staff or `foh.work` (`listShifts`) | Performances soon with no confirmed duty manager |
+| PUT | `/api/shifts/:id` | `shift.manage` (`manageShifts`) | Assign, reassign, confirm or empty a slot |
+| DELETE | `/api/shifts/:id` | `shift.manage` (`manageShifts`) | Remove a slot from the rota |
+| GET | `/api/performances/:id/shifts` | Staff or `foh.work` (`listShifts`) | The rota for one performance |
+| POST | `/api/performances/:id/shifts` | `shift.manage` (`manageShifts`) | Add a slot, open or filled |
 
 ### Admin
 
@@ -1801,6 +1815,119 @@ Looked up by `slug` **and** `status = 'PUBLISHED'`, so a DRAFT show is a 404 on 
 Unlike the other `available-ticket-types` endpoints, this one **filters out inactive ticket types** and sorts by `effectivePrice` ascending — it feeds the public booking form directly. `isSoldOut` is always `false` when capacity is unknown.
 
 **Errors** `400 Show slug is required`; `404 Show not found`.
+
+---
+
+### 3.9a Rota
+
+The rota is a control as well as a rostering tool: a confirmed shift is what scopes the show night
+screen, and later the access-needs visibility rule ([ADR-0019](./decisions/0019-the-rota-scopes-the-front-of-house-role.md),
+[ADR-0022](./decisions/0022-access-needs-are-special-category-data.md)). Design:
+[12-access-and-staffing](./12-access-and-staffing-design.md) §3.
+
+**No shift endpoint returns an email address.** `FRONT_OF_HOUSE` holders read these, so the column
+allow-list is name and id only.
+
+---
+
+#### `GET /api/shifts`
+
+**Source** `server/api/shifts/index.get.ts` · **Auth** `authorize(event, listShifts)` — staff, or any holder of `foh.work`
+
+```ts
+{
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),   // inclusive, Europe/London
+  to:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+}
+```
+
+Bounded by the performance's own `startsAt`, so the bound-parameter count does not grow with the
+number of rows covered ([ADR-0006](./decisions/0006-d1-bound-parameter-limit.md)). Cancelled
+performances are excluded.
+
+**Response** `200` — a bare array of shifts, each carrying its performance, show title and venue
+name. Not paginated: the window bounds it.
+
+---
+
+#### `GET /api/shifts/unstaffed`
+
+**Source** `server/api/shifts/unstaffed.get.ts` · **Auth** `authorize(event, listShifts)`
+
+```ts
+{ days: z.coerce.number().int().min(1).max(90).optional().default(7) }
+```
+
+On-sale performances starting within `days` that have **no confirmed duty manager**, oldest first.
+This is what the admin screen's warning renders. Scoped by a correlated `NOT EXISTS`, never an id
+list.
+
+**Response** `200` — a bare array of `{ performanceId, startsAt, showId, showTitle, venueName }`.
+
+---
+
+#### `GET /api/performances/:id/shifts`
+
+**Source** `server/api/performances/[id]/shifts/index.get.ts` · **Auth** `authorize(event, listShifts)`
+
+**Response** `200` — the performance's slots, ordered by role then creation, each with
+`userId` and `userName` (null on an open slot).
+
+---
+
+#### `POST /api/performances/:id/shifts`
+
+**Source** `server/api/performances/[id]/shifts/index.post.ts` · **Auth** `authorize(event, manageShifts)` — `shift.manage`
+
+```ts
+{
+  role:   z.enum(['DUTY_MANAGER','DOOR','BAR']),
+  userId: z.string().min(1).optional(),        // omit for an open slot
+  notes:  z.string().max(500).optional(),
+}
+```
+
+Giving a `userId` assigns **and confirms** in one step: an assignment by a manager is not a claim
+awaiting confirmation. A second confirmed duty manager is refused with `409` before it reaches the
+partial unique index, so staff see a sentence rather than a constraint error.
+
+**Response** `200` — the created row. `404` if the performance, or the assignee's mirror row, does
+not exist.
+
+---
+
+#### `PUT /api/shifts/:id`
+
+**Source** `server/api/shifts/[id]/index.put.ts` · **Auth** `authorize(event, manageShifts)`
+
+```ts
+{
+  userId: z.string().min(1).nullable().optional(),   // null empties the slot
+  status: z.enum(['OPEN','CLAIMED','CONFIRMED','DECLINED']).optional(),
+  notes:  z.string().max(500).nullable().optional(),
+}
+```
+
+`userId` and `status` are resolved **together**, not independently: emptying a slot returns it to
+`OPEN`, and filling an open one confirms it. The database pairs the two with a check constraint, so
+a caller cannot set a status the user column contradicts.
+
+Any manager edit clears `needsEligibilityReview` — that review is exactly what the flag was asking
+for ([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md)).
+
+**Response** `200` — the updated row. `409` on a second confirmed duty manager.
+
+---
+
+#### `DELETE /api/shifts/:id`
+
+**Source** `server/api/shifts/[id]/index.delete.ts` · **Auth** `authorize(event, manageShifts)`
+
+Removes the slot outright. A shift is a plan, not a sales record, so this is a real delete rather
+than an archive ([ADR-0010](./decisions/0010-archive-never-delete-referenced-records.md) covers
+referenced records; nothing references a shift).
+
+**Response** `200` — `{ ok: true }`. `404` if it does not exist.
 
 ---
 

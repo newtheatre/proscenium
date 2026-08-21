@@ -5,6 +5,7 @@ import { seedVenueFeatures, seedVenues, printVenuesSummary } from './seed/venues
 import { seedTicketTypes, printTicketTypesSummary } from './seed/ticketTypes'
 import { seedShows, printShowsSummary } from './seed/shows'
 import { seedReservations } from './seed/reservations'
+import { seedShifts } from './seed/shifts'
 
 /**
  * Seeds every entity in dependency order. Add a file under server/tasks/seed/
@@ -45,6 +46,9 @@ export default defineTask({
 
       // Seed reservations (depends on users, shows, and ticket types)
       await seedReservations(createdUsers, seededShows, seededPerformances, createdTicketTypes)
+
+      // Seed the rota (depends on users and performances)
+      await seedShifts(createdUsers, seededPerformances)
 
       // Print summary
 

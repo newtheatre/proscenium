@@ -23,13 +23,18 @@ erDiagram
     ticket_types ||--o{ tickets : types
     users ||--o{ reservations : owns
     reservations ||--o{ tickets : contains
+    performances ||--o{ performance_shifts : "is staffed by"
+    users ||--o{ performance_shifts : works
+    venues ||--o{ shift_templates : "is staffed as"
 ```
 
-Three groups:
+Four groups:
 
 - **Programme** — `shows` → `performances` → `venues` (+ `venue_features`). What is on, when, where.
 - **Money** — `ticket_types` with two layers of override. What things cost.
 - **Sales** — `users` → `reservations` → `tickets`. Who is coming and what they paid.
+- **Staffing** — `performance_shifts` (+ `shift_templates`). Who is working, which is also what
+  scopes the show night screen ([ADR-0019](./decisions/0019-the-rota-scopes-the-front-of-house-role.md)).
 
 ## Entities
 
@@ -162,6 +167,42 @@ reservations twice. If you ever write to it, write both.
 
 **`refundedAt` is read in five places and written by nothing.** Refunds are not implemented. See
 [09-known-issues](./09-known-issues.md#refunds-do-not-exist).
+
+### `performance_shifts`
+
+One slot on one performance. A null `userId` is an open slot. Design:
+[12-access-and-staffing](./12-access-and-staffing-design.md) §3.
+
+| Column | Notes |
+|---|---|
+| `performanceId` | FK, `cascade` |
+| `role` | `DUTY_MANAGER` \| `DOOR` \| `BAR` |
+| `userId` | FK, `restrict`, **nullable**. Null means the slot is open |
+| `status` | `OPEN` → `CLAIMED` → `CONFIRMED`, or `DECLINED` |
+| `needsEligibilityReview` | Set when a claim was allowed under the eligibility fallback ([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md)) |
+| `assignedByUserId` | FK, `restrict`, nullable |
+| `claimedAt`, `confirmedAt` | nullable timestamps |
+
+Two invariants, both held by the database rather than by every writer:
+
+- **Exactly one confirmed duty manager per performance**, as a partial unique index on
+  `(performance_id) WHERE role = 'DUTY_MANAGER' AND status = 'CONFIRMED'`. A second one is refused
+  with a 409 before it reaches the index, so staff see a sentence rather than a 500.
+- **An unfilled slot is `OPEN` and a filled one is not**, as a check constraint pairing `status`
+  and `user_id`. Without it "who is on" can quietly disagree with itself.
+
+`userId` is `restrict` rather than `cascade` deliberately: the rota is a record of who worked, and
+erasure anonymises the person while the shift survives
+([ADR-0014](./decisions/0014-anonymise-never-delete.md)).
+
+**A merge can collide here.** Two accounts confirmed on the same slot would break the duty-manager
+index, so `mergeUser` deletes the loser's duplicate before re-pointing the rest.
+
+### `shift_templates`
+
+How many of each role a new performance starts with. One row per role per venue; a null `venueId`
+is the estate default, used when a venue has no rows of its own. Stamped onto a performance at
+creation, so publishing a rota costs nothing by default.
 
 ## Status lifecycles
 

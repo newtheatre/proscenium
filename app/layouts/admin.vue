@@ -94,6 +94,7 @@ const navigation = computed<NavigationMenuItem[][]>(() => {
       icon: 'i-lucide-monitor-check',
       to: '/admin/box-office/reservations',
     },
+    { label: 'Rota', icon: 'i-lucide-clipboard-list', to: '/admin/rota' },
   ])
 
   return sections
