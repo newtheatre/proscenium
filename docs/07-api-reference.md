@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-99 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+105 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -346,6 +346,12 @@ and no password-reset route here.
 | POST | `/api/foh/backstage/reset` | `foh.work` (`workFoh`) | The kill switch: rotate the code, sign every device out |
 | POST | `/api/backstage/join` | **Public** | Join tonight's board with the code. Rate limited, and self-rotating |
 | GET | `/api/backstage/session` | Backstage cookie | Is this device still joined? |
+| GET | `/api/backstage/board` | Backstage cookie | The board, the presets and the house count. Polled |
+| POST | `/api/backstage/messages` | Backstage cookie | Send a preset or free text |
+| POST | `/api/backstage/messages/:id/ack` | Backstage cookie | Acknowledge a front-of-house call |
+| GET | `/api/foh/backstage/board` | `foh.work` (`workFoh`) | The front-of-house side of the board. Polled |
+| POST | `/api/foh/backstage/messages` | `foh.work` (`workFoh`) | Call something through to backstage |
+| POST | `/api/foh/backstage/messages/:id/ack` | `foh.work` (`workFoh`) | Acknowledge a backstage call |
 | GET | `/api/backstage/emergency` | **Public** | Tonight's emergency cards. Public on purpose |
 | GET | `/api/foh/emergency` | `foh.work` (`workFoh`) | The venue's emergency card for a performance |
 | GET | `/api/foh/contacts` | `foh.work` (`workFoh`) | Who is on tonight, and the numbers to call |
@@ -2231,6 +2237,35 @@ about who is coming, what was sold or who is working crosses that boundary.
 
 A joined backstage device gets **403 from every `/api/foh/*` and box-office route**, because those
 require a user session it does not have. That is the property to preserve if this ever changes.
+
+---
+
+#### The comms board
+
+**Source** `server/api/backstage/board.get.ts`, `server/api/backstage/messages/**`,
+`server/api/foh/backstage/**` · Design: [11-show-night-screen-design](./11-show-night-screen-design.md)
+§2.4, [ADR-0021](./decisions/0021-show-night-comms-poll-rather-than-hold-a-socket.md)
+
+**Polled, with a cursor.** `?since=<epoch ms>` returns only messages created after it. Clients also
+drop the cursor periodically, because an acknowledgement changes a message the client *already
+holds* and a cursor by definition cannot see that. Rate limits are set from the poll interval rather
+than guessed ([ADR-0015](./decisions/0015-rate-limits-declared-in-middleware.md)).
+
+Two rules the handlers enforce, not the UI:
+
+- **You may only send your own side's presets.** A backstage device posting a front-of-house preset
+  id gets `404`, because a preset carries a direction.
+- **You may only acknowledge the other side.** Acking your own message is `404`. The entire value of
+  the board over a group chat is one side seeing the other has read it, so acking yourself would be
+  a way to fake exactly the thing it exists to prove.
+
+`GET /api/backstage/board` also returns the **house count**: admitted against expected, and nothing
+else. That is the one piece of box office data that crosses to backstage (§5.2), and it is computed
+by the shared seat rule ([ADR-0007](./decisions/0007-one-seat-counting-rule.md)) rather than counted
+again here.
+
+The FOH side is scoped by the rota like every other show-night route; the backstage side takes a
+code session and never a user.
 
 ---
 

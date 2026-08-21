@@ -21,6 +21,7 @@ const REVIEWED = {
   'venueEmergencyInfo.updatedByUserId': { kind: 'attribution', note: 'Who last edited the emergency card.' },
   'incidentLog.authorUserId': { kind: 'attribution', note: 'Who wrote the entry. Append-only, so it survives as written.' },
   'backstageNights.lastResetByUserId': { kind: 'attribution', note: 'Who last used the kill switch.' },
+  'backstageMessages.senderUserId': { kind: 'attribution', note: 'Which FOH member sent the call. Backstage senders are devices, not users.' },
 }
 
 /** Columns deliberately not re-pointed by a merge, each with a reason. */

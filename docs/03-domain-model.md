@@ -252,6 +252,27 @@ epoch, so a distributed guesser achieves a reset rather than a join.
 here is social rather than authenticated: the page's ability surface contains nothing the account
 model exists to protect. The bearer token lives in a cookie; only its SHA-256 is stored.
 
+### `backstage_presets`, `backstage_messages`
+
+The comms board ([ADR-0021](./decisions/0021-show-night-comms-poll-rather-than-hold-a-socket.md)).
+
+Presets are **admin data with a direction**, because each society runs its calls slightly
+differently, and a preset may name a `milestone` (`CLEARANCE`, `HOUSE_OPEN`, `SHOW_START`,
+`INTERVAL`, `RESTART`, `END`). Naming the milestone on the preset rather than matching its label is
+what lets a society reword a call without losing the timing record that feeds the end-of-night
+report (docs/11 §5.5).
+
+`backstage_messages` snapshots the `label` it was sent with, for the same reason ticket prices are
+snapshotted: rewording a preset next term must not rewrite what was called on the night.
+
+**Exactly one sender column is set.** A front-of-house message has a `senderUserId`; a backstage
+message has a `senderSessionId` and the name somebody typed at join, which is social rather than
+authenticated ([ADR-0020](./decisions/0020-backstage-joins-by-a-nightly-code.md)).
+
+`acknowledgedAt` is a column rather than a derived thing because acknowledgement is the entire
+reason the board exists instead of a group chat. You cannot acknowledge your own side's message:
+the value is one side seeing that the other has read it.
+
 ## Status lifecycles
 
 ### Reservation

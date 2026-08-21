@@ -7,6 +7,7 @@ import { seedShows, printShowsSummary } from './seed/shows'
 import { seedReservations } from './seed/reservations'
 import { seedShifts } from './seed/shifts'
 import { seedFoh } from './seed/foh'
+import { seedBackstagePresets } from './seed/backstage'
 
 /**
  * Seeds every entity in dependency order. Add a file under server/tasks/seed/
@@ -53,6 +54,9 @@ export default defineTask({
 
       // Emergency cards and contact numbers (depends on venues)
       await seedFoh(seededVenues)
+
+      // The backstage call list (standalone admin data)
+      await seedBackstagePresets()
 
       // Print summary
 

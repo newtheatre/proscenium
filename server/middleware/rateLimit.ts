@@ -45,6 +45,22 @@ const PUBLIC_ROUTES: PublicRoute[] = [
     windowSeconds: 600,
   },
   {
+    // Polled every couple of seconds by a joined device, so the cap is set from
+    // the poll interval rather than from a guess (ADR-0015, ADR-0021).
+    name: 'backstage-board',
+    methods: ['GET'],
+    pattern: /^\/api\/backstage\/board\/?$/,
+    limit: 400,
+    windowSeconds: 600,
+  },
+  {
+    name: 'backstage-send',
+    methods: ['POST'],
+    pattern: /^\/api\/backstage\/messages(\/[^/]+\/ack)?\/?$/,
+    limit: 120,
+    windowSeconds: 600,
+  },
+  {
     // Public by design (safety information), so it carries a plain cap.
     name: 'backstage-emergency',
     methods: ['GET'],

@@ -25,12 +25,16 @@ const problem = ref<string | null>(null)
 const joined = ref<{ night: string, deviceName: string | null } | null>(null)
 const showEmergency = ref(false)
 
+// requestFetch, not $fetch: a plain one does not forward the cookie during SSR,
+// so a joined device would be served the join form every reload (ADR-0013).
+const requestFetch = useRequestFetch()
+
 const { data: session } = await useAsyncData('backstage-session', () =>
-  $fetch<{ night: string, deviceName: string | null }>('/api/backstage/session').catch(() => null))
+  requestFetch<{ night: string, deviceName: string | null }>('/api/backstage/session').catch(() => null))
 if (session.value) joined.value = session.value
 
 const { data: cards } = await useAsyncData('backstage-emergency', () =>
-  $fetch<EmergencyCard[]>('/api/backstage/emergency').catch(() => []))
+  requestFetch<EmergencyCard[]>('/api/backstage/emergency').catch(() => []))
 
 async function join() {
   if (code.value.replace(/\s/g, '').length < 6) return
@@ -80,10 +84,6 @@ async function join() {
           </template>
           It stays joined until the night is closed, or 02:00.
         </p>
-        <p class="mt-3 text-sm text-neutral-300">
-          The board itself arrives in the next change. Until then, the emergency information below
-          is available on this device.
-        </p>
       </section>
 
       <section
@@ -125,6 +125,11 @@ async function join() {
           {{ problem }}
         </p>
       </section>
+
+      <BackstageBoard
+        v-if="joined"
+        class="mb-6"
+      />
 
       <!-- Never behind the code: safety information is not a privilege (§5.1). -->
       <UButton
