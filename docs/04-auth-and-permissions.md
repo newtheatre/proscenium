@@ -256,6 +256,13 @@ Credentials, role assignment and verification are absent from this table on purp
 auth service's, and the abilities that used to describe them have been removed rather than left
 implying a permission model this app does not enforce.
 
+`/admin/users/:id` shows what this app knows about somebody: bookings, passes, shifts, and counts of
+what they wrote as staff. It shows **nothing about their identity**, because none of that is ours —
+`ensureLocalUser` rewrites name and email from the session on every authenticated request, so a local
+edit would be silently reverted on their next page load. The page links out to stage-door instead.
+The access-profile section is present only for `access.verify` holders, and is **absent from the
+response** rather than nulled, so "not yours to see" and "they have none" stay distinguishable.
+
 Note the row that matters operationally: **`BOX_OFFICE` can list and read every mirror user.** The
 walk-in lookup uses `GET /api/users?email=`, which returns at most one row rather than the table.
 
