@@ -1,3 +1,4 @@
+import { isStale } from '@newtheatre/auth-types'
 import { isStaff } from '~~/shared/utils/abilities'
 
 // Staff pages (ADMIN, MANAGER, BOX_OFFICE) — same staleness rule as admin.

@@ -1,3 +1,4 @@
+import { isStale } from '@newtheatre/auth-types'
 import { isAdminOrManager } from '~~/shared/utils/abilities'
 
 // ADMIN/MANAGER pages. A session older than the staleness window bounces

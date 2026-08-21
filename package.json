@@ -14,6 +14,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@newtheatre/auth-types": "^1.0.0",
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/content": "3.11.2",
     "@nuxt/eslint": "1.15.1",
