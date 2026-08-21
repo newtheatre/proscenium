@@ -129,6 +129,59 @@ offer, record only the conclusion, and agree the wording of the note with them.<
   })
 }
 
+const NEED_LABELS: Record<string, string> = {
+  difficultyStanding: 'difficulty standing',
+  difficultyWithCrowds: 'difficulty with crowds',
+  levelAccess: 'level access',
+  distance: 'difficulty with distance',
+  urgentToilet: 'urgent toilet needs',
+  visualInformation: 'visual information',
+  audibleInformation: 'audible information',
+  miscellaneous: 'something else, agreed with you',
+}
+
+/**
+ * States exactly what was recorded and what it entitles them to, so nothing
+ * about them is held that they have not read (docs/12 §2.4).
+ */
+export async function sendAccessDecisionEmail(data: {
+  to: string
+  name: string
+  verified: boolean
+  needs: readonly string[]
+  companions: number
+  fohNote: string | null
+  expiresAt: Date | null
+}): Promise<void> {
+  const { public: { baseURL } } = useRuntimeConfig()
+  const listed = data.needs.map(key => NEED_LABELS[key] ?? key)
+
+  const body = data.verified
+    ? `
+<p>Your access requirements are recorded. This is everything we hold, so please tell us if any of
+it is wrong.</p>
+<p><strong>What we have recorded:</strong><br>${
+  listed.length ? escapeHtml(listed.join(', ')) : 'No symbols, only the note below.'
+}</p>
+${data.companions ? `<p><strong>Essential companion:</strong> you can book ${data.companions} companion ticket${data.companions === 1 ? '' : 's'} with your own.</p>` : ''}
+${data.fohNote ? `<p><strong>What the team on the night will see:</strong> ${escapeHtml(data.fohNote)}</p>` : ''}
+${data.expiresAt ? `<p>This is in place until ${escapeHtml(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', dateStyle: 'long' }).format(data.expiresAt))}, after which we will ask you to confirm it is still right.</p>` : ''}
+<p>Only the staff working a performance you have booked can see this, on the day of that
+performance. You can change or remove it at any time at
+<a href="${baseURL}/account/access">${baseURL}/account/access</a>.</p>`
+    : `
+<p>We have not been able to record your access requirements from what we have so far. That is not a
+decision about you, and it is not final — the front-of-house manager will be in touch to sort it
+out.</p>
+<p>You can review what you sent at <a href="${baseURL}/account/access">${baseURL}/account/access</a>.</p>`
+
+  await sendEmail({
+    to: data.to,
+    subject: data.verified ? 'Your access requirements are recorded' : 'About your access requirements',
+    html: `<p>Hi ${escapeHtml(data.name.split(' ')[0] ?? data.name)},</p>${body}`.trim(),
+  })
+}
+
 // ── Booking Emails ──────────────────────────────────────────────────────────
 
 interface BookingTicket {

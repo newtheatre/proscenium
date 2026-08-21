@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
 
   if (!existing) {
     event.waitUntil(sendAccessRequestEmail({ name: user.name })
-      .catch(error => console.error('[access] request notice failed:', error)))
+      .catch((error: unknown) => console.error('[access] request notice failed:', error)))
   }
 
   return row
