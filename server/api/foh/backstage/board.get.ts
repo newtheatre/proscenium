@@ -12,10 +12,11 @@ export default defineEventHandler(async (event) => {
   const { since } = await getValidatedQuery(event, querySchema.parse)
 
   const night = await ensureNight(scope.night)
-  const [messages, presets] = await Promise.all([
+  const [messages, presets, timings] = await Promise.all([
     messagesSince(night.id, since),
     listPresets('FOH'),
+    curtainTimings(night.id),
   ])
 
-  return { night: night.night, messages, presets, serverTime: Date.now() }
+  return { night: night.night, messages, presets, timings, serverTime: Date.now() }
 })

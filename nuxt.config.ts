@@ -95,6 +95,11 @@ export default defineNuxtConfig({
       tasks: true,
       wasm: true,
     },
+    scheduledTasks: {
+      // Backstage free text is chatter, not record: 30 days, then gone
+      // (docs/11 §5.5). Runs off the wrangler cron trigger below.
+      '0 4 * * *': ['backstage:sweep'],
+    },
     rollupConfig: {
       plugins: [
         {
@@ -148,6 +153,9 @@ export default defineNuxtConfig({
           logs: {
             enabled: true,
           },
+        },
+        triggers: {
+          crons: ['0 4 * * *'],
         },
       },
     },

@@ -140,6 +140,24 @@ Rolling back also does not revert secrets or R2 contents.
 
 ---
 
+## 4a. Scheduled tasks
+
+**This worker has one cron trigger**, `0 4 * * *`, declared in `nuxt.config.ts` under
+`nitro.scheduledTasks` and mirrored into the generated Wrangler config as
+`triggers.crons`. Both halves are needed: the schedule tells Nitro what to run, the trigger tells
+Cloudflare to call it.
+
+| Task | What it does |
+| --- | --- |
+| `backstage:sweep` | Deletes backstage **free text** older than 30 days. Preset calls are kept: they carry the milestone the curtain-up record and the end-of-night report are built from (`docs/11` §5.5) |
+
+Run one by hand in development with `POST /_nitro/tasks/<name>` — note the name is the task's
+`meta.name` (`backstage:sweep`), not its file path. In production, check it ran with
+`bunx wrangler tail proscenium` around 04:00, or look at the Worker's cron invocations in the
+dashboard.
+
+**A task that fails is silent.** Nothing pages anyone. If a sweep matters to you, check it.
+
 ## 5. Running a migration against production
 
 **Migrations apply automatically when `main` moves.** `.github/workflows/migrate.yml` runs

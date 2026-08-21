@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, eq, gt, gte, lte, ne } from 'drizzle-orm'
+import { and, asc, eq, gt, gte, isNotNull, lte, ne } from 'drizzle-orm'
 
 /**
  * The comms board. Polled with a cursor rather than socketed (ADR-0021), and
@@ -147,4 +147,45 @@ export async function houseCountFor(night: string) {
     startsAt: first?.startsAt ?? null,
     intervalCount: first?.intervalCount ?? 0,
   }
+}
+
+export interface CurtainTiming {
+  milestone: (typeof schema.BOARD_MILESTONES)[number]
+  at: Date
+  calledBy: string | null
+  acknowledgedAt: Date | null
+}
+
+/**
+ * The night's curtain-up record, from preset transitions. The *first* time a
+ * milestone was called is the one that counts (docs/11 §5.5).
+ */
+export async function curtainTimings(nightId: string): Promise<CurtainTiming[]> {
+  const rows = await db.select({
+    milestone: schema.backstageMessages.milestone,
+    at: schema.backstageMessages.createdAt,
+    calledBy: schema.backstageMessages.senderName,
+    acknowledgedAt: schema.backstageMessages.acknowledgedAt,
+  })
+    .from(schema.backstageMessages)
+    .where(and(
+      eq(schema.backstageMessages.nightId, nightId),
+      isNotNull(schema.backstageMessages.milestone),
+    ))
+    .orderBy(asc(schema.backstageMessages.createdAt))
+
+  const first = new Map<string, CurtainTiming>()
+  for (const row of rows) {
+    if (!row.milestone || first.has(row.milestone)) continue
+    first.set(row.milestone, {
+      milestone: row.milestone,
+      at: row.at,
+      calledBy: row.calledBy,
+      acknowledgedAt: row.acknowledgedAt,
+    })
+  }
+
+  // Ordered as a night runs, not as they happened, so a missed call reads as a
+  // gap rather than reordering the rest.
+  return schema.BOARD_MILESTONES.map(m => first.get(m)).filter(Boolean) as CurtainTiming[]
 }
