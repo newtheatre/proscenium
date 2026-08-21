@@ -3,7 +3,7 @@
  * staleness of its own: a permission is a function of the session's roles.
  */
 
-import { permissionResolver } from './nntAuth'
+import { permissionResolver } from '@newtheatre/auth-types'
 import { APP_MANIFEST } from './appManifest'
 
 export const can = permissionResolver(APP_MANIFEST)

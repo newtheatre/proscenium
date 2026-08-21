@@ -5,6 +5,7 @@
     "": {
       "name": "proscenium",
       "dependencies": {
+        "@newtheatre/auth-types": "^1.0.0",
         "@nuxt/a11y": "1.0.0-alpha.1",
         "@nuxt/content": "3.11.2",
         "@nuxt/eslint": "1.15.1",
@@ -366,6 +367,8 @@
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.1.1", "", { "dependencies": { "@emnapi/core": "^1.7.1", "@emnapi/runtime": "^1.7.1", "@tybys/wasm-util": "^0.10.1" } }, "sha512-p64ah1M1ld8xjWv3qbvFwHiFVWrq1yFvV4f7w+mzaqiR4IlSgkqhcRdHwsGgomwzBH51sRY4NEowLxnaBjcW/A=="],
 
     "@neon-rs/load": ["@neon-rs/load@0.0.4", "", {}, "sha512-kTPhdZyTQxB+2wpiRcFWrDcejc4JI6tkPuS7UZCG4l6Zvc5kU/gGQ/ozvHTh1XR5tS+UlfAfGuPajjzQjCiHCw=="],
+
+    "@newtheatre/auth-types": ["@newtheatre/auth-types@1.0.0", "https://npm.pkg.github.com/download/@newtheatre/auth-types/1.0.0/7ce3abc5472e7111cbb039913487109d54dfb9c6", {}, "sha512-YS1ijGZS10giyAUCqdkZJ7QNLer/+X2H1jZHatQ6U0k5tXuI/+aOZ3XB+aidumiaaTTll9Gs7OtDbXCWlnQfVA=="],
 
     "@nodelib/fs.scandir": ["@nodelib/fs.scandir@2.1.5", "", { "dependencies": { "@nodelib/fs.stat": "2.0.5", "run-parallel": "^1.1.9" } }, "sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g=="],
 
