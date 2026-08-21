@@ -142,7 +142,7 @@ Rolling back also does not revert secrets or R2 contents.
 
 ## 4a. Scheduled tasks
 
-**This worker has one cron trigger**, `0 4 * * *`, declared in `nuxt.config.ts` under
+**This worker has two cron triggers**, `0 4 * * *` and `0 10 * * *`, declared in `nuxt.config.ts` under
 `nitro.scheduledTasks` and mirrored into the generated Wrangler config as
 `triggers.crons`. Both halves are needed: the schedule tells Nitro what to run, the trigger tells
 Cloudflare to call it.
@@ -150,6 +150,7 @@ Cloudflare to call it.
 | Task | What it does |
 | --- | --- |
 | `backstage:sweep` | Deletes backstage **free text** older than 30 days. Preset calls are kept: they carry the milestone the curtain-up record and the end-of-night report are built from (`docs/11` §5.5) |
+| `shifts:remind` | Emails everyone confirmed on tomorrow's performances, with an ICS attachment. **Not idempotent**: running it twice sends twice, which is why it is scheduled once and not retried |
 
 Run one by hand in development with `POST /_nitro/tasks/<name>` — note the name is the task's
 `meta.name` (`backstage:sweep`), not its file path. In production, check it ran with
