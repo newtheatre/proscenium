@@ -1,10 +1,18 @@
 import { db, schema } from '@nuxthub/db'
+import type { BatchItem } from 'drizzle-orm/batch'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { updateReservation } from '~~/shared/utils/abilities'
 
 const bodySchema = z.object({
   status: z.enum(['PENDING', 'COLLECTED', 'DOOR', 'CANCELLED', 'NO_SHOW']).optional(),
+  /**
+   * What the screen showed the customer. Checked, not trusted: they typed it
+   * into a card reader, so a silent disagreement is a real one (ADR-0023).
+   */
+  expectedTotalPence: z.coerce.number().int().min(0).optional(),
+  tender: z.enum(['CARD', 'COMP']).optional(),
+  compReason: z.string().trim().max(200).optional(),
   cancelledBy: z.enum(['CUSTOMER', 'STAFF']).optional().nullable(),
   customerNotes: z.string().optional().nullable(),
   staffNotes: z.string().optional().nullable(),
@@ -24,6 +32,7 @@ export default defineEventHandler(async (event) => {
   if (!existing) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
 
   const body = await readValidatedBody(event, bodySchema.parse)
+  const { user: actingUser } = await requireUserSession(event)
 
   // Reinstating re-takes seats that cancelling released, so it must pass the
   // same capacity check a fresh booking would (ADR-0007).
@@ -48,7 +57,44 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'No valid fields provided for update' })
   }
 
-  const [updated] = await db.update(schema.reservations).set(updateData).where(eq(schema.reservations.id, id)).returning()
+  // Collection is the payment boundary (ADR-0011), so it is also the moment
+  // the money is recorded (ADR-0023). Same batch: both, or neither.
+  const collecting = body.status !== undefined
+    && isCollected(body.status)
+    && !isCollected(existing.status)
+
+  let built: ReturnType<typeof buildTransaction> | null = null
+  if (collecting) {
+    const owed = await amountOwedFor(id)
+    if (!owed) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
+
+    const tender = body.tender ?? 'CARD'
+    if (body.expectedTotalPence !== undefined && tender !== 'COMP' && body.expectedTotalPence !== owed.amountPence) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `The screen showed ${formatPence(body.expectedTotalPence)} but this booking owes ${formatPence(owed.amountPence)}. Reload before taking payment.`,
+      })
+    }
+
+    built = buildTransaction({
+      source: 'BOX_OFFICE_DESK',
+      tender,
+      takenByUserId: actingUser.id,
+      compReason: tender === 'COMP' ? body.compReason ?? null : null,
+      compApprovedByUserId: tender === 'COMP' ? actingUser.id : null,
+      ticketLines: [{
+        reservationId: id,
+        performanceId: owed.performanceId,
+        amountPence: owed.amountPence,
+      }],
+    })
+  }
+
+  const statusUpdate = db.update(schema.reservations).set(updateData).where(eq(schema.reservations.id, id)).returning()
+  if (built) await db.batch([statusUpdate, ...built.statements] as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+  const [updated] = built
+    ? await db.select().from(schema.reservations).where(eq(schema.reservations.id, id))
+    : await statusUpdate
 
   // Send cancellation email if status was changed to CANCELLED
   if (body.status === 'CANCELLED' && existing.status !== 'CANCELLED') {

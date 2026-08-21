@@ -26,6 +26,9 @@ const REVIEWED = {
   'accessProfiles.userId': { kind: 'subject', note: 'Special category data. DELETED on erasure, not anonymised (ADR-0022).' },
   'accessProfiles.verifiedByUserId': { kind: 'attribution', note: 'Which FOH manager verified it.' },
   'barPrices.createdByUserId': { kind: 'attribution', note: 'Who set the price. The row history is the audit trail.' },
+  'transactions.takenByUserId': { kind: 'attribution', note: 'Who took the money. There is no anonymous till (ADR-0023).' },
+  'transactions.compApprovedByUserId': { kind: 'attribution', note: 'Which duty manager approved a comp.' },
+  'transactions.voidedByUserId': { kind: 'attribution', note: 'Who voided it.' },
 }
 
 /** Columns deliberately not re-pointed by a merge, each with a reason. */

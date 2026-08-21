@@ -13,7 +13,7 @@ export interface CurrentPrice {
 
 /** Today in Europe/London, which is the day a price takes effect on. */
 export function pricingDate(now: Date = new Date()): string {
-  return showNightDate(new Date(now.getTime() + 4 * 60 * 60 * 1000))
+  return londonDate(now)
 }
 
 /** The latest price effective on or before `on`. Null when never priced. */

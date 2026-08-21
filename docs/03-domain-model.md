@@ -346,6 +346,26 @@ something that itself depletes another is refused, because a bundle of bundles i
 their own override chain — and they are snapshotted onto a transaction when used, so changing the
 committee rate next year does not rewrite history.
 
+### `transactions`, `transaction_lines`
+
+**The record of money taken in the building** ([ADR-0023](./decisions/0023-money-taken-is-recorded-as-a-transaction.md)).
+One row per SumUp tap or comp, whatever mix of ticket payments, walk-ups and bar items it covers.
+
+[ADR-0011](./decisions/0011-collection-is-the-payment-boundary.md) still says *when* money is taken:
+collection is the boundary. This says *what was taken*, and the two are written in **one
+`db.batch()`** — both, or neither. D1 has no interactive transactions, so nothing here takes a
+transaction handle; the builders return statements and the caller batches them.
+
+- **`takenOn` is the Europe/London calendar day**, computed server-side. The Worker runs in UTC, so
+  a 23:30 sale in August lands on tomorrow's reader total without it.
+- **Two questions, two keys.** *Did today balance* is `taken_on`. *How did that show do* is
+  `transaction_lines.performance_id`. An advance payment belongs to one of each and to neither of
+  the others — confusing them is the bug this shape exists to prevent.
+- **Line amounts are gross.** The discount lives on the transaction, so "how much of that did we
+  sell" stays honest and "how much did we give away" is one sum.
+- **`bar_session_id` carries no foreign key.** `bar_sessions` arrives with the till, and SQLite
+  cannot add a constraint later without rebuilding the table.
+
 ## Status lifecycles
 
 ### Reservation
