@@ -162,6 +162,13 @@
       "when": 1787327675921,
       "tag": "0022_small_midnight",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1787327676921,
+      "tag": "0023_incident_log_append_only_fix",
+      "breakpoints": true
     }
   ]
 }

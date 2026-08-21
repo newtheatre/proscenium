@@ -235,6 +235,15 @@ other register this app keeps: one you can tidy is not a record.
 The trigger is hand-authored, because a trigger cannot be expressed in the Drizzle schema. That is
 authoring a new migration, not editing a generated one, which stays forbidden.
 
+**An append-only trigger must be scoped to the content columns**, as
+`BEFORE UPDATE OF body, performance_id, supersedes_id, created_at`. A blanket `BEFORE UPDATE` also
+blocks the author re-point that an estate account merge performs
+([ADR-0025](./decisions/0025-every-user-reference-joins-the-estate-hooks.md)), and because
+stage-door retries a failing hook indefinitely, that is a merge which can never complete. Migration
+`0019` had exactly that bug and `0023` fixes it. Any future append-only table with a user column
+needs the same scoping — what was written stays immutable; who the row points at is estate
+bookkeeping.
+
 ### `backstage_nights`, `backstage_sessions`
 
 The backstage board's access model ([ADR-0020](./decisions/0020-backstage-joins-by-a-nightly-code.md)).
