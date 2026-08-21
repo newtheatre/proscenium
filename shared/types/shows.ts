@@ -104,6 +104,8 @@ export interface ShowDetail extends ShowListItem {
   longDescription?: string | null
   programmeUrl?: string | null
   externalUrl?: string | null
+  ageGuidance?: string | null
+  latecomerPolicy?: string | null
   contentWarningNotes?: string | null
   warningsConfirmedNone: boolean
   categoryId?: string | null
