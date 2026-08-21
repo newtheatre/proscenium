@@ -335,6 +335,12 @@ and no password-reset route here.
 | --- | --- | --- | --- |
 | GET | `/images/**` | **Public** | Stream a blob out of R2 by pathname |
 
+### Health
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/health` | **Public** | Uptime check. 503 naming pending migrations when the schema is behind the code |
+
 ---
 
 ## 3. Endpoint detail
@@ -2046,6 +2052,50 @@ When `showId` matches a show with no performances, an empty CSV (headers only) i
 **Errors** `403`; `400` on a non-string query value.
 
 **Side effects** None — read-only. The whole file is built in memory as a single string, so a very large export is bounded by Worker memory.
+
+---
+
+### 3.10a Health
+
+---
+
+#### `GET /api/health`
+
+**Source** `server/api/health.get.ts` · **Auth** **Public** — no `authorize()`, no `requireUserSession()`
+
+The one endpoint in this app where an unguarded handler is deliberate rather than a bug: uptime
+monitoring cannot hold a session, and the response carries no personal data. Everywhere else in this
+document, a missing guard means an open endpoint.
+
+It compares the migration journal compiled into the running build against the `_hub_migrations`
+ledger in the database.
+
+**Response** `200` when they agree:
+
+```json
+{ "ok": true }
+```
+
+**Response** `503` when the schema is behind the deployed code, naming the files:
+
+```json
+{ "ok": false, "pendingMigrations": ["0017_rich_husk"] }
+```
+
+Three details that are load-bearing:
+
+- **Both ledger spellings are folded together.** `nuxt-db migrate` records the bare tag,
+  `wrangler d1 migrations apply` records it with `.sql`, and production carries a mix. Which
+  spelling a row has says nothing about whether it ran.
+- **A missing `_hub_migrations` table means everything is pending**, not an error. Nothing has ever
+  been applied against that database.
+- **The ledger is read with raw SQL.** NuxtHub owns that table, so declaring it in the Drizzle
+  schema would make `nuxt db generate` try to create it.
+
+Why it exists rather than returning a bare `ok`: migrations apply from CI but cannot be sequenced
+against the deploy, so the ordering is a race won on timing
+([08-operations](./08-operations.md) §5). This is the alarm for the case where it is lost, and it is
+the second half of stage-door ADR-0021 — the first half being the workflow this repo already had.
 
 ---
 
