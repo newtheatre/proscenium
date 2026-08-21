@@ -33,3 +33,13 @@ export function isAdminOrManager(user: AbilityUser): boolean {
 export function isAdmin(user: AbilityUser): boolean {
   return can(user, 'catalogue.delete')
 }
+
+/** Reach the show night screen. A confirmed shift narrows it to a night (ADR-0019). */
+export function canWorkFoh(user: AbilityUser): boolean {
+  return can(user, 'foh.work')
+}
+
+/** Run the rota: assign, confirm, reassign. */
+export function canManageShifts(user: AbilityUser): boolean {
+  return can(user, 'shift.manage')
+}

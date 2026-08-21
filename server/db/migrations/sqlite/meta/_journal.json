@@ -120,6 +120,13 @@
       "when": 1786717568989,
       "tag": "0016_lying_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1787308427714,
+      "tag": "0017_rich_husk",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,5 @@
 import { db, schema } from '@nuxthub/db'
+import type { BatchItem } from 'drizzle-orm/batch'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { createPerformance } from '~~/shared/utils/abilities'
@@ -50,6 +51,11 @@ export default defineEventHandler(async (event) => {
   if (!newPerformance) {
     throw createError({ statusCode: 500, statusMessage: 'Failed to create performance' })
   }
+
+  // Publishing a rota should cost nothing by default (docs/12 §3.2). A missing
+  // template is not a reason to fail creating the performance.
+  const stamps = await stampTemplateShifts(newPerformance.id, newPerformance.venueId)
+  if (stamps.length) await db.batch(stamps as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
 
   return newPerformance
 })

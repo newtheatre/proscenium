@@ -135,22 +135,60 @@ Full policy: stage-door's
 
 ## Roles
 
-Three roles in the `proscenium` namespace. No role at all is the customer case.
+Five roles in the `proscenium` namespace. No role at all is the customer case.
 
 | Role | Intended holder |
 |---|---|
 | `proscenium:ADMIN` | IT Manager, and normally the Theatre Manager |
 | `proscenium:MANAGER` | Box Office Manager, committee members who programme shows |
-| `proscenium:BOX_OFFICE` | Front-of-house volunteers on a shift |
+| `proscenium:BOX_OFFICE` | Box office staff: sells, admits, takes money |
+| `proscenium:FOH_MANAGER` | Runs the rota and verifies access profiles. Not a seller |
+| `proscenium:FRONT_OF_HOUSE` | Door volunteers. No prices, no emails, no money |
 
 Granted in the auth service's admin UI; there is no code registration step and no way to change a
-role from this app. The helpers are in `shared/utils/abilities/types.ts`:
+role from this app.
+
+**`FRONT_OF_HOUSE` is not a tier below `BOX_OFFICE`.** This app has no tiers: a role is a *set of
+permission keys*, and that role's set is narrower and differently shaped. It is also the one role
+whose usefulness depends on data rather than on the grant, because a confirmed shift on tonight's
+performance is what scopes it ([ADR-0019](./decisions/0019-the-rota-scopes-the-front-of-house-role.md)).
+Holding it while not rostered shows nothing.
+
+The helpers are in `shared/utils/abilities/types.ts`, and each resolves a permission key rather
+than naming roles:
 
 ```ts
-export function hasRole(user: AbilityUser, role: string): boolean   // adds 'proscenium:'
-export function isAdminOrManager(user: AbilityUser): boolean        // ADMIN | MANAGER
-export function isStaff(user: AbilityUser): boolean                 // + BOX_OFFICE
+export function isAdminOrManager(user: AbilityUser): boolean   // programme.manage
+export function isStaff(user: AbilityUser): boolean            // staff.access
+export function isAdmin(user: AbilityUser): boolean            // catalogue.delete
+export function canWorkFoh(user: AbilityUser): boolean         // foh.work
+export function canManageShifts(user: AbilityUser): boolean    // shift.manage
 ```
+
+### Permission keys
+
+`shared/utils/appManifest.ts` is the single declaration of what this app's roles can do, and it is
+served to the auth service at `/api/_hooks/auth/manifest`. Role definitions come only from
+manifests (stage-door ADR-0024), so adding a role or a permission is a change to that file and
+nothing else.
+
+| Key | What it admits |
+|---|---|
+| `staff.access` | Box-office and back-office surfaces |
+| `reservation.manage` | List, create and amend reservations; issue and redeem passes |
+| `programme.manage` | Venues, shows, performances, ticket types, pass products |
+| `money.refund` | Refund a ticket, delete a reservation, cancel an issued pass |
+| `user.manage` | Rows in the local user mirror |
+| `catalogue.delete` | Delete programme records outright |
+| `user.delete.any` | Delete another person from the mirror |
+| `foh.work` | Reach the show night screen for a performance you are rostered on |
+| `shift.manage` | Assign, confirm and reassign shifts |
+| `access.verify` | Verify access profiles, and read them outside show night |
+| `bar.manage` | The bar catalogue, stock, voids and exports |
+
+`access.verify` is deliberately **not** carried by `BOX_OFFICE` or `MANAGER`: selling someone a
+ticket is not a reason to read their access needs
+([ADR-0022](./decisions/0022-access-needs-are-special-category-data.md)).
 
 ## The ability system
 
@@ -176,6 +214,9 @@ Permissions are declared as abilities in `shared/utils/abilities/*.ts` and re-ex
 
 ## Permission matrix
 
+Roles not listed in a row hold nothing for that area. `FOH_MANAGER` and `FRONT_OF_HOUSE` appear
+only where they hold something, which is deliberately little.
+
 | Area | ADMIN | MANAGER | BOX_OFFICE | Customer |
 |---|---|---|---|---|
 | Shows: create / update / publish | ✅ | ✅ | — | — |
@@ -194,6 +235,18 @@ Permissions are declared as abilities in `shared/utils/abilities/*.ts` and re-ex
 | Users (mirror): list / read | ✅ | ✅ | ✅ | self |
 | Users (mirror): create / delete | ✅ | ✅ | — | — |
 | Admin stats & CSV export | ✅ | ✅ | — | — |
+| Rota: read | ✅ | ✅ | ✅ | — |
+| Rota: assign / confirm / remove | ✅ | ✅ | — | — |
+
+Plus the two front-of-house roles:
+
+| Area | FOH_MANAGER | FRONT_OF_HOUSE |
+|---|---|---|
+| Show night screen (rostered performances only) | ✅ | ✅ |
+| Rota: read | ✅ | ✅ |
+| Rota: assign / confirm / remove | ✅ | — |
+| Access profiles: verify and read | ✅ | — |
+| Prices, emails, taking money | — | — |
 
 Credentials, role assignment and verification are absent from this table on purpose: they are the
 auth service's, and the abilities that used to describe them have been removed rather than left
