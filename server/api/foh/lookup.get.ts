@@ -95,6 +95,13 @@ export default defineEventHandler(async (event) => {
   }
 
   const staff = isStaff(user)
+  // Symbols on the scan, but only where the §2.5 rule allows it — and it is
+  // asked per performance, not once for the night.
+  const accessByPerformance = new Map<string, Map<string, string[]>>()
+  for (const performanceId of new Set(rows.map(r => r.performanceId))) {
+    const entries = await accessTonight(user, performanceId)
+    accessByPerformance.set(performanceId, new Map(entries.map(e => [e.firstName, e.needs])))
+  }
 
   return rows.map((reservation) => {
     const tickets = ticketsByReservation.get(reservation.id) ?? []
@@ -111,13 +118,17 @@ export default defineEventHandler(async (event) => {
       },
     }
 
+    const firstName = reservation.customerName.split(' ')[0] ?? ''
+    const accessNeeds = accessByPerformance.get(reservation.performanceId)?.get(firstName) ?? null
+
     // The door admits or redirects. It gets the verdict and the head count and
     // no money at all, including what is owed: that is the bar's figure (§2.1).
     if (!staff) {
       return {
         ...base,
         standing: { state: standing.state, partySize: standing.partySize },
-        firstName: reservation.customerName.split(' ')[0] ?? '',
+        firstName,
+        accessNeeds,
       }
     }
 
@@ -126,6 +137,7 @@ export default defineEventHandler(async (event) => {
       standing,
       customerName: reservation.customerName,
       customerEmail: reservation.customerEmail,
+      accessNeeds,
       tickets: tickets.map(ticket => ({
         pricePaid: ticket.pricePaid,
         refundedAt: ticket.refundedAt,

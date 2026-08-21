@@ -28,6 +28,18 @@ interface Match {
   customerName?: string
   customerEmail?: string
   tickets?: Array<{ pricePaid: number, refundedAt: string | null, ticketTypeName: string | null }>
+  accessNeeds?: string[] | null
+}
+
+const NEED_LABELS: Record<string, string> = {
+  levelAccess: 'Level access',
+  difficultyStanding: 'Difficulty standing',
+  difficultyWithCrowds: 'Crowds',
+  distance: 'Distance',
+  urgentToilet: 'Urgent toilet',
+  visualInformation: 'Visual info',
+  audibleInformation: 'Audible info',
+  miscellaneous: 'Other',
 }
 
 const { user } = useUserSession()
@@ -255,6 +267,20 @@ function verdictText(standing: Standing) {
             {{ match.performance.showTitle }} · {{ formatTime(match.performance.startsAt) }} ·
             {{ match.performance.venueName }}
           </p>
+
+          <!-- Only where the §2.5 rule admits it; absent otherwise. -->
+          <div
+            v-if="match.accessNeeds?.length"
+            class="mt-2 flex flex-wrap gap-1"
+          >
+            <span
+              v-for="need in match.accessNeeds"
+              :key="need"
+              class="rounded-full bg-violet-900/70 px-2 py-0.5 text-xs text-violet-100"
+            >
+              {{ NEED_LABELS[need] ?? need }}
+            </span>
+          </div>
 
           <!-- Prices only where the role allows it; the door gets none. -->
           <div

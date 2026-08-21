@@ -24,6 +24,25 @@ interface Glance {
   }
 }
 
+interface AccessEntry {
+  firstName: string
+  partySize: number
+  needs: string[]
+  companions: number
+  fohNote: string | null
+}
+
+const NEED_LABELS: Record<string, string> = {
+  levelAccess: 'Level access',
+  difficultyStanding: 'Difficulty standing',
+  difficultyWithCrowds: 'Crowds',
+  distance: 'Distance',
+  urgentToilet: 'Urgent toilet',
+  visualInformation: 'Visual info',
+  audibleInformation: 'Audible info',
+  miscellaneous: 'Other',
+}
+
 const { performance, performances } = await useFohTonight()
 const requestFetch = useRequestFetch()
 
@@ -34,6 +53,17 @@ const { data } = await useAsyncData(
     : Promise.resolve(null)),
   { watch: [performance] },
 )
+
+const { data: accessData } = await useAsyncData(
+  'foh-access-tonight',
+  () => (performance.value
+    ? requestFetch<AccessEntry[]>('/api/foh/access-tonight', { query: { performanceId: performance.value.id } })
+    : Promise.resolve([])),
+  { watch: [performance] },
+)
+
+/** Empty when the rule does not admit you, which the screen simply does not show. */
+const access = computed<AccessEntry[]>(() => accessData.value ?? [])
 
 const numbers = computed(() => data.value?.numbers ?? null)
 const show = computed(() => data.value?.show ?? null)
@@ -130,6 +160,53 @@ const facts = computed(() => [
             Room for {{ numbers.remaining }} more, so walk-ups are fine.
           </template>
         </p>
+
+        <!-- Consented needs only, and only for the people working tonight
+             (ADR-0022). Absent entirely when the rule does not admit you. -->
+        <section
+          v-if="access.length"
+          class="mb-4 rounded-xl border border-violet-800 bg-violet-950/30 p-4"
+        >
+          <h2 class="mb-1 text-xs uppercase tracking-widest text-violet-300">
+            Access tonight
+          </h2>
+          <p class="mb-3 text-xs text-neutral-400">
+            Shared with you because you are working this performance. Do not pass it on.
+          </p>
+          <article
+            v-for="entry in access"
+            :key="entry.firstName"
+            class="mb-2 rounded-lg bg-neutral-900/80 p-3"
+          >
+            <p class="font-medium">
+              {{ entry.firstName }}
+              <span class="text-sm font-normal text-neutral-400">
+                · party of {{ entry.partySize }}
+                <template v-if="entry.companions">
+                  · +{{ entry.companions }} companion
+                </template>
+              </span>
+            </p>
+            <div
+              v-if="entry.needs.length"
+              class="mt-2 flex flex-wrap gap-1"
+            >
+              <span
+                v-for="need in entry.needs"
+                :key="need"
+                class="rounded-full bg-violet-900/70 px-2 py-0.5 text-xs text-violet-100"
+              >
+                {{ NEED_LABELS[need] ?? need }}
+              </span>
+            </div>
+            <p
+              v-if="entry.fohNote"
+              class="mt-2 text-sm text-neutral-300"
+            >
+              {{ entry.fohNote }}
+            </p>
+          </article>
+        </section>
 
         <section class="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
           <h2 class="mb-3 text-xs uppercase tracking-widest text-neutral-400">
