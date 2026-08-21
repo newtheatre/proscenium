@@ -26,20 +26,21 @@ interface Profile {
   audibleInformation: boolean
   miscellaneous: boolean
   companions: number
+  requesterNote: string | null
   fohNote: string | null
   consentFohAt: string | null
   expiresAt: string | null
 }
 
+/** Same difficulty framing as the requester sees, so they read as one thing. */
 const SYMBOLS = [
-  { key: 'levelAccess', label: 'Level access' },
-  { key: 'difficultyStanding', label: 'Difficulty standing' },
-  { key: 'difficultyWithCrowds', label: 'Difficulty with crowds' },
-  { key: 'distance', label: 'Distance' },
-  { key: 'urgentToilet', label: 'Urgent toilet needs' },
-  { key: 'visualInformation', label: 'Visual information' },
-  { key: 'audibleInformation', label: 'Audible information' },
-  { key: 'miscellaneous', label: 'Something else' },
+  { key: 'levelAccess', label: 'Stairs are a barrier' },
+  { key: 'difficultyStanding', label: 'Standing or queueing' },
+  { key: 'difficultyWithCrowds', label: 'Crowded spaces' },
+  { key: 'distance', label: 'Walking distance' },
+  { key: 'urgentToilet', label: 'May need to leave quickly' },
+  { key: 'audibleInformation', label: 'Hard to hear announcements' },
+  { key: 'visualInformation', label: 'Hard to read printed information' },
 ] as const
 
 const { user } = useUserSession()
@@ -50,11 +51,15 @@ const toast = useToast()
 const { data, refresh, error } = await useAsyncData('admin-access', () =>
   requestFetch<Profile[]>('/api/admin/access').catch(() => []))
 
-const profiles = computed<Profile[]>(() => data.value ?? [])
+const all = computed<Profile[]>(() => data.value ?? [])
+/** Split so recording something clears it out of the queue. */
+const waiting = computed(() => all.value.filter(p => p.status === 'PENDING'))
+const settled = computed(() => all.value.filter(p => p.status !== 'PENDING'))
+const showSettled = ref(false)
 const drafts = ref<Record<string, Record<string, unknown>>>({})
 
 watchEffect(() => {
-  for (const profile of profiles.value) {
+  for (const profile of all.value) {
     if (drafts.value[profile.userId]) continue
     drafts.value[profile.userId] = {
       ...Object.fromEntries(SYMBOLS.map(s => [s.key, profile[s.key]])),
@@ -106,8 +111,11 @@ async function decide(profile: Profile, status: 'VERIFIED' | 'DECLINED') {
     />
 
     <template v-else>
+      <h2 class="text-sm font-medium">
+        Waiting ({{ waiting.length }})
+      </h2>
       <UCard
-        v-for="profile in profiles"
+        v-for="profile in waiting"
         :key="profile.userId"
       >
         <template #header>
@@ -142,6 +150,18 @@ async function decide(profile: Profile, status: 'VERIFIED' | 'DECLINED') {
           v-if="drafts[profile.userId]"
           class="space-y-4"
         >
+          <div
+            v-if="profile.requesterNote"
+            class="rounded-lg bg-elevated p-3"
+          >
+            <p class="text-xs uppercase tracking-widest text-muted">
+              What they told us
+            </p>
+            <p class="mt-1 text-sm">
+              {{ profile.requesterNote }}
+            </p>
+          </div>
+
           <p
             v-if="profile.accessCardNumber"
             class="text-sm"
@@ -202,11 +222,60 @@ async function decide(profile: Profile, status: 'VERIFIED' | 'DECLINED') {
         </template>
       </UCard>
 
-      <UCard v-if="!profiles.length">
+      <UCard v-if="!waiting.length">
         <p class="text-sm text-muted">
           Nothing waiting.
         </p>
       </UCard>
+
+      <!-- Recorded profiles leave the queue, but stay reachable. -->
+      <div
+        v-if="settled.length"
+        class="pt-2"
+      >
+        <UButton
+          variant="ghost"
+          size="sm"
+          :label="showSettled ? `Hide recorded (${settled.length})` : `Show recorded (${settled.length})`"
+          @click="showSettled = !showSettled"
+        />
+        <ul
+          v-if="showSettled"
+          class="mt-3 divide-y divide-default rounded-lg border border-default"
+        >
+          <li
+            v-for="profile in settled"
+            :key="profile.userId"
+            class="flex items-center justify-between gap-3 p-3"
+          >
+            <div>
+              <p class="text-sm font-medium">
+                {{ profile.name }}
+              </p>
+              <p class="text-xs text-muted">
+                {{ SYMBOLS.filter(sym => profile[sym.key]).map(sym => sym.label).join(', ') || 'No symbols' }}
+                <template v-if="profile.companions">
+                  · +{{ profile.companions }}
+                </template>
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <UBadge
+                :color="profile.status === 'VERIFIED' ? 'success' : 'neutral'"
+                variant="subtle"
+              >
+                {{ profile.status.toLowerCase() }}
+              </UBadge>
+              <span
+                v-if="profile.expiresAt"
+                class="text-xs text-muted"
+              >
+                until {{ formatDate(profile.expiresAt) }}
+              </span>
+            </div>
+          </li>
+        </ul>
+      </div>
     </template>
   </div>
 </template>

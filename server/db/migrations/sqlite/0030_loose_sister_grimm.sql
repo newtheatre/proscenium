@@ -1,0 +1,1 @@
+ALTER TABLE `access_profiles` ADD `requester_note` text;

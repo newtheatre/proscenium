@@ -20,6 +20,7 @@ export default defineEventHandler(async (event) => {
     status: 'WITHDRAWN',
     companions: 0,
     accessCardNumber: null,
+    requesterNote: null,
     fohNote: null,
     consentFohAt: null,
     verifiedByUserId: null,

@@ -3,9 +3,11 @@ import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { verifyAccess } from '~~/shared/utils/abilities'
 
+// Optional, so the form need not send symbols it does not offer; anything
+// absent keeps whatever the person asked for.
 const needs = Object.fromEntries(
-  schema.ACCESS_NEEDS.map(key => [key, z.boolean()]),
-) as Record<(typeof schema.ACCESS_NEEDS)[number], z.ZodBoolean>
+  schema.ACCESS_NEEDS.map(key => [key, z.boolean().optional()]),
+) as Record<(typeof schema.ACCESS_NEEDS)[number], z.ZodOptional<z.ZodBoolean>>
 
 /** Three years, matching the Access Card's own cycle (docs/12 §2.3). */
 const DEFAULT_VALIDITY_YEARS = 3
@@ -41,7 +43,9 @@ export default defineEventHandler(async (event) => {
     ? new Date(input.expiresAt)
     : new Date(new Date().setFullYear(new Date().getFullYear() + DEFAULT_VALIDITY_YEARS))
 
-  const symbols = Object.fromEntries(schema.ACCESS_NEEDS.map(key => [key, input[key]]))
+  const symbols = Object.fromEntries(
+    schema.ACCESS_NEEDS.map(key => [key, input[key] ?? existing[key]]),
+  )
 
   const [row] = await db.update(schema.accessProfiles).set({
     ...symbols,
