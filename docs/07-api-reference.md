@@ -151,7 +151,7 @@ Implemented in `server/utils/tickets.ts` (`loadTicketPriceContext`, `resolveEffe
 
 ## 2. Endpoint summary
 
-125 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
+126 handler files under `server/api/` (counted 2026-08-21), plus the blob route, `/t/:ref` and the
 dev-only login under `server/routes/`. The figure in an earlier revision of this document said
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
@@ -268,6 +268,7 @@ is a separate, incremental job, one domain file at a time.
 | --- | --- | --- | --- |
 | GET | `/api/users` | Staff (`listUsers`) | Mirror users, paginated; `?email=` returns at most one |
 | POST | `/api/users` | ADMIN/MANAGER (`createUser`) | Create a shadow account via the auth service and mirror it |
+| GET | `/api/users/:id/summary` | Staff (`readUser`) | Everything this app knows about one person's relationship with it |
 | GET | `/api/users/:id` | Staff or self (`readUser`) | One mirror user |
 | DELETE | `/api/users/:id` | ADMIN (others) or self (`deleteUser`) | Delete the mirror row; refuses if they have bookings |
 

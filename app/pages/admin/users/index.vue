@@ -56,7 +56,12 @@ const columns: TableColumn<MirrorUser>[] = [
   {
     accessorKey: 'name',
     header: 'Name',
-    cell: ({ row }) => h('span', { class: 'text-sm text-highlighted' }, row.original.name),
+    // Links to what this app knows about them; identity stays stage-door's.
+    cell: ({ row }) => h(
+      resolveComponent('NuxtLink'),
+      { to: `/admin/users/${row.original.id}`, class: 'text-sm text-highlighted underline underline-offset-4' },
+      () => row.original.name,
+    ),
   },
   {
     accessorKey: 'email',
