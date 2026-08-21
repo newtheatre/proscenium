@@ -174,6 +174,26 @@ That is survivable for an additive migration and not for a destructive one. So:
 A destructive migration is also the case where you want a human watching, which is the other reason
 not to leave it to a push trigger.
 
+### Knowing when the race was lost
+
+`GET /api/health` compares the migration journal compiled into the running build against the
+`_hub_migrations` ledger, and returns **503 with the pending filenames** when the schema is behind
+the code. It is public, because monitoring cannot hold a session.
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://newtheatre.org.uk/api/health
+curl -s https://newtheatre.org.uk/api/health | jq
+```
+
+That is what to check first after merging a schema change, and what to point uptime monitoring at.
+A green build and a green deploy are not evidence the Worker can serve a request: the estate outage
+on 2026-08-19 reported `ok: true` for the whole hour it was down
+(stage-door ADR-0021, which this endpoint is the second half of).
+
+Both ledger spellings are folded together, because production carries a mix: `nuxt-db migrate`
+records `0016_lying_maverick` and `wrangler d1 migrations apply` records `0016_lying_maverick.sql`.
+Which spelling a row has says nothing about whether it ran.
+
 ### `nuxt db migrate` exits 0 when it fails — use `nuxt-db`
 
 The `db` subcommand on the main Nuxt CLI **swallows the exit code**. A migration that errors outright
