@@ -1,6 +1,6 @@
 import type { SQL, SQLWrapper } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
-import { z } from 'zod/v4'
+import { z } from 'zod'
 
 /**
  * Server-side pagination (ADR-0005). List endpoints take `page`, `limit` and

@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
-import { z } from 'zod/v4'
+import { z } from 'zod'
 
 /**
  * PUT /api/bookings/:id/tickets — customer self-service edit of their own

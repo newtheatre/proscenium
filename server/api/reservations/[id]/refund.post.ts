@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
-import { z } from 'zod/v4'
+import { z } from 'zod'
 import { refundTicket } from '~~/shared/utils/abilities'
 
 const bodySchema = z.object({

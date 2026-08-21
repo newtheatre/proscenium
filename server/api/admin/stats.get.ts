@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import { and, count, desc, eq, gt, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
-import { z } from 'zod/v4'
+import { z } from 'zod'
 import { isAdminOrManager } from '~~/shared/utils/abilities'
 import type { AbilityUser } from '~~/shared/utils/abilities'
 

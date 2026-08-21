@@ -2,7 +2,7 @@
 /**
  * Customer details step. Auto-fills from the session when signed in.
  */
-import { z } from 'zod/v4'
+import { z } from 'zod'
 
 interface CustomerInfo {
   name: string

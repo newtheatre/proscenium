@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { z } from 'zod/v4'
+import { z } from 'zod'
 import { createUser } from '~~/shared/utils/abilities'
 
 const bodySchema = z.object({

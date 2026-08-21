@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import { eq, inArray } from 'drizzle-orm'
-import { z } from 'zod/v4'
+import { z } from 'zod'
 import type { BatchItem } from 'drizzle-orm/batch'
 import { updateShow } from '~~/shared/utils/abilities'
 
