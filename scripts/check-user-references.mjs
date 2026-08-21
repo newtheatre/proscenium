@@ -23,6 +23,8 @@ const REVIEWED = {
   'backstageNights.lastResetByUserId': { kind: 'attribution', note: 'Who last used the kill switch.' },
   'backstageMessages.senderUserId': { kind: 'attribution', note: 'Which FOH member sent the call. Backstage senders are devices, not users.' },
   'ageChecks.checkedByUserId': { kind: 'attribution', note: 'Who ran the ID check. Append-only, so it survives as written (ADR-0027).' },
+  'accessProfiles.userId': { kind: 'subject', note: 'Special category data. DELETED on erasure, not anonymised (ADR-0022).' },
+  'accessProfiles.verifiedByUserId': { kind: 'attribution', note: 'Which FOH manager verified it.' },
 }
 
 /** Columns deliberately not re-pointed by a merge, each with a reason. */

@@ -150,6 +150,7 @@ Cloudflare to call it.
 | Task | What it does |
 | --- | --- |
 | `backstage:sweep` | Deletes backstage **free text** older than 30 days. Preset calls are kept: they carry the milestone the curtain-up record and the end-of-night report are built from (`docs/11` §5.5) |
+| `access:sweep` | Marks verified access profiles `EXPIRED` past their date, and deletes withdrawals after 30 days. Expiry is housekeeping, not deletion: the person can renew (`docs/12` §2.5) |
 | `shifts:remind` | Emails everyone confirmed on tomorrow's performances, with an ICS attachment. **Not idempotent**: running it twice sends twice, which is why it is scheduled once and not retried |
 
 Run one by hand in development with `POST /_nitro/tasks/<name>` — note the name is the task's

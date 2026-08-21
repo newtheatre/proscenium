@@ -111,6 +111,24 @@ can be filled. Your shifts are at <a href="${baseURL}/account/shifts">${baseURL}
   })
 }
 
+/**
+ * Someone has asked for their access needs to be verified. A narrower audience
+ * than boxoffice@, because these conversations are health-adjacent (docs/12 §2.4).
+ */
+export async function sendAccessRequestEmail(data: { name: string }): Promise<void> {
+  const { public: { baseURL } } = useRuntimeConfig()
+  await sendEmail({
+    to: 'access@newtheatre.org.uk',
+    subject: 'Access verification requested',
+    html: `
+<p><strong>${escapeHtml(data.name)}</strong> has asked for their access requirements to be verified.</p>
+<p>Verify it at <a href="${baseURL}/admin/access">${baseURL}/admin/access</a>. Look at whatever they
+offer, record only the conclusion, and agree the wording of the note with them.</p>
+<p>No documents, card scans or letters should be attached to anything, kept, or forwarded.</p>
+    `.trim(),
+  })
+}
+
 // ── Booking Emails ──────────────────────────────────────────────────────────
 
 interface BookingTicket {

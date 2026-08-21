@@ -101,7 +101,7 @@ export default defineNuxtConfig({
     scheduledTasks: {
       // Backstage free text is chatter, not record: 30 days, then gone
       // (docs/11 §5.5). Runs off the wrangler cron trigger below.
-      '0 4 * * *': ['backstage:sweep'],
+      '0 4 * * *': ['backstage:sweep', 'access:sweep'],
       // Late morning, so a reminder for tomorrow lands in waking hours.
       '0 10 * * *': ['shifts:remind'],
     },
