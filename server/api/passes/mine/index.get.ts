@@ -9,6 +9,20 @@ export default defineEventHandler(async (event) => {
   // Identity only, so it must not be gated on role staleness (ADR-0008).
   const { id: userId } = await requireSessionUser(event)
 
+  // Requests are shown alongside, because "I asked for one" is what the
+  // holder is looking for before it exists (ADR-0028).
+  const requests = await db.select({
+    id: schema.passRequests.id,
+    status: schema.passRequests.status,
+    quotedPence: schema.passRequests.quotedPence,
+    requestedAt: schema.passRequests.requestedAt,
+    passTypeName: schema.passTypes.name,
+  })
+    .from(schema.passRequests)
+    .innerJoin(schema.passTypes, eq(schema.passTypes.id, schema.passRequests.passTypeId))
+    .where(eq(schema.passRequests.userId, userId))
+    .orderBy(desc(schema.passRequests.requestedAt))
+
   const passes = await db.select({
     id: schema.passes.id,
     reference: schema.passes.reference,
@@ -26,7 +40,7 @@ export default defineEventHandler(async (event) => {
     .where(eq(schema.passes.userId, userId))
     .orderBy(desc(schema.passes.issuedAt))
 
-  if (!passes.length) return { passes: [] }
+  if (!passes.length) return { passes: [], requests }
 
   // Scoped by the holder, so neither query binds an id list (ADR-0006).
   const [covered, admissions] = await Promise.all([
@@ -57,6 +71,7 @@ export default defineEventHandler(async (event) => {
 
   const now = new Date()
   return {
+    requests,
     passes: passes.map(pass => ({
       ...pass,
       // Status is the record; whether it covers *today* is a separate question.

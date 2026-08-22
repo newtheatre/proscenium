@@ -39,6 +39,8 @@ const REVIEWED = {
   'compRequests.requestedByUserId': { kind: 'attribution', note: 'Who asked for the comp. The end-of-night report names them.' },
   'compRequests.decidedByUserId': { kind: 'attribution', note: 'Which duty manager approved or declined it.' },
   'performanceReports.closedByUserId': { kind: 'attribution', note: 'Which duty manager signed the night off. Null when the job auto-closed it.' },
+  'passRequests.userId': { kind: 'subject', note: 'Who asked for a pass. Survives erasure via the anonymised mirror row (ADR-0028).' },
+  'passRequests.decidedByUserId': { kind: 'attribution', note: 'Which staff member fulfilled or declined the request.' },
 }
 
 /** Columns deliberately not re-pointed by a merge, each with a reason. */

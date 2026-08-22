@@ -47,6 +47,18 @@ const toast = useToast()
 const confirm = useConfirm()
 
 // ── Pass products ─────────────────────────────────────────────────────────
+interface PassRequestRow {
+  id: string
+  status: string
+  quotedPence: number | null
+  note: string | null
+  requestedAt: string
+  passTypeId: string
+  passTypeName: string
+  requesterName: string | null
+  requesterEmail: string | null
+}
+
 const requestFetch = useRequestFetch()
 const { data: passTypes, status: typesStatus, error: typesError, refresh: refreshTypes } = await useAsyncData(
   'admin-pass-types', () => requestFetch<PassType[]>('/api/pass-types'), { default: () => [] })
@@ -134,6 +146,54 @@ async function cancelPass(pass: IssuedPass) {
     })
   }
 }
+
+/**
+ * People who asked for a pass online. Fulfilling one issues the pass; nothing
+ * exists until then, and payment is taken in person (ADR-0028).
+ */
+const { data: requestData, refresh: refreshRequests } = await useAsyncData('pass-requests', () =>
+  requestFetch<Paginated<PassRequestRow>>('/api/pass-requests', { query: { status: 'PENDING', limit: 50 } }))
+
+const passRequests = computed(() => requestData.value?.rows ?? [])
+const decidingRequest = ref<string | null>(null)
+
+async function fulfilRequest(row: PassRequestRow) {
+  const type = passTypes.value.find(t => t.id === row.passTypeId)
+  const priceId = type?.prices.find(p => p.active)?.id
+  if (!priceId) {
+    toast.add({ title: 'That pass has no active price', color: 'error' })
+    return
+  }
+  decidingRequest.value = row.id
+  try {
+    const result = await requestFetch<{ reference: string | null }>(`/api/pass-requests/${row.id}/fulfil`, {
+      method: 'POST',
+      body: { passTypePriceId: priceId },
+    })
+    toast.add({ title: `Issued ${result.reference ?? 'the pass'}`, icon: 'i-lucide-check', color: 'success' })
+    await Promise.all([refreshRequests(), refreshIssued()])
+  }
+  catch (error) {
+    toast.add({ title: 'Not issued', description: (error as { data?: { statusMessage?: string } }).data?.statusMessage, color: 'error' })
+  }
+  finally {
+    decidingRequest.value = null
+  }
+}
+
+async function declineRequest(row: PassRequestRow) {
+  decidingRequest.value = row.id
+  try {
+    await requestFetch(`/api/pass-requests/${row.id}/decline`, { method: 'POST' })
+    await refreshRequests()
+  }
+  catch (error) {
+    toast.add({ title: 'Not declined', description: (error as { data?: { statusMessage?: string } }).data?.statusMessage, color: 'error' })
+  }
+  finally {
+    decidingRequest.value = null
+  }
+}
 </script>
 
 <template>
@@ -152,6 +212,59 @@ async function cancelPass(pass: IssuedPass) {
         />
       </template>
     </AdminTableToolbar>
+
+    <section
+      v-if="passRequests.length"
+      class="space-y-3"
+    >
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-muted">
+        Waiting to be paid for
+      </h2>
+      <UCard
+        v-for="row in passRequests"
+        :key="row.id"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p class="font-medium">
+              {{ row.requesterName || 'Someone' }}
+              <span class="text-muted">&middot; {{ row.requesterEmail }}</span>
+            </p>
+            <p class="text-sm">
+              {{ row.passTypeName }}
+              <span
+                v-if="row.quotedPence !== null"
+                class="text-muted"
+              >
+                &middot; quoted {{ formatMoney(row.quotedPence) }}
+              </span>
+            </p>
+            <p
+              v-if="row.note"
+              class="mt-1 text-sm text-muted"
+            >
+              {{ row.note }}
+            </p>
+          </div>
+          <div class="flex gap-2">
+            <UButton
+              size="sm"
+              :loading="decidingRequest === row.id"
+              label="Paid — issue it"
+              @click="fulfilRequest(row)"
+            />
+            <UButton
+              size="sm"
+              variant="ghost"
+              color="neutral"
+              :loading="decidingRequest === row.id"
+              label="Decline"
+              @click="declineRequest(row)"
+            />
+          </div>
+        </div>
+      </UCard>
+    </section>
 
     <!-- Pass products -->
     <section class="space-y-3">

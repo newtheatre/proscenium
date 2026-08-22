@@ -199,6 +199,11 @@ is a separate, incremental job, one domain file at a time.
 | GET | `/api/bookings/my` | Logged in | The current user's bookings, split into upcoming and past |
 | GET | `/api/passes/mine` | Signed in | The holder's own passes, what they cover and what has been used |
 | POST | `/api/passes/mine/redeem` | Signed in, own pass | Book a seat on your own pass |
+| GET | `/api/pass-types/on-sale` | Public | What a member may ask for |
+| POST | `/api/passes/mine/requests` | Signed in | Ask for a pass. Creates no pass |
+| GET | `/api/pass-requests` | `passes.issue` (`issuePass`) | The box office queue |
+| POST | `/api/pass-requests/:id/fulfil` | `passes.issue` (`issuePass`) | Paid in person: issue the pass |
+| POST | `/api/pass-requests/:id/decline` | `passes.issue` (`issuePass`) | No, and no pass is created |
 | GET | `/api/bookings/my-options` | Optional session | What this account adds to the public picker |
 | GET | `/api/bookings/:id` | Owner, staff, or a signed `?t=` token | Booking detail for a confirmation page, customer shape |
 | GET | `/api/bookings/available-ticket-types` | Staff (`createReservation`) | Effective ticket prices for a performance before a reservation exists |
@@ -2089,6 +2094,26 @@ are gated on **identity, not role**, so they must not be blocked by role stalene
 **`/api/bookings/my-options` is deliberately separate from the show payload.** It is
 session-dependent, and `/api/whats-on/:slug` is public and should stay cacheable. It returns the
 access types this account may book, with what is left at that performance, and a pass covering it.
+
+---
+
+#### The pass request endpoints
+
+**Source** `server/api/passes/mine/requests.post.ts`, `server/api/pass-requests/**`
+
+**A request is not a pass** (ADR-0028). `POST /api/passes/mine/requests` writes a `pass_requests`
+row and **no `passes` row**, so there is nothing that could admit anyone, and the booking flow
+offers no pass until the box office has been paid.
+
+- `/api/pass-types/on-sale` is **public and column allow-listed**: name, description, validity,
+  active prices and covered shows. A requester cannot ask for something they cannot see.
+- Asking twice for the same pass is `409`, so the queue holds one row per person per pass.
+- **`quoted_pence` is what the requester was shown, not what they are charged.** Fulfilment takes
+  the price id used on the day, and a price belonging to a different pass type is `400`. A pass
+  quoted at £35 and sold at the £28 concession is a normal outcome, and the discrepancy is visible.
+- Fulfilling or declining twice is `409` naming the decision already made.
+- Fulfilment issues the pass through the normal columns, so `passes.pricePaid` stays a record of
+  money actually taken and pass revenue keeps its single source.
 
 ---
 

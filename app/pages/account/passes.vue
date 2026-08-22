@@ -24,11 +24,67 @@ interface Pass {
   admissions: Admission[]
 }
 
+interface PassRequest {
+  id: string
+  status: 'PENDING' | 'FULFILLED' | 'DECLINED' | 'EXPIRED'
+  quotedPence: number | null
+  requestedAt: string
+  passTypeName: string
+}
+interface OnSaleType {
+  id: string
+  name: string
+  description: string | null
+  validFrom: string
+  validTo: string
+  prices: Array<{ id: string, label: string, price: number }>
+  shows: Array<{ title: string, slug: string }>
+}
+
 const requestFetch = useRequestFetch()
-const { data } = await useAsyncData('my-passes', () =>
-  requestFetch<{ passes: Pass[] }>('/api/passes/mine'))
+const toast = useToast()
+const { data, refresh } = await useAsyncData('my-passes', () =>
+  requestFetch<{ passes: Pass[], requests: PassRequest[] }>('/api/passes/mine'))
+
+const { data: onSale } = await useAsyncData('pass-types-on-sale', () =>
+  requestFetch<{ passTypes: OnSaleType[] }>('/api/pass-types/on-sale'))
 
 const passes = computed(() => data.value?.passes ?? [])
+const requests = computed(() => data.value?.requests ?? [])
+const pending = computed(() => requests.value.filter(r => r.status === 'PENDING'))
+const available = computed(() =>
+  (onSale.value?.passTypes ?? []).filter(type =>
+    !pending.value.some(r => r.passTypeName === type.name)))
+
+const asking = ref<string | null>(null)
+
+/** Asks; it does not buy. No pass exists until the box office is paid (ADR-0028). */
+async function askFor(type: OnSaleType) {
+  asking.value = type.id
+  try {
+    await requestFetch('/api/passes/mine/requests', {
+      method: 'POST',
+      body: { passTypeId: type.id, passTypePriceId: type.prices[0]?.id ?? null },
+    })
+    await refresh()
+    toast.add({
+      title: 'Asked for',
+      description: 'The box office will have it ready. You pay in person.',
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+  }
+  catch (error) {
+    toast.add({
+      title: 'Not sent',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    asking.value = null
+  }
+}
 </script>
 
 <template>
@@ -43,9 +99,38 @@ const passes = computed(() => data.value?.passes ?? [])
       </p>
     </div>
 
-    <UCard v-if="!passes.length">
+    <UCard v-if="!passes.length && !pending.length">
       <p class="text-muted">
-        You do not have a pass. Passes are sold at the box office and in person before a show.
+        You do not have a pass yet.
+      </p>
+    </UCard>
+
+    <UCard
+      v-for="request in pending"
+      :key="request.id"
+    >
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 class="font-semibold">
+            {{ request.passTypeName }}
+          </h2>
+          <p class="text-sm text-muted">
+            Asked for {{ formatDate(request.requestedAt) }}.
+            <template v-if="request.quotedPence !== null">
+              You were shown {{ formatMoney(request.quotedPence) }}.
+            </template>
+          </p>
+        </div>
+        <UBadge
+          variant="subtle"
+          color="warning"
+        >
+          Waiting to be paid for
+        </UBadge>
+      </div>
+      <p class="mt-3 text-sm text-muted">
+        Pay at the box office before a show and they will issue it. Nothing has been charged, and
+        this does not admit you yet.
       </p>
     </UCard>
 
@@ -131,6 +216,54 @@ const passes = computed(() => data.value?.passes ?? [])
         >
           Not used yet.
         </p>
+      </div>
+    </UCard>
+    <UCard v-if="available.length">
+      <template #header>
+        <h2 class="font-semibold">
+          Ask for a pass
+        </h2>
+      </template>
+      <p class="mb-4 text-sm text-muted">
+        We cannot take payment online. Asking here puts your name down; you pay at the box office in
+        person and they issue it then.
+      </p>
+      <div class="space-y-4">
+        <div
+          v-for="type in available"
+          :key="type.id"
+          class="flex flex-wrap items-start justify-between gap-3 border-t pt-4 first:border-t-0 first:pt-0"
+        >
+          <div>
+            <p class="font-medium">
+              {{ type.name }}
+              <span
+                v-if="type.prices.length"
+                class="text-muted"
+              >
+                &middot; {{ formatMoney(type.prices[0]!.price) }}
+              </span>
+            </p>
+            <p
+              v-if="type.description"
+              class="text-sm text-muted"
+            >
+              {{ type.description }}
+            </p>
+            <p
+              v-if="type.shows.length"
+              class="mt-1 text-xs text-muted"
+            >
+              Covers {{ type.shows.map(s => s.title).join(', ') }}
+            </p>
+          </div>
+          <UButton
+            variant="subtle"
+            :loading="asking === type.id"
+            label="Ask for this"
+            @click="askFor(type)"
+          />
+        </div>
       </div>
     </UCard>
   </UContainer>
