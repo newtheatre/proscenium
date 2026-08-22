@@ -394,6 +394,10 @@ and no password-reset route here.
 | GET | `/api/admin/bar/catalogue` | `bar.manage` (`manageBar`) | Categories, products and today's prices |
 | POST | `/api/admin/bar/categories` | `bar.manage` | Add a category |
 | POST | `/api/admin/bar/products` | `bar.manage` | Add a product, with its first price |
+| PATCH | `/api/admin/bar/products/:id` | `bar.manage` (`manageBar`) | Edit or retire a product |
+| GET | `/api/admin/bar/products/:id/prices` | `bar.manage` (`manageBar`) | The price history, newest first |
+| PATCH | `/api/admin/bar/categories/:id` | `bar.manage` (`manageBar`) | Rename or reorder |
+| PATCH | `/api/admin/bar/discounts/:id` | `bar.manage` (`manageBar`) | Edit or retire a discount |
 | POST | `/api/admin/bar/products/:id/prices` | `bar.manage` | Set a price from a date. **Append only** |
 | POST | `/api/admin/bar/discounts` | `bar.manage` | Add a discount the till can offer |
 | GET | `/api/admin/bar/age-checks/export` | `bar.manage` (`manageBar`) | The register as CSV, for a date range |
@@ -2058,6 +2062,23 @@ only person who can approve out of the queue.
 - Approving or declining twice is `409` naming the decision already made.
 - `reason: 'OTHER'` without a note is `400`.
 - A request from another night is `409`, not `404`: it exists, it is simply not tonight's problem.
+
+---
+
+#### The catalogue endpoints
+
+**Source** `server/api/admin/bar/products/**`, `categories/**`, `discounts/**` · **Auth** `manageBar`
+
+- **Depletion is one level and the API enforces it.** Pointing a measure at another measure is
+  `400 That product already draws from another. Point at the one that holds the stock.`, pointing a
+  product at itself is refused, and a non-existent target is refused (`docs/13` §3.1).
+- **Retiring is not deleting.** A `RETIRED` product leaves the till and keeps every past sale,
+  price row and stock movement exactly as it was.
+- **A price is added, never edited.** `POST .../prices` writes a new dated row; a future
+  `effectiveFrom` schedules a change and does **not** affect what the till charges today. The
+  history is the audit trail, so there is no endpoint that updates a price row.
+- **Editing a discount is not retrospective.** A transaction stores the percentage it was rung up
+  at, so changing one here only affects future sales.
 
 ---
 
