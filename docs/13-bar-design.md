@@ -463,6 +463,13 @@ with the module catalogue:
 | `bar` | ADMN-102 *Selling Alcohol* (itself requiring ADMN-101), ADMN-103 | Claiming a `BAR` shift; the soft gate on age-restricted tiles (§4.1) |
 | `duty-manager` | as already proposed (NNT-001, ADMN-101, SFTY-002) | Claiming `DUTY_MANAGER` |
 
+**Practice.** Learning the till on a real show night, with a customer waiting, is how it is done
+today and is not good enough. [14-training-mode](./14-training-mode-design.md) adds a sandbox on the
+till and on Challenge 25, reachable only while rehearsal says the person is being taught it, writing
+to nothing operational at all
+([ADR-0032](./decisions/0032-training-mode-writes-to-its-own-table.md)). It is a separate programme
+that sits on top of this one and cannot start before it.
+
 `bar` includes ADMN-103 because the counter till takes ticket money. ADMN-102's description
 should name this system explicitly: the refusals log, the ID-check tally and closing the bar are
 now things you do in the app, and the module is where people learn them. ADMN-103 gains "the
@@ -521,6 +528,9 @@ Each stage is independently shippable and useful on its own.
   hard block. Default: leave it soft.
 - **Hard or soft training gate on alcohol sales.** v1 warns. Making it a hard block (tile
   disabled for an untrained user) is a committee/licensing decision; it is a one-line change.
+  Note that [ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md) asks
+  to be revisited in the same commit if this becomes hard: a licensing control that fails open is
+  not one, and the eligibility seam currently fails open.
 Formerly open, now settled: **voiding a mixed transaction**, the box office reversal exists
 (`POST /api/reservations/:id/refund`, manager-gated), so a void touching ticket lines needs that
 permission and everyone else is sent to the desk (§3.2); SumUp stays the payment device and is not
