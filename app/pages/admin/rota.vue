@@ -44,16 +44,18 @@ const toast = useToast()
 const requestFetch = useRequestFetch()
 
 const days = ref(28)
-const window = computed(() => {
+// Not `window`: that shadows the global for the whole setup scope. London,
+// not UTC, or the last day drops off the range between 23:00 and midnight.
+const rotaWindow = computed(() => {
   const start = new Date()
   const end = new Date(start.getTime() + days.value * 24 * 60 * 60 * 1000)
-  return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) }
+  return { from: londonDay(start), to: londonDay(end) }
 })
 
 const { data: shiftData, status, refresh } = await useAsyncData(
   'admin-rota-shifts',
-  () => requestFetch<ShiftRow[]>('/api/shifts', { query: window.value }),
-  { watch: [window] },
+  () => requestFetch<ShiftRow[]>('/api/shifts', { query: rotaWindow.value }),
+  { watch: [rotaWindow] },
 )
 
 const { data: unstaffedData, refresh: refreshUnstaffed } = await useAsyncData(

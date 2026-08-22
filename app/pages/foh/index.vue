@@ -9,23 +9,6 @@ definePageMeta({
   title: 'Front of House',
 })
 
-interface FohPerformance {
-  id: string
-  startsAt: string
-  doorsAt: string | null
-  showTitle: string
-  showSlug: string
-  venueName: string
-  shiftRole: 'DUTY_MANAGER' | 'DOOR' | 'BAR' | null
-}
-
-interface FohScope {
-  night: string
-  performances: FohPerformance[]
-  bypassedRota: boolean
-  rosteredOnNothing: boolean
-}
-
 const ROLE_LABELS: Record<NonNullable<FohPerformance['shiftRole']>, string> = {
   DUTY_MANAGER: 'Duty manager',
   DOOR: 'Door',
@@ -33,10 +16,9 @@ const ROLE_LABELS: Record<NonNullable<FohPerformance['shiftRole']>, string> = {
 }
 
 const requestFetch = useRequestFetch()
-const { data, status } = await useAsyncData('foh-tonight', () => requestFetch<FohScope>('/api/foh/tonight'))
-
-/** Always an array, never null (ADR-0012). */
-const performances = computed<FohPerformance[]>(() => data.value?.performances ?? [])
+// The composable owns the fetch and the types; four sibling pages use it, and
+// a third copy of FohScope goes stale without a type error.
+const { scope: data, status, performances } = await useFohTonight()
 const selectedId = ref<string | null>(null)
 watchEffect(() => {
   if (!selectedId.value && performances.value.length === 1) selectedId.value = performances.value[0]!.id

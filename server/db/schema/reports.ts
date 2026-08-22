@@ -10,7 +10,9 @@ import { performances } from './show'
 
 export const performanceReports = sqliteTable('performance_reports', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
-  performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'cascade' }),
+  // restrict, like every other record keyed on a performance: a signed-off
+  // report is the archive, and deleting the performance must not take it.
+  performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),
   night: text('night').notNull(),
 
   /** Null when nobody signed off and the job closed it (docs/12 §4.1). */
@@ -33,7 +35,7 @@ export const performanceReports = sqliteTable('performance_reports', {
 export interface NightReport {
   performance: { id: string, showTitle: string, venueName: string, startsAt: string, night: string }
   attendance: { capacity: number | null, sold: number, collected: number, noShows: number, walkUps: number, passAdmissions: number }
-  takings: { ticketsPence: number, walkUpPence: number, compPence: number, totalPence: number }
+  takings: { ticketsPence: number, walkUpPence: number, compPence: number, refundedPence: number, totalPence: number }
   /** Counts only, never needs and never names (docs/12 §2.5). */
   access: { bookingsWithNeeds: number, verified: number }
   incidents: Array<{ at: string, author: string | null, body: string }>

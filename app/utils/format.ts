@@ -76,3 +76,8 @@ export function formatCount(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return EMPTY
   return value.toLocaleString(LOCALE)
 }
+
+/** `YYYY-MM-DD` in Europe/London, for a date a query filters on. */
+export function londonDay(value: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(value)
+}

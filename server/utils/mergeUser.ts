@@ -62,11 +62,12 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
   }
 
   await db.batch([
-    // Both accounts on the same slot would collide on the one-confirmed-DM
-    // index, so the loser's duplicate goes before the rest re-point.
+    // Only a genuine duplicate. The rota is a record, so a confirmed row
+    // survives the merge even when both accounts hold the same slot.
     db.run(sql`
       delete from performance_shifts
       where user_id = ${fromUserId}
+        and status <> 'CONFIRMED'
         and exists (
           select 1 from performance_shifts winner
           where winner.user_id = ${toUserId}

@@ -15,6 +15,9 @@ export async function seedShifts(seededUsers: SeededUsers, seededPerformances: S
   console.log('🗓️  Seeding the rota...')
 
   // Null venue: the fallback used when a venue has no template rows of its own.
+  // NULL venue_id means the unique index cannot dedupe, so clear first.
+  await db.delete(shiftTemplates)
+
   await db.insert(shiftTemplates).values([
     { venueId: null, role: 'DUTY_MANAGER', count: 1 },
     { venueId: null, role: 'DOOR', count: 2 },

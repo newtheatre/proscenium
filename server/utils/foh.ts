@@ -14,7 +14,10 @@ import { canWorkFoh, isStaff } from '~~/shared/utils/abilities'
  */
 export const NIGHT_ROLLS_OVER_HOUR = 4
 
-/** The `YYYY-MM-DD` whose show night `now` falls in, in Europe/London. */
+/**
+ * The `YYYY-MM-DD` whose show night `now` falls in, in Europe/London. Reads the
+ * wall clock: subtracting four hours is wrong on the two DST nights a year.
+ */
 export function showNightDate(now: Date = new Date()): string {
   const london = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/London' }))
   if (london.getHours() < NIGHT_ROLLS_OVER_HOUR) london.setDate(london.getDate() - 1)

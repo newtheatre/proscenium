@@ -40,6 +40,9 @@ export default defineEventHandler(async (event) => {
     && releasesSeats(existing.status) && !releasesSeats(body.status)) {
     const seats = await countReservationSeats(id)
     await assertCapacity(existing.performanceId, seats)
+    // Cancelling gave the access entitlement back, so retaking it must pass
+    // the same per-performance cap a fresh booking would (docs/12 §2.6).
+    await assertReservationAccessAllowed(id, existing.userId, existing.performanceId)
   }
 
   const updateData: Partial<typeof schema.reservations.$inferInsert> = {}
@@ -63,8 +66,29 @@ export default defineEventHandler(async (event) => {
     && isCollected(body.status)
     && !isCollected(existing.status)
 
+  // Collection is the payment boundary and money has been taken, so it cannot
+  // cross back: the only reversal is a refund (ADR-0011).
+  const uncollecting = body.status !== undefined
+    && isCollected(existing.status)
+    && !isCollected(body.status)
+    && body.status !== 'CANCELLED'
+  if (uncollecting && await hasTicketPayment(id)) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'This booking has been paid for. Refund it rather than moving it back to pending.',
+    })
+  }
+
   let built: ReturnType<typeof buildTransaction> | null = null
   if (collecting) {
+    // A backstop: no path should reach here with a payment already recorded.
+    if (await hasTicketPayment(id)) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'This booking has already been paid for.',
+      })
+    }
+
     const owed = await amountOwedFor(id)
     if (!owed) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
 

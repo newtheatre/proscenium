@@ -24,68 +24,70 @@ export async function buildNightReport(performanceId: string): Promise<NightRepo
 
   if (!performance) throw createError({ statusCode: 404, statusMessage: 'Performance not found' })
 
-  const night = showNightDate(performance.startsAt)
-
-  const [sold, collected] = await Promise.all([
-    countOccupiedSeatsFor(performanceId),
-    countCollectedSeatsFor(performanceId),
-  ])
-
-  const [noShowRow] = await db.select({ value: count() })
-    .from(schema.reservations)
-    .where(and(
-      eq(schema.reservations.performanceId, performanceId),
-      eq(schema.reservations.status, 'NO_SHOW'),
-    ))
-
-  const [walkUpRow] = await db.select({ value: count() })
-    .from(schema.transactionLines)
-    .where(and(
-      eq(schema.transactionLines.performanceId, performanceId),
-      eq(schema.transactionLines.kind, 'WALK_UP'),
-    ))
-
-  const [passRow] = await db.select({ value: count() })
-    .from(schema.passAdmissions)
-    .where(eq(schema.passAdmissions.performanceId, performanceId))
-
-  const takings = await takingsForPerformance(performanceId)
-  const access = await accessCountsFor(performanceId)
+  // The calendar day the performance ran on. showNightDate answers "which
+  // night is it now" and would file a 19:30 show under the previous day.
+  const night = londonDate(performance.startsAt)
 
   const author = alias(schema.users, 'incident_author')
-  const incidents = await db.select({
-    at: schema.incidentLog.createdAt,
-    author: author.name,
-    body: schema.incidentLog.body,
-  })
-    .from(schema.incidentLog)
-    .leftJoin(author, eq(author.id, schema.incidentLog.authorUserId))
-    .where(eq(schema.incidentLog.performanceId, performanceId))
-    .orderBy(asc(schema.incidentLog.createdAt))
 
-  // The theatre's first curtain-up data. The message snapshots its own label
-  // and milestone, so a later edit to a preset cannot rewrite the night.
-  const milestones = await db.select({
-    at: schema.backstageMessages.createdAt,
-    label: schema.backstageMessages.label,
-  })
-    .from(schema.backstageMessages)
-    .innerJoin(schema.backstageNights, eq(schema.backstageNights.id, schema.backstageMessages.nightId))
-    .where(and(
-      eq(schema.backstageNights.night, night),
-      isNotNull(schema.backstageMessages.milestone),
-    ))
-    .orderBy(asc(schema.backstageMessages.createdAt))
-
-  const staffing = await db.select({
-    role: schema.performanceShifts.role,
-    name: schema.users.name,
-    status: schema.performanceShifts.status,
-  })
-    .from(schema.performanceShifts)
-    .leftJoin(schema.users, eq(schema.users.id, schema.performanceShifts.userId))
-    .where(eq(schema.performanceShifts.performanceId, performanceId))
-    .orderBy(asc(schema.performanceShifts.role))
+  // All of these depend only on the performance and the night, and the
+  // auto-close task builds up to twenty reports in one invocation.
+  const [
+    sold, collected, [noShowRow], [walkUpRow], [passRow],
+    takings, access, incidents, milestones, staffing, bar,
+  ] = await Promise.all([
+    countOccupiedSeatsFor(performanceId),
+    countCollectedSeatsFor(performanceId),
+    db.select({ value: count() })
+      .from(schema.reservations)
+      .where(and(
+        eq(schema.reservations.performanceId, performanceId),
+        eq(schema.reservations.status, 'NO_SHOW'),
+      )),
+    db.select({ value: count() })
+      .from(schema.transactionLines)
+      .where(and(
+        eq(schema.transactionLines.performanceId, performanceId),
+        eq(schema.transactionLines.kind, 'WALK_UP'),
+      )),
+    db.select({ value: count() })
+      .from(schema.passAdmissions)
+      .where(eq(schema.passAdmissions.performanceId, performanceId)),
+    takingsForPerformance(performanceId),
+    accessCountsFor(performanceId),
+    db.select({
+      at: schema.incidentLog.createdAt,
+      author: author.name,
+      body: schema.incidentLog.body,
+    })
+      .from(schema.incidentLog)
+      .leftJoin(author, eq(author.id, schema.incidentLog.authorUserId))
+      .where(eq(schema.incidentLog.performanceId, performanceId))
+      .orderBy(asc(schema.incidentLog.createdAt)),
+    // The theatre's first curtain-up data. The message snapshots its own
+    // label, so a later edit to a preset cannot rewrite the night.
+    db.select({
+      at: schema.backstageMessages.createdAt,
+      label: schema.backstageMessages.label,
+    })
+      .from(schema.backstageMessages)
+      .innerJoin(schema.backstageNights, eq(schema.backstageNights.id, schema.backstageMessages.nightId))
+      .where(and(
+        eq(schema.backstageNights.night, night),
+        isNotNull(schema.backstageMessages.milestone),
+      ))
+      .orderBy(asc(schema.backstageMessages.createdAt)),
+    db.select({
+      role: schema.performanceShifts.role,
+      name: schema.users.name,
+      status: schema.performanceShifts.status,
+    })
+      .from(schema.performanceShifts)
+      .leftJoin(schema.users, eq(schema.users.id, schema.performanceShifts.userId))
+      .where(eq(schema.performanceShifts.performanceId, performanceId))
+      .orderBy(asc(schema.performanceShifts.role)),
+    barSectionFor(performanceId, night),
+  ])
 
   return {
     performance: {
@@ -105,10 +107,12 @@ export async function buildNightReport(performanceId: string): Promise<NightRepo
     },
     takings,
     access,
-    incidents: incidents.map(i => ({ at: String(i.at), author: i.author, body: i.body })),
-    milestones: milestones.map(m => ({ at: String(m.at), label: m.label })),
+    incidents: incidents.map(i => ({ at: sqliteStampToIso(i.at), author: i.author, body: i.body })),
+    // ISO like the rest of the payload: String(Date) renders the host
+    // timezone, which is not what a stored record should carry.
+    milestones: milestones.map(m => ({ at: new Date(m.at).toISOString(), label: m.label })),
     staffing,
-    bar: await barSectionFor(performanceId, night),
+    bar,
   }
 }
 
@@ -124,6 +128,16 @@ async function takingsForPerformance(performanceId: string) {
     .where(eq(schema.transactionLines.performanceId, performanceId))
     .groupBy(schema.transactionLines.kind, schema.transactions.tender)
 
+  // Refunded tickets are money given back, so they are not takings.
+  const [refunded] = await db.select({
+    total: sql<number>`coalesce(sum(${schema.tickets.pricePaid}), 0)`,
+  })
+    .from(schema.tickets)
+    .where(and(
+      eq(schema.tickets.performanceId, performanceId),
+      isNotNull(schema.tickets.refundedAt),
+    ))
+
   let ticketsPence = 0
   let walkUpPence = 0
   let compPence = 0
@@ -135,7 +149,14 @@ async function takingsForPerformance(performanceId: string) {
 
   // Bar money belongs to the session, not the performance: it is in the Bar
   // section, and adding it here would count a double bill's takings twice.
-  return { ticketsPence, walkUpPence, compPence, totalPence: ticketsPence + walkUpPence }
+  const refundedPence = Number(refunded?.total ?? 0)
+  return {
+    ticketsPence,
+    walkUpPence,
+    compPence,
+    refundedPence,
+    totalPence: ticketsPence + walkUpPence - refundedPence,
+  }
 }
 
 /**

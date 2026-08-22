@@ -8,16 +8,6 @@ const querySchema = z.object({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 })
 
-/** Europe/London, because the Worker runs in UTC and a register is dated. */
-function london(value: Date, opts: Intl.DateTimeFormatOptions): string {
-  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', ...opts }).format(value)
-}
-
-function csvCell(value: unknown): string {
-  const text = value === null || value === undefined ? '' : String(value)
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
-}
-
 /** GET /api/admin/bar/age-checks/export — the register as CSV, for a date range. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
@@ -45,14 +35,14 @@ export default defineEventHandler(async (event) => {
     ))
     .orderBy(asc(schema.ageChecks.checkedAt))
 
-  const header = ['Date', 'Time', 'Outcome', 'Reason', 'Asked for', 'Description', 'Notes', 'Staff', 'Performance', 'Corrects']
-  const body = rows.map(r => [
-    london(r.checkedAt, { dateStyle: 'short' }), london(r.checkedAt, { timeStyle: 'short' }),
-    r.outcome, r.reason, r.productDescription,
-    r.description, r.notes, r.staff, r.showTitle, r.supersedesId,
-  ].map(csvCell).join(','))
-
-  setHeader(event, 'Content-Type', 'text/csv; charset=utf-8')
-  setHeader(event, 'Content-Disposition', `attachment; filename="challenge-25-${from}-to-${to}.csv"`)
-  return [header.join(','), ...body].join('\n')
+  // The shared CSV helpers: this file's own copy escaped \r differently, so a
+  // pasted note with CRLF line endings broke only this export.
+  return sendCsv(event, `challenge-25-${from}-to-${to}.csv`, toCsv(
+    ['Date', 'Time', 'Outcome', 'Reason', 'Asked for', 'Description', 'Notes', 'Staff', 'Performance', 'Corrects'],
+    rows.map(r => [
+      formatRegisterStamp(r.checkedAt).split(',')[0], formatRegisterStamp(r.checkedAt).split(', ')[1],
+      r.outcome, r.reason, r.productDescription,
+      r.description, r.notes, r.staff, r.showTitle, r.supersedesId,
+    ]),
+  ))
 })

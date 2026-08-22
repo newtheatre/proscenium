@@ -31,6 +31,12 @@ export async function templateSlotsFor(venueId: string): Promise<Array<{ role: '
  * the performance already has shifts, so re-running is safe.
  */
 export async function stampTemplateShifts(performanceId: string, venueId: string): Promise<BatchItem<'sqlite'>[]> {
+  // Not our building, not our rota (ADR-0029). Checked here rather than at the
+  // caller so a new caller cannot miss it.
+  const venue = await db.select({ isExternal: schema.venues.isExternal })
+    .from(schema.venues).where(eq(schema.venues.id, venueId)).get()
+  if (venue?.isExternal) return []
+
   const [existing] = await db.select({ n: sql<number>`count(*)` })
     .from(schema.performanceShifts)
     .where(eq(schema.performanceShifts.performanceId, performanceId))
