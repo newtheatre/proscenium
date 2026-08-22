@@ -64,6 +64,7 @@ function renderReport(report: NightReport, autoClosed: boolean, closingNote: str
       ['Tickets', money(t.ticketsPence)],
       ['Walk-ups', money(t.walkUpPence)],
       ['Comped', money(t.compPence)],
+      ['Refunded', money(t.refundedPence ?? 0)],
       ['Total', money(t.totalPence)],
     ])}</table>
     <h3>Access</h3>
@@ -78,11 +79,6 @@ function renderReport(report: NightReport, autoClosed: boolean, closingNote: str
     ${bar}
     ${closingNote ? `<h3>Closing note</h3><p>${escapeHtml(closingNote)}</p>` : ''}
   </div>`
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c]!))
 }
 
 /** Europe/London, because the Worker runs in UTC. */

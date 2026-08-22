@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import type { BatchItem } from 'drizzle-orm/batch'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { workFoh } from '~~/shared/utils/abilities'
 
@@ -44,12 +44,19 @@ export default defineEventHandler(async (event) => {
   // Ticket lines: what is owed, and the collection transition alongside.
   const ticketLines = []
   const collections: BatchItem<'sqlite'>[] = []
+  // One read for the basket rather than one per booking: the customer is at
+  // the card reader. Bounded at ten by the body schema (ADR-0006).
+  const scanned = input.reservationIds.length
+    ? await db.select({
+        id: schema.reservations.id,
+        status: schema.reservations.status,
+        performanceId: schema.reservations.performanceId,
+      }).from(schema.reservations).where(inArray(schema.reservations.id, input.reservationIds))
+    : []
+  const byId = new Map(scanned.map(row => [row.id, row]))
+
   for (const reservationId of input.reservationIds) {
-    const reservation = await db.select({
-      id: schema.reservations.id,
-      status: schema.reservations.status,
-      performanceId: schema.reservations.performanceId,
-    }).from(schema.reservations).where(eq(schema.reservations.id, reservationId)).get()
+    const reservation = byId.get(reservationId)
 
     if (!reservation) throw createError({ statusCode: 404, statusMessage: 'That booking no longer exists.' })
     if (isCollected(reservation.status)) {

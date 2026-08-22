@@ -258,6 +258,10 @@ export interface AdmitOnPassInput {
  * online. Do not start a second copy (docs/10 §4).
  */
 export async function admitOnPass(input: AdmitOnPassInput) {
+  // A pass admission takes a seat, so it passes the one seat-counting rule
+  // here rather than relying on every caller checking first (ADR-0007).
+  await assertCapacity(input.performanceId, 1)
+
   const ticketTypeId = await getPassAdmissionTicketTypeId()
 
   // Admit against an existing reservation for this holder and performance if

@@ -207,7 +207,7 @@ interface BookingEmailData {
  * customerName and customerNotes come from the unauthenticated booking
  * endpoint, so unescaped they put attacker markup in a DKIM-signed message.
  */
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

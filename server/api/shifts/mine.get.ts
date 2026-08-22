@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, eq, gte, ne } from 'drizzle-orm'
+import { and, asc, eq, gte, lte, ne } from 'drizzle-orm'
 import { z } from 'zod'
 
 const querySchema = z.object({
@@ -35,7 +35,11 @@ export default defineEventHandler(async (event) => {
     .leftJoin(schema.users, eq(schema.performanceShifts.userId, schema.users.id))
     .where(and(
       gte(schema.performances.startsAt, new Date()),
+      // Bounded in SQL, so `days` costs nothing to widen (ADR-0005).
+      lte(schema.performances.startsAt, until),
       ne(schema.performances.status, 'CANCELLED'),
+      // A venue we do not run has no rota to claim from (ADR-0029).
+      ourBuildingPredicate(),
     ))
     .orderBy(asc(schema.performances.startsAt), asc(schema.performanceShifts.role))
 
@@ -48,7 +52,6 @@ export default defineEventHandler(async (event) => {
 
   return {
     slots: rows
-      .filter(row => row.startsAt <= until)
       .map(row => ({
         ...row,
         holderName: row.holderName ? row.holderName.split(' ')[0] ?? null : null,

@@ -85,7 +85,7 @@ async function heldAccessTickets(userId: string, performanceId: string, excludeR
 
 /**
  * Refuses a basket that asks for access types the booker is not entitled to.
- * Called by every path that creates tickets, not just the public one.
+ * Called by every path that builds a basket, public and staff alike.
  */
 export async function assertAccessTicketsAllowed(
   userId: string | null | undefined,
@@ -139,4 +139,36 @@ function companionMessage(rights: AccessBookingRights): string {
     return `You have already booked ${rights.companions === 1 ? 'your companion ticket' : 'all your companion tickets'} for this performance.`
   }
   return `Your profile covers ${rights.companions} companion ticket${rights.companions === 1 ? '' : 's'} per performance, and you have ${rights.companionsRemaining} left.`
+}
+
+/**
+ * The cap applied to a reservation's existing tickets, for a path that
+ * reinstates rather than rebuilds a basket.
+ */
+export async function assertReservationAccessAllowed(
+  reservationId: string,
+  userId: string | null,
+  performanceId: string,
+): Promise<void> {
+  const held = await db.select({
+    ticketTypeId: schema.tickets.ticketTypeId,
+    quantity: sql<number>`count(*)`,
+  })
+    .from(schema.tickets)
+    .innerJoin(schema.ticketTypes, eq(schema.ticketTypes.id, schema.tickets.ticketTypeId))
+    .where(and(
+      eq(schema.tickets.reservationId, reservationId),
+      isNull(schema.tickets.refundedAt),
+      isNotNull(schema.ticketTypes.accessKind),
+    ))
+    .groupBy(schema.tickets.ticketTypeId)
+
+  if (!held.length) return
+
+  await assertAccessTicketsAllowed(
+    userId,
+    performanceId,
+    held.map(row => ({ ticketTypeId: row.ticketTypeId, quantity: Number(row.quantity) })),
+    { excludeReservationId: reservationId },
+  )
 }

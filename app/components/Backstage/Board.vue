@@ -106,10 +106,12 @@ async function poll() {
   }
 }
 
-/** An ack changes a message already held, which a cursor cannot see. */
+/**
+ * An ack changes a message already held, which a cursor cannot see. Keeps the
+ * held list: clearing it made every message look new and re-chimed the lot.
+ */
 async function refreshAll() {
   cursor.value = 0
-  messages.value = []
   await poll()
 }
 

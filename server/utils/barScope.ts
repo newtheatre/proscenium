@@ -26,7 +26,10 @@ export async function canWorkBarTonight(user: AbilityUser | null | undefined, ni
   return Boolean(row)
 }
 
-/** Guard for every `/api/bar/*` route. */
+/**
+ * Guard for the till and its writes. The comps queue uses the FOH scope
+ * instead, because the duty manager approving is not always on the bar.
+ */
 export async function requireBarScope(user: AbilityUser | null | undefined, night: string = showNightDate()): Promise<string> {
   if (!await canWorkBarTonight(user, night)) {
     throw createError({ statusCode: 403, statusMessage: 'The till is for whoever is on the bar tonight.' })

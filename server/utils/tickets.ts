@@ -207,6 +207,26 @@ export async function countOccupiedSeats(performanceScope: SQL): Promise<Map<str
   return new Map(rows.map(r => [r.performanceId, r.n]))
 }
 
+/** Collected seats per performance, grouped like {@link countOccupiedSeats}. */
+export async function countCollectedSeats(performanceScope: SQL): Promise<Map<string, number>> {
+  const rows = await db
+    .select({ performanceId: schema.tickets.performanceId, n: count() })
+    .from(schema.tickets)
+    .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
+    .innerJoin(schema.ticketTypes, eq(schema.tickets.ticketTypeId, schema.ticketTypes.id))
+    .where(
+      and(
+        performanceScope,
+        inArray(schema.reservations.status, ['COLLECTED', 'DOOR']),
+        isNull(schema.tickets.refundedAt),
+        ne(schema.ticketTypes.kind, 'PASS_SALE'),
+      ),
+    )
+    .groupBy(schema.tickets.performanceId)
+
+  return new Map(rows.map(r => [r.performanceId, r.n]))
+}
+
 /** Seats occupied at one performance. See {@link countOccupiedSeats}. */
 export async function countOccupiedSeatsFor(performanceId: string): Promise<number> {
   const counts = await countOccupiedSeats(eq(schema.tickets.performanceId, performanceId))

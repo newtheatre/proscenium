@@ -27,8 +27,17 @@ export default defineEventHandler(async (event) => {
 
   const rules = await depletionRules()
   for (const line of input.lines) {
-    if (!rules.has(line.productId)) {
+    const product = rules.get(line.productId)
+    if (!product) {
       throw createError({ statusCode: 400, statusMessage: 'One of those products no longer exists.' })
+    }
+    // Sales deplete the stock product, so a delivery booked against a measure
+    // piles up stock that never moves while its bottle runs negative.
+    if (product.stockProductId) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Book the delivery against the product that holds the stock, not the measure sold from it.',
+      })
     }
   }
 

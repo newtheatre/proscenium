@@ -32,6 +32,8 @@ export default defineTask({
       .innerJoin(schema.shows, eq(schema.performances.showId, schema.shows.id))
       .innerJoin(schema.venues, eq(schema.performances.venueId, schema.venues.id))
       .where(and(
+      // No reminder for a venue we do not run (ADR-0029).
+        ourBuildingPredicate(),
         eq(schema.performanceShifts.status, 'CONFIRMED'),
         gte(schema.performances.startsAt, validityStart(tomorrow)),
         lte(schema.performances.startsAt, validityEnd(tomorrow)),

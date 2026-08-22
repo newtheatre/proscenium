@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, eq, gte, isNotNull, lte, ne } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, isNotNull, lte, ne } from 'drizzle-orm'
 
 /**
  * The comms board. Polled with a cursor rather than socketed (ADR-0021), and
@@ -136,11 +136,18 @@ export async function houseCountFor(night: string) {
     ))
     .orderBy(asc(schema.performances.startsAt))
 
+  // Two grouped queries, not two per performance: this is polled every 2.5s
+  // by every resident display.
+  const scope = inArray(schema.tickets.performanceId, performances.map(p => p.id))
+  const [collected, occupied] = performances.length
+    ? await Promise.all([countCollectedSeats(scope), countOccupiedSeats(scope)])
+    : [new Map<string, number>(), new Map<string, number>()]
+
   let admitted = 0
   let expected = 0
   for (const performance of performances) {
-    admitted += await countCollectedSeatsFor(performance.id)
-    expected += await countOccupiedSeatsFor(performance.id)
+    admitted += collected.get(performance.id) ?? 0
+    expected += occupied.get(performance.id) ?? 0
   }
 
   const first = performances[0]

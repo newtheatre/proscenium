@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import type { BatchItem } from 'drizzle-orm/batch'
-import { and, eq, gte, isNull, lte } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 
 /**
@@ -48,12 +48,6 @@ export interface BuiltTransaction {
   barSubtotal: number
   discountPence: number
   statements: BatchItem<'sqlite'>[]
-}
-
-function chunked<T>(rows: T[], size: number): T[][] {
-  const out: T[][] = []
-  for (let i = 0; i < rows.length; i += size) out.push(rows.slice(i, i + size))
-  return out
 }
 
 /**
@@ -127,12 +121,11 @@ export function buildTransaction(draft: TransactionDraft): BuiltTransaction {
 
 /**
  * What a reservation owes: unrefunded tickets at the price they were sold at,
- * never the current price. Zero once collected (ADR-0011).
+ * never the current price. Does not check collection: the caller must.
  */
 export async function amountOwedFor(reservationId: string): Promise<{ amountPence: number, performanceId: string } | null> {
   const reservation = await db.select({
     id: schema.reservations.id,
-    status: schema.reservations.status,
     performanceId: schema.reservations.performanceId,
   }).from(schema.reservations).where(eq(schema.reservations.id, reservationId)).get()
 
@@ -161,6 +154,8 @@ export interface DayReconciliation {
   expectedZPence: number
   compPence: number
   discountPence: number
+  /** Refunded on this day, which the reader nets off its own total. */
+  refundedPence: number
 }
 
 /**
@@ -196,6 +191,7 @@ export async function reconciliation(day: string): Promise<DayReconciliation> {
     expectedZPence: 0,
     compPence: 0,
     discountPence: 0,
+    refundedPence: 0,
   }
 
   const countedTransactions = new Set<string>()
@@ -223,7 +219,26 @@ export async function reconciliation(day: string): Promise<DayReconciliation> {
     }
   }
 
+  // A refund processed today comes off the reader's own total, so the expected
+  // figure has to come off too or the DM chases a difference every time.
+  totals.refundedPence = await refundedOn(day)
+  totals.expectedZPence -= totals.refundedPence
+
   return totals
+}
+
+/** Ticket money given back on a given London day. */
+async function refundedOn(day: string): Promise<number> {
+  const [row] = await db.select({
+    total: sql<number>`coalesce(sum(${schema.tickets.pricePaid}), 0)`,
+  })
+    .from(schema.tickets)
+    // The column is a unix integer, so date() needs the modifier or it returns
+    // null and the refund silently never matches.
+    .where(sql`${schema.tickets.refundedAt} is not null
+      and date(${schema.tickets.refundedAt}, 'unixepoch') = ${day}`)
+
+  return Number(row?.total ?? 0)
 }
 
 /** Performances on a given London day, for the advance-payment breakdown. */
@@ -235,4 +250,18 @@ async function performanceIdsOn(day: string): Promise<Set<string>> {
       lte(schema.performances.startsAt, validityEnd(day)),
     ))
   return new Set(rows.map(r => r.id))
+}
+
+/** Whether a payment has already been recorded against this reservation. */
+export async function hasTicketPayment(reservationId: string): Promise<boolean> {
+  const row = await db.select({ id: schema.transactionLines.id })
+    .from(schema.transactionLines)
+    .innerJoin(schema.transactions, eq(schema.transactions.id, schema.transactionLines.transactionId))
+    .where(and(
+      eq(schema.transactionLines.reservationId, reservationId),
+      inArray(schema.transactionLines.kind, ['TICKET_PAYMENT', 'WALK_UP']),
+      isNull(schema.transactions.voidedAt),
+    ))
+    .get()
+  return Boolean(row)
 }

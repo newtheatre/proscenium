@@ -24,7 +24,9 @@ export default defineEventHandler(async (event) => {
 
   if (!person) throw createError({ statusCode: 404, statusMessage: 'No mirror row for that account' })
 
-  const reservations = await db.select({
+  // One batch: each of these depends only on `id`, and the page paid six
+  // serial round-trips on every load.
+  const reservationsQuery = db.select({
     id: schema.reservations.id,
     bookingRef: schema.reservations.bookingRef,
     status: schema.reservations.status,
@@ -40,7 +42,7 @@ export default defineEventHandler(async (event) => {
     .limit(50)
 
   // Joined on the owner rather than an id list from the rows above (ADR-0006).
-  const ticketRows = await db.select({
+  const ticketRowsQuery = db.select({
     reservationId: schema.tickets.reservationId,
     pricePaid: schema.tickets.pricePaid,
     refundedAt: schema.tickets.refundedAt,
@@ -49,17 +51,7 @@ export default defineEventHandler(async (event) => {
     .innerJoin(schema.reservations, eq(schema.tickets.reservationId, schema.reservations.id))
     .where(eq(schema.reservations.userId, id))
 
-  const byReservation = new Map<string, { count: number, paidPence: number }>()
-  for (const ticket of ticketRows) {
-    const entry = byReservation.get(ticket.reservationId) ?? { count: 0, paidPence: 0 }
-    if (!ticket.refundedAt) {
-      entry.count++
-      entry.paidPence += ticket.pricePaid
-    }
-    byReservation.set(ticket.reservationId, entry)
-  }
-
-  const passes = await db.select({
+  const passesQuery = db.select({
     id: schema.passes.id,
     reference: schema.passes.reference,
     status: schema.passes.status,
@@ -70,7 +62,7 @@ export default defineEventHandler(async (event) => {
     .leftJoin(schema.passTypes, eq(schema.passes.passTypeId, schema.passTypes.id))
     .where(eq(schema.passes.userId, id))
 
-  const shifts = await db.select({
+  const shiftsQuery = db.select({
     id: schema.performanceShifts.id,
     role: schema.performanceShifts.role,
     status: schema.performanceShifts.status,
@@ -87,10 +79,24 @@ export default defineEventHandler(async (event) => {
 
   // What they wrote as staff. Counts only: the entries belong to their own
   // screens, where the append-only framing is visible.
-  const [incidents] = await db.select({ n: count() })
+  const incidentsQuery = db.select({ n: count() })
     .from(schema.incidentLog).where(eq(schema.incidentLog.authorUserId, id))
-  const [ageChecks] = await db.select({ n: count() })
+  const ageChecksQuery = db.select({ n: count() })
     .from(schema.ageChecks).where(eq(schema.ageChecks.checkedByUserId, id))
+
+  const [reservations, ticketRows, passes, shifts, [incidents], [ageChecks]] = await Promise.all([
+    reservationsQuery, ticketRowsQuery, passesQuery, shiftsQuery, incidentsQuery, ageChecksQuery,
+  ])
+
+  const byReservation = new Map<string, { count: number, paidPence: number }>()
+  for (const ticket of ticketRows) {
+    const entry = byReservation.get(ticket.reservationId) ?? { count: 0, paidPence: 0 }
+    if (!ticket.refundedAt) {
+      entry.count++
+      entry.paidPence += ticket.pricePaid
+    }
+    byReservation.set(ticket.reservationId, entry)
+  }
 
   // Special category data: only for the people allowed to read it (ADR-0022).
   let access: { status: string, companions: number, consentFohAt: Date | null, expiresAt: Date | null } | null | undefined

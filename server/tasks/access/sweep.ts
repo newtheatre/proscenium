@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, eq, lt } from 'drizzle-orm'
+import { and, eq, lt, sql } from 'drizzle-orm'
 
 /** A withdrawn profile is a tombstone; it does not need to be one forever. */
 const WITHDRAWN_RETENTION_DAYS = 30
@@ -22,11 +22,12 @@ export default defineTask({
       ))
       .returning({ id: schema.accessProfiles.id })
 
-    const cutoff = new Date(now.getTime() - WITHDRAWN_RETENTION_DAYS * 24 * 60 * 60 * 1000)
     const removed = await db.delete(schema.accessProfiles)
       .where(and(
         eq(schema.accessProfiles.status, 'WITHDRAWN'),
-        lt(schema.accessProfiles.updatedAt, cutoff.toISOString()),
+        // The column holds `YYYY-MM-DD HH:MM:SS` from current_timestamp, and a
+        // TEXT compare against an ISO string sorts ' ' before 'T' (ADR-0023).
+        lt(schema.accessProfiles.updatedAt, sql`datetime('now', ${`-${WITHDRAWN_RETENTION_DAYS} days`})`),
       ))
       .returning({ id: schema.accessProfiles.id })
 

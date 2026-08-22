@@ -7,7 +7,12 @@ export function londonDate(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(now)
 }
 
-/** Pence as a readable figure, for messages a human reads mid-transaction. */
-export function formatPence(pence: number): string {
-  return `£${(pence / 100).toFixed(2)}`
+/**
+ * A SQLite `current_timestamp` value as ISO. The column holds
+ * `YYYY-MM-DD HH:MM:SS` in UTC with no zone marker, which Date parses as local.
+ */
+export function sqliteStampToIso(value: string | Date): string {
+  if (value instanceof Date) return value.toISOString()
+  const parsed = new Date(`${value.replace(' ', 'T')}Z`)
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString()
 }

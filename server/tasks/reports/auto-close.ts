@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, eq, gt, isNull, lt, ne } from 'drizzle-orm'
+import { and, asc, eq, gt, isNull, lt, ne } from 'drizzle-orm'
 
 /**
  * Closes any performance nobody signed off by noon the next day, so a gap is
@@ -27,6 +27,7 @@ export default defineTask({
         ne(schema.performances.status, 'CANCELLED'),
         isNull(schema.performanceReports.id),
       ))
+      .orderBy(asc(schema.performances.startsAt))
       .limit(20)
 
     // A previous show night, in Europe/London. The noon cron supplies the
