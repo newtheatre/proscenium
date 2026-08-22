@@ -49,6 +49,8 @@ watchEffect(() => {
 
 const rows = computed(() => data.value?.lines ?? [])
 const isOpen = computed(() => data.value?.status === 'OPEN')
+/** Every line expected nothing, so this count establishes the ledger (#208). */
+const isOpening = computed(() => rows.value.length > 0 && rows.value.every(line => line.expectedMilli === 0))
 const saving = ref(false)
 
 const columns = [
@@ -125,7 +127,7 @@ async function abandon() {
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="text-lg font-semibold">
-          Stocktake
+          {{ isOpening ? 'Opening stock' : 'Stocktake' }}
         </h2>
         <p class="text-sm text-muted">
           Started {{ formatDateTime(data?.startedAt) }} ·
@@ -172,8 +174,10 @@ async function abandon() {
       icon="i-lucide-info"
       color="neutral"
       variant="subtle"
-      title="Count in whole units"
-      description="A part bottle is a decimal: half a bottle is 0.5. Leave a line blank and it is not adjusted."
+      :title="isOpening ? 'Count everything you have' : 'Count in whole units'"
+      :description="isOpening
+        ? 'This is the opening count, so what you enter becomes the level. A part bottle is a decimal: half a bottle is 0.5. Leave a line blank and it stays at zero.'
+        : 'A part bottle is a decimal: half a bottle is 0.5. Leave a line blank and it is not adjusted.'"
     />
 
     <UTable
