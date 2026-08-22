@@ -52,5 +52,6 @@ export const publicPerformanceColumns = {
   intervalMinutes: true,
   capacityOverride: true,
   bookingClosesHoursBefore: true,
+  externalBookingUrl: true,
   status: true,
 } as const

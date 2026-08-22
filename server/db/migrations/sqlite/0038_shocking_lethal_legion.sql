@@ -1,0 +1,1 @@
+ALTER TABLE `venues` ADD `is_external` integer DEFAULT false NOT NULL;

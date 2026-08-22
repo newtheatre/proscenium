@@ -63,9 +63,16 @@ useSeoMeta({
 
 // ── State ────────────────────────────────────────────────────────────────────
 
-// Externally ticketed: the booking flow cannot complete, so do not start it (#135).
+// Externally ticketed: the flow cannot complete, so do not start it (#135).
+// Every performance, or the selected one, being external is enough.
+const allExternal = computed(() => {
+  const performances = show.value?.performances ?? []
+  return Boolean(show.value?.externalUrl)
+    || (performances.length > 0 && performances.every(p => p.isExternallyTicketed))
+})
+
 watchEffect(() => {
-  if (show.value?.externalUrl) {
+  if (allExternal.value) {
     navigateTo(`/whats-on/${slug}`, { replace: true })
   }
 })

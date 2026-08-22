@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
         with: {
           // Allow-listed rather than `true`: the venue row is spread into a
           // public, edge-cached response.
-          venue: { columns: { id: true, name: true, address: true, capacity: true } },
+          venue: { columns: { id: true, name: true, address: true, capacity: true, isExternal: true } },
         },
       },
       // Allow-listed on both sides — the link row's ids mean nothing publicly and
@@ -104,6 +104,10 @@ export default defineEventHandler(async (event) => {
       // So the listing can say "booking closed" rather than letting a customer
       // pick a performance and only find out when the booking is rejected.
       isBookingClosed: !isBookingOpen(perf),
+      // Sold by someone else, so the page links out rather than offering a
+      // basket it would refuse (ADR-0029).
+      isExternallyTicketed: externallyTicketed({ ...perf, show: { externalUrl: show.externalUrl } }),
+      externalBookingUrl: externalBookingUrl({ ...perf, show: { externalUrl: show.externalUrl } }),
     }
   })
 

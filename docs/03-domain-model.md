@@ -466,6 +466,24 @@ sees it.
 The shape deliberately mirrors `comp_requests`: where an approval is the control, the thing awaiting
 approval must not also be the thing that grants the entitlement.
 
+### External: a venue, not a strand
+
+Two different things are called external, and they behave in opposite directions (ADR-0029).
+
+- **`venues.is_external`** — somewhere we perform but do not run, like a festival venue. The venue
+  sells the tickets. We advertise the show and link out; there is no rota, no bar and no
+  end-of-night report, because none of it happens in a building we run.
+- **The `External` show category** — another company using *our* building, usually StuFF. **We sell
+  the tickets, run the bar and staff the front of house**, because the hire requires it. The strand
+  is for the listing and for reporting, and carries no operational meaning at all.
+
+A performance is externally ticketed when its venue is external, when it carries its own
+`external_booking_url`, or when its show carries an `external_url`. **The link is resolved
+performance first**: a show that transfers plays five dates at home and one at the Fringe, and a
+show-level link would take the home run off sale. The show-level link means the whole run.
+`externallyTicketed()` is the only place that decides, and `ourTicketingPredicate()` is its SQL
+form; four paths use them, and none reimplements the rule.
+
 ## Status lifecycles
 
 ### Reservation

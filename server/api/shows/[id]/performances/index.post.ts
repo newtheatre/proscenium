@@ -13,6 +13,8 @@ const bodySchema = z.object({
   intervalMinutes: z.number().int().positive().optional().nullable(),
   capacityOverride: z.number().int().positive().optional().nullable(),
   bookingClosesHoursBefore: z.number().int().nonnegative().max(168).optional().nullable(),
+  /** Sold by someone else for this date only (ADR-0029). */
+  externalBookingUrl: z.string().trim().url().nullable().optional(),
   status: z.enum(['DRAFT', 'ON_SALE', 'CANCELLED']).optional().default('DRAFT'),
   notes: z.string().optional().nullable(),
 })
@@ -44,6 +46,7 @@ export default defineEventHandler(async (event) => {
     intervalMinutes: body.intervalMinutes,
     capacityOverride: body.capacityOverride,
     bookingClosesHoursBefore: body.bookingClosesHoursBefore,
+    externalBookingUrl: body.externalBookingUrl,
     status: body.status,
     notes: body.notes,
   }).returning()
