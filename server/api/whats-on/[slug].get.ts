@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, eq, gt, inArray } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, isNull } from 'drizzle-orm'
 
 /**
  * GET /api/whats-on/:slug — get a published show by slug with performances
@@ -58,9 +58,9 @@ export default defineEventHandler(async (event) => {
     ))
 
   const [allTicketTypes, showOverrides, perfOverrides, ticketCountMap] = await Promise.all([
-    // The shared filter: archived legacy types and the pass bookkeeping kinds
-    // must never reach a picker (ADR-0002, ADR-0010).
-    db.select().from(schema.ticketTypes).where(sellableTicketTypes()),
+    // Plus: access types are never advertised publicly. Entitlement is
+    // account-level, so /api/bookings/my-options offers them (docs/12 §2.6).
+    db.select().from(schema.ticketTypes).where(and(sellableTicketTypes(), isNull(schema.ticketTypes.accessKind))),
 
     db.select().from(schema.showTicketTypeOverrides)
       .where(eq(schema.showTicketTypeOverrides.showId, show.id)),

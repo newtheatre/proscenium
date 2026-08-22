@@ -10,6 +10,14 @@ const { data, status } = await useFetch('/api/bookings/my', {
   default: () => ({ upcoming: [], past: [] }),
 })
 
+// A pass is not a booking, so it is its own page. This is the signpost to it,
+// because this is where a holder comes looking.
+const { data: passData } = await useFetch('/api/passes/mine', {
+  key: 'my-passes-banner',
+  default: () => ({ passes: [] as Array<{ id: string, inDate: boolean }> }),
+})
+const validPasses = computed(() => passData.value.passes.filter(pass => pass.inDate).length)
+
 function formatDate(date: string | Date) {
   return new Date(date).toLocaleDateString('en-GB', {
     timeZone: 'Europe/London',
@@ -94,6 +102,16 @@ function getStatusLabel(status: string) {
       title="My Reservations"
       description="Your upcoming and past show reservations."
       variant="naked"
+    />
+
+    <UAlert
+      v-if="validPasses"
+      icon="i-lucide-credit-card"
+      color="primary"
+      variant="subtle"
+      :title="validPasses === 1 ? 'You have a valid pass' : `You have ${validPasses} valid passes`"
+      description="A pass covers admission to the shows it lists. Book a seat with it from the show page."
+      :actions="[{ label: 'View my passes', to: '/account/passes', color: 'primary', variant: 'outline' }]"
     />
 
     <!-- Loading -->

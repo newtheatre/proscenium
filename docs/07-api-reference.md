@@ -197,6 +197,9 @@ is a separate, incremental job, one domain file at a time.
 | --- | --- | --- | --- |
 | POST | `/api/bookings` | Public | Public booking flow — capacity-checked, sends a confirmation email |
 | GET | `/api/bookings/my` | Logged in | The current user's bookings, split into upcoming and past |
+| GET | `/api/passes/mine` | Signed in | The holder's own passes, what they cover and what has been used |
+| POST | `/api/passes/mine/redeem` | Signed in, own pass | Book a seat on your own pass |
+| GET | `/api/bookings/my-options` | Optional session | What this account adds to the public picker |
 | GET | `/api/bookings/:id` | Owner, staff, or a signed `?t=` token | Booking detail for a confirmation page, customer shape |
 | GET | `/api/bookings/available-ticket-types` | Staff (`createReservation`) | Effective ticket prices for a performance before a reservation exists |
 | PUT | `/api/bookings/:id/tickets` | Owner, or a signed `?t=` token | Customer self-service edit of their own ticket composition |
@@ -2062,6 +2065,30 @@ only person who can approve out of the queue.
 - Approving or declining twice is `409` naming the decision already made.
 - `reason: 'OTHER'` without a note is `400`.
 - A request from another night is `409`, not `404`: it exists, it is simply not tonight's problem.
+
+---
+
+#### The customer pass endpoints
+
+**Source** `server/api/passes/mine/**`, `server/api/bookings/my-options.get.ts`
+
+Everything else under `/api/passes` is staff-gated. These three are the holder's own view, and they
+are gated on **identity, not role**, so they must not be blocked by role staleness (ADR-0008).
+
+- **`/api/passes/mine` is column allow-listed.** `notes`, `issuedByUserId` and `passTypePriceId` are
+  internal and never reach it. It reports `inDate` separately from `status`, because "cancelled" and
+  "does not cover today" are different answers.
+- **Redeeming uses `canRedeem`**, the same single rule as the door (`docs/10` §4). There is no
+  second copy, and `admitOnPass()` is now the one way a pass becomes a seat, shared by both.
+- **A pass that is not yours is `404`, not `403`.** A holder should not be able to probe for other
+  people's passes by reference.
+- **Online redemption books `PENDING` with source `WEB`**; the door books `DOOR`/`DOOR`. Both write
+  the same £0 `PASS_ADMISSION` ticket, which **does** count against capacity: a pass is an
+  entitlement, not a reserved seat.
+
+**`/api/bookings/my-options` is deliberately separate from the show payload.** It is
+session-dependent, and `/api/whats-on/:slug` is public and should stay cacheable. It returns the
+access types this account may book, with what is left at that performance, and a pass covering it.
 
 ---
 

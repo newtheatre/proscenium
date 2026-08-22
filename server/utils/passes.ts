@@ -1,5 +1,6 @@
 import { db, schema } from '@nuxthub/db'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
+import { nanoid } from 'nanoid'
 
 /**
  * Pass redemption. `decideRedeem` is the only copy of the entitlement rule;
@@ -238,4 +239,72 @@ export async function getPassAdmissionTicketTypeId(): Promise<string> {
 
   if (!created) throw createError({ statusCode: 500, statusMessage: 'Could not create the pass admission ticket type' })
   return created.id
+}
+
+export interface AdmitOnPassInput {
+  passId: string
+  holderUserId: string
+  performanceId: string
+  /** Null when the holder redeemed it themselves online. */
+  redeemedByUserId: string | null
+  /** `DOOR` for a door admission, `WEB` when the holder booked ahead. */
+  source: 'DOOR' | 'WEB'
+  status: 'DOOR' | 'PENDING'
+  staffNote?: string
+}
+
+/**
+ * The one way a pass becomes a seat, used by the door and by the holder
+ * online. Do not start a second copy (docs/10 §4).
+ */
+export async function admitOnPass(input: AdmitOnPassInput) {
+  const ticketTypeId = await getPassAdmissionTicketTypeId()
+
+  // Admit against an existing reservation for this holder and performance if
+  // there is one — the door list should show one party, not two.
+  const existing = await db.select({ id: schema.reservations.id })
+    .from(schema.reservations)
+    .where(and(
+      eq(schema.reservations.userId, input.holderUserId),
+      eq(schema.reservations.performanceId, input.performanceId),
+      inArray(schema.reservations.status, ['PENDING', 'COLLECTED', 'DOOR']),
+    ))
+    .get()
+
+  const reservationId = existing?.id ?? nanoid()
+  const ticketId = nanoid()
+
+  const ticketInsert = db.insert(schema.tickets).values({
+    id: ticketId,
+    reservationId,
+    performanceId: input.performanceId,
+    ticketTypeId,
+    pricePaid: 0,
+  })
+  const admissionInsert = db.insert(schema.passAdmissions).values({
+    passId: input.passId,
+    ticketId,
+    performanceId: input.performanceId,
+    redeemedByUserId: input.redeemedByUserId,
+  })
+
+  if (existing) {
+    await db.batch([ticketInsert, admissionInsert])
+  }
+  else {
+    await db.batch([
+      db.insert(schema.reservations).values({
+        id: reservationId,
+        performanceId: input.performanceId,
+        userId: input.holderUserId,
+        status: input.status,
+        source: input.source,
+        staffNotes: input.staffNote ?? null,
+      }),
+      ticketInsert,
+      admissionInsert,
+    ])
+  }
+
+  return { reservationId, ticketId, joinedExisting: Boolean(existing) }
 }

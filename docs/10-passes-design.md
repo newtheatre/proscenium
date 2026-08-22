@@ -183,6 +183,12 @@ In the booking flow, a logged-in user with an `ACTIVE` pass covering that show s
 **Use my pass — £0**. Selecting it books a normal reservation containing one pass-admission ticket.
 Everything downstream is unchanged.
 
+**Built.** The option comes from `/api/bookings/my-options`, and `POST /api/passes/mine/redeem`
+books it. The holder's own passes are at `/account/passes`, signposted from `/account/reservations`
+because that is where a holder goes looking. Redemption writes `PENDING` with source `WEB`; the
+door writes `DOOR`/`DOOR`. Both go through `admitOnPass()`, which is the only way a pass becomes a
+seat.
+
 Guests cannot redeem: there is no identity to redeem against. That is the intended consequence of
 account-binding, and it is a mild incentive for holders to hold an account.
 

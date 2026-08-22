@@ -58,6 +58,17 @@ it. Fixed by giving it the performance and counting what is already held, with t
 excluded and cancellations returning the entitlement. Access tickets gained the same one-per-
 performance count at the same time.
 
+### Access ticket types were offered to everyone in the public booking flow
+
+`sellableTicketTypes()` filters on `kind` and `archived` only, so `/api/whats-on/:slug` returned the
+access and companion types to logged-out visitors. The booking route refused them with a `403`, so
+no free tickets and no data leak, but a guest could select "Essential companion", work through a
+multi-step flow and be refused at the end.
+
+Fixed by excluding access types from the public payload and adding
+`/api/bookings/my-options`, which is session-dependent and offers them only to an entitled account.
+The public show payload stays cacheable.
+
 ### Fixed in the August 2026 full-repo review
 
 Also fixed, and worth knowing about because several were silent:

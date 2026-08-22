@@ -23,9 +23,24 @@ interface BookingResult {
   }>
 }
 
+interface MyBookingOptions {
+  accessTypes: Array<{
+    id: string
+    name: string
+    description: string | null
+    effectivePrice: number
+    active: boolean
+    accessKind: string | null
+    maxQuantity: number
+  }>
+  pass: { id: string, reference: string, name: string } | null
+}
+
 const route = useRoute()
 const toast = useToast()
 const { loggedIn, user } = useUserSession()
+// Forwards the session cookie during SSR; plain $fetch does not (ADR-0013).
+const requestFetch = useRequestFetch()
 
 const slug = route.params.slug as string
 
@@ -73,9 +88,24 @@ const selectedPerformance = computed(() => {
   return show.value?.performances.find(p => p.id === selectedPerformanceId.value) ?? null
 })
 
-const selectedPerformanceTicketTypes = computed(() => {
-  return selectedPerformance.value?.ticketTypes ?? []
-})
+// What this account adds to the public picker. Session-dependent, so it is a
+// separate call from the cacheable show payload.
+const { data: myOptions } = await useAsyncData(
+  () => `book-my-options-${selectedPerformanceId.value ?? 'none'}`,
+  () => selectedPerformanceId.value && loggedIn.value
+    ? requestFetch<MyBookingOptions>('/api/bookings/my-options', {
+        query: { performanceId: selectedPerformanceId.value },
+      })
+    : Promise.resolve(null),
+  { watch: [selectedPerformanceId, loggedIn] },
+)
+
+const selectedPerformanceTicketTypes = computed(() => [
+  ...(selectedPerformance.value?.ticketTypes ?? []),
+  ...(myOptions.value?.accessTypes ?? []),
+])
+
+const redeemablePass = computed(() => myOptions.value?.pass ?? null)
 
 const remainingCapacity = computed(() => {
   if (!selectedPerformance.value) return null
@@ -101,6 +131,35 @@ const canProceedFromDetails = computed(() => {
   return customerInfo.value.name.trim().length > 0
     && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.value.email)
 })
+
+const redeemingPass = ref(false)
+
+/**
+ * A pass books a reservation of its own rather than joining the basket: it is
+ * an entitlement, not a ticket type with a price (docs/10 §4).
+ */
+async function useMyPass() {
+  if (!redeemablePass.value || !selectedPerformanceId.value) return
+  redeemingPass.value = true
+  try {
+    const result = await $fetch<{ reservationId: string }>('/api/passes/mine/redeem', {
+      method: 'POST',
+      body: { passId: redeemablePass.value.id, performanceId: selectedPerformanceId.value },
+    })
+    toast.add({ title: 'Booked on your pass', icon: 'i-lucide-check', color: 'success' })
+    await navigateTo(`/account/reservations?booked=${result.reservationId}`)
+  }
+  catch (error) {
+    toast.add({
+      title: 'Could not use your pass',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    redeemingPass.value = false
+  }
+}
 
 const steps = computed(() => [
   {
@@ -284,6 +343,25 @@ async function submitBooking() {
 
         <!-- Step 2: Tickets -->
         <div v-show="currentStep === 1">
+          <div
+            v-if="redeemablePass"
+            class="mb-6 rounded-lg border border-primary/40 bg-primary/5 p-4"
+          >
+            <p class="font-medium">
+              Use my pass &mdash; &pound;0
+            </p>
+            <p class="mt-1 text-sm text-muted">
+              {{ redeemablePass.name }} &middot; {{ redeemablePass.reference }}.
+              This books your seat now; a pass is an entitlement, so it is still subject to capacity.
+            </p>
+            <UButton
+              class="mt-3"
+              :loading="redeemingPass"
+              label="Book on my pass"
+              @click="useMyPass"
+            />
+          </div>
+
           <BookingTicketSelect
             v-model="selectedTickets"
             :ticket-types="selectedPerformanceTicketTypes"
