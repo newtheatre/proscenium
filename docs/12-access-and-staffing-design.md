@@ -136,7 +136,13 @@ override chain — see [06-pricing-and-ticket-types](./06-pricing-and-ticket-typ
 
 Gating, in one server-side function (`canBookAccessTickets(user, performance)` — same single-copy
 discipline as `canRedeem` in the passes design): available only to logged-in users with a
-`VERIFIED`, unexpired profile; companion count capped by the profile. Guests cannot book them —
+`VERIFIED`, unexpired profile; companion count capped by the profile.
+
+**The cap is per performance, counted across every booking**, not per basket. It returns what is
+*left* at that performance, so a second booking cannot spend an entitlement the first already used.
+An access ticket is the holder's own seat, so it is capped at one per performance on the same
+count. Editing a booking excludes that booking's own tickets, because the basket replaces them
+rather than adding to them, and a `CANCELLED` or `NO_SHOW` booking gives the entitlement back. Guests cannot book them —
 verification is account-level, which is the point (and consistent with passes' account-binding).
 Box office staff can add them to a walk-in or phone booking against a looked-up verified account.
 

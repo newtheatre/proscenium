@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
 
   // Editing is another way to add tickets, so it needs the same gate as
   // creating them: the entitlement is the booker's (docs/12 §2.6).
-  await assertAccessTicketsAllowed(reservation.userId, body.tickets)
+  await assertAccessTicketsAllowed(reservation.userId, reservation.performanceId, body.tickets, { excludeReservationId: reservation.id })
 
   // Collected tickets are a record of a completed transaction, not a working
   // draft — the only reversal is a refund (ADR-0011).

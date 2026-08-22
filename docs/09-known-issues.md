@@ -47,6 +47,17 @@ Kept as a record of what changed and why, so nobody re-fixes them.
 | 21 | Production migration ledger empty; `d1 migrations list` always said "nothing to apply" | `migrations_dir` pinned in `nuxt.config.ts`; ledger backfilled and `0015` applied 2026-08-13 |
 | 22 | [Editing a show wiped its write-up](#editing-a-show-wiped-its-write-up) | `ShowEditModal` loads the full record from `GET /api/shows/:id`; the five projected-away fields are omitted from the PUT unless it succeeded |
 
+### The companion entitlement was enforced per basket, not per performance
+
+A profile entitled to one companion could hold two by making two bookings: the basket check refused
+`quantity: 2` in one go and allowed `quantity: 1` twice.
+
+`docs/12` §2.6 specifies `canBookAccessTickets(user, performance)`. The implementation took only the
+user, so it could not see what was already booked and could only ever check the basket in front of
+it. Fixed by giving it the performance and counting what is already held, with the edited booking
+excluded and cancellations returning the entitlement. Access tickets gained the same one-per-
+performance count at the same time.
+
 ### Fixed in the August 2026 full-repo review
 
 Also fixed, and worth knowing about because several were silent:
