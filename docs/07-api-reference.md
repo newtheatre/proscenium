@@ -325,6 +325,7 @@ and no password-reset route here.
 | --- | --- | --- | --- |
 | GET | `/api/shifts` | Staff or `foh.work` (`listShifts`) | Every shift on performances in a date window |
 | GET | `/api/shifts/unstaffed` | Staff or `foh.work` (`listShifts`) | Performances soon with no confirmed duty manager |
+| POST | `/api/shifts/stamp` | `shift.manage` (`manageShifts`) | Stamp the template onto performances with no shifts |
 | GET | `/api/shifts/mine` | Any logged-in member | Upcoming performances, their open slots, and who is on |
 | POST | `/api/shifts/:id/claim` | Any logged-in member | Take an open slot, subject to training |
 | POST | `/api/shifts/:id/release` | The claimant | Give back a claim, before it is confirmed |

@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import type { BatchItem } from 'drizzle-orm/batch'
-import { and, asc, eq, gte, isNull, lte, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, isNull, lte, ne, sql } from 'drizzle-orm'
 
 /**
  * The rota. A confirmed shift is what scopes the show night screen and the
@@ -88,6 +88,8 @@ export async function performancesMissingDutyManager(days = DUTY_MANAGER_WARNING
       gte(schema.performances.startsAt, now),
       lte(schema.performances.startsAt, until),
       eq(schema.performances.status, 'ON_SALE'),
+      // An externally ticketed show is not ours to staff (#136).
+      isNull(schema.shows.externalUrl),
       sql`not exists (
         select 1 from performance_shifts ps
         where ps.performance_id = ${schema.performances.id}
@@ -115,4 +117,53 @@ export const SHIFT_ELIGIBILITY: Record<'DUTY_MANAGER' | 'DOOR' | 'BAR', Eligibil
   DUTY_MANAGER: 'duty-manager',
   DOOR: 'door',
   BAR: 'bar',
+}
+
+/**
+ * Performances in a window with no shifts at all, and the statements to stamp
+ * them. One query for the gaps and one per venue's template, never per row.
+ */
+export async function stampMissingShifts(from: Date, to: Date) {
+  const gaps = await db.select({
+    id: schema.performances.id,
+    venueId: schema.performances.venueId,
+  })
+    .from(schema.performances)
+    .innerJoin(schema.shows, eq(schema.shows.id, schema.performances.showId))
+    .where(and(
+      // An externally ticketed show is not ours to staff (#136).
+      isNull(schema.shows.externalUrl),
+      gte(schema.performances.startsAt, from),
+      lte(schema.performances.startsAt, to),
+      ne(schema.performances.status, 'CANCELLED'),
+      sql`not exists (
+        select 1 from performance_shifts ps where ps.performance_id = ${schema.performances.id}
+      )`,
+    ))
+    .orderBy(asc(schema.performances.startsAt))
+
+  if (!gaps.length) return { statements: [] as BatchItem<'sqlite'>[], performances: 0, slots: 0 }
+
+  // Templates are per venue and venues are few, so this is bounded by venues.
+  const templates = new Map<string, Array<{ role: 'DUTY_MANAGER' | 'DOOR' | 'BAR', count: number }>>()
+  for (const venueId of new Set(gaps.map(g => g.venueId))) {
+    templates.set(venueId, await templateSlotsFor(venueId))
+  }
+
+  const statements: BatchItem<'sqlite'>[] = []
+  let slots = 0
+  let stamped = 0
+  for (const gap of gaps) {
+    const rows = (templates.get(gap.venueId) ?? []).flatMap(({ role, count }) =>
+      Array.from({ length: Math.max(0, count) }, () => ({ performanceId: gap.id, role, status: 'OPEN' as const })),
+    )
+    if (!rows.length) continue
+    // One statement per performance: the parameter count follows the template,
+    // not the number of performances covered (ADR-0006).
+    statements.push(db.insert(schema.performanceShifts).values(rows))
+    slots += rows.length
+    stamped++
+  }
+
+  return { statements, performances: stamped, slots }
 }

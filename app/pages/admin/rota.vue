@@ -193,6 +193,40 @@ async function removeSlot(shift: ShiftRow) {
     toast.add({ title: 'That slot was not removed', color: 'error' })
   }
 }
+
+const stamping = ref(false)
+
+/**
+ * Performances created before the rota existed have no shifts, and nothing
+ * stamped them retrospectively. Idempotent, so it is safe to press twice.
+ */
+async function stampShifts() {
+  stamping.value = true
+  try {
+    const result = await requestFetch<{ performances: number, slots: number }>('/api/shifts/stamp', { method: 'POST' })
+    if (result.performances) {
+      toast.add({
+        title: `Stamped ${result.slots} shift${result.slots === 1 ? '' : 's'} onto ${result.performances} performance${result.performances === 1 ? '' : 's'}`,
+        icon: 'i-lucide-check',
+        color: 'success',
+      })
+      await Promise.all([refresh(), refreshUnstaffed()])
+    }
+    else {
+      toast.add({ title: 'Every performance already has its shifts', icon: 'i-lucide-check' })
+    }
+  }
+  catch (error) {
+    toast.add({
+      title: 'Could not stamp the rota',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    stamping.value = false
+  }
+}
 </script>
 
 <template>
@@ -206,15 +240,24 @@ async function removeSlot(shift: ShiftRow) {
           Who is working each performance. Exactly one confirmed duty manager per performance.
         </p>
       </div>
-      <UFormField
-        label="Show the next"
-        class="w-40"
-      >
-        <USelect
-          v-model="days"
-          :items="[{ label: '7 days', value: 7 }, { label: '28 days', value: 28 }, { label: '90 days', value: 90 }]"
+      <div class="flex items-end gap-3">
+        <UButton
+          variant="subtle"
+          icon="i-lucide-stamp"
+          :loading="stamping"
+          label="Stamp missing shifts"
+          @click="stampShifts"
         />
-      </UFormField>
+        <UFormField
+          label="Show the next"
+          class="w-40"
+        >
+          <USelect
+            v-model="days"
+            :items="[{ label: '7 days', value: 7 }, { label: '28 days', value: 28 }, { label: '90 days', value: 90 }]"
+          />
+        </UFormField>
+      </div>
     </div>
 
     <UAlert
@@ -245,8 +288,9 @@ async function removeSlot(shift: ShiftRow) {
 
     <UCard v-else-if="!performances.length">
       <p class="text-sm text-muted">
-        No performances in this window. Shifts are stamped onto a performance when it is created,
-        from the venue's shift template.
+        No performances in this window. Shifts are stamped from the venue's template when a
+        performance is created; use <strong>Stamp missing shifts</strong> for anything created
+        before the rota existed.
       </p>
     </UCard>
 
