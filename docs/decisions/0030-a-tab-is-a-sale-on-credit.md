@@ -64,13 +64,17 @@ anything else, which is why the self-service screen lives at `/bar/tab` and not 
   a term, not as a footnote.
 - The reconciliation gains two figures, `tabChargedPence` (not in today's Z) and `tabSettledPence`
   (in it). The identity to check is
-  `expectedZPence == cardBar + cardTickets + tabSettledPence - discountPence`.
+  `expectedZPence == cardBar + cardTickets + tabSettledPence - discountPence - refundedPence`.
 - `tabChargedPence` sums `total_pence` per transaction, not line amounts the way comps do. A comp
   figure is gross; a debt is net of any discount chip.
-- **`bar.tab` cannot be enforced on the debtor at the till.** The local mirror holds no roles, so
-  nothing here can check that the person being charged holds the permission. It is trust and
-  attribution, as discounts already are (13-bar-design §4.1.1), and the debtor lookup is an exact
-  email match so a bar phone cannot browse the user table. Recorded in `docs/09-known-issues.md`.
+- **The till lists names rather than asking for an email.** The local mirror holds no roles, so
+  the holder list is read from stage-door's `GET /api/role-holders`, scoped to this app's own
+  namespace, behind a seam that caches for ten minutes and degrades to the email lookup when
+  stage-door cannot answer. The same seam refuses a debtor who is not on the list, which is what
+  makes `bar.tab` mean something at the till and not only on the self-service screen.
+- **The refusal is fail-soft on purpose.** When stage-door cannot be reached the till is trusted
+  exactly as it was before, because a bar that cannot sell is a worse outage than a tab opened for
+  the wrong person, and every tab is attributed either way.
 - A tab can only be opened for someone who has signed in to Proscenium at least once, because the
   debtor is a restricted foreign key onto the mirror.
 - An account erased with an unsettled tab keeps the debt against an anonymised row. Settle or void

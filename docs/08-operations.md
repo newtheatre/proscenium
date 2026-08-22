@@ -174,7 +174,9 @@ leaves the shelf, the sale is recorded, and no money has moved yet. It exists fo
 paper book existed for, which is the bar being open with nothing on and nobody able to work the
 reader.
 
-- **Who can:** anyone holding `proscenium:COMMITTEE`, `MANAGER` or `ADMIN`. They go to `/bar/tab`
+- **Who can:** anyone holding `proscenium:COMMITTEE`, `MANAGER` or `ADMIN`. The till reads that
+  list from stage-door, so granting the role in the auth service is the only thing to do; there is
+  no separate list here to maintain. They go to `/bar/tab`
   on their own phone, tap what they took, and it is on their tab.
 - **What can:** snacks and soft drinks only. Alcohol is refused there and can go on a tab only
   through the staffed till, where somebody can check ID.
@@ -195,7 +197,11 @@ That is the write-off, and the reason is the record of it. Do not delete anythin
 Two things worth knowing before someone asks:
 
 - **A tab can only be opened for someone who has signed in to Proscenium at least once**, because
-  the debtor is a foreign key onto the local mirror. The till says so when the lookup misses.
+  the debtor is a foreign key onto the local mirror. Somebody granted `COMMITTEE` this morning who
+  has never visited the site will not be in the till's list until they do.
+- **If stage-door is unreachable** the till falls back to asking for an exact email address and
+  stops checking whether the debtor may run a tab. That is deliberate: the bar keeps selling, and
+  every tab still records who rang it up.
 - **Sales and cash split across a term boundary.** A tab charged in June and settled in October is
   in June's sales and October's SumUp totals. The reconciling number is the outstanding balance on
   `/admin/bar/tabs`; the Treasurer wants it at both ends of a term.

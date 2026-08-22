@@ -24,7 +24,6 @@ Severity is about consequences for the theatre, not code aesthetics:
 | 16 | [No shared types](#no-shared-types) | P3 | Medium |
 | 20a | [No tests](#no-tests) | P3 | Medium |
 | 21 | [The dev server loses its D1 binding after a hot reload](#dev-d1-binding) | P3 | Small |
-| 22 | [`bar.tab` is not enforceable on the debtor at the till](#bar-tab-debtor) | P3 | Medium |
 | 23 | [Tab sales and tab cash split across a term boundary](#tab-accrual-split) | P3 | Won't fix |
 
 ## Fixed
@@ -42,6 +41,7 @@ Kept as a record of what changed and why, so nobody re-fixes them.
 | 8 | `DOOR` status is never set | Walk-ins create `DOOR` |
 | 24 | Bar sales and night reports counted voided transactions | `isNull(voidedAt)` added to `barLineRange()` and the night report's tender group-by |
 | 25 | The sales report had a `cash` column for a tender that never existed | Replaced with `tab`, so the tender columns sum to gross again |
+| 22 | `bar.tab` was not enforceable on the debtor at the till | stage-door serves `GET /api/role-holders`; the till lists names and the server refuses a debtor who is not on it |
 | 11 | Publish resurrects cancelled performances | `ne(status, 'CANCELLED')` on the update |
 | 12 | Refunds do not exist | `POST /api/reservations/:id/refund` (see also the lifecycle rule below) |
 | 15 | Five copies of the price rule | `resolveEffectiveTicketType()` is the only copy |
@@ -271,19 +271,6 @@ migration or a query broke.
 2. **#16**: shared types. Everything else is safer afterwards.
 3. **#9, #10a**: transactionality and the capacity race, together.
 4. **#13, #14**: the two workflow gaps, whenever the box office next complains.
-
-### `bar.tab` is not enforceable on the debtor at the till {#bar-tab-debtor}
-
-**P3 · Medium.** `bar.tab` gates the self-service screen correctly, because that checks the
-caller's own session. At the staffed till the debtor is a third party, and the local `users` table
-is a thin mirror that holds no roles, so nothing in this app can check that the person being
-charged holds the permission ([ADR-0030](./decisions/0030-a-tab-is-a-sale-on-credit.md)).
-
-For now it is trust and attribution, exactly as discount chips already are
-([13-bar-design §4.1.1](./13-bar-design.md)), and `GET /api/bar/tabs/debtor` is an exact email
-match so the till cannot be used to browse the user table. Fixing it properly means either caching
-role holders locally, which contradicts "roles live in stage-door, never here", or a new endpoint
-in stage-door. Neither is worth it until somebody actually abuses it.
 
 ### Tab sales and tab cash split across a term boundary {#tab-accrual-split}
 

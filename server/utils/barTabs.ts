@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import type { BatchItem } from 'drizzle-orm/batch'
-import { and, asc, count, desc, eq, isNull, lte, sql, sum } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, isNull, lte, sql, sum } from 'drizzle-orm'
 
 /**
  * Bar tabs: a sale on credit, settled later by card on the reader (ADR-0030).
@@ -86,6 +86,31 @@ export async function outstandingFor(userId: string): Promise<number> {
   const row = await db.select({ total: sum(schema.transactions.totalPence) })
     .from(schema.transactions).where(unsettled(userId)).get()
   return Number(row?.total ?? 0)
+}
+
+/** Balances for a bounded set of people, for the till's picker. */
+export async function outstandingByHolder(userIds: string[]): Promise<Map<string, number>> {
+  const balances = new Map<string, number>()
+  if (!userIds.length) return balances
+
+  // Chunked, so the parameter count does not grow with the committee (ADR-0006).
+  for (const group of chunked(userIds, 20)) {
+    const rows = await db.select({
+      userId: schema.transactions.tabDebtorUserId,
+      total: sum(schema.transactions.totalPence),
+    }).from(schema.transactions)
+      .where(and(
+        eq(schema.transactions.tender, 'TAB'),
+        inArray(schema.transactions.tabDebtorUserId, group),
+        isNull(schema.transactions.tabSettledAt),
+        isNull(schema.transactions.voidedAt),
+      ))
+      .groupBy(schema.transactions.tabDebtorUserId)
+    for (const row of rows) {
+      if (row.userId) balances.set(row.userId, Number(row.total ?? 0))
+    }
+  }
+  return balances
 }
 
 export interface TabDebtor {

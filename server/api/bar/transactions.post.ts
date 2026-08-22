@@ -105,6 +105,11 @@ export default defineEventHandler(async (event) => {
     if (!debtor || debtor.anonymisedAt) {
       throw createError({ statusCode: 404, statusMessage: 'That person cannot hold a tab. Look them up again.' })
     }
+    // Null when stage-door cannot say, and then the till is trusted as before.
+    const permitted = await mayHoldTab(input.tabDebtorUserId!)
+    if (permitted === false) {
+      throw createError({ statusCode: 403, statusMessage: 'They are not on the list of people who may run a tab.' })
+    }
   }
 
   const discount = input.discountId

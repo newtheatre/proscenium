@@ -374,7 +374,7 @@ Put on tabs today (not in the Z)              £6.20   (settled on some later da
 The identity to hold in your head, and the one to check when a day will not balance:
 
 ```
-expected Z = card bar + card tickets + tabs settled − discounts
+expected Z = card bar + card tickets + tabs settled − discounts − refunds
 ```
 
 **Two questions, two lenses.** *"Does today's SumUp match?"* is answered by `taken_on = today`,
@@ -407,8 +407,11 @@ of term. A tab is that book, in the same ledger as everything else
   button. Nobody else is involved, which is the whole point: the case this serves is one person in
   an empty foyer. Alcohol is not on this screen at all, and the server refuses it even if asked
   directly, because there is no trained server and no Challenge 25 check.
-- **The counter till, *Tab* beside *Card* and *Comp*.** Find the person by exact email, see what
-  they already owe, add the basket. Age-restricted items are fine here: the training gate and the
+- **The counter till, *Tab* beside *Card* and *Comp*.** Pick the person from a list of everyone
+  who may run a tab, read from stage-door and searchable by name, with what each already owes
+  beside them. When stage-door cannot answer, the panel falls back to an exact-email lookup and
+  the server stops checking the debtor's permission, because a bar that cannot sell is the worse
+  outage. Then see what they owe and add the basket. Age-restricted items are fine here: the training gate and the
   refusals register apply exactly as they do to a card sale. Disabled when the basket holds ticket
   lines, for the reason in §3.2.
 

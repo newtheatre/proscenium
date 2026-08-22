@@ -382,7 +382,8 @@ and no password-reset route here.
 | GET | `/api/bar/tabs/menu` | `bar.tab` (`runBarTab`) | What you may put on a tab, and what you owe |
 | POST | `/api/bar/tabs` | `bar.tab` (`runBarTab`) | Put your own snack on your own tab |
 | GET | `/api/bar/tabs/mine` | `bar.tab` (`runBarTab`) | Your outstanding and settled charges |
-| GET | `/api/bar/tabs/debtor` | `foh.work` + a `BAR` shift | Find who to charge, by **exact email** |
+| GET | `/api/bar/tabs/holders` | `foh.work` + a `BAR` shift | Everyone who may run a tab, with what they owe |
+| GET | `/api/bar/tabs/debtor` | `foh.work` + a `BAR` shift | Fallback lookup by **exact email** |
 | POST | `/api/bar/tabs/settle` | `foh.work` + a `BAR` shift | Clear someone's tab at the counter |
 | POST | `/api/bar/tabs/:id/void` | the debtor, or `bar.manage` | Take an unsettled charge back off a tab |
 | GET | `/api/admin/bar/tabs` | `bar.manage` (`manageBar`) | Who owes what, biggest first |
@@ -2081,9 +2082,17 @@ the bar scope, because they are till work.
   something on somebody else's tab from your own phone.
 - **Age-restricted products are refused server-side**, not merely absent from the menu. Alcohol
   reaches a tab only through the till, where the training gate and Challenge 25 apply.
-- `GET /api/bar/tabs/debtor` is an **exact email match** returning at most one row. It is never a
-  name search: a bar phone must not become a way to browse the user table. `404` when there is no
-  mirror row, saying they need to sign in to the site once first.
+- `GET /api/bar/tabs/holders` lists everyone holding a role that carries `bar.tab`, read from
+  stage-door's `GET /api/role-holders` behind `server/utils/tabHolders.ts` and filtered to people
+  this app already mirrors, because the debtor column is a restricted foreign key. Cached ten
+  minutes per isolate. It returns `available: false` rather than an error when stage-door cannot
+  answer, and the till then shows the email field instead.
+- `GET /api/bar/tabs/debtor` is the fallback: an **exact email match** returning at most one row,
+  never a name search, so a bar phone cannot browse the user table. `404` when there is no mirror
+  row, saying they need to sign in to the site once first.
+- Charging a `TAB` at the till **refuses a debtor who is not a holder**, and skips that check when
+  stage-door could not say. A bar that cannot sell is a worse outage than a tab opened for the
+  wrong person, and every tab is attributed either way.
 - `POST /api/bar/transactions` with `tender: 'TAB'` requires `tabDebtorUserId` and **forbids
   `reservationIds`**. Ticket money on credit would mark a booking paid for money nobody took.
 - **Settling clears the whole balance as at now**, against `expectedTotalPence`. There is no list

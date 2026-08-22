@@ -218,18 +218,44 @@ function addReservation(found: Found) {
 
 // Tabs
 interface Debtor { userId: string, name: string, outstandingPence: number, softCapPence: number }
+interface Holder { userId: string, name: string, outstandingPence: number }
 const tabOpen = ref(false)
 const tabEmail = ref('')
 const debtor = ref<Debtor | null>(null)
 const finding = ref(false)
+const holders = ref<Holder[]>([])
+const holdersAvailable = ref(false)
+const holderSearch = ref('')
+const softCap = ref(0)
 
 /** Ticket money never goes on credit: it would mark a booking paid (ADR-0030). */
 const canTab = computed(() => Boolean(basketBar.value.length) && !basketTickets.value.length)
 
-function openTab() {
+const shownHolders = computed(() => {
+  const term = holderSearch.value.trim().toLowerCase()
+  if (!term) return holders.value
+  return holders.value.filter(holder => holder.name.toLowerCase().includes(term))
+})
+
+async function openTab() {
   debtor.value = null
   tabEmail.value = ''
+  holderSearch.value = ''
   tabOpen.value = true
+  try {
+    const list = await $fetch<{ available: boolean, holders: Holder[], softCapPence: number }>('/api/bar/tabs/holders')
+    holders.value = list.holders
+    holdersAvailable.value = list.available
+    softCap.value = list.softCapPence
+  }
+  catch {
+    // The email field is always there, so a missing list is not an error.
+    holdersAvailable.value = false
+  }
+}
+
+function pick(holder: Holder) {
+  debtor.value = { ...holder, softCapPence: softCap.value }
 }
 
 async function findDebtor() {
@@ -798,7 +824,39 @@ async function closeBar() {
             {{ basketBar.map(l => `${l.qty} x ${l.product.name}`).join(', ') }}
             &middot; {{ formatMoney(total) }}
           </p>
+          <template v-if="holdersAvailable && !debtor">
+            <UInput
+              v-model="holderSearch"
+              icon="i-lucide-search"
+              placeholder="Search by name"
+              autocapitalize="off"
+              class="w-full"
+            />
+            <div class="max-h-64 space-y-1 overflow-y-auto">
+              <button
+                v-for="holder in shownHolders"
+                :key="holder.userId"
+                type="button"
+                class="flex w-full items-center justify-between gap-3 rounded-md border border-default px-3 py-2 text-left hover:bg-elevated"
+                @click="pick(holder)"
+              >
+                <span class="truncate">{{ holder.name }}</span>
+                <span
+                  v-if="holder.outstandingPence"
+                  class="shrink-0 text-sm text-muted tabular-nums"
+                >owes {{ formatMoney(holder.outstandingPence) }}</span>
+              </button>
+              <p
+                v-if="!shownHolders.length"
+                class="px-1 py-2 text-sm text-muted"
+              >
+                Nobody by that name may run a tab. Committee roles are granted in stage-door.
+              </p>
+            </div>
+          </template>
+
           <UFormField
+            v-if="!holdersAvailable && !debtor"
             label="Their NNT email"
             help="Exact address. They need to have signed in to the site once."
           >
@@ -834,6 +892,14 @@ async function closeBar() {
             >
               Over the tab limit. Ask them to settle up.
             </p>
+            <UButton
+              class="mt-2"
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              label="Someone else"
+              @click="debtor = null"
+            />
           </div>
         </div>
       </template>
