@@ -2,8 +2,8 @@ import { db, schema } from '@nuxthub/db'
 import { eq, isNotNull, or, sql } from 'drizzle-orm'
 
 /**
- * Who sells the tickets. One answer, used by every path that could take money
- * for a seat we do not control (ADR-0029).
+ * External, in its two senses (ADR-0029). Who sells the tickets, and whose
+ * building it is. They are not the same question and have different answers.
  */
 
 /**
@@ -57,4 +57,15 @@ export async function isExternallyTicketed(performanceId: string): Promise<boole
     )})`)
     .get()
   return Boolean(row)
+}
+
+/**
+ * Whose building it is: the rota, the emergency card, the show night screen.
+ * Not the ticketing question, and the two differ (ADR-0029).
+ */
+export function ourBuildingPredicate() {
+  return sql`not exists (
+    select 1 from venues v
+    where v.id = ${schema.performances.venueId} and v.is_external = 1
+  )`
 }

@@ -32,9 +32,18 @@ which needs a duty manager more than an in-house show does, not less.
   by us here and by them there, so the two dates need different answers: setting the show-level link
   for a transfer would take the home run off sale, which is exactly the trap this ordering avoids.
   The show-level link means *the whole run is sold elsewhere*.
-- One function, `externallyTicketed()`, answers the question, with `ourTicketingPredicate()` as its
-  SQL form. Every path that could take money for a seat we do not control goes through it: the
-  public booking route, the box office feed, the rota stamp, and the duty-manager warning.
+**There are two questions, and they are answered separately.**
+
+- *Who sells the tickets*: `externallyTicketed()`, with `ourTicketingPredicate()` as its SQL form.
+  Every path that could take money for a seat we do not control uses it: the public booking route
+  and the box office feed.
+- *Whose building it is*: `ourBuildingPredicate()`. Everything front of house uses it: the rota
+  stamp, the duty-manager warning, the show night screen, the emergency cards, closing the night,
+  and which performances a bar session may serve.
+
+They diverge, and the divergence is real rather than theoretical. A show in our building that
+somebody else sells is **not ours to ticket and is ours to staff**. A show we sell at the Fringe is
+the other way round.
 - **The `External` show category changes nothing.** It is a programming strand for the What's On
   listing and for reporting. A hire in our building is ticketed, staffed and barred by us exactly as
   an in-house show is.
@@ -44,8 +53,11 @@ which needs a duty manager more than an in-house show does, not less.
 - A StuFF hire behaves like any other night: it appears in the box office, gets a rota, warns when
   it has no duty manager, and can open a bar session. This is the behaviour the hire agreement
   requires, and it now falls out of the model rather than depending on nobody having set a URL.
-- Marking a venue external retires its performances from the box office feed and the rota. Do not
-  use it for a hire of our own space; the checkbox says so.
+- Marking a venue external retires its performances from the box office feed, the rota, the show
+  night screen and the end-of-night report, and takes the venue out of the emergency card list. We
+  do not run front of house somewhere that is not ours, so an empty emergency card there is not a
+  gap and must not be shown as one. Do not use the flag for a hire of our own space; the checkbox
+  says so.
 - A performance at an external venue with no link, on itself or its show, is a dead end: the page
   cannot offer a basket and has nowhere to send anyone. This is visible in admin rather than
   refused at save time, because the venue is usually known before the ticket link is.
@@ -63,6 +75,6 @@ home run off sale. The show-level link survives for a whole run sold elsewhere, 
 was originally added for.
 
 **A separate `foh_staffed_by_us` flag.** Considered when the two arrangements were still conflated.
-Once ticketing follows the venue it has no work left to do: we staff every night in our building and
-none outside it. If a hire ever brings its own front of house, that is the point to add it, and this
-decision should be superseded rather than quietly extended.
+It has no work left to do: we staff every night in our building and none outside it, which
+`ourBuildingPredicate()` already expresses. If a hire ever brings its own front of house, that is
+the point to add it, and this decision should be superseded rather than quietly extended.

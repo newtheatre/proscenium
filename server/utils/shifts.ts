@@ -88,9 +88,9 @@ export async function performancesMissingDutyManager(days = DUTY_MANAGER_WARNING
       gte(schema.performances.startsAt, now),
       lte(schema.performances.startsAt, until),
       eq(schema.performances.status, 'ON_SALE'),
-      // Someone else's venue is not ours to staff. A hire in our building is
-      // still ours, so this asks about ticketing, not about the strand.
-      ourTicketingPredicate(),
+      // Whose building, not who sells: a hire is ours to staff, and so is a
+      // show here that somebody else ticketed (ADR-0029).
+      ourBuildingPredicate(),
       sql`not exists (
         select 1 from performance_shifts ps
         where ps.performance_id = ${schema.performances.id}
@@ -131,8 +131,8 @@ export async function stampMissingShifts(from: Date, to: Date) {
   })
     .from(schema.performances)
     .where(and(
-      // Someone else's venue is not ours to staff (ADR-0029).
-      ourTicketingPredicate(),
+      // Whose building, not who sells (ADR-0029).
+      ourBuildingPredicate(),
       gte(schema.performances.startsAt, from),
       lte(schema.performances.startsAt, to),
       ne(schema.performances.status, 'CANCELLED'),

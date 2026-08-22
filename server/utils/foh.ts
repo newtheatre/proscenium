@@ -75,6 +75,8 @@ export async function fohScope(user: AbilityUser | null | undefined, now: Date =
       gte(schema.performances.startsAt, validityStart(night)),
       lte(schema.performances.startsAt, validityEnd(night)),
       ne(schema.performances.status, 'CANCELLED'),
+      // Not our building, so there is no night of ours to run (ADR-0029).
+      ourBuildingPredicate(),
     ))
     .orderBy(asc(schema.performances.startsAt))
 

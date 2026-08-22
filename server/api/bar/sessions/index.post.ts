@@ -31,9 +31,15 @@ export default defineEventHandler(async (event) => {
   }).returning()
 
   if (input.performanceIds.length) {
-    await db.insert(schema.barSessionPerformances)
-      .values(input.performanceIds.map(performanceId => ({ sessionId: session!.id, performanceId })))
-      .onConflictDoNothing()
+    // Only tonight's, and only ours: the bar cannot serve a room we do not run.
+    const scope = await fohScope(user)
+    const ours = new Set(scope.performances.map(performance => performance.id))
+    const linked = input.performanceIds.filter(id => ours.has(id))
+    if (linked.length) {
+      await db.insert(schema.barSessionPerformances)
+        .values(linked.map(performanceId => ({ sessionId: session!.id, performanceId })))
+        .onConflictDoNothing()
+    }
   }
 
   return session
