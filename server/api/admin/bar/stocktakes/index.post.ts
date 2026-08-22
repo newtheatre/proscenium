@@ -17,7 +17,9 @@ export default defineEventHandler(async (event) => {
 
   const products = await stockProducts()
   const active = products.filter(p => p.status === 'ACTIVE')
-  if (!active.length) throw createError({ statusCode: 400, statusMessage: 'There is nothing to count.' })
+  if (!active.length) {
+    throw createError({ statusCode: 400, statusMessage: 'Add a product to the catalogue first, then count what you have.' })
+  }
 
   const onHand = await onHandByProduct()
   const stocktakeId = nanoid()

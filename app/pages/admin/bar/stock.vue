@@ -41,6 +41,10 @@ const { data, refresh } = await useAsyncData('admin-bar-stock', () =>
 
 const rows = computed(() => data.value?.rows ?? [])
 
+// Nothing has ever moved, so the first count is the opening stock. Entering it
+// as a delivery would put an invented cost into the ledger (#208).
+const ledgerEmpty = computed(() => rows.value.length > 0 && rows.value.every(row => row.onHandMilli === 0))
+
 const columns = [
   { accessorKey: 'name', header: 'Product' },
   { accessorKey: 'onHandUnits', header: 'On hand' },
@@ -193,13 +197,32 @@ async function startStocktake() {
         <UButton
           v-else
           icon="i-lucide-clipboard-list"
-          variant="subtle"
+          :variant="ledgerEmpty ? 'solid' : 'subtle'"
           @click="startStocktake"
         >
-          Start stocktake
+          {{ ledgerEmpty ? 'Count opening stock' : 'Start stocktake' }}
         </UButton>
       </div>
     </div>
+
+    <UAlert
+      v-if="!rows.length"
+      icon="i-lucide-package-open"
+      color="neutral"
+      variant="subtle"
+      title="Nothing in the catalogue yet"
+      description="Add the products you sell first. Stock levels are counted against them."
+      :actions="[{ label: 'Go to the catalogue', to: '/admin/bar/catalogue', color: 'neutral', variant: 'outline' }]"
+    />
+
+    <UAlert
+      v-else-if="ledgerEmpty"
+      icon="i-lucide-clipboard-list"
+      color="primary"
+      variant="subtle"
+      title="Count what you already have"
+      description="Nothing has moved yet, so the first count is your opening stock. Do not enter it as a delivery: that would put a made-up cost into the ledger, and stock at cost is worked out from it."
+    />
 
     <UTable
       :data="rows"

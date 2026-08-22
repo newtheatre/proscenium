@@ -107,6 +107,78 @@ async function saveProduct() {
   finally { busy.value = false }
 }
 
+// Creating
+const newProductOpen = ref(false)
+const newProduct = reactive({
+  name: '',
+  categoryId: '',
+  unit: 'each',
+  stockProductId: undefined as string | undefined,
+  depletesMilli: 1000,
+  parMilli: null as number | null,
+  ageRestricted: true,
+  sort: 0,
+  pricePence: 0,
+})
+
+function openNewProduct() {
+  Object.assign(newProduct, {
+    name: '',
+    categoryId: categories.value[0]?.id ?? '',
+    unit: 'each',
+    stockProductId: undefined,
+    depletesMilli: 1000,
+    parMilli: null,
+    ageRestricted: true,
+    sort: 0,
+    pricePence: 0,
+  })
+  newProductOpen.value = true
+}
+
+async function createProduct() {
+  busy.value = true
+  try {
+    await requestFetch('/api/admin/bar/products', {
+      method: 'POST',
+      body: { ...newProduct, stockProductId: newProduct.stockProductId ?? null },
+    })
+    newProductOpen.value = false
+    await refresh()
+    toast.add({ title: 'Added', icon: 'i-lucide-check', color: 'success' })
+  }
+  catch (error) { fail(error, 'Not added') }
+  finally { busy.value = false }
+}
+
+const newCategoryName = ref('')
+const newDiscount = reactive({ name: '', percent: 10 })
+
+async function createCategory() {
+  if (!newCategoryName.value) return
+  busy.value = true
+  try {
+    await requestFetch('/api/admin/bar/categories', { method: 'POST', body: { name: newCategoryName.value } })
+    newCategoryName.value = ''
+    await refresh()
+  }
+  catch (error) { fail(error, 'Not added') }
+  finally { busy.value = false }
+}
+
+async function createDiscount() {
+  if (!newDiscount.name) return
+  busy.value = true
+  try {
+    await requestFetch('/api/admin/bar/discounts', { method: 'POST', body: { ...newDiscount } })
+    newDiscount.name = ''
+    newDiscount.percent = 10
+    await refresh()
+  }
+  catch (error) { fail(error, 'Not added') }
+  finally { busy.value = false }
+}
+
 // Pricing
 const priceOpen = ref(false)
 const pricing = ref<Product | null>(null)
@@ -168,10 +240,29 @@ async function moveCategory(category: Category, by: number) {
   <UContainer class="space-y-6 py-6">
     <UCard>
       <template #header>
-        <h3 class="font-semibold">
-          Products
-        </h3>
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="font-semibold">
+            Products
+          </h3>
+          <UButton
+            icon="i-lucide-plus"
+            size="sm"
+            :disabled="!categories.length"
+            label="Add product"
+            @click="openNewProduct"
+          />
+        </div>
       </template>
+
+      <UAlert
+        v-if="!categories.length"
+        class="mb-4"
+        icon="i-lucide-info"
+        color="neutral"
+        variant="subtle"
+        title="Add a category first"
+        description="Every product belongs to a category, so the till can group the tiles."
+      />
       <UTable
         :data="products"
         :columns="productColumns"
@@ -253,6 +344,21 @@ async function moveCategory(category: Category, by: number) {
             Categories
           </h3>
         </template>
+        <div class="mb-3 flex gap-2">
+          <UInput
+            v-model="newCategoryName"
+            placeholder="New category"
+            class="flex-1"
+            @keyup.enter="createCategory"
+          />
+          <UButton
+            icon="i-lucide-plus"
+            :loading="busy"
+            :disabled="!newCategoryName"
+            aria-label="Add category"
+            @click="createCategory"
+          />
+        </div>
         <ul class="space-y-2">
           <li
             v-for="category in categories"
@@ -288,6 +394,28 @@ async function moveCategory(category: Category, by: number) {
             Discounts
           </h3>
         </template>
+        <div class="mb-3 flex gap-2">
+          <UInput
+            v-model="newDiscount.name"
+            placeholder="New discount"
+            class="flex-1"
+          />
+          <UInput
+            v-model.number="newDiscount.percent"
+            type="number"
+            min="1"
+            max="100"
+            class="w-20"
+            aria-label="Percent"
+          />
+          <UButton
+            icon="i-lucide-plus"
+            :loading="busy"
+            :disabled="!newDiscount.name"
+            aria-label="Add discount"
+            @click="createDiscount"
+          />
+        </div>
         <ul class="space-y-2">
           <li
             v-for="discount in discounts"
@@ -321,6 +449,109 @@ async function moveCategory(category: Category, by: number) {
         </template>
       </UCard>
     </div>
+
+    <UModal
+      v-model:open="newProductOpen"
+      title="Add a product"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UFormField
+            label="Name"
+            required
+          >
+            <UInput
+              v-model="newProduct.name"
+              class="w-full"
+            />
+          </UFormField>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <UFormField
+              label="Category"
+              required
+            >
+              <USelectMenu
+                v-model="newProduct.categoryId"
+                :items="categories.map(c => ({ label: c.name, value: c.id }))"
+                value-key="value"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField label="Sold as">
+              <USelectMenu
+                v-model="newProduct.unit"
+                :items="['bottle', 'can', 'measure', 'glass', 'each']"
+                class="w-full"
+              />
+            </UFormField>
+          </div>
+          <UFormField
+            label="Price (pence)"
+            required
+            help="Sets the first price, effective today."
+          >
+            <UInput
+              v-model.number="newProduct.pricePence"
+              type="number"
+              min="0"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Draws stock from"
+            help="Leave empty when this product holds its own stock."
+          >
+            <USelectMenu
+              v-model="newProduct.stockProductId"
+              :items="stockTargets"
+              value-key="value"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            v-if="newProduct.stockProductId"
+            label="Thousandths taken per sale"
+            help="A 175 ml glass of a 750 ml bottle is 233."
+          >
+            <UInput
+              v-model.number="newProduct.depletesMilli"
+              type="number"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Par level (thousandths)"
+            help="Flags the product when stock drops below this."
+          >
+            <UInput
+              v-model.number="newProduct.parMilli"
+              type="number"
+              class="w-full"
+            />
+          </UFormField>
+          <UCheckbox
+            v-model="newProduct.ageRestricted"
+            label="Age restricted"
+          />
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            label="Cancel"
+            @click="newProductOpen = false"
+          />
+          <UButton
+            :loading="busy"
+            :disabled="!newProduct.name || !newProduct.categoryId"
+            label="Add"
+            @click="createProduct"
+          />
+        </div>
+      </template>
+    </UModal>
 
     <UModal
       v-model:open="editOpen"

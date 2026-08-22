@@ -40,6 +40,11 @@ export default defineEventHandler(async (event) => {
    * count is real, and correcting to the snapshot would erase it.
    */
   const onHand = await onHandByProduct()
+
+  // Opening stock, not variance: nothing was expected and nothing is on hand.
+  // Judged per counted line, so an unrelated product's history cannot mask it.
+  const opening = counted.every(line => line.expectedMilli === 0 && (onHand.get(line.productId) ?? 0) === 0)
+
   const movements = counted
     .map(line => ({
       productId: line.productId,
@@ -47,7 +52,7 @@ export default defineEventHandler(async (event) => {
       kind: 'STOCKTAKE' as const,
       refTable: 'stocktake_lines',
       refId: line.id,
-      reason: line.reason,
+      reason: line.reason ?? (opening ? 'Opening stock' : null),
       createdByUserId: user.id,
     }))
     .filter(m => m.qtyMilli !== 0)
@@ -62,5 +67,5 @@ export default defineEventHandler(async (event) => {
     ...movementStatements(movements),
   ] as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
 
-  return { applied: movements.length, counted: counted.length }
+  return { applied: movements.length, counted: counted.length, opening }
 })

@@ -149,6 +149,24 @@ time, so they always get a copy of what they signed.
 **With nothing configured, no email is sent and the report is still filed.** That is deliberate: the
 stored row is the record, so a missing address loses a courtesy copy, never the night.
 
+## 4b. Setting the bar up for the first time
+
+In order, from an empty database:
+
+1. **`/admin/bar/catalogue` → add a category.** Every product belongs to one, because the till
+   groups its tiles by category. The Add product button stays disabled until one exists.
+2. **Add your products**, each with its first price. A measure poured from a bottle points at the
+   bottle and says how much it takes: a 175 ml glass of a 750 ml bottle is `233`.
+3. **`/admin/bar/stock` → Count opening stock.** Count what is actually on the shelf.
+
+**Do not enter what you already have as a delivery.** A delivery carries a cost per unit, and stock
+at cost and GP are both computed from the most recent one. Inventing a cost to get the levels right
+puts a wrong number into every report that reads it, and it is not visible afterwards as a guess.
+
+The opening count is an ordinary stocktake against an empty ledger: expected is zero, so what you
+count becomes the level. Its movements are stamped `Opening stock`, and carry **no cost**, so stock
+at cost stays honest until a real delivery arrives with a real invoice.
+
 ## 4a. Scheduled tasks
 
 **This worker has four cron triggers**, `*/15 * * * *`, `0 4 * * *`, `0 10 * * *` and `0 12 * * *`, declared in `nuxt.config.ts` under
