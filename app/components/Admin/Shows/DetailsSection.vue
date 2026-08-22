@@ -13,6 +13,11 @@ const emit = defineEmits<{ refresh: [] }>()
 const toast = useToast()
 const isSubmitting = ref(false)
 
+const latecomerOptions = LATECOMER_POLICIES.map(value => ({
+  label: LATECOMER_POLICY_LABELS[value],
+  value,
+}))
+
 const schema = z.object({
   title: z.string().min(1, 'Title is required'),
   slug: z
@@ -21,7 +26,7 @@ const schema = z.object({
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Only lowercase letters, numbers, and hyphens'),
   subtitle: z.string().optional(),
   ageGuidance: z.string().max(200).optional(),
-  latecomerPolicy: z.string().max(500).optional(),
+  latecomerPolicy: z.enum(LATECOMER_POLICIES).optional(),
   description: z.string().optional(),
   longDescription: z.string().optional(),
   programmeUrl: z.string().url('Must be a full URL').or(z.literal('')).optional(),
@@ -37,7 +42,7 @@ function stateFromShow(show: ShowDetail): Schema {
     slug: show.slug,
     subtitle: show.subtitle ?? '',
     ageGuidance: show.ageGuidance ?? '',
-    latecomerPolicy: show.latecomerPolicy ?? '',
+    latecomerPolicy: show.latecomerPolicy ?? undefined,
     description: show.description ?? '',
     longDescription: show.longDescription ?? '',
     programmeUrl: show.programmeUrl ?? '',
@@ -298,12 +303,13 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         <UFormField
           label="Latecomer policy"
           name="latecomerPolicy"
-          help="What the door should tell someone arriving after the start"
+          help="What the door reads out to someone arriving after the start"
         >
-          <UTextarea
+          <USelectMenu
             v-model="state.latecomerPolicy"
-            :rows="2"
-            placeholder="e.g. Admitted at a suitable break, at the duty manager's discretion"
+            :items="latecomerOptions"
+            value-key="value"
+            placeholder="Not set"
             class="w-full"
           />
         </UFormField>

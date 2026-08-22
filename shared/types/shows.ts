@@ -1,3 +1,4 @@
+import type { LatecomerPolicy } from '../utils/latecomers'
 /**
  * The shapes /api/shows puts on the wire. Hand-written, not derived: these
  * rows carry computed fields no column corresponds to.
@@ -105,7 +106,7 @@ export interface ShowDetail extends ShowListItem {
   programmeUrl?: string | null
   externalUrl?: string | null
   ageGuidance?: string | null
-  latecomerPolicy?: string | null
+  latecomerPolicy?: LatecomerPolicy | null
   contentWarningNotes?: string | null
   warningsConfirmedNone: boolean
   categoryId?: string | null

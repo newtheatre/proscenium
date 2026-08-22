@@ -41,6 +41,9 @@ const { data, refresh } = await useAsyncData('admin-bar-stock', () =>
 
 const rows = computed(() => data.value?.rows ?? [])
 
+// Money is pence in the store and pounds on screen.
+const GBP = { style: 'currency' as const, currency: 'GBP' as const }
+
 // Nothing has ever moved, so the first count is the opening stock. Entering it
 // as a delivery would put an invented cost into the ledger (#208).
 const ledgerEmpty = computed(() => rows.value.length > 0 && rows.value.every(row => row.onHandMilli === 0))
@@ -327,14 +330,16 @@ async function startStocktake() {
                 />
               </UFormField>
               <UFormField
-                label="Cost each (p)"
-                class="w-32"
+                label="Cost each"
+                class="w-40"
               >
-                <UInput
-                  v-model.number="line.costPencePerUnit"
-                  type="number"
-                  min="0"
+                <UInputNumber
+                  :model-value="line.costPencePerUnit === null ? undefined : line.costPencePerUnit / 100"
+                  :min="0"
+                  :step="0.1"
+                  :format-options="GBP"
                   class="w-full"
+                  @update:model-value="value => line.costPencePerUnit = value == null ? null : Math.round(value * 100)"
                 />
               </UFormField>
               <UButton

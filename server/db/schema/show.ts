@@ -5,6 +5,7 @@ import { venues } from './venue'
 import { showCategories } from './legacy'
 import { showContentWarnings } from './contentWarnings'
 import { seasons } from './passes'
+import { LATECOMER_POLICIES } from '../../../shared/utils/latecomers'
 
 // A show is a production — the top-level entity for a run of performances.
 export const shows = sqliteTable('shows', {
@@ -32,7 +33,8 @@ export const shows = sqliteTable('shows', {
   // Questions the door is asked, kept on the record rather than in someone's
   // head (docs/11 §2.2).
   ageGuidance: text('age_guidance'),
-  latecomerPolicy: text('latecomer_policy'),
+  // A short preset list, not free text: a volunteer reads it out at the door.
+  latecomerPolicy: text('latecomer_policy', { enum: LATECOMER_POLICIES }),
 
   // Free-text notes accompanying the content warnings — timings, intensity, how
   // to avoid a particular moment. Anything the vocabulary cannot express.
