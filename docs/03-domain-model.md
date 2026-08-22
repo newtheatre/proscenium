@@ -481,8 +481,13 @@ A performance is externally ticketed when its venue is external, when it carries
 `external_booking_url`, or when its show carries an `external_url`. **The link is resolved
 performance first**: a show that transfers plays five dates at home and one at the Fringe, and a
 show-level link would take the home run off sale. The show-level link means the whole run.
-`externallyTicketed()` is the only place that decides, and `ourTicketingPredicate()` is its SQL
-form; four paths use them, and none reimplements the rule.
+**Two questions, answered separately.** `externallyTicketed()` and `ourTicketingPredicate()` answer
+*who sells*, used by the public booking route and the box office feed. `ourBuildingPredicate()`
+answers *whose building*, used by everything front of house: the rota, the duty-manager warning,
+the show night screen, the emergency cards, closing the night, and what a bar session may serve.
+
+They diverge for real cases. A show in our building that somebody else sells is not ours to ticket
+and **is** ours to staff. Nothing reimplements either rule.
 
 ## Status lifecycles
 

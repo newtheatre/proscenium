@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { asc, eq } from 'drizzle-orm'
 import { manageFohReference } from '~~/shared/utils/abilities'
 
-/** GET /api/admin/foh/emergency — every venue's emergency card, for editing. */
+/** GET /api/admin/foh/emergency — the emergency card for each venue we run. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageFohReference)
 
@@ -22,5 +22,8 @@ export default defineEventHandler(async (event) => {
   })
     .from(schema.venues)
     .leftJoin(schema.venueEmergencyInfo, eq(schema.venueEmergencyInfo.venueId, schema.venues.id))
+    // We never run front of house somewhere that is not ours, so an empty card
+    // there is not a gap and must not be shown as one (ADR-0029).
+    .where(eq(schema.venues.isExternal, false))
     .orderBy(asc(schema.venues.name))
 })
