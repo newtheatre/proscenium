@@ -9,7 +9,7 @@ const bodySchema = z.object({
   note: z.string().trim().max(300).nullable().optional(),
 })
 
-/** POST /api/passes/mine/requests — ask for a pass. Creates no pass (ADR-0028). */
+/** POST /api/passes/mine/requests: ask for a pass. Creates no pass (ADR-0028). */
 export default defineEventHandler(async (event) => {
   const { id: userId } = await requireSessionUser(event)
   const input = await readValidatedBody(event, bodySchema.parse)

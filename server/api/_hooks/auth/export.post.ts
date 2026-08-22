@@ -5,7 +5,7 @@ import { z } from 'zod'
 const bodySchema = z.object({ userId: z.string().min(1) })
 
 /**
- * POST /api/_hooks/auth/export — this app's contribution to a subject-access
+ * POST /api/_hooks/auth/export: this app's contribution to a subject-access
  * bundle (stage-door docs/gdpr-retention.md). Service-hook auth.
  */
 export default defineEventHandler(async (event) => {
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     .leftJoin(schema.shows, eq(schema.performances.showId, schema.shows.id))
     .where(eq(schema.reservations.userId, userId))
 
-  // Joined on the owner rather than a bound list of reservation ids — a regular
+  // Joined on the owner rather than a bound list of reservation ids: a regular
   // attendee is well past 100 of them (ADR-0006).
   const ticketTotals = new Map<string, { count: number, total: number }>()
   if (reservations.length) {

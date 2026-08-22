@@ -154,7 +154,7 @@ const performanceColumns: TableColumn<PerformanceListItem>[] = [
   {
     id: 'venue',
     header: 'Venue',
-    cell: ({ row }) => h('span', { class: 'text-sm text-highlighted' }, row.original.venue?.name ?? '—'),
+    cell: ({ row }) => h('span', { class: 'text-sm text-highlighted' }, row.original.venue?.name ?? '-'),
   },
   {
     id: 'doors',

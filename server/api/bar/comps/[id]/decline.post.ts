@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq, sql } from 'drizzle-orm'
 import { workFoh } from '~~/shared/utils/abilities'
 
-/** POST /api/bar/comps/:id/decline — no, and nothing is recorded. */
+/** POST /api/bar/comps/:id/decline: no, and nothing is recorded. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

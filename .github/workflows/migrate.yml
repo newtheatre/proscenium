@@ -1,11 +1,11 @@
 # Apply pending database migrations to production.
 #
-# Runs on pushes to main only — never on a pull request. A PR must not touch the
+# Runs on pushes to main only: never on a pull request. A PR must not touch the
 # production database, and `pull_request` events do not get repository secrets
 # from forks anyway.
 #
 # This does NOT deploy. Cloudflare Workers Builds deploys the Worker on its own
-# when main moves, and the two cannot be sequenced from here — see the note on
+# when main moves, and the two cannot be sequenced from here: see the note on
 # ordering in docs/08-operations.md §5.
 name: Migrate
 
@@ -56,7 +56,7 @@ jobs:
           bun-version: latest
 
       # postinstall runs `nuxt prepare`, which generates the drizzle config and
-      # schema that `nuxt db migrate` reads. No full build is needed — this job
+      # schema that `nuxt db migrate` reads. No full build is needed: this job
       # only touches the database.
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -71,7 +71,7 @@ jobs:
           fi
 
       # Informational. `continue-on-error` because a hiccup reading the ledger
-      # here is not a reason to skip the migration — the check that matters runs
+      # here is not a reason to skip the migration: the check that matters runs
       # after the apply and is not forgiving.
       - name: Show what is pending
         continue-on-error: true
@@ -86,7 +86,7 @@ jobs:
       # Captured *before* anything is applied, so a bad migration always has a
       # recorded restore point in this run's output. Time Travel keeps 30 days,
       # but finding the right bookmark after the fact means guessing at
-      # timestamps — this pins the exact one.
+      # timestamps: this pins the exact one.
       - name: Record a Time Travel restore point
         id: bookmark
         run: |
@@ -94,7 +94,7 @@ jobs:
           out=$(bunx wrangler d1 time-travel info proscenium 2>&1 | tee /dev/stderr)
           mark=$(echo "$out" | grep -oE "[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}" | head -1)
           if [ -z "$mark" ]; then
-            echo "::error::Could not read a Time Travel bookmark — refusing to migrate without a restore point."
+            echo "::error::Could not read a Time Travel bookmark: refusing to migrate without a restore point."
             exit 1
           fi
           echo "bookmark=$mark" >> "$GITHUB_OUTPUT"
@@ -108,8 +108,8 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # `nuxt-db`, not `nuxt db`. The `nuxt db` proxy swallows the exit code —
-      # verified on both 0.10.6 and 0.10.8, a failed migration still exits 0 —
+      # `nuxt-db`, not `nuxt db`. The `nuxt db` proxy swallows the exit code:
+      # verified on both 0.10.6 and 0.10.8, a failed migration still exits 0:
       # which is how the first run of this workflow reported success while
       # applying nothing. The bin that @nuxthub/core installs propagates it.
       - name: Apply migrations
@@ -126,7 +126,7 @@ jobs:
             exit 1
           fi
           if [ -n "$pending" ]; then
-            echo "::error::Migrations are still pending after the apply step — it failed silently:"
+            echo "::error::Migrations are still pending after the apply step: it failed silently:"
             echo "$pending" | sed 's/^/  /'
             exit 1
           fi

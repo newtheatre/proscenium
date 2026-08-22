@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq, sql } from 'drizzle-orm'
 import { issuePass } from '~~/shared/utils/abilities'
 
-/** POST /api/pass-requests/:id/decline — no, and no pass is created. */
+/** POST /api/pass-requests/:id/decline: no, and no pass is created. */
 export default defineEventHandler(async (event) => {
   await authorize(event, issuePass)
 

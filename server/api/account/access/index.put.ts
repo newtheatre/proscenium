@@ -19,7 +19,7 @@ const bodySchema = z.object({
   consentFoh: z.boolean(),
 })
 
-/** PUT /api/account/access — ask for verification, or update what you asked for. */
+/** PUT /api/account/access: ask for verification, or update what you asked for. */
 export default defineEventHandler(async (event) => {
   const { user } = await requireUserSession(event)
   const input = await readValidatedBody(event, bodySchema.parse)

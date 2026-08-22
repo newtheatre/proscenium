@@ -8,7 +8,7 @@ export interface Paginated<T> {
   page: number
   limit: number
   /**
-   * Rows matching the filter but withheld from `rows` — currently only
+   * Rows matching the filter but withheld from `rows`: currently only
    * `/api/users`, which counts anonymised accounts without listing them.
    */
   hiddenAnonymised?: number

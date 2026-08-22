@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { asc, desc, eq } from 'drizzle-orm'
 
 /**
- * GET /api/passes/mine — the holder's own passes. Column allow-listed: notes
+ * GET /api/passes/mine: the holder's own passes. Column allow-listed: notes
  * and issuedByUserId are internal and must not reach a customer.
  */
 export default defineEventHandler(async (event) => {

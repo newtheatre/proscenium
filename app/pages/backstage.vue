@@ -107,7 +107,7 @@ async function join() {
           />
           <UInput
             v-model="name"
-            placeholder="Your name and role (optional) — Sam, DSM"
+            placeholder="Your name and role (optional): Sam, DSM"
             class="w-full"
           />
           <UButton
@@ -152,7 +152,7 @@ async function join() {
           class="rounded-xl border-2 border-red-700 bg-red-950/30 p-4"
         >
           <p class="text-xs uppercase tracking-widest text-red-300">
-            {{ card.venueName }} — read this to 999
+            {{ card.venueName }}: read this to 999
           </p>
           <p class="mt-1 text-xl font-bold leading-snug">
             {{ card.addressForEmergencyCall ?? card.venueName }}

@@ -2,7 +2,7 @@
 
 Complete reference for the HTTP API exposed by Proscenium, the Nottingham New Theatre website and box office.
 
-Everything here was transcribed from the handler source in `server/api/` and `server/routes/`. If the code and this document disagree, the code wins — please fix the document.
+Everything here was transcribed from the handler source in `server/api/` and `server/routes/`. If the code and this document disagree, the code wins: please fix the document.
 
 ---
 
@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
 })
 ```
 
-When `schema.parse` throws, h3 converts the `ZodError` into a **400** with `statusMessage: 'Validation Error'`, a `message` carrying Zod's summary, and the full issue list in `data`. Individual endpoint sections below do not repeat this — assume every documented schema can produce a 400 on malformed input.
+When `schema.parse` throws, h3 converts the `ZodError` into a **400** with `statusMessage: 'Validation Error'`, a `message` carrying Zod's summary, and the full issue list in `data`. Individual endpoint sections below do not repeat this, assume every documented schema can produce a 400 on malformed input.
 
 A handful of older handlers read query strings with plain `getQuery(event)` and hand-check the values; those are called out where they occur.
 
@@ -88,7 +88,7 @@ Status codes used across the codebase:
 | 400 | Validation failure, missing route parameter, or a business-rule breach (duplicate slug, already-verified email, …) |
 | 401 | No session where one is required (`requireUserSession` only) |
 | 403 | Authorisation denied (see below), or a granular permission check inside a handler |
-| 404 | Row not found — also used for "no override exists" and "this show has no poster" |
+| 404 | Row not found: also used for "no override exists" and "this show has no poster" |
 | 409 | Conflict: not enough capacity, or a delete blocked by a foreign key |
 | 500 | Insert/select returned nothing unexpectedly, blob deletion failed, or an email failed to send |
 
@@ -96,9 +96,9 @@ Status codes used across the codebase:
 
 Two independent mechanisms are in play.
 
-**`requireUserSession(event)`** — from `nuxt-auth-utils`. Throws **401 Unauthorized** when there is no session cookie. Used by exactly one handler (`GET /api/bookings/my`).
+**`requireUserSession(event)`**: from `nuxt-auth-utils`. Throws **401 Unauthorized** when there is no session cookie. Used by exactly one handler (`GET /api/bookings/my`).
 
-**`authorize(event, ability, ...args)`** — from `nuxt-authorization`. Resolves the session user via the Nitro plugin in `server/plugins/authorization-resolver.ts`, then runs the ability. Abilities live in `shared/utils/abilities/` and are re-exported from the barrel `shared/utils/abilities/index.ts`:
+**`authorize(event, ability, ...args)`**: from `nuxt-authorization`. Resolves the session user via the Nitro plugin in `server/plugins/authorization-resolver.ts`, then runs the ability. Abilities live in `shared/utils/abilities/` and are re-exported from the barrel `shared/utils/abilities/index.ts`:
 
 | File | Abilities |
 | --- | --- |
@@ -116,18 +116,18 @@ isAdminOrManager(user)   // ADMIN | MANAGER
 isStaff(user)            // ADMIN | MANAGER | BOX_OFFICE
 ```
 
-The three roles are `ADMIN`, `MANAGER`, `BOX_OFFICE`. They arrive **namespaced** on the session as `proscenium:ADMIN` and friends, because one estate session carries every app's roles — `hasRole` adds the prefix for you. Never compare against a bare role name. A user with no `proscenium:` role is a plain customer.
+The three roles are `ADMIN`, `MANAGER`, `BOX_OFFICE`. They arrive **namespaced** on the session as `proscenium:ADMIN` and friends, because one estate session carries every app's roles: `hasRole` adds the prefix for you. Never compare against a bare role name. A user with no `proscenium:` role is a plain customer.
 
 **Roles go stale.** A session whose `refreshedAt` is older than 15 minutes has its `proscenium:` roles dropped for authorization purposes, so staff abilities fail closed until the browser refreshes through the auth service. See [04-auth-and-permissions](./04-auth-and-permissions.md).
 
 **Two things about `authorize()` that are easy to get wrong:**
 
-1. **It always requires a session.** Every ability in this repo is declared with the single-argument form `defineAbility(fn)`, which sets `allowGuest: false`. `nuxt-authorization` short-circuits to *denied* when the resolved user is `null`, *before* the ability body runs. So abilities whose body is `() => true` — `readShow`, `listShows`, `readTicketType`, `listVenues`, and friends — do **not** mean "public" when passed to `authorize()`. They mean "any logged-in user, regardless of role". The genuinely public endpoints achieve that by not calling `authorize()` at all.
+1. **It always requires a session.** Every ability in this repo is declared with the single-argument form `defineAbility(fn)`, which sets `allowGuest: false`. `nuxt-authorization` short-circuits to *denied* when the resolved user is `null`, *before* the ability body runs. So abilities whose body is `() => true` (`readShow`, `listShows`, `readTicketType`, `listVenues`, and friends) do **not** mean "public" when passed to `authorize()`. They mean "any logged-in user, regardless of role". The genuinely public endpoints achieve that by not calling `authorize()` at all.
 2. **Denial is a 403, not a 401,** and the payload comes from the library rather than from `createError` in the handler: `statusCode: 403` with `message: 'Unauthorized'`. Do not pattern-match on `statusMessage` for authorisation failures.
 
-`allows(event, ability)` is the non-throwing sibling. Note that `authorize()` **swallows any non-`AuthorizationError` thrown while resolving the user** and then resolves successfully — which is why `sessionUserForAuthorization` must never throw. See [04-auth-and-permissions](./04-auth-and-permissions.md#staleness-not-epochs).
+`allows(event, ability)` is the non-throwing sibling. Note that `authorize()` **swallows any non-`AuthorizationError` thrown while resolving the user** and then resolves successfully, which is why `sessionUserForAuthorization` must never throw. See [04-auth-and-permissions](./04-auth-and-permissions.md#staleness-not-epochs).
 
-> **Any handler with no `authorize()` and no `requireUserSession()` call is fully public** — reachable by anyone on the internet, unauthenticated. That includes `POST /api/bookings`, `GET /api/bookings/:id` (via a signed `?t=` token), all of `/api/whats-on`, `/api/venues` and `/api/venue-features` reads, `/api/ticket-types` reads, and `/images/**`. `GET /api/shows` and `GET /api/shows/:id` are **not** in that list any more — they now call `authorize()`, because they return DRAFT productions.
+> **Any handler with no `authorize()` and no `requireUserSession()` call is fully public**: reachable by anyone on the internet, unauthenticated. That includes `POST /api/bookings`, `GET /api/bookings/:id` (via a signed `?t=` token), all of `/api/whats-on`, `/api/venues` and `/api/venue-features` reads, `/api/ticket-types` reads, and `/images/**`. `GET /api/shows` and `GET /api/shows/:id` are **not** in that list any more: they now call `authorize()`, because they return DRAFT productions.
 
 Public write paths are rate limited in `server/middleware/rateLimit.ts`, declared against route patterns rather than per handler.
 
@@ -156,7 +156,7 @@ dev-only login under `server/routes/`. The figure in an earlier revision of this
 69, which was already behind the code: prefer `find server/api -name '*.ts' | wc -l` to the
 number written here.
 
-There are **no `/api/auth/*` endpoints**. Registration, login, logout, verification and password reset all live at `auth.newtheatre.org.uk` — this app reads the shared session cookie and never writes it. Anything in an older copy of this document describing `POST /api/auth/login` and friends is describing code that was deleted at the stage-door cutover.
+There are **no `/api/auth/*` endpoints**. Registration, login, logout, verification and password reset all live at `auth.newtheatre.org.uk`: this app reads the shared session cookie and never writes it. Anything in an older copy of this document describing `POST /api/auth/login` and friends is describing code that was deleted at the stage-door cutover.
 
 In the Auth column, **Public** means no `authorize()` and no `requireUserSession()`; **Any user** means `authorize()` with a permissive ability (so login required, role irrelevant); **Staff** means ADMIN, MANAGER, or BOX_OFFICE.
 
@@ -176,7 +176,7 @@ Authenticated by the SHA-256 of this app's `AUTH_SERVICE_TOKEN`, compared consta
 
 `GET /api/_hooks/auth/manifest` returns `shared/utils/appManifest.ts` verbatim: the role namespace
 (`proscenium`), the roles this app reads, and the permissions each carries. The auth service polls it
-and turns it into role definitions, so **adding a role here is what makes it grantable** — nobody
+and turns it into role definitions, so **adding a role here is what makes it grantable**: nobody
 types it into the auth admin UI.
 
 It sits under `_hooks/` because it uses exactly the same auth as the GDPR hooks: the bearer is the
@@ -195,7 +195,7 @@ is a separate, incremental job, one domain file at a time.
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| POST | `/api/bookings` | Public | Public booking flow — capacity-checked, sends a confirmation email |
+| POST | `/api/bookings` | Public | Public booking flow: capacity-checked, sends a confirmation email |
 | GET | `/api/bookings/my` | Logged in | The current user's bookings, split into upcoming and past |
 | GET | `/api/passes/mine` | Signed in | The holder's own passes, what they cover and what has been used |
 | POST | `/api/passes/mine/redeem` | Signed in, own pass | Book a seat on your own pass |
@@ -280,7 +280,7 @@ is a separate, incremental job, one domain file at a time.
 | GET | `/api/users/:id` | Staff or self (`readUser`) | One mirror user |
 | DELETE | `/api/users/:id` | ADMIN (others) or self (`deleteUser`) | Delete the mirror row; refuses if they have bookings |
 
-Credentials, roles, verification and erasure are the auth service's — there is no `PUT /api/users/:id`
+Credentials, roles, verification and erasure are the auth service's: there is no `PUT /api/users/:id`
 and no password-reset route here.
 
 ### Passes
@@ -434,7 +434,7 @@ and no password-reset route here.
 
 #### `PUT /api/admin/access/:userId`
 
-**Source** `server/api/admin/access/[userId]/index.put.ts` · **Auth** `authorize(event, verifyAccess)` — `access.verify`
+**Source** `server/api/admin/access/[userId]/index.put.ts` · **Auth** `authorize(event, verifyAccess)`: `access.verify`
 
 **Not `staff.access`, and not `MANAGER`.** Selling someone a ticket is not a reason to read their
 access needs, so this is a one-or-two-people privilege held by `ADMIN` and `FOH_MANAGER` only
@@ -445,7 +445,7 @@ The verifier records **the conclusion of a conversation**, never the evidence: s
 letter or a judgement all end in the same eight symbols. There is no field, and no endpoint, that
 would accept a document.
 
-`expiresAt` follows a sighted card's own expiry where one is given, otherwise three years — the
+`expiresAt` follows a sighted card's own expiry where one is given, otherwise three years: the
 Access Card's cycle. On `VERIFIED` the person is emailed **exactly what was recorded**, including
 the note the door will see, so nothing is held about them that they have not read.
 
@@ -464,7 +464,7 @@ A withdrawn profile is `409`: it is not the verifier's to reinstate.
 ### 3.1 Service hooks
 
 Called by stage-door, never by a browser. Each authenticates with `Authorization: Bearer <sha256hex>`
-where the value is the SHA-256 of this app's own `AUTH_SERVICE_TOKEN` — the auth service stores only
+where the value is the SHA-256 of this app's own `AUTH_SERVICE_TOKEN`: the auth service stores only
 the hash, so no plaintext ever travels and the hash cannot be replayed inbound against the auth
 service. Verified constant-time in `server/utils/hookAuth.ts`; anything else is a bare 401.
 
@@ -474,7 +474,7 @@ service. Verified constant-time in `server/utils/hookAuth.ts`; anything else is 
 
 **Body** `{ userId: string }`
 
-**Returns** `{ data: { profile, reservations[], passes[] } }` — the personal data this app holds for
+**Returns** `{ data: { profile, reservations[], passes[] } }`, the personal data this app holds for
 that person: mirror profile, every reservation with its show, performance, status, notes, ticket
 count and total paid, and every pass. Empty structures rather than a 404 when the person never used
 this app.
@@ -485,8 +485,8 @@ this app.
 
 **Body** `{ userId: string }` · **Returns** `{ ok: true }`
 
-Rewrites the mirror row to `deleted-<userId>@anonymised.invalid` / `Deleted user` — byte-identical
-to what stage-door writes centrally — and clears **both** `customerNotes` and `staffNotes` on every
+Rewrites the mirror row to `deleted-<userId>@anonymised.invalid` / `Deleted user`: byte-identical
+to what stage-door writes centrally, and clears **both** `customerNotes` and `staffNotes` on every
 reservation the person owns, stamping `anonymisedAt`. Bookings and ticket rows survive: attendance
 and revenue statistics stay intact, the person does not.
 
@@ -501,7 +501,7 @@ retries until every app succeeds and an erasure is not complete until they all d
 
 The most recent reservation or pass per user, feeding the retention sweep's guest cohort. Every
 requested id appears in the response, `null` where nothing is known. Ids are chunked at 90 per query
-internally — D1 binds at most 100 parameters per statement, and stage-door batches at 90 for the
+internally: D1 binds at most 100 parameters per statement, and stage-door batches at 90 for the
 same reason.
 
 #### `POST /api/_hooks/auth/merge`
@@ -513,12 +513,12 @@ same reason.
 This app's share of an estate-wide account merge (stage-door ADR-0015). Re-points
 `reservations.userId`, `passes.userId`, `passes.issuedByUserId` and
 `pass_admissions.redeemedByUserId` from the losing account onto the winner, then deletes the losing
-mirror row — with nothing referencing it the `restrict` FKs are satisfied, and the sales record now
+mirror row: with nothing referencing it the `restrict` FKs are satisfied, and the sales record now
 lives intact on the winner. `dryRun: true` returns the affected-row `counts` without writing;
 stage-door shows them in its pre-merge report. Each statement binds two parameters however many rows
 move, so no chunking is needed.
 
-**Idempotent**, and `{ ok: true, notMirrored: true }` for a losing account this app has never seen —
+**Idempotent**, and `{ ok: true, notMirrored: true }` for a losing account this app has never seen:
 stage-door retries until every app succeeds.
 
 ### 3.2 Bookings
@@ -529,7 +529,7 @@ stage-door retries until every app succeeds.
 
 #### `POST /api/bookings`
 
-**Source** `server/api/bookings/index.post.ts` · **Auth** **Public** — no `authorize()`, no `requireUserSession()`
+**Source** `server/api/bookings/index.post.ts` · **Auth** **Public**: no `authorize()`, no `requireUserSession()`
 
 ```ts
 {
@@ -548,7 +548,7 @@ stage-door retries until every app succeeds.
 }
 ```
 
-**Response** `200` — the created reservation with relations:
+**Response** `200`: the created reservation with relations:
 
 ```jsonc
 {
@@ -564,31 +564,31 @@ stage-door retries until every app succeeds.
 }
 ```
 
-One `tickets` row is created per seat — a line of `quantity: 3` yields three rows, each with its own `pricePaid` snapshot.
+One `tickets` row is created per seat: a line of `quantity: 3` yields three rows, each with its own `pricePaid` snapshot.
 
 **Errors**
 
 | Code | Cause |
 | --- | --- |
 | 400 | `Name and email are required for guest bookings` |
-| 404 | `Performance not found or not on sale` — the lookup filters on `status = 'ON_SALE'`, so a DRAFT or CANCELLED performance is indistinguishable from a missing one |
+| 404 | `Performance not found or not on sale`: the lookup filters on `status = 'ON_SALE'`, so a DRAFT or CANCELLED performance is indistinguishable from a missing one |
 | 400 | `Show is not currently published` |
 | 400 | `This performance has already started` |
 | 409 | `Not enough tickets available for this performance` |
 | 400 | `Ticket type <id> not found` (from `validateTicketTypesExist`) |
 | 500 | `Failed to create guest account` / `Failed to create reservation` |
 
-**Capacity check.** `assertCapacity` — effective capacity is `performance.capacityOverride ?? venue.capacity`, and both `null` means uncapped. Occupied seats are counted by `countOccupiedSeats`, the one shared rule: non-refunded tickets on `PENDING`/`COLLECTED`/`DOOR` reservations, excluding `PASS_SALE` types (a pass purchase is not a seat — the seat is the separate `PASS_ADMISSION` ticket). Every write path calls it, including reinstating a cancelled reservation. **It remains a read-then-write with no lock** — two concurrent bookings can both pass and jointly oversell. Accepted at this volume; see [09-known-issues](./09-known-issues.md#capacity-is-still-read-then-write).
+**Capacity check.** `assertCapacity`: effective capacity is `performance.capacityOverride ?? venue.capacity`, and both `null` means uncapped. Occupied seats are counted by `countOccupiedSeats`, the one shared rule: non-refunded tickets on `PENDING`/`COLLECTED`/`DOOR` reservations, excluding `PASS_SALE` types (a pass purchase is not a seat, the seat is the separate `PASS_ADMISSION` ticket). Every write path calls it, including reinstating a cancelled reservation. **It remains a read-then-write with no lock**: two concurrent bookings can both pass and jointly oversell. Accepted at this volume; see [09-known-issues](./09-known-issues.md#capacity-is-still-read-then-write).
 
 **Side effects**
-- Guests are matched to an existing account by email if one exists (including a staff account — the booking is then attributed to that user); otherwise a **shadow account** is created with `password: null, verified: false`.
+- Guests are matched to an existing account by email if one exists (including a staff account: the booking is then attributed to that user); otherwise a **shadow account** is created with `password: null, verified: false`.
 - Sends a booking confirmation email via Resend. The promise is *not* awaited: failures are logged, and the promise is handed to `event.context.cloudflare?.context.waitUntil()` so the Worker stays alive until it settles. The response is returned regardless.
 
 ---
 
 #### `GET /api/bookings/my`
 
-**Source** `server/api/bookings/my.get.ts` · **Auth** `requireUserSession` — any logged-in user, no role needed
+**Source** `server/api/bookings/my.get.ts` · **Auth** `requireUserSession`: any logged-in user, no role needed
 
 **Query** none.
 
@@ -601,7 +601,7 @@ One `tickets` row is created per seat — a line of `quantity: 3` yields three r
 }
 ```
 
-Each entry uses the shared `reservationDetailWith` shape (`server/utils/queries/reservations.ts`): the reservation columns plus `user` (id, name, email, verified — never the password hash), `performance` with nested `show` (id, title, slug) and `venue` (id, name), and `tickets` ordered by `createdAt` with `ticketType` (id, name, description).
+Each entry uses the shared `reservationDetailWith` shape (`server/utils/queries/reservations.ts`): the reservation columns plus `user` (id, name, email, verified, never the password hash), `performance` with nested `show` (id, title, slug) and `venue` (id, name), and `tickets` ordered by `createdAt` with `ticketType` (id, name, description).
 
 A booking is **upcoming** when the performance starts in the future *and* the status is not `CANCELLED` or `NO_SHOW`; everything else is **past**. Note that `staffNotes` is included in this customer-facing payload.
 
@@ -623,13 +623,13 @@ A booking is **upcoming** when the performance starts in the future *and* the st
 
 Access is granted, in order: (1) session user is the booking's `userId`; (2) session user holds ADMIN, MANAGER or BOX_OFFICE; (3) a valid `?t=` token, or the cookie it was swapped for.
 
-**`?ref=` is not an access path.** The booking reference is a customer-facing identifier — printed on emails, read aloud at the box office — and was previously accepted as a bearer credential; it is not, and must not be reintroduced as one.
+**`?ref=` is not an access path.** The booking reference is a customer-facing identifier (printed on emails, read aloud at the box office) and was previously accepted as a bearer credential; it is not, and must not be reintroduced as one.
 
 A stale session keeps its identity but loses its roles, so the owner branch keeps working while the staff branch fails closed until the browser refreshes ([ADR-0008](decisions/0008-roles-go-stale-identity-does-not.md)).
 
-Note that the booking is loaded from the database *before* the access check, so a wrong `id` yields 404 and a right `id` with no credentials yields 403 — which confirms the id exists.
+Note that the booking is loaded from the database *before* the access check, so a wrong `id` yields 404 and a right `id` with no credentials yields 403, which confirms the id exists.
 
-**Response** `200` — the **customer** shape, allow-listed by `reservationCustomerColumns`: `id`, `bookingRef`, `status`, `cancelledBy`, `customerNotes`, `performanceId`, timestamps, plus `performance` → `show` and `venue`, and `tickets` → `ticketType`. It does **not** include `staffNotes`, `legacyRef` or `userId`; the staff shape is `GET /api/reservations/:id`.
+**Response** `200`: the **customer** shape, allow-listed by `reservationCustomerColumns`: `id`, `bookingRef`, `status`, `cancelledBy`, `customerNotes`, `performanceId`, timestamps, plus `performance` → `show` and `venue`, and `tickets` → `ticketType`. It does **not** include `staffNotes`, `legacyRef` or `userId`; the staff shape is `GET /api/reservations/:id`.
 
 **Errors**
 
@@ -643,7 +643,7 @@ Note that the booking is loaded from the database *before* the access check, so 
 
 #### `PUT /api/bookings/:id/tickets`
 
-**Source** `server/api/bookings/[id]/tickets.put.ts` · **Auth** owner, or a valid signed access token — same check as `GET /api/bookings/:id`
+**Source** `server/api/bookings/[id]/tickets.put.ts` · **Auth** owner, or a valid signed access token: same check as `GET /api/bookings/:id`
 
 Customer self-service edit of their own ticket composition. The same desired-quantity diff as the staff route (`PUT /api/reservations/:id/tickets`), with self-service guards on top.
 
@@ -655,7 +655,7 @@ Customer self-service edit of their own ticket composition. The same desired-qua
 
 A ticket type may appear only once. The handler reads each type's current count from a map it does not update, so two entries for one type would compound rather than replace.
 
-**Guards** the booking must be `PENDING` ([ADR-0011](decisions/0011-collection-is-the-payment-boundary.md)); the performance must be `ON_SALE`, in the future, and inside its booking window (`bookingClosesHoursBefore`); only active ticket types may be added; capacity is enforced; and the booking cannot be emptied — cancel it instead.
+**Guards** the booking must be `PENDING` ([ADR-0011](decisions/0011-collection-is-the-payment-boundary.md)); the performance must be `ON_SALE`, in the future, and inside its booking window (`bookingClosesHoursBefore`); only active ticket types may be added; capacity is enforced; and the booking cannot be emptied: cancel it instead.
 
 **Errors**
 
@@ -676,7 +676,7 @@ Lets a customer cancel their own booking. Only a `PENDING` booking for a future 
 
 **Side effects** sets `status = 'CANCELLED'`, `cancelledBy = 'CUSTOMER'`, and sends a cancellation email best-effort via `waitUntil`. Cancelling releases the seats ([ADR-0007](decisions/0007-one-seat-counting-rule.md)).
 
-**Response** `200` — `{ "status": "CANCELLED" }`
+**Response** `200`: `{ "status": "CANCELLED" }`
 
 **Errors**
 
@@ -690,7 +690,7 @@ Lets a customer cancel their own booking. Only a `PENDING` booking for a future 
 
 #### `GET /api/bookings/available-ticket-types`
 
-**Source** `server/api/bookings/available-ticket-types.get.ts` · **Auth** `authorize(event, createReservation)` — **staff only** (ADMIN, MANAGER, BOX_OFFICE), despite living under `/bookings`
+**Source** `server/api/bookings/available-ticket-types.get.ts` · **Auth** `authorize(event, createReservation)`: **staff only** (ADMIN, MANAGER, BOX_OFFICE), despite living under `/bookings`
 
 Used by the walk-in / door-sales modal, which needs override-aware prices before any reservation exists.
 
@@ -700,13 +700,13 @@ Used by the walk-in / door-sales modal, which needs override-aware prices before
 | --- | --- | --- |
 | `performanceId` | string, required | Read with plain `getQuery` and hand-checked |
 
-**Response** `200` — every base ticket type, sorted by name:
+**Response** `200`: every base ticket type, sorted by name:
 
 ```jsonc
 [ { "id": "…", "name": "Adult", "description": null, "effectivePrice": 800, "active": true } ]
 ```
 
-`active` and `effectivePrice` are resolved through performance → show → base. Inactive types are **returned, not filtered** — the caller decides what to do with them.
+`active` and `effectivePrice` are resolved through performance → show → base. Inactive types are **returned, not filtered**: the caller decides what to do with them.
 
 **Errors**
 
@@ -724,7 +724,7 @@ Used by the walk-in / door-sales modal, which needs override-aware prices before
 
 #### `GET /api/reservations`
 
-**Source** `server/api/reservations/index.get.ts` · **Auth** `authorize(event, listReservations)` — staff
+**Source** `server/api/reservations/index.get.ts` · **Auth** `authorize(event, listReservations)`: staff
 
 ```ts
 // query schema
@@ -739,9 +739,9 @@ Used by the walk-in / door-sales modal, which needs override-aware prices before
 
 Filters combine with AND. `showId` is resolved to that show's performance IDs first; a show with no performances short-circuits to `[]`. Supplying both `showId` and `performanceId` applies both conditions.
 
-**Response** `200` — an array in `reservationSummaryWith` shape: reservation columns plus `user` (id, name, email, verified) and `performance` → `show` (id, title, slug) and `venue` (id, name). **No `tickets` array** — this is the list view. Ordered by `createdAt` descending.
+**Response** `200`: an array in `reservationSummaryWith` shape: reservation columns plus `user` (id, name, email, verified) and `performance` → `show` (id, title, slug) and `venue` (id, name). **No `tickets` array**, this is the list view. Ordered by `createdAt` descending.
 
-With `withCounts=true`, each row gains `ticketCount`: the number of non-refunded tickets. The parameter is a **string enum**, not a boolean — only `'true'` and `'false'` validate, anything else is a 400, and only the exact string `'true'` triggers the count.
+With `withCounts=true`, each row gains `ticketCount`: the number of non-refunded tickets. The parameter is a **string enum**, not a boolean, only `'true'` and `'false'` validate, anything else is a 400, and only the exact string `'true'` triggers the count.
 
 **SQLite parameter limit.** The count query batches reservation IDs into **chunks of 800** (`const chunkSize = 800`) and issues one grouped `COUNT` per chunk, because a single `IN (…)` with thousands of bound parameters would exceed SQLite/D1's limit. If you add a similar bulk lookup elsewhere, copy this pattern.
 
@@ -751,7 +751,7 @@ With `withCounts=true`, each row gains `ticketCount`: the number of non-refunded
 
 #### `POST /api/reservations`
 
-**Source** `server/api/reservations/index.post.ts` · **Auth** `authorize(event, createReservation)` — staff
+**Source** `server/api/reservations/index.post.ts` · **Auth** `authorize(event, createReservation)`: staff
 
 ```ts
 z.object({
@@ -761,7 +761,7 @@ z.object({
   userId: z.string().optional(),
   name:   z.string().min(1).optional(),
   email:  z.email().optional(),
-  phone:  z.string().optional(),          // accepted and then discarded — there is no phone column
+  phone:  z.string().optional(),          // accepted and then discarded, there is no phone column
 
   tickets: z.array(z.object({
     ticketTypeId: z.string().min(1),
@@ -776,7 +776,7 @@ z.object({
 )
 ```
 
-**Response** `200` — the created reservation in `reservationSummaryWith` shape (no `tickets` array; fetch the detail endpoint if you need it).
+**Response** `200`: the created reservation in `reservationSummaryWith` shape (no `tickets` array; fetch the detail endpoint if you need it).
 
 **Errors**
 
@@ -788,11 +788,11 @@ z.object({
 | 400 | `Ticket type <id> not found` |
 | 500 | `Failed to create guest account` / `Failed to create reservation` |
 
-**Differences from the public `POST /api/bookings` — read this before reusing either.**
+**Differences from the public `POST /api/bookings`: read this before reusing either.**
 
 | | `POST /api/bookings` (public) | `POST /api/reservations` (staff) |
 | --- | --- | --- |
-| Capacity check | Yes, 409 when it would oversell | **None — never checks capacity** |
+| Capacity check | Yes, 409 when it would oversell | **None: never checks capacity** |
 | Performance status | Must be `ON_SALE` | Any status, including DRAFT and CANCELLED |
 | Show status | Must be `PUBLISHED` | Not checked |
 | Past performances | Rejected | Allowed |
@@ -800,7 +800,7 @@ z.object({
 | Confirmation email | Sent | **Not sent** |
 | `staffNotes` | Not accepted | Accepted |
 
-The staff route is deliberately permissive so the box office can overbook, sell into an unpublished show, and record retrospective sales. The consequence is that it is the only way to oversell a house — nothing downstream re-validates capacity.
+The staff route is deliberately permissive so the box office can overbook, sell into an unpublished show, and record retrospective sales. The consequence is that it is the only way to oversell a house: nothing downstream re-validates capacity.
 
 **Side effects** Resolves or creates a shadow account exactly as the public route does (match on email, else insert with `password: null`). Inserts one ticket row per seat with `pricePaid` resolved at current rates.
 
@@ -808,11 +808,11 @@ The staff route is deliberately permissive so the box office can overbook, sell 
 
 #### `GET /api/reservations/:id`
 
-**Source** `server/api/reservations/[id]/index.get.ts` · **Auth** `authorize(event, readReservation, { userId })` — staff can read any; a customer can read one whose `userId` matches their session
+**Source** `server/api/reservations/[id]/index.get.ts` · **Auth** `authorize(event, readReservation, { userId })`: staff can read any; a customer can read one whose `userId` matches their session
 
 The reservation is loaded *before* the authorisation call, since the ability needs the owner's id.
 
-**Response** `200` — `reservationDetailWith` shape: reservation columns (including `staffNotes`), `user`, `performance` → `show` + `venue`, and `tickets` (with `ticketType`) ordered by `createdAt`.
+**Response** `200`: `reservationDetailWith` shape: reservation columns (including `staffNotes`), `user`, `performance` → `show` + `venue`, and `tickets` (with `ticketType`) ordered by `createdAt`.
 
 **Errors** `400 Reservation ID is required`; `404 Reservation not found`; `403` when neither staff nor owner.
 
@@ -820,7 +820,7 @@ The reservation is loaded *before* the authorisation call, since the ability nee
 
 #### `PUT /api/reservations/:id`
 
-**Source** `server/api/reservations/[id]/index.put.ts` · **Auth** `authorize(event, updateReservation)` — staff
+**Source** `server/api/reservations/[id]/index.put.ts` · **Auth** `authorize(event, updateReservation)`: staff
 
 ```ts
 z.object({
@@ -836,7 +836,7 @@ z.object({
 
 Only keys actually present are written; explicit `null` clears the column. Moving *away* from `CANCELLED` without naming `cancelledBy` clears `cancelledBy` automatically.
 
-**Response** `200` — the updated `reservations` row (no relations).
+**Response** `200`: the updated `reservations` row (no relations).
 
 **Errors**
 
@@ -848,25 +848,25 @@ Only keys actually present are written; explicit `null` clears the column. Movin
 | 404 | `Reservation not found` |
 | 403 | Not staff |
 
-**Side effects** When `status` transitions **to** `CANCELLED` from something else, a cancellation email is sent to the customer. As with the booking confirmation, it is fire-and-forget with `.catch()` logging and `event.context.cloudflare?.context.waitUntil()`. Re-cancelling an already-cancelled reservation sends nothing. Cancelling does **not** delete or refund the ticket rows — they stay, and simply stop counting towards capacity and revenue because those queries filter on status.
+**Side effects** When `status` transitions **to** `CANCELLED` from something else, a cancellation email is sent to the customer. As with the booking confirmation, it is fire-and-forget with `.catch()` logging and `event.context.cloudflare?.context.waitUntil()`. Re-cancelling an already-cancelled reservation sends nothing. Cancelling does **not** delete or refund the ticket rows: they stay, and simply stop counting towards capacity and revenue because those queries filter on status.
 
 ---
 
 #### `DELETE /api/reservations/:id`
 
-**Source** `server/api/reservations/[id]/index.delete.ts` · **Auth** `authorize(event, deleteReservation)` — **ADMIN or MANAGER only** (BOX_OFFICE cannot)
+**Source** `server/api/reservations/[id]/index.delete.ts` · **Auth** `authorize(event, deleteReservation)`: **ADMIN or MANAGER only** (BOX_OFFICE cannot)
 
-**Response** `200` — `{ message: 'Reservation deleted successfully' }`
+**Response** `200`: `{ message: 'Reservation deleted successfully' }`
 
 **Errors** `400 Reservation ID is required`; `404 Reservation not found`; `403` for BOX_OFFICE and customers.
 
-**Side effects** Hard delete. Deletes all `tickets` rows for the reservation first — required, because `tickets.reservationId` is `onDelete: 'restrict'` — then the reservation. There is no soft-delete, no audit row, and no email. Revenue history for that booking disappears from `/api/admin/stats` and the CSV export. Prefer `PUT … { status: 'CANCELLED' }` in almost every real situation.
+**Side effects** Hard delete. Deletes all `tickets` rows for the reservation first (required, because `tickets.reservationId` is `onDelete: 'restrict'`) then the reservation. There is no soft-delete, no audit row, and no email. Revenue history for that booking disappears from `/api/admin/stats` and the CSV export. Prefer `PUT … { status: 'CANCELLED' }` in almost every real situation.
 
 ---
 
 #### `PUT /api/reservations/:id/tickets`
 
-**Source** `server/api/reservations/[id]/tickets.put.ts` · **Auth** `authorize(event, updateReservation)` — staff
+**Source** `server/api/reservations/[id]/tickets.put.ts` · **Auth** `authorize(event, updateReservation)`: staff
 
 ```ts
 {
@@ -880,14 +880,14 @@ Only keys actually present are written; explicit `null` clears the column. Movin
 This is a **declarative diff**, not an increment. You send the desired *total* active quantity per ticket type; the server compares it with the current state and inserts or deletes rows to match.
 
 - `quantity > current` → insert the difference.
-- `quantity < current` → delete the difference, **newest rows first (LIFO)** — rows are sorted oldest-first by `createdAt` and the tail is removed.
+- `quantity < current` → delete the difference, **newest rows first (LIFO)**: rows are sorted oldest-first by `createdAt` and the tail is removed.
 - `quantity === current` → no-op.
 - Ticket types **omitted from the body are left untouched**. To empty a reservation you must list every type explicitly with `quantity: 0`.
 - Rows with `refundedAt` set are excluded from the current-state query and are never inserted, deleted, or counted.
 
-**Price re-resolution — the thing to watch.** Newly inserted rows get `pricePaid` from `resolveEffectivePrice` **at the current override chain**, not from the prices in the rest of the reservation. If the show price changed after the original booking, adding a seat to an old reservation records the *new* price, and the reservation ends up with mixed `pricePaid` values for the same ticket type. Existing rows are never repriced. Deletion is a hard `DELETE`, so shrinking a reservation destroys the original price snapshot.
+**Price re-resolution: the thing to watch.** Newly inserted rows get `pricePaid` from `resolveEffectivePrice` **at the current override chain**, not from the prices in the rest of the reservation. If the show price changed after the original booking, adding a seat to an old reservation records the *new* price, and the reservation ends up with mixed `pricePaid` values for the same ticket type. Existing rows are never repriced. Deletion is a hard `DELETE`, so shrinking a reservation destroys the original price snapshot.
 
-**Response** `200` — the full reservation in `reservationDetailWith` shape, so the caller can re-render immediately.
+**Response** `200`: the full reservation in `reservationDetailWith` shape, so the caller can re-render immediately.
 
 **Errors**
 
@@ -895,7 +895,7 @@ This is a **declarative diff**, not an increment. You send the desired *total* a
 | --- | --- |
 | 400 | `Reservation ID is required` |
 | 404 | `Reservation not found` |
-| 500 | `Performance not found` — a 500, not a 404, because it indicates a broken foreign key |
+| 500 | `Performance not found`: a 500, not a 404, because it indicates a broken foreign key |
 | 400 | `Ticket type <id> not found` |
 | 403 | Not staff |
 
@@ -905,9 +905,9 @@ This is a **declarative diff**, not an increment. You send the desired *total* a
 
 #### `GET /api/reservations/:id/available-ticket-types`
 
-**Source** `server/api/reservations/[id]/available-ticket-types.get.ts` · **Auth** `authorize(event, updateReservation)` — staff (note: the *update* ability, not a read ability)
+**Source** `server/api/reservations/[id]/available-ticket-types.get.ts` · **Auth** `authorize(event, updateReservation)`: staff (note: the *update* ability, not a read ability)
 
-**Response** `200` — identical shape to `/api/bookings/available-ticket-types`: every base type with `{ id, name, description, effectivePrice, active }`, sorted by name, resolved through performance → show → base for this reservation's performance. Inactive types are included.
+**Response** `200`: identical shape to `/api/bookings/available-ticket-types`: every base type with `{ id, name, description, effectivePrice, active }`, sorted by name, resolved through performance → show → base for this reservation's performance. Inactive types are included.
 
 **Errors** `400 Reservation ID is required`; `404 Reservation not found`; `500 Performance not found`; `403` when not staff.
 
@@ -919,7 +919,7 @@ This is a **declarative diff**, not an increment. You send the desired *total* a
 
 #### `GET /api/performances`
 
-**Source** `server/api/performances/index.get.ts` · **Auth** `authorize(event, listShows)` — any logged-in user
+**Source** `server/api/performances/index.get.ts` · **Auth** `authorize(event, listShows)`: any logged-in user
 
 A flat, chronological list of performances, each with its `show` and `venue` attached and
 `ticketsSold` resolved. Performances otherwise exist only nested under a show, which is why the box
@@ -944,22 +944,22 @@ season still fills the window. In `near` mode the response is one centred window
 `page` is always 1 and `total` is the size of that window.
 
 Ticket counts scope through a subquery over the time span the page covers, so the page's own ids are
-never bound — two parameters whether the page holds five performances or two hundred.
+never bound: two parameters whether the page holds five performances or two hundred.
 
 ---
 
 #### `GET /api/shows`
 
-**Source** `server/api/shows/index.get.ts` · **Auth** `authorize(event, listShows)` — any logged-in user
+**Source** `server/api/shows/index.get.ts` · **Auth** `authorize(event, listShows)`: any logged-in user
 
 > This endpoint returns every show, including `DRAFT` ones. Each show carries its full `performances`
-> array, and each performance includes the internal `notes` column — production notes that are
-> explicitly "not shown to customers" per the schema — along with `capacityOverride`, `ticketsSold`,
+> array, and each performance includes the internal `notes` column: production notes that are
+> explicitly "not shown to customers" per the schema: along with `capacityOverride`, `ticketsSold`,
 > and DRAFT/CANCELLED statuses. `listShows` resolves to "any logged-in user, regardless of role"
 > (see §2), so a customer account is enough to enumerate the unannounced season. The customer-safe
 > alternative is `/api/whats-on`.
 
-**Query** — the response is always the standard `{ rows, total, page, limit }` envelope.
+**Query**: the response is always the standard `{ rows, total, page, limit }` envelope.
 
 | | | |
 |---|---|---|
@@ -968,12 +968,12 @@ never bound — two parameters whether the page holds five performances or two h
 | `q` | ≤100 chars | matches title, subtitle, slug **and venue name** |
 | `from`, `to` | `YYYY-MM-DD` | shows with a performance inside the window, inclusive, Europe/London |
 | `view` | `tree` \| `options` | `tree` nests performances; `options` returns `{ id, slug, title, status }` |
-| `sort` | `run` \| `title` | default `run` — earliest performance |
+| `sort` | `run` \| `title` | default `run`: earliest performance |
 | `order` | `asc` \| `desc` | defaults to `desc` for `scope=archive`, `asc` otherwise |
 | `page` | | default 1 |
 | `limit` | | default 25, **max 50** for `view=tree`, 500 for `view=options` |
 
-`draft`, `current`, `upcoming` and `archive` **partition** every show — each show is in exactly one,
+`draft`, `current`, `upcoming` and `archive` **partition** every show: each show is in exactly one,
 so per-tab counts add up to the whole. `active` is `current ∪ upcoming`. A published show with no
 performances counts as `archive`, which is the only scope with an `IS NULL` arm and the reason the
 partition holds. "Today" is resolved in `Europe/London`, not the Worker's UTC.
@@ -985,7 +985,7 @@ through a subquery rather than binding ~150 performance ids. Do not raise the ca
 
 A `tree` row adds `performanceCount`, `firstPerformanceAt` and `lastPerformanceAt` to the fields below.
 
-**Response** `200` — `rows`, each with:
+**Response** `200`: `rows`, each with:
 
 ```jsonc
 {
@@ -1013,7 +1013,7 @@ A `tree` row adds `performanceCount`, `firstPerformanceAt` and `lastPerformanceA
 
 #### `POST /api/shows`
 
-**Source** `server/api/shows/index.post.ts` · **Auth** `authorize(event, createShow)` — ADMIN or MANAGER
+**Source** `server/api/shows/index.post.ts` · **Auth** `authorize(event, createShow)`: ADMIN or MANAGER
 
 ```ts
 {
@@ -1025,7 +1025,7 @@ A `tree` row adds `performanceCount`, `firstPerformanceAt` and `lastPerformanceA
 }
 ```
 
-**Response** `200` — the created `shows` row.
+**Response** `200`: the created `shows` row.
 
 **Errors** `400 A show with this slug already exists`; `400` on a slug that fails the regex; `403` for BOX_OFFICE and customers; `500 Failed to create show`.
 
@@ -1033,12 +1033,12 @@ A `tree` row adds `performanceCount`, `firstPerformanceAt` and `lastPerformanceA
 
 #### `GET /api/shows/:id`
 
-**Source** `server/api/shows/[id]/index.get.ts` · **Auth** `authorize(event, readShow)` — any logged-in user
+**Source** `server/api/shows/[id]/index.get.ts` · **Auth** `authorize(event, readShow)`: any logged-in user
 
 > Same exposure as `GET /api/shows`: DRAFT shows returned, `performances[].notes` included, and
 > `readShow` means "any logged-in user, regardless of role".
 
-**Response** `200` — one show with **every column**, `performances` ordered by `startsAt` (each with
+**Response** `200`: one show with **every column**, `performances` ordered by `startsAt` (each with
 `venue`, `ticketsSold` and `ticketTypeOverrideCount`), `contentWarnings` with their vocabulary
 entries resolved, plus `ticketTypeOverrideCount`, `performanceCount`, `firstPerformanceAt` and
 `lastPerformanceAt`.
@@ -1046,7 +1046,7 @@ entries resolved, plus `ticketTypeOverrideCount`, `performanceCount`, `firstPerf
 > **Anything that edits a show must read it from here.** `GET /api/shows` returns a column
 > *projection* that omits `longDescription`, `programmeUrl`, `externalUrl`, `contentWarningNotes` and
 > `warningsConfirmedNone`. A form populated from a list row cannot see those five, and writing back
-> what it never read is what silently emptied shows' write-ups — see
+> what it never read is what silently emptied shows' write-ups: see
 > [09-known-issues](./09-known-issues.md#editing-a-show-wiped-its-write-up).
 
 Every count scopes through a subquery on this show's performances rather than binding their ids, so
@@ -1058,7 +1058,7 @@ the parameter cost is fixed however long the run.
 
 #### `PUT /api/shows/:id`
 
-**Source** `server/api/shows/[id]/index.put.ts` · **Auth** `authorize(event, updateShow)` — ADMIN or MANAGER
+**Source** `server/api/shows/[id]/index.put.ts` · **Auth** `authorize(event, updateShow)`: ADMIN or MANAGER
 
 ```ts
 {
@@ -1084,7 +1084,7 @@ the parameter cost is fixed however long the run.
 Only present keys are written. An empty body returns the existing row unchanged with `200`.
 
 `contentWarnings` replaces the show's links wholesale, in one `db.batch` chunked at 30 rows (D1 caps
-bound parameters at 100 and each link binds three). Repeated ids are deduped before the write —
+bound parameters at 100 and each link binds three). Repeated ids are deduped before the write:
 the unique index is `(show_id, content_warning_id)`, so a duplicate would otherwise fail mid-batch.
 
 `level` must be `null` for a technical warning and set for a general one. That spans two tables, so
@@ -1093,19 +1093,19 @@ with `400 "<title>" is a technical effect and cannot have a level` or
 `400 "<title>" needs a level: mentioned, discussed or depicted`. An id not in the vocabulary is
 `400 Unknown content warning: <id>`.
 
-**Response** `200` — the updated `shows` row.
+**Response** `200`: the updated `shows` row.
 
 **Errors** `400 Show ID is required`; `404 Show not found`; `400 A show with this slug already exists` (checked only when the slug actually changes); `403`.
 
-**Side effects** Setting `posterUrl` here rewrites the column **without** touching R2 — the old blob is orphaned and the new pathname is not validated. Use `POST /api/shows/:id/poster` instead. Setting `status: 'DRAFT'` is the only way to unpublish a show; the publish endpoint cannot.
+**Side effects** Setting `posterUrl` here rewrites the column **without** touching R2: the old blob is orphaned and the new pathname is not validated. Use `POST /api/shows/:id/poster` instead. Setting `status: 'DRAFT'` is the only way to unpublish a show; the publish endpoint cannot.
 
 ---
 
 #### `DELETE /api/shows/:id`
 
-**Source** `server/api/shows/[id]/index.delete.ts` · **Auth** `authorize(event, deleteShow)` — **ADMIN only**
+**Source** `server/api/shows/[id]/index.delete.ts` · **Auth** `authorize(event, deleteShow)`: **ADMIN only**
 
-**Response** `200` — `{ message: 'Show deleted successfully' }`
+**Response** `200`: `{ message: 'Show deleted successfully' }`
 
 **Errors** `400 Show ID is required`; `404 Show not found`; `403` for MANAGER, BOX_OFFICE, and customers.
 
@@ -1121,7 +1121,7 @@ with `400 "<title>" is a technical effect and cannot have a level` or
 
 #### `POST /api/shows/:id/poster`
 
-**Source** `server/api/shows/[id]/poster.post.ts`, via `validateAndUploadImage` in `server/utils/images.ts` · **Auth** `authorize(event, updateShow)` — ADMIN or MANAGER
+**Source** `server/api/shows/[id]/poster.post.ts`, via `validateAndUploadImage` in `server/utils/images.ts` · **Auth** `authorize(event, updateShow)`: ADMIN or MANAGER
 
 **Body** `multipart/form-data` with a single file field named **`poster`**.
 
@@ -1132,7 +1132,7 @@ with `400 "<title>" is a technical effect and cannot have a level` or
 | Stored at | `shows/<showId>/image-<Date.now()>.<ext>` |
 | Access | `public` |
 
-**Response** `200` — the updated `shows` row, with `posterUrl` set to the new blob pathname. Render it through `/images/<pathname>`.
+**Response** `200`: the updated `shows` row, with `posterUrl` set to the new blob pathname. Render it through `/images/<pathname>`.
 
 **Errors**
 
@@ -1150,19 +1150,19 @@ with `400 "<title>" is a technical effect and cannot have a level` or
 
 #### `DELETE /api/shows/:id/poster`
 
-**Source** `server/api/shows/[id]/poster.delete.ts` · **Auth** `authorize(event, updateShow)` — ADMIN or MANAGER
+**Source** `server/api/shows/[id]/poster.delete.ts` · **Auth** `authorize(event, updateShow)`: ADMIN or MANAGER
 
-**Response** `200` — the updated `shows` row with `posterUrl: null`.
+**Response** `200`: the updated `shows` row with `posterUrl: null`.
 
 **Errors** `400 Show ID is required`; `404 Show not found`; `404 This show has no poster`; `403`.
 
-**Side effects** Deletes the object from R2 **before** clearing the column, and unlike the upload path this deletion is not wrapped in a try/catch — an R2 failure surfaces as a 500 and the column keeps pointing at the (possibly deleted) blob.
+**Side effects** Deletes the object from R2 **before** clearing the column, and unlike the upload path this deletion is not wrapped in a try/catch: an R2 failure surfaces as a 500 and the column keeps pointing at the (possibly deleted) blob.
 
 ---
 
 #### `POST /api/shows/:id/publish`
 
-**Source** `server/api/shows/[id]/publish.post.ts` · **Auth** `authorize(event, updateShow)`, plus a second `authorize(event, updatePerformance)` when `markPerformancesOnSale` is true — ADMIN or MANAGER for both
+**Source** `server/api/shows/[id]/publish.post.ts` · **Auth** `authorize(event, updateShow)`, plus a second `authorize(event, updatePerformance)` when `markPerformancesOnSale` is true: ADMIN or MANAGER for both
 
 ```ts
 { markPerformancesOnSale: z.boolean().optional().default(false) }
@@ -1189,12 +1189,12 @@ with `400 "<title>" is a technical effect and cannot have a level` or
 
 #### `POST /api/shows/:id/performances`
 
-**Source** `server/api/shows/[id]/performances/index.post.ts` · **Auth** `authorize(event, createPerformance)` — ADMIN or MANAGER
+**Source** `server/api/shows/[id]/performances/index.post.ts` · **Auth** `authorize(event, createPerformance)`: ADMIN or MANAGER
 
 ```ts
 {
   venueId:  z.string().min(1),                                    // 'Venue is required'
-  startsAt: z.number().int(),                                     // UNIX SECONDS — multiplied by 1000
+  startsAt: z.number().int(),                                     // UNIX SECONDS, multiplied by 1000
   doorsAt:  z.number().int().optional().nullable(),               // unix seconds
   durationMinutes: z.number().int().positive().optional().nullable(),
   intervalCount:   z.number().int().nonnegative().optional().default(0),
@@ -1205,17 +1205,17 @@ with `400 "<title>" is a technical effect and cannot have a level` or
 }
 ```
 
-`startsAt` and `doorsAt` are **seconds**, not milliseconds — the handler does `new Date(body.startsAt * 1000)`. Passing milliseconds silently schedules the performance tens of thousands of years from now. `doorsAt` is falsy-checked, so `0` becomes `null`.
+`startsAt` and `doorsAt` are **seconds**, not milliseconds: the handler does `new Date(body.startsAt * 1000)`. Passing milliseconds silently schedules the performance tens of thousands of years from now. `doorsAt` is falsy-checked, so `0` becomes `null`.
 
-**Response** `200` — the created `performances` row.
+**Response** `200`: the created `performances` row.
 
-**Errors** `400 Show ID is required`; `404 Show not found`; `403`; `500 Failed to create performance`. `venueId` is **not** verified to exist — an unknown venue produces a foreign-key error surfacing as a 500.
+**Errors** `400 Show ID is required`; `404 Show not found`; `403`; `500 Failed to create performance`. `venueId` is **not** verified to exist: an unknown venue produces a foreign-key error surfacing as a 500.
 
 ---
 
 #### `PUT /api/shows/:id/performances/:performanceId`
 
-**Source** `server/api/shows/[id]/performances/[performanceId]/index.put.ts` · **Auth** `authorize(event, updatePerformance)` — ADMIN or MANAGER
+**Source** `server/api/shows/[id]/performances/[performanceId]/index.put.ts` · **Auth** `authorize(event, updatePerformance)`: ADMIN or MANAGER
 
 ```ts
 {
@@ -1233,19 +1233,19 @@ with `400 "<title>" is a technical effect and cannot have a level` or
 
 The performance is looked up by `id` **and** `showId`, so a mismatched pair returns 404 rather than editing another show's performance. Only present keys are written; an empty body returns the existing row with `200`.
 
-**Response** `200` — the updated `performances` row.
+**Response** `200`: the updated `performances` row.
 
 **Errors** `400 Show ID and Performance ID are required`; `404 Performance not found`; `403`.
 
-**Side effects** Lowering `capacityOverride` below the number of tickets already sold is permitted — nothing re-validates existing bookings. Setting `status: 'CANCELLED'` sends no emails to affected customers; that has to be done by hand.
+**Side effects** Lowering `capacityOverride` below the number of tickets already sold is permitted: nothing re-validates existing bookings. Setting `status: 'CANCELLED'` sends no emails to affected customers; that has to be done by hand.
 
 ---
 
 #### `DELETE /api/shows/:id/performances/:performanceId`
 
-**Source** `server/api/shows/[id]/performances/[performanceId]/index.delete.ts` · **Auth** `authorize(event, deletePerformance)` — ADMIN or MANAGER
+**Source** `server/api/shows/[id]/performances/[performanceId]/index.delete.ts` · **Auth** `authorize(event, deletePerformance)`: ADMIN or MANAGER
 
-**Response** `200` — `{ message: 'Performance deleted successfully' }`
+**Response** `200`: `{ message: 'Performance deleted successfully' }`
 
 **Errors**
 
@@ -1253,7 +1253,7 @@ The performance is looked up by `id` **and** `showId`, so a mismatched pair retu
 | --- | --- |
 | 400 | `Show ID and Performance ID are required` |
 | 404 | `Performance not found` (also when the performance belongs to a different show) |
-| 409 | `Cannot delete this performance because it has tickets associated with it` — the delete is wrapped in a try/catch that converts the FK violation |
+| 409 | `Cannot delete this performance because it has tickets associated with it`: the delete is wrapped in a try/catch that converts the FK violation |
 | 403 | Not ADMIN/MANAGER |
 
 **Side effects** `performance_ticket_type_overrides` cascade. Reservations pointing at the performance block the delete via `reservations.performanceId` restrict, which is also caught and reported as the same 409.
@@ -1262,17 +1262,17 @@ The performance is looked up by `id` **and** `showId`, so a mismatched pair retu
 
 ### 3.5a Content warnings
 
-The shared vocabulary every show picks from. A warning is either a **technical effect** — strobe,
-haze, loud noise, no level — or a **general** theme recorded on each show as `MENTIONED`,
+The shared vocabulary every show picks from. A warning is either a **technical effect**: strobe,
+haze, loud noise, no level, or a **general** theme recorded on each show as `MENTIONED`,
 `DISCUSSED` or `DEPICTED`. See [ADR-0004](./decisions/0004-content-warning-model.md).
 
 #### `GET /api/content-warnings`
 
-**Source** `server/api/content-warnings/index.get.ts` · **Auth** `authorize(event, listContentWarnings)` — staff
+**Source** `server/api/content-warnings/index.get.ts` · **Auth** `authorize(event, listContentWarnings)`: staff
 
 **Query** `includeArchived` (`'true'`/`'false'`, default `'false'`) · `kind` (`TECHNICAL`/`GENERAL`)
 
-**Response** `200` — an array of `{ id, slug, title, kind, category, description, icon, sort, archived, showCount }`,
+**Response** `200`: an array of `{ id, slug, title, kind, category, description, icon, sort, archived, showCount }`,
 ordered technical-first then by `(sort, title)`. `showCount` is a correlated subquery counting the
 shows that carry the entry; it is what the admin page uses to warn before a rename and what blocks a
 delete.
@@ -1283,7 +1283,7 @@ delete.
 
 #### `POST /api/content-warnings`
 
-**Source** `server/api/content-warnings/index.post.ts` · **Auth** `authorize(event, createContentWarning)` — ADMIN or MANAGER
+**Source** `server/api/content-warnings/index.post.ts` · **Auth** `authorize(event, createContentWarning)`: ADMIN or MANAGER
 
 ```ts
 {
@@ -1297,27 +1297,27 @@ delete.
 }
 ```
 
-**Response** `200` — the created row.
+**Response** `200`: the created row.
 
 **Errors** `400 A content warning with the slug "…" already exists`; `400 A content warning with this title already exists`; `400 Title must contain at least one letter or number`; `403`.
 
 #### `PUT /api/content-warnings/:id`
 
-**Source** `server/api/content-warnings/[id]/index.put.ts` · **Auth** `authorize(event, updateContentWarning)` — ADMIN or MANAGER
+**Source** `server/api/content-warnings/[id]/index.put.ts` · **Auth** `authorize(event, updateContentWarning)`: ADMIN or MANAGER
 
 Same body as `POST`, every key optional, plus `archived: z.boolean().optional()`. Only present keys
 are written; an empty body returns the existing row.
 
 **Errors** `404 Content warning not found`; the two uniqueness `400`s above; `403`; and
-`409 Cannot change the type of this warning while N show(s) use it` — `kind` decides whether a link
+`409 Cannot change the type of this warning while N show(s) use it`: `kind` decides whether a link
 carries a level, and the existing links were written under the old answer, so there is no correct
 level to invent on their behalf.
 
 #### `DELETE /api/content-warnings/:id`
 
-**Source** `server/api/content-warnings/[id]/index.delete.ts` · **Auth** `authorize(event, deleteContentWarning)` — **ADMIN only**
+**Source** `server/api/content-warnings/[id]/index.delete.ts` · **Auth** `authorize(event, deleteContentWarning)`: **ADMIN only**
 
-**Response** `200` — `{ message: 'Content warning deleted successfully' }`
+**Response** `200`: `{ message: 'Content warning deleted successfully' }`
 
 **Errors** `404 Content warning not found`; `403`;
 `409 Cannot delete "<title>" because N show(s) use it. Archive it instead…`.
@@ -1329,13 +1329,13 @@ level to invent on their behalf.
 
 #### `GET /api/shows/:id/legacy-content-warnings`
 
-**Source** `server/api/shows/[id]/legacy-content-warnings.get.ts` · **Auth** `authorize(event, readShow)` — staff
+**Source** `server/api/shows/[id]/legacy-content-warnings.get.ts` · **Auth** `authorize(event, readShow)`: staff
 
-**Response** `200` — `[{ title, kind }]`: the warnings this show carried before the rework that
+**Response** `200`: `[{ title, kind }]`: the warnings this show carried before the rework that
 migration 0016 could not map onto the new vocabulary, ordered by title. Empty for most shows; 30 have
 entries. The show editor renders them under "Not carried over from the old system".
 
-Read from `show_content_warnings_archive.mapped_to_warning_id IS NULL` — the migration's own record —
+Read from `show_content_warnings_archive.mapped_to_warning_id IS NULL`: the migration's own record:
 rather than derived by looking for archive ids missing from the live table. The remap collapses rows
 (`Sexism` and `Misogyny` both became `sexism`), so only one of the two ids survives and the other
 would look dropped.
@@ -1346,25 +1346,25 @@ would look dropped.
 
 #### `GET /api/ticket-types`
 
-**Source** `server/api/ticket-types/index.get.ts` · **Auth** **Public** — no `authorize()`; the comment in the source explains that booking flows need it
+**Source** `server/api/ticket-types/index.get.ts` · **Auth** **Public**: no `authorize()`; the comment in the source explains that booking flows need it
 
 **Query** `?includeArchived=true` to include retired types. Omitted or `false` returns only live
 ones, so a caller that just wants "the ticket types" cannot accidentally offer a dead Fringe type.
 The management screen at `/admin/ticket-types` is the one caller that passes it, because it is where
 types are archived and restored.
 
-**Response** `200` — `ticket_types` rows ordered by name:
+**Response** `200`: `ticket_types` rows ordered by name:
 `{ id, name, description, price, kind, archived, activeByDefault, createdAt, updatedAt }`.
 `price` is in pence.
 
-`archived` and `activeByDefault` answer different questions — see
+`archived` and `activeByDefault` answer different questions: see
 [06-pricing-and-ticket-types](./06-pricing-and-ticket-types.md#archived-vs-activebydefault--two-different-questions).
 
 ---
 
 #### `POST /api/ticket-types`
 
-**Source** `server/api/ticket-types/index.post.ts` · **Auth** `authorize(event, createTicketType)` — ADMIN or MANAGER
+**Source** `server/api/ticket-types/index.post.ts` · **Auth** `authorize(event, createTicketType)`: ADMIN or MANAGER
 
 ```ts
 {
@@ -1375,7 +1375,7 @@ types are archived and restored.
 }
 ```
 
-**Response** `200` — the created row. **Errors** `400 A ticket type with this name already exists`; `403`; `500 Failed to create ticket type`.
+**Response** `200`: the created row. **Errors** `400 A ticket type with this name already exists`; `403`; `500 Failed to create ticket type`.
 
 ---
 
@@ -1383,13 +1383,13 @@ types are archived and restored.
 
 **Source** `server/api/ticket-types/[id]/index.get.ts` · **Auth** **Public**
 
-**Response** `200` — one `ticket_types` row. **Errors** `400 Ticket type ID is required`; `404 Ticket type not found`.
+**Response** `200`: one `ticket_types` row. **Errors** `400 Ticket type ID is required`; `404 Ticket type not found`.
 
 ---
 
 #### `PUT /api/ticket-types/:id`
 
-**Source** `server/api/ticket-types/[id]/index.put.ts` · **Auth** `authorize(event, updateTicketType)` — ADMIN or MANAGER
+**Source** `server/api/ticket-types/[id]/index.put.ts` · **Auth** `authorize(event, updateTicketType)`: ADMIN or MANAGER
 
 ```ts
 {
@@ -1402,17 +1402,17 @@ types are archived and restored.
 
 An empty body returns the existing row with `200`.
 
-**Response** `200` — the updated row. **Errors** `400 Ticket type ID is required`; `404 Ticket type not found`; `400 A ticket type with this name already exists`; `403`.
+**Response** `200`: the updated row. **Errors** `400 Ticket type ID is required`; `404 Ticket type not found`; `400 A ticket type with this name already exists`; `403`.
 
-**Side effects** Changing `price` affects **future** price resolution only. Already-issued tickets keep their `pricePaid` snapshot — but any row added later through `PUT /api/reservations/:id/tickets` picks up the new price, which is how a single reservation ends up with two prices for one ticket type.
+**Side effects** Changing `price` affects **future** price resolution only. Already-issued tickets keep their `pricePaid` snapshot, but any row added later through `PUT /api/reservations/:id/tickets` picks up the new price, which is how a single reservation ends up with two prices for one ticket type.
 
 ---
 
 #### `DELETE /api/ticket-types/:id`
 
-**Source** `server/api/ticket-types/[id]/index.delete.ts` · **Auth** `authorize(event, deleteTicketType)` — **ADMIN only**
+**Source** `server/api/ticket-types/[id]/index.delete.ts` · **Auth** `authorize(event, deleteTicketType)`: **ADMIN only**
 
-**Response** `200` — `{ message: 'Ticket type deleted successfully' }`
+**Response** `200`: `{ message: 'Ticket type deleted successfully' }`
 
 **Errors** `400 Ticket type ID is required`; `404 Ticket type not found`; `409 Cannot delete this ticket type because it has issued tickets associated with it`; `403`.
 
@@ -1426,7 +1426,7 @@ An empty body returns the existing row with `200`.
 
 > `readShow` is `defineAbility(() => true)`, but because it is used through `authorize()` with `allowGuest: false`, **a session is still required**. Effective access: any logged-in user, no role needed. Guests get a 403.
 
-**Response** `200` — every base ticket type, ordered by name, annotated with this show's override:
+**Response** `200`: every base ticket type, ordered by name, annotated with this show's override:
 
 ```jsonc
 [{
@@ -1444,7 +1444,7 @@ An empty body returns the existing row with `200`.
 
 #### `PUT /api/shows/:id/ticket-types`
 
-**Source** `server/api/shows/[id]/ticket-types/index.put.ts` · **Auth** `authorize(event, updateShow)` — ADMIN or MANAGER
+**Source** `server/api/shows/[id]/ticket-types/index.put.ts` · **Auth** `authorize(event, updateShow)`: ADMIN or MANAGER
 
 ```ts
 {
@@ -1458,7 +1458,7 @@ An **upsert** keyed on (`showId`, `ticketTypeId`), matching the unique index. On
 
 Note that omitting a field is the same as sending `null`: the handler writes `body.price ?? null` and `body.active ?? null` in both the insert and the update branch. Updating an existing override to change only `active` therefore **wipes its `price` back to inherit**. Always send both fields.
 
-**Response** `200` — the created or updated `show_ticket_type_overrides` row.
+**Response** `200`: the created or updated `show_ticket_type_overrides` row.
 
 **Errors** `400 Show ID is required`; `404 Show not found`; `404 Ticket type not found`; `403`.
 
@@ -1466,9 +1466,9 @@ Note that omitting a field is the same as sending `null`: the handler writes `bo
 
 #### `DELETE /api/shows/:id/ticket-types/:ticketTypeId`
 
-**Source** `server/api/shows/[id]/ticket-types/[ticketTypeId]/index.delete.ts` · **Auth** `authorize(event, updateShow)` — ADMIN or MANAGER
+**Source** `server/api/shows/[id]/ticket-types/[ticketTypeId]/index.delete.ts` · **Auth** `authorize(event, updateShow)`: ADMIN or MANAGER
 
-**Response** `200` — `{ message: 'Show ticket type override removed' }`
+**Response** `200`: `{ message: 'Show ticket type override removed' }`
 
 **Errors** `400 Show ID and Ticket Type ID are required`; `404 Show not found`; `404 No override exists for this ticket type`; `403`.
 
@@ -1478,9 +1478,9 @@ Note that omitting a field is the same as sending `null`: the handler writes `bo
 
 #### `GET /api/shows/:id/performances/:performanceId/ticket-types`
 
-**Source** `server/api/shows/[id]/performances/[performanceId]/ticket-types/index.get.ts` · **Auth** `authorize(event, readShow)` — any logged-in user (see the note above; guests get 403)
+**Source** `server/api/shows/[id]/performances/[performanceId]/ticket-types/index.get.ts` · **Auth** `authorize(event, readShow)`: any logged-in user (see the note above; guests get 403)
 
-**Response** `200` — every base ticket type ordered by name, with both override levels exposed separately:
+**Response** `200`: every base ticket type ordered by name, with both override levels exposed separately:
 
 ```jsonc
 [{
@@ -1498,7 +1498,7 @@ Note that omitting a field is the same as sending `null`: the handler writes `bo
 
 #### `PUT /api/shows/:id/performances/:performanceId/ticket-types`
 
-**Source** `server/api/shows/[id]/performances/[performanceId]/ticket-types/index.put.ts` · **Auth** `authorize(event, updatePerformance)` — ADMIN or MANAGER
+**Source** `server/api/shows/[id]/performances/[performanceId]/ticket-types/index.put.ts` · **Auth** `authorize(event, updatePerformance)`: ADMIN or MANAGER
 
 Same body schema as the show-level upsert:
 
@@ -1510,9 +1510,9 @@ Same body schema as the show-level upsert:
 }
 ```
 
-Upsert keyed on (`performanceId`, `ticketTypeId`). The same "omitted means null" caveat applies — send both `price` and `active` on every call.
+Upsert keyed on (`performanceId`, `ticketTypeId`). The same "omitted means null" caveat applies: send both `price` and `active` on every call.
 
-**Response** `200` — the created or updated `performance_ticket_type_overrides` row.
+**Response** `200`: the created or updated `performance_ticket_type_overrides` row.
 
 **Errors** `400 Show ID and Performance ID are required`; `404 Show not found`; `404 Performance not found`; `404 Ticket type not found`; `403`.
 
@@ -1520,19 +1520,19 @@ Upsert keyed on (`performanceId`, `ticketTypeId`). The same "omitted means null"
 
 #### `DELETE /api/shows/:id/performances/:performanceId/ticket-types/:ticketTypeId`
 
-**Source** `server/api/shows/[id]/performances/[performanceId]/ticket-types/[ticketTypeId]/index.delete.ts` · **Auth** `authorize(event, updatePerformance)` — ADMIN or MANAGER
+**Source** `server/api/shows/[id]/performances/[performanceId]/ticket-types/[ticketTypeId]/index.delete.ts` · **Auth** `authorize(event, updatePerformance)`: ADMIN or MANAGER
 
-**Response** `200` — `{ message: 'Performance ticket type override removed' }`
+**Response** `200`: `{ message: 'Performance ticket type override removed' }`
 
 **Errors** `400 Show ID, Performance ID and Ticket Type ID are required`; `404 Show not found`; `404 Performance not found`; `403`.
 
-Unlike its show-level counterpart, this handler does **not** check that the override exists — deleting a non-existent override succeeds with the same 200 message.
+Unlike its show-level counterpart, this handler does **not** check that the override exists: deleting a non-existent override succeeds with the same 200 message.
 
 ---
 
 ### 3.7 Users
 
-These act on the **local mirror** only — `id`, `email`, `name`, `anonymisedAt`, timestamps. Credentials, roles, verification and erasure belong to the auth service; there is deliberately no `PUT /api/users/:id`, no password reset and no role editor here, and the abilities that used to describe them have been removed rather than left implying a permission model this app does not enforce.
+These act on the **local mirror** only: `id`, `email`, `name`, `anonymisedAt`, timestamps. Credentials, roles, verification and erasure belong to the auth service; there is deliberately no `PUT /api/users/:id`, no password reset and no role editor here, and the abilities that used to describe them have been removed rather than left implying a permission model this app does not enforce.
 
 ```jsonc
 {
@@ -1542,15 +1542,15 @@ These act on the **local mirror** only — `id`, `email`, `name`, `anonymisedAt`
 }
 ```
 
-Anonymised rows and legacy `.invalid` placeholders never appear in listings or lookups — they surface only as a `hiddenAnonymised` count on the paginated response.
+Anonymised rows and legacy `.invalid` placeholders never appear in listings or lookups: they surface only as a `hiddenAnonymised` count on the paginated response.
 
 ---
 
 #### `GET /api/users`
 
-**Source** `server/api/users/index.get.ts` · **Auth** `authorize(event, listUsers)` — staff (ADMIN, MANAGER, BOX_OFFICE)
+**Source** `server/api/users/index.get.ts` · **Auth** `authorize(event, listUsers)`: staff (ADMIN, MANAGER, BOX_OFFICE)
 
-**Query** `?email=` returns **at most one row, as a bare array** — the exact-address lookup the box-office walk-in form uses, so a volunteer's browser never receives the user table. Otherwise `?page`, `?limit` (max 100) and `?q` (name or email, case-insensitive) give the paginated envelope `{ rows, total, page, limit, hiddenAnonymised }`.
+**Query** `?email=` returns **at most one row, as a bare array**: the exact-address lookup the box-office walk-in form uses, so a volunteer's browser never receives the user table. Otherwise `?page`, `?limit` (max 100) and `?q` (name or email, case-insensitive) give the paginated envelope `{ rows, total, page, limit, hiddenAnonymised }`.
 
 Note the two response shapes from one path; `?email=` is the exception to the `Paginated<T>` contract in `server/utils/pagination.ts`.
 
@@ -1560,7 +1560,7 @@ Note the two response shapes from one path; `?email=` is the exception to the `P
 
 #### `POST /api/users`
 
-**Source** `server/api/users/index.post.ts` · **Auth** `authorize(event, createUser)` — ADMIN or MANAGER, plus granular `allows()` checks
+**Source** `server/api/users/index.post.ts` · **Auth** `authorize(event, createUser)`: ADMIN or MANAGER, plus granular `allows()` checks
 
 ```ts
 {
@@ -1573,7 +1573,7 @@ Note the two response shapes from one path; `?email=` is the exception to the `P
 
 A MANAGER may create a plain user, but `allows(event, updateUserVerified)` and `allows(event, updateUserRoles)` are ADMIN-only, so a MANAGER sending `verified: true` or any `roles` gets a 403.
 
-**Response** `200` — the formatted user with roles.
+**Response** `200`: the formatted user with roles.
 
 **Errors**
 
@@ -1584,7 +1584,7 @@ A MANAGER may create a plain user, but `allows(event, updateUserVerified)` and `
 | 403 | Not ADMIN/MANAGER |
 
 **Side effects** Calls `POST /api/users/shadow` on the auth service to match or create the central
-identity, then mirrors the returned id locally. No password is set and no email is sent — the person
+identity, then mirrors the returned id locally. No password is set and no email is sent: the person
 claims the account by registering or signing in with Google on the same address, and their booking
 history comes with it. If the auth service is unreachable the operation fails rather than creating a
 local-only user, because an id this app invented would never match the central one.
@@ -1593,11 +1593,11 @@ local-only user, because an id this app invented would never match the central o
 
 #### `GET /api/users/:id`
 
-**Source** `server/api/users/[id]/index.get.ts` · **Auth** `authorize(event, readUser, user)` — staff can read anyone; any user can read themselves
+**Source** `server/api/users/[id]/index.get.ts` · **Auth** `authorize(event, readUser, user)`: staff can read anyone; any user can read themselves
 
 The row is fetched before the check, so an unknown id yields 404 regardless of who is asking.
 
-**Response** `200` — the formatted user. **Errors** `400 User ID is required`; `404 User not found`; `403`.
+**Response** `200`: the formatted user. **Errors** `400 User ID is required`; `404 User not found`; `403`.
 
 ---
 
@@ -1605,20 +1605,20 @@ The row is fetched before the check, so an unknown id yields 404 regardless of w
 
 **Source** `server/api/users/[id]/index.delete.ts` · **Auth** `authorize(event, deleteUser, { id: userId })`
 
-The `deleteUser` ability is unusual — read it carefully:
+The `deleteUser` ability is unusual: read it carefully:
 
 | Caller | Target | Allowed? |
 | --- | --- | --- |
 | Non-ADMIN | themselves | ✅ yes (self-service account deletion) |
 | ADMIN | someone else | ✅ yes |
-| ADMIN | themselves | ❌ **no** — admins cannot delete their own account |
+| ADMIN | themselves | ❌ **no**: admins cannot delete their own account |
 | MANAGER / BOX_OFFICE | someone else | ❌ no |
 
-**Response** `200` — `{ message: 'User deleted successfully' }`
+**Response** `200`: `{ message: 'User deleted successfully' }`
 
 **Errors** `400 User ID is required`; `404 User not found`; `403`.
 
-**Side effects** none — this deletes the mirror row only, and the central identity is untouched. **`reservations.userId` and `passes.userId` are both `onDelete: 'restrict'`**, so anyone who has ever booked or held a pass cannot be deleted; the handler pre-checks reservations and returns 409. To remove a *person*, use erasure at the auth service, which calls this app's anonymise hook. The caller's session is not cleared when they delete themselves.
+**Side effects** none: this deletes the mirror row only, and the central identity is untouched. **`reservations.userId` and `passes.userId` are both `onDelete: 'restrict'`**, so anyone who has ever booked or held a pass cannot be deleted; the handler pre-checks reservations and returns 409. To remove a *person*, use erasure at the auth service, which calls this app's anonymise hook. The caller's session is not cleared when they delete themselves.
 
 ---
 
@@ -1629,15 +1629,15 @@ entitlement rule lives in `server/utils/passes.ts` and nowhere else.
 
 #### `GET /api/pass-types`
 
-**Source** `server/api/pass-types/index.get.ts` · **Auth** `authorize(event, listPassTypes)` — staff
+**Source** `server/api/pass-types/index.get.ts` · **Auth** `authorize(event, listPassTypes)`: staff
 
 Pass products with their price variants, show scope count and issued count.
 
 #### `POST /api/pass-types`
 
-**Source** `server/api/pass-types/index.post.ts` · **Auth** `authorize(event, managePassTypes)` — ADMIN or MANAGER
+**Source** `server/api/pass-types/index.post.ts` · **Auth** `authorize(event, managePassTypes)`: ADMIN or MANAGER
 
-Creates a product, its price variants and its show scope in one batch. **Always created `DRAFT`** —
+Creates a product, its price variants and its show scope in one batch. **Always created `DRAFT`**:
 use the route below to put it on sale.
 
 `validFrom` / `validTo` accept `YYYY-MM-DD` and are stored as the **first and last instants of those
@@ -1646,7 +1646,7 @@ overrides that.
 
 #### `PUT /api/pass-types/:id`
 
-**Source** `server/api/pass-types/[id]/index.put.ts` · **Auth** `authorize(event, managePassTypes)` — ADMIN or MANAGER
+**Source** `server/api/pass-types/[id]/index.put.ts` · **Auth** `authorize(event, managePassTypes)`: ADMIN or MANAGER
 
 Edits a product and is the **only** way to change `status`. The box office offers `ON_SALE` types
 only, so without this a pass product could never be sold.
@@ -1656,36 +1656,36 @@ nowhere), and `409` when lowering `maxIssued` below the number already issued.
 
 #### `GET /api/passes`
 
-**Source** `server/api/passes/index.get.ts` · **Auth** `authorize(event, listPasses)` — staff
+**Source** `server/api/passes/index.get.ts` · **Auth** `authorize(event, listPasses)`: staff
 
 Paginated `{ rows, total, page, limit }`. `?q` matches reference, holder name or holder email.
 
-With `?performanceId=`, each row gains `redeemable: { ok, reason?, message? }` — the door check,
+With `?performanceId=`, each row gains `redeemable: { ok, reason?, message? }`, the door check,
 decided for the whole page in four queries rather than five per pass.
 
 #### `POST /api/passes`
 
-**Source** `server/api/passes/index.post.ts` · **Auth** `authorize(event, issuePass)` — staff
+**Source** `server/api/passes/index.post.ts` · **Auth** `authorize(event, issuePass)`: staff
 
 Issues a pass to a holder, creating a shadow account via the auth service when the buyer has none.
 Enforces `maxIssued` against ACTIVE passes.
 
 #### `PUT /api/passes/:id`
 
-**Source** `server/api/passes/[id]/index.put.ts` · **Auth** `authorize(event, cancelPass)` — ADMIN or MANAGER
+**Source** `server/api/passes/[id]/index.put.ts` · **Auth** `authorize(event, cancelPass)`: ADMIN or MANAGER
 
 Cancels or reinstates one issued pass.
 
 #### `POST /api/passes/:id/redeem`
 
-**Source** `server/api/passes/[id]/redeem.post.ts` · **Auth** `authorize(event, redeemPass)` — staff
+**Source** `server/api/passes/[id]/redeem.post.ts` · **Auth** `authorize(event, redeemPass)`: staff
 
 Admits a pass holder to a performance: writes a £0 `PASS_ADMISSION` ticket and a `pass_admissions`
 ledger row in one batch. `canRedeem` checks, in order, that the pass is ACTIVE, in date, covers the
 show, has not already been used for this performance, that the performance is ON_SALE, and that
 there is room.
 
-`UNIQUE (pass_id, performance_id)` on `pass_admissions` **is** the once-per-performance rule — D1 has
+`UNIQUE (pass_id, performance_id)` on `pass_admissions` **is** the once-per-performance rule: D1 has
 no interactive transactions, so that index is what holds under a double-submit.
 
 The ledger row is protected at three depths, because losing it makes a used pass redeemable again
@@ -1722,15 +1722,15 @@ Venue responses come from `formatVenueResponse` (`server/utils/queries/venues.ts
 
 #### `GET /api/venues`
 
-**Source** `server/api/venues/index.get.ts` · **Auth** **Public** — no `authorize()`
+**Source** `server/api/venues/index.get.ts` · **Auth** **Public**: no `authorize()`
 
-**Response** `200` — all venues with features, ordered by name.
+**Response** `200`: all venues with features, ordered by name.
 
 ---
 
 #### `POST /api/venues`
 
-**Source** `server/api/venues/index.post.ts` · **Auth** `authorize(event, createVenue)` — ADMIN or MANAGER
+**Source** `server/api/venues/index.post.ts` · **Auth** `authorize(event, createVenue)`: ADMIN or MANAGER
 
 ```ts
 {
@@ -1742,11 +1742,11 @@ Venue responses come from `formatVenueResponse` (`server/utils/queries/venues.ts
 }
 ```
 
-**Response** `200` — the created venue with features.
+**Response** `200`: the created venue with features.
 
 **Errors** `400 Venue with this name already exists`; `403`; `500 Failed to create venue` / `Failed to retrieve created venue`.
 
-**Side effects** Inserts `venues_to_features` join rows for each `featureIds` entry. IDs are **not** validated, so an unknown feature id raises a foreign-key error as a 500 *after* the venue has been created. There is no image field here — upload separately.
+**Side effects** Inserts `venues_to_features` join rows for each `featureIds` entry. IDs are **not** validated, so an unknown feature id raises a foreign-key error as a 500 *after* the venue has been created. There is no image field here: upload separately.
 
 ---
 
@@ -1754,13 +1754,13 @@ Venue responses come from `formatVenueResponse` (`server/utils/queries/venues.ts
 
 **Source** `server/api/venues/[id]/index.get.ts` · **Auth** **Public**
 
-**Response** `200` — one venue with features. **Errors** `400 Venue ID is required`; `404 Venue not found`.
+**Response** `200`: one venue with features. **Errors** `400 Venue ID is required`; `404 Venue not found`.
 
 ---
 
 #### `PUT /api/venues/:id`
 
-**Source** `server/api/venues/[id]/index.put.ts` · **Auth** `authorize(event, updateVenue)` — ADMIN or MANAGER
+**Source** `server/api/venues/[id]/index.put.ts` · **Auth** `authorize(event, updateVenue)`: ADMIN or MANAGER
 
 ```ts
 {
@@ -1772,7 +1772,7 @@ Venue responses come from `formatVenueResponse` (`server/utils/queries/venues.ts
 }
 ```
 
-**Response** `200` — the updated venue with features.
+**Response** `200`: the updated venue with features.
 
 **Errors** `400 Venue ID is required`; `404 Venue not found`; `400 Venue name is already taken`; `403`; `500 Failed to retrieve updated venue`.
 
@@ -1782,23 +1782,23 @@ Venue responses come from `formatVenueResponse` (`server/utils/queries/venues.ts
 
 #### `DELETE /api/venues/:id`
 
-**Source** `server/api/venues/[id]/index.delete.ts` · **Auth** `authorize(event, deleteVenue)` — **ADMIN only**
+**Source** `server/api/venues/[id]/index.delete.ts` · **Auth** `authorize(event, deleteVenue)`: **ADMIN only**
 
-**Response** `200` — `{ message: 'Venue deleted successfully' }`
+**Response** `200`: `{ message: 'Venue deleted successfully' }`
 
 **Errors** `400 Venue ID is required`; `404 Venue not found`; `403`.
 
-**Side effects** Deletes the venue image from R2 first, logging and continuing if that fails. `venues_to_features` rows cascade. **`performances.venueId` is `onDelete: 'restrict'`**, so a venue with any performance cannot be deleted and the FK error surfaces as an uncaught 500 — note the R2 image may already have been destroyed by that point.
+**Side effects** Deletes the venue image from R2 first, logging and continuing if that fails. `venues_to_features` rows cascade. **`performances.venueId` is `onDelete: 'restrict'`**, so a venue with any performance cannot be deleted and the FK error surfaces as an uncaught 500, note the R2 image may already have been destroyed by that point.
 
 ---
 
 #### `POST /api/venues/:id/image`
 
-**Source** `server/api/venues/[id]/image.post.ts`, via `validateAndUploadImage` · **Auth** `authorize(event, updateVenue)` — ADMIN or MANAGER
+**Source** `server/api/venues/[id]/image.post.ts`, via `validateAndUploadImage` · **Auth** `authorize(event, updateVenue)`: ADMIN or MANAGER
 
 **Body** `multipart/form-data` with a single file field named **`image`** (the show equivalent uses `poster`). Same constraints: JPEG/PNG/WebP, max 5 MB, stored at `venues/<venueId>/image-<Date.now()>.<ext>` with public access.
 
-**Response** `200` — `{ imageUrl: '<pathname>', message: 'Image uploaded successfully' }`. Note this differs from the show poster endpoint, which returns the whole updated row.
+**Response** `200`: `{ imageUrl: '<pathname>', message: 'Image uploaded successfully' }`. Note this differs from the show poster endpoint, which returns the whole updated row.
 
 **Errors** `400 Venue ID is required`; the three `validateAndUploadImage` 400s (`No file provided`, `No file provided (field name: image)`, `Invalid file type…`, `File size exceeds 5MB limit`); `404 Venue not found`; `403`.
 
@@ -1808,9 +1808,9 @@ Venue responses come from `formatVenueResponse` (`server/utils/queries/venues.ts
 
 #### `DELETE /api/venues/:id/image`
 
-**Source** `server/api/venues/[id]/image.delete.ts` · **Auth** `authorize(event, updateVenue)` — ADMIN or MANAGER
+**Source** `server/api/venues/[id]/image.delete.ts` · **Auth** `authorize(event, updateVenue)`: ADMIN or MANAGER
 
-**Response** `200` — `{ message: 'Image deleted successfully' }`
+**Response** `200`: `{ message: 'Image deleted successfully' }`
 
 **Errors** `400 Venue ID is required`; `404 Venue not found`; `404 Venue has no image to delete`; `500 Failed to delete image from storage`; `403`.
 
@@ -1824,13 +1824,13 @@ Venue responses come from `formatVenueResponse` (`server/utils/queries/venues.ts
 
 **Query** `page`, `limit` (max 100, default 25) and optional `q`, matching `name`.
 
-**Response** `200` — the `Paginated<T>` envelope, rows ordered by name: `{ rows: [{ id, name, description, icon, createdAt, updatedAt }], total, page, limit }`.
+**Response** `200`: the `Paginated<T>` envelope, rows ordered by name: `{ rows: [{ id, name, description, icon, createdAt, updatedAt }], total, page, limit }`.
 
 ---
 
 #### `POST /api/venue-features`
 
-**Source** `server/api/venue-features/index.post.ts` · **Auth** `authorize(event, createVenueFeature)` — ADMIN or MANAGER
+**Source** `server/api/venue-features/index.post.ts` · **Auth** `authorize(event, createVenueFeature)`: ADMIN or MANAGER
 
 ```ts
 {
@@ -1840,7 +1840,7 @@ Venue responses come from `formatVenueResponse` (`server/utils/queries/venues.ts
 }
 ```
 
-**Response** `200` — the created row. **Errors** `400 Feature with this name already exists`; `403`; `500 Failed to create venue feature`.
+**Response** `200`: the created row. **Errors** `400 Feature with this name already exists`; `403`; `500 Failed to create venue feature`.
 
 ---
 
@@ -1848,13 +1848,13 @@ Venue responses come from `formatVenueResponse` (`server/utils/queries/venues.ts
 
 **Source** `server/api/venue-features/[id]/index.get.ts` · **Auth** **Public**
 
-**Response** `200` — one feature row. **Errors** `400 Feature ID is required`; `404 Venue feature not found`.
+**Response** `200`: one feature row. **Errors** `400 Feature ID is required`; `404 Venue feature not found`.
 
 ---
 
 #### `PUT /api/venue-features/:id`
 
-**Source** `server/api/venue-features/[id]/index.put.ts` · **Auth** `authorize(event, updateVenueFeature)` — ADMIN or MANAGER
+**Source** `server/api/venue-features/[id]/index.put.ts` · **Auth** `authorize(event, updateVenueFeature)`: ADMIN or MANAGER
 
 ```ts
 {
@@ -1866,15 +1866,15 @@ Venue responses come from `formatVenueResponse` (`server/utils/queries/venues.ts
 
 An empty body returns the existing row with `200`.
 
-**Response** `200` — the updated row. **Errors** `400 Feature ID is required`; `404 Venue feature not found`; `400 Feature name is already taken`; `403`; `500 Failed to update venue feature`.
+**Response** `200`: the updated row. **Errors** `400 Feature ID is required`; `404 Venue feature not found`; `400 Feature name is already taken`; `403`; `500 Failed to update venue feature`.
 
 ---
 
 #### `DELETE /api/venue-features/:id`
 
-**Source** `server/api/venue-features/[id]/index.delete.ts` · **Auth** `authorize(event, deleteVenueFeature)` — **ADMIN only**
+**Source** `server/api/venue-features/[id]/index.delete.ts` · **Auth** `authorize(event, deleteVenueFeature)`: **ADMIN only**
 
-**Response** `200` — `{ message: 'Venue feature deleted successfully' }`
+**Response** `200`: `{ message: 'Venue feature deleted successfully' }`
 
 **Errors** `400 Feature ID is required`; `404 Venue feature not found`; `403`.
 
@@ -1894,7 +1894,7 @@ These two endpoints are the customer-safe view of the programme. Unlike `/api/sh
 
 **Query** none.
 
-**Response** `200` — published shows that have at least one `ON_SALE` performance starting after "now", sorted by earliest performance date. Shows with no qualifying performance are dropped. Returns `[]` when nothing is on.
+**Response** `200`: published shows that have at least one `ON_SALE` performance starting after "now", sorted by earliest performance date. Shows with no qualifying performance are dropped. Returns `[]` when nothing is on.
 
 ```jsonc
 [{
@@ -1911,7 +1911,7 @@ These two endpoints are the customer-safe view of the programme. Unlike `/api/sh
 }]
 ```
 
-`ticketsSold` comes from `countOccupiedSeats`, the same rule the capacity check uses, so the sold-out badge and the booking path always agree. Show and performance rows are projected through the allow-lists in `server/utils/queries/whatsOn.ts` — the internal `notes` column is **not** returned.
+`ticketsSold` comes from `countOccupiedSeats`, the same rule the capacity check uses, so the sold-out badge and the booking path always agree. Show and performance rows are projected through the allow-lists in `server/utils/queries/whatsOn.ts`: the internal `notes` column is **not** returned.
 
 ---
 
@@ -1921,7 +1921,7 @@ These two endpoints are the customer-safe view of the programme. Unlike `/api/sh
 
 Looked up by `slug` **and** `status = 'PUBLISHED'`, so a DRAFT show is a 404 on this route (it is still fully visible via `GET /api/shows`).
 
-**Response** `200` — the show with every future `ON_SALE` performance, each carrying the **full venue row** (including `address`, `description`, `imageUrl`) plus:
+**Response** `200`: the show with every future `ON_SALE` performance, each carrying the **full venue row** (including `address`, `description`, `imageUrl`) plus:
 
 ```jsonc
 {
@@ -1934,7 +1934,7 @@ Looked up by `slug` **and** `status = 'PUBLISHED'`, so a DRAFT show is a 404 on 
 }
 ```
 
-Unlike the other `available-ticket-types` endpoints, this one **filters out inactive ticket types** and sorts by `effectivePrice` ascending — it feeds the public booking form directly. `isSoldOut` is always `false` when capacity is unknown.
+Unlike the other `available-ticket-types` endpoints, this one **filters out inactive ticket types** and sorts by `effectivePrice` ascending: it feeds the public booking form directly. `isSoldOut` is always `false` when capacity is unknown.
 
 **Errors** `400 Show slug is required`; `404 Show not found`.
 
@@ -1954,7 +1954,7 @@ allow-list is name and id only.
 
 #### `GET /api/shifts`
 
-**Source** `server/api/shifts/index.get.ts` · **Auth** `authorize(event, listShifts)` — staff, or any holder of `foh.work`
+**Source** `server/api/shifts/index.get.ts` · **Auth** `authorize(event, listShifts)`: staff, or any holder of `foh.work`
 
 ```ts
 {
@@ -1967,7 +1967,7 @@ Bounded by the performance's own `startsAt`, so the bound-parameter count does n
 number of rows covered ([ADR-0006](./decisions/0006-d1-bound-parameter-limit.md)). Cancelled
 performances are excluded.
 
-**Response** `200` — a bare array of shifts, each carrying its performance, show title and venue
+**Response** `200`: a bare array of shifts, each carrying its performance, show title and venue
 name. Not paginated: the window bounds it.
 
 ---
@@ -1984,7 +1984,7 @@ On-sale performances starting within `days` that have **no confirmed duty manage
 This is what the admin screen's warning renders. Scoped by a correlated `NOT EXISTS`, never an id
 list.
 
-**Response** `200` — a bare array of `{ performanceId, startsAt, showId, showTitle, venueName }`.
+**Response** `200`: a bare array of `{ performanceId, startsAt, showId, showTitle, venueName }`.
 
 ---
 
@@ -1992,14 +1992,14 @@ list.
 
 **Source** `server/api/performances/[id]/shifts/index.get.ts` · **Auth** `authorize(event, listShifts)`
 
-**Response** `200` — the performance's slots, ordered by role then creation, each with
+**Response** `200`: the performance's slots, ordered by role then creation, each with
 `userId` and `userName` (null on an open slot).
 
 ---
 
 #### `POST /api/performances/:id/shifts`
 
-**Source** `server/api/performances/[id]/shifts/index.post.ts` · **Auth** `authorize(event, manageShifts)` — `shift.manage`
+**Source** `server/api/performances/[id]/shifts/index.post.ts` · **Auth** `authorize(event, manageShifts)`: `shift.manage`
 
 ```ts
 {
@@ -2013,7 +2013,7 @@ Giving a `userId` assigns **and confirms** in one step: an assignment by a manag
 awaiting confirmation. A second confirmed duty manager is refused with `409` before it reaches the
 partial unique index, so staff see a sentence rather than a constraint error.
 
-**Response** `200` — the created row. `404` if the performance, or the assignee's mirror row, does
+**Response** `200`: the created row. `404` if the performance, or the assignee's mirror row, does
 not exist.
 
 ---
@@ -2034,10 +2034,10 @@ not exist.
 `OPEN`, and filling an open one confirms it. The database pairs the two with a check constraint, so
 a caller cannot set a status the user column contradicts.
 
-Any manager edit clears `needsEligibilityReview` — that review is exactly what the flag was asking
+Any manager edit clears `needsEligibilityReview`: that review is exactly what the flag was asking
 for ([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md)).
 
-**Response** `200` — the updated row. `409` on a second confirmed duty manager.
+**Response** `200`: the updated row. `409` on a second confirmed duty manager.
 
 ---
 
@@ -2178,14 +2178,14 @@ Every level is derived: there is no endpoint that sets on-hand, because there is
 
 #### `POST /api/bar/transactions`
 
-**Source** `server/api/bar/transactions.post.ts` · **Auth** `workFoh` then `requireBarScope` — a
+**Source** `server/api/bar/transactions.post.ts` · **Auth** `workFoh` then `requireBarScope`: a
 `BAR` shift tonight, or `BOX_OFFICE`+
 
 One tap writes **one transaction**, whatever mix of ticket payments and bar items it covers, in a
 single `db.batch()` alongside the collection transitions. A `DOOR` shift gets `403` from every
 `/api/bar/*` route: the door never sells (docs/13 §5).
 
-- **The discount applies to the bar subtotal only.** Ticket lines are never discounted — ticket
+- **The discount applies to the bar subtotal only.** Ticket lines are never discounted: ticket
   prices have their own override chain. Line amounts stay **gross**, so product reports are honest
   and "what did we give away" is one sum.
 - **Prices are snapshotted** onto the line, exactly as a ticket's `pricePaid` is.
@@ -2200,20 +2200,20 @@ on its card, and still payable. It returns a first name and what is owed, never 
 
 ---
 
-#### `PUT /api/reservations/:id` — now also records the money
+#### `PUT /api/reservations/:id`: now also records the money
 
 Collection is the payment boundary
 ([ADR-0011](./decisions/0011-collection-is-the-payment-boundary.md)) and therefore the moment the
 money is recorded ([ADR-0023](./decisions/0023-money-taken-is-recorded-as-a-transaction.md)). Moving
 a reservation into `COLLECTED` or `DOOR` writes a `transactions` row with a `TICKET_PAYMENT` line,
-**in the same `db.batch()` as the status change** — both, or neither.
+**in the same `db.batch()` as the status change**: both, or neither.
 
 Two optional fields:
 
-- **`expectedTotalPence`** — what the screen showed. Checked, not trusted: the customer typed that
+- **`expectedTotalPence`**: what the screen showed. Checked, not trusted: the customer typed that
   figure into a card reader, so a disagreement is a real one and returns `409` with both amounts,
   having written nothing.
-- **`tender`** — `CARD` (default) or `COMP`. A comp records `0` and who approved it.
+- **`tender`**: `CARD` (default) or `COMP`. A comp records `0` and who approved it.
 
 The amount is the sum of **unrefunded tickets at the price they were sold at**, never the current
 price.
@@ -2238,7 +2238,7 @@ a real harm tonight; an unqualified claim is a flagged row a human reviews. A cl
 A `404` from rehearsal means a rule was renamed or removed. That is a configuration break, not a
 transient, and it is logged loudly rather than quietly treated as an outage.
 
-**Response** `200` — the updated shift. `409` if somebody got there first, `403` with the missing
+**Response** `200`: the updated shift. `409` if somebody got there first, `403` with the missing
 module codes when rehearsal says no.
 
 ---
@@ -2251,7 +2251,7 @@ Removes the slot outright. A shift is a plan, not a sales record, so this is a r
 than an archive ([ADR-0010](./decisions/0010-archive-never-delete-referenced-records.md) covers
 referenced records; nothing references a shift).
 
-**Response** `200` — `{ ok: true }`. `404` if it does not exist.
+**Response** `200`: `{ ok: true }`. `404` if it does not exist.
 
 ---
 
@@ -2269,7 +2269,7 @@ Effective access is ADMIN or MANAGER. BOX_OFFICE is excluded. If you add another
 
 #### `GET /api/admin/reservation-counts`
 
-**Source** `server/api/admin/reservation-counts.get.ts` · **Auth** `authorize(event, listReservations)` — staff
+**Source** `server/api/admin/reservation-counts.get.ts` · **Auth** `authorize(event, listReservations)`: staff
 
 Reservation totals by status, as one `GROUP BY` returning at most five rows. It backs the box-office status pills, which would otherwise be five `filter().length` passes over every reservation in the browser.
 
@@ -2282,7 +2282,7 @@ Reservation totals by status, as one `GROUP BY` returning at most five rows. It 
 
 Both are optional; with neither, the counts cover every reservation.
 
-**Response** `200` — `byStatus` always carries all five keys, zero-filled, so a caller need not handle a missing status:
+**Response** `200`: `byStatus` always carries all five keys, zero-filled, so a caller need not handle a missing status:
 
 ```jsonc
 { "byStatus": { "PENDING": 12, "COLLECTED": 40, "DOOR": 3, "CANCELLED": 1, "NO_SHOW": 0 }, "total": 56 }
@@ -2292,7 +2292,7 @@ Both are optional; with neither, the counts cover every reservation.
 
 #### `GET /api/admin/stats`
 
-**Source** `server/api/admin/stats.get.ts` · **Auth** inline ability — ADMIN or MANAGER
+**Source** `server/api/admin/stats.get.ts` · **Auth** inline ability: ADMIN or MANAGER
 
 **Query** none.
 
@@ -2313,7 +2313,7 @@ Both are optional; with neither, the counts cover every reservation.
 }
 ```
 
-**Revenue definition — get this right when reporting to the treasurer.** Revenue and `totalTicketsSold` count only tickets whose reservation status is `COLLECTED` or `DOOR`, and whose `refundedAt` is null. `PENDING` reservations are pre-bookings where no money has changed hands and are deliberately excluded, as are `CANCELLED` and `NO_SHOW`. `reservationsByStatus`, by contrast, counts **all** statuses. `revenueByShow` is ordered by revenue descending and only includes shows with at least one qualifying ticket.
+**Revenue definition: get this right when reporting to the treasurer.** Revenue and `totalTicketsSold` count only tickets whose reservation status is `COLLECTED` or `DOOR`, and whose `refundedAt` is null. `PENDING` reservations are pre-bookings where no money has changed hands and are deliberately excluded, as are `CANCELLED` and `NO_SHOW`. `reservationsByStatus`, by contrast, counts **all** statuses. `revenueByShow` is ordered by revenue descending and only includes shows with at least one qualifying ticket.
 
 `recentReservations` are the ten most recently created, regardless of status, with `user` (id, name, email) and `performance` → `show` (id, title) and `venue` (id, name). There are no `tickets` on these entries.
 
@@ -2323,7 +2323,7 @@ Both are optional; with neither, the counts cover every reservation.
 
 #### `GET /api/admin/export/tickets`
 
-**Source** `server/api/admin/export/tickets.get.ts` · **Auth** inline ability — ADMIN or MANAGER
+**Source** `server/api/admin/export/tickets.get.ts` · **Auth** inline ability: ADMIN or MANAGER
 
 ```ts
 // query schema
@@ -2337,9 +2337,9 @@ Both are optional; with neither, the counts cover every reservation.
 
 `performanceId` **takes precedence** over `showId`: when both are supplied the query filters on the performance alone, though the download filename is still derived from `showId`. `from` and `to` are inclusive performance-date bounds, whole days in `Europe/London`.
 
-**`400`** if none of the four is supplied — the whole archive is too large to build in one request. **`400`** again if the filters still match more than 20,000 tickets, which the CSV is assembled in memory in a single Worker.
+**`400`** if none of the four is supplied: the whole archive is too large to build in one request. **`400`** again if the filters still match more than 20,000 tickets, which the CSV is assembled in memory in a single Worker.
 
-**Response** `200` — a CSV body, not JSON, with:
+**Response** `200`: a CSV body, not JSON, with:
 
 - `Content-Type: text/csv; charset=utf-8`
 - `Content-Disposition: attachment; filename="nnt-tickets-<slug>-<YYYY-MM-DD>.csv"`, where `<slug>` is `perf-<first 8 chars of performanceId>`, `show-<first 8 chars of showId>`, or `<from|start>-to-<to|end>`.
@@ -2363,13 +2363,13 @@ Columns, in order:
 | 13 | Customer Notes | |
 | 14 | Staff Notes | Internal notes are included in the export |
 
-One row per ticket, ordered by show title, then performance start, then booking reference. Cells containing a comma, quote, or newline are quoted with doubled inner quotes. **Every reservation status is included** — cancelled and no-show rows appear too — so the treasurer has a full audit trail; filter on the Status and Refunded columns rather than assuming the file is a revenue report.
+One row per ticket, ordered by show title, then performance start, then booking reference. Cells containing a comma, quote, or newline are quoted with doubled inner quotes. **Every reservation status is included** (cancelled and no-show rows appear too) so the treasurer has a full audit trail; filter on the Status and Refunded columns rather than assuming the file is a revenue report.
 
 When `showId` matches a show with no performances, an empty CSV (headers only) is returned with the generic filename `nnt-tickets.csv`.
 
 **Errors** `403`; `400` on a non-string query value.
 
-**Side effects** None — read-only. The whole file is built in memory as a single string, so a very large export is bounded by Worker memory.
+**Side effects** None: read-only. The whole file is built in memory as a single string, so a very large export is bounded by Worker memory.
 
 ---
 
@@ -2379,7 +2379,7 @@ When `showId` matches a show with no performances, an empty CSV (headers only) i
 
 #### `GET /api/health`
 
-**Source** `server/api/health.get.ts` · **Auth** **Public** — no `authorize()`, no `requireUserSession()`
+**Source** `server/api/health.get.ts` · **Auth** **Public**: no `authorize()`, no `requireUserSession()`
 
 The one endpoint in this app where an unguarded handler is deliberate rather than a bug: uptime
 monitoring cannot hold a session, and the response carries no personal data. Everywhere else in this
@@ -2413,14 +2413,14 @@ Three details that are load-bearing:
 Why it exists rather than returning a bare `ok`: migrations apply from CI but cannot be sequenced
 against the deploy, so the ordering is a race won on timing
 ([08-operations](./08-operations.md) §5). This is the alarm for the case where it is lost, and it is
-the second half of stage-door ADR-0021 — the first half being the workflow this repo already had.
+the second half of stage-door ADR-0021: the first half being the workflow this repo already had.
 ### 3.10a2 Show night
 
 ---
 
 #### `GET /api/foh/tonight`
 
-**Source** `server/api/foh/tonight.get.ts` · **Auth** `authorize(event, workFoh)` — `foh.work`
+**Source** `server/api/foh/tonight.get.ts` · **Auth** `authorize(event, workFoh)`: `foh.work`
 
 The scope the `/foh` screen renders. The role gets you the endpoint; **the rota decides what is in
 it** ([ADR-0019](./decisions/0019-the-rota-scopes-the-front-of-house-role.md)).
@@ -2450,14 +2450,14 @@ Three behaviours worth knowing:
 - **The night rolls over at 04:00**, not midnight, so a screen open at 00:30 still shows the night
   that is ending. `showNightDate()` in `server/utils/foh.ts` is the only definition of that.
 
-Anyone without `foh.work` gets `403`, including anonymous callers — `defineAbility` with a single
+Anyone without `foh.work` gets `403`, including anonymous callers: `defineAbility` with a single
 argument denies guests (§1).
 
 ---
 
 #### `GET /api/foh/lookup`
 
-**Source** `server/api/foh/lookup.get.ts` · **Auth** `authorize(event, workFoh)` — `foh.work`
+**Source** `server/api/foh/lookup.get.ts` · **Auth** `authorize(event, workFoh)`: `foh.work`
 
 ```ts
 { q: z.string().trim().min(2).max(100) }
@@ -2475,13 +2475,13 @@ filtered by the *same predicate* rather than by the ids just returned, for the s
 | | `FRONT_OF_HOUSE` | `BOX_OFFICE` and above |
 |---|---|---|
 | `standing.state`, `standing.partySize` | ✅ | ✅ |
-| `standing.amountOwedPence` | — | ✅ |
-| `firstName` | ✅ | — |
-| `customerName`, `customerEmail` | — | ✅ |
-| `tickets` with `pricePaid` | — | ✅ |
+| `standing.amountOwedPence` | - | ✅ |
+| `firstName` | ✅ | - |
+| `customerName`, `customerEmail` | - | ✅ |
+| `tickets` with `pricePaid` | - | ✅ |
 
 The door's job is admit or redirect, so it gets the verdict and the head count and **no money at
-all, including what is owed** — that figure is the bar's
+all, including what is owed**: that figure is the bar's
 ([11-show-night-screen-design](./11-show-night-screen-design.md) §2.1). Allow-listed rather than
 deleted, so a column added later is private until someone decides otherwise.
 
@@ -2489,7 +2489,7 @@ deleted, so a column added later is private until someone decides otherwise.
 ([ADR-0011](./decisions/0011-collection-is-the-payment-boundary.md)). The bar till will call the
 same function; do not write a second one.
 
-**Response** `200` — an array, possibly empty. A booking for another night is simply not found here,
+**Response** `200`: an array, possibly empty. A booking for another night is simply not found here,
 which is deliberate: the rota scope is a boundary, not a convenience.
 
 ---
@@ -2507,7 +2507,7 @@ backstage cookie is not that cookie.
 
 **The code is never stored.** It is derived by HMAC from the night and the epoch; the database holds
 only those two. `POST /api/foh/backstage/reset` bumps the epoch, which changes the code and
-invalidates every session in one write, logs an incident entry and emails `boxoffice@` — audited and
+invalidates every session in one write, logs an incident entry and emails `boxoffice@`: audited and
 announced, so it stays free to use liberally.
 
 **Two limits guard joining.** The rate limiter caps attempts per caller
@@ -2515,7 +2515,7 @@ announced, so it stays free to use liberally.
 across *all* devices: past the threshold it rotates its own epoch. A distributed guesser therefore
 achieves a code reset, never a join.
 
-`GET /api/backstage/emergency` is **deliberately public** — no session of either kind. Safety
+`GET /api/backstage/emergency` is **deliberately public**: no session of either kind. Safety
 information is never behind a lock (§5.1), so a device that has not joined can still read the 999
 address and the assembly point. It is allow-listed to the emergency card and rate limited; nothing
 about who is coming, what was sold or who is working crosses that boundary.
@@ -2591,12 +2591,12 @@ access field at all, and withdrawing consent empties it while leaving the profil
 
 #### `GET /api/foh/glance`
 
-**Source** `server/api/foh/glance.get.ts` · **Auth** `authorize(event, workFoh)` — `foh.work`
+**Source** `server/api/foh/glance.get.ts` · **Auth** `authorize(event, workFoh)`: `foh.work`
 
 `{ performanceId }`, scoped like every other show-night route.
 
 Returns `numbers` and `show`. **Every seat figure goes through `countOccupiedSeatsFor()`**
-([ADR-0007](./decisions/0007-one-seat-counting-rule.md)) — a second count here would be a second
+([ADR-0007](./decisions/0007-one-seat-counting-rule.md)): a second count here would be a second
 definition of a full house. `collected` narrows the same set by reservation status rather than
 counting seats a different way.
 
@@ -2612,7 +2612,7 @@ because the door should say which it is rather than guess.
 
 #### `GET /api/foh/emergency`, `GET /api/foh/contacts`, `GET|POST /api/foh/incidents`
 
-**Source** `server/api/foh/*` · **Auth** `authorize(event, workFoh)` — `foh.work`
+**Source** `server/api/foh/*` · **Auth** `authorize(event, workFoh)`: `foh.work`
 
 All take a `performanceId` and run it through `scopedPerformance()`, which **404s anything not in
 tonight's scope**. A performance id from elsewhere is not a way round the rota, so the check is one
@@ -2622,7 +2622,7 @@ function and every show-night route calls it
 - **`emergency`** returns the venue's card, or `null` where none is recorded. A venue with no card
   still answers: nothing on this path is worth a failed request, because it is the one screen that
   has to work when everything else is going wrong.
-- **`contacts`** returns `{ onTonight, contacts }`. `onTonight` is **names and roles only** — the
+- **`contacts`** returns `{ onTonight, contacts }`. `onTonight` is **names and roles only**: the
   mirror holds no phone numbers, and a colleague's email is not the door's business. The numbers
   come from the admin list.
 - **`incidents`** lists in reverse order, and `POST` appends. **There is deliberately no update or
@@ -2632,7 +2632,7 @@ function and every show-night route calls it
 
 #### `/api/admin/foh/**`
 
-**Auth** `authorize(event, manageFohReference)` — `foh.manage`, held by `ADMIN`, `MANAGER` and
+**Auth** `authorize(event, manageFohReference)`: `foh.manage`, held by `ADMIN`, `MANAGER` and
 `FOH_MANAGER`.
 
 The emergency card is upserted per venue, so a first save and an edit are the same call. Contacts
@@ -2682,19 +2682,19 @@ oracle over a six-character space, so it is capped like the other public booking
 
 #### `GET /images/**`
 
-**Source** `server/routes/images/[...pathname].get.ts` · **Auth** **Public — no `authorize()`**
+**Source** `server/routes/images/[...pathname].get.ts` · **Auth** **Public: no `authorize()`**
 
 The only handler outside `server/api/`. Streams an object out of the Cloudflare R2 bucket (`proscenium-blob`) by pathname, e.g. `/images/shows/abc123/image-1712345678.jpg` serves the blob at `shows/abc123/image-1712345678.jpg`.
 
-**Response** `200` — the raw object with its stored content type, plus `Content-Security-Policy: default-src 'none';` to neutralise any HTML or script that reaches the bucket. `404` when the pathname does not exist.
+**Response** `200`: the raw object with its stored content type, plus `Content-Security-Policy: default-src 'none';` to neutralise any HTML or script that reaches the bucket. `404` when the pathname does not exist.
 
-**Side effects** None. Anything written to the bucket is publicly readable by anyone who knows or guesses the pathname — uploads are stored with `access: 'public'`. Do not put anything sensitive in blob storage.
+**Side effects** None. Anything written to the bucket is publicly readable by anyone who knows or guesses the pathname: uploads are stored with `access: 'public'`. Do not put anything sensitive in blob storage.
 
 ---
 
 ## 4. Cross-cutting notes for maintainers
 
-**Nothing is transactional.** Every multi-step write — create reservation then insert tickets, create user then insert roles, replace venue features — runs as separate statements. A failure midway leaves partial state. If you are adding a multi-row write, consider whether an orphan is tolerable.
+**Nothing is transactional.** Every multi-step write (create reservation then insert tickets, create user then insert roles, replace venue features) runs as separate statements. A failure midway leaves partial state. If you are adding a multi-row write, consider whether an orphan is tolerable.
 
 **Capacity is enforced in exactly one place.** `POST /api/bookings` is the only handler that checks it, and it does so with a non-atomic read-then-write. `POST /api/reservations` and `PUT /api/reservations/:id/tickets` do not check at all. `isSoldOut` on `/api/whats-on/:slug` is presentational.
 

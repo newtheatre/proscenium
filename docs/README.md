@@ -33,15 +33,15 @@ Gaps section of [08-operations](./08-operations.md) are what you have actually i
 | 02 | [Architecture](./02-architecture.md) | Stack, deployment shape, request lifecycle, the constraints Workers and D1 impose | Before making a structural change |
 | 03 | [Domain model](./03-domain-model.md) | Every entity, its invariants, and the status lifecycles | Before touching the schema |
 | 04 | [Auth and permissions](./04-auth-and-permissions.md) | Sessions, roles, the ability system, the permission matrix | Adding an endpoint |
-| 05 | [Booking and box office](./05-booking-and-box-office.md) | The public booking flow, walk-ins, collection, no-shows — end to end | Changing anything a customer touches |
+| 05 | [Booking and box office](./05-booking-and-box-office.md) | The public booking flow, walk-ins, collection, no-shows: end to end | Changing anything a customer touches |
 | 06 | [Pricing and ticket types](./06-pricing-and-ticket-types.md) | The override chain, price snapshots, what `pricePaid` actually means | Changing prices or reporting on money |
 | 07 | [API reference](./07-api-reference.md) | Every endpoint: auth, schemas, responses, side effects | Writing a client, or auditing access |
 | 08 | [Operations](./08-operations.md) | Deploy, rollback, migrations, backups, incident checklists, handover | On call |
 | 09 | [Known issues](./09-known-issues.md) | Every bug and sharp edge found in the August 2026 audit, with severity | Prioritising work |
-| 10 | [Passes — design](./10-passes-design.md) | Season passes and festival passes. **Phase 1 built** (Aug 2026); phases 2–4 outstanding. | Implementing passes |
-| 11 | [Show night screen — design](./11-show-night-screen-design.md) | The `/foh` screen: scanner and QR, tonight at a glance, emergency, incidents, backstage comms. **Agreed Aug 2026, not built.** | Implementing the show night screen |
-| 12 | [Access, staffing and end-of-night — design](./12-access-and-staffing-design.md) | Access needs, the volunteer rota, the end-of-night report. **Its §5 is the programme order for 11, 12 and 13 together.** | Before starting any part of 11, 12 or 13 |
-| 13 | [Bar — design](./13-bar-design.md) | The counter till, the stock ledger, Challenge 25, the daily reconciliation. **Agreed Aug 2026, not built.** | Implementing the bar |
+| 10 | [Passes: design](./10-passes-design.md) | Season passes and festival passes. **Phase 1 built** (Aug 2026); phases 2–4 outstanding. | Implementing passes |
+| 11 | [Show night screen: design](./11-show-night-screen-design.md) | The `/foh` screen: scanner and QR, tonight at a glance, emergency, incidents, backstage comms. **Agreed Aug 2026, not built.** | Implementing the show night screen |
+| 12 | [Access, staffing and end-of-night: design](./12-access-and-staffing-design.md) | Access needs, the volunteer rota, the end-of-night report. **Its §5 is the programme order for 11, 12 and 13 together.** | Before starting any part of 11, 12 or 13 |
+| 13 | [Bar: design](./13-bar-design.md) | The counter till, the stock ledger, Challenge 25, the daily reconciliation. **Agreed Aug 2026, not built.** | Implementing the bar |
 
 **Documents 11, 12 and 13 are one programme, not three features.** They interleave: the rota gates
 the show night screen, the screen hosts the bar, and the end-of-night report aggregates all three.
@@ -58,7 +58,7 @@ The index, with the template, is in [`decisions/README.md`](./decisions/README.m
 
 - **British English**, sentence case headings.
 - **State what is, not what should be.** Where the code is wrong, document the behaviour and link
-  to [09-known-issues](./09-known-issues.md) — do not document the intent as though it were the
+  to [09-known-issues](./09-known-issues.md): do not document the intent as though it were the
   behaviour. A doc that lies is worse than no doc.
 - **Numbers with provenance.** If you quote a figure, say where it came from and when.
 - **One owner.** The IT Manager owns this directory. Review it at handover, as required by the
@@ -69,4 +69,4 @@ The index, with the template, is in [`decisions/README.md`](./decisions/README.m
 Written August 2026 by Matt Adcock (IT Manager/Archivist 26/27) as part of the legacy ticketing
 migration. Sections 01, 07 and 08 were drafted from a full read of the source; 02–06 and 09 from an
 audit of the same. Nothing here has been through code review, because there is no one else to review
-it — which is itself the problem this directory exists to reduce.
+it, which is itself the problem this directory exists to reduce.

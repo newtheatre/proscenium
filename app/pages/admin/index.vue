@@ -65,13 +65,13 @@ const STATUS_CONFIG = {
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
-// Server-rendered, and requestFetch rather than a bare $fetch — every admin
+// Server-rendered, and requestFetch rather than a bare $fetch: every admin
 // endpoint is behind authorize() (ADR-0013).
 const requestFetch = useRequestFetch()
 const { data: stats, status: statsStatus, error: statsError, refresh: refreshStats } = await useAsyncData(
   'admin-stats', () => requestFetch<Stats>('/api/admin/stats'))
 
-/** e.g. "2025/26 season" — or the explicit dates when a custom range is set. */
+/** e.g. "2025/26 season", or the explicit dates when a custom range is set. */
 const windowLabel = computed(() => {
   const w = stats.value?.window
   if (!w) return ''
@@ -96,7 +96,7 @@ const statsCaveat = computed(() => {
   if (derived) parts.push(`${derived.toLocaleString('en-GB')} estimated`)
   return `Includes ${parts.join(', ')}`
 })
-// `view=options` — id, slug, title, status and nothing else, rather than the
+// `view=options`: id, slug, title, status and nothing else, rather than the
 // whole nested archive.
 const { data: shows } = await useAsyncData(
   'admin-show-options',
@@ -184,12 +184,12 @@ const recentColumns: TableColumn<RecentReservation>[] = [
   {
     accessorKey: 'user',
     header: 'Customer',
-    cell: ({ row }) => row.original.user?.name ?? '—',
+    cell: ({ row }) => row.original.user?.name ?? '-',
   },
   {
     id: 'show',
     header: 'Show',
-    cell: ({ row }) => row.original.performance?.show?.title ?? '—',
+    cell: ({ row }) => row.original.performance?.show?.title ?? '-',
   },
   {
     id: 'performance',
@@ -226,7 +226,7 @@ const recentColumns: TableColumn<RecentReservation>[] = [
 
     <template v-else-if="stats">
       <!--
-      These figures are for one season, not all time — say so, or a decade of
+      These figures are for one season, not all time: say so, or a decade of
       imported takings reads as the current year's.
       -->
       <div class="flex flex-wrap items-center gap-2 text-sm">

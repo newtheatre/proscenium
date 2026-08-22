@@ -13,7 +13,7 @@ import type {
 
 const props = withDefaults(defineProps<{
   /**
-   * Must be a caller-owned computed or ref, never built in the template — a new
+   * Must be a caller-owned computed or ref, never built in the template: a new
    * array identity per render sends UTable into a loop (ADR-0012).
    */
   rows: ShowListItem[]
@@ -221,7 +221,7 @@ const columns: TableColumn<ShowTreeRow>[] = [
     cell: ({ row }) => {
       if (row.depth === 0) return null
       const performance = row.original as PerformanceListItem
-      return h('span', { class: 'text-sm text-highlighted' }, performance.venue?.name ?? '—')
+      return h('span', { class: 'text-sm text-highlighted' }, performance.venue?.name ?? '-')
     },
   },
   {

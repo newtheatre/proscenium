@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { count, eq } from 'drizzle-orm'
 import { deleteReservation } from '~~/shared/utils/abilities'
 
-/** DELETE /api/reservations/:id — delete a reservation. Admin/Manager only. */
+/** DELETE /api/reservations/:id. Delete a reservation. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, deleteReservation)
 
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Tickets first — the reservation FK is `restrict` — and atomically, so a
+  // Tickets first (the reservation FK is `restrict`) and atomically, so a
   // failure cannot strip a reservation of its tickets.
   await db.batch([
     db.delete(schema.tickets).where(eq(schema.tickets.reservationId, id)),

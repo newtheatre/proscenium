@@ -8,7 +8,7 @@ const querySchema = paginationSchema.extend({
   status: z.enum(schema.PASS_REQUEST_STATUSES).optional().default('PENDING'),
 })
 
-/** GET /api/pass-requests — the box office queue of people wanting a pass. */
+/** GET /api/pass-requests: the box office queue of people wanting a pass. */
 export default defineEventHandler(async (event) => {
   await authorize(event, issuePass)
 

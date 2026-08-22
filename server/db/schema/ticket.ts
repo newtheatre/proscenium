@@ -41,7 +41,7 @@ export const ticketTypesRelations = relations(ticketTypes, ({ many }) => ({
   tickets: many(tickets),
 }))
 
-// Show-level overrides — apply to all performances in a show unless further overridden
+// Show-level overrides: apply to all performances in a show unless further overridden
 export const showTicketTypeOverrides = sqliteTable('show_ticket_type_overrides', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   showId: text('show_id').notNull().references(() => shows.id, { onDelete: 'cascade' }),
@@ -70,7 +70,7 @@ export const showTicketTypeOverridesRelations = relations(showTicketTypeOverride
   }),
 }))
 
-// Performance-level overrides — most specific, highest priority in the override chain
+// Performance-level overrides: most specific, highest priority in the override chain
 export const performanceTicketTypeOverrides = sqliteTable('performance_ticket_type_overrides', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'cascade' }),

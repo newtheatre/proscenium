@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
       v-if="stale"
       class="mb-3 rounded-lg bg-amber-600 p-3 text-center font-medium text-neutral-950"
     >
-      Stale since {{ formatTime(new Date(lastSuccess).toISOString()) }} — this board is not updating.
+      Stale since {{ formatTime(new Date(lastSuccess).toISOString()) }}: this board is not updating.
     </div>
 
     <!-- Unacked calls take the width and stay until tapped (§5.4). -->
@@ -183,7 +183,7 @@ onBeforeUnmount(() => {
           Last from front of house
         </p>
         <p class="mt-1 text-xl font-semibold">
-          {{ latestFoh?.label ?? '—' }}
+          {{ latestFoh?.label ?? '-' }}
         </p>
         <p
           v-if="latestFoh"
@@ -198,7 +198,7 @@ onBeforeUnmount(() => {
           Last from us
         </p>
         <p class="mt-1 text-xl font-semibold">
-          {{ latestOurs?.label ?? '—' }}
+          {{ latestOurs?.label ?? '-' }}
         </p>
         <p
           v-if="latestOurs"

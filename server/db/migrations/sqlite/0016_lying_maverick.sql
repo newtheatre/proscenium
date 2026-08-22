@@ -6,11 +6,11 @@
 -- emitted the usual `__new_*` rebuild, which would have failed twice over:
 --
 --   1. Both INSERT…SELECTs read columns that do not exist yet (`slug`, `level`).
---      Nothing carries over anyway — this is a deliberate clean slate.
+--      Nothing carries over anyway: this is a deliberate clean slate.
 --   2. `DROP TABLE content_warnings` drops a *parent*. D1 runs every migration
 --      inside an implicit transaction with foreign keys enforced and documents
 --      that a query cannot turn them off, so drizzle's `PRAGMA foreign_keys=OFF`
---      is inert there — the drop would have cascaded into show_content_warnings
+--      is inert there: the drop would have cascaded into show_content_warnings
 --      and emptied it before the archive copy ran. Every previous rebuild in
 --      this repo happened to touch a child table, which is why this has not
 --      bitten before. Child is dropped first here so no cascade is possible.
@@ -158,11 +158,11 @@ INSERT INTO `content_warnings` ("id", "slug", "title", "kind", "category", "desc
 -- the archive ends up self-describing: `mapped_to_warning_id IS NULL` is exactly
 -- "this one did not carry over", which is what the show editor asks for. The
 -- insert below cannot answer that question on its own, because it collapses
--- rows — "Sexism" and "Misogyny" both become `sexism`, so only one of the two
+-- rows: "Sexism" and "Misogyny" both become `sexism`, so only one of the two
 -- archive ids survives as a live row and the other would look dropped.
 --
 -- The alias map was derived by reading every one of the 361 distinct legacy
--- titles in use, ranked by usage — not by pattern-matching prefixes. It covers
+-- titles in use, ranked by usage: not by pattern-matching prefixes. It covers
 -- 963 of 998 links (96.5%). The 35 it leaves are titles too vague to restate
 -- ("Adult content", "Political Themes", "Lying and Deceit"); inventing a
 -- meaning for those would be worse than admitting they were dropped.
@@ -555,8 +555,8 @@ UPDATE `show_content_warnings_archive` SET `mapped_to_warning_id` = (
 -- it was staged, so it was shown.
 --
 -- The GROUP BY is not cosmetic. The old unique key was (show, warning, axis) and
--- the new one is (show, warning), so a show carrying one warning on two axes —
--- or two legacy titles that alias to one entry — would violate it and, on D1's
+-- the new one is (show, warning), so a show carrying one warning on two axes:
+-- or two legacy titles that alias to one entry: would violate it and, on D1's
 -- atomic path, roll back the whole migration. MIN(level_rank) means the
 -- strongest claim wins. Reusing MIN(archive_id) as the new row id keeps the
 -- migration deterministic and every live row traceable to an archive row.

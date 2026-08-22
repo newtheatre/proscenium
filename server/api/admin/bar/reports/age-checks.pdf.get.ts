@@ -17,7 +17,7 @@ const REASONS: Record<string, string> = {
   OTHER: 'Other',
 }
 
-/** GET /api/admin/bar/reports/age-checks.pdf — the register, for a licensing visit. */
+/** GET /api/admin/bar/reports/age-checks.pdf: the register, for a licensing visit. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

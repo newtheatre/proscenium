@@ -39,10 +39,10 @@ const emit = defineEmits<{
 
 const toast = useToast()
 
-// ─── Data fetching (no await — see ShowTicketTypesModal for explanation) ─────────
+// ─── Data fetching (no await: see ShowTicketTypesModal for explanation) ─────────
 
 // Nuxt types the request getter as () => NitroFetchRequest and does not model
-// returning null to skip, so cast it — the runtime honours the null.
+// returning null to skip, so cast it: the runtime honours the null.
 const ticketTypesUrl = () => props.performance?.id
   ? `/api/shows/${props.performance.showId}/performances/${props.performance.id}/ticket-types`
   : null

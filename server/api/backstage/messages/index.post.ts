@@ -5,7 +5,7 @@ const bodySchema = z.object({
   body: z.string().trim().max(500).optional(),
 })
 
-/** POST /api/backstage/messages — send a preset or free text. One of three verbs. */
+/** POST /api/backstage/messages: send a preset or free text. One of three verbs. */
 export default defineEventHandler(async (event) => {
   const session = await requireBackstageSession(event)
   const input = await readValidatedBody(event, bodySchema.parse)

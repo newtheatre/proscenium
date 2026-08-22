@@ -3,7 +3,7 @@ import type { BatchItem } from 'drizzle-orm/batch'
 import { eq, sql } from 'drizzle-orm'
 import { workFoh } from '~~/shared/utils/abilities'
 
-/** POST /api/bar/comps/:id/approve — the approval writes the record. */
+/** POST /api/bar/comps/:id/approve: the approval writes the record. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

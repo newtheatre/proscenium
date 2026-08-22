@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { readUser } from '~~/shared/utils/abilities'
 
-/** GET /api/users/:id — get a local user mirror by ID. Staff or own profile. */
+/** GET /api/users/:id. Get a local user mirror by ID. Staff or own profile. */
 export default defineEventHandler(async (event) => {
   const userId = getRouterParam(event, 'id')
 

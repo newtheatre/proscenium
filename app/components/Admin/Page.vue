@@ -1,5 +1,5 @@
 <!--
-The root element of an admin page, and almost nothing else — the panel body
+The root element of an admin page, and almost nothing else: the panel body
 already provides padding, scrolling and rhythm (ADR-0012).
 -->
 <template>

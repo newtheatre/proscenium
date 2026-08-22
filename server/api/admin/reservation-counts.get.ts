@@ -9,7 +9,7 @@ const querySchema = z.object({
 })
 
 /**
- * GET /api/admin/reservation-counts — reservation totals by status.
+ * GET /api/admin/reservation-counts: reservation totals by status.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listReservations)

@@ -3,7 +3,7 @@ import { z } from 'zod'
 const querySchema = z.object({ since: z.coerce.number().int().min(0).optional() })
 
 /**
- * GET /api/backstage/board — everything the backstage display shows. Zero
+ * GET /api/backstage/board: everything the backstage display shows. Zero
  * personal data crosses this line, by construction (docs/11 §5.2).
  */
 export default defineEventHandler(async (event) => {

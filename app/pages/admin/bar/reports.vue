@@ -266,16 +266,16 @@ const registerUrl = computed(() =>
         :columns="gpColumns"
       >
         <template #pricePence-cell="{ row }">
-          <span class="tabular-nums">{{ row.original.pricePence == null ? '—' : formatMoney(row.original.pricePence) }}</span>
+          <span class="tabular-nums">{{ row.original.pricePence == null ? '-' : formatMoney(row.original.pricePence) }}</span>
         </template>
         <template #costPence-cell="{ row }">
-          <span class="tabular-nums">{{ row.original.costPence == null ? '—' : formatMoney(row.original.costPence) }}</span>
+          <span class="tabular-nums">{{ row.original.costPence == null ? '-' : formatMoney(row.original.costPence) }}</span>
         </template>
         <template #marginPence-cell="{ row }">
-          <span class="tabular-nums">{{ row.original.marginPence == null ? '—' : formatMoney(row.original.marginPence) }}</span>
+          <span class="tabular-nums">{{ row.original.marginPence == null ? '-' : formatMoney(row.original.marginPence) }}</span>
         </template>
         <template #gpPercent-cell="{ row }">
-          <span class="tabular-nums">{{ row.original.gpPercent == null ? '—' : `${row.original.gpPercent}%` }}</span>
+          <span class="tabular-nums">{{ row.original.gpPercent == null ? '-' : `${row.original.gpPercent}%` }}</span>
         </template>
       </UTable>
       <template #footer>

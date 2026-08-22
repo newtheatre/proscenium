@@ -258,14 +258,14 @@ async function startStocktake() {
       </template>
       <template #parMilli-cell="{ row }">
         <span class="tabular-nums text-muted">
-          {{ row.original.parMilli == null ? '—' : (row.original.parMilli / 1000).toFixed(2) }}
+          {{ row.original.parMilli == null ? '-' : (row.original.parMilli / 1000).toFixed(2) }}
         </span>
       </template>
       <template #lastCostPence-cell="{ row }">
-        <span class="tabular-nums">{{ row.original.lastCostPence == null ? '—' : formatMoney(row.original.lastCostPence) }}</span>
+        <span class="tabular-nums">{{ row.original.lastCostPence == null ? '-' : formatMoney(row.original.lastCostPence) }}</span>
       </template>
       <template #valuePence-cell="{ row }">
-        <span class="tabular-nums">{{ row.original.valuePence == null ? '—' : formatMoney(row.original.valuePence) }}</span>
+        <span class="tabular-nums">{{ row.original.valuePence == null ? '-' : formatMoney(row.original.valuePence) }}</span>
       </template>
       <template #actions-cell="{ row }">
         <UButton

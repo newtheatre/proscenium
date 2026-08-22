@@ -7,7 +7,7 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 
 const props = defineProps<{
   showId: string | null
-  /** Status of the parent show — determines initial performance status. */
+  /** Status of the parent show: determines initial performance status. */
   showStatus?: 'DRAFT' | 'PUBLISHED'
 }>()
 

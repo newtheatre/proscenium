@@ -26,7 +26,7 @@ const bodySchema = z.object({
   { message: 'Either userId or both name and email are required' },
 )
 
-/** POST /api/reservations — create a new reservation. Staff only. */
+/** POST /api/reservations: create a new reservation. Staff only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, createReservation)
 
@@ -79,7 +79,7 @@ export default defineEventHandler(async (event) => {
     }
     catch (error) {
       console.error('[reservations] shadow-account call failed:', error)
-      throw createError({ statusCode: 502, statusMessage: 'Could not reach the auth service — try again' })
+      throw createError({ statusCode: 502, statusMessage: 'Could not reach the auth service, try again' })
     }
 
     resolvedUserId = shadow.id

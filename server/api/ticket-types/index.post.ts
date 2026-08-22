@@ -10,7 +10,7 @@ const bodySchema = z.object({
   activeByDefault: z.boolean().optional().default(true),
 })
 
-/** POST /api/ticket-types — create a ticket type. Admin/Manager only. */
+/** POST /api/ticket-types: create a ticket type. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, createTicketType)
 

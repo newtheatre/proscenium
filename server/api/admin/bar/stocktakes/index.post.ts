@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { manageBar } from '~~/shared/utils/abilities'
 
-/** POST /api/admin/bar/stocktakes — start a count, snapshotting expected. */
+/** POST /api/admin/bar/stocktakes: start a count, snapshotting expected. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
   const { user } = await requireUserSession(event)

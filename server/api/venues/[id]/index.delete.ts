@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { blob } from 'hub:blob'
 import { deleteVenue } from '~~/shared/utils/abilities'
 
-/** DELETE /api/venues/:id — delete a venue. Admin only. */
+/** DELETE /api/venues/:id. Delete a venue. Admin only. */
 export default defineEventHandler(async (event) => {
   const venueId = getRouterParam(event, 'id')
 

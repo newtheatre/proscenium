@@ -1,7 +1,7 @@
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('request', async (event) => {
     event.context.$authorization = {
-      // MUST be the non-throwing resolver — authorize() swallows anything else and
+      // MUST be the non-throwing resolver: authorize() swallows anything else and
       // then runs the handler unchecked (ADR-0008).
       resolveServerUser: () => sessionUserForAuthorization(event),
     }

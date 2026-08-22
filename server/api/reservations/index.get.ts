@@ -12,7 +12,7 @@ const querySchema = paginationSchema.extend({
 })
 
 /**
- * GET /api/reservations — list reservations.
+ * GET /api/reservations: list reservations.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listReservations)
@@ -67,7 +67,7 @@ export default defineEventHandler(async (event) => {
 
   if (withCounts !== 'true') return paginated(rows, total, { page, limit })
 
-  // Ticket counts for this page only — at most `limit` (≤100) ids, so it stays
+  // Ticket counts for this page only: at most `limit` (≤100) ids, so it stays
   // inside D1's bound-parameter budget.
   const pageIds = rows.map(r => r.id)
   const ticketCounts = pageIds.length

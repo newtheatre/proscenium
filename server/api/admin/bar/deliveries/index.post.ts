@@ -18,7 +18,7 @@ const bodySchema = z.object({
   })).min(1).max(60),
 })
 
-/** POST /api/admin/bar/deliveries — stock in, with the movements it causes. */
+/** POST /api/admin/bar/deliveries: stock in, with the movements it causes. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

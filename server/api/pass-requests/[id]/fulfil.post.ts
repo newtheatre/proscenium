@@ -11,7 +11,7 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/pass-requests/:id/fulfil — the money has been taken in person, so
+ * POST /api/pass-requests/:id/fulfil: the money has been taken in person, so
  * the pass exists now and not before (ADR-0028).
  */
 export default defineEventHandler(async (event) => {

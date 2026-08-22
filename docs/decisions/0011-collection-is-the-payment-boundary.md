@@ -38,7 +38,7 @@ The rule is implemented once, in `server/utils/reservationLifecycle.ts`.
 
 The refund handler carries `refundedAt IS NULL` in the `WHERE`, not merely in the `SELECT` that
 chose the rows. The read and the write are separate statements, so a double-click or two staff
-refunding at once both select the same rows and both report success while only one stamp lands —
+refunding at once both select the same rows and both report success while only one stamp lands:
 cash out twice, recorded once. With the guard the loser updates nothing, and `returning()` reports
 how many rows the call actually refunded rather than how many it intended to.
 

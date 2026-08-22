@@ -3,7 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { updateReservation } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/reservations/:id/available-ticket-types — types active for this
+ * GET /api/reservations/:id/available-ticket-types: types active for this
  * reservation's performance, with effective prices.
  */
 export default defineEventHandler(async (event) => {

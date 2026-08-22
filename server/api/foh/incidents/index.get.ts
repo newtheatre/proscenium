@@ -5,7 +5,7 @@ import { workFoh } from '~~/shared/utils/abilities'
 
 const querySchema = z.object({ performanceId: z.string().trim().min(1) })
 
-/** GET /api/foh/incidents — the log for one of tonight's performances. */
+/** GET /api/foh/incidents: the log for one of tonight's performances. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

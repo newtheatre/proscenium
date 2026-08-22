@@ -10,7 +10,7 @@ type ReservationWith = NonNullable<ReservationQuery['with']>
 type TicketQuery = NonNullable<Parameters<(typeof db)['query']['tickets']['findMany']>[0]>
 
 /**
- * Ticket relation config — defined separately so `satisfies` provides
+ * Ticket relation config: defined separately so `satisfies` provides
  * contextual typing for the `orderBy` callback parameters.
  */
 const ticketsConfig = {
@@ -22,7 +22,7 @@ const ticketsConfig = {
  * `with` clause for reservation list/summary views (no tickets).
  */
 export const reservationSummaryWith = {
-  // `password`/`verified` are not listed because migration 0014 dropped them —
+  // `password`/`verified` are not listed because migration 0014 dropped them:
   // naming them would read as a decision about columns that no longer exist.
   user: { columns: { id: true, name: true, email: true } },
   performance: {
@@ -37,7 +37,7 @@ export const reservationSummaryWith = {
  * `with` clause for detailed reservation views (with tickets).
  */
 export const reservationDetailWith = {
-  // `password`/`verified` are not listed because migration 0014 dropped them —
+  // `password`/`verified` are not listed because migration 0014 dropped them:
   // naming them would read as a decision about columns that no longer exist.
   user: { columns: { id: true, name: true, email: true } },
   performance: {
@@ -66,7 +66,7 @@ export const reservationCustomerColumns = {
   updatedAt: true,
 } as const
 
-/** Ticket relation for customer views — carries priceConfidence so £0 legacy
+/** Ticket relation for customer views: carries priceConfidence so £0 legacy
  *  tickets can be shown as "not recorded" rather than "Free". */
 const customerTicketsConfig = {
   columns: { id: true, pricePaid: true, priceConfidence: true, refundedAt: true },

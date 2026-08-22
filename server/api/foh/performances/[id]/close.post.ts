@@ -11,7 +11,7 @@ const bodySchema = z.object({
   closingNote: z.string().trim().max(2000).nullable().optional(),
 })
 
-/** POST /api/foh/performances/:id/close — sign the night off. */
+/** POST /api/foh/performances/:id/close: sign the night off. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

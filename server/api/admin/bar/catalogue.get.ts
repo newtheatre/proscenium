@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { asc } from 'drizzle-orm'
 import { manageBar } from '~~/shared/utils/abilities'
 
-/** GET /api/admin/bar/catalogue — categories, products and today's prices. */
+/** GET /api/admin/bar/catalogue: categories, products and today's prices. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

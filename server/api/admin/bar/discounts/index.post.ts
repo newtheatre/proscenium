@@ -9,7 +9,7 @@ const bodySchema = z.object({
   sort: z.coerce.number().int().min(0).max(999).optional().default(0),
 })
 
-/** POST /api/admin/bar/discounts — add a discount the till can offer. */
+/** POST /api/admin/bar/discounts: add a discount the till can offer. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
   const input = await readValidatedBody(event, bodySchema.parse)

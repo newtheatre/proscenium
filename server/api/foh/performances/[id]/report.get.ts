@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { workFoh } from '~~/shared/utils/abilities'
 
-/** GET /api/foh/performances/:id/report — the stored record, if it is closed. */
+/** GET /api/foh/performances/:id/report: the stored record, if it is closed. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

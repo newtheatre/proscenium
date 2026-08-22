@@ -15,7 +15,7 @@ const querySchema = z.object({
 })
 
 /**
- * GET /api/passes — search issued passes.
+ * GET /api/passes: search issued passes.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listPasses)
@@ -66,7 +66,7 @@ export default defineEventHandler(async (event) => {
     .offset((page - 1) * limit)
 
   // Decided for the whole page in four queries. Calling canRedeem per row cost
-  // five D1 queries each — 500 subrequests at limit=100.
+  // five D1 queries each: 500 subrequests at limit=100.
   let withEligibility: Array<typeof rows[number] & { redeemable?: RedeemCheck }> = rows
   if (performanceId) {
     const redeemability = await redeemabilityForPage(performanceId, rows)

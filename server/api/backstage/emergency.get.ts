@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { and, asc, eq, gte, lte, ne } from 'drizzle-orm'
 
 /**
- * GET /api/backstage/emergency — tonight's emergency cards, **deliberately
+ * GET /api/backstage/emergency: tonight's emergency cards, **deliberately
  * public**: safety information is never behind a lock (ADR-0020, docs/11 §5.1).
  */
 export default defineEventHandler(async () => {

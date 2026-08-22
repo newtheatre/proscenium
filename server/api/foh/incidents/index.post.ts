@@ -11,7 +11,7 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/foh/incidents — add an entry. There is deliberately no update or
+ * POST /api/foh/incidents: add an entry. There is deliberately no update or
  * delete route: corrections are new entries (ADR-0027's reasoning).
  */
 export default defineEventHandler(async (event) => {

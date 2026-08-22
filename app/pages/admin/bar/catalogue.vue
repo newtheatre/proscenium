@@ -55,7 +55,7 @@ function fail(error: unknown, title: string) {
   })
 }
 
-const categoryName = (id: string) => categories.value.find(c => c.id === id)?.name ?? '—'
+const categoryName = (id: string) => categories.value.find(c => c.id === id)?.name ?? '-'
 
 /** Only products that hold stock may be pointed at (docs/13 §3.1). */
 const stockTargets = computed(() =>

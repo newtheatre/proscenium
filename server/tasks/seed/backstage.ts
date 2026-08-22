@@ -3,7 +3,7 @@ import { backstagePresets } from '~~/server/db/schema/backstageBoard'
 
 /**
  * A starting set of calls. Admin data, because each society runs them slightly
- * differently — agree these with a stage manager before treating them as fixed.
+ * differently: agree these with a stage manager before treating them as fixed.
  */
 export async function seedBackstagePresets() {
   console.log('📻 Seeding backstage calls...')

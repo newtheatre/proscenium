@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { count } from 'drizzle-orm'
 import { listVenueFeatures } from '~~/shared/utils/abilities'
 
-/** GET /api/venue-features — list venue features. Public. */
+/** GET /api/venue-features: list venue features. Public. */
 export default defineEventHandler(async (event) => {
   await authorize(event, listVenueFeatures)
 

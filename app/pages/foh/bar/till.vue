@@ -48,7 +48,7 @@ const busy = ref(false)
 const discount = computed(() => tonight.value?.discounts.find(d => d.id === discountId.value) ?? null)
 const barSubtotal = computed(() => basketBar.value.reduce((t, l) => t + l.product.pricePence * l.qty, 0))
 const ticketSubtotal = computed(() => basketTickets.value.reduce((t, r) => t + r.amountOwedPence, 0))
-/** Half up, once, on the bar subtotal only — the server does the same (§4.1.1). */
+/** Half up, once, on the bar subtotal only: the server does the same (§4.1.1). */
 const discountPence = computed(() =>
   discount.value ? Math.floor((barSubtotal.value * discount.value.percent) / 100 + 0.5) : 0)
 const total = computed(() => barSubtotal.value + ticketSubtotal.value - discountPence.value)

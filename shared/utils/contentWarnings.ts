@@ -8,7 +8,7 @@ export type ContentWarningLevel = 'MENTIONED' | 'DISCUSSED' | 'DEPICTED'
 
 /**
  * How intensely a general warning features, weakest to strongest. `rank`
- * orders them and resolves collisions — lowest wins.
+ * orders them and resolves collisions: lowest wins.
  */
 export const CONTENT_WARNING_LEVELS = [
   {
@@ -42,7 +42,7 @@ export const CONTENT_WARNING_TECHNICAL_GROUP = {
 }
 
 export const CONTENT_WARNING_KINDS = [
-  { value: 'TECHNICAL' as const, label: 'Technical', hint: 'A production effect. No level — either the show does it or it does not.' },
+  { value: 'TECHNICAL' as const, label: 'Technical', hint: 'A production effect. No level, either the show does it or it does not.' },
   { value: 'GENERAL' as const, label: 'General', hint: 'A theme. Carries a level on each show that has it.' },
 ]
 
@@ -111,7 +111,7 @@ export function compareContentWarnings(
   return (a.sort ?? 0) - (b.sort ?? 0) || a.title.localeCompare(b.title)
 }
 
-/** Lowercase, hyphenated, no punctuation — the shape `content_warnings.slug` expects. */
+/** Lowercase, hyphenated, no punctuation: the shape `content_warnings.slug` expects. */
 export function contentWarningSlug(title: string): string {
   return title
     .toLowerCase()

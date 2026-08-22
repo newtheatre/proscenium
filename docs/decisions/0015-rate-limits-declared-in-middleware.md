@@ -4,7 +4,7 @@
 
 ## Context
 
-`server/utils/rateLimit.ts` was written, tested — and never called from anywhere. The limiter
+`server/utils/rateLimit.ts` was written, tested, and never called from anywhere. The limiter
 existed, the limits did not, and its own comments read as though protection were in place. Nothing
 distinguishes that state from a working one except reading every call site.
 
@@ -21,7 +21,7 @@ express.
 
 **Buckets are per-IP via `CF-Connecting-IP`.** That header is set by the edge and cannot be spoofed
 by a client on a Cloudflare-fronted origin, unlike `X-Forwarded-For`. Its **absence** means the
-request did not come from outside — an SSR render calling the app's own API, or local dev — and such
+request did not come from outside (an SSR render calling the app's own API, or local dev) and such
 requests are skipped rather than falling back to a shared bucket, which a busy evening's page renders
 would exhaust before rejecting real customers.
 
@@ -34,8 +34,8 @@ one more. A fixed window can let through up to twice the limit across a boundary
 trade for billing and the right one here: the aim is to stop thousands of attempts, and the cost of
 being approximate is that an attacker gets ten tries instead of five.
 
-`key` encodes both the action and the subject — `login:ip:1.2.3.4`,
-`forgot:email:someone@example.com` — so one table serves every limit.
+`key` encodes both the action and the subject: `login:ip:1.2.3.4`,
+`forgot:email:someone@example.com`, so one table serves every limit.
 
 ### Guest checkout is limited by address, not only by IP
 

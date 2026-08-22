@@ -7,7 +7,7 @@ const bodySchema = z.object({
   performanceId: z.string().trim().min(1),
 })
 
-/** POST /api/passes/mine/redeem — book a seat on your own pass (docs/10 §4). */
+/** POST /api/passes/mine/redeem: book a seat on your own pass (docs/10 §4). */
 export default defineEventHandler(async (event) => {
   const { id: userId } = await requireSessionUser(event)
   const input = await readValidatedBody(event, bodySchema.parse)
@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
     redeemedByUserId: null,
     source: 'WEB',
     status: 'PENDING',
-    staffNote: `Pass admission — ${pass.reference}`,
+    staffNote: `Pass admission, ${pass.reference}`,
   })
 
   return { reservationId, joinedExisting }

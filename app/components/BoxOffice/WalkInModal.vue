@@ -32,7 +32,7 @@ const toast = useToast()
 // ── Ticket types ──────────────────────────────────────────────────────────────
 
 // Nuxt types the request getter as () => NitroFetchRequest and does not model
-// returning null to skip, so cast it — the runtime honours the null.
+// returning null to skip, so cast it: the runtime honours the null.
 const existingUserId = ref<string | null>(null)
 
 const ticketTypesUrl = () => {
@@ -110,7 +110,7 @@ async function lookupEmail() {
   // leave the previous customer's match on screen.
   existingUserId.value = null
   if (nameFromLookup.value) {
-    // Only clear a name the lookup filled in — never one the volunteer typed.
+    // Only clear a name the lookup filled in: never one the volunteer typed.
     name.value = ''
     nameFromLookup.value = false
   }
@@ -131,7 +131,7 @@ async function lookupEmail() {
     }
   }
   catch {
-    // Silently fail — staff can still type a name manually
+    // Silently fail: staff can still type a name manually
   }
   finally {
     lookingUp.value = false
@@ -210,7 +210,7 @@ async function submit() {
 <template>
   <UModal
     v-model:open="modelOpen"
-    :title="`Walk-in — ${performanceLabel}`"
+    :title="`Walk-in: ${performanceLabel}`"
     description="Create an on-the-door reservation. You'll be taken straight to collection after."
   >
     <template #body>

@@ -10,7 +10,7 @@ the DSM and operators, who change every production, are staffed by the productio
 front-of-house rota, and by design hold no Proscenium accounts.
 
 Every account-shaped answer fails on the same point. A per-person grant needs the accounts this
-group does not have. A dedicated device account — which was the first version of this decision — is
+group does not have. A dedicated device account (which was the first version of this decision) is
 a standing credential somebody must own, rotate at handover, and keep signed in on a shared machine.
 The failure mode of a device account is a resident display signed out at the worst possible moment,
 with nobody in the building knowing the password.
@@ -34,7 +34,7 @@ The security model is five controls, in order of how much work they do:
 2. **Rate-limited joining**, per device and IP, with backoff. Past a threshold of failures across
    all devices the code regenerates itself and the FOH screen says so, so even a distributed guesser
    achieves a code reset rather than a join.
-3. **A visible device list** — name given at join, join time, last seen. The duty manager counting
+3. **A visible device list**: name given at join, join time, last seen. The duty manager counting
    "desk and Sam, so why is there a third?" is the detection mechanism, and it needs no technology
    beyond rendering the list. This is what makes a shared code honest.
 4. **A kill switch.** One tap bumps the performance's session epoch: every device is out, a new code

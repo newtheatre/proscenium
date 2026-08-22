@@ -6,7 +6,7 @@ const bodySchema = z.object({
   body: z.string().trim().max(500).optional(),
 })
 
-/** POST /api/foh/backstage/messages — call something through to backstage. */
+/** POST /api/foh/backstage/messages: call something through to backstage. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

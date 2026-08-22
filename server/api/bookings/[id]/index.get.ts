@@ -2,7 +2,7 @@ import { db } from '@nuxthub/db'
 import { isStaff } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/bookings/:id — get a booking by its id or its booking reference.
+ * GET /api/bookings/:id. Get a booking by its id or its booking reference.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Booking ID is required' })
   }
 
-  // Customer-facing shape — this endpoint is reachable without a session, so it
+  // Customer-facing shape: this endpoint is reachable without a session, so it
   // must not return internal columns.
   const booking = await db.query.reservations.findFirst({
     where: (r, { eq, or }) => or(eq(r.id, id), eq(r.bookingRef, id)),
@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // A signed token scoped to this booking. The booking reference is no longer
-  // accepted — it is quoted aloud and printed on emails (ADR-0009).
+  // accepted: it is quoted aloud and printed on emails (ADR-0009).
   if (await hasBookingToken(event, booking.id)) {
     return customerBooking
   }

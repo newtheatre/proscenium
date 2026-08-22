@@ -32,12 +32,12 @@ interface BookingRow {
 }
 
 /**
- * GET /api/bookings/my — get the current user's bookings.
+ * GET /api/bookings/my: get the current user's bookings.
  *
  * Requires authentication. Returns upcoming and past bookings.
  */
 export default defineEventHandler(async (event) => {
-  // Identity only — this handler reads no role, so it must not be gated on role
+  // Identity only: this handler reads no role, so it must not be gated on role
   // staleness (ADR-0008).
   const { id: userId } = await requireSessionUser(event)
   const now = new Date()

@@ -8,7 +8,7 @@ const bodySchema = z.object({
   checklist: z.record(z.string(), z.boolean()).optional(),
 }).optional().default({})
 
-/** POST /api/bar/sessions/:id/close — shut the bar for the night (docs/13 §4.5). */
+/** POST /api/bar/sessions/:id/close: shut the bar for the night (docs/13 §4.5). */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

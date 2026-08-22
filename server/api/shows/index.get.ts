@@ -29,13 +29,13 @@ const querySchema = paginationSchema.omit({ limit: true }).extend({
 const MAX_TREE_LIMIT = 50
 const MAX_OPTIONS_LIMIT = 500
 
-/** `performances.startsAt` is `mode: 'timestamp'` — unix **seconds**, not ms. */
+/** `performances.startsAt` is `mode: 'timestamp'`, unix **seconds**, not ms. */
 function unixSeconds(date: Date): number {
   return Math.floor(date.getTime() / 1000)
 }
 
 /**
- * GET /api/shows — list shows.
+ * GET /api/shows: list shows.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listShows)
@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
   const firstAt = sql<number | null>`(select min(${schema.performances.startsAt}) from ${schema.performances} where ${schema.performances.showId} = ${schema.shows.id})`
   const lastAt = sql<number | null>`(select max(${schema.performances.startsAt}) from ${schema.performances} where ${schema.performances.showId} = ${schema.shows.id})`
 
-  // "Today" in Nottingham, not the Worker's UTC — an hour's difference through
+  // "Today" in Nottingham, not the Worker's UTC: an hour's difference through
   // BST is enough to file tonight's show under the archive.
   const todayLondon = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/London',
@@ -147,7 +147,7 @@ export default defineEventHandler(async (event) => {
     return paginated(options, total, { page, limit })
   }
 
-  // Ids only. The correlated scalars filter and order but cannot be projected —
+  // Ids only. The correlated scalars filter and order but cannot be projected:
   // the outer reference resolves differently in a projection.
   const pageRows = await db
     .select({ id: schema.shows.id })
@@ -185,7 +185,7 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  // Every per-performance lookup scopes through this rather than binding ids —
+  // Every per-performance lookup scopes through this rather than binding ids:
   // ~150 for a 50-show page would exceed D1's budget (ADR-0006).
   const pagePerformances = db
     .select({ id: schema.performances.id })

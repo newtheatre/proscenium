@@ -34,7 +34,7 @@ const showArchived = ref(false)
 const kindFilter = ref<'ALL' | ContentWarningKind>('ALL')
 
 /**
- * Deliberately not keyed `content-warnings` — the show editor caches the live
+ * Deliberately not keyed `content-warnings`: the show editor caches the live
  * vocabulary there, and this page asks for archived ones (ADR-0013).
  */
 const requestFetch = useRequestFetch()
@@ -44,7 +44,7 @@ const { data: rawData, status, error, refresh } = await useAsyncData(
 )
 
 /**
- * **Always an array, never null** — a fresh array per render sends UTable into
+ * **Always an array, never null**: a fresh array per render sends UTable into
  * a loop with no fixed point (ADR-0012).
  */
 const rows = computed<AdminContentWarning[]>(() => {
@@ -125,7 +125,7 @@ async function deleteWarning(warning: AdminContentWarning) {
 const isArchiving = ref(false)
 
 /**
- * Retire an entry or bring it back — deliberately not a delete (ADR-0010).
+ * Retire an entry or bring it back: deliberately not a delete (ADR-0010).
  */
 async function setArchived(warning: AdminContentWarning, archived: boolean) {
   if (isArchiving.value) return
@@ -243,7 +243,7 @@ const columns: TableColumn<AdminContentWarning>[] = [
   {
     accessorKey: 'category',
     header: 'Category',
-    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.category ?? '—'),
+    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.category ?? '-'),
   },
   {
     accessorKey: 'showCount',

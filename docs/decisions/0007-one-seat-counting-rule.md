@@ -9,8 +9,8 @@ disagreed, and the disagreements were invisible until someone was affected by on
 
 - The pass redemption check counted tickets on **cancelled** reservations, so pass holders were
   turned away from houses that were half empty.
-- The public listings counted `PASS_SALE` rows — the purchase of a pass, which is money but not a
-  seat — so a show could read "sold out" while the booking path would still sell into it.
+- The public listings counted `PASS_SALE` rows: the purchase of a pass, which is money but not a
+  seat, so a show could read "sold out" while the booking path would still sell into it.
 
 Capacity is also enforced on more paths than are obvious. Two were fixed by routing ticket writes
 through `assertCapacity`; a third was missed because it writes a *status* rather than a ticket.
@@ -27,8 +27,8 @@ A ticket occupies a seat when it is:
 - on a reservation with status `PENDING`, `COLLECTED` or `DOOR`, and
 - not of kind `PASS_SALE`.
 
-`PASS_ADMISSION` **does** occupy a seat — a pass grants entitlement, not a reserved seat
-([ADR-0002](0002-passes-as-first-class-entities.md)) — which is precisely why redemption issues an
+`PASS_ADMISSION` **does** occupy a seat: a pass grants entitlement, not a reserved seat
+([ADR-0002](0002-passes-as-first-class-entities.md)), which is precisely why redemption issues an
 ordinary ticket rather than a parallel record.
 
 Every write path that adds occupancy calls `assertCapacity`, including status changes that reinstate

@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { updateVenue } from '~~/shared/utils/abilities'
 
-/** POST /api/venues/:id/image — upload a venue image. Admin/Manager only. */
+/** POST /api/venues/:id/image: upload a venue image. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const venueId = getRouterParam(event, 'id')
 

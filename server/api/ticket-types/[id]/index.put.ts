@@ -15,7 +15,7 @@ const bodySchema = z.object({
   archived: z.boolean().optional(),
 })
 
-/** PUT /api/ticket-types/:id — update a ticket type. Admin/Manager only. */
+/** PUT /api/ticket-types/:id. Update a ticket type. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const ticketTypeId = getRouterParam(event, 'id')
 

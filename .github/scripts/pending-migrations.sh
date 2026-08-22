@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
 # Print the migration tags that exist on disk but are absent from production's
-# `_hub_migrations` ledger — one per line, nothing at all when up to date.
+# `_hub_migrations` ledger: one per line, nothing at all when up to date.
 #
 # `nuxt db migrate` has no dry-run, so this stands in for one. It is also the
 # gate the migrate workflow runs *after* applying, because the CLI cannot be
 # trusted to fail loudly on its own: `nuxt db migrate` exits 0 even when the
-# migration errored (the `nuxt db` proxy swallows the code — `nuxt-db migrate`
+# migration errored (the `nuxt db` proxy swallows the code: `nuxt-db migrate`
 # is the invocation that propagates it, and the workflow uses that). Checking
 # the ledger afterwards is the only version-independent proof that the work
 # actually landed.

@@ -88,7 +88,7 @@ export function useShowActions(onChanged: () => void | Promise<void>) {
   }
 
   /**
-   * Back on sale — or back to draft, if the show itself is not published. A
+   * Back on sale, or back to draft, if the show itself is not published. A
    * reinstated performance must never be more public than its show.
    */
   async function reinstatePerformance(performance: PerformanceListItem, showStatus: ShowStatus) {

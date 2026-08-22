@@ -7,7 +7,7 @@ const querySchema = z.object({
   format: z.enum(['json', 'csv']).optional().default('json'),
 })
 
-/** GET /api/admin/bar/reports/variance — stocktake variance over time. */
+/** GET /api/admin/bar/reports/variance: stocktake variance over time. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

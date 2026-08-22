@@ -82,7 +82,7 @@ function isSameDay(a: Date, b: Date): boolean {
 
 // ── Performance data ──────────────────────────────────────────────────────────
 
-/** `YYYY-MM-DD` in Europe/London — the shape `<input type="date">` speaks. */
+/** `YYYY-MM-DD` in Europe/London: the shape `<input type="date">` speaks. */
 function londonDateOnly(date: Date): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/London',
@@ -115,7 +115,7 @@ const { data: performancePage, status: showsStatus, error: showsError, refresh: 
   },
 )
 
-// Already chronological, on-sale-only and from today — the endpoint sorts and
+// Already chronological, on-sale-only and from today: the endpoint sorts and
 // filters. `showTitle` is flattened on for the picker.
 const sortedPerformances = computed(() =>
   (performancePage.value?.rows ?? []).map(p => ({ ...p, showTitle: p.show.title })),
@@ -124,7 +124,7 @@ const sortedPerformances = computed(() =>
 // ── Performance navigation ────────────────────────────────────────────────────
 
 /**
- * One on that day, else the next after it. Never the most recent past one —
+ * One on that day, else the next after it. Never the most recent past one:
  * when there is nothing ahead the page says so (ADR-0018).
  */
 function pickPerformance(
@@ -146,10 +146,10 @@ function asLocalDate(dateOnly: string): Date {
   return new Date(`${dateOnly}T12:00:00`)
 }
 
-/** The date shown in the picker. Selection only — it does not refetch. */
+/** The date shown in the picker. Selection only: it does not refetch. */
 const jumpDate = ref(today)
 
-// Set synchronously — available during SSR, since the list is already resolved.
+// Set synchronously: available during SSR, since the list is already resolved.
 const selectedPerformanceId = ref<string | undefined>(
   pickPerformance(sortedPerformances.value, new Date()),
 )
@@ -172,7 +172,7 @@ const lastPerformanceDate = computed(() => {
   return date ? londonDateOnly(date) : undefined
 })
 
-// After a refresh — a walk-in, a collection — keep the volunteer on the
+// After a refresh (a walk-in, a collection) keep the volunteer on the
 // performance they are working, and only re-pick if it has gone.
 watch(sortedPerformances, (perfs) => {
   if (perfs.some(p => p.id === selectedPerformanceId.value)) return
@@ -187,7 +187,7 @@ const selectedPerformance = computed(() =>
   currentIndex.value >= 0 ? sortedPerformances.value[currentIndex.value] ?? null : null,
 )
 
-// Wrap-around navigation — always navigable when > 1 performance
+// Wrap-around navigation: always navigable when > 1 performance
 const prevPerformance = computed(() => {
   const perfs = sortedPerformances.value
   if (perfs.length <= 1) return null
@@ -227,7 +227,7 @@ const noPerformanceToday = computed(() => {
 })
 
 /**
- * Nothing today and nothing ahead — distinct from "no performance today", which
+ * Nothing today and nothing ahead: distinct from "no performance today", which
  * would quietly show last spring's.
  */
 const nothingScheduled = computed(() =>
@@ -270,7 +270,7 @@ const { data: reservations, status: reservationsStatus, refresh: refreshReservat
   },
 )
 
-// Refresh the shows data too — the capacity pill's ticketsSold comes from
+// Refresh the shows data too: the capacity pill's ticketsSold comes from
 // /api/shows.
 async function refresh() {
   await Promise.all([refreshReservations(), refreshShows()])
@@ -356,10 +356,10 @@ const showHasStarted = computed(() => {
 const isMarkingAllNoShow = ref(false)
 
 const funEarlyMessages = [
-  'The curtain hasn\'t gone up yet — give them a chance!',
+  'The curtain hasn\'t gone up yet: give them a chance!',
   'Shh, the show hasn\'t started! No no-shows before curtain up.',
   'Too early! The cast are still in their dressing rooms.',
-  'Hold your horses — the show starts at {{ time }}.',
+  'Hold your horses: the show starts at {{ time }}.',
   'Even the latecomers aren\'t late yet.',
 ]
 
@@ -429,7 +429,7 @@ async function markAllNoShow() {
 const collectReservationId = ref<string | null>(null)
 const collectBookingRef = ref<string | null>(null)
 // A walk-in is a sale made at the door, so it collects as DOOR rather than
-// COLLECTED — this keeps on-the-door and pre-booked revenue distinguishable.
+// COLLECTED: this keeps on-the-door and pre-booked revenue distinguishable.
 const collectAsDoor = ref(false)
 
 function openCollect(r: Reservation) {
@@ -453,7 +453,7 @@ const passesOpen = ref(false)
 const performanceLabel = computed(() => {
   const p = selectedPerformance.value
   if (!p) return ''
-  return `${p.showTitle} — ${formatTime(p.startsAt)}`
+  return `${p.showTitle}: ${formatTime(p.startsAt)}`
 })
 
 async function onWalkInCreated(reservationId: string, bookingRef: string) {
@@ -801,7 +801,7 @@ const todayFormatted = computed(() =>
       <UAlert
         v-if="noPerformanceToday && selectedPerformanceId"
         title="No performance today"
-        description="Nothing is scheduled for today — showing the next one."
+        description="Nothing is scheduled for today: showing the next one."
         color="neutral"
         variant="subtle"
         icon="i-lucide-calendar-x"
@@ -846,7 +846,7 @@ const todayFormatted = computed(() =>
               name="i-lucide-ticket"
               class="size-3.5 text-primary"
             />
-            <span class="font-medium text-highlighted">{{ ticketsRemaining ?? '—' }}</span>
+            <span class="font-medium text-highlighted">{{ ticketsRemaining ?? '-' }}</span>
             <span v-if="performanceCapacity !== null">left</span>
             <template v-if="performanceCapacity !== null">
               <span class="opacity-50">·</span>

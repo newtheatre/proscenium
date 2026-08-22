@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { and, asc, eq, gt, inArray, isNull } from 'drizzle-orm'
 
 /**
- * GET /api/whats-on/:slug — get a published show by slug with performances
+ * GET /api/whats-on/:slug. Get a published show by slug with performances
  * and ticket types.
  */
 export default defineEventHandler(async (event) => {
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
           venue: { columns: { id: true, name: true, address: true, capacity: true, isExternal: true } },
         },
       },
-      // Allow-listed on both sides — the link row's ids mean nothing publicly and
+      // Allow-listed on both sides: the link row's ids mean nothing publicly and
       // would be edge-cached along with everything else.
       contentWarnings: {
         columns: publicContentWarningLinkColumns,
@@ -112,7 +112,7 @@ export default defineEventHandler(async (event) => {
   })
 
   // Public and slow-changing. The only fast-moving field is ticketsSold, which
-  // is advisory — capacity is enforced at write time.
+  // is advisory: capacity is enforced at write time.
   setHeader(event, 'Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
 
   return {

@@ -15,7 +15,7 @@ const bodySchema = z.object({
   status: z.enum(schema.PRODUCT_STATUSES).optional(),
 })
 
-/** PATCH /api/admin/bar/products/:id — edit or retire. Prices have their own route. */
+/** PATCH /api/admin/bar/products/:id. Edit or retire. Prices have their own route. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

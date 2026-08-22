@@ -14,7 +14,7 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/content-warnings — add a vocabulary entry.
+ * POST /api/content-warnings: add a vocabulary entry.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, createContentWarning)

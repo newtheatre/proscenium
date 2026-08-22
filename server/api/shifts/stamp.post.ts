@@ -9,7 +9,7 @@ const bodySchema = z.object({
 }).optional().default({})
 
 /**
- * POST /api/shifts/stamp — stamp the template onto performances that have no
+ * POST /api/shifts/stamp: stamp the template onto performances that have no
  * shifts. Idempotent: a performance with any shift is left alone.
  */
 export default defineEventHandler(async (event) => {

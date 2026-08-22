@@ -11,7 +11,7 @@ const bodySchema = z.object({
 })
 
 /**
- * PATCH /api/admin/bar/discounts/:id — edit or retire. Past transactions keep
+ * PATCH /api/admin/bar/discounts/:id. Edit or retire. Past transactions keep
  * the percent they were rung up at, so changing this is not retrospective.
  */
 export default defineEventHandler(async (event) => {

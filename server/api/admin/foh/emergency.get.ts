@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { asc, eq } from 'drizzle-orm'
 import { manageFohReference } from '~~/shared/utils/abilities'
 
-/** GET /api/admin/foh/emergency — the emergency card for each venue we run. */
+/** GET /api/admin/foh/emergency: the emergency card for each venue we run. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageFohReference)
 

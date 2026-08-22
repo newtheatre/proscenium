@@ -14,7 +14,7 @@ const bodySchema = z.object({
 })
 
 /**
- * PUT /api/pass-types/:id — edit a pass product, including putting it on
+ * PUT /api/pass-types/:id. Edit a pass product, including putting it on
  * sale.
  */
 export default defineEventHandler(async (event) => {
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
   if (body.description !== undefined) update.description = body.description ?? null
   if (body.maxIssued !== undefined) update.maxIssued = body.maxIssued ?? null
   if (body.transferable !== undefined) update.transferable = body.transferable
-  // Whole days in Europe/London, matching the create route — see
+  // Whole days in Europe/London, matching the create route: see
   // server/utils/validityWindow.ts.
   if (body.validFrom !== undefined) update.validFrom = validityStart(body.validFrom)
   if (body.validTo !== undefined) update.validTo = validityEnd(body.validTo)

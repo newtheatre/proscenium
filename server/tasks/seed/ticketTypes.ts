@@ -64,6 +64,6 @@ export function printTicketTypesSummary(ticketTypes: Awaited<ReturnType<typeof s
   ticketTypes.forEach((tt) => {
     const price = tt.price === 0 ? 'Free' : `£${(tt.price / 100).toFixed(2)}`
     const status = tt.activeByDefault ? 'active by default' : 'inactive by default'
-    console.log(`  • ${tt.name} — ${price} (${status})`)
+    console.log(`  • ${tt.name}: ${price} (${status})`)
   })
 }

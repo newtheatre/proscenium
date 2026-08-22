@@ -5,8 +5,8 @@
 ## Context
 
 The theatre wants to sell season passes for the Autumn 2026 in-house/studio season, and festival
-passes for StuFF thereafter. It has sold both for a decade — the legacy Heroku system recorded 135
-pass sales and 1,186 pass admissions between 2016 and 2025 — but modelled neither.
+passes for StuFF thereafter. It has sold both for a decade: the legacy Heroku system recorded 135
+pass sales and 1,186 pass admissions between 2016 and 2025, but modelled neither.
 
 In that system a pass was two prices in a singleton table and a set of integer counters on the
 till transaction. There was no pass entity, no holder, no serial number, no validity window, no show
@@ -27,7 +27,7 @@ with `UNIQUE (pass_id, performance_id)` carrying the entitlement rule.
 
 Four supporting choices:
 
-- **Entitlement is unlimited within scope** — one admission to every covered show, no credit
+- **Entitlement is unlimited within scope**: one admission to every covered show, no credit
   balance. The database enforces one admission per performance.
 - **Scope is an explicit list of shows**, seeded from a season and editable afterwards.
 - **A pass is account-bound** to a user, real or shadow, exactly like a booking.
@@ -37,21 +37,21 @@ Full design in [10-passes-design](../10-passes-design.md).
 
 ## Alternatives considered
 
-- **Passes as a ticket type with an entitlement flag** — no new tables, and it is what the legacy
+- **Passes as a ticket type with an entitlement flag**: no new tables, and it is what the legacy
   import does for historic data. Lost because a ticket type carries no holder, no scope and no
   expiry, so it can record that a pass was used but never validate one. It would reproduce exactly
   the gap that makes the 2016–2025 data unusable.
-- **Passes as a reservation spanning many performances** — nullable `performanceId` on
+- **Passes as a reservation spanning many performances**: nullable `performanceId` on
   `reservations`, one reservation per pass. Lost because it makes a NOT NULL column nullable across
   the busiest table in the schema, breaks every capacity and door-list query, and conflates "a seat
   is held" with "a right exists".
-- **A separate pass-admission ledger that does not create tickets** — a parallel seat count
+- **A separate pass-admission ledger that does not create tickets**: a parallel seat count
   reconciled against the ticket count. Lost immediately: two sources of truth for capacity in a
   system with no transactions is how you oversell a house.
-- **Scope as a stored rule (season + category) rather than a show list** — nothing to maintain, but
+- **Scope as a stored rule (season + category) rather than a show list**: nothing to maintain, but
   cannot express "everything except that one", and cannot grant a mid-season addition to existing
   holders without changing the rule's meaning retrospectively.
-- **Bearer passes with no holder** — closest to how it actually worked, no personal-data surface,
+- **Bearer passes with no holder**: closest to how it actually worked, no personal-data surface,
   transferable by nature. Lost because renewals and replacement of a lost pass are the two things
   the box office actually asks for, and both need identity. Revisit if a physical card is ever
   wanted: `transferable` is already on `pass_types`.
@@ -61,7 +61,7 @@ Full design in [10-passes-design](../10-passes-design.md).
 **Good.** Capacity, the door list, "my bookings", the sold-out badge and the treasurer's export all
 keep working with no changes, because a pass admission *is* a ticket. Entitlement is enforced by a
 unique index rather than application logic, which matters when D1 offers no transactions. Festival
-passes need no new code — a StuFF Day Pass is a pass whose validity window is one day. The theatre
+passes need no new code: a StuFF Day Pass is a pass whose validity window is one day. The theatre
 gets a renewal list for the first time.
 
 **Bad.** Revenue now has two sources and every money query must union them; `/api/admin/stats` and
@@ -71,5 +71,5 @@ risk, mitigated by `maxIssued` and by stating in the terms of sale that a pass d
 seat. Guests cannot redeem, which is a deliberate consequence of account-binding.
 
 **Deferred.** Online pass purchase is out of scope because the app has no payment integration at
-all. Historic passes are not retro-fitted — no holder was ever recorded, and inventing one would be
+all. Historic passes are not retro-fitted: no holder was ever recorded, and inventing one would be
 fabricating an archive.

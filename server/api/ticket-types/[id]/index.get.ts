@@ -1,6 +1,6 @@
 import { db } from '@nuxthub/db'
 
-/** GET /api/ticket-types/:id — get a ticket type by ID. Public. */
+/** GET /api/ticket-types/:id. Get a ticket type by ID. Public. */
 export default defineEventHandler(async (event) => {
   const ticketTypeId = getRouterParam(event, 'id')
 
@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Ticket type ID is required' })
   }
 
-  // Ticket types are public — no authentication required
+  // Ticket types are public: no authentication required
 
   const ticketType = await db.query.ticketTypes.findFirst({
     where: (ticketTypes, { eq }) => eq(ticketTypes.id, ticketTypeId),

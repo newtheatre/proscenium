@@ -12,8 +12,8 @@ filter and page it. That was tolerable at a few hundred rows. After the legacy i
   128 MB memory ceiling.
 - `/api/shows` returned all 498 shows with all 1,304 performances nested, for a page that displayed
   fifty of them.
-- `/api/whats-on` — the highest-traffic endpoint in the app, backing both the homepage and What's On
-  — read every published show and its performances and then discarded the historical majority in
+- `/api/whats-on`: the highest-traffic endpoint in the app, backing both the homepage and What's On.
+  It read every published show and its performances and then discarded the historical majority in
   JavaScript.
 
 D1 also bills by rows read, so the cost was not only latency.
@@ -31,7 +31,7 @@ from the first page of a truncated one, which is how a "search returned nothing"
 
 The contract lives in `server/utils/pagination.ts` and `shared/types/pagination.ts`. An endpoint
 accepts `page`, `limit` and optionally `q`; `q` searches the columns that identify the row to a human
-(booking reference, holder name, holder email — not free-text notes).
+(booking reference, holder name, holder email: not free-text notes).
 
 There are no exceptions. `/api/shows` briefly kept an undocumented no-query-string mode that returned
 everything nested, for the box-office navigator; that consumer moved to
@@ -41,7 +41,7 @@ everything nested, for the box-office navigator; that consumer moved to
 
 `containsTerm()` emits its own `ESCAPE` clause. This is not incidental: Drizzle's `like()` renders a
 bare `col like ?`, and SQLite has **no default escape character**. An earlier `likeTerm()`
-backslash-escaped `%` and `_` and instructed callers to "pair with `ESCAPE '\'`" — which nothing did,
+backslash-escaped `%` and `_` and instructed callers to "pair with `ESCAPE '\'`", which nothing did,
 so the backslashes were matched literally. Searching for `john_smith@nott.ac.uk` looked for a
 backslash no row contains and returned nothing at all: the box office was told a booking did not
 exist. Underscores are common in email local parts and the failure was silent.

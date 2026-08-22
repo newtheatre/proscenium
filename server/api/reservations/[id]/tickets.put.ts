@@ -13,13 +13,13 @@ const bodySchema = z.object({
     quantity: z.int().min(0).max(50),
   })).min(1),
 }).refine(
-  // Each entry is the desired TOTAL, read against a map that is never updated —
+  // Each entry is the desired TOTAL, read against a map that is never updated:
   // so two entries for one type would compound rather than replace.
   data => new Set(data.tickets.map(t => t.ticketTypeId)).size === data.tickets.length,
   { message: 'Each ticket type may only appear once' },
 )
 
-/** PUT /api/reservations/:id/tickets — update ticket quantities on a reservation. Staff only. */
+/** PUT /api/reservations/:id/tickets: update ticket quantities on a reservation. Staff only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, updateReservation)
 
@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
   await assertAccessTicketsAllowed(reservation.userId, reservation.performanceId, body.tickets, { excludeReservationId: reservation.id })
 
   // Collected tickets are a record of a completed transaction, not a working
-  // draft — the only reversal is a refund (ADR-0011).
+  // draft: the only reversal is a refund (ADR-0011).
   assertTicketsEditable(reservation.status)
 
   const { performanceId } = reservation
@@ -102,7 +102,7 @@ export default defineEventHandler(async (event) => {
     const currentCount = current.length
 
     if (quantity > currentCount) {
-      // Need more — insert (quantity - currentCount) rows
+      // Need more: insert (quantity - currentCount) rows
       for (let i = 0; i < quantity - currentCount; i++) {
         toInsert.push({
           reservationId: id,
@@ -113,7 +113,7 @@ export default defineEventHandler(async (event) => {
       }
     }
     else if (quantity < currentCount) {
-      // Need fewer — delete the newest rows first (LIFO)
+      // Need fewer: delete the newest rows first (LIFO)
       const deleteCount = currentCount - quantity
       const toRemove = current.slice(-deleteCount) // newest are last after sort
       toDelete.push(...toRemove.map(t => t.id))
@@ -121,7 +121,7 @@ export default defineEventHandler(async (event) => {
     // quantity === currentCount → no-op
   }
 
-  // A reservation must keep at least one ticket — to remove them all, cancel it.
+  // A reservation must keep at least one ticket: to remove them all, cancel it.
   // Same rule as the customer route in server/api/bookings/[id]/tickets.put.ts.
   if (existingActive.length + toInsert.length - toDelete.length < 1) {
     throw createError({ statusCode: 400, statusMessage: 'A reservation must have at least one ticket. Cancel it instead.' })

@@ -1,7 +1,7 @@
 import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 
-/** GET /api/venue-features/:id — get a venue feature by ID. Public. */
+/** GET /api/venue-features/:id. Get a venue feature by ID. Public. */
 export default defineEventHandler(async (event) => {
   const featureId = getRouterParam(event, 'id')
 

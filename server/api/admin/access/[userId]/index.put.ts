@@ -22,7 +22,7 @@ const bodySchema = z.object({
   expiresAt: z.string().datetime().nullable().optional(),
 })
 
-/** PUT /api/admin/access/:userId — record the conclusion of a conversation. */
+/** PUT /api/admin/access/:userId. Record the conclusion of a conversation. */
 export default defineEventHandler(async (event) => {
   await authorize(event, verifyAccess)
 

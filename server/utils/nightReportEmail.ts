@@ -116,7 +116,7 @@ export async function emailNightReport(reportId: string, report: NightReport, au
   }
 
   const html = renderReport(report, autoClosed, stored?.closingNote ?? null)
-  const subject = `${report.performance.showTitle} — ${report.performance.night}${autoClosed ? ' (auto-closed)' : ''}`
+  const subject = `${report.performance.showTitle}: ${report.performance.night}${autoClosed ? ' (auto-closed)' : ''}`
 
   for (const to of recipients) {
     await sendEmail({ to, subject, html })

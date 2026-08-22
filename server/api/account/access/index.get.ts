@@ -1,7 +1,7 @@
 import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 
-/** GET /api/account/access — your own access profile, or null. */
+/** GET /api/account/access: your own access profile, or null. */
 export default defineEventHandler(async (event) => {
   const { user } = await requireUserSession(event)
 

@@ -5,7 +5,7 @@ import { workFoh } from '~~/shared/utils/abilities'
 
 const querySchema = z.object({ performanceId: z.string().trim().min(1) })
 
-/** GET /api/foh/emergency — the venue's emergency card for a performance. */
+/** GET /api/foh/emergency: the venue's emergency card for a performance. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

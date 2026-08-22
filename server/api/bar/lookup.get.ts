@@ -7,7 +7,7 @@ const querySchema = z.object({ q: z.string().trim().min(2).max(100) })
 const REF = /^[A-Z0-9]{6}$/i
 
 /**
- * GET /api/bar/lookup — find a booking to take payment for. Deliberately NOT
+ * GET /api/bar/lookup: find a booking to take payment for. Deliberately NOT
  * night-scoped: paying in advance for Saturday is a designed case (§2.2).
  */
 export default defineEventHandler(async (event) => {

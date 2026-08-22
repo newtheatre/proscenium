@@ -21,7 +21,7 @@ export const publicShowColumns = {
 } as const
 
 /**
- * The level and nothing else — the link row's ids mean nothing outside the
+ * The level and nothing else: the link row's ids mean nothing outside the
  * admin section.
  */
 export const publicContentWarningLinkColumns = {

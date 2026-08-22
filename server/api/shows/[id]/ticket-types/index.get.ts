@@ -3,10 +3,10 @@ import { eq } from 'drizzle-orm'
 import { readShow } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/shows/:id/ticket-types — effective prices and active state,
+ * GET /api/shows/:id/ticket-types: effective prices and active state,
  * including show-level overrides.
  */
-/** GET /api/shows/:id/ticket-types — get ticket type overrides for a show. */
+/** GET /api/shows/:id/ticket-types: get ticket type overrides for a show. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 

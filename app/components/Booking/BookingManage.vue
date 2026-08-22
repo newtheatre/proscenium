@@ -92,7 +92,7 @@ const saving = ref(false)
 const selection = ref<Array<{ ticketTypeId: string, quantity: number }>>([])
 
 // Active ticket types + capacity come from the public what's-on data.
-// Lazy (no await) so it never suspends the page — only needed when editing.
+// Lazy (no await) so it never suspends the page: only needed when editing.
 const { data: showData } = useFetch<{ performances: ShowPerformance[] }>(
   () => `/api/whats-on/${props.booking.performance.show.slug}`,
   { key: `manage-show-${props.booking.id}`, lazy: true },

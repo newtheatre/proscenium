@@ -10,7 +10,7 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/passes/:id/redeem — admit a pass holder to a performance.
+ * POST /api/passes/:id/redeem: admit a pass holder to a performance.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, redeemPass)
@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
     redeemedByUserId: session.user?.id ?? null,
     source: 'DOOR',
     status: 'DOOR',
-    staffNote: `Pass admission — ${pass.reference}`,
+    staffNote: `Pass admission, ${pass.reference}`,
   })
 
   return { admitted: true, passReference: pass.reference, reservationId, ticketId }

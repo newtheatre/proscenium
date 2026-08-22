@@ -3,7 +3,7 @@ import { and, asc, count, isNull, isNotNull, or, sql } from 'drizzle-orm'
 import { listUsers } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/users — list local user mirrors.
+ * GET /api/users: list local user mirrors.
  */
 // Anonymised bookers and legacy placeholder rows are records, not people:
 // never in listings or lookups, surfaced only as a count.

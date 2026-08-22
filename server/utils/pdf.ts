@@ -15,7 +15,7 @@ function pdfText(value: string): string {
   return value
     .replace(/[‘’]/g, '\'')
     .replace(/[“”]/g, '"')
-    .replace(/[–—]/g, '-')
+    .replace(/[–-]/g, '-')
     .replace(/[^\x20-\x7E]/g, '?')
     .replace(/([\\()])/g, '\\$1')
 }

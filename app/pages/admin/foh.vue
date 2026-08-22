@@ -280,7 +280,7 @@ async function setArchived(contact: Contact, archived: boolean) {
 
     <UModal
       :open="editingVenueId !== null"
-      :title="`Emergency card — ${editingVenue?.venueName ?? ''}`"
+      :title="`Emergency card: ${editingVenue?.venueName ?? ''}`"
       @update:open="value => { if (!value) editingVenueId = null }"
     >
       <template #body>

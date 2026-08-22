@@ -37,7 +37,7 @@
 
     <!--
     Breathing room under the last element of every admin page. Both breakpoints
-    are needed — the body's own `sm:p-6` would otherwise win.
+    are needed: the body's own `sm:p-6` would otherwise win.
     -->
     <UDashboardPanel :ui="{ body: 'pb-8 sm:pb-10' }">
       <template #header>

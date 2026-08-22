@@ -146,7 +146,7 @@ function updateField<K extends keyof CustomerInfo>(key: K, value: CustomerInfo[K
                 Special Requirements
               </h4>
               <p class="text-xs text-muted mt-0.5">
-                Optional — let us know about any needs so we can help
+                Optional: let us know about any needs so we can help
               </p>
             </div>
           </div>

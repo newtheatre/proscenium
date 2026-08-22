@@ -1,5 +1,5 @@
 /**
- * DEV ONLY — the one sanctioned exception to "apps never write the session".
+ * DEV ONLY: the one sanctioned exception to "apps never write the session".
  * Guarded by import.meta.dev, so it does not exist in production.
  */
 export default defineEventHandler(async (event) => {

@@ -29,7 +29,7 @@ export function paginated<T>(rows: T[], total: number, { page, limit }: { page: 
 }
 
 /**
- * Emits its own ESCAPE clause — Drizzle's like() renders a bare `col like ?`
+ * Emits its own ESCAPE clause: Drizzle's like() renders a bare `col like ?`
  * and SQLite has no default escape character (ADR-0005).
  */
 export function likeInsensitive(column: SQLWrapper, q: string): SQL {

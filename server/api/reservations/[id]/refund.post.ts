@@ -11,7 +11,7 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/reservations/:id/refund — stamp `refundedAt` on `quantity` active
+ * POST /api/reservations/:id/refund: stamp `refundedAt` on `quantity` active
  * tickets of a type.
  */
 export default defineEventHandler(async (event) => {
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
 
   if (!reservation) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
 
-  // Only a collected booking has money to give back — see reservationLifecycle.
+  // Only a collected booking has money to give back: see reservationLifecycle.
   assertRefundable(reservation.status)
 
   const active = await db

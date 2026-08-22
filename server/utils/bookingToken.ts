@@ -10,7 +10,7 @@ interface TokenPayload {
   e: number
 }
 
-/** A week, as a floor — a booking made the day before still needs a usable link. */
+/** A week, as a floor: a booking made the day before still needs a usable link. */
 const MIN_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000
 /** A day past the performance, so the page still opens on the night. */
 const GRACE_AFTER_PERFORMANCE_MS = 24 * 60 * 60 * 1000
@@ -49,7 +49,7 @@ async function key(): Promise<CryptoKey> {
 }
 
 /**
- * A day after the performance, but never less than a week away — the
+ * A day after the performance, but never less than a week away: the
  * credential stops working once it can no longer be acted on.
  */
 export function bookingTokenExpiry(performanceStartsAt: Date, now = new Date()): number {
@@ -65,7 +65,7 @@ export async function signBookingToken(bookingId: string, expiresAt: number): Pr
 }
 
 /**
- * Null for every failure — bad shape, signature, expiry or booking — so a
+ * Null for every failure (bad shape, signature, expiry or booking) so a
  * caller cannot tell which of them it was.
  */
 export async function verifyBookingToken(token: string, bookingId: string, now = new Date()): Promise<boolean> {

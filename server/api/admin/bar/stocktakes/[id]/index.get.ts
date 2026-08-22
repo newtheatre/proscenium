@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { asc, eq } from 'drizzle-orm'
 import { manageBar } from '~~/shared/utils/abilities'
 
-/** GET /api/admin/bar/stocktakes/:id — the count sheet and its variance. */
+/** GET /api/admin/bar/stocktakes/:id. The count sheet and its variance. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
   const id = getRouterParam(event, 'id')!

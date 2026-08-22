@@ -106,7 +106,7 @@ watch(tab, (value) => {
   }
 })
 
-// Bound as computeds, never as template expressions — see the note on
+// Bound as computeds, never as template expressions: see the note on
 // AdminShowsTreeTable's `rows` prop.
 const activeRows = computed(() => activePage.value?.rows ?? [])
 const draftRows = computed(() => draftPage.value?.rows ?? [])
@@ -138,7 +138,7 @@ const performanceForTicketTypesLabel = ref('')
 const performanceForTicketTypesShowTitle = ref('')
 
 /**
- * One handler, exhaustive over the union — adding a case to `ShowRowAction`
+ * One handler, exhaustive over the union: adding a case to `ShowRowAction`
  * without handling it is a type error rather than a dead button.
  */
 function onRowAction(action: ShowRowAction) {

@@ -7,7 +7,7 @@ const querySchema = z.object({
 })
 
 /**
- * GET /api/shifts/mine — upcoming performances, their open slots and who is
+ * GET /api/shifts/mine: upcoming performances, their open slots and who is
  * already on. Any member with an account may see this (docs/12 §3.3).
  */
 export default defineEventHandler(async (event) => {

@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { workFoh } from '~~/shared/utils/abilities'
 
 /**
- * POST /api/foh/backstage/reset — the kill switch. Every joined device is out
+ * POST /api/foh/backstage/reset: the kill switch. Every joined device is out
  * instantly and a new code appears (ADR-0020).
  */
 export default defineEventHandler(async (event) => {

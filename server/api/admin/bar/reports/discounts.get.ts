@@ -7,7 +7,7 @@ const querySchema = z.object({
   format: z.enum(['json', 'csv']).optional().default('json'),
 })
 
-/** GET /api/admin/bar/reports/discounts — by type, and by who rang it up. */
+/** GET /api/admin/bar/reports/discounts: by type, and by who rang it up. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

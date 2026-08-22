@@ -3,7 +3,7 @@ import { asc, count, eq, inArray } from 'drizzle-orm'
 import { readShow } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/shows/:id — one show, in full.
+ * GET /api/shows/:id. One show, in full.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, readShow)

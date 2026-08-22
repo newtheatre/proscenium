@@ -10,7 +10,7 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/admin/bar/products/:id/prices — set a price from a date. Append
+ * POST /api/admin/bar/products/:id/prices: set a price from a date. Append
  * only: nothing is updated, so the history is the audit trail (docs/13 §3).
  */
 export default defineEventHandler(async (event) => {

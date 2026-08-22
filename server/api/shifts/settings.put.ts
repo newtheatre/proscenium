@@ -5,7 +5,7 @@ import { manageShifts } from '~~/shared/utils/abilities'
 
 const bodySchema = z.object({ autoConfirmClaims: z.boolean() })
 
-/** PUT /api/shifts/settings — a per-season toggle, because trust differs. */
+/** PUT /api/shifts/settings: a per-season toggle, because trust differs. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageShifts)
 

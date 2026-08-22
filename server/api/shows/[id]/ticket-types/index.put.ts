@@ -12,7 +12,7 @@ const bodySchema = z.object({
 /**
  * PUT /api/shows/:id/ticket-types Upserts a show-level ticket type override.
  */
-/** PUT /api/shows/:id/ticket-types — set ticket type price overrides for a show. Admin/Manager only. */
+/** PUT /api/shows/:id/ticket-types: set ticket type price overrides for a show. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 

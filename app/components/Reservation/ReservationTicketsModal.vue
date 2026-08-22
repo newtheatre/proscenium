@@ -1,6 +1,6 @@
 /**
  * View and adjust a reservation's tickets. Refunded ones are separate and
- * read-only — they record a transaction (ADR-0011).
+ * read-only: they record a transaction (ADR-0011).
  */
 <script setup lang="ts">
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -347,7 +347,7 @@ function formatDate(val: string | number): string {
 <template>
   <USlideover
     v-model:open="open"
-    :title="`Manage Tickets — ${bookingRef ?? ''}`"
+    :title="`Manage Tickets: ${bookingRef ?? ''}`"
     side="right"
   >
     <template #description>
@@ -399,7 +399,7 @@ function formatDate(val: string | number): string {
               </p>
             </div>
 
-            <!-- Refund (admin/manager) — disabled while there are unsaved quantity edits -->
+            <!-- Refund (admin/manager): disabled while there are unsaved quantity edits -->
             <UButton
               v-if="(activeCountByType.get(row.id) ?? 0) > 0"
               icon="i-lucide-banknote"

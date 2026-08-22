@@ -11,7 +11,7 @@ Store rather than as four worker secrets rotated in lockstep.
 
 A Secrets Store binding is an object with an async `get()`, not a string. Nitro's env → runtimeConfig
 mapping cannot consume one, and `nuxt-auth-utils` reads `runtimeConfig.session.password`
-**synchronously** the first time a session is touched — and memoises the whole session config, the
+**synchronously** the first time a session is touched, and memoises the whole session config, the
 password included, for the life of the isolate.
 
 So the value must be written into `runtimeConfig` before any handler runs, and before any other
@@ -30,7 +30,7 @@ anonymous `{ id }` and nothing appeared in the logs.
 
 **A leftover worker secret wins.** `nuxt-auth-utils` resolves the password as
 `defu({ password: process.env.NUXT_SESSION_PASSWORD }, runtimeConfig.session)`, and `defu` gives its
-first argument priority — so a stale worker secret of that name beats the store. This app then seals
+first argument priority, so a stale worker secret of that name beats the store. This app then seals
 with the stale key while the auth service seals with the store key, and a user who logs in
 successfully is bounced straight back to the login page. It cost an evening on 2026-08-14.
 
@@ -52,7 +52,7 @@ successfully is bounced straight back to the login page. It cost an evening on 2
 - Rotating the estate seal is one write in the Secrets Store and no deploy here. The auth service's
   runbook owns rotation.
 - Scheduled tasks do not go through the request hook. None of ours seal sessions, so nothing is
-  missing today — but a task that needs a store-backed secret must read the binding itself.
+  missing today, but a task that needs a store-backed secret must read the binding itself.
 - `bookingTokenSecret` falls back to the session password when unset
   ([ADR-0009](0009-signed-booking-access-tokens.md)); that fallback resolves inside request handlers,
   so it sees the value this plugin has already written.

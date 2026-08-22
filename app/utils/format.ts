@@ -1,5 +1,5 @@
 /**
- * Display formatting with `en-GB` and `Europe/London` fixed — the Worker runs
+ * Display formatting with `en-GB` and `Europe/London` fixed: the Worker runs
  * in UTC. In app/utils, not shared/, which is auto-imported server-side too.
  */
 
@@ -7,7 +7,7 @@ const TIME_ZONE = 'Europe/London'
 const LOCALE = 'en-GB'
 
 /** What we render when there is nothing to render. */
-const EMPTY = '—'
+const EMPTY = '-'
 
 /**
  * `performances.startsAt` is Unix seconds while `createdAt` is a SQLite
@@ -21,7 +21,7 @@ export function toDate(value: string | number | Date | null | undefined): Date |
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-/** `14 Aug 2026, 19:30` — the default for anything with a time of day. */
+/** `14 Aug 2026, 19:30`: the default for anything with a time of day. */
 export function formatDateTime(value: string | number | Date | null | undefined): string {
   const date = toDate(value)
   if (!date) return EMPTY
@@ -36,7 +36,7 @@ export function formatDateTime(value: string | number | Date | null | undefined)
   })
 }
 
-/** `14 Aug 2026` — for runs and issue dates, where the time is noise. */
+/** `14 Aug 2026`: for runs and issue dates, where the time is noise. */
 export function formatDate(value: string | number | Date | null | undefined): string {
   const date = toDate(value)
   if (!date) return EMPTY
@@ -48,7 +48,7 @@ export function formatDate(value: string | number | Date | null | undefined): st
   })
 }
 
-/** `19:30` — for doors and curtain, where the date is already established. */
+/** `19:30`: for doors and curtain, where the date is already established. */
 export function formatTime(value: string | number | Date | null | undefined): string {
   const date = toDate(value)
   if (!date) return EMPTY
@@ -61,7 +61,7 @@ export function formatTime(value: string | number | Date | null | undefined): st
 }
 
 /**
- * Takes **pence** — money is stored as integer pence everywhere, and converting
+ * Takes **pence**: money is stored as integer pence everywhere, and converting
  * earlier than the last moment is how rounding errors start.
  */
 export function formatMoney(pence: number | null | undefined): string {

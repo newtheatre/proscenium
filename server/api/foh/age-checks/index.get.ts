@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { and, desc, eq, gte, lte } from 'drizzle-orm'
 import { workFoh } from '~~/shared/utils/abilities'
 
-/** GET /api/foh/age-checks — tonight's register and its two counters. */
+/** GET /api/foh/age-checks: tonight's register and its two counters. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

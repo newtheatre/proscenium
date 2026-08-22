@@ -19,7 +19,7 @@ const querySchema = z.object({
 const MAX_EXPORT_ROWS = 20_000
 
 /**
- * GET /api/admin/export/tickets — ticket data as CSV, for the treasurer.
+ * GET /api/admin/export/tickets: ticket data as CSV, for the treasurer.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, defineAbility((user: AbilityUser) => isAdminOrManager(user)))
@@ -169,7 +169,7 @@ function buildCsv(rows: TicketRow[]): string {
     // Two imported rows carry a negative price from an ETL rounding remainder;
     // unflagged they quietly subtract from a spreadsheet total.
     const priceNote = r.pricePaid < 0
-      ? 'Negative — apportioning remainder, check against the booking total'
+      ? 'Negative: apportioning remainder, check against the booking total'
       : r.priceConfidence === 'UNKNOWN'
         ? 'Price was never recorded in the legacy system'
         : r.priceConfidence === 'DERIVED'

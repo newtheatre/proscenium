@@ -14,7 +14,7 @@ const bodySchema = z.object({
  *
  * Upserts a performance-level ticket type override.
  */
-/** PUT /api/shows/:id/performances/:performanceId/ticket-types — set ticket type price overrides for a performance. Admin/Manager only. */
+/** PUT /api/shows/:id/performances/:performanceId/ticket-types: set ticket type price overrides for a performance. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
   const performanceId = getRouterParam(event, 'performanceId')

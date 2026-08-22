@@ -2,12 +2,12 @@ import { db, schema } from '@nuxthub/db'
 import { and, asc, eq, gt, inArray, min } from 'drizzle-orm'
 
 /**
- * GET /api/whats-on — published shows with upcoming on-sale performances.
+ * GET /api/whats-on: published shows with upcoming on-sale performances.
  */
 export default defineEventHandler(async (event) => {
   const now = new Date()
 
-  // Set before any return, including the empty one — placed after, the header is
+  // Set before any return, including the empty one: placed after, the header is
   // skipped exactly when nothing is on sale.
   setHeader(event, 'Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
 
@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
   const orderedShowIds = candidates.map(c => c.showId)
 
   // A subquery rather than the id list, for the same 100-parameter reason as
-  // below — a busy season could put more than 100 shows on sale at once.
+  // below: a busy season could put more than 100 shows on sale at once.
   const showsOnSale = db
     .select({ id: schema.performances.showId })
     .from(schema.performances)

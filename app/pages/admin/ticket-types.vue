@@ -51,7 +51,7 @@ const { data: rawData, status, error, refresh } = await useAsyncData(
 )
 
 /**
- * **Always an array, never null** — a fresh array per render sends UTable into
+ * **Always an array, never null**: a fresh array per render sends UTable into
  * a loop, which locks the tab up (ADR-0012).
  */
 const rows = computed<TicketType[]>(() => {
@@ -95,7 +95,7 @@ function formatTicketPrice(pence: number): string {
 async function deleteTicketType(ticketType: TicketType) {
   const confirmed = await confirm({
     title: `Delete '${ticketType.name}'?`,
-    description: 'This permanently deletes the ticket type and cannot be undone. If any issued tickets reference it, the deletion will be refused — archive it instead.',
+    description: 'This permanently deletes the ticket type and cannot be undone. If any issued tickets reference it, the deletion will be refused, archive it instead.',
     confirmLabel: 'Delete',
     confirmColor: 'error',
   })
@@ -124,7 +124,7 @@ async function deleteTicketType(ticketType: TicketType) {
 const isArchiving = ref(false)
 
 /**
- * Retire a type, or bring it back — deliberately not a delete (ADR-0010).
+ * Retire a type, or bring it back: deliberately not a delete (ADR-0010).
  * A 2019 ticket still has to resolve its name and price.
  */
 async function setArchived(tt: TicketType, archived: boolean) {

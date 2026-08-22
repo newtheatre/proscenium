@@ -16,7 +16,7 @@ function holdsAppRoles(user: User): boolean {
 }
 
 /**
- * **MUST NOT throw** — authorize() swallows anything that is not an
+ * **MUST NOT throw**: authorize() swallows anything that is not an
  * AuthorizationError and then runs the handler unchecked (ADR-0008).
  */
 export async function sessionUserForAuthorization(event: H3Event): Promise<User | null> {

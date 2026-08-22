@@ -7,7 +7,7 @@ Extends [ADR-0011](0011-collection-is-the-payment-boundary.md)
 
 [ADR-0011](0011-collection-is-the-payment-boundary.md) settled *when* money is taken: nothing is
 paid until the tickets are collected, and the boundary is a status transition. That answers the
-question it was written for — may this booking be edited, or only refunded — and it answers it well.
+question it was written for (may this booking be edited, or only refunded) and it answers it well.
 
 It does not answer a different question, and the bar design
 ([13-bar-design](../13-bar-design.md)) is built entirely on that question: **how much money did the

@@ -115,8 +115,8 @@ function reset() {
 const markPerformancesOnSaleToo = ref(false)
 
 const statusItems = [
-  { label: 'Draft — not visible to the public', value: 'DRAFT' },
-  { label: 'Published — visible to the public', value: 'PUBLISHED' },
+  { label: 'Draft, not visible to the public', value: 'DRAFT' },
+  { label: 'Published, visible to the public', value: 'PUBLISHED' },
 ]
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {

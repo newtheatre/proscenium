@@ -1,6 +1,6 @@
 import { workFoh } from '~~/shared/utils/abilities'
 
-/** POST /api/foh/backstage/messages/:id/ack — acknowledge a backstage call. */
+/** POST /api/foh/backstage/messages/:id/ack: acknowledge a backstage call. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

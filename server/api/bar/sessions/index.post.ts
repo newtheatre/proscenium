@@ -8,7 +8,7 @@ const bodySchema = z.object({
   performanceIds: z.array(z.string().trim().min(1)).max(8).optional().default([]),
 })
 
-/** POST /api/bar/sessions — open the bar for tonight. */
+/** POST /api/bar/sessions: open the bar for tonight. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

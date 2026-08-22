@@ -8,7 +8,7 @@ const querySchema = z.object({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 })
 
-/** GET /api/admin/bar/age-checks/export — the register as CSV, for a date range. */
+/** GET /api/admin/bar/age-checks/export: the register as CSV, for a date range. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

@@ -10,17 +10,21 @@ const SKIP = new Set(['node_modules', '.nuxt', '.output', '.wrangler', '.git', '
 const EXTS = ['.ts', '.vue', '.mjs', '.js', '.prisma']
 
 const BANNED_TAGS = /@(param|returns?|prop|props|emits?|module|route|authenticated|admin-only|method|example|see|throws)\b/
+// The estate rule is a hard one and covers prose, UI copy and docs alike, so
+// this pass reads whole files rather than only their comments.
+const EM_DASH = '\u2014'
+const EM_DASH_EXTS = ['.ts', '.vue', '.mjs', '.js', '.md', '.yml', '.yaml', '.sql', '.sh', '.json']
 const HISTORY = /\b(used to|originally|an earlier version|previously|it used to|we used to|this used to|no longer needed|before this)\b/i
 // Thousands-separated counts and precise percentages rot; years and ADR
 // numbers do not, so they are not flagged.
 const FIGURES = /\b\d{1,3}(,\d{3})+\b|\b\d+\.\d+%/
 
-function walk(dir, out = []) {
+function walk(dir, out = [], exts = EXTS) {
   for (const entry of readdirSync(dir)) {
     if (SKIP.has(entry)) continue
     const full = join(dir, entry)
-    if (statSync(full).isDirectory()) walk(full, out)
-    else if (EXTS.some(e => entry.endsWith(e))) out.push(full)
+    if (statSync(full).isDirectory()) walk(full, out, exts)
+    else if (exts.some(e => entry.endsWith(e))) out.push(full)
   }
   return out
 }
@@ -81,14 +85,34 @@ for (const file of walk(ROOT)) {
     // Directives are instructions to tooling, not prose.
     if (/^(eslint|@ts-|prettier|c8 |v8 |istanbul|#!)/.test(joined)) continue
     if (body.length > MAX_LINES) failures.push(`${rel}:${line}  ${body.length} lines (max ${MAX_LINES})`)
-    if (BANNED_TAGS.test(joined)) failures.push(`${rel}:${line}  JSDoc tag — the signature already says it`)
-    if (HISTORY.test(joined)) failures.push(`${rel}:${line}  narrates history — that belongs in an ADR`)
-    if (FIGURES.test(joined)) failures.push(`${rel}:${line}  bare figure — put it in docs/, dated`)
+    if (BANNED_TAGS.test(joined)) failures.push(`${rel}:${line}  JSDoc tag: the signature already says it`)
+    if (HISTORY.test(joined)) failures.push(`${rel}:${line}  narrates history: that belongs in an ADR`)
+    if (FIGURES.test(joined)) failures.push(`${rel}:${line}  bare figure: put it in docs/, dated`)
   }
 }
 
+// Em dashes, everywhere. `node_modules` and generated output are skipped by
+// walk(); migrations are too, so a generated one cannot fail the build.
+for (const file of walk(ROOT, [], EM_DASH_EXTS)) {
+  const rel = relative(ROOT, file)
+  if (rel === join('scripts', 'check-comments.mjs')) continue
+  let source
+  try {
+    source = readFileSync(file, 'utf8')
+  }
+  catch {
+    continue
+  }
+  if (!source.includes(EM_DASH)) continue
+  source.split('\n').forEach((line, i) => {
+    if (line.includes(EM_DASH)) {
+      failures.push(`${rel}:${i + 1}  em dash: use a comma, colon, semicolon, parentheses or two sentences`)
+    }
+  })
+}
+
 if (failures.length) {
-  console.error(`\n${failures.length} comment rule violation(s):\n`)
+  console.error(`\n${failures.length} prose rule violation(s):\n`)
   for (const f of failures) console.error(`  ${f}`)
   console.error('\nSee CONTRIBUTING.md §Comments.\n')
   process.exit(1)

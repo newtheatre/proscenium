@@ -4,7 +4,7 @@
 [stage-door](https://github.com/newtheatre/stage-door) on 2026-08-12, `auth.newtheatre.org.uk` owns
 accounts, credentials, roles and erasure. Proscenium reads a sealed cookie and keeps a thin mirror
 of the people who have booked something. There are no passwords, no login pages and no role editing
-in this repo, and there must never be again — see stage-door's
+in this repo, and there must never be again: see stage-door's
 [integrating-an-app](https://github.com/newtheatre/stage-door/blob/main/docs/integrating-an-app.md).
 
 ## Sessions
@@ -14,7 +14,7 @@ The `nnt-session` cookie is sealed by the auth service with the estate-wide
 **This app only ever reads it.** The single sanctioned exception is `/dev-login`, guarded by
 `import.meta.dev` so it does not exist in a production build.
 
-The payload is the published contract, copied into `shared/utils/nntAuth.ts` (do not edit it here —
+The payload is the published contract, copied into `shared/utils/nntAuth.ts` (do not edit it here:
 change it in stage-door and re-copy):
 
 ```ts
@@ -26,13 +26,13 @@ interface User {
 }
 interface UserSession {
   loggedInAt: number        // epoch ms
-  refreshedAt: number       // epoch ms of the last DB re-read — drives staleness
-  epoch: number             // copy of users.session_epoch — drives force-logout
+  refreshedAt: number       // epoch ms of the last DB re-read, drives staleness
+  epoch: number             // copy of users.session_epoch, drives force-logout
 }
 ```
 
 **Roles are namespaced.** They arrive as `proscenium:ADMIN`, not `ADMIN`, because one session
-carries every app's roles. Never compare against a bare role name — use `hasRole`/`isStaff` from
+carries every app's roles. Never compare against a bare role name: use `hasRole`/`isStaff` from
 `shared/utils/abilities/types.ts`, which add the prefix. Writing the list out by hand is how the
 staff branch of `requireBookingAccess` silently never matched.
 
@@ -48,7 +48,7 @@ https://auth.newtheatre.org.uk/account
 Roles are a snapshot taken when the auth service last read its database. A session whose
 `refreshedAt` is older than **15 minutes** (`ROLE_STALENESS_MS`) must not have its roles honoured;
 the browser is bounced through `auth.newtheatre.org.uk/api/session/refresh`, which re-reads roles
-and rejects revoked or disabled accounts. That refresh is where the `session_epoch` check lives —
+and rejects revoked or disabled accounts. That refresh is where the `session_epoch` check lives:
 this app never queries it.
 
 Sessions with no `proscenium:` role are never staleness-checked, so ordinary audience browsing
@@ -62,14 +62,14 @@ it:
 > `nuxt-authorization`'s server `authorize()` wraps its resolver in a try/catch that only re-throws
 > `AuthorizationError`; anything else is swallowed and `authorize()` then resolves *successfully*,
 > running the handler with no check at all. A resolver that threw on stale sessions therefore turned
-> the staleness rule into a privilege escalation — and because sessions last 30 days and go stale
+> the staleness rule into a privilege escalation, and because sessions last 30 days and go stale
 > after 15 minutes, that was the ordinary state of a staff session, not an edge case.
 >
 > Staleness is expressed as data instead: a stale session keeps its identity and loses its
 > `proscenium:` roles. Staff abilities fail closed; ownership checks still work.
 
 `getVerifiedSessionUser` *does* throw a 401 with `data: { stale: true }`, which is correct for
-handlers that call it directly — the throw propagates normally there. Do not wire it into the
+handlers that call it directly: the throw propagates normally there. Do not wire it into the
 resolver.
 
 **Rotating `NUXT_SESSION_PASSWORD` invalidates every session estate-wide.** That is the emergency
@@ -89,7 +89,7 @@ the *person* rather than their relationship to this app belongs in it.
 
 The mirror upsert is `server/utils/ensureLocalUser.ts`, run from the authorization-resolver plugin
 and debounced per isolate. Canonical ids are stable forever and `reservations.user_id` FKs against
-them — never invent a user id the auth service did not issue.
+them: never invent a user id the auth service did not issue.
 
 ## Erasure {#erasure}
 
@@ -105,9 +105,9 @@ POST /api/_hooks/auth/anonymise { userId }  →  { ok: true }
 ```
 
 Ours is `server/api/_hooks/auth/anonymise.post.ts`, delegating to `anonymiseUser`, which rewrites
-the mirror row and scrubs **both** reservation note fields (`customerNotes` and `staffNotes` — a
+the mirror row and scrubs **both** reservation note fields (`customerNotes` and `staffNotes`: a
 staff note saying who collected the tickets identifies someone just as well as a name). It writes
-byte-identical values to stage-door's — `deleted-<userId>@anonymised.invalid` and `Deleted user` —
+byte-identical values to stage-door's: `deleted-<userId>@anonymised.invalid` and `Deleted user`:
 because the mirror is upserted *from the session*, so a locally-invented placeholder would be
 overwritten by the central one on the next refresh. Deriving the address from the user id also makes
 the hook genuinely idempotent, which stage-door's retry loop assumes.
@@ -116,18 +116,18 @@ Two things that are easy to get wrong here:
 
 - **The mirror upsert must not resurrect an erased row.** It runs on every authenticated request and
   writes name and email from the session. A customer holds no roles, so their sealed cookie stays
-  readable for the full 30-day `maxAge` after erasure — their own browser used to restore their
+  readable for the full 30-day `maxAge` after erasure: their own browser used to restore their
   details while `anonymisedAt` kept the row hidden from listings, so the erasure looked complete and
   silently was not. `ensureLocalUser` now carries `setWhere: isNull(anonymisedAt)`.
 - **There is no app-local erasure endpoint**, deliberately. One used to exist and produced a half
-  erasure — this app scrubbed, the central identity untouched — which is worse than none.
+  erasure (this app scrubbed, the central identity untouched) which is worse than none.
 
 The other hooks are `export` (subject-access contribution), `last-activity` (feeds the
 retention sweep; stage-door batches ids at 90 and so do we, because D1 binds at most 100 parameters
-per statement) and `merge` (stage-door ADR-0015: re-points every user-referencing column —
-reservations, passes, and the two staff-attribution columns — onto the winning account and deletes
+per statement) and `merge` (stage-door ADR-0015: re-points every user-referencing column:
+reservations, passes, and the two staff-attribution columns: onto the winning account and deletes
 the losing mirror row; the losing central identity is erased by stage-door afterwards). All four
-authenticate with the SHA-256 of this app's own `AUTH_SERVICE_TOKEN`, compared constant-time — see
+authenticate with the SHA-256 of this app's own `AUTH_SERVICE_TOKEN`, compared constant-time: see
 `server/utils/hookAuth.ts`.
 
 Full policy: stage-door's
@@ -202,11 +202,11 @@ Permissions are declared as abilities in `shared/utils/abilities/*.ts` and re-ex
 
 1. **A handler with no `authorize()` and no `requireUserSession()` is fully public.** There is no
    route-level middleware over `/api/**`. Forgetting the guard is not a subtle bug, it is an open
-   endpoint — it has already happened once, with `GET /api/shows` exposing DRAFT productions.
+   endpoint: it has already happened once, with `GET /api/shows` exposing DRAFT productions.
 
 2. **`defineAbility(fn)` with a single argument sets `allowGuest: false`.** So an ability that
    *looks* public, like `readShow = defineAbility(() => true)`, denies anonymous users when passed
-   through `authorize()` — it means "any logged-in user". Denial surfaces as **403**, not 401. If
+   through `authorize()`: it means "any logged-in user". Denial surfaces as **403**, not 401. If
    you genuinely want a public endpoint, do not call `authorize()` at all.
 
 3. **An ability that admits the resource owner must not return the staff shape.** `readReservation`
@@ -221,25 +221,25 @@ only where they hold something, which is deliberately little.
 
 | Area | ADMIN | MANAGER | BOX_OFFICE | Customer |
 |---|---|---|---|---|
-| Shows: create / update / publish | ✅ | ✅ | — | — |
-| Shows: delete | ✅ | — | — | — |
-| Performances: create / update / delete | ✅ | ✅ | — | — |
-| Venues & features: create / update | ✅ | ✅ | — | — |
-| Venues & features: delete | ✅ | — | — | — |
-| Ticket types: create / update | ✅ | ✅ | — | — |
-| Ticket types: delete | ✅ | — | — | — |
-| Pass types: create / update (incl. on sale) | ✅ | ✅ | — | — |
-| Passes: issue / redeem | ✅ | ✅ | ✅ | — |
-| Passes: cancel | ✅ | ✅ | — | — |
+| Shows: create / update / publish | ✅ | ✅ | - | - |
+| Shows: delete | ✅ | - | - | - |
+| Performances: create / update / delete | ✅ | ✅ | - | - |
+| Venues & features: create / update | ✅ | ✅ | - | - |
+| Venues & features: delete | ✅ | - | - | - |
+| Ticket types: create / update | ✅ | ✅ | - | - |
+| Ticket types: delete | ✅ | - | - | - |
+| Pass types: create / update (incl. on sale) | ✅ | ✅ | - | - |
+| Passes: issue / redeem | ✅ | ✅ | ✅ | - |
+| Passes: cancel | ✅ | ✅ | - | - |
 | Reservations: list / create / read / update | ✅ | ✅ | ✅ | own only |
-| Reservations: refund | ✅ | ✅ | — | — |
-| Reservations: delete | ✅ | ✅ | — | — |
+| Reservations: refund | ✅ | ✅ | - | - |
+| Reservations: delete | ✅ | ✅ | - | - |
 | Users (mirror): list / read | ✅ | ✅ | ✅ | self |
-| Users (mirror): create / delete | ✅ | ✅ | — | — |
-| Admin stats & CSV export | ✅ | ✅ | — | — |
-| Rota: read | ✅ | ✅ | ✅ | — |
-| Rota: assign / confirm / remove | ✅ | ✅ | — | — |
-| Emergency card and contacts: edit | ✅ | ✅ | — | — |
+| Users (mirror): create / delete | ✅ | ✅ | - | - |
+| Admin stats & CSV export | ✅ | ✅ | - | - |
+| Rota: read | ✅ | ✅ | ✅ | - |
+| Rota: assign / confirm / remove | ✅ | ✅ | - | - |
+| Emergency card and contacts: edit | ✅ | ✅ | - | - |
 
 Plus the two front-of-house roles:
 
@@ -247,17 +247,17 @@ Plus the two front-of-house roles:
 |---|---|---|
 | Show night screen (rostered performances only) | ✅ | ✅ |
 | Rota: read | ✅ | ✅ |
-| Rota: assign / confirm / remove | ✅ | — |
-| Emergency card and contacts: edit | ✅ | — |
-| Access profiles: verify and read | ✅ | — |
-| Prices, emails, taking money | — | — |
+| Rota: assign / confirm / remove | ✅ | - |
+| Emergency card and contacts: edit | ✅ | - |
+| Access profiles: verify and read | ✅ | - |
+| Prices, emails, taking money | - | - |
 
 Credentials, role assignment and verification are absent from this table on purpose: they are the
 auth service's, and the abilities that used to describe them have been removed rather than left
 implying a permission model this app does not enforce.
 
 `/admin/users/:id` shows what this app knows about somebody: bookings, passes, shifts, and counts of
-what they wrote as staff. It shows **nothing about their identity**, because none of that is ours —
+what they wrote as staff. It shows **nothing about their identity**, because none of that is ours:
 `ensureLocalUser` rewrites name and email from the session on every authenticated request, so a local
 edit would be silently reverted on their next page load. The page links out to stage-door instead.
 The access-profile section is present only for `access.verify` holders, and is **absent from the
@@ -268,7 +268,7 @@ walk-in lookup uses `GET /api/users?email=`, which returns at most one row rathe
 
 ## Client-side guards
 
-`app/middleware/` — `auth`, `admin`, `staff`, `foh`. These are **user experience only**. They stop someone
+`app/middleware/`: `auth`, `admin`, `staff`, `foh`. These are **user experience only**. They stop someone
 landing on a page they cannot use; they are not a security boundary. The API is the boundary. Each
 checks staleness *before* the role, so a session that is merely out of date is refreshed rather than
 turned away.
@@ -282,11 +282,11 @@ nothing reaches the page and is told so, which is a state rather than a denial.
 ## Guest booking access
 
 A customer with no account still needs to open their own booking from an emailed link. That is a
-signed, expiring token (`server/utils/bookingToken.ts`), not the booking reference — the reference
+signed, expiring token (`server/utils/bookingToken.ts`), not the booking reference: the reference
 is quoted aloud at the box office and printed on every email, so it cannot also be the key.
 
 The token is HMAC-SHA256 over `{ bookingId, expiry }`, expiring a day after the performance and
 never sooner than a week out. It is signed with `NUXT_BOOKING_TOKEN_SECRET`, **which falls back to
-the estate session password when unset** — set it explicitly in production, or one key serves two
+the estate session password when unset**: set it explicitly in production, or one key serves two
 different credential types across a trust boundary and a seal rotation kills every booking link
 already in customers' inboxes.

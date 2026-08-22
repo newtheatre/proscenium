@@ -3,7 +3,7 @@ import { eq, sql } from 'drizzle-orm'
 import { deleteContentWarning } from '~~/shared/utils/abilities'
 
 /**
- * DELETE /api/content-warnings/:id — remove a vocabulary entry. Admin only.
+ * DELETE /api/content-warnings/:id. Remove a vocabulary entry. Admin only.
  * Refused while any show carries it; archive instead (ADR-0010).
  */
 export default defineEventHandler(async (event) => {

@@ -1,6 +1,6 @@
 <!--
 Search and date-range controls for the archive tab, which is paged on the
-server — so these are the only way to reach an old show (ADR-0005).
+server, so these are the only way to reach an old show (ADR-0005).
 -->
 <script setup lang="ts">
 const search = defineModel<string>('search', { required: true })

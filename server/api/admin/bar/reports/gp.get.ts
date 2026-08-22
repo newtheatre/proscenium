@@ -3,7 +3,7 @@ import { manageBar } from '~~/shared/utils/abilities'
 
 const querySchema = z.object({ format: z.enum(['json', 'csv']).optional().default('json') })
 
-/** GET /api/admin/bar/reports/gp — margin per product at the latest cost. */
+/** GET /api/admin/bar/reports/gp: margin per product at the latest cost. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

@@ -19,7 +19,7 @@ const bodySchema = z.object({
   notes: z.string().optional().nullable(),
 })
 
-/** POST /api/shows/:id/performances — create a performance for a show. Admin/Manager only. */
+/** POST /api/shows/:id/performances: create a performance for a show. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 

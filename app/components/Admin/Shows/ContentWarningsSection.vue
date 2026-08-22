@@ -16,7 +16,7 @@ interface WarningOption extends ContentWarningRef {
 
 /**
  * Fetched only when the editor opens, and deliberately not the admin page's
- * key — that one includes archived entries (ADR-0013).
+ * key: that one includes archived entries (ADR-0013).
  */
 const { data: vocabulary, status: vocabularyStatus, refresh: loadVocabulary } = useFetch<WarningOption[]>(
   '/api/content-warnings',
@@ -95,7 +95,7 @@ const technicalOptions = computed(() =>
 )
 
 /**
- * A `{ type: 'label' }` header per category — unlabelled separators would not
+ * A `{ type: 'label' }` header per category, unlabelled separators would not
  * say what the groups are.
  */
 const generalOptions = computed(() => {
@@ -342,7 +342,7 @@ async function save() {
 
         <UFormField
           label="Technical effects"
-          help="What the production does to the room. These have no level — either it happens or it does not."
+          help="What the production does to the room. These have no level: either it happens or it does not."
         >
           <UCheckboxGroup
             v-model="technicalIds"
@@ -457,7 +457,7 @@ async function save() {
 
         <UFormField
           label="Notes"
-          help="Anything the list above cannot express — timings, intensity, how to avoid a particular moment."
+          help="Anything the list above cannot express: timings, intensity, how to avoid a particular moment."
         >
           <UTextarea
             v-model="notes"

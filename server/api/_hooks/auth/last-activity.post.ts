@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   requireHookAuth(event)
   const { userIds } = await readValidatedBody(event, bodySchema.parse)
 
-  // D1 caps bound parameters at 100 — chunk regardless of caller batch size.
+  // D1 caps bound parameters at 100: chunk regardless of caller batch size.
   const rows: { userId: string, latest: string | null }[] = []
   for (let i = 0; i < userIds.length; i += 90) {
     const chunk = userIds.slice(i, i + 90)

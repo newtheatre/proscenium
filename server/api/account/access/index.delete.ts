@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 
 /**
- * DELETE /api/account/access — remove my access profile. No questions asked,
+ * DELETE /api/account/access: remove my access profile. No questions asked,
  * and the needs data goes; tickets already issued stay valid (docs/12 §2.5).
  */
 export default defineEventHandler(async (event) => {

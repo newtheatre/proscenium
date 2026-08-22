@@ -119,7 +119,7 @@ function reasonLabel(value: string | null) {
         >
           <span class="block text-4xl font-bold">{{ register.accepted }}</span>
           <span class="mt-1 block text-xs uppercase tracking-widest text-emerald-300">
-            IDs accepted — tap to add
+            IDs accepted: tap to add
           </span>
         </button>
         <div class="rounded-xl border-2 border-amber-700 bg-amber-950/30 p-5 text-center">

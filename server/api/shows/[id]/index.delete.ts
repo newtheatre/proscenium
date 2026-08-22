@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { count, eq, inArray } from 'drizzle-orm'
 import { deleteShow } from '~~/shared/utils/abilities'
 
-/** DELETE /api/shows/:id — delete a show. Admin only. */
+/** DELETE /api/shows/:id. Delete a show. Admin only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
   if ((bookings?.n ?? 0) > 0) {
     throw createError({
       statusCode: 409,
-      statusMessage: `This show cannot be deleted because it has ${bookings!.n} booking${bookings!.n === 1 ? '' : 's'} against its performances. Set it back to draft to hide it from the public listings — the sales history has to be kept.`,
+      statusMessage: `This show cannot be deleted because it has ${bookings!.n} booking${bookings!.n === 1 ? '' : 's'} against its performances. Set it back to draft to hide it from the public listings, the sales history has to be kept.`,
     })
   }
 
