@@ -23,8 +23,9 @@ export default defineEventHandler(async (event) => {
     .from(schema.ageChecks)
     .innerJoin(schema.users, eq(schema.ageChecks.checkedByUserId, schema.users.id))
     .where(and(
-      gte(schema.ageChecks.checkedAt, validityStart(scope.night)),
-      lte(schema.ageChecks.checkedAt, validityEnd(scope.night)),
+      // The night runs to 04:00, so a refusal logged at 00:20 is still tonight's.
+      gte(schema.ageChecks.checkedAt, showNightWindow(scope.night).from),
+      lte(schema.ageChecks.checkedAt, showNightWindow(scope.night).to),
     ))
     .orderBy(desc(schema.ageChecks.checkedAt))
 

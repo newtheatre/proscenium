@@ -281,6 +281,13 @@
       "when": 1787393293050,
       "tag": "0039_broken_sharon_carter",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1787403952497,
+      "tag": "0040_perfect_umar",
+      "breakpoints": true
     }
   ]
 }

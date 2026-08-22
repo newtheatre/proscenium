@@ -53,6 +53,7 @@ export async function isExternallyTicketed(performanceId: string): Promise<boole
     .innerJoin(schema.venues, eq(schema.venues.id, schema.performances.venueId))
     .where(sql`${schema.performances.id} = ${performanceId} and (${or(
       isNotNull(schema.shows.externalUrl),
+      isNotNull(schema.performances.externalBookingUrl),
       eq(schema.venues.isExternal, true),
     )})`)
     .get()

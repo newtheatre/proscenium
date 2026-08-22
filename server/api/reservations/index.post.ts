@@ -89,6 +89,14 @@ export default defineEventHandler(async (event) => {
 
   // ── Resolve effective ticket prices ───────────────────────────────────────
 
+  // Sold elsewhere, so a walk-up here is a seat NNT cannot honour (ADR-0029).
+  if (await isExternallyTicketed(body.performanceId)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Tickets for this show are sold elsewhere, so it cannot be sold here.',
+    })
+  }
+
   // Staff may add them to a walk-in, but only against a verified account:
   // the entitlement belongs to the person, not to the counter (docs/12 §2.6).
   await assertAccessTicketsAllowed(resolvedUserId, body.performanceId, body.tickets)

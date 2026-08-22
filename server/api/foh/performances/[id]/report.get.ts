@@ -12,6 +12,12 @@ export default defineEventHandler(async (event) => {
   const scope = await requireFohScope(user)
   scopedPerformance(scope, performanceId)
 
+  // The report carries takings, comps and the incident log. Reading it needs
+  // the same standing as signing the night off (docs/11 §2.1).
+  if (!await mayApproveComps(user, scope.night)) {
+    throw createError({ statusCode: 403, statusMessage: 'Only tonight’s duty manager can read the end-of-night report.' })
+  }
+
   const report = await db.select({
     id: schema.performanceReports.id,
     night: schema.performanceReports.night,

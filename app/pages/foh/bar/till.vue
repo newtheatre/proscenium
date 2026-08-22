@@ -254,6 +254,34 @@ async function openBar() {
   })
   await refresh()
 }
+
+const closingNote = ref('')
+
+/** Until this runs, every end-of-night report calls the bar unclosed. */
+async function closeBar() {
+  const sessionId = tonight.value?.session?.id
+  if (!sessionId) return
+  busy.value = true
+  try {
+    await requestFetch(`/api/bar/sessions/${sessionId}/close`, {
+      method: 'POST',
+      body: { closingNote: closingNote.value || null },
+    })
+    closingNote.value = ''
+    await refresh()
+    toast.add({ title: 'Bar closed', icon: 'i-lucide-check', color: 'success' })
+  }
+  catch (error) {
+    toast.add({
+      title: 'Not closed',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    busy.value = false
+  }
+}
 </script>
 
 <template>
@@ -287,6 +315,24 @@ async function openBar() {
           />
         </template>
       </UAlert>
+
+      <div
+        v-if="tonight?.session"
+        class="mb-4 flex flex-wrap items-center gap-2"
+      >
+        <UInput
+          v-model="closingNote"
+          placeholder="Closing note (optional)"
+          class="flex-1 min-w-48"
+        />
+        <UButton
+          variant="subtle"
+          color="neutral"
+          :loading="busy"
+          label="Close the bar"
+          @click="closeBar"
+        />
+      </div>
 
       <div class="mb-4 flex gap-2">
         <UButton

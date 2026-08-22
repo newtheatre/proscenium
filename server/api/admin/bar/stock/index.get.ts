@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { asc, eq } from 'drizzle-orm'
+import { asc, desc, eq } from 'drizzle-orm'
 import { manageBar } from '~~/shared/utils/abilities'
 
 /** GET /api/admin/bar/stock — on-hand, par flags and value, all derived. */
@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
     id: schema.stockDeliveries.id,
     supplier: schema.stockDeliveries.supplier,
     deliveredOn: schema.stockDeliveries.deliveredOn,
-  }).from(schema.stockDeliveries).orderBy(asc(schema.stockDeliveries.deliveredOn)).limit(1).get()
+  }).from(schema.stockDeliveries).orderBy(desc(schema.stockDeliveries.deliveredOn)).limit(1).get()
 
   return {
     rows,

@@ -53,8 +53,13 @@ export default defineEventHandler(async (event) => {
     ),
   ])
 
+  // The booker's entitlement, so the picker cannot offer an access type the
+  // edit would then refuse (docs/12 §2.6).
+  const rights = await canBookAccessTickets(reservation.userId, performanceId, { excludeReservationId: id })
+
   const ctx = { baseTypes: allTypes, showOverrides, perfOverrides }
   return allTypes
+    .filter(type => !type.accessKind || rights.allowed)
     .map((type) => {
       const { effectivePrice, active } = resolveEffectiveTicketType(type.id, ctx)
       return {
@@ -63,7 +68,12 @@ export default defineEventHandler(async (event) => {
         description: type.description,
         effectivePrice,
         active,
+        accessKind: type.accessKind,
+        maxQuantity: type.accessKind === 'COMPANION'
+          ? rights.companionsRemaining
+          : type.accessKind === 'ACCESS' ? rights.accessRemaining : null,
       }
     })
+    .filter(type => !type.accessKind || (type.maxQuantity ?? 0) > 0)
     .sort((a, b) => a.name.localeCompare(b.name))
 })

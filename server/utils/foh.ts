@@ -21,6 +21,15 @@ export function showNightDate(now: Date = new Date()): string {
   return `${london.getFullYear()}-${String(london.getMonth() + 1).padStart(2, '0')}-${String(london.getDate()).padStart(2, '0')}`
 }
 
+/**
+ * The instants a show night actually covers: 04:00 to 04:00, not a calendar
+ * day. A refusal logged at 00:20 belongs to the night that is still running.
+ */
+export function showNightWindow(night: string): { from: Date, to: Date } {
+  const from = londonInstant(night, NIGHT_ROLLS_OVER_HOUR, 0, 0, 0)
+  return { from, to: new Date(from.getTime() + 24 * 60 * 60 * 1000 - 1) }
+}
+
 export interface FohPerformance {
   id: string
   startsAt: Date

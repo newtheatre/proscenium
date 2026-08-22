@@ -91,8 +91,9 @@ const PUBLIC_ROUTES: PublicRoute[] = [
 export default defineEventHandler(async (event: H3Event) => {
   // `event.path` carries the query string; match on the pathname only.
   const path = getRequestURL(event).pathname
-  if (!path.startsWith('/api/')) return
 
+  // Match on the declared patterns, not on a path prefix: `/t/<ref>` is a
+  // route rather than an endpoint, and skipping it left it uncapped.
   const method = event.method.toUpperCase()
   const route = PUBLIC_ROUTES.find(r => r.methods.includes(method) && r.pattern.test(path))
   if (!route) return

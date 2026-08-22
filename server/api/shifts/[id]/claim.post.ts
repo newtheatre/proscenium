@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 
 /**
  * POST /api/shifts/:id/claim — take an open slot. Eligibility is asked of
@@ -42,7 +42,17 @@ export default defineEventHandler(async (event) => {
     confirmedAt: confirming ? now : null,
     // Allowed under the fail-open path, so a human should look (ADR-0026).
     needsEligibilityReview: answer.needsReview,
-  }).where(eq(schema.performanceShifts.id, id)).returning()
+  }).where(and(
+    eq(schema.performanceShifts.id, id),
+    // Check-then-act: D1 has no interactive transaction, so the write itself
+    // has to re-assert what the read saw or two claims both succeed.
+    eq(schema.performanceShifts.status, 'OPEN'),
+    isNull(schema.performanceShifts.userId),
+  )).returning()
+
+  if (!row) {
+    throw createError({ statusCode: 409, statusMessage: 'Somebody has already taken that one.' })
+  }
 
   return row
 })
