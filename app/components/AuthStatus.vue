@@ -43,6 +43,20 @@ const loginHref = computed(() => {
 
 const showAdminLink = computed(() => user.value ? isStaff(user.value) : false)
 
+/**
+ * Working tonight, so the show night screen is one tap away rather than a URL
+ * to remember in a dark foyer. Client-only: the menu is not server-rendered.
+ */
+const { data: tonight } = await useAsyncData(
+  'auth-status-foh',
+  () => loggedIn.value
+    ? $fetch<{ performances: unknown[] }>('/api/foh/tonight').catch(() => null)
+    : Promise.resolve(null),
+  { watch: [loggedIn], server: false, lazy: true },
+)
+
+const onTonight = computed(() => (tonight.value?.performances?.length ?? 0) > 0)
+
 const menuItems = computed(() => {
   const actionItems: DropdownMenuItem[] = [
     {
@@ -51,6 +65,14 @@ const menuItems = computed(() => {
       to: '/account',
     },
   ]
+
+  if (onTonight.value) {
+    actionItems.push({
+      label: 'Front of house tonight',
+      icon: 'i-lucide-theater',
+      to: '/foh',
+    })
+  }
 
   if (showAdminLink.value) {
     actionItems.push({
