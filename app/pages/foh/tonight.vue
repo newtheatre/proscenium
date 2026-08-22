@@ -150,7 +150,7 @@ const runningTime = computed(() => {
 const facts = computed(() => [
   { label: 'Running time', value: runningTime.value },
   { label: 'Age guidance', value: show.value?.ageGuidance },
-  { label: 'Latecomers', value: show.value?.latecomerPolicy },
+  { label: 'Latecomers', value: latecomerPolicyLabel(show.value?.latecomerPolicy) },
 ].filter(fact => fact.value))
 </script>
 

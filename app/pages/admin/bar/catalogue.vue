@@ -37,6 +37,16 @@ const categories = computed(() => data.value?.categories ?? [])
 const discounts = computed(() => data.value?.discounts ?? [])
 const busy = ref(false)
 
+/** Money is pence in the store and pounds on screen, converted only here. */
+function poundsProxy(read: () => number, write: (pence: number) => void) {
+  return computed({
+    get: () => read() / 100,
+    set: (pounds: number | undefined) => write(Math.round((pounds ?? 0) * 100)),
+  })
+}
+
+const GBP = { style: 'currency' as const, currency: 'GBP' as const }
+
 function fail(error: unknown, title: string) {
   toast.add({
     title,
@@ -151,6 +161,13 @@ async function createProduct() {
   finally { busy.value = false }
 }
 
+const newProductPrice = poundsProxy(
+  () => newProduct.pricePence,
+  (v) => {
+    newProduct.pricePence = v
+  },
+)
+
 const newCategoryName = ref('')
 const newDiscount = reactive({ name: '', percent: 10 })
 
@@ -195,6 +212,12 @@ async function openPrice(product: Product) {
 }
 
 const priceInForce = computed(() => priceHistory.value.find(row => !row.pending) ?? null)
+const newPricePounds = poundsProxy(
+  () => newPrice.pricePence,
+  (v) => {
+    newPrice.pricePence = v
+  },
+)
 
 async function savePrice() {
   busy.value = true
@@ -486,14 +509,15 @@ async function moveCategory(category: Category, by: number) {
             </UFormField>
           </div>
           <UFormField
-            label="Price (pence)"
+            label="Price"
             required
             help="Sets the first price, effective today."
           >
-            <UInput
-              v-model.number="newProduct.pricePence"
-              type="number"
-              min="0"
+            <UInputNumber
+              v-model="newProductPrice"
+              :min="0"
+              :step="0.1"
+              :format-options="GBP"
               class="w-full"
             />
           </UFormField>
@@ -663,13 +687,14 @@ async function moveCategory(category: Category, by: number) {
           />
           <div class="grid gap-3 sm:grid-cols-2">
             <UFormField
-              label="New price (pence)"
+              label="New price"
               required
             >
-              <UInput
-                v-model.number="newPrice.pricePence"
-                type="number"
-                min="0"
+              <UInputNumber
+                v-model="newPricePounds"
+                :min="0"
+                :step="0.1"
+                :format-options="GBP"
                 class="w-full"
               />
             </UFormField>

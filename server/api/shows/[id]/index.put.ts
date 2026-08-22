@@ -15,7 +15,7 @@ const bodySchema = z.object({
   externalUrl: z.url().max(2048).optional().nullable(),
   categoryId: z.string().optional().nullable(),
   ageGuidance: z.string().max(200).optional().nullable(),
-  latecomerPolicy: z.string().max(500).optional().nullable(),
+  latecomerPolicy: z.enum(LATECOMER_POLICIES).optional().nullable(),
   contentWarningNotes: z.string().max(2000).optional().nullable(),
   warningsConfirmedNone: z.boolean().optional(),
   /**

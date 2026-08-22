@@ -59,7 +59,7 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
       subtitle: 'A Trivial Comedy for Serious People',
       description: 'Oscar Wilde\'s masterpiece of wit and wordplay. Two friends maintain fictitious alter egos to escape their social obligations, with mistaken identities and romantic entanglements following inevitably.',
       ageGuidance: 'Suitable for all ages',
-      latecomerPolicy: 'Admitted at the interval.',
+      latecomerPolicy: 'INTERVAL_ONLY' as const,
       status: 'PUBLISHED' as const,
     },
     {
@@ -67,7 +67,7 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
       title: 'Hamlet',
       subtitle: null,
       ageGuidance: '14+, for themes of grief and violence',
-      latecomerPolicy: 'Admitted at a suitable break, at the duty manager\'s discretion.',
+      latecomerPolicy: 'SUITABLE_BREAK' as const,
       description: 'Shakespeare\'s most celebrated tragedy. The Prince of Denmark wrestles with grief, betrayal, and the burden of revenge in this timeless examination of mortality and moral corruption.',
       status: 'PUBLISHED' as const,
     },
