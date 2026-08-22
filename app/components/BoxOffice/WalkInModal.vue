@@ -33,15 +33,21 @@ const toast = useToast()
 
 // Nuxt types the request getter as () => NitroFetchRequest and does not model
 // returning null to skip, so cast it — the runtime honours the null.
-const ticketTypesUrl = () => props.performanceId
-  ? `/api/bookings/available-ticket-types?performanceId=${props.performanceId}`
-  : null
+const existingUserId = ref<string | null>(null)
+
+const ticketTypesUrl = () => {
+  if (!props.performanceId) return null
+  // The booker's entitlement, not the operator's: access types belong to the
+  // customer being sold to, and the write gates on them.
+  const forUser = existingUserId.value ? `&forUserId=${existingUserId.value}` : ''
+  return `/api/bookings/available-ticket-types?performanceId=${props.performanceId}${forUser}`
+}
 const { data: ticketTypes } = useFetch<TicketType[]>(
   ticketTypesUrl as () => string,
   {
     key: 'walk-in-ticket-types',
     lazy: true,
-    watch: [() => props.performanceId],
+    watch: [() => props.performanceId, () => existingUserId.value],
   },
 )
 
@@ -95,7 +101,6 @@ function formatPrice(pence: number): string {
 const email = ref('')
 const name = ref('')
 const lookingUp = ref(false)
-const existingUserId = ref<string | null>(null)
 const nameFromLookup = ref(false)
 
 async function lookupEmail() {

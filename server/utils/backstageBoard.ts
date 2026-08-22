@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, eq, gt, gte, isNotNull, lte, ne } from 'drizzle-orm'
+import { and, asc, eq, gte, isNotNull, lte, ne } from 'drizzle-orm'
 
 /**
  * The comms board. Polled with a cursor rather than socketed (ADR-0021), and
@@ -72,10 +72,14 @@ export async function sendBoardMessage(input: {
   return row!
 }
 
-/** Messages after the cursor, oldest first. `since` is epoch milliseconds. */
+/**
+ * Messages at or after the cursor, oldest first. Inclusive because the column
+ * stores whole seconds: `gt` drops a message written in the cursor's second.
+ */
 export async function messagesSince(nightId: string, since?: number) {
   const clauses = [eq(schema.backstageMessages.nightId, nightId)]
-  if (since) clauses.push(gt(schema.backstageMessages.createdAt, new Date(since)))
+  // The caller dedupes by id, so re-sending the boundary row is free.
+  if (since) clauses.push(gte(schema.backstageMessages.createdAt, new Date(since)))
 
   return db.select({
     id: schema.backstageMessages.id,

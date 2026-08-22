@@ -11,6 +11,9 @@ export default defineEventHandler(async (event) => {
 
   const query = getQuery(event)
   const performanceId = query.performanceId as string | undefined
+  // Staff sell to somebody else, so the entitlement asked about is the
+  // booker's. Without it the desk sees its own rights and the write refuses.
+  const forUserId = query.forUserId as string | undefined
 
   if (!performanceId) {
     throw createError({ statusCode: 400, statusMessage: 'performanceId query parameter is required' })
@@ -54,7 +57,7 @@ export default defineEventHandler(async (event) => {
   // Access types are offered only to accounts entitled to them. The gate on
   // the booking route is the real one; this keeps the picker honest.
   const session = await getUserSession(event)
-  const rights = await canBookAccessTickets(session?.user?.id, performanceId)
+  const rights = await canBookAccessTickets(forUserId ?? session?.user?.id, performanceId)
 
   const ctx = { baseTypes: allTypes, showOverrides, perfOverrides }
   return allTypes

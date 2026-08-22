@@ -9,6 +9,7 @@ import { canVerifyAccess } from '~~/shared/utils/abilities'
  */
 
 export interface AccessTonightEntry {
+  reservationId: string
   firstName: string
   partySize: number
   needs: string[]
@@ -62,6 +63,7 @@ export async function accessTonight(
   if (!await maySeeAccessNeeds(user, performanceId, now)) return []
 
   const rows = await db.select({
+    reservationId: schema.reservations.id,
     name: schema.users.name,
     companions: schema.accessProfiles.companions,
     fohNote: schema.accessProfiles.fohNote,
@@ -95,6 +97,8 @@ export async function accessTonight(
     .orderBy(asc(schema.users.name))
 
   return rows.map(row => ({
+    // The key a caller must match on: names are neither unique nor stable.
+    reservationId: row.reservationId,
     // A first name is what the door needs to greet somebody by.
     firstName: row.name.split(' ')[0] ?? row.name,
     partySize: Number(row.partySize ?? 0),

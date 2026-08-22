@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, count, eq, isNotNull, sql } from 'drizzle-orm'
+import { and, asc, count, eq, gte, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
 import type { NightReport } from '../db/schema/reports'
 
@@ -267,9 +267,29 @@ export async function closeNight(input: CloseNightInput) {
     payload,
   }).returning()
 
-  // Closing the night ends every backstage session for it (docs/11 §5.1).
-  await resetCode(payload.performance.night, input.closedByUserId)
+  // Only once the night's last performance is signed off: a matinee closing
+  // must not log out the devices joined for the evening (docs/11 §5.1).
+  if (await nightFullyClosed(payload.performance.night)) {
+    await resetCode(payload.performance.night, input.closedByUserId)
+  }
 
   await emailNightReport(stored!.id, payload, input.autoClosed)
   return stored!
+}
+
+/** True when every performance that night now has a report. */
+async function nightFullyClosed(night: string): Promise<boolean> {
+  const open = await db.select({ id: schema.performances.id })
+    .from(schema.performances)
+    .leftJoin(schema.performanceReports, eq(schema.performanceReports.performanceId, schema.performances.id))
+    .where(and(
+      gte(schema.performances.startsAt, validityStart(night)),
+      lte(schema.performances.startsAt, validityEnd(night)),
+      ne(schema.performances.status, 'CANCELLED'),
+      ourBuildingPredicate(),
+      isNull(schema.performanceReports.id),
+    ))
+    .get()
+
+  return !open
 }

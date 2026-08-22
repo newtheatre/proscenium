@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
 
   const [session] = await db.insert(schema.barSessions).values({
     night,
-    venue: input.venue ?? null,
+    venue: input.venue ?? '',
     openedAt: new Date(),
     openedByUserId: user.id,
   }).returning()

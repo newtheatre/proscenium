@@ -48,11 +48,19 @@ export default defineEventHandler(async (event) => {
     const reservation = await db.select({
       id: schema.reservations.id,
       status: schema.reservations.status,
+      performanceId: schema.reservations.performanceId,
     }).from(schema.reservations).where(eq(schema.reservations.id, reservationId)).get()
 
     if (!reservation) throw createError({ statusCode: 404, statusMessage: 'That booking no longer exists.' })
     if (isCollected(reservation.status)) {
       throw createError({ statusCode: 409, statusMessage: 'That booking has already been paid. Reload the till.' })
+    }
+
+    // Collecting a cancelled or no-show booking re-takes seats that were
+    // released and may have been resold, so it needs the same check (ADR-0007).
+    if (releasesSeats(reservation.status)) {
+      const seats = await countReservationSeats(reservationId)
+      await assertCapacity(reservation.performanceId, seats)
     }
 
     const owed = await amountOwedFor(reservationId)

@@ -12,7 +12,9 @@ export const barSessions = sqliteTable('bar_sessions', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   /** `YYYY-MM-DD`, the show night. A social or a get-out has no performances. */
   night: text('night').notNull(),
-  venue: text('venue'),
+  // Empty rather than null: SQLite treats NULLs as distinct, which made the
+  // one-open-session index constrain nothing.
+  venue: text('venue').notNull().default(''),
 
   openedAt: integer('opened_at', { mode: 'timestamp' }).notNull(),
   openedByUserId: text('opened_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
@@ -20,7 +22,7 @@ export const barSessions = sqliteTable('bar_sessions', {
   closedByUserId: text('closed_by_user_id').references(() => users.id, { onDelete: 'set null' }),
 
   closingNote: text('closing_note'),
-  checklist: text('checklist'),
+  checklist: text('checklist', { mode: 'json' }).$type<Record<string, boolean>>(),
 
   createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
 }, table => [

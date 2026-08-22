@@ -19,7 +19,7 @@ function londonOffsetMinutes(utc: Date): number {
 }
 
 /** Resolve a `YYYY-MM-DD` plus a wall-clock time in Europe/London to an instant. */
-function londonInstant(dateOnly: string, hours: number, minutes: number, seconds: number, ms: number): Date {
+export function londonInstant(dateOnly: string, hours: number, minutes: number, seconds: number, ms: number): Date {
   const [y, m, d] = dateOnly.split('-').map(Number) as [number, number, number]
   const naiveUtc = Date.UTC(y, m - 1, d, hours, minutes, seconds, ms)
   // The only misreadable inputs are the two ambiguous hours at a DST boundary,
