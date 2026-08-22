@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   // Check if user has permission to create venues
   await authorize(event, createVenue)
 
-  const { name, address, capacity, description, featureIds } = await readValidatedBody(event, bodySchema.parse)
+  const { name, address, capacity, description, isExternal, featureIds } = await readValidatedBody(event, bodySchema.parse)
 
   // Check if venue with this name already exists
   const existingVenue = await db.select().from(schema.venues).where(eq(schema.venues.name, name)).get()
@@ -32,6 +32,7 @@ export default defineEventHandler(async (event) => {
     address,
     capacity,
     description,
+    isExternal,
   }).returning()
 
   if (!newVenue) {
