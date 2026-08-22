@@ -194,6 +194,63 @@ async function removeSlot(shift: ShiftRow) {
   }
 }
 
+interface TemplateSlot { role: string, count: number }
+interface Templates {
+  roles: readonly string[]
+  defaults: Array<{ venueId: string | null, role: string, count: number }>
+  overrides: Array<{ venueId: string | null, role: string, count: number }>
+  venues: Array<{ id: string, name: string }>
+  configured: boolean
+}
+
+const { data: templateData, refresh: refreshTemplates } = await useAsyncData(
+  'rota-templates',
+  () => requestFetch<Templates>('/api/shifts/templates'),
+)
+
+/**
+ * Without a default template nothing is ever stamped, at creation or by hand,
+ * so the rota silently stays empty. That is worth saying loudly.
+ */
+const templatesConfigured = computed(() => templateData.value?.configured ?? true)
+const roles = computed(() => templateData.value?.roles ?? [])
+
+const templateOpen = ref(false)
+const templateSlots = ref<TemplateSlot[]>([])
+const savingTemplate = ref(false)
+
+function openTemplate() {
+  const existing = templateData.value?.defaults ?? []
+  templateSlots.value = roles.value.map(role => ({
+    role,
+    count: existing.find(d => d.role === role)?.count ?? 0,
+  }))
+  templateOpen.value = true
+}
+
+async function saveTemplate() {
+  savingTemplate.value = true
+  try {
+    await requestFetch('/api/shifts/templates', {
+      method: 'PUT',
+      body: { venueId: null, slots: templateSlots.value },
+    })
+    templateOpen.value = false
+    await refreshTemplates()
+    toast.add({ title: 'Template saved', icon: 'i-lucide-check', color: 'success' })
+  }
+  catch (error) {
+    toast.add({
+      title: 'Not saved',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    savingTemplate.value = false
+  }
+}
+
 const stamping = ref(false)
 
 /**
@@ -203,7 +260,9 @@ const stamping = ref(false)
 async function stampShifts() {
   stamping.value = true
   try {
-    const result = await requestFetch<{ performances: number, slots: number }>('/api/shifts/stamp', { method: 'POST' })
+    const result = await requestFetch<{ performances: number, slots: number, withoutTemplate: number }>(
+      '/api/shifts/stamp', { method: 'POST' },
+    )
     if (result.performances) {
       toast.add({
         title: `Stamped ${result.slots} shift${result.slots === 1 ? '' : 's'} onto ${result.performances} performance${result.performances === 1 ? '' : 's'}`,
@@ -211,6 +270,15 @@ async function stampShifts() {
         color: 'success',
       })
       await Promise.all([refresh(), refreshUnstaffed()])
+    }
+    else if (result.withoutTemplate) {
+      // Do not report success: nothing was stamped and nothing can be until a
+      // template exists, which is the actual problem to fix.
+      toast.add({
+        title: `${result.withoutTemplate} performance${result.withoutTemplate === 1 ? '' : 's'} have no shifts`,
+        description: 'There is no shift template to stamp, so set one up first.',
+        color: 'warning',
+      })
     }
     else {
       toast.add({ title: 'Every performance already has its shifts', icon: 'i-lucide-check' })
@@ -243,8 +311,15 @@ async function stampShifts() {
       <div class="flex items-end gap-3">
         <UButton
           variant="subtle"
+          icon="i-lucide-list-checks"
+          label="Shift template"
+          @click="openTemplate"
+        />
+        <UButton
+          variant="subtle"
           icon="i-lucide-stamp"
           :loading="stamping"
+          :disabled="!templatesConfigured"
           label="Stamp missing shifts"
           @click="stampShifts"
         />
@@ -259,6 +334,17 @@ async function stampShifts() {
         </UFormField>
       </div>
     </div>
+
+    <UAlert
+      v-if="!templatesConfigured"
+      icon="i-lucide-triangle-alert"
+      color="warning"
+      variant="subtle"
+      title="No shift template is set up"
+      description="Nothing is stamped onto a performance without one, so the rota stays empty however many performances there are. Set the template and then stamp."
+      :actions="[{ label: 'Set the template', color: 'warning', variant: 'solid', onClick: openTemplate }]"
+      class="mb-4"
+    />
 
     <UAlert
       v-if="unstaffed.length"
@@ -463,6 +549,49 @@ async function stampShifts() {
           >
             Nobody found.
           </p>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="templateOpen"
+      title="Shift template"
+    >
+      <template #body>
+        <p class="mb-4 text-sm text-muted">
+          The slots stamped onto every new performance at a venue we run. Set a role to zero to
+          leave it off the rota.
+        </p>
+        <div class="space-y-3">
+          <UFormField
+            v-for="slot in templateSlots"
+            :key="slot.role"
+            :label="slot.role.replace('_', ' ').toLowerCase()"
+            class="capitalize"
+          >
+            <UInput
+              v-model.number="slot.count"
+              type="number"
+              min="0"
+              max="20"
+              class="w-24"
+            />
+          </UFormField>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            label="Cancel"
+            @click="templateOpen = false"
+          />
+          <UButton
+            :loading="savingTemplate"
+            label="Save template"
+            @click="saveTemplate"
+          />
         </div>
       </template>
     </UModal>

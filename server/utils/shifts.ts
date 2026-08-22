@@ -142,7 +142,9 @@ export async function stampMissingShifts(from: Date, to: Date) {
     ))
     .orderBy(asc(schema.performances.startsAt))
 
-  if (!gaps.length) return { statements: [] as BatchItem<'sqlite'>[], performances: 0, slots: 0 }
+  if (!gaps.length) {
+    return { statements: [] as BatchItem<'sqlite'>[], performances: 0, slots: 0, withoutTemplate: 0 }
+  }
 
   // Templates are per venue and venues are few, so this is bounded by venues.
   const templates = new Map<string, Array<{ role: 'DUTY_MANAGER' | 'DOOR' | 'BAR', count: number }>>()
@@ -153,11 +155,17 @@ export async function stampMissingShifts(from: Date, to: Date) {
   const statements: BatchItem<'sqlite'>[] = []
   let slots = 0
   let stamped = 0
+  // A performance with no template is not "already done": it is unstampable
+  // until someone sets one up, and the caller must be able to say so.
+  let withoutTemplate = 0
   for (const gap of gaps) {
     const rows = (templates.get(gap.venueId) ?? []).flatMap(({ role, count }) =>
       Array.from({ length: Math.max(0, count) }, () => ({ performanceId: gap.id, role, status: 'OPEN' as const })),
     )
-    if (!rows.length) continue
+    if (!rows.length) {
+      withoutTemplate++
+      continue
+    }
     // One statement per performance: the parameter count follows the template,
     // not the number of performances covered (ADR-0006).
     statements.push(db.insert(schema.performanceShifts).values(rows))
@@ -165,5 +173,5 @@ export async function stampMissingShifts(from: Date, to: Date) {
     stamped++
   }
 
-  return { statements, performances: stamped, slots }
+  return { statements, performances: stamped, slots, withoutTemplate }
 }

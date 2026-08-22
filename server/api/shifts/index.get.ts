@@ -38,6 +38,6 @@ export default defineEventHandler(async (event) => {
     .innerJoin(schema.shows, eq(schema.performances.showId, schema.shows.id))
     .innerJoin(schema.venues, eq(schema.performances.venueId, schema.venues.id))
     .leftJoin(schema.users, eq(schema.performanceShifts.userId, schema.users.id))
-    .where(and(...filters))
+    .where(and(...filters, ourBuildingPredicate()))
     .orderBy(asc(schema.performances.startsAt), asc(schema.performanceShifts.role))
 })
