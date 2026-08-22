@@ -28,9 +28,31 @@ const ROLE_LABELS: Record<Slot['role'], string> = {
 
 const requestFetch = useRequestFetch()
 const toast = useToast()
-const { data, refresh } = await useAsyncData('my-shifts', () => requestFetch<Slot[]>('/api/shifts/mine'))
+interface Eligibility { eligible: boolean, missing: string[], needsReview: boolean }
 
-const slots = computed<Slot[]>(() => data.value ?? [])
+const { data, refresh } = await useAsyncData('my-shifts', () =>
+  requestFetch<{ slots: Slot[], eligibility: Record<string, Eligibility> }>('/api/shifts/mine'))
+
+const slots = computed<Slot[]>(() => data.value?.slots ?? [])
+const eligibility = computed(() => data.value?.eligibility ?? {})
+
+/** A shift you are not trained for is not an option, so it is not offered. */
+function mayClaim(role: Slot['role']): boolean {
+  return eligibility.value[role]?.eligible ?? false
+}
+
+function missingFor(role: Slot['role']): string | null {
+  const answer = eligibility.value[role]
+  if (!answer || answer.eligible) return null
+  return answer.missing.length
+    ? `Needs ${answer.missing.join(', ')}`
+    : 'Training needed'
+}
+
+/** Trained for nothing at all: say so once rather than on every row. */
+const trainedForNothing = computed(() =>
+  Object.keys(eligibility.value).length > 0
+  && Object.values(eligibility.value).every(answer => !answer.eligible))
 const mine = computed(() => slots.value.filter(s => s.mine))
 
 const performances = computed(() => {
@@ -81,6 +103,16 @@ async function act(slot: Slot, action: 'claim' | 'release') {
       Front of house runs on volunteers. Take a slot and you are on the rota; you will get a
       reminder the day before.
     </p>
+
+    <UAlert
+      v-if="trainedForNothing"
+      icon="i-lucide-graduation-cap"
+      color="neutral"
+      variant="subtle"
+      class="mt-6"
+      title="You are not signed off for a front-of-house role yet"
+      description="Training is recorded in the training system. Once a module is signed off, the shifts it covers become claimable here."
+    />
 
     <UCard
       v-if="mine.length"
@@ -156,12 +188,18 @@ async function act(slot: Slot, action: 'claim' | 'release') {
               </span>
             </span>
             <UButton
-              v-if="slot.status === 'OPEN'"
+              v-if="slot.status === 'OPEN' && mayClaim(slot.role)"
               size="xs"
               label="Claim"
               :loading="busy === slot.id"
               @click="act(slot, 'claim')"
             />
+            <span
+              v-else-if="slot.status === 'OPEN'"
+              class="text-xs text-muted"
+            >
+              {{ missingFor(slot.role) }}
+            </span>
           </li>
         </ul>
       </UCard>

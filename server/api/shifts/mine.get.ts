@@ -39,11 +39,21 @@ export default defineEventHandler(async (event) => {
     ))
     .orderBy(asc(schema.performances.startsAt), asc(schema.performanceShifts.role))
 
-  return rows
-    .filter(row => row.startsAt <= until)
-    .map(row => ({
-      ...row,
-      holderName: row.holderName ? row.holderName.split(' ')[0] ?? null : null,
-      mine: row.userId === user.id,
-    }))
+  // Per role, not per slot: three questions however long the rota is, and
+  // `isEligible` caches, so this does not hammer rehearsal (ADR-0026).
+  const eligibility: Record<string, { eligible: boolean, missing: string[], needsReview: boolean }> = {}
+  for (const role of schema.SHIFT_ROLES) {
+    eligibility[role] = await isEligible(user.id, SHIFT_ELIGIBILITY[role])
+  }
+
+  return {
+    slots: rows
+      .filter(row => row.startsAt <= until)
+      .map(row => ({
+        ...row,
+        holderName: row.holderName ? row.holderName.split(' ')[0] ?? null : null,
+        mine: row.userId === user.id,
+      })),
+    eligibility,
+  }
 })

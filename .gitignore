@@ -25,5 +25,6 @@ logs
 
 # Cloudflare wrangler emulation
 .wrangler
-.claude/worktrees/optimistic-margulis-8d8dd5/.data
-.claude/worktrees/content-warnings-redesign-d3b595/.data
+# Worktrees live inside the repo but are never part of it. Ignoring the
+# directory rather than each one, which has been added twice already.
+.claude/worktrees/
