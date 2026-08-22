@@ -127,7 +127,7 @@ export default defineEventHandler(async (event) => {
   // ── Resolve effective ticket prices ───────────────────────────────────────
 
   // Gated server-side, not merely hidden from the picker (docs/12 §2.6).
-  await assertAccessTicketsAllowed(resolvedUserId, body.tickets)
+  await assertAccessTicketsAllowed(resolvedUserId, body.performanceId, body.tickets)
 
   const requestedTypeIds = body.tickets.map(t => t.ticketTypeId)
   const priceCtx = await loadTicketPriceContext(requestedTypeIds, performance.show.id, body.performanceId)

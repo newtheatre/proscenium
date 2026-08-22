@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
   // Access types are offered only to accounts entitled to them. The gate on
   // the booking route is the real one; this keeps the picker honest.
   const session = await getUserSession(event)
-  const rights = await canBookAccessTickets(session?.user?.id)
+  const rights = await canBookAccessTickets(session?.user?.id, performanceId)
 
   const ctx = { baseTypes: allTypes, showOverrides, perfOverrides }
   return allTypes
@@ -68,8 +68,11 @@ export default defineEventHandler(async (event) => {
         effectivePrice,
         active,
         accessKind: type.accessKind,
-        /** Companion tickets are capped per performance by the profile. */
-        maxQuantity: type.accessKind === 'COMPANION' ? rights.companions : null,
+        // What is left at this performance, not the entitlement: the picker
+        // should not offer a companion the booker has already used.
+        maxQuantity: type.accessKind === 'COMPANION'
+          ? rights.companionsRemaining
+          : type.accessKind === 'ACCESS' ? rights.accessRemaining : null,
       }
     })
     .sort((a, b) => a.name.localeCompare(b.name))

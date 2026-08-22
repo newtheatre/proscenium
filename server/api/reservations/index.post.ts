@@ -91,7 +91,7 @@ export default defineEventHandler(async (event) => {
 
   // Staff may add them to a walk-in, but only against a verified account:
   // the entitlement belongs to the person, not to the counter (docs/12 §2.6).
-  await assertAccessTicketsAllowed(resolvedUserId, body.tickets)
+  await assertAccessTicketsAllowed(resolvedUserId, body.performanceId, body.tickets)
 
   const requestedTypeIds = body.tickets.map(t => t.ticketTypeId)
   const priceCtx = await loadTicketPriceContext(requestedTypeIds, performance.show.id, body.performanceId)
