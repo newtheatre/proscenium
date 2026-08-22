@@ -24,6 +24,7 @@ Severity is about consequences for the theatre, not code aesthetics:
 | 16 | [No shared types](#no-shared-types) | P3 | Medium |
 | 20a | [No tests](#no-tests) | P3 | Medium |
 | 21 | [The dev server loses its D1 binding after a hot reload](#dev-d1-binding) | P3 | Small |
+| 23 | [Tab sales and tab cash split across a term boundary](#tab-accrual-split) | P3 | Won't fix |
 
 ## Fixed
 
@@ -38,6 +39,9 @@ Kept as a record of what changed and why, so nobody re-fixes them.
 | 6 | Resend key crashes the whole worker | Client constructed lazily; missing key degrades to a no-op |
 | 7 | Collection charges current prices | Existing tickets show `pricePaid` |
 | 8 | `DOOR` status is never set | Walk-ins create `DOOR` |
+| 24 | Bar sales and night reports counted voided transactions | `isNull(voidedAt)` added to `barLineRange()` and the night report's tender group-by |
+| 25 | The sales report had a `cash` column for a tender that never existed | Replaced with `tab`, so the tender columns sum to gross again |
+| 22 | `bar.tab` was not enforceable on the debtor at the till | stage-door serves `GET /api/role-holders`; the till lists names and the server refuses a debtor who is not on it |
 | 11 | Publish resurrects cancelled performances | `ne(status, 'CANCELLED')` on the update |
 | 12 | Refunds do not exist | `POST /api/reservations/:id/refund` (see also the lifecycle rule below) |
 | 15 | Five copies of the price rule | `resolveEffectiveTicketType()` is the only copy |
@@ -267,3 +271,11 @@ migration or a query broke.
 2. **#16**: shared types. Everything else is safer afterwards.
 3. **#9, #10a**: transactionality and the capacity race, together.
 4. **#13, #14**: the two workflow gaps, whenever the box office next complains.
+
+### Tab sales and tab cash split across a term boundary {#tab-accrual-split}
+
+**P3 · Won't fix.** A tab charged in one term and settled in the next is in the first term's
+sales figures and the second term's SumUp totals. That is inherent in selling on credit, not a
+bug: the reconciling figure is the outstanding balance, which `/admin/bar/tabs` reports. The
+Treasurer needs that number at both ends of a term. Recorded here so nobody spends an afternoon
+hunting a discrepancy that is the design working.

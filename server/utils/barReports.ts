@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, desc, eq, gte, lte, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
 
 /**
@@ -15,6 +15,7 @@ function barLineRange(from: string, to: string) {
     eq(schema.transactionLines.kind, 'BAR_ITEM'),
     gte(schema.transactions.takenOn, from),
     lte(schema.transactions.takenOn, to),
+    isNull(schema.transactions.voidedAt),
   )
 }
 
@@ -31,7 +32,7 @@ export async function salesBy(grouping: SalesGrouping, from: string, to: string,
     qty: sql<number>`coalesce(sum(${schema.transactionLines.qty}), 0)`,
     grossPence: sql<number>`coalesce(sum(${schema.transactionLines.amountPence}), 0)`,
     cardPence: sql<number>`coalesce(sum(case when ${schema.transactions.tender} = 'CARD' then ${schema.transactionLines.amountPence} else 0 end), 0)`,
-    cashPence: sql<number>`coalesce(sum(case when ${schema.transactions.tender} = 'CASH' then ${schema.transactionLines.amountPence} else 0 end), 0)`,
+    tabPence: sql<number>`coalesce(sum(case when ${schema.transactions.tender} = 'TAB' then ${schema.transactionLines.amountPence} else 0 end), 0)`,
     compPence: sql<number>`coalesce(sum(case when ${schema.transactions.tender} = 'COMP' then ${schema.transactionLines.amountPence} else 0 end), 0)`,
   })
     .from(schema.transactionLines)
@@ -65,7 +66,7 @@ function normaliseSales(row: Record<string, unknown>) {
     qty: Number(row.qty ?? 0),
     grossPence: Number(row.grossPence ?? 0),
     cardPence: Number(row.cardPence ?? 0),
-    cashPence: Number(row.cashPence ?? 0),
+    tabPence: Number(row.tabPence ?? 0),
     compPence: Number(row.compPence ?? 0),
   }
 }

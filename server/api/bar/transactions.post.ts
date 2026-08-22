@@ -5,8 +5,10 @@ import { z } from 'zod'
 import { workFoh } from '~~/shared/utils/abilities'
 
 const bodySchema = z.object({
-  /** Only CARD here: a comp is a request, and needs approval first (#166). */
-  tender: z.literal('CARD'),
+  /** No COMP here: a comp is a request, and needs approval first (#166). */
+  tender: z.enum(['CARD', 'TAB']),
+  /** Required on a TAB, and a TAB may carry no ticket line (ADR-0030). */
+  tabDebtorUserId: z.string().trim().min(1).nullable().optional(),
   barItems: z.array(z.object({
     productId: z.string().trim().min(1),
     qty: z.coerce.number().int().min(1).max(99),
@@ -16,6 +18,14 @@ const bodySchema = z.object({
   discountId: z.string().trim().min(1).nullable().optional(),
   /** The gold figure the screen showed. Checked, not trusted (ADR-0023). */
   expectedTotalPence: z.coerce.number().int().min(0),
+}).superRefine((body, ctx) => {
+  if (body.tender !== 'TAB') return
+  if (!body.tabDebtorUserId) {
+    ctx.addIssue({ code: 'custom', message: 'A tab has to say who owes it.', path: ['tabDebtorUserId'] })
+  }
+  if (body.reservationIds?.length) {
+    ctx.addIssue({ code: 'custom', message: 'Ticket money cannot go on a tab.', path: ['reservationIds'] })
+  }
 })
 
 /** POST /api/bar/transactions: one tap, one transaction, one figure. */
@@ -88,6 +98,20 @@ export default defineEventHandler(async (event) => {
     return { product, qty: line.qty }
   })
 
+  // Checked here rather than left to the foreign key, which fails opaquely.
+  if (input.tender === 'TAB') {
+    const debtor = await db.select({ id: schema.users.id, anonymisedAt: schema.users.anonymisedAt })
+      .from(schema.users).where(eq(schema.users.id, input.tabDebtorUserId!)).get()
+    if (!debtor || debtor.anonymisedAt) {
+      throw createError({ statusCode: 404, statusMessage: 'That person cannot hold a tab. Look them up again.' })
+    }
+    // Null when stage-door cannot say, and then the till is trusted as before.
+    const permitted = await mayHoldTab(input.tabDebtorUserId!)
+    if (permitted === false) {
+      throw createError({ statusCode: 403, statusMessage: 'They are not on the list of people who may run a tab.' })
+    }
+  }
+
   const discount = input.discountId
     ? await db.select({ id: schema.barDiscounts.id, percent: schema.barDiscounts.percent })
       .from(schema.barDiscounts)
@@ -97,8 +121,9 @@ export default defineEventHandler(async (event) => {
 
   const built = buildTransaction({
     source: 'TILL',
-    tender: 'CARD',
+    tender: input.tender,
     takenByUserId: user.id,
+    tabDebtorUserId: input.tabDebtorUserId ?? null,
     barSessionId: session?.id ?? null,
     ticketLines,
     barLines,

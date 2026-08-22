@@ -1,7 +1,7 @@
 # Bar (sales, stock and Challenge 25) design
 
-**Status: agreed, not yet built.** Drafted August 2026 by Matt Adcock (ITM 26/27); agreed
-2026-08-21 and reconciled against the code the same day. Depends on the
+**Status: agreed, largely built.** Drafted August 2026 by Matt Adcock (ITM 26/27); agreed
+2026-08-21 and reconciled against the code the same day. Amended 2026-08-22 to add tabs (§4.6). Depends on the
 [show night screen design](./11-show-night-screen-design.md) for the route shell, role scoping and
 QR/ref lookup, and on the [access, staffing & end-of-night design](./12-access-and-staffing-design.md)
 (referred to below as *12-access-and-staffing*) for the rota's `BAR` shift and the end-of-night
@@ -134,22 +134,27 @@ bar_discounts        id · name ('Committee', 'Cast & crew') · percent INTEGER 
 
 transactions         id · taken_at · taken_on DATE (Europe/London) · taken_by_user_id FK
                      bar_session_id FK NULL                         -- NULL if no session was open (desk, daytime)
-                     source ('TILL'|'BOX_OFFICE_DESK')             -- which screen wrote it
-                     tender ('CARD'|'COMP') · comp_reason TEXT NULL -- no cash, ever
+                     source ('TILL'|'BOX_OFFICE_DESK'|'SELF_SERVE') -- which screen wrote it
+                     tender ('CARD'|'COMP'|'TAB') · comp_reason TEXT NULL -- no cash, ever; TAB is credit
                      discount_id FK NULL · discount_percent INTEGER NULL · discount_pence INTEGER DEFAULT 0
                      -- snapshot of the discount applied to the BAR subtotal; ticket lines are never discounted
                      comp_approved_by_user_id FK NULL · comp_approved_at NULL   -- COMP only; see §4.1
                      total_pence                                    -- after discount; what was typed into SumUp
+                     tab_debtor_user_id FK NULL                     -- TAB only: who owes (§4.6)
+                     tab_settled_at NULL · tab_settlement_transaction_id FK NULL
+                     -- stamped when the CARD settlement clears this charge
                      voided_at NULL · voided_by NULL · void_reason NULL
-                     -- ONE row per SumUp tap (or comp). The thing you reconcile.
+                     -- ONE row per SumUp tap (or comp, or tab charge). The thing you reconcile.
 transaction_lines    id · transaction_id FK
-                     kind ('TICKET_PAYMENT'|'WALK_UP'|'BAR_ITEM'|'PASS_SALE')
+                     kind ('TICKET_PAYMENT'|'WALK_UP'|'BAR_ITEM'|'PASS_SALE'|'TAB_SETTLEMENT')
                      amount_pence                                  -- signed total for the line
                      reservation_id FK NULL · performance_id FK NULL   -- ticket kinds
                      product_id FK NULL · qty INTEGER NULL · unit_price_pence NULL · price_id FK NULL  -- BAR_ITEM
                      -- price snapshotted, same principle as ticket pricePaid
                      -- The bar ledger is simply WHERE kind = 'BAR_ITEM'. Line amounts are gross;
                      -- the discount is on the transaction, so product reports stay honest.
+                     -- TAB_SETTLEMENT carries NO product: it is money for a sale already
+                     -- recorded, which is what stops a tab counting twice.
 
 comp_requests        id · requested_by FK · requested_at · bar_session_id FK · reason TEXT
                      lines JSON (the bar basket) · gross_pence
@@ -157,7 +162,7 @@ comp_requests        id · requested_by FK · requested_at · bar_session_id FK 
                      decided_by FK NULL · decided_at NULL · transaction_id FK NULL (set on approval)
 
 stock_movements      id · product_id FK (always the *stock* product) · qty_milli (signed)
-                     kind ('DELIVERY'|'SALE'|'COMP'|'STOCKTAKE'|'WASTAGE'|'TRANSFER'|'ADJUST')
+                     kind ('DELIVERY'|'SALE'|'COMP'|'STOCKTAKE'|'WASTAGE'|'TRANSFER'|'ADJUST'|'VOID')
                      ref_table · ref_id                            -- the sale line / delivery line / stocktake line
                      cost_pence_per_unit NULL                      -- on deliveries
                      reason TEXT NULL · created_by · created_at
@@ -227,6 +232,13 @@ the committee wants deals in v1, otherwise defer.
   ([ADR-0027](./decisions/0027-the-refusals-register-is-append-only.md)).
 - At most one open `bar_session` per night per venue. A bar opened outside a performance (a
   social, a get-out) is a session with no linked performances.
+- **A tab may never carry a ticket line.** `TICKET_PAYMENT` and `WALK_UP` flip a reservation to
+  `COLLECTED`, which is the payment boundary (ADR-0011), so ticket money on credit would mark a
+  booking paid for money nobody took. `buildTransaction()` refuses it, not just the route
+  ([ADR-0030](./decisions/0030-a-tab-is-a-sale-on-credit.md)).
+- **The tab charge is the only voidable transaction**, and only while unsettled. Its stock is
+  reversed by an opposing `VOID` movement *copied* from the original `SALE` rows, never recomputed
+  from the catalogue ([ADR-0031](./decisions/0031-a-tab-charge-is-the-only-voidable-transaction.md)).
 
 ## 4. Screens
 
@@ -350,11 +362,19 @@ Card: bar items                             £281.80   (BAR_ITEM lines, taken to
 Card: tickets & walk-ups at the till         £96.00   (TICKET_PAYMENT + WALK_UP lines, source TILL)
    of which for other performances            £24.00   (advance payments: informational)
 Card: taken on the box office desk          £412.00   (source BOX_OFFICE_DESK)
-SumUp Z-total should read                    £789.80
+Tabs settled today                            £18.40   (TAB_SETTLEMENT lines; the money is in the Z)
+SumUp Z-total should read                    £808.20
 SumUp actual                                 [______]  → Matches / £x over / £x short
 
 Discounts given (already off the Z)           £9.60   (Committee 20% × 6 · Cast & crew 10% × 2)
 Comps (not in the Z)                          £14.00   (4 items · cast & crew · all DM-approved)
+Put on tabs today (not in the Z)              £6.20   (settled on some later day; §4.6)
+```
+
+The identity to hold in your head, and the one to check when a day will not balance:
+
+```
+expected Z = card bar + card tickets + tabs settled − discounts − refunds
 ```
 
 **Two questions, two lenses.** *"Does today's SumUp match?"* is answered by `taken_on = today`,
@@ -374,6 +394,42 @@ pretend to split a pint between the studio and the auditorium. Ticket money in t
 `performance_id`, so it *is* per show. If the bar is not closed by the
 noon auto-close, the report carries the same "no sign-off" banner.
 
+### 4.6 Tabs
+
+The bar is sometimes open with nothing on: members or committee studying in the foyer want a
+snack, and the reader is not to hand. That was a paper book, committee-only, reconciled at the end
+of term. A tab is that book, in the same ledger as everything else
+([ADR-0030](./decisions/0030-a-tab-is-a-sale-on-credit.md)).
+
+**Two ways onto a tab.**
+
+- **`/bar/tab`, your own phone.** Balance at the top, tiles below, one gold *Put £x on my tab*
+  button. Nobody else is involved, which is the whole point: the case this serves is one person in
+  an empty foyer. Alcohol is not on this screen at all, and the server refuses it even if asked
+  directly, because there is no trained server and no Challenge 25 check.
+- **The counter till, *Tab* beside *Card* and *Comp*.** Pick the person from a list of everyone
+  who may run a tab, read from stage-door and searchable by name, with what each already owes
+  beside them. When stage-door cannot answer, the panel falls back to an exact-email lookup and
+  the server stops checking the debtor's permission, because a bar that cannot sell is the worse
+  outage. Then see what they owe and add the basket. Age-restricted items are fine here: the training gate and the
+  refusals register apply exactly as they do to a card sale. Disabled when the basket holds ticket
+  lines, for the reason in §3.2.
+
+**Settling.** Whoever has the reader takes the whole balance and taps settle, at the till or from
+`/admin/bar/tabs`. That writes one `CARD` transaction with a single `TAB_SETTLEMENT` line, so the
+money lands in that day's Z. It clears the balance *as at that moment* rather than a chosen list of
+charges: a list of ids is the shape ADR-0006 forbids, and a predicate makes two people settling at
+once a no-op rather than a race. A charge someone disputes is voided, not deselected.
+
+**The limit is soft.** Over `TAB_SOFT_CAP_PENCE` the screen asks them to settle up and the admin
+page flags them, and the charge still goes through. A blocked charge does not stop somebody taking
+a packet of crisps; it stops the crisps being recorded.
+
+**What this does to the books.** A tab charged in one term and settled in the next is in the first
+term's sales and the second term's SumUp totals. That is what selling on credit is. The reconciling
+figure is the outstanding balance on `/admin/bar/tabs`, and the Treasurer wants it at both ends of
+a term.
+
 ## 5. Roles, scoping and training
 
 - **`BAR` shift confirmed on tonight's rota** (12-access-and-staffing §3) lights up the Till,
@@ -381,6 +437,10 @@ noon auto-close, the report carries the same "no sign-off" banner.
   The underlying role is the existing `FRONT_OF_HOUSE`; the rota supplies the scope.
   `BOX_OFFICE`+ bypasses the rota as everywhere else. A `DOOR` shift does **not** see the till:
   the door never sells.
+- **`bar.tab`**, a new permission carried by a new **`COMMITTEE`** role, and by `MANAGER` and
+  `ADMIN`. It is the only thing that role carries: no `staff.access` and no `foh.work`, so a tab is
+  not a way into anything else, which is why `/bar/tab` sits outside `/foh` with its own middleware.
+  The rota cannot scope it, because the case it serves has no performance and therefore no shift.
 - **Bar manager**: a new permission **`bar.manage`**, declared in `shared/utils/appManifest.ts`
   and carried by a role granted to whoever runs the bar that year: products, prices, deliveries,
   stocktakes, voids, exports, the Challenge 25 register export. `MANAGER` and `ADMIN` carry it too.
@@ -438,6 +498,9 @@ Each stage is independently shippable and useful on its own.
 4. **Shift-scoped FOH home + training gates.** Tiles by shift; `door`/`bar` eligibility rules
    consumed by the rota claim filter and the till's soft gate. (Needs the training API; until
    then the soft gate reads a hand-maintained flag behind the same function.)
+5a. **Tabs.** `tender = 'TAB'`, the self-service screen, the till's tab tender, settlement and
+   the admin page. Independently shippable, and the self-service half alone replaces the paper
+   book for the daytime case (ADR-0030, ADR-0031).
 5. **End-of-night integration.** The *Bar* section in the performance report(s); auto-close
    behaviour. (Lands whenever 12-access-and-staffing §4 exists; until then the close screen
    emails its own summary to `boxoffice@`.)
@@ -453,6 +516,9 @@ Each stage is independently shippable and useful on its own.
 - **Measure sizes for spirits** (25 ml vs 35 ml) and wine (125/175/250): configure per product;
   confirm what the licence and the bar actually pour.
 - **Discount list and rates** (mockup: Committee 20%, Cast & crew 10%), committee sets them; admin data.
+- **The tab limit** is a constant, `TAB_SOFT_CAP_PENCE` in `server/utils/barTabs.ts`, currently
+  £20. Committee decision whether that is the right figure and whether it should ever become a
+  hard block. Default: leave it soft.
 - **Hard or soft training gate on alcohol sales.** v1 warns. Making it a hard block (tile
   disabled for an untrained user) is a committee/licensing decision; it is a one-line change.
 Formerly open, now settled: **voiding a mixed transaction**, the box office reversal exists

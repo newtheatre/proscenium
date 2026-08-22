@@ -9,7 +9,7 @@ definePageMeta({
   title: 'Bar reports',
 })
 
-interface SalesRow { label: string, qty: number, grossPence: number, cardPence: number, cashPence: number, compPence: number }
+interface SalesRow { label: string, qty: number, grossPence: number, cardPence: number, tabPence: number, compPence: number }
 interface Term { from: string, to: string, name: string }
 
 const requestFetch = useRequestFetch()
@@ -54,7 +54,7 @@ const salesColumns = [
   { accessorKey: 'qty', header: 'Qty' },
   { accessorKey: 'grossPence', header: 'Gross' },
   { accessorKey: 'cardPence', header: 'Card' },
-  { accessorKey: 'cashPence', header: 'Cash' },
+  { accessorKey: 'tabPence', header: 'Tab' },
   { accessorKey: 'compPence', header: 'Comped' },
 ]
 
@@ -150,8 +150,8 @@ const registerUrl = computed(() =>
         <template #cardPence-cell="{ row }">
           <span class="tabular-nums">{{ formatMoney(row.original.cardPence) }}</span>
         </template>
-        <template #cashPence-cell="{ row }">
-          <span class="tabular-nums">{{ formatMoney(row.original.cashPence) }}</span>
+        <template #tabPence-cell="{ row }">
+          <span class="tabular-nums">{{ formatMoney(row.original.tabPence) }}</span>
         </template>
         <template #compPence-cell="{ row }">
           <span class="tabular-nums text-muted">{{ formatMoney(row.original.compPence) }}</span>

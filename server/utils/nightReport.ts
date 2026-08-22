@@ -125,7 +125,10 @@ async function takingsForPerformance(performanceId: string) {
   })
     .from(schema.transactionLines)
     .innerJoin(schema.transactions, eq(schema.transactions.id, schema.transactionLines.transactionId))
-    .where(eq(schema.transactionLines.performanceId, performanceId))
+    .where(and(
+      eq(schema.transactionLines.performanceId, performanceId),
+      isNull(schema.transactions.voidedAt),
+    ))
     .groupBy(schema.transactionLines.kind, schema.transactions.tender)
 
   // Refunded tickets are money given back, so they are not takings.
@@ -207,7 +210,10 @@ async function barSectionFor(performanceId: string, night: string): Promise<Nigh
     totalPence: sql<number>`coalesce(sum(${schema.transactions.totalPence}), 0)`,
   })
     .from(schema.transactions)
-    .where(eq(schema.transactions.barSessionId, session.id))
+    .where(and(
+      eq(schema.transactions.barSessionId, session.id),
+      isNull(schema.transactions.voidedAt),
+    ))
     .groupBy(schema.transactions.tender)
 
   const requester = alias(schema.users, 'comp_requester')

@@ -2,6 +2,7 @@
  * The record of money taken in the building. One row per SumUp tap or comp,
  * whatever mix it covers (ADR-0023). Design: docs/13-bar-design.md §3
  */
+import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { relations, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
@@ -10,10 +11,10 @@ import { performances } from './show'
 import { reservations } from './reservation'
 import { users } from './user'
 
-export const TRANSACTION_SOURCES = ['TILL', 'BOX_OFFICE_DESK'] as const
-/** No cash, ever. The theatre takes none (docs/13 §1). */
-export const TENDERS = ['CARD', 'COMP'] as const
-export const LINE_KINDS = ['TICKET_PAYMENT', 'WALK_UP', 'BAR_ITEM', 'PASS_SALE'] as const
+export const TRANSACTION_SOURCES = ['TILL', 'BOX_OFFICE_DESK', 'SELF_SERVE'] as const
+/** No cash, ever. The theatre takes none. A tab is credit, not cash (docs/13 §1). */
+export const TENDERS = ['CARD', 'COMP', 'TAB'] as const
+export const LINE_KINDS = ['TICKET_PAYMENT', 'WALK_UP', 'BAR_ITEM', 'PASS_SALE', 'TAB_SETTLEMENT'] as const
 
 export const transactions = sqliteTable('transactions', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -45,6 +46,13 @@ export const transactions = sqliteTable('transactions', {
   /** After discount: the figure a human typed into the reader. */
   totalPence: integer('total_pence').notNull(),
 
+  /** Who owes, on a TAB. Null on every other tender (ADR-0030). */
+  tabDebtorUserId: text('tab_debtor_user_id').references(() => users.id, { onDelete: 'restrict' }),
+  tabSettledAt: integer('tab_settled_at', { mode: 'timestamp' }),
+  /** The CARD transaction that cleared this charge. */
+  tabSettlementTransactionId: text('tab_settlement_transaction_id')
+    .references((): AnySQLiteColumn => transactions.id, { onDelete: 'set null' }),
+
   voidedAt: integer('voided_at', { mode: 'timestamp' }),
   voidedByUserId: text('voided_by_user_id').references(() => users.id, { onDelete: 'set null' }),
   voidReason: text('void_reason'),
@@ -53,6 +61,7 @@ export const transactions = sqliteTable('transactions', {
 }, table => [
   index('transactions_taken_on_idx').on(table.takenOn),
   index('transactions_bar_session_idx').on(table.barSessionId),
+  index('transactions_tab_debtor_idx').on(table.tabDebtorUserId, table.tabSettledAt),
 ])
 
 export const transactionLines = sqliteTable('transaction_lines', {

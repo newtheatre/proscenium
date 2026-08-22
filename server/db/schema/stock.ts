@@ -8,7 +8,7 @@ import { nanoid } from 'nanoid'
 import { users } from './user'
 import { barProducts } from './bar'
 
-export const MOVEMENT_KINDS = ['DELIVERY', 'SALE', 'COMP', 'STOCKTAKE', 'WASTAGE', 'TRANSFER', 'ADJUST'] as const
+export const MOVEMENT_KINDS = ['DELIVERY', 'SALE', 'COMP', 'STOCKTAKE', 'WASTAGE', 'TRANSFER', 'ADJUST', 'VOID'] as const
 export const STOCKTAKE_STATUSES = ['OPEN', 'APPLIED', 'ABANDONED'] as const
 
 /**

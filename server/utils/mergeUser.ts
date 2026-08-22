@@ -14,6 +14,7 @@ export interface MergeCounts {
   shiftsWorked: number
   shiftsAssigned: number
   incidentEntries: number
+  tabsOwed: number
 }
 
 export interface MergeResult {
@@ -43,6 +44,9 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
       .where(eq(schema.performanceShifts.assignedByUserId, fromUserId)).get()),
     incidentEntries: n(await db.select({ n: sql<number>`count(*)` }).from(schema.incidentLog)
       .where(eq(schema.incidentLog.authorUserId, fromUserId)).get()),
+    // A merge moves a debt, so it says how much it moved.
+    tabsOwed: n(await db.select({ n: sql<number>`count(*)` }).from(schema.transactions)
+      .where(eq(schema.transactions.tabDebtorUserId, fromUserId)).get()),
   }
 
   if (!loser || dryRun) {
@@ -110,6 +114,8 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
       .where(eq(schema.transactions.compApprovedByUserId, fromUserId)),
     db.update(schema.transactions).set({ voidedByUserId: toUserId })
       .where(eq(schema.transactions.voidedByUserId, fromUserId)),
+    db.update(schema.transactions).set({ tabDebtorUserId: toUserId })
+      .where(eq(schema.transactions.tabDebtorUserId, fromUserId)),
     db.update(schema.barSessions).set({ openedByUserId: toUserId })
       .where(eq(schema.barSessions.openedByUserId, fromUserId)),
     db.update(schema.barSessions).set({ closedByUserId: toUserId })

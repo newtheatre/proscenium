@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 const bodySchema = z.object({ userId: z.string().min(1) })
@@ -79,6 +79,37 @@ export default defineEventHandler(async (event) => {
     expiresAt: schema.accessProfiles.expiresAt,
   }).from(schema.accessProfiles).where(eq(schema.accessProfiles.userId, userId)).get()
 
+  // Their own debt, so it belongs in the bundle (ADR-0025). Scoped by debtor,
+  // not by a bound list of transaction ids (ADR-0006).
+  const tabCharges = await db.select({
+    id: schema.transactions.id,
+    takenOn: schema.transactions.takenOn,
+    totalPence: schema.transactions.totalPence,
+    settledAt: schema.transactions.tabSettledAt,
+    voidedAt: schema.transactions.voidedAt,
+  }).from(schema.transactions)
+    .where(eq(schema.transactions.tabDebtorUserId, userId))
+
+  const tabItems = new Map<string, string[]>()
+  if (tabCharges.length) {
+    const lines = await db.select({
+      transactionId: schema.transactionLines.transactionId,
+      qty: schema.transactionLines.qty,
+      name: schema.barProducts.name,
+    }).from(schema.transactionLines)
+      .innerJoin(schema.transactions, eq(schema.transactionLines.transactionId, schema.transactions.id))
+      .leftJoin(schema.barProducts, eq(schema.transactionLines.productId, schema.barProducts.id))
+      .where(and(
+        eq(schema.transactions.tabDebtorUserId, userId),
+        eq(schema.transactionLines.kind, 'BAR_ITEM'),
+      ))
+    for (const line of lines) {
+      const items = tabItems.get(line.transactionId) ?? []
+      items.push(`${line.qty ?? 1} x ${line.name ?? 'Unknown item'}`)
+      tabItems.set(line.transactionId, items)
+    }
+  }
+
   return {
     data: {
       profile: user ?? null,
@@ -98,6 +129,13 @@ export default defineEventHandler(async (event) => {
         status: p.status,
         pricePaid: p.pricePaid,
         issuedAt: p.createdAt,
+      })),
+      barTabs: tabCharges.map(charge => ({
+        chargedOn: charge.takenOn,
+        items: tabItems.get(charge.id) ?? [],
+        totalPence: charge.totalPence,
+        settledAt: charge.settledAt,
+        voidedAt: charge.voidedAt,
       })),
     },
   }

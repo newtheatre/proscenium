@@ -216,6 +216,124 @@ function addReservation(found: Found) {
   term.value = ''
 }
 
+// Tabs
+interface Debtor { userId: string, name: string, outstandingPence: number, softCapPence: number }
+interface Holder { userId: string, name: string, outstandingPence: number }
+const tabOpen = ref(false)
+const tabEmail = ref('')
+const debtor = ref<Debtor | null>(null)
+const finding = ref(false)
+const holders = ref<Holder[]>([])
+const holdersAvailable = ref(false)
+const holderSearch = ref('')
+const softCap = ref(0)
+
+/** Ticket money never goes on credit: it would mark a booking paid (ADR-0030). */
+const canTab = computed(() => Boolean(basketBar.value.length) && !basketTickets.value.length)
+
+const shownHolders = computed(() => {
+  const term = holderSearch.value.trim().toLowerCase()
+  if (!term) return holders.value
+  return holders.value.filter(holder => holder.name.toLowerCase().includes(term))
+})
+
+async function openTab() {
+  debtor.value = null
+  tabEmail.value = ''
+  holderSearch.value = ''
+  tabOpen.value = true
+  try {
+    const list = await $fetch<{ available: boolean, holders: Holder[], softCapPence: number }>('/api/bar/tabs/holders')
+    holders.value = list.holders
+    holdersAvailable.value = list.available
+    softCap.value = list.softCapPence
+  }
+  catch {
+    // The email field is always there, so a missing list is not an error.
+    holdersAvailable.value = false
+  }
+}
+
+function pick(holder: Holder) {
+  debtor.value = { ...holder, softCapPence: softCap.value }
+}
+
+async function findDebtor() {
+  finding.value = true
+  try {
+    debtor.value = await $fetch<Debtor>('/api/bar/tabs/debtor', { query: { email: tabEmail.value } })
+  }
+  catch (error) {
+    debtor.value = null
+    toast.add({
+      title: 'Not found',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    finding.value = false
+  }
+}
+
+async function chargeToTab() {
+  if (!debtor.value) return
+  busy.value = true
+  try {
+    const result = await requestFetch<{ totalPence: number }>('/api/bar/transactions', {
+      method: 'POST',
+      body: {
+        tender: 'TAB',
+        tabDebtorUserId: debtor.value.userId,
+        barItems: basketBar.value.map(l => ({ productId: l.product.id, qty: l.qty })),
+        discountId: discountId.value,
+        expectedTotalPence: total.value,
+      },
+    })
+    basketBar.value = []
+    discountId.value = null
+    tabOpen.value = false
+    toast.add({ title: `${formatMoney(result.totalPence)} on ${debtor.value.name}'s tab`, color: 'success' })
+    await refresh()
+  }
+  catch (error) {
+    toast.add({
+      title: 'Not recorded',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    busy.value = false
+  }
+}
+
+async function settleTab() {
+  if (!debtor.value) return
+  busy.value = true
+  try {
+    const result = await requestFetch<{ totalPence: number }>('/api/bar/tabs/settle', {
+      method: 'POST',
+      body: {
+        debtorUserId: debtor.value.userId,
+        expectedTotalPence: debtor.value.outstandingPence,
+      },
+    })
+    tabOpen.value = false
+    toast.add({ title: `Settled ${formatMoney(result.totalPence)}`, color: 'success' })
+  }
+  catch (error) {
+    toast.add({
+      title: 'Not settled',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    busy.value = false
+  }
+}
+
 async function takeCard() {
   busy.value = true
   try {
@@ -534,6 +652,13 @@ async function closeBar() {
             <UButton
               size="xl"
               variant="soft"
+              :disabled="!canTab || busy"
+              label="Tab"
+              @click="openTab"
+            />
+            <UButton
+              size="xl"
+              variant="soft"
               :disabled="!canComp || busy || Boolean(myPending)"
               :label="myPending ? 'Waiting…' : 'Comp'"
               @click="compOpen = true"
@@ -684,6 +809,120 @@ async function closeBar() {
             :disabled="compReason === 'OTHER' && !compNote"
             :label="comps.mayApprove ? 'Ask, then approve' : 'Ask the duty manager'"
             @click="requestComp"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="tabOpen"
+      title="Put it on a tab"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <p class="text-sm text-muted">
+            {{ basketBar.map(l => `${l.qty} x ${l.product.name}`).join(', ') }}
+            &middot; {{ formatMoney(total) }}
+          </p>
+          <template v-if="holdersAvailable && !debtor">
+            <UInput
+              v-model="holderSearch"
+              icon="i-lucide-search"
+              placeholder="Search by name"
+              autocapitalize="off"
+              class="w-full"
+            />
+            <div class="max-h-64 space-y-1 overflow-y-auto">
+              <button
+                v-for="holder in shownHolders"
+                :key="holder.userId"
+                type="button"
+                class="flex w-full items-center justify-between gap-3 rounded-md border border-default px-3 py-2 text-left hover:bg-elevated"
+                @click="pick(holder)"
+              >
+                <span class="truncate">{{ holder.name }}</span>
+                <span
+                  v-if="holder.outstandingPence"
+                  class="shrink-0 text-sm text-muted tabular-nums"
+                >owes {{ formatMoney(holder.outstandingPence) }}</span>
+              </button>
+              <p
+                v-if="!shownHolders.length"
+                class="px-1 py-2 text-sm text-muted"
+              >
+                Nobody by that name may run a tab. Committee roles are granted in stage-door.
+              </p>
+            </div>
+          </template>
+
+          <UFormField
+            v-if="!holdersAvailable && !debtor"
+            label="Their NNT email"
+            help="Exact address. They need to have signed in to the site once."
+          >
+            <div class="flex gap-2">
+              <UInput
+                v-model="tabEmail"
+                type="email"
+                autocapitalize="off"
+                class="flex-1"
+                @keyup.enter="findDebtor"
+              />
+              <UButton
+                :loading="finding"
+                :disabled="!tabEmail"
+                label="Find"
+                @click="findDebtor"
+              />
+            </div>
+          </UFormField>
+          <div
+            v-if="debtor"
+            class="rounded-md border border-default p-3"
+          >
+            <p class="font-medium">
+              {{ debtor.name }}
+            </p>
+            <p class="text-sm text-muted">
+              Already owes {{ formatMoney(debtor.outstandingPence) }}
+            </p>
+            <p
+              v-if="debtor.outstandingPence > debtor.softCapPence"
+              class="mt-2 text-sm text-amber-500"
+            >
+              Over the tab limit. Ask them to settle up.
+            </p>
+            <UButton
+              class="mt-2"
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              label="Someone else"
+              @click="debtor = null"
+            />
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            label="Cancel"
+            @click="tabOpen = false"
+          />
+          <UButton
+            v-if="debtor && debtor.outstandingPence > 0"
+            variant="soft"
+            :loading="busy"
+            :label="`Settle ${formatMoney(debtor.outstandingPence)} on the reader`"
+            @click="settleTab"
+          />
+          <UButton
+            :loading="busy"
+            :disabled="!debtor || !total"
+            label="Add to their tab"
+            @click="chargeToTab"
           />
         </div>
       </template>
