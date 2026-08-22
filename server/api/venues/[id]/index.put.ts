@@ -46,12 +46,14 @@ export default defineEventHandler(async (event) => {
     address?: string | null
     capacity?: number | null
     description?: string | null
+    isExternal?: boolean
   } = {}
 
   if (body.name !== undefined) updateData.name = body.name
   if (body.address !== undefined) updateData.address = body.address
   if (body.capacity !== undefined) updateData.capacity = body.capacity
   if (body.description !== undefined) updateData.description = body.description
+  if (body.isExternal !== undefined) updateData.isExternal = body.isExternal
 
   // Update venue if there are changes
   if (Object.keys(updateData).length > 0) {
