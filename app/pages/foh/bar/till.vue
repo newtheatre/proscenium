@@ -4,7 +4,7 @@
  */
 <script setup lang="ts">
 definePageMeta({
-  layout: false,
+  layout: 'foh',
   middleware: ['foh'],
   title: 'Till',
 })
@@ -31,7 +31,18 @@ interface Found {
 
 const requestFetch = useRequestFetch()
 const toast = useToast()
-const { data, refresh } = await useAsyncData('bar-tonight', () => requestFetch<Tonight>('/api/bar/tonight'))
+
+// One page, two modes. The prefix is the only difference, so what a trainee
+// practises cannot drift from the thing itself (docs/14 §8).
+const route = useRoute()
+const training = useTrainingMode()
+if (route.query.practice) await training.start('bar-till').catch(() => {})
+await training.refresh()
+const api = (path: string) => `${training.prefix.value}${path}`
+
+const { data, refresh } = await useAsyncData('bar-tonight',
+  () => requestFetch<Tonight>(api('/api/bar/tonight')),
+  { watch: [training.active] })
 
 const tonight = computed(() => data.value ?? null)
 const products = computed<Product[]>(() => tonight.value?.products ?? [])
@@ -202,7 +213,7 @@ async function search() {
   if (term.value.trim().length < 2) return
   searching.value = true
   try {
-    results.value = await requestFetch<Found[]>('/api/bar/lookup', { query: { q: term.value.trim() } })
+    results.value = await requestFetch<Found[]>(api('/api/bar/lookup'), { query: { q: term.value.trim() } })
   }
   finally {
     searching.value = false
@@ -337,7 +348,7 @@ async function settleTab() {
 async function takeCard() {
   busy.value = true
   try {
-    const result = await requestFetch<{ totalPence: number }>('/api/bar/transactions', {
+    const result = await requestFetch<{ totalPence: number }>(api('/api/bar/transactions'), {
       method: 'POST',
       body: {
         tender: 'CARD',
@@ -418,7 +429,7 @@ async function closeBar() {
       </header>
 
       <UAlert
-        v-if="tonight && !tonight.session"
+        v-if="!training.active.value && tonight && !tonight.session"
         class="mb-4"
         color="warning"
         variant="subtle"
@@ -435,7 +446,7 @@ async function closeBar() {
       </UAlert>
 
       <div
-        v-if="tonight?.session"
+        v-if="!training.active.value && tonight?.session"
         class="mb-4 flex flex-wrap items-center gap-2"
       >
         <UInput

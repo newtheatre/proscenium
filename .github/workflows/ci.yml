@@ -42,3 +42,8 @@ jobs:
       # A new users.id reference that skipped the estate hooks (ADR-0025).
       - name: User references
         run: bun run check:user-refs
+
+      # Training mode reaching an operational table (ADR-0032). The guarantee
+      # is meant to be checkable, not reviewable, so this is the check.
+      - name: Training isolation
+        run: bun run check:training

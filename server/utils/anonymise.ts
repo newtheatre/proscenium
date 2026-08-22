@@ -59,6 +59,10 @@ export async function anonymiseUser(userId: string): Promise<AnonymiseResult> {
     // Deleted outright, not anonymised: special category data held on consent,
     // and consent is what an erasure withdraws (ADR-0022).
     db.delete(schema.accessProfiles).where(eq(schema.accessProfiles.userId, userId)),
+
+    // Also deleted, for a different reason: ADR-0014 keeps rows because sales
+    // statistics need them, and practice is not a statistic (ADR-0032).
+    db.delete(schema.trainingRuns).where(eq(schema.trainingRuns.userId, userId)),
   ])
 
   return { alreadyAnonymised: false, reservationsAffected: Number(n) }

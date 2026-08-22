@@ -1,6 +1,6 @@
 /**
- * Training eligibility, read from rehearsal behind one seam (ADR-0026). The
- * rota never encodes what a rule requires, only that there is one.
+ * Everything this app asks rehearsal, in one file (ADR-0026). Two questions
+ * with opposite failure directions: read the comments before changing either.
  */
 
 /** Advisory-fresh, never transactional: rehearsal's own guidance. */
@@ -73,6 +73,65 @@ export async function isEligible(userId: string, rule: EligibilityRule): Promise
       console.error(`[eligibility] could not reach rehearsal for "${rule}":`, error)
     }
     return failOpen(hit)
+  }
+}
+
+/**
+ * Sandboxes this app can open. rehearsal owns which modules unlock each one,
+ * so a catalogue renumbering never touches this repo (its ADR-0014).
+ */
+export type PracticeTarget = 'bar-till' | 'challenge-25' | 'door-scan'
+
+export interface PracticeAnswer {
+  active: boolean
+  /** When the sandbox must shut, straight from rehearsal. */
+  expiresAt: string | null
+  /** The training session behind it, for the trail. Null for an ad-hoc grant. */
+  sessionId: string | null
+}
+
+const CLOSED: PracticeAnswer = { active: false, expiresAt: null, sessionId: null }
+
+/**
+ * Is this person being taught this, right now? **Fails closed** and is never
+ * cached, unlike isEligible above (ADR-0033).
+ */
+export async function practiceWindow(userId: string, target: PracticeTarget): Promise<PracticeAnswer> {
+  const config = useRuntimeConfig()
+  const token = config.trainingApiToken
+
+  // No token is the same as an outage, and takes the same path: no sandbox.
+  if (!token) return CLOSED
+
+  try {
+    const response = await $fetch<{ active: boolean, expiresAt?: string | null, sessionId?: string | null }>(
+      `${config.trainingApiBaseURL}/api/v1/practice/${target}`,
+      { query: { userId }, headers: { Authorization: `Bearer ${token}` }, timeout: 4000 },
+    )
+    if (!response.active) return CLOSED
+
+    return {
+      active: true,
+      expiresAt: response.expiresAt ?? null,
+      sessionId: response.sessionId ?? null,
+    }
+  }
+  catch (error) {
+    const status = (error as { statusCode?: number, response?: { status?: number } }).statusCode
+      ?? (error as { response?: { status?: number } }).response?.status
+
+    // A renamed or retired target is a configuration break across two repos,
+    // not somebody who happens not to be practising.
+    if (status === 404) {
+      console.error(`[practice] rehearsal has no active target "${target}": someone renamed or retired it`)
+    }
+    else {
+      console.error(`[practice] could not reach rehearsal for "${target}":`, error)
+    }
+
+    // Refusing costs a trainee an evening's practice; the fallback is
+    // shadowing a real shift, which is how this was learned before (ADR-0033).
+    return CLOSED
   }
 }
 
