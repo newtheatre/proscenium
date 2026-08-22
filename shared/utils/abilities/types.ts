@@ -54,6 +54,11 @@ export function canManageBar(user: AbilityUser): boolean {
   return can(user, 'bar.manage')
 }
 
+/** Run a bar tab. Not scoped by the rota: a tab has nothing to do with a shift. */
+export function canRunBarTab(user: AbilityUser): boolean {
+  return can(user, 'bar.tab')
+}
+
 /** Verify access profiles, and read them outside show night. */
 export function canVerifyAccess(user: AbilityUser): boolean {
   return can(user, 'access.verify')

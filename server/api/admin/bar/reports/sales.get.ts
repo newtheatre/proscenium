@@ -21,8 +21,8 @@ export default defineEventHandler(async (event) => {
 
   if (query.format === 'csv') {
     return sendCsv(event, `bar-sales-${query.groupBy}-${query.from}-to-${query.to}.csv`, toCsv(
-      [query.groupBy, 'quantity', 'gross', 'card', 'cash', 'comp'],
-      rows.map(r => [r.label, r.qty, penceToPounds(r.grossPence), penceToPounds(r.cardPence), penceToPounds(r.cashPence), penceToPounds(r.compPence)]),
+      [query.groupBy, 'quantity', 'gross', 'card', 'tab', 'comp'],
+      rows.map(r => [r.label, r.qty, penceToPounds(r.grossPence), penceToPounds(r.cardPence), penceToPounds(r.tabPence), penceToPounds(r.compPence)]),
     ))
   }
 

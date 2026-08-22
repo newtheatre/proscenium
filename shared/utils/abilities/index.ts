@@ -3,7 +3,7 @@
  * the domain file; both work.
  */
 export type { AbilityUser, OwnedResource } from './types'
-export { canManageBar, canManageFoh, canManageShifts, canVerifyAccess, canWorkFoh, isAdmin, isAdminOrManager, isStaff } from './types'
+export { canManageBar, canManageFoh, canManageShifts, canRunBarTab, canVerifyAccess, canWorkFoh, isAdmin, isAdminOrManager, isStaff } from './types'
 
 export {
   listUsers,
@@ -68,7 +68,7 @@ export {
 
 export { manageFohReference, workFoh } from './foh'
 
-export { manageBar } from './bar'
+export { manageBar, runBarTab } from './bar'
 
 export { verifyAccess } from './access'
 

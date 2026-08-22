@@ -29,6 +29,7 @@ const REVIEWED = {
   'transactions.takenByUserId': { kind: 'attribution', note: 'Who took the money. There is no anonymous till (ADR-0023).' },
   'transactions.compApprovedByUserId': { kind: 'attribution', note: 'Which duty manager approved a comp.' },
   'transactions.voidedByUserId': { kind: 'attribution', note: 'Who voided it.' },
+  'transactions.tabDebtorUserId': { kind: 'subject', note: 'Who owes for a tab. A financial record: it survives erasure on the anonymised mirror row (ADR-0014, ADR-0030).' },
   'barSessions.openedByUserId': { kind: 'attribution', note: 'Who opened the bar.' },
   'barSessions.closedByUserId': { kind: 'attribution', note: 'Who closed and reconciled it.' },
   'dayReconciliations.enteredByUserId': { kind: 'attribution', note: 'Who typed the reader total in.' },

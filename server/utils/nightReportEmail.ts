@@ -35,7 +35,7 @@ function renderReport(report: NightReport, autoClosed: boolean, closingNote: str
     ? `<h3>Bar</h3>
        ${report.bar.unclosed ? '<p style="background:#fef3c7;padding:8px;border-radius:6px"><strong>The bar session was never closed.</strong></p>' : ''}
        <table>${rows([
-          ...report.bar.takingsByTender.map(x => [x.tender, money(x.totalPence)] as string[]),
+          ...report.bar.takingsByTender.map(x => [tenderLabel(x.tender), money(x.totalPence)] as string[]),
           ['ID checks accepted', String(report.bar.idChecks.accepted)],
           ['ID checks refused', String(report.bar.idChecks.refused)],
         ])}</table>
@@ -79,6 +79,16 @@ function renderReport(report: NightReport, autoClosed: boolean, closingNote: str
     ${bar}
     ${closingNote ? `<h3>Closing note</h3><p>${escapeHtml(closingNote)}</p>` : ''}
   </div>`
+}
+
+const TENDER_LABELS: Record<string, string> = {
+  CARD: 'Card',
+  COMP: 'Comps',
+  TAB: 'On tabs (not taken)',
+}
+
+function tenderLabel(tender: string): string {
+  return TENDER_LABELS[tender] ?? tender
 }
 
 /** Europe/London, because the Worker runs in UTC. */

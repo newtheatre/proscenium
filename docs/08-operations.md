@@ -167,6 +167,39 @@ The opening count is an ordinary stocktake against an empty ledger: expected is 
 count becomes the level. Its movements are stamped `Opening stock`, and carry **no cost**, so stock
 at cost stays honest until a real delivery arrives with a real invoice.
 
+## 4c. Bar tabs: running them, and clearing them at end of term
+
+A tab is a sale on credit ([ADR-0030](./decisions/0030-a-tab-is-a-sale-on-credit.md)): the snack
+leaves the shelf, the sale is recorded, and no money has moved yet. It exists for the case the
+paper book existed for, which is the bar being open with nothing on and nobody able to work the
+reader.
+
+- **Who can:** anyone holding `proscenium:COMMITTEE`, `MANAGER` or `ADMIN`. They go to `/bar/tab`
+  on their own phone, tap what they took, and it is on their tab.
+- **What can:** snacks and soft drinks only. Alcohol is refused there and can go on a tab only
+  through the staffed till, where somebody can check ID.
+- **The limit is a soft one.** `TAB_SOFT_CAP_PENCE` in `server/utils/barTabs.ts` (currently £20)
+  makes the screen ask them to settle up and flags them on the admin page. It never blocks a
+  charge, because a blocked charge just goes unrecorded.
+- **A mis-tap is removed, not edited.** The debtor can take an unsettled charge back off their own
+  tab; `bar.manage` can take anyone's off. The stock comes back with it.
+
+**Clearing tabs at the end of term.** Open `/admin/bar/tabs`, which lists everyone who owes, biggest
+first. For each person: take the balance on the SumUp reader, then tap the settle button with the
+figure it shows. That writes one card sale on today's date, so it lands in today's Z-total and
+reconciles like anything else. Do it on a day somebody will be entering that Z.
+
+A tab that will never be paid is **voided with a reason**, charge by charge, from the same page.
+That is the write-off, and the reason is the record of it. Do not delete anything.
+
+Two things worth knowing before someone asks:
+
+- **A tab can only be opened for someone who has signed in to Proscenium at least once**, because
+  the debtor is a foreign key onto the local mirror. The till says so when the lookup misses.
+- **Sales and cash split across a term boundary.** A tab charged in June and settled in October is
+  in June's sales and October's SumUp totals. The reconciling number is the outstanding balance on
+  `/admin/bar/tabs`; the Treasurer wants it at both ends of a term.
+
 ## 4a. Scheduled tasks
 
 **This worker has four cron triggers**, `*/15 * * * *`, `0 4 * * *`, `0 10 * * *` and `0 12 * * *`, declared in `nuxt.config.ts` under
@@ -575,6 +608,7 @@ Roles in this app's namespace, and what they gate:
 | `proscenium:ADMIN` | Everything, including deleting shows, venues and ticket types |
 | `proscenium:MANAGER` | The admin area, programming, passes and refunds |
 | `proscenium:BOX_OFFICE` | `/admin/box-office` only: selling and managing reservations on the door |
+| `proscenium:COMMITTEE` | `/bar/tab` only: running a bar tab. No box office, no admin |
 
 **Normal route:** sign in to `auth.newtheatre.org.uk/admin` as an `auth:ADMIN`, find the person, and
 grant `proscenium:<ROLE>` from the roles dropdown. Role definitions (description, default expiry:
@@ -590,6 +624,10 @@ exists and the command fails with *"no such table"*. If the auth service itself 
 access is not possible and the incident is stage-door's: see its
 [operations doc](https://github.com/newtheatre/stage-door/blob/main/docs/operations.md). Front-of-house
 can still take money on the door and record it afterwards.
+
+`COMMITTEE` expires at the end of the committee year like every other role here, so it has to be
+re-granted each October along with the rest. Somebody who loses it keeps any outstanding tab: the
+debt is a `transactions` row, not a permission, and `/admin/bar/tabs` still shows it.
 
 **Removing access when someone leaves committee:** remove their roles in the auth service. Do not
 delete the mirror row here: `reservations.user_id` is `ON DELETE restrict`, so anyone with a

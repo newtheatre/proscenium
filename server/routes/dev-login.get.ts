@@ -16,6 +16,7 @@ export default defineEventHandler(async (event) => {
     'box-office': ['BOX_OFFICE'],
     'foh-manager': ['FOH_MANAGER'],
     'front-of-house': ['FRONT_OF_HOUSE'],
+    'committee': ['COMMITTEE'],
   }
   const roles = (PERSONAS[String(staff ?? '')] ?? [])
     .map(role => `${APP_MANIFEST.namespace}:${role}`)

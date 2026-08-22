@@ -216,6 +216,98 @@ function addReservation(found: Found) {
   term.value = ''
 }
 
+// Tabs
+interface Debtor { userId: string, name: string, outstandingPence: number, softCapPence: number }
+const tabOpen = ref(false)
+const tabEmail = ref('')
+const debtor = ref<Debtor | null>(null)
+const finding = ref(false)
+
+/** Ticket money never goes on credit: it would mark a booking paid (ADR-0030). */
+const canTab = computed(() => Boolean(basketBar.value.length) && !basketTickets.value.length)
+
+function openTab() {
+  debtor.value = null
+  tabEmail.value = ''
+  tabOpen.value = true
+}
+
+async function findDebtor() {
+  finding.value = true
+  try {
+    debtor.value = await $fetch<Debtor>('/api/bar/tabs/debtor', { query: { email: tabEmail.value } })
+  }
+  catch (error) {
+    debtor.value = null
+    toast.add({
+      title: 'Not found',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    finding.value = false
+  }
+}
+
+async function chargeToTab() {
+  if (!debtor.value) return
+  busy.value = true
+  try {
+    const result = await requestFetch<{ totalPence: number }>('/api/bar/transactions', {
+      method: 'POST',
+      body: {
+        tender: 'TAB',
+        tabDebtorUserId: debtor.value.userId,
+        barItems: basketBar.value.map(l => ({ productId: l.product.id, qty: l.qty })),
+        discountId: discountId.value,
+        expectedTotalPence: total.value,
+      },
+    })
+    basketBar.value = []
+    discountId.value = null
+    tabOpen.value = false
+    toast.add({ title: `${formatMoney(result.totalPence)} on ${debtor.value.name}'s tab`, color: 'success' })
+    await refresh()
+  }
+  catch (error) {
+    toast.add({
+      title: 'Not recorded',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    busy.value = false
+  }
+}
+
+async function settleTab() {
+  if (!debtor.value) return
+  busy.value = true
+  try {
+    const result = await requestFetch<{ totalPence: number }>('/api/bar/tabs/settle', {
+      method: 'POST',
+      body: {
+        debtorUserId: debtor.value.userId,
+        expectedTotalPence: debtor.value.outstandingPence,
+      },
+    })
+    tabOpen.value = false
+    toast.add({ title: `Settled ${formatMoney(result.totalPence)}`, color: 'success' })
+  }
+  catch (error) {
+    toast.add({
+      title: 'Not settled',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    busy.value = false
+  }
+}
+
 async function takeCard() {
   busy.value = true
   try {
@@ -534,6 +626,13 @@ async function closeBar() {
             <UButton
               size="xl"
               variant="soft"
+              :disabled="!canTab || busy"
+              label="Tab"
+              @click="openTab"
+            />
+            <UButton
+              size="xl"
+              variant="soft"
               :disabled="!canComp || busy || Boolean(myPending)"
               :label="myPending ? 'Waiting…' : 'Comp'"
               @click="compOpen = true"
@@ -684,6 +783,80 @@ async function closeBar() {
             :disabled="compReason === 'OTHER' && !compNote"
             :label="comps.mayApprove ? 'Ask, then approve' : 'Ask the duty manager'"
             @click="requestComp"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="tabOpen"
+      title="Put it on a tab"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <p class="text-sm text-muted">
+            {{ basketBar.map(l => `${l.qty} x ${l.product.name}`).join(', ') }}
+            &middot; {{ formatMoney(total) }}
+          </p>
+          <UFormField
+            label="Their NNT email"
+            help="Exact address. They need to have signed in to the site once."
+          >
+            <div class="flex gap-2">
+              <UInput
+                v-model="tabEmail"
+                type="email"
+                autocapitalize="off"
+                class="flex-1"
+                @keyup.enter="findDebtor"
+              />
+              <UButton
+                :loading="finding"
+                :disabled="!tabEmail"
+                label="Find"
+                @click="findDebtor"
+              />
+            </div>
+          </UFormField>
+          <div
+            v-if="debtor"
+            class="rounded-md border border-default p-3"
+          >
+            <p class="font-medium">
+              {{ debtor.name }}
+            </p>
+            <p class="text-sm text-muted">
+              Already owes {{ formatMoney(debtor.outstandingPence) }}
+            </p>
+            <p
+              v-if="debtor.outstandingPence > debtor.softCapPence"
+              class="mt-2 text-sm text-amber-500"
+            >
+              Over the tab limit. Ask them to settle up.
+            </p>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            label="Cancel"
+            @click="tabOpen = false"
+          />
+          <UButton
+            v-if="debtor && debtor.outstandingPence > 0"
+            variant="soft"
+            :loading="busy"
+            :label="`Settle ${formatMoney(debtor.outstandingPence)} on the reader`"
+            @click="settleTab"
+          />
+          <UButton
+            :loading="busy"
+            :disabled="!debtor || !total"
+            label="Add to their tab"
+            @click="chargeToTab"
           />
         </div>
       </template>

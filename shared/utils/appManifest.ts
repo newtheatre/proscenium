@@ -22,6 +22,7 @@ export const APP_MANIFEST = {
     { key: 'shift.manage', description: 'Assign, confirm and reassign front-of-house shifts' },
     { key: 'access.verify', description: 'Verify access profiles, and read them outside show night' },
     { key: 'bar.manage', description: 'Manage the bar catalogue, stock, voids and exports' },
+    { key: 'bar.tab', description: 'Run a bar tab and settle it later' },
     { key: 'foh.manage', description: 'Maintain the emergency card and the front-of-house contact list' },
   ],
 
@@ -42,6 +43,7 @@ export const APP_MANIFEST = {
         'shift.manage',
         'access.verify',
         'bar.manage',
+        'bar.tab',
         'foh.manage',
       ],
       requiresEligibility: null,
@@ -59,6 +61,7 @@ export const APP_MANIFEST = {
         'foh.work',
         'shift.manage',
         'bar.manage',
+        'bar.tab',
         'foh.manage',
       ],
       requiresEligibility: null,
@@ -84,6 +87,14 @@ export const APP_MANIFEST = {
       description: 'Works a door shift. Sees tonight only, and no prices, emails or money.',
       defaultExpiry: { kind: 'committee-year' },
       permissions: ['foh.work'],
+      requiresEligibility: null,
+    },
+    {
+      // No staff.access and no foh.work: a tab is not a way into anything else.
+      role: 'COMMITTEE',
+      description: 'Committee member. May run a bar tab; no box office or admin access.',
+      defaultExpiry: { kind: 'committee-year' },
+      permissions: ['bar.tab'],
       requiresEligibility: null,
     },
   ],

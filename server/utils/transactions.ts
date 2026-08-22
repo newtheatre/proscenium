@@ -24,6 +24,10 @@ export interface BarItemLine {
   priceId: string
 }
 
+export interface SettlementLine {
+  amountPence: number
+}
+
 export interface TransactionDraft {
   source: (typeof schema.TRANSACTION_SOURCES)[number]
   tender: (typeof schema.TENDERS)[number]
@@ -32,11 +36,15 @@ export interface TransactionDraft {
   /** `WALK_UP` rather than `TICKET_PAYMENT`: a new sale, not a debt settled. */
   walkUpLines?: TicketPaymentLine[]
   barLines?: BarItemLine[]
+  /** Clearing a tab: money for a sale already recorded, so it carries no product. */
+  settlementLines?: SettlementLine[]
   /** Applies to the bar subtotal only. Ticket lines are never discounted. */
   discount?: { id: string, percent: number } | null
   compReason?: string | null
   compApprovedByUserId?: string | null
   barSessionId?: string | null
+  /** Required on a TAB, forbidden on anything else. */
+  tabDebtorUserId?: string | null
   takenAt?: Date
 }
 
@@ -51,12 +59,28 @@ export interface BuiltTransaction {
 }
 
 /**
+ * A tab is credit, and credit may never mark a booking paid: a ticket line
+ * flips a reservation to COLLECTED for money not taken (ADR-0011, ADR-0030).
+ */
+function assertTabDraft(draft: TransactionDraft): void {
+  if (draft.tender !== 'TAB') return
+  if (!draft.tabDebtorUserId) {
+    throw createError({ statusCode: 400, statusMessage: 'A tab has to say who owes it.' })
+  }
+  if (draft.ticketLines?.length || draft.walkUpLines?.length) {
+    throw createError({ statusCode: 400, statusMessage: 'Ticket money cannot go on a tab. Take it on the reader.' })
+  }
+}
+
+/**
  * Statements for one transaction and its lines. Nothing is written here: the
  * caller batches these with whatever else must succeed or fail alongside.
  */
 export function buildTransaction(draft: TransactionDraft): BuiltTransaction {
   const takenAt = draft.takenAt ?? new Date()
   const transactionId = nanoid()
+
+  assertTabDraft(draft)
 
   const ticketRows = [
     ...(draft.ticketLines ?? []).map(line => ({ ...line, kind: 'TICKET_PAYMENT' as const })),
@@ -68,12 +92,15 @@ export function buildTransaction(draft: TransactionDraft): BuiltTransaction {
     amountPence: line.unitPricePence * line.qty,
   }))
 
+  const settlementRows = (draft.settlementLines ?? []).map(line => ({ ...line, kind: 'TAB_SETTLEMENT' as const }))
+
+  const settlementSubtotal = settlementRows.reduce((total, line) => total + line.amountPence, 0)
   const ticketSubtotal = ticketRows.reduce((total, line) => total + line.amountPence, 0)
   // Gross, because the discount lives on the transaction: product reports stay
   // honest and "what did we give away" is one sum (docs/13 §4.1.1).
   const barSubtotal = barRows.reduce((total, line) => total + line.amountPence, 0)
   const discountPence = applyDiscount(barSubtotal, draft.discount?.percent)
-  const totalPence = ticketSubtotal + barSubtotal - discountPence
+  const totalPence = ticketSubtotal + barSubtotal + settlementSubtotal - discountPence
 
   const statements: BatchItem<'sqlite'>[] = [
     db.insert(schema.transactions).values({
@@ -91,8 +118,17 @@ export function buildTransaction(draft: TransactionDraft): BuiltTransaction {
       discountPercent: draft.discount?.percent ?? null,
       discountPence,
       totalPence: draft.tender === 'COMP' ? 0 : totalPence,
+      tabDebtorUserId: draft.tender === 'TAB' ? draft.tabDebtorUserId : null,
     }),
   ]
+
+  for (const group of chunked(settlementRows, LINES_PER_INSERT)) {
+    statements.push(db.insert(schema.transactionLines).values(group.map(line => ({
+      transactionId,
+      kind: line.kind,
+      amountPence: line.amountPence,
+    }))))
+  }
 
   for (const group of chunked(ticketRows, LINES_PER_INSERT)) {
     statements.push(db.insert(schema.transactionLines).values(group.map(line => ({
@@ -156,6 +192,10 @@ export interface DayReconciliation {
   discountPence: number
   /** Refunded on this day, which the reader nets off its own total. */
   refundedPence: number
+  /** Put on tabs today: a sale, but not money, so not in today's Z. */
+  tabChargedPence: number
+  /** Tabs cleared today. This one is in today's Z. */
+  tabSettledPence: number
 }
 
 /**
@@ -192,6 +232,8 @@ export async function reconciliation(day: string): Promise<DayReconciliation> {
     compPence: 0,
     discountPence: 0,
     refundedPence: 0,
+    tabChargedPence: 0,
+    tabSettledPence: 0,
   }
 
   const countedTransactions = new Set<string>()
@@ -202,7 +244,19 @@ export async function reconciliation(day: string): Promise<DayReconciliation> {
       totals.compPence += row.amountPence ?? 0
       continue
     }
+    // A sale on credit. The money reaches the reader on the day it is settled,
+    // so nothing here touches today's Z (ADR-0030).
+    if (row.tender === 'TAB') {
+      if (!countedTransactions.has(row.id)) {
+        countedTransactions.add(row.id)
+        // Per transaction, not per line: a debt is net of any discount chip.
+        totals.tabChargedPence += row.totalPence
+      }
+      continue
+    }
+
     if (row.kind === 'BAR_ITEM') totals.cardBar += row.amountPence ?? 0
+    else if (row.kind === 'TAB_SETTLEMENT') totals.tabSettledPence += row.amountPence ?? 0
     else if (row.kind) totals.cardTickets += row.amountPence ?? 0
 
     // Informational: money taken today for a show on another night.
@@ -214,8 +268,8 @@ export async function reconciliation(day: string): Promise<DayReconciliation> {
       countedTransactions.add(row.id)
       totals.expectedZPence += row.totalPence
       totals.discountPence += row.discountPence
-      if (row.source === 'TILL') totals.cardTill += row.totalPence
-      else totals.cardDesk += row.totalPence
+      if (row.source === 'BOX_OFFICE_DESK') totals.cardDesk += row.totalPence
+      else totals.cardTill += row.totalPence
     }
   }
 

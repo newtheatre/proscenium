@@ -378,7 +378,16 @@ and no password-reset route here.
 | GET | `/api/bar/tonight` | `foh.work` + a `BAR` shift | The till's opening state: session, products, prices, discounts, training |
 | GET | `/api/bar/lookup` | `foh.work` + a `BAR` shift | Find a booking to take payment for. **Not night-scoped** |
 | POST | `/api/bar/sessions` | `foh.work` + a `BAR` shift | Open the bar for tonight |
-| POST | `/api/bar/transactions` | `foh.work` + a `BAR` shift | One tap, one transaction, one figure |
+| POST | `/api/bar/transactions` | `foh.work` + a `BAR` shift | One tap, one transaction, one figure. `CARD` or `TAB` |
+| GET | `/api/bar/tabs/menu` | `bar.tab` (`runBarTab`) | What you may put on a tab, and what you owe |
+| POST | `/api/bar/tabs` | `bar.tab` (`runBarTab`) | Put your own snack on your own tab |
+| GET | `/api/bar/tabs/mine` | `bar.tab` (`runBarTab`) | Your outstanding and settled charges |
+| GET | `/api/bar/tabs/debtor` | `foh.work` + a `BAR` shift | Find who to charge, by **exact email** |
+| POST | `/api/bar/tabs/settle` | `foh.work` + a `BAR` shift | Clear someone's tab at the counter |
+| POST | `/api/bar/tabs/:id/void` | the debtor, or `bar.manage` | Take an unsettled charge back off a tab |
+| GET | `/api/admin/bar/tabs` | `bar.manage` (`manageBar`) | Who owes what, biggest first |
+| GET | `/api/admin/bar/tabs/:userId` | `bar.manage` (`manageBar`) | One person's tab, itemised |
+| POST | `/api/admin/bar/tabs/settle` | `bar.manage` (`manageBar`) | Clear a tab away from the till |
 | GET | `/api/bar/comps` | `foh.work` + a `BAR` shift **or** approver | Your own requests, and the approver's queue |
 | POST | `/api/bar/comps` | `foh.work` + a `BAR` shift | Ask for a comp. Records nothing |
 | POST | `/api/bar/comps/:id/approve` | Tonight's `DUTY_MANAGER`, or `BOX_OFFICE`+ | The approval writes the record |
@@ -2050,6 +2059,41 @@ for ([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-s
 `trainingNeedsReview` is true on the fail-open path, when rehearsal could not be reached and there
 was no cached answer. **No banner is shown in that case.** Warning during an outage would warn
 everyone at once, which teaches people to ignore the banner precisely when it stops being reliable.
+
+---
+
+#### The bar tab endpoints
+
+**Source** `server/api/bar/tabs/**`, `server/api/admin/bar/tabs/**` · **Design**
+[ADR-0030](./decisions/0030-a-tab-is-a-sale-on-credit.md),
+[ADR-0031](./decisions/0031-a-tab-charge-is-the-only-voidable-transaction.md)
+
+A tab is a sale on credit: a `transactions` row with `tender = 'TAB'`, real `BAR_ITEM` lines, real
+`SALE` movements and `tab_debtor_user_id`. No money has moved, so it is in no SumUp Z-total until
+it is settled.
+
+**Two entry routes, two guards.** `/api/bar/tabs/*` is gated on the `bar.tab` permission and
+**deliberately not on `requireBarScope`**: that needs a confirmed `BAR` shift joined to a
+performance, which is exactly what a quiet weekday afternoon does not have. The till's routes keep
+the bar scope, because they are till work.
+
+- `POST /api/bar/tabs` charges **the caller only**. There is no debtor field: you cannot put
+  something on somebody else's tab from your own phone.
+- **Age-restricted products are refused server-side**, not merely absent from the menu. Alcohol
+  reaches a tab only through the till, where the training gate and Challenge 25 apply.
+- `GET /api/bar/tabs/debtor` is an **exact email match** returning at most one row. It is never a
+  name search: a bar phone must not become a way to browse the user table. `404` when there is no
+  mirror row, saying they need to sign in to the site once first.
+- `POST /api/bar/transactions` with `tender: 'TAB'` requires `tabDebtorUserId` and **forbids
+  `reservationIds`**. Ticket money on credit would mark a booking paid for money nobody took.
+- **Settling clears the whole balance as at now**, against `expectedTotalPence`. There is no list
+  of chosen charges: an id list is the shape ADR-0006 forbids, and a predicate makes a concurrent
+  double-settle a no-op rather than a race. `409` when the figure has moved, naming both amounts.
+- Settlement writes one `CARD` transaction with a single `TAB_SETTLEMENT` line and **no product**,
+  and **no stock movements**: the stock left the shelf when the tab was charged.
+- The void needs all three of `tender = 'TAB'`, `voided_at IS NULL` and `tab_settled_at IS NULL`,
+  and the last two are in the SQL predicate as well as the read. Voiding a settled charge would
+  take money out of a day the reader really took it in, possibly against a recorded Z-total.
 
 ---
 

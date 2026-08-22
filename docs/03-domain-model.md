@@ -365,6 +365,17 @@ transaction handle; the builders return statements and the caller batches them.
   sell" stays honest and "how much did we give away" is one sum.
 - **`bar_session_id` carries no foreign key.** It was written before `bar_sessions` existed, and
   SQLite cannot add a constraint later without rebuilding the table.
+- **`tender = 'TAB'` is a sale on credit** ([ADR-0030](./decisions/0030-a-tab-is-a-sale-on-credit.md)).
+  `tab_debtor_user_id` names who owes; the stock leaves the shelf and the sale is real, but no
+  money has moved, so a tab is never in a SumUp Z-total until it is settled. A tab may never carry
+  a ticket line: that would mark a booking paid for money nobody took.
+- **Settlement is a separate `CARD` transaction** with one `TAB_SETTLEMENT` line and **no product**,
+  which is what stops the sale being counted twice. The cleared charges are stamped with
+  `tab_settled_at` and `tab_settlement_transaction_id`. So a tab appears in product reports on the
+  day it was charged, and in the reader's total on the day it was paid.
+- **`voided_at` is written by one path only:** an unsettled tab charge, taken back off the tab by
+  its debtor or by `bar.manage` ([ADR-0031](./decisions/0031-a-tab-charge-is-the-only-voidable-transaction.md)).
+  Everything else is corrected by a refund.
 
 ### `bar_sessions`, `bar_session_performances`, `day_reconciliations`
 
@@ -401,6 +412,10 @@ half: the content columns cannot be updated and no row can be deleted.
   written against the measure that was sold.
 - **A correction is an opposing movement**, never an edit. `WASTAGE`, `TRANSFER` and `ADJUST` all
   require a reason, because the reason is the whole value of the row.
+- **`VOID` reverses a voided tab charge**, and it is *copied* from that charge's original `SALE`
+  rows rather than recomputed from the catalogue. Recomputing would not cancel the sale if
+  `depletes_milli` or `stock_product_id` had changed in between, and `on_hand` would drift
+  permanently with no trace (ADR-0031).
 - **Stocktake variance is computed against on-hand at the moment of finishing**, not against the
   snapshot taken at the start. `expected_milli` is recorded so the sheet can show what was expected
   when counting began, but correcting to it would erase any sale made during the count.

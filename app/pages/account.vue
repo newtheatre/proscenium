@@ -3,12 +3,15 @@
  */
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
+import { canRunBarTab } from '~~/shared/utils/abilities'
 
 definePageMeta({
   middleware: 'auth',
 })
 
-const navigation: NavigationMenuItem[][] = [
+const { user } = useUserSession()
+
+const navigation = computed<NavigationMenuItem[][]>(() => [
   [
     {
       label: 'Overview',
@@ -31,13 +34,20 @@ const navigation: NavigationMenuItem[][] = [
       icon: 'i-lucide-clipboard-list',
       to: '/account/shifts',
     },
+    ...(user.value && canRunBarTab(user.value)
+      ? [{
+          label: 'Bar tab',
+          icon: 'i-lucide-beer',
+          to: '/account/tab',
+        }]
+      : []),
     {
       label: 'Security',
       icon: 'i-lucide-shield',
       to: '/account/security',
     },
   ],
-]
+])
 </script>
 
 <template>

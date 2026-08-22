@@ -3,11 +3,15 @@
  * in a dark foyer. Scoped by tonight's rota (ADR-0019). Design: docs/11 §2.
  */
 <script setup lang="ts">
+import { canRunBarTab } from '~~/shared/utils/abilities'
+
 definePageMeta({
   layout: false,
   middleware: ['foh'],
   title: 'Front of House',
 })
+
+const { user } = useUserSession()
 
 const ROLE_LABELS: Record<NonNullable<FohPerformance['shiftRole']>, string> = {
   DUTY_MANAGER: 'Duty manager',
@@ -211,6 +215,14 @@ onBeforeUnmount(() => {
             </span>
           </component>
         </div>
+
+        <NuxtLink
+          v-if="user && canRunBarTab(user)"
+          to="/bar/tab"
+          class="mt-4 block text-sm text-neutral-400 underline underline-offset-4"
+        >
+          My bar tab
+        </NuxtLink>
       </template>
     </div>
   </div>
