@@ -13,7 +13,7 @@ There is a global price list, and two layers of override on top of it. A ticket 
   performance_ticket_type_overrides.price  "…and £3 for the Wednesday matinee"
 ```
 
-Same chain for `active` — whether the type is offered at all:
+Same chain for `active`: whether the type is offered at all:
 
 ```
   ticket_types.activeByDefault
@@ -58,14 +58,14 @@ The rule is reimplemented inline in five places:
 
 | File | Resolves |
 |---|---|
-| `server/utils/tickets.ts` | price only — the canonical one |
+| `server/utils/tickets.ts` | price only: the canonical one |
 | `server/api/whats-on/[slug].get.ts` | price + active |
 | `server/api/bookings/available-ticket-types.get.ts` | price + active |
 | `server/api/reservations/[id]/available-ticket-types.get.ts` | price + active |
 | `server/api/shows/[id]/performances/[performanceId]/ticket-types/index.get.ts` | price + active |
 
 They agree today. Nothing keeps them agreeing, and one of them already carries a comment describing
-a *different* rule from the one it implements — "false wins if any level sets it false", where the
+a *different* rule from the one it implements: "false wins if any level sets it false", where the
 code is last-wins.
 
 **The obvious refactor**, and the natural seam for the passes work:
@@ -83,7 +83,7 @@ are no floats or decimals anywhere in this codebase and there must not be. Forma
 frontend's job.
 
 This is a deliberate reaction to the legacy system, which used `DecimalField` and stored only a
-per-transaction total — making historic unit prices unrecoverable for 5% of sales and requiring
+per-transaction total: making historic unit prices unrecoverable for 5% of sales and requiring
 inference for the rest.
 
 ## What `pricePaid` means, and where the promise leaks
@@ -96,8 +96,8 @@ Two places where it leaks:
 
 **1. Adding tickets at collection re-prices at current rates.** `PUT /api/reservations/:id/tickets`
 resolves prices afresh for newly-inserted rows, so one reservation can legitimately contain two
-tickets of the same type at different prices. Usually correct — if the price changed, the new ticket
-costs the new price — but it surprises people.
+tickets of the same type at different prices. Usually correct: if the price changed, the new ticket
+costs the new price, but it surprises people.
 
 **2. The collection modal displays current prices, not paid prices.** `CollectModal.vue` builds its
 totals from the currently-effective price rather than the `pricePaid` on the existing tickets. So if
@@ -107,29 +107,29 @@ first.
 
 ## Ticket types today
 
-`ticket_types.name` is **UNIQUE and global** — there is no per-show namespace. So types are
+`ticket_types.name` is **UNIQUE and global**: there is no per-show namespace. So types are
 theatre-wide concepts ("Adult", "Student", "Member", "Fellow") and per-show variation is expressed
 through overrides, not through new types. Resist creating "Macbeth Concession"; that is what the
 override chain is for.
 
-Deleting a type that has ever been sold fails — `tickets.ticketTypeId` is `restrict` — and the
+Deleting a type that has ever been sold fails (`tickets.ticketTypeId` is `restrict`) and the
 handler turns that into a 409. That restriction is the point: a 2019 ticket still has to resolve its
 name and price. **Retire a type by archiving it.**
 
-### `archived` vs `activeByDefault` — two different questions
+### `archived` vs `activeByDefault`: two different questions
 
 These get confused, so they are worth separating plainly:
 
 | | `activeByDefault` | `archived` |
 |---|---|---|
 | Question it answers | Is this type pre-selected on new shows? | Is this type still in use at all? |
-| Still sellable | Yes — switch it on for a show or performance | **No** |
+| Still sellable | Yes: switch it on for a show or performance | **No** |
 | Appears in box-office pickers | Yes | No |
 | Appears in the show/performance override screens | Yes | No |
 | Appears in `/admin/ticket-types` | Yes | Only behind "Show archived" |
 | Historic tickets still price correctly | Yes | Yes |
 
-`activeByDefault = false` means "current, but off unless someone asks for it" — a Member rate, say.
+`activeByDefault = false` means "current, but off unless someone asks for it": a Member rate, say.
 `archived = true` means "we are never selling this again". After the legacy import there are far
 more dead Fringe and StuFF types than live ones, which is why the management screen hides them by
 default.
@@ -144,15 +144,15 @@ cannot sell against it.
 
 Two columns are being added to `ticket_types` (migration `0009`, the legacy import):
 
-- **`kind`** — `SINGLE` | `PASS_SALE` | `PASS_ADMISSION`. Without this split, importing the legacy
+- **`kind`**: `SINGLE` | `PASS_SALE` | `PASS_ADMISSION`. Without this split, importing the legacy
   pass counters either double-counts revenue or loses the fact a pass existed. It is also what the
   passes feature uses for the zero-priced admission type.
-- **`archived`** — legacy-only types (Fringe, StuFF, the historic pass products) stay valid for
+- **`archived`**: legacy-only types (Fringe, StuFF, the historic pass products) stay valid for
   historic tickets but are hidden everywhere a type can be chosen. See the table above.
 
 And one on `tickets`:
 
-- **`priceConfidence`** — `EXACT` | `DERIVED` | `UNKNOWN`. Records whether an imported price was
+- **`priceConfidence`**: `EXACT` | `DERIVED` | `UNKNOWN`. Records whether an imported price was
   observed or inferred. 94.6% of legacy sales had a single ticket category and so give an exact unit
   price; the rest are apportioned. New tickets are always `EXACT`.
 
@@ -164,9 +164,9 @@ See [ADR-0003](./decisions/0003-legacy-ticketing-import.md) and
 Worth one paragraph, because it explains several decisions here.
 
 The legacy Django app resolved prices in **five copy-pasted places**, dispatching on three different
-keys — `category.slug` in the till and booking pages, `category.id` in the reports, and
+keys: `category.slug` in the till and booking pages, `category.id` in the reports, and
 `category.name` in the templates. Prices lived in singleton tables holding only *current* values, so
 there was no history. The result: reconciling historic sales against the pricing tables matches
 1,232 of 16,255 sales. The override chain and the `pricePaid` snapshot exist specifically so that
-never happens again — which is precisely why the five copies of the resolution rule in *this*
+never happens again, which is precisely why the five copies of the resolution rule in *this*
 codebase are worth consolidating before they drift.

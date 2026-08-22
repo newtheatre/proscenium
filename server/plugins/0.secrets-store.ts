@@ -25,7 +25,7 @@ export default defineNitroPlugin((nitroApp) => {
       warnedAboutWorkerSecret = true
       console.error(
         '[secrets-store] NUXT_SESSION_PASSWORD is set as a worker secret and takes '
-        + 'priority over the SESSION_PASSWORD store binding — this app is sealing '
+        + 'priority over the SESSION_PASSWORD store binding: this app is sealing '
         + 'sessions with the wrong key. Run `wrangler secret delete '
         + 'NUXT_SESSION_PASSWORD --name proscenium`, then redeploy.',
       )

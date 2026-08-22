@@ -4,7 +4,7 @@ import { workFoh } from '~~/shared/utils/abilities'
 const querySchema = z.object({ performanceId: z.string().trim().min(1) })
 
 /**
- * GET /api/foh/access-tonight — consented needs for this performance. Empty
+ * GET /api/foh/access-tonight: consented needs for this performance. Empty
  * rather than 403: an empty list does not advertise that there was something.
  */
 export default defineEventHandler(async (event) => {

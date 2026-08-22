@@ -33,7 +33,7 @@ const debouncedQuery = useDebouncedRef(q, {
 })
 
 /**
- * `useRequestFetch()` is not optional — a plain useFetch on the server does not
+ * `useRequestFetch()` is not optional: a plain useFetch on the server does not
  * forward the session cookie (ADR-0013).
  */
 const requestFetch = useRequestFetch()
@@ -118,7 +118,7 @@ async function createUser() {
     toast.add({
       title: result.user.existing ? 'Existing NNT account linked' : 'User created',
       description: result.user.existing
-        ? 'That email already has an NNT account — reservations will attach to it.'
+        ? 'That email already has an NNT account: reservations will attach to it.'
         : 'They can claim the account later via forgot-password on the NNT login page.',
       color: 'success',
     })
@@ -209,7 +209,7 @@ async function createUser() {
     <UModal
       v-model:open="createOpen"
       title="Add user"
-      description="Creates an NNT account they can claim later — no passwords to hand out."
+      description="Creates an NNT account they can claim later: no passwords to hand out."
     >
       <template #body>
         <UForm

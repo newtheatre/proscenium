@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq, sql } from 'drizzle-orm'
 import { manageBar } from '~~/shared/utils/abilities'
 
-/** POST /api/admin/bar/stocktakes/:id/abandon — walk away, writing nothing. */
+/** POST /api/admin/bar/stocktakes/:id/abandon: walk away, writing nothing. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
   const id = getRouterParam(event, 'id')!

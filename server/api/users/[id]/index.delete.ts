@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { count, eq } from 'drizzle-orm'
 import { deleteUser } from '~~/shared/utils/abilities'
 
-/** DELETE /api/users/:id — delete a user. Admin or own account. */
+/** DELETE /api/users/:id. Delete a user. Admin or own account. */
 export default defineEventHandler(async (event) => {
   const userId = getRouterParam(event, 'id')
 
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
   if ((bookings?.n ?? 0) > 0) {
     throw createError({
       statusCode: 409,
-      statusMessage: `This account cannot be deleted because it has ${bookings!.n} booking${bookings!.n === 1 ? '' : 's'} against it. Booking history has to be kept for reporting. Close the account instead — POST /api/users/${userId}/anonymise removes the person and keeps the sales record.`,
+      statusMessage: `This account cannot be deleted because it has ${bookings!.n} booking${bookings!.n === 1 ? '' : 's'} against it. Booking history has to be kept for reporting. Close the account instead, POST /api/users/${userId}/anonymise removes the person and keeps the sales record.`,
     })
   }
 

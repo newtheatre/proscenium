@@ -165,7 +165,7 @@ const displayRows = computed(() => {
         id: t.ticketTypeId,
         name: t.ticketType.name,
         // Existing tickets keep the price the customer booked at, not the
-        // current price — the customer holds an email quoting the old price.
+        // current price: the customer holds an email quoting the old price.
         effectivePrice: t.pricePaid,
         isDefault: true, // types with existing tickets always show
       })
@@ -368,7 +368,7 @@ async function markNoShow() {
 <template>
   <USlideover
     v-model:open="open"
-    :title="`Collect — ${bookingRef ?? ''}`"
+    :title="`Collect: ${bookingRef ?? ''}`"
     side="right"
   >
     <template #description>
@@ -502,7 +502,7 @@ async function markNoShow() {
             name="i-lucide-circle-dot"
             class="size-3"
           />
-          Ticket quantities modified — will be saved on collect
+          Ticket quantities modified: will be saved on collect
         </p>
 
         <!-- Total summary -->

@@ -224,7 +224,7 @@ async function onSubmit(_event: FormSubmitEvent<Schema>) {
         <UFormField
           name="staffNotes"
           label="Staff notes"
-          description="Internal box-office notes — not visible to the customer"
+          description="Internal box-office notes: not visible to the customer"
         >
           <UTextarea
             v-model="state.staffNotes"

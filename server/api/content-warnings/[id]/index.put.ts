@@ -15,7 +15,7 @@ const bodySchema = z.object({
 })
 
 /**
- * PUT /api/content-warnings/:id — edit a vocabulary entry.
+ * PUT /api/content-warnings/:id. Edit a vocabulary entry.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')

@@ -3,7 +3,7 @@ import { alias } from 'drizzle-orm/sqlite-core'
 import { desc, eq } from 'drizzle-orm'
 import { workFoh } from '~~/shared/utils/abilities'
 
-/** GET /api/bar/comps — the requester's own, and the approver's queue. */
+/** GET /api/bar/comps: the requester's own, and the approver's queue. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

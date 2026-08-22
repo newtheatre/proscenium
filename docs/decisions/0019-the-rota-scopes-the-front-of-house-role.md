@@ -34,7 +34,7 @@ A `DOOR` shift does not reach the till and a `BAR` shift does not reach the door
 ([13-bar-design §5](../13-bar-design.md)); the shift's `role` column is what separates them.
 
 The check lives in one function, alongside the other session helpers, and like every resolver it
-**must not throw** — a resolver that throws grants rather than denies
+**must not throw**: a resolver that throws grants rather than denies
 ([ADR-0008](0008-roles-go-stale-identity-does-not.md)). Absence of a shift is data: no shift, no
 scope, and the screen says so rather than erroring.
 

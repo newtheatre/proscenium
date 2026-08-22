@@ -61,7 +61,7 @@ export default defineTask({
             uid: `shift-${row.shiftId}@newtheatre.org.uk`,
             startsAt: starts,
             endsAt: ends,
-            summary: `${row.role.replace('_', ' ')} — ${row.showTitle}`,
+            summary: `${row.role.replace('_', ' ')}, ${row.showTitle}`,
             description: `Front of house at the Nottingham New Theatre.`,
             location: row.venueAddress ?? row.venueName,
             url: `${useRuntimeConfig().public.baseURL}/account/shifts`,

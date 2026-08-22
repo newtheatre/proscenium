@@ -17,7 +17,7 @@ const bodySchema = z.object({
   pricePence: z.coerce.number().int().min(0).max(100_000),
 })
 
-/** POST /api/admin/bar/products — add something to sell, with its first price. */
+/** POST /api/admin/bar/products: add something to sell, with its first price. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

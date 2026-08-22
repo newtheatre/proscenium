@@ -8,7 +8,7 @@ const bodySchema = z.object({
   passTypeId: z.string().min(1),
   passTypePriceId: z.string().min(1),
 
-  // Either an existing account, or name + email for a find-or-create — the same
+  // Either an existing account, or name + email for a find-or-create: the same
   // shadow-account path a walk-in booking uses.
   userId: z.string().optional(),
   name: z.string().min(1).optional(),
@@ -21,7 +21,7 @@ const bodySchema = z.object({
   message: 'Either userId or both name and email are required',
 })
 
-/** POST /api/passes — sell a pass. Staff only. */
+/** POST /api/passes: sell a pass. Staff only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, issuePass)
 
@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
   if (!price.active) throw createError({ statusCode: 400, statusMessage: 'That price is no longer available' })
 
   // maxIssued is the blunt protection against selling more passes than the
-  // house can seat. Read-then-write, like capacity — acceptable at this volume.
+  // house can seat. Read-then-write, like capacity: acceptable at this volume.
   if (passType.maxIssued != null) {
     const [issued] = await db.select({ n: count() }).from(schema.passes)
       .where(and(
@@ -94,7 +94,7 @@ export default defineEventHandler(async (event) => {
     }
     catch (error) {
       console.error('[passes] shadow-account call failed:', error)
-      throw createError({ statusCode: 502, statusMessage: 'Could not reach the auth service — try again' })
+      throw createError({ statusCode: 502, statusMessage: 'Could not reach the auth service, try again' })
     }
     userId = shadow.id
     const mirror = await db.select({ id: schema.users.id }).from(schema.users)

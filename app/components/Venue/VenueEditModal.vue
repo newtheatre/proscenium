@@ -49,7 +49,7 @@ const open = computed({
 })
 
 const isSubmitting = ref(false)
-// Staged image state — nothing is sent to the server until "Update Venue" is confirmed
+// Staged image state: nothing is sent to the server until "Update Venue" is confirmed
 const pendingImageAction = ref<'replace' | 'delete' | null>(null)
 const imageFile = ref<File | null>(null)
 const imagePreview = ref<string | null>(null)

@@ -1,6 +1,6 @@
-# 08 — Operations Runbook
+# 08: Operations Runbook
 
-For whoever holds the IT Manager role. This covers running **Proscenium** — the Nottingham New Theatre's public website and box office — in production: deploying, rolling back, migrating, backing up, reading logs, and what to do when it breaks during a show.
+For whoever holds the IT Manager role. This covers running **Proscenium** (the Nottingham New Theatre's public website and box office) in production: deploying, rolling back, migrating, backing up, reading logs, and what to do when it breaks during a show.
 
 Read `docs/01-getting-started.md` first if you have not set the project up locally. Several failure modes in §8 are only intelligible if you know how the environment variables work.
 
@@ -13,12 +13,12 @@ You do not need to be a Cloudflare expert, but these five terms appear constantl
 | Term | What it means here |
 | --- | --- |
 | **Worker** | A small server-side programme that runs on Cloudflare's edge network instead of on a machine we rent. Our entire Nuxt server is one Worker, named `proscenium`. There is no SSH, no server to log into, no disk to fill up. |
-| **Binding** | How a Worker is granted access to a resource. Bindings are declared in configuration and appear to the code as global objects — our database arrives as the binding `DB`, our file storage as `BLOB`. If a binding is missing, the code sees `undefined` and fails at runtime, not at deploy time. |
+| **Binding** | How a Worker is granted access to a resource. Bindings are declared in configuration and appear to the code as global objects: our database arrives as the binding `DB`, our file storage as `BLOB`. If a binding is missing, the code sees `undefined` and fails at runtime, not at deploy time. |
 | **D1** | Cloudflare's managed SQLite database. Same SQL as the local file you develop against, but accessed through the `DB` binding. It has a point-in-time restore feature called Time Travel (§6). |
-| **R2** | Cloudflare's object storage — an S3-alike. We keep uploaded show posters and venue images there, in a bucket named `proscenium-blob`. |
+| **R2** | Cloudflare's object storage: an S3-alike. We keep uploaded show posters and venue images there, in a bucket named `proscenium-blob`. |
 | **Wrangler** | Cloudflare's command-line tool. Deploys the Worker, streams logs, runs SQL against D1, manages secrets. Installed as a dev dependency; run it with `bunx wrangler`. |
 
-**Secrets** are environment variables stored encrypted against the Worker. They persist across deploys and are not in the repository. They are set with `wrangler secret put` and are invisible afterwards — you can replace one but never read it back.
+**Secrets** are environment variables stored encrypted against the Worker. They persist across deploys and are not in the repository. They are set with `wrangler secret put` and are invisible afterwards: you can replace one but never read it back.
 
 ---
 
@@ -34,7 +34,7 @@ There is no `wrangler.toml` in the repository. The Wrangler configuration is **g
 | D1 binding | `DB` | `nitro.cloudflare.wrangler.d1_databases`, and again via `$production.hub.db` |
 | D1 database name | `proscenium` | Same |
 | **D1 database id** | `01a75263-87a9-452a-a4a0-b3b9db71dfe5` | Hard-coded in **two** places: `nitro.cloudflare.wrangler.d1_databases[0].database_id` and `$production.hub.db.connection.databaseId`. Keep them in step. |
-| | | **August 2026:** these ids previously pointed at `proscenium-testing` (`c4200074-…`) while the name said `proscenium`, so production ran on the testing database. The live data was copied into `proscenium` and the ids corrected — see "Database cutover" below. |
+| | | **August 2026:** these ids previously pointed at `proscenium-testing` (`c4200074-…`) while the name said `proscenium`, so production ran on the testing database. The live data was copied into `proscenium` and the ids corrected: see "Database cutover" below. |
 | R2 binding | `BLOB` | `$production.hub.blob.binding` |
 | **R2 bucket name** | `proscenium-blob` | `$production.hub.blob.bucketName` |
 | Observability logs | Enabled | `nitro.cloudflare.wrangler.observability.logs.enabled` |
@@ -61,8 +61,8 @@ $production: {
 What this pins around, based on how `@nuxthub/core@0.10.6` actually resolves database configuration:
 
 - Left to itself, NuxtHub picks the driver by inspecting the environment: it only switches SQLite to the `d1` driver when the hosting provider looks like Cloudflare **and** the build is neither a dev run nor a `nuxt prepare` run. During `nuxt prepare` it deliberately falls back to the local libsql file.
-- Every database CLI command (`nuxt db migrate`, `nuxt db drop-all`, …) runs `nuxt prepare` first and then reads the config it produced. Under auto-detection, that config would describe the **local SQLite file**, not production D1 — so there would be no supported way to point the CLI at production.
-- Pinning `driver: 'd1'` with an explicit `connection.databaseId` forces the D1 path regardless of detection, and gives the CLI the database id it needs to talk to the D1 HTTP API (it takes the account id and API token from `NUXT_HUB_CLOUDFLARE_*`). It also makes NuxtHub register the `DB` binding itself, and — because the `d1` driver disables build-time migrations — guarantees `bun run build` never tries to migrate anything.
+- Every database CLI command (`nuxt db migrate`, `nuxt db drop-all`, …) runs `nuxt prepare` first and then reads the config it produced. Under auto-detection, that config would describe the **local SQLite file**, not production D1, so there would be no supported way to point the CLI at production.
+- Pinning `driver: 'd1'` with an explicit `connection.databaseId` forces the D1 path regardless of detection, and gives the CLI the database id it needs to talk to the D1 HTTP API (it takes the account id and API token from `NUXT_HUB_CLOUDFLARE_*`). It also makes NuxtHub register the `DB` binding itself, and (because the `d1` driver disables build-time migrations) guarantees `bun run build` never tries to migrate anything.
 
 The FIXME means: **this pin is a workaround, and when the upstream pull request ships in a released version of `@nuxthub/core`, re-test whether the explicit `driver` and `connection` block can be deleted.** The pull request could not be read from this environment, so treat that as the intent rather than a description of its contents. If you do remove the pin, verify all three of: `bunx nuxt db migrate` still targets production, the generated `.output/wrangler.json` still contains the `DB` binding with the right database id, and a production deploy still boots.
 
@@ -73,7 +73,7 @@ The FIXME means: **this pin is a workaround, and when the upstream pull request 
 CI runs on every pull request and push to `main` (`.github/workflows/ci.yml`: install → build →
 typecheck → lint, all hard gates), and Cloudflare builds and deploys the Worker automatically when
 `main` moves. The manual sequence below remains the fallback for when the automatic pipeline is
-unavailable — and steps 1–5 are still what you run locally before opening a PR.
+unavailable, and steps 1–5 are still what you run locally before opening a PR.
 
 | Step | Command | Notes |
 | --- | --- | --- |
@@ -85,7 +85,7 @@ unavailable — and steps 1–5 are still what you run locally before opening a 
 | 6. Deploy | `bunx wrangler --cwd .output deploy` | `--cwd .output` is what makes Wrangler read the generated config |
 | 7. Verify | Load <https://newtheatre.org.uk>, load `/whats-on`, log in, open `/admin/box-office` | Roughly 60 seconds of manual checking |
 
-If the change includes a schema change, apply the migration **before** deploying the code that depends on it — see §5.
+If the change includes a schema change, apply the migration **before** deploying the code that depends on it: see §5.
 
 **Never deploy during a performance.** A deploy replaces the Worker; in-flight requests are handled, but a mistake at 19:25 on a Friday means a box office queue and no way to sell tickets.
 
@@ -99,11 +99,11 @@ bunx wrangler --cwd .output secret put NUXT_RESEND_API_KEY
 bunx wrangler secret put NUXT_RESEND_API_KEY --name proscenium
 ```
 
-**`NUXT_SESSION_PASSWORD` is the exception — it is not a worker secret.** It is
+**`NUXT_SESSION_PASSWORD` is the exception: it is not a worker secret.** It is
 shared with every other app on the estate, so it lives in the account Secrets
 Store and this Worker binds it as `SESSION_PASSWORD`
 (`nuxt.config.ts` → `secrets_store_secrets`, hydrated by
-`server/plugins/0.secrets-store.ts`). The auth service's runbook owns rotation —
+`server/plugins/0.secrets-store.ts`). The auth service's runbook owns rotation:
 stage-door `docs/operations.md`, ADR-0016. Rotating it there needs no deploy
 here.
 
@@ -113,7 +113,7 @@ here.
 | `NUXT_SESSION_PASSWORD` (Secrets Store) | Nobody can log in; `/api/_auth/session` returns 500 while the homepage still serves, which makes it easy to miss. Must be at least 32 characters |
 | `NUXT_RESEND_FROM_EMAIL` | Falls back to `no-reply@tickets.newtheatre.org.uk`; sends fail if that address is not verified in Resend |
 
-List what is currently set (names only — values cannot be read back):
+List what is currently set (names only: values cannot be read back):
 
 ```bash
 bunx wrangler secret list --name proscenium                  # worker secrets
@@ -182,7 +182,7 @@ Cloudflare to call it.
 | `reports:auto-close` | Files an end-of-night report for any performance nobody signed off, banner-marked *auto-closed, no duty manager sign-off*. **Idempotent**: the unique index on `performance_id` means a second run closes nothing (`docs/12` §4.1) |
 | `shifts:remind` | Emails everyone confirmed on tomorrow's performances, with an ICS attachment. **Not idempotent**: running it twice sends twice, which is why it is scheduled once and not retried |
 
-Run one by hand in development with `POST /_nitro/tasks/<name>` — note the name is the task's
+Run one by hand in development with `POST /_nitro/tasks/<name>`: note the name is the task's
 `meta.name` (`backstage:sweep`), not its file path. In production, check it ran with
 `bunx wrangler tail proscenium` around 04:00, or look at the Worker's cron invocations in the
 dashboard.
@@ -200,7 +200,7 @@ night, not from the trigger time, so an hour's drift delays the report and never
 `nuxt db migrate` on any push to `main` that touches `server/db/migrations/**`, and records a Time
 Travel bookmark in the run summary before it applies anything. It never runs on a pull request.
 
-Migrations are still **not** applied at build, at deploy, or at boot — `applyMigrationsDuringBuild`
+Migrations are still **not** applied at build, at deploy, or at boot: `applyMigrationsDuringBuild`
 is `false`, and Cloudflare's deploy does not touch the database. The workflow is the only automatic
 path.
 
@@ -214,15 +214,15 @@ Builds reacts to the same push independently, so on every merge two things start
 | `migrate` workflow | ~1 minute |
 | Cloudflare build + deploy | ~3–5 minutes |
 
-The migration almost always lands first, which is the order NuxtHub requires — but **it is a race,
+The migration almost always lands first, which is the order NuxtHub requires, but **it is a race,
 not a guarantee**. If the deploy wins, the new Worker runs against the old schema until the
 migration catches up.
 
 That is survivable for an additive migration and not for a destructive one. So:
 
-- **Additive changes** (new nullable column, new table, new index) — just merge.
+- **Additive changes** (new nullable column, new table, new index): just merge.
 - **Destructive changes** (dropping or renaming a column or table, narrowing a constraint, rewriting
-  data) — apply by hand *before* merging, with the manual sequence below, then merge. The workflow
+  data): apply by hand *before* merging, with the manual sequence below, then merge. The workflow
   will find nothing pending and no-op. This is what was done for `0016_lying_maverick`.
 
 A destructive migration is also the case where you want a human watching, which is the other reason
@@ -248,7 +248,7 @@ Both ledger spellings are folded together, because production carries a mix: `nu
 records `0016_lying_maverick` and `wrangler d1 migrations apply` records `0016_lying_maverick.sql`.
 Which spelling a row has says nothing about whether it ran.
 
-### `nuxt db migrate` exits 0 when it fails — use `nuxt-db`
+### `nuxt db migrate` exits 0 when it fails: use `nuxt-db`
 
 The `db` subcommand on the main Nuxt CLI **swallows the exit code**. A migration that errors outright
 logs `[error] Failed to create migrations table` and then exits `0`, so a CI step wrapping it goes
@@ -261,7 +261,7 @@ nuxt-db migrate   →  exit 1   ✓
 
 `nuxt-db` and `nuxt-hub` are the binaries `@nuxthub/core` installs, and they propagate properly.
 `.github/workflows/migrate.yml` uses `./node_modules/.bin/nuxt-db migrate`, and then re-reads the
-ledger anyway via `.github/scripts/pending-migrations.sh` — the CLI's word is not accepted as proof
+ledger anyway via `.github/scripts/pending-migrations.sh`: the CLI's word is not accepted as proof
 that anything landed. This is the same class of failure as the `migrations_dir` bug below: not an
 error, just a cheerful exit code and nothing done.
 
@@ -281,7 +281,7 @@ permission and that env var on the install step. All four estate repos had the s
 
 It went unnoticed for two days because the workflow only runs on a push that touches
 `server/db/migrations/**`, and nothing had added a migration since. **A workflow that only runs
-when it is needed is a workflow that is only tested when it is needed** — which is the argument for
+when it is needed is a workflow that is only tested when it is needed**, which is the argument for
 `workflow_dispatch` being on it, and for running it by hand after any change to how dependencies
 are installed.
 
@@ -293,7 +293,7 @@ is what `GET /api/health` now reports (§5).
 
 0.10.6's CLI posts to `https://api.cloudflare.com/client/v4/accounts/{account}/d1/db/{id}/raw`.
 Cloudflare's D1 API is `/d1/**database**/{id}/raw`, and the wrong path answers with
-`{"code":10001,"message":"Unable to authenticate request"}` — which reads like a credentials problem
+`{"code":10001,"message":"Unable to authenticate request"}`, which reads like a credentials problem
 and is not one. The same package's *runtime* template had the correct path all along, so only the
 CLI was affected. Fixed in 0.10.8.
 
@@ -307,7 +307,7 @@ Still the right move for anything destructive, and the fallback when the workflo
 ### Before you start
 
 1. Take a backup (§6). Non-negotiable.
-2. Check there is no performance on sale in the next hour or so — `/admin` shows what is upcoming.
+2. Check there is no performance on sale in the next hour or so: `/admin` shows what is upcoming.
 3. Read the generated `.sql`. If it contains `PRAGMA foreign_keys=OFF` and a `__new_*` table, it is a full table rebuild: SQLite copies the data across via an explicit `INSERT … SELECT`, and **any column omitted from that list is silently dropped**. On a large `tickets` or `reservations` table this is also the slowest and riskiest kind of migration.
 4. If that rebuild touches a table other tables reference, read the next section before going any further.
 
@@ -315,13 +315,13 @@ Still the right move for anything destructive, and the fallback when the workflo
 
 Drizzle opens every table rebuild with `PRAGMA foreign_keys=OFF` and closes it with `=ON`. **On D1 both lines are inert.** Cloudflare runs each migration inside an implicit transaction with foreign keys enforced, and documents that a query cannot change that; `PRAGMA defer_foreign_keys = ON` does not stop `ON DELETE CASCADE` either.
 
-That matters when the rebuilt table is a **parent**. `DROP TABLE parent` with enforcement on deletes its rows first, which fires `ON DELETE CASCADE` and empties the children — before any later statement in the same file gets to look at them. Every rebuild in this repo up to `0015` happened to touch a child table, which is why this had never bitten.
+That matters when the rebuilt table is a **parent**. `DROP TABLE parent` with enforcement on deletes its rows first, which fires `ON DELETE CASCADE` and empties the children: before any later statement in the same file gets to look at them. Every rebuild in this repo up to `0015` happened to touch a child table, which is why this had never bitten.
 
 Locally the opposite is true: migrations run statement-by-statement with no transaction and the pragma is honoured. **A migration of this shape succeeding in dev proves very little about production.** Rehearse it against a throwaway D1 database loaded from a production export.
 
-If you need to rebuild a parent table, hand-edit the generated file (permitted before it has been applied anywhere — see `CONTRIBUTING.md`) to drop the child first, then the parent, then recreate parent-then-child. `0016_lying_maverick.sql` is the worked example, and [ADR-0004](decisions/0004-content-warning-model.md) explains why.
+If you need to rebuild a parent table, hand-edit the generated file (permitted before it has been applied anywhere: see `CONTRIBUTING.md`) to drop the child first, then the parent, then recreate parent-then-child. `0016_lying_maverick.sql` is the worked example, and [ADR-0004](decisions/0004-content-warning-model.md) explains why.
 
-### Option A — NuxtHub CLI over the D1 HTTP API (preferred)
+### Option A: NuxtHub CLI over the D1 HTTP API (preferred)
 
 ```bash
 export NUXT_HUB_CLOUDFLARE_ACCOUNT_ID=…
@@ -330,9 +330,9 @@ export NUXT_HUB_CLOUDFLARE_API_TOKEN=…      # needs D1 edit permission
 NODE_ENV=production bunx nuxt db migrate
 ```
 
-This is what the line at the bottom of the repository `README.md` is referring to. It prints the resolved dialect and driver before doing anything — **read that line**. If it says `libsql` rather than `d1`, it is pointed at your local file, and you should stop and work out why before continuing.
+This is what the line at the bottom of the repository `README.md` is referring to. It prints the resolved dialect and driver before doing anything: **read that line**. If it says `libsql` rather than `d1`, it is pointed at your local file, and you should stop and work out why before continuing.
 
-### Option B — Wrangler
+### Option B: Wrangler
 
 After a `bun run build` has copied the migrations into `.output/server/db/migrations/sqlite/`:
 
@@ -342,26 +342,26 @@ bunx wrangler --cwd .output/server d1 migrations apply proscenium --remote
 ```
 
 **`--cwd .output/server`, not `--cwd .output`.** The generated Wrangler config is written to
-`.output/server/wrangler.json`, and from `.output` Wrangler cannot find it — it fails with
+`.output/server/wrangler.json`, and from `.output` Wrangler cannot find it: it fails with
 *"No configuration file found"*, which at least tells you something is wrong. (`.wrangler/deploy/
 config.json` redirects Wrangler to that config for deploys, but is not honoured by the `d1
 migrations` subcommands in Wrangler 4.x, so the `--cwd` is still needed here.)
 
 **Always run `list` before `apply`, and read what it prints.** `migrations_dir` is pinned in
 `nuxt.config.ts` because NuxtHub's default for it (`.output/server/db/migrations/`) is resolved by
-Wrangler *relative to the config file*, landing on a path that does not exist — and the failure mode
+Wrangler *relative to the config file*, landing on a path that does not exist, and the failure mode
 was not an error but `✅ No migrations to apply!` and an exit code of 0. If you ever see that message
 when you know a migration is outstanding, do not believe it: check `list` output against
 `server/db/migrations/sqlite/` before concluding production is up to date.
 
-### The two routes do not share a name format — pick one and stay on it
+### The two routes do not share a name format: pick one and stay on it
 
 Both write to `_hub_migrations`, but they disagree about what a migration is called:
 
 | Route | Value stored in `name` |
 |---|---|
-| `nuxt db migrate` (Option A) | `0015_lovely_stryfe` — `.sql` stripped |
-| `wrangler d1 migrations apply` (Option B) | `0015_lovely_stryfe.sql` — filename as-is |
+| `nuxt db migrate` (Option A) | `0015_lovely_stryfe`: `.sql` stripped |
+| `wrangler d1 migrations apply` (Option B) | `0015_lovely_stryfe.sql`: filename as-is |
 
 So they do **not** interoperate, whatever an earlier version of this document said. Apply a migration
 with one and the other still considers it pending, and will re-run it. That is survivable for a
@@ -381,14 +381,14 @@ bunx wrangler d1 execute proscenium --remote \
   --command "INSERT INTO \"_hub_migrations\" (name) values ('0017_name')"
 ```
 
-That is exactly what `nuxt db mark-as-migrated 0017_name` writes — one row, nothing else — and it is
+That is exactly what `nuxt db mark-as-migrated 0017_name` writes (one row, nothing else) and it is
 the supported command when you have the API credentials to hand.
 
 The 2026-08-13 ledger recovery wrote both formats for `0000`–`0014` for exactly this reason.
 `0016_lying_maverick` was applied with wrangler on 2026-08-14 and its Option A name backfilled the
 same day, when the workflow was introduced.
 
-### The ledger was recovered on 2026-08-13 — history
+### The ledger was recovered on 2026-08-13: history
 
 For a period ending 2026-08-13, `_hub_migrations` was **empty** on a fully populated production
 database: the schema was there, the record of how it got there was not. Nobody noticed because the
@@ -396,7 +396,7 @@ broken `migrations_dir` above meant `list` always answered "nothing to do".
 
 The recovery, kept here because the same shape of problem could recur:
 
-1. Verified production was genuinely at `0014` — `0014`'s dropped tables absent, `users` carrying
+1. Verified production was genuinely at `0014`: `0014`'s dropped tables absent, `users` carrying
    exactly the post-`0014` columns, and `pass_admissions.ticket_id` still `cascade` (so `0015` had
    not run).
 2. Took a Time Travel bookmark first.
@@ -428,7 +428,7 @@ have *proved* the schema matches the migration you are claiming was applied. Pro
 | Schema only | `bunx wrangler d1 export proscenium --remote --no-data --output=schema-$(date +%F).sql` |
 | One table | `bunx wrangler d1 export proscenium --remote --table=reservations --output=reservations-$(date +%F).sql` |
 
-The output is plain SQL. **It contains customer names, email addresses and booking history** — it is personal data. Store it somewhere access-controlled (the committee Google Drive, in the IT folder), never in the repository, never in a public Drive folder, and delete old copies in line with the theatre's retention policy.
+The output is plain SQL. **It contains customer names, email addresses and booking history**: it is personal data. Store it somewhere access-controlled (the committee Google Drive, in the IT folder), never in the repository, never in a public Drive folder, and delete old copies in line with the theatre's retention policy.
 
 ### Restoring
 
@@ -438,7 +438,7 @@ bunx wrangler d1 execute proscenium --remote --file=proscenium-2026-08-10.sql
 
 An export contains `CREATE TABLE` statements, so restoring over a database that still has those tables will fail. A real restore usually means: create a fresh D1 database, import into it, verify, then repoint `database_id` in `nuxt.config.ts` and redeploy. **Practise this once before you need it.**
 
-### Time Travel — the fast route
+### Time Travel: the fast route
 
 D1 keeps a continuous 30-day history and can be restored to any point in it. This is usually faster and better than a file restore for "we ran the wrong SQL five minutes ago":
 
@@ -447,11 +447,11 @@ bunx wrangler d1 time-travel info proscenium
 bunx wrangler d1 time-travel restore proscenium --timestamp=2026-08-10T18:30:00Z
 ```
 
-Restoring is destructive to anything written after that timestamp — bookings taken in the interval are lost. Note the current time before you restore, so you know exactly what window needs re-entering by hand from the box office paper record.
+Restoring is destructive to anything written after that timestamp: bookings taken in the interval are lost. Note the current time before you restore, so you know exactly what window needs re-entering by hand from the box office paper record.
 
 ### R2
 
-There is no backup of the R2 bucket at all. Its contents are show posters and venue images — recoverable by re-uploading, but a nuisance. `bunx wrangler r2 object get proscenium-blob/<key> --file=<local>` fetches individual objects; a bulk copy needs `rclone` with an R2-compatible S3 endpoint.
+There is no backup of the R2 bucket at all. Its contents are show posters and venue images: recoverable by re-uploading, but a nuisance. `bunx wrangler r2 object get proscenium-blob/<key> --file=<local>` fetches individual objects; a bulk copy needs `rclone` with an R2-compatible S3 endpoint.
 
 ---
 
@@ -460,7 +460,7 @@ There is no backup of the R2 bucket at all. Its contents are show posters and ve
 - Uploads go through `server/utils/images.ts` (`validateAndUploadImage`): JPEG, PNG and WebP only, maximum 5 MB, filename generated as `image-<timestamp>.<ext>`.
 - Path prefixes: `shows/<showId>/…` (posters, `server/api/shows/[id]/poster.post.ts`) and `venues/<venueId>/…` (`server/api/venues/[id]/image.post.ts`). The database stores the pathname, not the bytes.
 - Replacing an image deletes the previous object first. A failed delete is logged and swallowed, so it does not block the upload.
-- Serving is `server/routes/images/[...pathname].get.ts`, i.e. `https://newtheatre.org.uk/images/shows/<id>/image-123.jpg`. It sets `Content-Security-Policy: default-src 'none'` on every response — so that if someone manages to upload something that a browser would treat as HTML, it cannot load scripts, styles or subresources. **Do not remove that header.**
+- Serving is `server/routes/images/[...pathname].get.ts`, i.e. `https://newtheatre.org.uk/images/shows/<id>/image-123.jpg`. It sets `Content-Security-Policy: default-src 'none'` on every response, so that if someone manages to upload something that a browser would treat as HTML, it cannot load scripts, styles or subresources. **Do not remove that header.**
 - Locally the same code path writes to `.data/blob/` instead of R2, so image handling is testable without Cloudflare credentials.
 
 **Known wart:** deleting a show (`DELETE /api/shows/:id`) removes the database rows but does not delete the poster from R2. Orphaned objects accumulate. Harmless at our scale, but worth a tidy-up task eventually.
@@ -492,7 +492,7 @@ Also worth checking during an incident: <https://www.cloudflarestatus.com> (is i
 3. `bunx wrangler tail proscenium --format pretty` and reproduce the failure. Look for the exception. A boot-time throw (§8, email section) shows as the same error on every single request.
 4. Check <https://www.cloudflarestatus.com> for D1 or Workers incidents in Europe.
 5. If a deploy went out in the last few hours, **roll it back** (§4) before diagnosing further. Restoring service beats understanding it.
-6. If the cause is a migration applied today, consider Time Travel to just before it (§6) — accepting that bookings taken since are lost and must be re-entered from the paper record.
+6. If the cause is a migration applied today, consider Time Travel to just before it (§6): accepting that bookings taken since are lost and must be re-entered from the paper record.
 7. Afterwards: enter the paper bookings, and write up what happened while it is fresh.
 
 ### Incident: emails are not sending
@@ -500,16 +500,16 @@ Also worth checking during an incident: <https://www.cloudflarestatus.com> (is i
 Symptoms range from "confirmation emails never arrive" to "the whole site is 500-ing", because of how the Resend client is wired.
 
 1. **Is the whole site down?** If so, suspect `RESEND_API_KEY` first. `server/utils/resend.ts` throws at module load when it is unset, which kills the Worker rather than just email. Check `wrangler tail` for `RESEND_API_KEY is not set in environment variables`; fix by `bunx wrangler secret put RESEND_API_KEY --name proscenium` and redeploying.
-2. **Site up, emails silent?** Check the Resend dashboard: is the API key still valid, is the sending domain still verified, are messages bouncing or being rate-limited? A failed send raises a 500 from `sendEmail()` and logs `[Email] Failed to send email:` — search the logs for that string.
+2. **Site up, emails silent?** Check the Resend dashboard: is the API key still valid, is the sending domain still verified, are messages bouncing or being rate-limited? A failed send raises a 500 from `sendEmail()` and logs `[Email] Failed to send email:`, search the logs for that string.
 3. **Wrong sender?** With `NUXT_RESEND_FROM_EMAIL` unset the code falls back to `no-reply@tickets.newtheatre.org.uk`. If that address is not verified in Resend, every send fails.
-4. **Emails arrive but the links are broken?** That is the known `baseUrl` / `baseURL` bug documented in `docs/01-getting-started.md` §6 — links render as `undefined/…`. It is a one-line fix and should be prioritised, since it breaks email verification and password resets outright.
+4. **Emails arrive but the links are broken?** That is the known `baseUrl` / `baseURL` bug documented in `docs/01-getting-started.md` §6: links render as `undefined/…`. It is a one-line fix and should be prioritised, since it breaks email verification and password resets outright.
 5. Remember the three-way naming muddle: only the bare `RESEND_API_KEY` is actually read. Setting `NUXT_RESEND_API_KEY` alone changes nothing.
 
 While email is broken: staff can create bookings from `/admin/box-office` and read the booking reference to the customer directly, and admins can trigger a password reset for a user from `/admin/users`.
 
 ### Incident: a migration fails part-way through
 
-D1 has no transactional multi-statement migrations, so a migration can leave the database half-changed — particularly the table-rebuild pattern (`__new_tickets` created, old table dropped, rename not yet run).
+D1 has no transactional multi-statement migrations, so a migration can leave the database half-changed: particularly the table-rebuild pattern (`__new_tickets` created, old table dropped, rename not yet run).
 
 1. **Do not re-run it.** A second attempt against a half-applied schema usually makes things worse.
 2. Establish what actually landed:
@@ -531,12 +531,12 @@ D1 has no transactional multi-statement migrations, so a migration can leave the
 `NUXT_SESSION_PASSWORD` is the key that seals the login cookie. Rotate it when a committee member with production access leaves, if you suspect it has leaked, and at handover each year.
 
 **Not from here.** The key is shared by every app on the estate and lives in the
-account Secrets Store, so it is rotated once, centrally — follow stage-door
+account Secrets Store, so it is rotated once, centrally: follow stage-door
 `docs/operations.md` §"Rotating the session seal secret". Doing it per-app is
 what the Secrets Store move (ADR-0016) removed.
 
 ⚠️ **Never set `NUXT_SESSION_PASSWORD` as a worker secret on this app.** It does
-not merely duplicate the store value — it *overrides* it. `nuxt-auth-utils`
+not merely duplicate the store value: it *overrides* it. `nuxt-auth-utils`
 resolves the password as `defu({ password: process.env.NUXT_SESSION_PASSWORD },
 runtimeConfig.session)`, and `defu` gives its first argument priority, so the
 worker secret wins over the binding. The symptom is confusing and points
@@ -548,7 +548,7 @@ when it sees both, so check the logs (§7) before theorising.
 **"Logged in on auth, but this app never shows me as logged in"** has a second
 cause worth knowing, because it looks identical and produces no errors at all.
 `nuxt-auth-utils` memoises the session password on the *first* session read an
-isolate performs, and h3's `getSession` swallows unseal failures — so if
+isolate performs, and h3's `getSession` swallows unseal failures, so if
 anything reads the session before `0.secrets-store.ts` has hydrated the
 password, that isolate is anonymous for its whole life while
 `/api/_auth/session` cheerfully answers `200` with a bare `{ id }`. The `0.`
@@ -556,16 +556,16 @@ prefix on that plugin is what orders it ahead of `authorization-resolver.ts`;
 Nitro sorts `server/plugins/` by filename. Do not rename it, and read its
 header before adding a plugin that touches sessions.
 
-A logged-out `{ id }` with no `user` key is the signature — `curl` alone will
+A logged-out `{ id }` with no `user` key is the signature: `curl` alone will
 not distinguish it from health, so check the body, not just the status.
 
-**Rotating invalidates every existing session.** Every logged-in user — customers and staff alike — is signed out and must log in again. Nothing is lost, but do not do it fifteen minutes before curtain-up. Rotate at a quiet time, then confirm you can still log in yourself. Workers pick the new value up as isolates recycle rather than instantly, so allow a few minutes for the estate to settle.
+**Rotating invalidates every existing session.** Every logged-in user (customers and staff alike) is signed out and must log in again. Nothing is lost, but do not do it fifteen minutes before curtain-up. Rotate at a quiet time, then confirm you can still log in yourself. Workers pick the new value up as isolates recycle rather than instantly, so allow a few minutes for the estate to settle.
 
 ### Adding a staff account and granting roles
 
 **This is no longer done from Proscenium.** Since the estate cut over to stage-door, accounts,
 credentials and roles all live at `auth.newtheatre.org.uk`. There is no user-creation form, no
-password reset and no role editor in this app, and there is no `user_roles` table in this database —
+password reset and no role editor in this app, and there is no `user_roles` table in this database:
 `users` here is a mirror of `id`, `email` and `name` only.
 
 Roles in this app's namespace, and what they gate:
@@ -574,28 +574,28 @@ Roles in this app's namespace, and what they gate:
 | --- | --- |
 | `proscenium:ADMIN` | Everything, including deleting shows, venues and ticket types |
 | `proscenium:MANAGER` | The admin area, programming, passes and refunds |
-| `proscenium:BOX_OFFICE` | `/admin/box-office` only — selling and managing reservations on the door |
+| `proscenium:BOX_OFFICE` | `/admin/box-office` only: selling and managing reservations on the door |
 
 **Normal route:** sign in to `auth.newtheatre.org.uk/admin` as an `auth:ADMIN`, find the person, and
-grant `proscenium:<ROLE>` from the roles dropdown. Role definitions (description, default expiry —
+grant `proscenium:<ROLE>` from the roles dropdown. Role definitions (description, default expiry:
 most app roles want *end of committee year*) are managed there too.
 
-The new role takes effect when that person's session next refreshes — **up to 15 minutes**, or
+The new role takes effect when that person's session next refreshes: **up to 15 minutes**, or
 immediately if they sign out and back in. Removing a role is subject to the same window. There is
 nothing to do in this app either way.
 
 **There is no emergency route from this database.** A previous version of this runbook gave an
 `INSERT INTO user_roles …` command for when the admin area is unreachable; that table no longer
 exists and the command fails with *"no such table"*. If the auth service itself is down, granting
-access is not possible and the incident is stage-door's — see its
+access is not possible and the incident is stage-door's: see its
 [operations doc](https://github.com/newtheatre/stage-door/blob/main/docs/operations.md). Front-of-house
 can still take money on the door and record it afterwards.
 
 **Removing access when someone leaves committee:** remove their roles in the auth service. Do not
-delete the mirror row here — `reservations.user_id` is `ON DELETE restrict`, so anyone with a
+delete the mirror row here: `reservations.user_id` is `ON DELETE restrict`, so anyone with a
 booking cannot be deleted anyway, and their booking history has to survive for the treasurer.
 
-**Erasing someone (a GDPR request):** also the auth service — `POST /api/users/:id/erase`, or
+**Erasing someone (a GDPR request):** also the auth service: `POST /api/users/:id/erase`, or
 self-service from their `/account` page. That rewrites the central identity, bumps `session_epoch`
 and calls this app's anonymise hook, retrying until it succeeds. Do not try to scrub this database
 by hand: an erasure that does not go through the auth service leaves the central identity intact,
@@ -643,7 +643,7 @@ Do this in the summer, alongside the wider IT handover.
 
 ## 10. Gaps
 
-Things that do not exist. None of these are hypothetical improvements — each one is a way an incident gets worse or longer.
+Things that do not exist. None of these are hypothetical improvements: each one is a way an incident gets worse or longer.
 
 | Gap | Consequence | Recommendation |
 | --- | --- | --- |
@@ -652,7 +652,7 @@ Things that do not exist. None of these are hypothetical improvements — each o
 | **No staging environment** | Every change is tested for the first time in production, against real bookings and real customers | Create a second D1 database and a `proscenium-staging` Worker on a `staging.` subdomain, deployed from `main` before production. This is the single highest-value item on this list |
 | **No uptime monitoring** | If the site goes down at 02:00 nobody knows until someone tries to buy a ticket. Discovery is currently "a customer emails us" | Point a free monitor (UptimeRobot, Better Stack, or a Cloudflare Health Check) at `https://newtheatre.org.uk/whats-on` at five-minute intervals, alerting the IT Manager and the duty box office phone |
 | **No error tracking** | Exceptions exist only in Worker logs, which nobody reads proactively and which no-one is alerted about. Intermittent booking failures could run for weeks unnoticed | Add Sentry (its Nuxt SDK supports the Cloudflare Workers runtime) or, at minimum, a Cloudflare Logpush destination and an alert on error rate |
-| **No tests** | No safety net for changes to the booking, pricing or capacity logic | Start with Vitest over the pure helpers in `server/utils/tickets.ts` and `shared/utils/abilities/` — highest value per hour, and it gives CI something meaningful to run |
+| **No tests** | No safety net for changes to the booking, pricing or capacity logic | Start with Vitest over the pure helpers in `server/utils/tickets.ts` and `shared/utils/abilities/`: highest value per hour, and it gives CI something meaningful to run |
 | **No `.env.example`** | Every new developer rediscovers the environment variables from scratch, usually via a stack trace | Commit a `.env.example` mirroring the table in `docs/01-getting-started.md` §4 |
 | **No documented on-call** | "Ring the IT Manager" is the whole escalation policy | Agree with committee who covers performance nights and record the number in the box office folder, alongside a printed copy of §8 |
 

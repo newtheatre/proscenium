@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { count, desc, eq } from 'drizzle-orm'
 import { manageBar } from '~~/shared/utils/abilities'
 
-/** GET /api/admin/bar/deliveries — what came in, most recent first. */
+/** GET /api/admin/bar/deliveries: what came in, most recent first. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

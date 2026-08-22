@@ -88,7 +88,7 @@ const pendingPerformances = ref<PendingPerformance[]>([])
 
 const defaultVenueId = computed(() => venues.value?.[0]?.id ?? '')
 
-// These are reactive refs — populated in step 1 and inherited by each performance
+// These are reactive refs: populated in step 1 and inherited by each performance
 const showDefaults = reactive({
   venueId: '', // populated when venues load
   durationMinutes: null as number | null,
@@ -173,8 +173,8 @@ function handlePosterSelect(event: Event) {
 const initialStatus = ref<'DRAFT' | 'PUBLISHED'>('DRAFT')
 
 const statusItems = [
-  { label: 'Draft — not visible to the public', value: 'DRAFT' },
-  { label: 'Published — visible to the public', value: 'PUBLISHED' },
+  { label: 'Draft, not visible to the public', value: 'DRAFT' },
+  { label: 'Published, visible to the public', value: 'PUBLISHED' },
 ]
 
 async function onSubmit() {
@@ -421,7 +421,7 @@ function resetAll() {
           <div class="border-t border-default pt-4 space-y-3">
             <p class="text-sm font-medium text-muted">
               Scheduling defaults
-              <span class="font-normal">— inherited by each performance, and can be overridden per performance</span>
+              <span class="font-normal">: inherited by each performance, and can be overridden per performance</span>
             </p>
 
             <div class="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -680,7 +680,7 @@ function resetAll() {
                   />
                   <span>
                     {{ venues?.find(v => v.id === p.venueId)?.name ?? 'Unknown venue' }}
-                    — {{ p.date }} at {{ p.time }}
+                    &middot; {{ p.date }} at {{ p.time }}
                   </span>
                 </li>
               </ul>
@@ -689,7 +689,7 @@ function resetAll() {
               v-else
               class="text-sm text-muted"
             >
-              No performances — you can schedule them after creation.
+              No performances: you can schedule them after creation.
             </p>
 
             <UFormField

@@ -1,6 +1,6 @@
 # Proscenium
 
-Proscenium is the Nottingham New Theatre's public website **and** its box office — one Nuxt 4
+Proscenium is the Nottingham New Theatre's public website **and** its box office: one Nuxt 4
 application, deployed to Cloudflare Workers, serving [`newtheatre.org.uk`](https://newtheatre.org.uk).
 It handles what's-on listings, online booking, walk-ins and collection on the door, and the admin
 tools behind them.
@@ -10,7 +10,7 @@ tools behind them.
 | Layer | Choice |
 | --- | --- |
 | Framework | Nuxt 4, Vue 3, Nuxt UI 4 |
-| Server runtime | Nitro on the `cloudflare_module` preset — runs as a Cloudflare Worker, not Node |
+| Server runtime | Nitro on the `cloudflare_module` preset: runs as a Cloudflare Worker, not Node |
 | Database | SQLite: a local file in development, Cloudflare D1 in production |
 | ORM / migrations | Drizzle ORM + Drizzle Kit, via NuxtHub's `hub:db` layer |
 | File storage | Cloudflare R2 (posters, venue images) via NuxtHub's blob layer |
@@ -20,7 +20,7 @@ tools behind them.
 
 ## Quick start
 
-This project uses **Bun** — `bun.lock` is the only lockfile, so install with Bun to get the same
+This project uses **Bun**: `bun.lock` is the only lockfile, so install with Bun to get the same
 dependency tree as everyone else. Do not use `npm`, `pnpm` or `yarn`; they will generate a second
 lockfile and a different tree.
 
@@ -38,19 +38,19 @@ RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 `nuxt-auth-utils` generates `NUXT_SESSION_PASSWORD` and appends it to `.env` on first run. The full
-list of variables — and the Resend key naming pitfall — is in
+list of variables (and the Resend key naming pitfall) is in
 [docs/01-getting-started.md](docs/01-getting-started.md) §4–5.
 
 ```bash
 bun run dev
 ```
 
-Then open <http://localhost:3000>. The local database starts **empty** — seed it via
+Then open <http://localhost:3000>. The local database starts **empty**: seed it via
 Nuxt DevTools → Tasks → `db:seed` (see [docs/01-getting-started.md](docs/01-getting-started.md) §9).
 
 ## Documentation
 
-The [`docs/`](docs/) directory is the application's institutional memory — read
+The [`docs/`](docs/) directory is the application's institutional memory: read
 [docs/README.md](docs/README.md) first. Highlights:
 
 | Doc | For |
@@ -70,10 +70,10 @@ The [`docs/`](docs/) directory is the application's institutional memory — rea
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, the commit and branch conventions, the
 database-change workflow, and when to write an ADR. Skim
-[docs/09-known-issues.md](docs/09-known-issues.md) before starting — it may already describe what
+[docs/09-known-issues.md](docs/09-known-issues.md) before starting: it may already describe what
 you are about to hit.
 
 ## Project status
 
 An internal project of the Nottingham New Theatre, maintained by the IT Manager. The theatre's
-committee turns over yearly, so the docs above exist to make handover possible — keep them current.
+committee turns over yearly, so the docs above exist to make handover possible: keep them current.

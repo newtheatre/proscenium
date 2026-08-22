@@ -12,7 +12,7 @@ As a secret it is weak. Six characters from a 32-symbol alphabet is about 1.07 �
 name, an email address and free-text notes.
 
 As a reference it is deliberately public. It is printed on confirmation emails, read aloud at the box
-office and quoted in messages — so treating it as a credential meant every one of those places was
+office and quoted in messages, so treating it as a credential meant every one of those places was
 handing out access to the booking it identified.
 
 Putting a credential in the query string is its own problem: it reaches browser history, any
@@ -25,7 +25,7 @@ signed, scoped, expiring token.
 
 Format: `<base64url payload>.<base64url HMAC-SHA256>`, implemented in `server/utils/bookingToken.ts`.
 
-- HMAC rather than encryption: nothing in the payload is secret — the booking id is already in the
+- HMAC rather than encryption: nothing in the payload is secret, the booking id is already in the
   path. What is needed is authenticity, not confidentiality.
 - Compact enough for a URL, verifiable without a database round trip, and revocable in bulk by
   rotating the secret.
@@ -38,8 +38,8 @@ cookie on first use so the page can drop it from the address bar. The token was 
 expiring; the cookie is simply a better place to keep it.
 
 `NUXT_BOOKING_TOKEN_SECRET` signs these. It falls back to `NUXT_SESSION_PASSWORD` when unset, which
-works but is undesirable in production: rotating the estate seal — the emergency estate-wide logout
-lever — would then also invalidate every booking link already sitting in customers' inboxes, and any
+works but is undesirable in production: rotating the estate seal, the emergency estate-wide logout
+lever: would then also invalidate every booking link already sitting in customers' inboxes, and any
 other estate app holding the seal could mint booking tokens.
 
 ## Consequences

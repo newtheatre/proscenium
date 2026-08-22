@@ -3,15 +3,15 @@
 Originally the August 2026 audit of commit `9d17251`. **Last reviewed: 2026-08-12**, after a
 full-repo review whose fixes landed on `fix/review-sweep-aug-2026`.
 
-Read this before planning work, and edit it when you fix something — a handover document that
+Read this before planning work, and edit it when you fix something: a handover document that
 says "nothing has been fixed" long after things were fixed costs the next person more time than
 having no list at all.
 
 Severity is about consequences for the theatre, not code aesthetics:
 
-- **P1** — customer-visible breakage, data loss risk, or exposure of personal data.
-- **P2** — wrong numbers, or a foot-gun that will cause P1 later.
-- **P3** — hygiene, drift, missing scaffolding.
+- **P1**: customer-visible breakage, data loss risk, or exposure of personal data.
+- **P2**: wrong numbers, or a foot-gun that will cause P1 later.
+- **P3**: hygiene, drift, missing scaffolding.
 
 ## Open
 
@@ -94,11 +94,11 @@ Also fixed, and worth knowing about because several were silent:
 - **Stale staff sessions bypassed authorization entirely.** `nuxt-authorization`'s server
   `authorize()` swallows any non-`AuthorizationError` its resolver throws and then *resolves
   successfully*. Our resolver threw a 401 for stale role-holding sessions, so every ability check
-  passed for them — and since sessions last 30 days and go stale after 15 minutes, that was the
+  passed for them, and since sessions last 30 days and go stale after 15 minutes, that was the
   ordinary state of a staff session. Staleness is now expressed by dropping roles, not by throwing
   (`sessionUserForAuthorization`). **If you touch that resolver, it must never throw.**
 - **GDPR erasure was silently reverted.** The mirror upsert runs on every authenticated request and
-  rewrote name and email from the session, with no `anonymisedAt` guard — so an erased customer's
+  rewrote name and email from the session, with no `anonymisedAt` guard, so an erased customer's
   own browser restored their details while the row stayed hidden from listings. See
   [04-auth-and-permissions](04-auth-and-permissions.md#erasure).
 - **Internal notes were readable by customers and by the public.** `GET /api/reservations/:id`
@@ -131,7 +131,7 @@ Worth reading even though it is fixed, because the shape of it will recur.
 `GET /api/shows` was narrowed to a column projection to stop shipping a paragraph per show across
 498 of them. The projection dropped `longDescription`, `programmeUrl`, `externalUrl`,
 `contentWarningNotes` and `warningsConfirmedNone`. Nothing on the admin table rendered those fields,
-so the change looked safe — but `/admin/shows` passed the **list row itself** into `ShowEditModal`,
+so the change looked safe, but `/admin/shows` passed the **list row itself** into `ShowEditModal`,
 whose watcher read `show.longDescription ?? ''` on five now-absent keys and whose submit sent them
 unconditionally as `null`. `PUT /api/shows/:id` guards on `!== undefined`, so `null` is a legitimate
 clear and went straight through. Editing a show's *title* silently emptied its public write-up.
@@ -139,7 +139,7 @@ clear and went straight through. Editing a show's *title* silently emptied its p
 Three things made it survive review: the fields were absent rather than wrong, so nothing threw;
 `?? ''` turned the absence into a plausible value; and the damage only showed on the public site.
 
-The fix is on the client, not in the PUT — `null` really does mean "clear this" and that contract is
+The fix is on the client, not in the PUT: `null` really does mean "clear this" and that contract is
 correct. `ShowEditModal` has since been replaced by the editable sections on `/admin/shows/:id`
 (`Admin/Shows/DetailsSection.vue`, `ContentWarningsSection.vue`, `TicketTypesSection.vue`), which
 structurally cannot reproduce this: each section is mounted on the detail page, which loads the full
@@ -158,7 +158,7 @@ and the two paths contradicted each other:
 **Nothing is paid until the tickets are collected.**
 
 - **Before collection** (`PENDING`) a booking is an intention. The customer or the box office adds
-  and removes tickets freely — removing one is not a refund, because nothing was taken.
+  and removes tickets freely: removing one is not a refund, because nothing was taken.
 - **After collection** (`COLLECTED`, `DOOR`) money has changed hands and the composition is a record
   of a transaction. It cannot be edited; the only way to reverse any part of it is a refund, which
   is ADMIN/MANAGER only and leaves `refundedAt` behind as the audit trail.
@@ -171,7 +171,7 @@ refund route.
 ### Roles are stale until re-login
 
 Roles are snapshotted into the session cookie by the auth service. Granting or removing a role has
-no effect until that session refreshes — up to 15 minutes for a staff session, and a customer's
+no effect until that session refreshes: up to 15 minutes for a staff session, and a customer's
 session is never staleness-checked at all (they hold no roles, so there is nothing to re-read).
 
 The estate answer is `session_epoch`, which stage-door already bumps on erasure and force-logout.
@@ -191,8 +191,8 @@ up front, and database constraints where they cannot.
 
 ### Capacity is still read-then-write
 
-Both write paths now call `assertCapacity`, and reinstating a cancelled reservation is checked too
-— so the *bypasses* are gone. What remains is the race: the check and the insert are separate
+Both write paths now call `assertCapacity`, and reinstating a cancelled reservation is checked too,
+so the *bypasses* are gone. What remains is the race: the check and the insert are separate
 statements, and on the public booking path there is a call to the auth service in between, so two
 concurrent bookings can both pass a check that only one should.
 
@@ -203,7 +203,7 @@ Closing it needs either a conditional insert in a batch or a per-performance loc
 
 `updateReservation` is staff-only. `cancelledBy: 'CUSTOMER'` exists in the schema and the UI but can
 only be set by staff. The legacy system had self-service cancellation via an emailed link, so this
-is a regression — and it means every cancellation is a phone call or an email to the box office.
+is a regression, and it means every cancellation is a phone call or an email to the box office.
 
 (`POST /api/bookings/:id/cancel` does let the *owner or token holder* cancel; what is missing is the
 staff-facing reservation route treating a customer-initiated cancellation as such.)
@@ -216,7 +216,7 @@ There is no central types module. Divergent `Reservation`/`Booking` interfaces a
 `bookings/index.post.ts`. Server responses are cast with `as` rather than inferred.
 
 This is the largest ongoing maintainability tax in the codebase: a schema change does not produce a
-type error anywhere it should. It bit during the August review — adding `refundedAt` to the customer
+type error anywhere it should. It bit during the August review: adding `refundedAt` to the customer
 booking shape required editing four unrelated component interfaces by hand, and missing one would
 have been a silent money bug rather than a compile error.
 
@@ -229,7 +229,7 @@ shows page and four of its modals each declared separately). The reservation fam
 is the bigger half.
 
 One correction to the fix as written: **do not derive the wire types with `InferSelectModel`.** The
-Drizzle model describes the *table*, and the API is not the table — `performances.startsAt` is a
+Drizzle model describes the *table*, and the API is not the table: `performances.startsAt` is a
 `Date` in the model and an ISO string in the response, and the rows carry computed fields
 (`ticketsSold`, `performanceCount`, the run window) that no column corresponds to. Deriving from the
 schema would describe something the client never receives. `shared/types/shows.ts` is hand-written
@@ -239,8 +239,8 @@ for that reason, and says so.
 
 CI now runs build, typecheck and lint, but there is no test framework and no `tests/`.
 
-**Minimum worth having:** integration tests for the handlers that touch money — `POST /api/bookings`,
-`PUT /api/reservations/:id/tickets`, `POST /api/reservations/:id/refund` — and unit tests for
+**Minimum worth having:** integration tests for the handlers that touch money: `POST /api/bookings`,
+`PUT /api/reservations/:id/tickets`, `POST /api/reservations/:id/refund`, and unit tests for
 `canRedeem`, `countOccupiedSeats` and `validityWindow`, all of which encode rules that were wrong in
 ways no type checker would have caught.
 
@@ -263,7 +263,7 @@ migration or a query broke.
 
 ## Suggested order
 
-1. **#20a** — tests for the money handlers, before the structural work below.
-2. **#16** — shared types. Everything else is safer afterwards.
-3. **#9, #10a** — transactionality and the capacity race, together.
-4. **#13, #14** — the two workflow gaps, whenever the box office next complains.
+1. **#20a**: tests for the money handlers, before the structural work below.
+2. **#16**: shared types. Everything else is safer afterwards.
+3. **#9, #10a**: transactionality and the capacity race, together.
+4. **#13, #14**: the two workflow gaps, whenever the box office next complains.

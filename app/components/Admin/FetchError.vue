@@ -5,7 +5,7 @@ as "there are no venues".
 <script setup lang="ts">
 defineProps<{
   error: unknown
-  /** Omit to hide the retry button — e.g. where a refresh handler isn't to hand. */
+  /** Omit to hide the retry button: e.g. where a refresh handler isn't to hand. */
   onRetry?: () => void
   title?: string
 }>()

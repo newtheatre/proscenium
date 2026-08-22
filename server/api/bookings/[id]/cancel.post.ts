@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { sendBookingCancellationEmail } from '~~/server/utils/email'
 
 /**
- * POST /api/bookings/:id/cancel Lets a customer cancel their own booking —
+ * POST /api/bookings/:id/cancel Lets a customer cancel their own booking:
  * the logged-in owner, or a guest presenting a valid access token.
  */
 export default defineEventHandler(async (event) => {

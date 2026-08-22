@@ -154,7 +154,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           capacityOverride: event.data.capacityOverride,
           bookingClosesHoursBefore: event.data.bookingClosesHoursBefore,
           externalBookingUrl: event.data.externalBookingUrl || null,
-          // Status is intentionally omitted here — managed via show publish/cancel actions
+          // Status is intentionally omitted here: managed via show publish/cancel actions
           notes: event.data.notes || null,
         },
       },

@@ -14,7 +14,7 @@ const bodySchema = z.object({
   archived: z.boolean().optional(),
 })
 
-/** PUT /api/admin/foh/contacts/:id — edit or archive a contact. */
+/** PUT /api/admin/foh/contacts/:id. Edit or archive a contact. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageFohReference)
 

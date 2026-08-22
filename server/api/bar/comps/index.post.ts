@@ -12,7 +12,7 @@ const bodySchema = z.object({
   note: z.string().trim().max(200).nullable().optional(),
 })
 
-/** POST /api/bar/comps — ask for a comp. Nothing is recorded until approved. */
+/** POST /api/bar/comps: ask for a comp. Nothing is recorded until approved. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

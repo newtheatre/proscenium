@@ -14,7 +14,7 @@ const bodySchema = z.object({
 })
 
 /**
- * PUT /api/shifts/templates — set the slots stamped onto a new performance.
+ * PUT /api/shifts/templates: set the slots stamped onto a new performance.
  * Replaces the set for that venue, so a count of 0 removes the role.
  */
 export default defineEventHandler(async (event) => {

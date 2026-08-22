@@ -18,7 +18,7 @@ const bodySchema = z.object({
   expectedTotalPence: z.coerce.number().int().min(0),
 })
 
-/** POST /api/bar/transactions — one tap, one transaction, one figure. */
+/** POST /api/bar/transactions: one tap, one transaction, one figure. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

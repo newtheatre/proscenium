@@ -3,7 +3,7 @@
  * becomes its last instant. The Worker runs in UTC, hence the conversion.
  */
 
-/** `YYYY-MM-DD` — the shape `<input type="date">` submits. */
+/** `YYYY-MM-DD`: the shape `<input type="date">` submits. */
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
 
 /**

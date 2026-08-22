@@ -11,7 +11,7 @@ const bodySchema = z.object({
   reason: z.string().trim().min(1).max(200),
 })
 
-/** POST /api/admin/bar/stock/adjust — wastage, transfers and corrections. */
+/** POST /api/admin/bar/stock/adjust: wastage, transfers and corrections. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
   const input = await readValidatedBody(event, bodySchema.parse)

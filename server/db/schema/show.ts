@@ -7,7 +7,7 @@ import { showContentWarnings } from './contentWarnings'
 import { seasons } from './passes'
 import { LATECOMER_POLICIES } from '../../../shared/utils/latecomers'
 
-// A show is a production — the top-level entity for a run of performances.
+// A show is a production: the top-level entity for a run of performances.
 export const shows = sqliteTable('shows', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   slug: text('slug').notNull().unique(), // URL-friendly identifier, e.g. "machinal-2026"
@@ -23,10 +23,10 @@ export const shows = sqliteTable('shows', {
   // External booking or info link for shows we host but do not sell for.
   externalUrl: text('external_url'),
 
-  // The strand this show belongs to — In House, Fringe, StuFF, External, …
+  // The strand this show belongs to. In House, Fringe, StuFF, External, …
   categoryId: text('category_id').references(() => showCategories.id, { onDelete: 'restrict' }),
 
-  // The programming period this show sits in. Nullable — externals and one-offs
+  // The programming period this show sits in. Nullable: externals and one-offs
   // do not belong to one.
   seasonId: text('season_id').references(() => seasons.id, { onDelete: 'set null' }),
 
@@ -36,10 +36,10 @@ export const shows = sqliteTable('shows', {
   // A short preset list, not free text: a volunteer reads it out at the door.
   latecomerPolicy: text('latecomer_policy', { enum: LATECOMER_POLICIES }),
 
-  // Free-text notes accompanying the content warnings — timings, intensity, how
+  // Free-text notes accompanying the content warnings: timings, intensity, how
   // to avoid a particular moment. Anything the vocabulary cannot express.
   contentWarningNotes: text('content_warning_notes'),
-  // TRUE means "checked, there are none" — meaningfully different from the
+  // TRUE means "checked, there are none": meaningfully different from the
   // absence of any showContentWarnings rows, which means "nobody filled it in".
   warningsConfirmedNone: integer('warnings_confirmed_none', { mode: 'boolean' }).notNull().default(false),
 
@@ -78,7 +78,7 @@ export const performances = sqliteTable('performances', {
 
   // Date/time stored as unix timestamps for reliable sorting and comparison
   startsAt: integer('starts_at', { mode: 'timestamp' }).notNull(),
-  doorsAt: integer('doors_at', { mode: 'timestamp' }), // Optional — when doors open to the public
+  doorsAt: integer('doors_at', { mode: 'timestamp' }), // Optional, when doors open to the public
 
   durationMinutes: integer('duration_minutes'), // Approximate run time in minutes (excluding interval)
   intervalCount: integer('interval_count').notNull().default(0), // Number of intervals (0, 1, 2, ...)

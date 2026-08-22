@@ -25,7 +25,7 @@ export const ageChecks = sqliteTable('age_checks', {
 
   /** What they asked for, not who they were. */
   productDescription: text('product_description'),
-  /** "Tall man, grey coat" — for the register, never a name (ADR-0027). */
+  /** "Tall man, grey coat": for the register, never a name (ADR-0027). */
   description: text('description'),
   notes: text('notes'),
 

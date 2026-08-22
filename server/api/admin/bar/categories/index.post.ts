@@ -8,7 +8,7 @@ const bodySchema = z.object({
   colour: z.string().trim().max(20).nullable().optional(),
 })
 
-/** POST /api/admin/bar/categories — add a category of things to sell. */
+/** POST /api/admin/bar/categories: add a category of things to sell. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
   const input = await readValidatedBody(event, bodySchema.parse)

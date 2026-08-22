@@ -10,7 +10,7 @@ accepted ID checks.
 
 A paper register has one property that makes it evidence: you cannot go back and tidy it. Crossings
 out are visible, and the book is in page order. A licensing officer asking to see the register is
-relying on that. A database table is, by default, the opposite — a row that can be corrected in
+relying on that. A database table is, by default, the opposite: a row that can be corrected in
 place, by anyone with the endpoint, with no trace.
 
 The pressure to edit is real and well-meant. Someone will log a refusal against the wrong product,
@@ -46,7 +46,7 @@ rather than merely displayed on a poster.
 - The export is the artefact that matters, because it is what goes across the counter at an
   inspection. It is laid out like the paper register: one page per date range, in order, readable on
   paper rather than only on a screen.
-- Retention is unresolved and deliberately so — it waits on the data-protection policy, and until
+- Retention is unresolved and deliberately so: it waits on the data-protection policy, and until
   then rows are kept ([13-bar-design §8](../13-bar-design.md)). Whatever that policy says, deletion
   under it will be a schedule applied to the whole table, not a per-row correction, which is
   consistent with this record.

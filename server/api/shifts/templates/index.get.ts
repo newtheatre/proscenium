@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { asc, eq, isNull } from 'drizzle-orm'
 import { manageShifts } from '~~/shared/utils/abilities'
 
-/** GET /api/shifts/templates — the default rota, and any per-venue override. */
+/** GET /api/shifts/templates: the default rota, and any per-venue override. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageShifts)
 

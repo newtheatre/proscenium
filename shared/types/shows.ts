@@ -35,7 +35,7 @@ export interface PerformanceListItem {
   ticketTypeOverrideCount: number
   ticketsSold: number
   /**
-   * Sub-row anchor, never present on a real performance — it exists so
+   * Sub-row anchor, never present on a real performance: it exists so
    * `getSubRows` can be typed over the union without a cast.
    */
   performances?: never
@@ -82,7 +82,7 @@ export interface ShowContentWarningLink {
 }
 
 /**
- * As the public show page receives it — narrower on purpose, since the link
+ * As the public show page receives it: narrower on purpose, since the link
  * row's ids mean nothing outside the admin section.
  */
 export interface PublicShowContentWarning {

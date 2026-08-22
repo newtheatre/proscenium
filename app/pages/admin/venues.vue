@@ -60,7 +60,7 @@ const { data, status, error, refresh } = await useAsyncData(
   'admin-venues', () => requestFetch<Venue[]>('/api/venues'))
 
 /**
- * **Always an array, never null** — `data ?? []` mints a new identity per
+ * **Always an array, never null**: `data ?? []` mints a new identity per
  * render and sends UTable into a loop (ADR-0012).
  */
 const rows = computed<Venue[]>(() => data.value ?? [])

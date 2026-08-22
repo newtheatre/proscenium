@@ -140,7 +140,7 @@ export function resolveEffectiveActive(
 }
 
 /**
- * Price and active state together — the single source of the resolution rule.
+ * Price and active state together: the single source of the resolution rule.
  * Endpoints use this rather than re-implementing either half.
  */
 export function resolveEffectiveTicketType(
@@ -185,7 +185,7 @@ export function chunked<T>(items: T[], size: number): T[][] {
 }
 
 /**
- * The single definition of "this ticket occupies a seat" (ADR-0007) — do not
+ * The single definition of "this ticket occupies a seat" (ADR-0007): do not
  * add a parallel path. Pass a subquery, never an id list (ADR-0006).
  */
 export async function countOccupiedSeats(performanceScope: SQL): Promise<Map<string, number>> {
@@ -253,7 +253,7 @@ export async function countCollectedSeatsFor(performanceId: string): Promise<num
 }
 
 /**
- * One reservation's seats, ignoring its status — for reinstatement, where the
+ * One reservation's seats, ignoring its status: for reinstatement, where the
  * tickets are about to start counting against the house again.
  */
 export async function countReservationSeats(reservationId: string): Promise<number> {

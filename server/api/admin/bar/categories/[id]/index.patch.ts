@@ -9,7 +9,7 @@ const bodySchema = z.object({
   colour: z.string().trim().max(30).nullable().optional(),
 })
 
-/** PATCH /api/admin/bar/categories/:id — rename or reorder. */
+/** PATCH /api/admin/bar/categories/:id. Rename or reorder. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

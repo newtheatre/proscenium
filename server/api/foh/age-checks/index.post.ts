@@ -15,7 +15,7 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/foh/age-checks — record an ID check. There is no update or delete
+ * POST /api/foh/age-checks: record an ID check. There is no update or delete
  * route, and the database refuses both (ADR-0027).
  */
 export default defineEventHandler(async (event) => {

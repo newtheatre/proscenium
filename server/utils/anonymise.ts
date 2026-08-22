@@ -24,7 +24,7 @@ export interface AnonymiseResult {
 
 /**
  * One batch: a half-applied anonymisation would clear the name and leave the
- * notes. Both note fields go — a staff note names people too.
+ * notes. Both note fields go: a staff note names people too.
  */
 export async function anonymiseUser(userId: string): Promise<AnonymiseResult> {
   const user = await db

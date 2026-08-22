@@ -179,7 +179,7 @@ async function remove() {
           {{ data.companions }} essential companion {{ data.companions === 1 ? 'ticket' : 'tickets' }}
         </li>
         <li v-if="!SYMBOLS.some(sym => data![sym.key]) && !data.companions">
-          Nothing ticked — only the note below.
+          Nothing ticked: only the note below.
         </li>
       </ul>
       <p
@@ -216,7 +216,7 @@ async function remove() {
         </p>
         <p class="text-sm text-muted">
           Tick what applies. These are about what is hard, not about what you would like us to
-          provide — so tick the thing you struggle with.
+          provide, so tick the thing you struggle with.
         </p>
       </template>
 
@@ -231,7 +231,7 @@ async function remove() {
 
         <UFormField
           label="Anything else we should know"
-          help="In your own words. Tell us what you need from us rather than why — this goes to the front-of-house manager for the conversation, and is not shown to the team on the night."
+          help="In your own words. Tell us what you need from us rather than why: this goes to the front-of-house manager for the conversation, and is not shown to the team on the night."
         >
           <UTextarea
             v-model="form.requesterNote"

@@ -3,7 +3,7 @@ import { workFoh } from '~~/shared/utils/abilities'
 
 const querySchema = z.object({ since: z.coerce.number().int().min(0).optional() })
 
-/** GET /api/foh/backstage/board — the front-of-house side of the board. */
+/** GET /api/foh/backstage/board: the front-of-house side of the board. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

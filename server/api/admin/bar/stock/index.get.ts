@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { asc, desc, eq } from 'drizzle-orm'
 import { manageBar } from '~~/shared/utils/abilities'
 
-/** GET /api/admin/bar/stock — on-hand, par flags and value, all derived. */
+/** GET /api/admin/bar/stock: on-hand, par flags and value, all derived. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

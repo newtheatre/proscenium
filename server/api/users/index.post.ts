@@ -8,7 +8,7 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/users — create a user to attach a reservation to (staff).
+ * POST /api/users: create a user to attach a reservation to (staff).
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, createUser)
@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
   }
   catch (error) {
     console.error('[users] shadow-account call failed:', error)
-    throw createError({ statusCode: 502, statusMessage: 'Could not reach the auth service — try again' })
+    throw createError({ statusCode: 502, statusMessage: 'Could not reach the auth service, try again' })
   }
 
   const [user] = await db.insert(schema.users)

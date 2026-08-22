@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 /**
- * Password strength rules. Unused since identity moved to the auth service —
+ * Password strength rules. Unused since identity moved to the auth service:
  * this app has no credentials.
  */
 export const passwordSchema = z.string()

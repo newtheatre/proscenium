@@ -7,7 +7,7 @@ const querySchema = z.object({
   format: z.enum(['json', 'csv']).optional().default('json'),
 })
 
-/** GET /api/admin/bar/reports/comps — by reason, with requester and approver. */
+/** GET /api/admin/bar/reports/comps: by reason, with requester and approver. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

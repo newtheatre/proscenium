@@ -10,7 +10,7 @@ const bodySchema = z.object({
   notes: z.string().trim().max(500).nullable().optional(),
 })
 
-/** PUT /api/shifts/:id — assign, reassign, confirm or empty a slot. */
+/** PUT /api/shifts/:id. Assign, reassign, confirm or empty a slot. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageShifts)
 

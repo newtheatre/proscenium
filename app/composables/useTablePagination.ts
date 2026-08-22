@@ -2,7 +2,7 @@ import { computed, ref } from '#imports'
 import type { PaginationState } from '@tanstack/table-core'
 
 /**
- * Pagination state for a UTable. **Every write replaces the state object** —
+ * Pagination state for a UTable. **Every write replaces the state object**:
  * mutating it does not notify TanStack (ADR-0012).
  */
 export function useTablePagination(pageSize: number) {
@@ -16,7 +16,7 @@ export function useTablePagination(pageSize: number) {
     },
   })
 
-  /** Back to the first page — for when a filter changes what "page 3" means. */
+  /** Back to the first page: for when a filter changes what "page 3" means. */
   function resetPage() {
     if (pagination.value.pageIndex === 0) return
     pagination.value = { ...pagination.value, pageIndex: 0 }

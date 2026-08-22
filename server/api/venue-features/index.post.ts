@@ -9,7 +9,7 @@ const bodySchema = z.object({
   icon: z.string().optional(),
 })
 
-/** POST /api/venue-features — create a venue feature. Admin/Manager only. */
+/** POST /api/venue-features: create a venue feature. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   // Check if user has permission to create venue features
   await authorize(event, createVenueFeature)

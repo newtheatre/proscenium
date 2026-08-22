@@ -95,7 +95,7 @@ export async function sweepRateLimits(event: H3Event, probability = 0.02): Promi
   const dayAgo = Math.floor(Date.now() / 1000) - 24 * 60 * 60
   const sweep = db.delete(schema.rateLimits).where(lt(schema.rateLimits.windowStart, dayAgo))
 
-  // Off the response path — the caller should not wait on housekeeping.
+  // Off the response path: the caller should not wait on housekeeping.
   const promise = Promise.resolve(sweep).then(() => undefined).catch((err: unknown) => {
     console.error('[RateLimit] Sweep failed:', err)
   })

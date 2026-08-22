@@ -22,7 +22,7 @@ const bodySchema = z.object({
 // Warning links are not settable here: they are their own section on the
 // detail page, where the vocabulary is loaded (ADR-0017).
 
-/** POST /api/shows — create a new show. Admin/Manager only. */
+/** POST /api/shows: create a new show. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, createShow)
 

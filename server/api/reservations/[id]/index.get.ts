@@ -2,7 +2,7 @@ import { db } from '@nuxthub/db'
 import { isStaff, readReservation } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/reservations/:id — one reservation.
+ * GET /api/reservations/:id. One reservation.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')

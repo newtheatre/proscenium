@@ -20,7 +20,7 @@ function currentSeason(now: Date): { from: string, to: string } {
 }
 
 /**
- * GET /api/admin/stats — aggregate dashboard statistics.
+ * GET /api/admin/stats: aggregate dashboard statistics.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, defineAbility((user: AbilityUser) => isAdminOrManager(user)))
@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
   const now = new Date()
   const { from, to } = await getValidatedQuery(event, querySchema.parse)
   const season = currentSeason(now)
-  // Whole days in Europe/London, not UTC midnights — the Worker runs in UTC and
+  // Whole days in Europe/London, not UTC midnights: the Worker runs in UTC and
   // an unpinned bound moves the season boundary by an hour through BST.
   const windowFrom = validityStart(from ?? season.from)
   const windowTo = validityEnd(to ?? season.to)
@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
     revenueByShowResult,
     recentReservations,
   ] = await Promise.all([
-    // Published shows *in the window* — a show counts if it has a performance
+    // Published shows *in the window*: a show counts if it has a performance
     // inside it. The subquery keeps the parameter cost fixed (ADR-0006).
     db.select({ count: count() })
       .from(schema.shows)
@@ -141,7 +141,7 @@ export default defineEventHandler(async (event) => {
 
   const totals = revenueAndTicketsResult[0]
 
-  // Not defineCachedEventHandler, which skips the handler on a hit — including
+  // Not defineCachedEventHandler, which skips the handler on a hit: including
   // the authorize() above, so the finances could be served unauthenticated.
   setHeader(event, 'Cache-Control', 'private, max-age=30')
 

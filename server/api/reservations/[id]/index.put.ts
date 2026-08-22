@@ -21,7 +21,7 @@ const bodySchema = z.object({
   { message: 'cancelledBy is required when status is CANCELLED' },
 )
 
-/** PUT /api/reservations/:id — update a reservation. Staff only. */
+/** PUT /api/reservations/:id. Update a reservation. Staff only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, updateReservation)
 

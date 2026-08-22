@@ -10,7 +10,7 @@ const querySchema = z.object({
 const REF = /^[A-Z0-9]{6}$/i
 
 /**
- * GET /api/foh/lookup — find a booking on tonight's performances, by
+ * GET /api/foh/lookup: find a booking on tonight's performances, by
  * reference, name or email. Scoped to tonight by design (ADR-0019).
  */
 export default defineEventHandler(async (event) => {

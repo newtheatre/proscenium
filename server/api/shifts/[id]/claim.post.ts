@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { and, eq, isNull } from 'drizzle-orm'
 
 /**
- * POST /api/shifts/:id/claim — take an open slot. Eligibility is asked of
+ * POST /api/shifts/:id/claim: take an open slot. Eligibility is asked of
  * rehearsal through the one seam, and fails open with a flag (ADR-0026).
  */
 export default defineEventHandler(async (event) => {

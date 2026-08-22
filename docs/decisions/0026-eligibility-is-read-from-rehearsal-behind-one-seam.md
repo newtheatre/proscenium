@@ -22,7 +22,7 @@ service cannot be reached at 19:10 on a Friday.
 
 **One seam, `isEligible(userId, ruleKey)`.** Every eligibility question in this app goes through it:
 `duty-manager`, `door`, `bar`, and whatever the committee adds later. The rota never encodes what a
-rule *requires* — only that there is one — so the committee can change the requirement in
+rule *requires* (only that there is one) so the committee can change the requirement in
 rehearsal's admin UI without a deploy on either side.
 
 **The rule keys are created in rehearsal, not here.** `door` and `bar` do not exist yet; creating
@@ -64,7 +64,7 @@ control that fails open is not one. Revisit this record at the same time, in the
 
 ## Consequences
 
-- A service token is needed (`NUXT_TRAINING_API_TOKEN` — the `NUXT_` prefix is load-bearing) as a
+- A service token is needed (`NUXT_TRAINING_API_TOKEN`: the `NUXT_` prefix is load-bearing) as a
   worker secret and in the password manager. Issuing it is a prerequisite in rehearsal.
 - The failure direction must be **tested by killing the URL locally**, which is on rehearsal's
   consumer checklist. Untested fallbacks are decoration.

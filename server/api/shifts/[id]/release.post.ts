@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 
 /**
- * POST /api/shifts/:id/release — give back a claim. Only before it is
+ * POST /api/shifts/:id/release: give back a claim. Only before it is
  * confirmed: after that it is a promise, and the manager unpicks it.
  */
 export default defineEventHandler(async (event) => {

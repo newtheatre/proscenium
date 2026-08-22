@@ -10,7 +10,7 @@ import { users } from './user'
 import { tickets } from './ticket'
 import { reservations } from './reservation'
 
-// Same unambiguous alphabet as reservations.bookingRef — no O/0, no I/L/1.
+// Same unambiguous alphabet as reservations.bookingRef: no O/0, no I/L/1.
 // Pass references get read aloud across a foyer desk.
 const passRefId = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6)
 
@@ -50,7 +50,7 @@ export const seasonsRelations = relations(seasons, ({ many }) => ({
  */
 
 /**
- * A pass product. Entitlement is unlimited within scope but reserves no seat —
+ * A pass product. Entitlement is unlimited within scope but reserves no seat:
  * holders are subject to capacity like anyone else (ADR-0002).
  */
 export const passTypes = sqliteTable('pass_types', {
@@ -184,7 +184,7 @@ export const passes = sqliteTable('passes', {
 
 /**
  * The redemption ledger. `UNIQUE (pass_id, performance_id)` IS the entitlement
- * rule — D1 has no interactive transactions, so the index is what holds.
+ * rule: D1 has no interactive transactions, so the index is what holds.
  */
 export const passAdmissions = sqliteTable('pass_admissions', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),

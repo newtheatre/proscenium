@@ -27,7 +27,7 @@ learns of revocation only when a *role-holding* session goes stale after 15 minu
 ([ADR-0008](0008-roles-go-stale-identity-does-not.md)). A customer holds no roles, so their sealed
 cookie stays readable for the full 30-day `maxAge`, and `ensureLocalUser` runs on every request.
 Without a guard, the erased person's next page load writes their real name and email straight back
-over the scrubbed row — while `anonymisedAt` stays set, so the row remains hidden from listings and
+over the scrubbed row, while `anonymisedAt` stays set, so the row remains hidden from listings and
 the erasure looks done.
 
 ## Decision
@@ -47,7 +47,7 @@ the erasure looks done.
   shapes.
 
 Calling `anonymiseUser` directly is not a fulfilled erasure request: it scrubs this app and leaves the
-central identity intact. Central erasure is the supported route —
+central identity intact. Central erasure is the supported route:
 [docs/04-auth-and-permissions.md](../04-auth-and-permissions.md) §erasure.
 
 ## Consequences

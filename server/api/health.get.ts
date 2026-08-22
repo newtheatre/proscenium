@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 import journal from '../db/migrations/sqlite/meta/_journal.json'
 
 /**
- * GET /api/health: uptime check. Deliberately public — monitoring holds no
+ * GET /api/health: uptime check. Deliberately public, monitoring holds no
  * session. 503 when the schema is behind the code (stage-door ADR-0021).
  */
 export default defineEventHandler(async (event) => {

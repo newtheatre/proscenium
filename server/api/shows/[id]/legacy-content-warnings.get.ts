@@ -3,7 +3,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm'
 import { readShow } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/shows/:id/legacy-content-warnings — warnings this show carried
+ * GET /api/shows/:id/legacy-content-warnings: warnings this show carried
  * before the rework that did not carry over.
  */
 export default defineEventHandler(async (event) => {
@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   await authorize(event, readShow)
 
   // `mapped_to_warning_id IS NULL` is the migration's own record of what it
-  // could not place — do not re-derive it (ADR-0004).
+  // could not place: do not re-derive it (ADR-0004).
   return db
     .select({
       title: schema.contentWarningsArchive.title,

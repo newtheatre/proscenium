@@ -3,7 +3,7 @@ import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 
 /**
- * PUT /api/bookings/:id/tickets — customer self-service edit of their own
+ * PUT /api/bookings/:id/tickets: customer self-service edit of their own
  * ticket composition.
  */
 const bodySchema = z.object({
@@ -12,7 +12,7 @@ const bodySchema = z.object({
     quantity: z.int().min(0).max(10),
   })).min(1),
 }).refine(
-  // Each entry is the desired TOTAL, read against a map that is never updated —
+  // Each entry is the desired TOTAL, read against a map that is never updated:
   // so two entries for one type would compound rather than replace.
   data => new Set(data.tickets.map(t => t.ticketTypeId)).size === data.tickets.length,
   { message: 'Each ticket type may only appear once' },
@@ -85,7 +85,7 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // A booking must keep at least one ticket — to remove everything, cancel it.
+  // A booking must keep at least one ticket: to remove everything, cancel it.
   if (allActive.length + toInsert.length - toDelete.length < 1) {
     throw createError({ statusCode: 400, statusMessage: 'A booking must have at least one ticket. Cancel it instead.' })
   }

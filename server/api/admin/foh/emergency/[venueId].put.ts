@@ -15,7 +15,7 @@ const bodySchema = z.object({
   firePanelLocation: text,
 })
 
-/** PUT /api/admin/foh/emergency/:venueId — upsert one venue's card. */
+/** PUT /api/admin/foh/emergency/:venueId. Upsert one venue's card. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageFohReference)
 

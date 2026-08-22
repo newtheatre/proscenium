@@ -1,4 +1,4 @@
-# Bar — sales, stock and Challenge 25 — design
+# Bar (sales, stock and Challenge 25) design
 
 **Status: agreed, not yet built.** Drafted August 2026 by Matt Adcock (ITM 26/27); agreed
 2026-08-21 and reconciled against the code the same day. Depends on the
@@ -18,7 +18,7 @@ sales*. Challenge 25 refusals are recorded in a paper register.
 try. Instead, Proscenium gains a **bar module** (under `/foh`, see §2.3) that is the *till
 that does not take money*: it builds the basket, shows the one figure to type into SumUp, and
 records the itemised sale, the tender, the stock movement and the person who rang it up. That
-division — the reader charges, this app records — is
+division (the reader charges, this app records) is
 [ADR-0024](./decisions/0024-sumup-stays-a-manual-reader.md), and it is not a stopgap. Around
 that sit a stock ledger (deliveries, stocktakes, variance, cost and GP), a Challenge 25 log with
 an ID-check tally, and a reconciliation that explains the SumUp reader's daily total to the penny.
@@ -34,9 +34,9 @@ Three goals, in order:
 And one quality-of-life promise that drives adoption: **nobody does mental arithmetic on a show
 night.** The basket adds up; ticket money owed can be pulled into the same basket so a mixed
 transaction is one number into SumUp; the end of the night is "type the Z-total, does it match?".
-Everything is card or comp — there is no cash anywhere in this design.
+Everything is card or comp: there is no cash anywhere in this design.
 
-**Not in scope:** card payment of any kind (SumUp's API is not used — the reader stays a manual
+**Not in scope:** card payment of any kind (SumUp's API is not used: the reader stays a manual
 device), **cash** (the theatre takes none; charity collection buckets are outside this system
 entirely), customer-facing ordering, table service, a loyalty scheme, supplier ordering/purchase
 orders, and anything resembling an accounts package. Sales and stock export to CSV; the Treasurer's
@@ -46,16 +46,16 @@ spreadsheet remains the book of account.
 
 ### 2.1 One counter, one till
 
-The FOH design settled that **the door never sells — direct to the bar**. Taken seriously, that
+The FOH design settled that **the door never sells: direct to the bar**. Taken seriously, that
 means there is one money-taking point in the building: the counter, with the laptop and the
 SumUp. So this is not a bar till beside a ticket till. It is **the counter till**, with two tabs
 over one basket:
 
-- **Tickets** — scan/ref/name lookup of a reservation (the same lookup `/foh` uses) drops the
+- **Tickets**: scan/ref/name lookup of a reservation (the same lookup `/foh` uses) drops the
   amount owed into the basket; **Walk-up** sells new tickets (performance, type, quantity) via
   the existing walk-up sale function. Both call the existing box office functions; this screen
   adds no ticketing logic of its own.
-- **Bar** — the product tiles.
+- **Bar**: the product tiles.
 
 One basket, one gold figure to type into SumUp, one tender tap. That tap writes one
 **transaction** (§3) whose lines may be ticket payments, walk-up sales, bar items or any mix.
@@ -65,7 +65,7 @@ total again.
 **The till takes money; the desk changes bookings.** That is the entire division of labour, and
 it is what keeps the till simple. The till's Tickets tab can do exactly two things: pay what is
 owed on an existing reservation, and sell a plain walk-up. Changing ticket types or quantities,
-moving a booking to another performance, refunds, ticket comps, group discounts, pass sales —
+moving a booking to another performance, refunds, ticket comps, group discounts, pass sales:
 all of it stays on `/admin/boxoffice`, and the till's reservation card carries an *Edit on desk*
 link for the one-in-twenty case. If a customer needs a change and a payment, the desk makes the
 change, then the till (or the desk's own pay button) takes the money. Do not grow the Tickets tab.
@@ -75,7 +75,7 @@ change, then the till (or the desk's own pay button) takes the money. Do not gro
 | When | Who | What happens |
 |---|---|---|
 | 18:30 | First `BAR` shift at the counter | Opens the night's **bar session**. Till lights up on their phone and on the laptop. |
-| 18:45 | Customer with an unpaid reservation goes to the door first | Door scans → amber *UNPAID — pay at the bar*. Sends them to the counter. |
+| 18:45 | Customer with an unpaid reservation goes to the door first | Door scans → amber *UNPAID: pay at the bar*. Sends them to the counter. |
 | 18:46 | Counter | Scans the same QR on the Tickets tab → ticket line for the amount owed; adds two drinks on the Bar tab; types the total into SumUp; taps **Card**. The reservation becomes paid through the existing state machine, the bar lines and stock movements are written. |
 | 18:47 | Door | Rescans → green *PAID*. Records admission. Payment and admission stay separate states: paying at the counter before the 19:15 release stops the release; admission is the door's record. |
 | 18:55 | Walk-up, no reservation | Counter: Tickets tab → Walk-up → 2 × standard → basket → SumUp → Card. Existing walk-up sale function; shadow account as now. |
@@ -86,8 +86,8 @@ change, then the till (or the desk's own pay button) takes the money. Do not gro
 | 22:30 | Last `BAR` shift | **Close the bar**: SumUp Z-total typed in, checklist, closing note. Reconciliation is per *day* because the SumUp Z is per day (§4.5). |
 | Next morning | DM / auto-close | The performance report(s) carry the bar section. |
 
-The box office admin page (`/admin/boxoffice`) stays for desk work — reservation list, the 19:15
-release, edits, comps, pass sales — but its *take payment* action writes through the same
+The box office admin page (`/admin/boxoffice`) stays for desk work: reservation list, the 19:15
+release, edits, comps, pass sales, but its *take payment* action writes through the same
 transaction function with a tender, so there is exactly one ledger of money taken in the building.
 
 ### 2.3 Inside the FOH app
@@ -95,7 +95,7 @@ transaction function with a tender, so there is exactly one ledger of money take
 One app, shift-scoped tiles. The `/foh` home renders what tonight's confirmed shift (or role)
 entitles you to: `DOOR` sees the six buttons from the show night design; `BAR` sees **Till**,
 **Challenge 25**, **Close the bar**, plus *Tonight at a glance*, *Emergency* and *Contacts*;
-the duty manager and `BOX_OFFICE`+ see everything. Same home, same device, same login — no
+the duty manager and `BOX_OFFICE`+ see everything. Same home, same device, same login: no
 seventh app for a volunteer to learn. Routes live under `/foh/bar/**`; management surfaces
 (products, deliveries, stocktakes, reports) under `/admin/bar/**`.
 
@@ -107,12 +107,12 @@ attribution matters (alcohol sales, refusals) staff should use their own phone. 
 who was on regardless. No PIN-switching or shared-device user picker in v1.
 
 A **module inside Proscenium**, not a standalone app, for the reasons above: it is made almost
-entirely of things Proscenium already owns — performances, the rota, reservations and their
+entirely of things Proscenium already owns: performances, the rota, reservations and their
 payment state, the auth roles, the end-of-night report.
 
 ## 3. Domain model
 
-All money in **integer pence** (matching the rest of Proscenium — see
+All money in **integer pence** (matching the rest of Proscenium: see
 [06-pricing-and-ticket-types](./06-pricing-and-ticket-types.md)); all quantities in **thousandths
 of a unit** (`qty_milli`), so opened wine can be counted in tenths and a 25 ml measure out of a
 70 cl bottle is an exact integer.
@@ -197,7 +197,7 @@ product may point at another product as the thing it depletes: `House white 175m
 `stock_product_id = House white 750ml bottle`, `depletes_milli = 233`. Bottled beer points at
 itself with `depletes_milli = 1000`. Every sale line produces one `SALE` movement against the
 **stock** product. Keep this to one level (no bundles of bundles); a "meal deal" is a product
-whose sale handler writes several movements — implement as a small `bar_bundle_items` table if
+whose sale handler writes several movements: implement as a small `bar_bundle_items` table if
 the committee wants deals in v1, otherwise defer.
 
 ### 3.2 Invariants
@@ -208,14 +208,14 @@ the committee wants deals in v1, otherwise defer.
   `POST /api/reservations/:id/refund`, which is manager-gated. So a void touching ticket lines
   needs the refund permission, and a bar-shift user who tries one is refused and sent to the desk;
   a bar-only void needs no such permission inside the window in §5.
-- A transaction always records `taken_by_user_id` from the session — there is no anonymous till.
+- A transaction always records `taken_by_user_id` from the session: there is no anonymous till.
 - **Ticket lines never carry ticketing logic.** `TICKET_PAYMENT` and `WALK_UP` lines are produced
   by the box office's own code, which this module calls; it records only that the money was taken
   here, how, and alongside what. Two facts from the August 2026 audit govern *how* it calls it, and
   neither was known when this section was first drafted. **There is no payment function and no
   tender to add one to**: collection is the payment boundary and it is a bare status transition
   ([ADR-0011](./decisions/0011-collection-is-the-payment-boundary.md)), so the money event has to
-  be introduced, not extended. And **D1 has no interactive transactions** — Drizzle over D1 offers
+  be introduced, not extended. And **D1 has no interactive transactions**: Drizzle over D1 offers
   `db.batch()` and nothing else, so "inside the same transaction" cannot mean passing a handle
   down. The box office code is therefore refactored into *statement builders* that return batch
   items, and one `db.batch()` writes the transaction, its lines, the stock movements and the
@@ -236,8 +236,8 @@ Two tabs above one basket.
 
 **Tickets tab.** A scan button (same scanner as `/foh`), a ref field and a name search. A found
 reservation shows party, performance (highlighted if it is not tonight's), what's owed and its
-state, with one action — **Add to basket** (the amount owed) — and a quiet *Edit on desk* link.
-Already-paid reservations say so and offer nothing — the door handles admission.
+state, with one action (**Add to basket** (the amount owed)) and a quiet *Edit on desk* link.
+Already-paid reservations say so and offer nothing: the door handles admission.
 Below, **Walk-up**: performance (tonight's, pre-selected if only one), ticket type, quantity,
 optional name/email for the shadow account, **Add to basket**. Both actions use the box office's
 existing functions.
@@ -246,7 +246,7 @@ existing functions.
 amber flag when on-hand < par). Tap to add.
 
 **The basket** lists ticket lines (purple, with the ref) and bar lines together, then the gold
-**Type into SumUp** figure with a sub-label — *Bar only / Tickets only / Bar + tickets in one
+**Type into SumUp** figure with a sub-label: *Bar only / Tickets only / Bar + tickets in one
 transaction*, and beneath it the **Discount** chips (§4.1.1). Two tender buttons: **Card**, and
 **Comp** (§4.1.2). There is no cash button because there is no cash. The tap writes one `transactions` row and its lines atomically: the
 reservation pay transition, the walk-up sale, the bar lines and the stock movements either all
@@ -254,7 +254,7 @@ happen or none do. Voided transactions are reversed, never edited.
 
 #### 4.1.1 Discounts
 
-A row of chips under the basket — *None · Committee 20% · Cast & crew 10%* — from the
+A row of chips under the basket (*None · Committee 20% · Cast & crew 10%*) from the
 admin-maintained `bar_discounts` list. Rules:
 
 - **Percentage only, bar lines only.** The discount applies to the bar subtotal; ticket lines are
@@ -271,17 +271,17 @@ admin-maintained `bar_discounts` list. Rules:
   can pick a chip, and every use is attributed. Reports show discounts by staff member; a pattern
   is a conversation, not a feature.
 
-#### 4.1.2 Comps — rare, and approved by the duty manager
+#### 4.1.2 Comps: rare, and approved by the duty manager
 
 Comping is the exception, so it is deliberately one step slower than a sale:
 
-1. Staff build a bar-only basket (Comp is disabled if the basket has ticket lines — ticket comps
+1. Staff build a bar-only basket (Comp is disabled if the basket has ticket lines: ticket comps
    are a ticket type on the desk), tap **Comp**, pick a reason (cast & crew, committee, spillage,
    other + note). This creates a `comp_requests` row, *not* a transaction. Stock does not move.
 2. Tonight's **duty manager** sees *1 comp awaiting approval* on their FOH home and in Tonight at
    a glance, opens it, sees who is asking, what and why, and taps **Approve** or **Decline**. Same
    short-polling transport as the backstage messages. If the person at the till *is* the DM (or
-   `BOX_OFFICE`+), the approval is inline — one extra confirm tap, still recorded as approved by
+   `BOX_OFFICE`+), the approval is inline: one extra confirm tap, still recorded as approved by
    them.
 3. On approval the server writes the transaction (`tender = COMP`, `comp_approved_by`,
    `total_pence = 0`) and the stock movements. The requester's till shows *Approved by Quinn* and
@@ -294,7 +294,7 @@ which is the correct outcome.
 
 If the acting user is not currently valid for the `bar` eligibility rule (§5) and the basket
 contains an age-restricted product, the till shows a persistent amber banner on the tender row:
-*"You're not recorded as trained to sell alcohol — ask the DM."* Soft gate in v1; see §8.
+*"You're not recorded as trained to sell alcohol: ask the DM."* Soft gate in v1; see §8.
 
 Works identically on a phone and the counter laptop. Tiles, prices and order are admin data.
 
@@ -313,7 +313,7 @@ printed a few times a year is not a good trade, so the built export is CSV with 
 matches the paper book. The across-the-counter artefact an inspection wants should be a
 print-stylesheet page rendered by the browser, which lands with the reports work rather than here.
 Admin export produces
-one PDF per performance or date range laid out like the paper register — that export is what
+one PDF per performance or date range laid out like the paper register: that export is what
 goes across the counter at an inspection. Until the data-protection policy lands, retention
 defaults to whatever the FOH incident log adopts.
 
@@ -346,10 +346,10 @@ the SumUp Z-total is per day, and because every card payment in the building is 
 `transactions` row stamped with the day it was taken:
 
 ```
-Card — bar items                             £281.80   (BAR_ITEM lines, taken today)
-Card — tickets & walk-ups at the till         £96.00   (TICKET_PAYMENT + WALK_UP lines, source TILL)
-   of which for other performances            £24.00   (advance payments — informational)
-Card — taken on the box office desk          £412.00   (source BOX_OFFICE_DESK)
+Card: bar items                             £281.80   (BAR_ITEM lines, taken today)
+Card: tickets & walk-ups at the till         £96.00   (TICKET_PAYMENT + WALK_UP lines, source TILL)
+   of which for other performances            £24.00   (advance payments: informational)
+Card: taken on the box office desk          £412.00   (source BOX_OFFICE_DESK)
 SumUp Z-total should read                    £789.80
 SumUp actual                                 [______]  → Matches / £x over / £x short
 
@@ -369,7 +369,7 @@ Then a short checklist (reconciled, refusals reviewed with the DM, low stock fla
 note) and **Close the bar**. Closing writes the `bar_session` and contributes a
 *Bar* section to each linked performance's end-of-night report (12-access-and-staffing §4.3):
 takings by tender, comps, ID checks accepted/refused, stock warnings, closing note. Where two
-performances shared a bar, the section is the night's bar figures, labelled as such — we do not
+performances shared a bar, the section is the night's bar figures, labelled as such: we do not
 pretend to split a pint between the studio and the auditorium. Ticket money in the report is by
 `performance_id`, so it *is* per show. If the bar is not closed by the
 noon auto-close, the report carries the same "no sign-off" banner.
@@ -379,9 +379,9 @@ noon auto-close, the report carries the same "no sign-off" banner.
 - **`BAR` shift confirmed on tonight's rota** (12-access-and-staffing §3) lights up the Till,
   Challenge 25 and Close the bar for tonight, exactly as a `DOOR` shift scopes the door screens.
   The underlying role is the existing `FRONT_OF_HOUSE`; the rota supplies the scope.
-  `BOX_OFFICE`+ bypasses the rota as everywhere else. A `DOOR` shift does **not** see the till —
+  `BOX_OFFICE`+ bypasses the rota as everywhere else. A `DOOR` shift does **not** see the till:
   the door never sells.
-- **Bar manager** — a new permission **`bar.manage`**, declared in `shared/utils/appManifest.ts`
+- **Bar manager**: a new permission **`bar.manage`**, declared in `shared/utils/appManifest.ts`
   and carried by a role granted to whoever runs the bar that year: products, prices, deliveries,
   stocktakes, voids, exports, the Challenge 25 register export. `MANAGER` and `ADMIN` carry it too.
   Permission keys here are dotted and role-mapped in the manifest; this app has no ad-hoc ability
@@ -404,7 +404,7 @@ with the module catalogue:
 | `duty-manager` | as already proposed (NNT-001, ADMN-101, SFTY-002) | Claiming `DUTY_MANAGER` |
 
 `bar` includes ADMN-103 because the counter till takes ticket money. ADMN-102's description
-should name this system explicitly — the refusals log, the ID-check tally and closing the bar are
+should name this system explicitly: the refusals log, the ID-check tally and closing the bar are
 now things you do in the app, and the module is where people learn them. ADMN-103 gains "the
 counter till: tickets and bar in one basket". Training is annual (AY) for both, so the rota's
 claim filter quietly enforces the refresh each October.
@@ -414,7 +414,7 @@ claim filter quietly enforces the refresh each October.
 Sales by product / category / performance / month; tender split; discounts by type and by staff member; comps by reason with requester and approver; GP by product;
 stocktake variance over time; Challenge 25 register (PDF); everything as CSV. Date-range pickers
 default to the current term. The Treasurer's monthly ask is: sales by month by tender, closing
-stock at cost — make those two one click.
+stock at cost: make those two one click.
 
 ## 7. Build order
 
@@ -446,16 +446,16 @@ Each stage is independently shippable and useful on its own.
 
 - **Bundles/deals in v1?** The mockup shows a "Deals" category; it is a small table but a
   design decision for the bar manager. Default: defer.
-- **Who holds `bar.manage`** this year — FOH manager, Theatre Manager, or a named bar manager?
+- **Who holds `bar.manage`** this year: FOH manager, Theatre Manager, or a named bar manager?
   Committee decision; the system only needs a name.
-- **Retention for `age_checks`** — adopt with the data-protection policy (spring 2027). Until
+- **Retention for `age_checks`**: adopt with the data-protection policy (spring 2027). Until
   then: keep.
-- **Measure sizes for spirits** (25 ml vs 35 ml) and wine (125/175/250) — configure per product;
+- **Measure sizes for spirits** (25 ml vs 35 ml) and wine (125/175/250): configure per product;
   confirm what the licence and the bar actually pour.
-- **Discount list and rates** (mockup: Committee 20%, Cast & crew 10%) — committee sets them; admin data.
+- **Discount list and rates** (mockup: Committee 20%, Cast & crew 10%), committee sets them; admin data.
 - **Hard or soft training gate on alcohol sales.** v1 warns. Making it a hard block (tile
   disabled for an untrained user) is a committee/licensing decision; it is a one-line change.
-Formerly open, now settled: **voiding a mixed transaction** — the box office reversal exists
+Formerly open, now settled: **voiding a mixed transaction**, the box office reversal exists
 (`POST /api/reservations/:id/refund`, manager-gated), so a void touching ticket lines needs that
 permission and everyone else is sent to the desk (§3.2); SumUp stays the payment device and is not
 integrated via API ([ADR-0024](./decisions/0024-sumup-stays-a-manual-reader.md)); this is

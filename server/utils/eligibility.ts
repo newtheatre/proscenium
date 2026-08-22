@@ -67,7 +67,7 @@ export async function isEligible(userId: string, rule: EligibilityRule): Promise
     // A renamed or deleted rule is a configuration break, not a transient, and
     // must be loud rather than quietly fail-open (ADR-0026).
     if (status === 404) {
-      console.error(`[eligibility] rehearsal has no rule "${rule}" — someone renamed or removed it`)
+      console.error(`[eligibility] rehearsal has no rule "${rule}": someone renamed or removed it`)
     }
     else {
       console.error(`[eligibility] could not reach rehearsal for "${rule}":`, error)

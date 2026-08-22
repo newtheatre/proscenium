@@ -13,7 +13,7 @@ const bodySchema = z.object({
   })).min(1).max(50),
 })
 
-/** PATCH /api/admin/bar/stocktakes/:id/lines — record counts as they happen. */
+/** PATCH /api/admin/bar/stocktakes/:id/lines: record counts as they happen. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
   const id = getRouterParam(event, 'id')!

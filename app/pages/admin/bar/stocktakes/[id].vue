@@ -209,7 +209,7 @@ async function abandon() {
           v-else
           class="tabular-nums"
         >
-          {{ row.original.countedMilli == null ? '—' : (row.original.countedMilli / 1000).toFixed(2) }}
+          {{ row.original.countedMilli == null ? '-' : (row.original.countedMilli / 1000).toFixed(2) }}
         </span>
       </template>
       <template #variance-cell="{ row }">
@@ -223,7 +223,7 @@ async function abandon() {
         <span
           v-else
           class="text-muted"
-        >—</span>
+        >-</span>
       </template>
     </UTable>
   </UContainer>

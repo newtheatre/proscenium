@@ -13,7 +13,7 @@ import { venues } from './venue'
  */
 
 /**
- * The strand a show belongs to — In House, Fringe, StuFF, External, Studio.
+ * The strand a show belongs to. In House, Fringe, StuFF, External, Studio.
  * Orthogonal to season: category is what kind of show, season is when.
  */
 export const showCategories = sqliteTable('show_categories', {

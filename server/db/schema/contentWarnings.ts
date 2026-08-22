@@ -12,7 +12,7 @@ import { shows } from './show'
  */
 
 /**
- * `slug` is the stable key — migrations and seeds reference a warning by slug,
+ * `slug` is the stable key: migrations and seeds reference a warning by slug,
  * never by id. `category` is plain text so it needs no deploy; null if TECHNICAL.
  */
 export const contentWarnings = sqliteTable('content_warnings', {
@@ -23,7 +23,7 @@ export const contentWarnings = sqliteTable('content_warnings', {
   category: text('category'),
   /** One line of clarification, shown as help in the editor and on the show page. */
   description: text('description'),
-  /** An icon name. Constrained to a shortlist in the admin form — see CONTENT_WARNING_ICONS. */
+  /** An icon name. Constrained to a shortlist in the admin form: see CONTENT_WARNING_ICONS. */
   icon: text('icon'),
   sort: integer('sort').notNull().default(0),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),

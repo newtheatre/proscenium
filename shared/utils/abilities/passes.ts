@@ -21,5 +21,5 @@ export const listPasses = defineAbility((user: AbilityUser) => isStaff(user))
 export const issuePass = defineAbility((user: AbilityUser) => isStaff(user))
 /** Admit a holder against their pass. */
 export const redeemPass = defineAbility((user: AbilityUser) => isStaff(user))
-/** Cancel an issued pass — money, so same bar as refunds. */
+/** Cancel an issued pass: money, so same bar as refunds. */
 export const cancelPass = defineAbility((user: AbilityUser) => isAdminOrManager(user))

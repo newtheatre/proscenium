@@ -87,8 +87,8 @@ async function setPassTypeStatus(passType: PassType, status: PassType['status'])
     await refreshTypes()
   }
   catch (error: unknown) {
-    // The server refuses ON_SALE for a product covering no shows, and says why
-    // — surface that rather than a generic failure.
+    // The server refuses ON_SALE for a product covering no shows and says why,
+    // so surface that rather than a generic failure.
     toast.add({
       title: 'Could not update this pass product',
       description: getErrorMessage(error, 'Please try again'),
@@ -111,7 +111,7 @@ const debouncedSearch = useDebouncedRef(search, {
 })
 
 // Searching and paging re-run this on the client, which does not suspend the
-// page — so the table stays interactive while it refetches.
+// page, so the table stays interactive while it refetches.
 const { data: issued, status: issuedStatus, error: issuedError, refresh: refreshIssued } = await useAsyncData(
   'admin-passes',
   () => requestFetch<{ rows: IssuedPass[], total: number }>('/api/passes', {
@@ -250,7 +250,7 @@ async function declineRequest(row: PassRequestRow) {
             <UButton
               size="sm"
               :loading="decidingRequest === row.id"
-              label="Paid — issue it"
+              label="Paid: issue it"
               @click="fulfilRequest(row)"
             />
             <UButton

@@ -156,10 +156,10 @@ function verdictClass(standing: Standing) {
 }
 
 function verdictText(standing: Standing) {
-  if (standing.state === 'PAID') return 'PAID — all collected'
-  if (standing.state === 'UNPAID') return 'UNPAID — send to the bar to pay'
-  if (standing.state === 'CANCELLED') return 'CANCELLED — do not admit'
-  return 'NO SHOW — released'
+  if (standing.state === 'PAID') return 'PAID: all collected'
+  if (standing.state === 'UNPAID') return 'UNPAID: send to the bar to pay'
+  if (standing.state === 'CANCELLED') return 'CANCELLED: do not admit'
+  return 'NO SHOW: released'
 }
 </script>
 

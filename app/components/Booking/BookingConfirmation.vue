@@ -6,7 +6,7 @@
 interface Ticket {
   id: string
   pricePaid: number
-  /** Imported legacy tickets may have no recorded price — see formatTotal. */
+  /** Imported legacy tickets may have no recorded price: see formatTotal. */
   priceConfidence?: 'EXACT' | 'DERIVED' | 'UNKNOWN'
   /** Set once the box office has refunded this specific ticket. */
   refundedAt?: string | Date | null

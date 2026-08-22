@@ -9,7 +9,7 @@ const querySchema = z.object({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 })
 
-/** GET /api/shifts — every shift on performances in a date window. */
+/** GET /api/shifts: every shift on performances in a date window. */
 export default defineEventHandler(async (event) => {
   await authorize(event, listShifts)
 

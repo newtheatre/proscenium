@@ -9,7 +9,7 @@ const bodySchema = z.object({
 })
 
 /**
- * PUT /api/passes/:id — update an issued pass.
+ * PUT /api/passes/:id. Update an issued pass.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, cancelPass)

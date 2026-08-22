@@ -3,10 +3,10 @@ import { eq, and } from 'drizzle-orm'
 import { updateShow } from '~~/shared/utils/abilities'
 
 /**
- * DELETE /api/shows/:id/ticket-types/:ticketTypeId — remove a show-level
+ * DELETE /api/shows/:id/ticket-types/:ticketTypeId. Remove a show-level
  * override, reverting that type to its base defaults.
  */
-/** DELETE /api/shows/:id/ticket-types/:ticketTypeId — remove a show ticket type override. Admin/Manager only. */
+/** DELETE /api/shows/:id/ticket-types/:ticketTypeId. Remove a show ticket type override. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
   const ticketTypeId = getRouterParam(event, 'ticketTypeId')

@@ -10,7 +10,7 @@ const bodySchema = z.object({
   notes: z.string().trim().max(500).optional(),
 })
 
-/** POST /api/performances/:id/shifts — add a slot, open or filled. */
+/** POST /api/performances/:id/shifts: add a slot, open or filled. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageShifts)
 

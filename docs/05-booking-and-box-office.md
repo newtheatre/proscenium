@@ -6,14 +6,14 @@ anything a customer or a front-of-house volunteer touches.
 
 ## The model in one paragraph
 
-Tickets are **reserved online and paid for on collection**. There is no payment integration at all —
+Tickets are **reserved online and paid for on collection**. There is no payment integration at all:
 money is taken in person, in cash or on the card reader, and the system records what was owed rather
 than evidence that it was paid. That was true of the legacy Django system since 2016 and it is still
 true. Anything you design has to work with it.
 
 ## 1. Public booking
 
-**Page:** `app/pages/whats-on/[slug]/book.vue` — a four-step stepper: performance → tickets →
+**Page:** `app/pages/whats-on/[slug]/book.vue`: a four-step stepper: performance → tickets →
 details → confirm. Everything it needs comes from one call to `GET /api/whats-on/:slug`.
 
 **Handler:** `server/api/bookings/index.post.ts`.
@@ -29,7 +29,7 @@ Order of operations:
 2. Guests must supply name and email; logged-in users must not.
 3. Load the performance. Must be `ON_SALE`, its show must be `PUBLISHED`, and `startsAt` must be
    in the future.
-4. **Capacity check** — see §3.
+4. **Capacity check**: see §3.
 5. Resolve the user: session user, or an existing user with that email, or a new shadow account.
 6. Resolve effective prices through the override chain (`loadTicketPriceContext` →
    `resolveEffectivePrice`).
@@ -40,13 +40,13 @@ Order of operations:
 **Three things to know:**
 
 - **It is not transactional.** Shadow user, reservation and tickets are three separate statements. A
-  failure between steps 7a and 7b leaves a reservation with no tickets — which still appears on the
+  failure between steps 7a and 7b leaves a reservation with no tickets, which still appears on the
   door list. D1 has no interactive transactions; the fix is `db.batch()`.
 - **The capacity check is read-then-write with no lock.** Two simultaneous bookings can both pass it.
 - **A guest booking with an email that already belongs to a registered account silently attaches to
   that account.** The booking then appears in that person's account area. The booking reference is
   only returned to whoever made the booking, so the exposure is limited to writing into someone
-  else's list — but it is worth knowing about.
+  else's list, but it is worth knowing about.
 
 ## 2. Staff booking (walk-in)
 
@@ -60,10 +60,10 @@ non-transactional inserts. Differences that matter:
 | Max per ticket type | 10 | 20 |
 | Capacity checked | ✅ | **❌ none** |
 | Performance status | must be `ON_SALE` | any, including `DRAFT`/`CANCELLED` |
-| Accepts `userId` | — | ✅ |
-| Accepts `staffNotes` | — | ✅ |
+| Accepts `userId` | - | ✅ |
+| Accepts `staffNotes` | - | ✅ |
 
-The staff path deliberately allows overriding the rules — a manager selling into a cancelled
+The staff path deliberately allows overriding the rules: a manager selling into a cancelled
 performance is doing so knowingly. The missing capacity check is not deliberate; it means the box
 office can oversell the house with no warning.
 
@@ -72,7 +72,7 @@ one continuous flow.
 
 ## 3. Capacity
 
-**The definition** — one sentence, and every implementation should match it:
+**The definition**: one sentence, and every implementation should match it:
 
 > Count `tickets` joined to `reservations` where the reservation status is `PENDING`, `COLLECTED` or
 > `DOOR`, `tickets.refundedAt IS NULL`, and the ticket type's `kind` is not `PASS_SALE`. Compare
@@ -81,12 +81,12 @@ one continuous flow.
 `CANCELLED` and `NO_SHOW` release their seats. That is correct and intended.
 
 `PASS_SALE` is excluded because such a row records the **purchase** of a pass, not a seat at this
-performance — the seat is the separate `PASS_ADMISSION` ticket. Counting both makes one buyer
+performance: the seat is the separate `PASS_ADMISSION` ticket. Counting both makes one buyer
 consume two seats.
 
 **Where it lives:** `countOccupiedSeats()` in `server/utils/tickets.ts`, and nowhere else. Every
 write path enforces it through `assertCapacity()`; every display path counts with the same function.
-Do not write a second copy — there used to be four, and they disagreed in ways that were invisible
+Do not write a second copy: there used to be four, and they disagreed in ways that were invisible
 until someone was turned away at the door.
 
 **Enforced by:** `POST /api/bookings`, `POST /api/reservations`, both `PUT .../tickets` routes,
@@ -95,7 +95,7 @@ reinstated (its seats re-enter the count). `PUT .../performances/:id` refuses to
 `capacityOverride` below what is already sold.
 
 **Still true:** the check and the write are separate statements, so two concurrent bookings can both
-pass. There is **no database constraint** backing capacity — it is advisory application logic. See
+pass. There is **no database constraint** backing capacity: it is advisory application logic. See
 [09-known-issues](./09-known-issues.md#capacity-is-still-read-then-write).
 
 ## 4. The door: collection and no-shows
@@ -135,7 +135,7 @@ Individually from the collect modal, or **Mark all as no-show** for the whole pe
 action fires N parallel `PUT`s; a partial failure leaves mixed state and shows a generic error.
 
 The button is available before curtain-up, and will tell you off with a rotating selection of jokes
-if you press it early. That is deliberate and should be preserved — it is the only bit of the
+if you press it early. That is deliberate and should be preserved: it is the only bit of the
 interface that acknowledges it is used by tired volunteers at 19:25.
 
 ### `DOOR` is currently unreachable
@@ -156,7 +156,7 @@ the auth service's and are not sent from here ([04-auth-and-permissions](./04-au
 | Reservation cancelled by staff or customer | Cancellation notice | Sent |
 | Booking reminder | Written, never called | No scheduler exists |
 
-**The QR encodes `/t/<ref>?t=<token>`** — the short booking handle, carrying the same signed token
+**The QR encodes `/t/<ref>?t=<token>`**: the short booking handle, carrying the same signed token
 this email's own link already carries, so it exposes nothing the email did not already contain. The
 reference alone still grants nothing ([ADR-0009](./decisions/0009-signed-booking-access-tokens.md));
 access is the token, as everywhere else. It is attached inline (`cid:`) rather than linked, because
@@ -178,12 +178,12 @@ Worth knowing before someone promises one of them:
 
 - No payment, online or otherwise.
 - No seat selection. Unreserved seating only.
-- No holds or expiry — a `PENDING` reservation from 2026 will still be there in 2028.
+- No holds or expiry: a `PENDING` reservation from 2026 will still be there in 2028.
 - No waiting list for sold-out performances.
 - No payment integration, so a "refund" is a record that money was handed back at the desk, not a
   card reversal.
 - No group or school bookings beyond raising the quantity cap.
-- No passes-by-post or transfers between holders — but passes themselves exist, see
+- No passes-by-post or transfers between holders, but passes themselves exist, see
   [10-passes-design](./10-passes-design.md).
 
 ## 7. Editing versus refunding
@@ -201,8 +201,8 @@ each other:
 
 Before collection a booking is an intention: adding and removing tickets is free, and removing one
 is not a refund because nothing was taken. After collection the composition is a record of a
-completed transaction — editing it would delete paid-for tickets with nothing to show that anything
-was returned — so the only way to reverse part of it is `POST /api/reservations/:id/refund`, which
+completed transaction: editing it would delete paid-for tickets with nothing to show that anything
+was returned, so the only way to reverse part of it is `POST /api/reservations/:id/refund`, which
 stamps `refundedAt` and leaves the row in place as the audit trail.
 
 Implemented in `server/utils/reservationLifecycle.ts` and applied by both ticket-diff routes and the
@@ -210,5 +210,5 @@ refund route. The collect screen edits tickets *before* setting the status, whic
 still works.
 
 Refunded tickets stop counting towards capacity and revenue, and are excluded from anything the
-customer sees — their confirmation page, their account page and the self-service editor all filter
+customer sees: their confirmation page, their account page and the self-service editor all filter
 them out.

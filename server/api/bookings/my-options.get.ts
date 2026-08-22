@@ -5,7 +5,7 @@ import { z } from 'zod'
 const querySchema = z.object({ performanceId: z.string().trim().min(1) })
 
 /**
- * GET /api/bookings/my-options — what this account adds to the public picker.
+ * GET /api/bookings/my-options: what this account adds to the public picker.
  * Session-dependent by design, which is why it is not in the show payload.
  */
 export default defineEventHandler(async (event) => {

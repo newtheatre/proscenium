@@ -17,12 +17,12 @@ export type PassRejection
 
 /** Copy a volunteer can read out at the door. */
 export const PASS_REJECTION_MESSAGE: Record<PassRejection, string> = {
-  PASS_NOT_ACTIVE: 'This pass has been cancelled — please see the Box Office Manager.',
-  OUTSIDE_VALIDITY: 'This pass does not cover tonight — it is outside its validity dates.',
+  PASS_NOT_ACTIVE: 'This pass has been cancelled, please see the Box Office Manager.',
+  OUTSIDE_VALIDITY: 'This pass does not cover tonight, it is outside its validity dates.',
   SHOW_NOT_COVERED: 'This pass does not cover this show.',
   ALREADY_REDEEMED: 'This pass has already been used for this performance.',
   PERFORMANCE_NOT_ON_SALE: 'This performance is not on sale.',
-  SOLD_OUT: 'We\'re full tonight, I\'m afraid — a pass doesn\'t reserve a seat.',
+  SOLD_OUT: 'We\'re full tonight, I\'m afraid, a pass doesn\'t reserve a seat.',
 }
 
 export interface RedeemCheck {
@@ -69,7 +69,7 @@ export function decideRedeem(input: {
   if (pass.status !== 'ACTIVE') return reject('PASS_NOT_ACTIVE')
 
   // Judged against the performance, not "now", which only holds because validTo
-  // is the last instant of its day — see server/utils/validityWindow.ts.
+  // is the last instant of its day: see server/utils/validityWindow.ts.
   const startsAt = performance.startsAt.getTime()
   if (startsAt < pass.validFrom.getTime() || startsAt > pass.validTo.getTime()) {
     return reject('OUTSIDE_VALIDITY')
@@ -217,7 +217,7 @@ export async function redeemabilityForPage(
 }
 
 /**
- * The ticket type used for pass admissions — a £0 `PASS_ADMISSION` type.
+ * The ticket type used for pass admissions: a £0 `PASS_ADMISSION` type.
  * Created on first use so passes work without a seeding step.
  */
 export async function getPassAdmissionTicketTypeId(): Promise<string> {
@@ -265,7 +265,7 @@ export async function admitOnPass(input: AdmitOnPassInput) {
   const ticketTypeId = await getPassAdmissionTicketTypeId()
 
   // Admit against an existing reservation for this holder and performance if
-  // there is one — the door list should show one party, not two.
+  // there is one: the door list should show one party, not two.
   const existing = await db.select({ id: schema.reservations.id })
     .from(schema.reservations)
     .where(and(

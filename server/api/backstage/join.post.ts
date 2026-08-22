@@ -2,12 +2,12 @@ import { z } from 'zod'
 
 const bodySchema = z.object({
   code: z.string().trim().min(6).max(10),
-  /** "Sam — DSM". Skippable, and social rather than authenticated (ADR-0020). */
+  /** "Sam: DSM". Skippable, and social rather than authenticated (ADR-0020). */
   name: z.string().trim().max(60).optional(),
 })
 
 /**
- * POST /api/backstage/join — join tonight's board by code. Deliberately
+ * POST /api/backstage/join: join tonight's board by code. Deliberately
  * unauthenticated: the crew hold no accounts, which is the whole point.
  */
 export default defineEventHandler(async (event) => {

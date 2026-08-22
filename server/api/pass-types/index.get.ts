@@ -3,7 +3,7 @@ import { asc, count, eq } from 'drizzle-orm'
 import { listPassTypes } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/pass-types — list pass products with their prices, scope size and
+ * GET /api/pass-types: list pass products with their prices, scope size and
  * how many passes have been issued. Staff only.
  */
 export default defineEventHandler(async (event) => {
@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
 
   if (types.length === 0) return []
 
-  // Counts in SQL rather than by loading the rows — there can be thousands of
+  // Counts in SQL rather than by loading the rows: there can be thousands of
   // issued passes and this list is a summary.
   const [prices, scope, issued] = await Promise.all([
     db.select({

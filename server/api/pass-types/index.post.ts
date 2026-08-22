@@ -23,7 +23,7 @@ const bodySchema = z.object({
   seedFromSeason: z.string().optional().nullable(),
 })
 
-/** POST /api/pass-types — create a pass product. Admin/Manager only. */
+/** POST /api/pass-types: create a pass product. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   await authorize(event, managePassTypes)
 

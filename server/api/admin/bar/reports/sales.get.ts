@@ -8,7 +8,7 @@ const querySchema = paginationSchema.extend({
   format: z.enum(['json', 'csv']).optional().default('json'),
 })
 
-/** GET /api/admin/bar/reports/sales — sales by product, category, show or month. */
+/** GET /api/admin/bar/reports/sales: sales by product, category, show or month. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

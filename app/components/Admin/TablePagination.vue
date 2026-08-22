@@ -4,14 +4,14 @@ so nothing re-walks the row model to report a count (ADR-0012).
 -->
 <script setup lang="ts">
 const props = defineProps<{
-  /** Row count across all pages — the server's `total` where paging is server-side. */
+  /** Row count across all pages: the server's `total` where paging is server-side. */
   total: number
   limit: number
   /** Selected-row count. Omit on tables without selection. */
   selected?: number
   /** Singular noun for the count, e.g. `'venue'`. Pluralised with a trailing s. */
   label?: string
-  /** Plural form, where a trailing s will not do — `'passes'`, not `'passs'`. */
+  /** Plural form, where a trailing s will not do: `'passes'`, not `'passs'`. */
   labelPlural?: string
   /** Appended to the count when a filter is narrowing the set, e.g. `'matching'`. */
   suffix?: string
@@ -20,7 +20,7 @@ const props = defineProps<{
 const page = defineModel<number>('page', { required: true })
 
 /**
- * The count always reads the same way — "12 venues" — with selection folded in
+ * The count always reads the same way ("12 venues") with selection folded in
  * only when something is selected.
  */
 const summary = computed(() => {

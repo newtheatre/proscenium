@@ -55,7 +55,7 @@ export async function sendEmail({ to, subject, html, attachments }: SendEmailOpt
 export async function sendBackstageResetEmail(data: { night: string, resetBy: string, showTitle: string }): Promise<void> {
   await sendEmail({
     to: 'boxoffice@newtheatre.org.uk',
-    subject: `Backstage code reset — ${data.showTitle} (${data.night})`,
+    subject: `Backstage code reset, ${data.showTitle} (${data.night})`,
     html: `
 <p><strong>${escapeHtml(data.resetBy)}</strong> reset the backstage code for
 ${escapeHtml(data.showTitle)} on ${escapeHtml(data.night)}.</p>
@@ -102,7 +102,7 @@ export async function sendShiftReminderEmail(data: {
 can be filled. Your shifts are at <a href="${baseURL}/account/shifts">${baseURL}/account/shifts</a>.</p>
     `.trim(),
     attachments: [{
-      // toBase64 over encoded bytes, not btoa: a summary like "DOOR — Hamlet"
+      // toBase64 over encoded bytes, not btoa: a summary like "DOOR, Hamlet"
       // has an em dash, and btoa throws above U+00FF.
       content: toBase64(new TextEncoder().encode(data.ics)),
       filename: 'shift.ics',
@@ -171,7 +171,7 @@ performance. You can change or remove it at any time at
 <a href="${baseURL}/account/access">${baseURL}/account/access</a>.</p>`
     : `
 <p>We have not been able to record your access requirements from what we have so far. That is not a
-decision about you, and it is not final — the front-of-house manager will be in touch to sort it
+decision about you, and it is not final: the front-of-house manager will be in touch to sort it
 out.</p>
 <p>You can review what you sent at <a href="${baseURL}/account/access">${baseURL}/account/access</a>.</p>`
 
@@ -300,7 +300,7 @@ function buildTicketTable(tickets: BookingTicket[]): string {
  */
 export async function sendBookingConfirmationEmail(data: BookingEmailData): Promise<void> {
   const { public: { baseURL } } = useRuntimeConfig()
-  // A signed token, not the booking reference — the reference is printed below
+  // A signed token, not the booking reference: the reference is printed below
   // for the customer to quote, which is why it cannot also unlock the booking.
   const token = await signBookingToken(data.bookingId, bookingTokenExpiry(data.performanceDate))
   const bookingUrl = `${baseURL}/whats-on/${data.showSlug}/booking/${data.bookingRef}?t=${encodeURIComponent(token)}`
@@ -386,7 +386,7 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData): Prom
       <p style="margin: 12px 0 0; font-size: 13px; color: #78716c;">
         Want to track your bookings across NNT sites?
         <a href="https://auth.newtheatre.org.uk/forgot-password" style="color: #7c3aed;">Set a password</a>
-        for your NNT account — it already exists for this email address.
+        for your NNT account: it already exists for this email address.
       </p>
     </div>
 
@@ -404,7 +404,7 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData): Prom
 
   await sendEmail({
     to: data.customerEmail,
-    subject: `Booking Confirmed — ${data.showTitle} (${data.bookingRef})`,
+    subject: `Booking Confirmed, ${data.showTitle} (${data.bookingRef})`,
     html,
     // Inline, not a remote image: clients block those by default, and Gmail
     // strips `data:` URIs. A cid attachment is the one that renders.
@@ -482,7 +482,7 @@ export async function sendBookingCancellationEmail(data: Omit<BookingEmailData, 
 
   await sendEmail({
     to: data.customerEmail,
-    subject: `Booking Cancelled — ${data.showTitle} (${data.bookingRef})`,
+    subject: `Booking Cancelled, ${data.showTitle} (${data.bookingRef})`,
     html,
   })
 }
@@ -492,7 +492,7 @@ export async function sendBookingCancellationEmail(data: Omit<BookingEmailData, 
  */
 export async function sendBookingReminderEmail(data: BookingEmailData): Promise<void> {
   const { public: { baseURL } } = useRuntimeConfig()
-  // A signed token, not the booking reference — the reference is printed below
+  // A signed token, not the booking reference: the reference is printed below
   // for the customer to quote, which is why it cannot also unlock the booking.
   const token = await signBookingToken(data.bookingId, bookingTokenExpiry(data.performanceDate))
   const bookingUrl = `${baseURL}/whats-on/${data.showSlug}/booking/${data.bookingRef}?t=${encodeURIComponent(token)}`
@@ -567,7 +567,7 @@ export async function sendBookingReminderEmail(data: BookingEmailData): Promise<
 
   await sendEmail({
     to: data.customerEmail,
-    subject: `Reminder: ${data.showTitle} — ${formatEmailDate(data.performanceDate)} (${data.bookingRef})`,
+    subject: `Reminder: ${data.showTitle}, ${formatEmailDate(data.performanceDate)} (${data.bookingRef})`,
     html,
   })
 }

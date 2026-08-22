@@ -15,7 +15,7 @@ export const reservations = sqliteTable('reservations', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
 
   // Short human-readable public code used for QR codes and confirmation emails
-  // e.g. "A3KP7X" — uses an unambiguous character set to avoid misreads
+  // e.g. "A3KP7X": uses an unambiguous character set to avoid misreads
   bookingRef: text('booking_ref').notNull().$defaultFn(() => bookingRefId()),
 
   // The legacy public handle. Every confirmation email since 2016 carried a
@@ -37,7 +37,7 @@ export const reservations = sqliteTable('reservations', {
 
   performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),
 
-  // Always references a user — guests get a shadow account with no password.
+  // Always references a user: guests get a shadow account with no password.
   // onDelete: restrict prevents accidental data loss; reassign before deleting a user.
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
 
@@ -51,7 +51,7 @@ export const reservations = sqliteTable('reservations', {
   // Freetext requests submitted by the customer at booking time (accessibility needs, dietary requirements, etc.)
   customerNotes: text('customer_notes'),
 
-  // Internal box-office notes — not visible to the customer
+  // Internal box-office notes: not visible to the customer
   staffNotes: text('staff_notes'),
 
   // Metadata
@@ -82,5 +82,5 @@ export const reservationsRelations = relations(reservations, ({ one }) => ({
     fields: [reservations.userId],
     references: [users.id],
   }),
-  // tickets: many(tickets) — defined in ticket.ts via reservationsTicketsRelation to avoid circular imports
+  // tickets: many(tickets), defined in ticket.ts via reservationsTicketsRelation to avoid circular imports
 }))

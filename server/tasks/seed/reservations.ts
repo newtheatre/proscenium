@@ -59,7 +59,7 @@ export async function seedReservations(
     ticketRows: { ticketTypeId: string, pricePaid: number }[]
   }
 
-  // Earnest — past run, mix of outcomes
+  // Earnest: past run, mix of outcomes
   const reservationSeeds: ReservationSeed[] = [
     // Collected: regular user booked 2 adults for the first completed night
     {
@@ -96,7 +96,7 @@ export async function seedReservations(
       performanceId: earnestPerfs[3]!.id, // day(-32 matinée)
       userId: regularUser.id,
       status: 'COLLECTED',
-      staffNotes: 'Production team comps — director and stage manager',
+      staffNotes: 'Production team comps, director and stage manager',
       ticketRows: [
         { ticketTypeId: complimentary.id, pricePaid: complimentary.price },
         { ticketTypeId: complimentary.id, pricePaid: complimentary.price },
@@ -114,13 +114,13 @@ export async function seedReservations(
       ],
     },
 
-    // Hamlet — currently running, mix of pending and collected
+    // Hamlet: currently running, mix of pending and collected
     // Pending: regular user booked for an upcoming performance
     {
-      performanceId: hamletPerfs[1]!.id, // day(+1) — tomorrow
+      performanceId: hamletPerfs[1]!.id, // day(+1), tomorrow
       userId: regularUser.id,
       status: 'PENDING',
-      customerNotes: 'Wheelchair user — please reserve accessible seating.',
+      customerNotes: 'Wheelchair user, please reserve accessible seating.',
       ticketRows: [
         { ticketTypeId: adult.id, pricePaid: adult.price },
         { ticketTypeId: student.id, pricePaid: student.price },
@@ -140,13 +140,13 @@ export async function seedReservations(
       performanceId: hamletPerfs[0]!.id, // day(-1)
       userId: alice!.id,
       status: 'DOOR',
-      staffNotes: 'Walk-up — paid on door',
+      staffNotes: 'Walk-up, paid on door',
       ticketRows: [
         { ticketTypeId: adult.id, pricePaid: adult.price },
         { ticketTypeId: adult.id, pricePaid: adult.price },
       ],
     },
-    // Collected: yesterday's performance — unverified user collected
+    // Collected: yesterday's performance, unverified user collected
     {
       performanceId: hamletPerfs[0]!.id, // day(-1)
       userId: unverifiedUser.id,
@@ -161,7 +161,7 @@ export async function seedReservations(
       userId: bob!.id,
       status: 'CANCELLED',
       cancelledBy: 'STAFF' as const,
-      staffNotes: 'Duplicate booking — cancelled by box office',
+      staffNotes: 'Duplicate booking, cancelled by box office',
       ticketRows: [
         { ticketTypeId: adult.id, pricePaid: adult.price },
       ],

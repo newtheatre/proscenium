@@ -15,7 +15,7 @@ const querySchema = paginationSchema.omit({ limit: true, q: true }).extend({
   showId: z.string().optional(),
   /**
    * Exact match. Omitted, cancelled performances are excluded and the rest
-   * returned — note that DRAFT ones are in that set.
+   * returned: note that DRAFT ones are in that set.
    */
   status: z.enum(['DRAFT', 'ON_SALE', 'CANCELLED']).optional(),
   order: z.enum(['asc', 'desc']).optional().default('asc'),
@@ -23,7 +23,7 @@ const querySchema = paginationSchema.omit({ limit: true, q: true }).extend({
 })
 
 /**
- * GET /api/performances — a flat, chronological list of performances.
+ * GET /api/performances: a flat, chronological list of performances.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listShows)

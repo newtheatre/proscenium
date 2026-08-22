@@ -20,7 +20,7 @@ export default defineNuxtConfig({
 
   $production: {
     runtimeConfig: {
-      // Production only — localhost has no subdomains, so a domain'd cookie breaks
+      // Production only: localhost has no subdomains, so a domain'd cookie breaks
       // dev.
       session: {
         name: 'nnt-session',
@@ -79,7 +79,7 @@ export default defineNuxtConfig({
     // Derives the nightly backstage code. Nothing is stored, so rotating this
     // changes tonight's code and nothing else (ADR-0020).
     backstageCodeSecret: '',
-    // Worker secret NUXT_AUTH_SERVICE_TOKEN. The NUXT_ prefix is load-bearing —
+    // Worker secret NUXT_AUTH_SERVICE_TOKEN. The NUXT_ prefix is load-bearing:
     // a secret named AUTH_SERVICE_TOKEN is silently ignored.
     authServiceToken: '',
     // Reads rehearsal's eligibility rules (ADR-0026). Same prefix rule.
@@ -152,7 +152,7 @@ export default defineNuxtConfig({
           },
         ],
         // Estate secrets come from the Secrets Store (stage-door ADR-0016); the
-        // binding name matters — read server/plugins/0.secrets-store.ts first.
+        // binding name matters: read server/plugins/0.secrets-store.ts first.
         ...({
           secrets_store_secrets: [
             {

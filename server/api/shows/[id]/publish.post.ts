@@ -9,10 +9,10 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/shows/:id/publish — publish a show, optionally putting its
+ * POST /api/shows/:id/publish: publish a show, optionally putting its
  * performances on sale.
  */
-/** POST /api/shows/:id/publish — toggle show published status. Admin/Manager only. */
+/** POST /api/shows/:id/publish: toggle show published status. Admin/Manager only. */
 export default defineEventHandler(async (event) => {
   const showId = getRouterParam(event, 'id')
 
@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
   if (body.markPerformancesOnSale) {
     await authorize(event, updatePerformance)
 
-    // Leave cancelled performances cancelled — without the filter, publishing
+    // Leave cancelled performances cancelled: without the filter, publishing
     // would put them on sale.
     const result = await db.update(schema.performances)
       .set({ status: 'ON_SALE' })

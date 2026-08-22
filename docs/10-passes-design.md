@@ -1,6 +1,6 @@
-# Passes and season tickets — design
+# Passes and season tickets: design
 
-**Status:** **Phase 1 built** (August 2026) — schema, `canRedeem`, pass-type admin, and sell
+**Status:** **Phase 1 built** (August 2026): schema, `canRedeem`, pass-type admin, and sell
 and admit at the box office. Phases 2–4 remain as described in §9. Approved in principle by
 Matt Adcock (IT Manager/Archivist 26/27), 10 August 2026.
 **Decision record:** [ADR-0002](./decisions/0002-passes-as-first-class-entities.md)
@@ -11,7 +11,7 @@ Matt Adcock (IT Manager/Archivist 26/27), 10 August 2026.
 ## 1. Why
 
 The theatre has sold season passes since at least 2016 and stopped being able to see them properly
-the moment the legacy system was replaced — because the legacy system never really modelled them.
+the moment the legacy system was replaced: because the legacy system never really modelled them.
 
 What the Heroku/Django box office actually recorded, over 2016–2025:
 
@@ -30,7 +30,7 @@ Two things follow from that data.
 **The product works.** 867 season admissions against 74 recorded sales is roughly twelve visits per
 pass. Against a current £35 public / £28 member price and a ~10-show season, that is an effective
 £3 a ticket versus £6–£8 at the door. Whether that is generosity or under-pricing is a committee
-question, but it is not a dead product — it is a heavily-used one that the theatre currently cannot
+question, but it is not a dead product: it is a heavily-used one that the theatre currently cannot
 account for. (Caveat: some passes were certainly sold outside the box office and never recorded, so
 twelve is an upper bound on usage per pass.)
 
@@ -67,7 +67,7 @@ to change to keep working. A pass holder appears on the door list like any other
 ### Entitlement, stated precisely
 
 A pass grants **the right to book one seat at each covered show, at no charge, for as long as the
-pass is valid**. It does not guarantee a seat — the pass holder books or turns up like everybody
+pass is valid**. It does not guarantee a seat: the pass holder books or turns up like everybody
 else and is subject to capacity. "Unlimited" means unlimited entitlement, not reserved seating.
 This must be in the terms of sale, because it is exactly the thing an unhappy customer will argue
 about in the foyer.
@@ -80,7 +80,7 @@ wants once-per-show, it is a second unique index and a rule change, not a redesi
 
 ## 3. Schema
 
-Five new tables plus one column on `shows`. **Shipped** — the Drizzle schema is
+Five new tables plus one column on `shows`. **Shipped**: the Drizzle schema is
 [`server/db/schema/passes.ts`](../server/db/schema/passes.ts) and the migration is
 `server/db/migrations/sqlite/0010_freezing_stone_men.sql`.
 
@@ -104,7 +104,7 @@ erDiagram
 
 `Autumn 2026`, `Spring 2027`. Name, slug, start and end dates, sort order.
 
-Seasons are useful well beyond passes — they are how the archive will eventually be browsed, and
+Seasons are useful well beyond passes: they are how the archive will eventually be browsed, and
 they are the natural home for "everything In House this term". `shows.seasonId` is nullable, because
 externals and one-offs do not belong to one.
 
@@ -126,7 +126,7 @@ The product. `Autumn 2026 Season Pass`.
 | `maxIssued` | Optional cap on how many can exist. See §6 |
 | `transferable` | Default false |
 
-`validFrom`/`validTo` do more work than they look like they do — see §7 on festivals.
+`validFrom`/`validTo` do more work than they look like they do: see §7 on festivals.
 
 ### `pass_type_prices`
 
@@ -140,7 +140,7 @@ unanalysable.
 
 The scope: an explicit `(passTypeId, showId)` list.
 
-Created by seeding from a season — "add every In House and Studio show in Autumn 2026" — and then
+Created by seeding from a season ("add every In House and Studio show in Autumn 2026") and then
 editable. Explicit-with-a-seeder rather than a stored rule, because:
 
 - it is auditable: you can print the list of shows a pass covers and put it on the website;
@@ -157,7 +157,7 @@ it was sold alongside.
 
 ### `pass_admissions`
 
-The ledger. One row per redemption: `passId`, `ticketId` (UNIQUE — one ticket is one admission),
+The ledger. One row per redemption: `passId`, `ticketId` (UNIQUE, one ticket is one admission),
 `performanceId`, `redeemedAt`, `redeemedByUserId`.
 
 `UNIQUE (passId, performanceId)` is the entitlement rule, enforced by the database rather than by
@@ -169,7 +169,7 @@ matters: it is the only thing that will hold under a double-submit.
 ### Selling a pass at the box office
 
 1. Staff open **Sell pass** from the box office screen.
-2. Look up or create the customer by email — same shadow-account path as a walk-in booking.
+2. Look up or create the customer by email: same shadow-account path as a walk-in booking.
 3. Pick pass type and price variant. Take the money as cash or card, as now.
 4. `POST /api/passes` → creates the `passes` row, returns the reference.
 5. Confirmation email with the reference and the list of covered shows.
@@ -177,10 +177,10 @@ matters: it is the only thing that will hold under a double-submit.
 If the sale happens during a performance transaction, pass `reservationId` so the pass and the
 night's takings are linked.
 
-### Redeeming — online, logged in
+### Redeeming: online, logged in
 
 In the booking flow, a logged-in user with an `ACTIVE` pass covering that show sees an extra option:
-**Use my pass — £0**. Selecting it books a normal reservation containing one pass-admission ticket.
+**Use my pass: £0**. Selecting it books a normal reservation containing one pass-admission ticket.
 Everything downstream is unchanged.
 
 **Built.** The option comes from `/api/bookings/my-options`, and `POST /api/passes/mine/redeem`
@@ -192,7 +192,7 @@ seat.
 Guests cannot redeem: there is no identity to redeem against. That is the intended consequence of
 account-binding, and it is a mild incentive for holders to hold an account.
 
-### Redeeming — at the door
+### Redeeming: at the door
 
 1. Staff search by pass reference, name or email in the box office screen.
 2. The pass card shows: holder, status, validity, whether this performance is covered, and whether
@@ -215,12 +215,12 @@ Rejection reasons, all of which need a sentence of copy a volunteer can read out
 
 | Reason | What the door says |
 |---|---|
-| `PASS_NOT_ACTIVE` | "This pass has been cancelled — please see the Box Office Manager." |
+| `PASS_NOT_ACTIVE` | "This pass has been cancelled: please see the Box Office Manager." |
 | `OUTSIDE_VALIDITY` | "This pass ran to 31 March; it doesn't cover tonight." |
-| `SHOW_NOT_COVERED` | "This pass covers the In House season — this one's an External hire." |
+| `SHOW_NOT_COVERED` | "This pass covers the In House season: this one's an External hire." |
 | `ALREADY_REDEEMED` | "This pass has already been used for this performance." |
 | `PERFORMANCE_NOT_ON_SALE` | staff override permitted |
-| `SOLD_OUT` | "We're full tonight, I'm afraid — the pass doesn't reserve a seat." |
+| `SOLD_OUT` | "We're full tonight, I'm afraid: the pass doesn't reserve a seat." |
 
 Do not reimplement this check in the UI. There are already five copies of the ticket-price
 resolution rule in this codebase ([06-pricing-and-ticket-types](./06-pricing-and-ticket-types.md));
@@ -231,9 +231,9 @@ do not start a sixth family.
 Pass revenue lives on `passes.pricePaid`, not on a ticket. That means **every revenue query must
 union two sources**, and the ones that exist today do not:
 
-- `GET /api/admin/stats` — revenue currently sums `tickets.pricePaid` for `COLLECTED`/`DOOR`,
+- `GET /api/admin/stats`: revenue currently sums `tickets.pricePaid` for `COLLECTED`/`DOOR`,
   non-refunded. Add pass revenue by `issuedAt`.
-- `GET /api/admin/export/tickets` — the treasurer's CSV. Either add a pass column or ship a second
+- `GET /api/admin/export/tickets`: the treasurer's CSV. Either add a pass column or ship a second
   export; a second export is cleaner, since a pass is not a per-performance line.
 - Anything showing "revenue by show" needs a decision: **a pass admission earns £0 for the show it
   is used on.** Attributing a share of the pass price across the shows a holder attended is possible
@@ -244,7 +244,7 @@ union two sources**, and the ones that exist today do not:
 New reports worth having, none of which were possible before:
 
 - Passes sold this season, against `maxIssued` and against last year.
-- Admissions per pass — the utilisation number that tells you whether the price is right.
+- Admissions per pass: the utilisation number that tells you whether the price is right.
 - Holders who have not renewed. This is the first time the theatre can have a renewal list at all.
 
 ## 6. Capacity and overselling
@@ -256,7 +256,7 @@ Three mitigations, in order of importance:
 
 1. **Pass admissions consume capacity like any other ticket**, because they *are* tickets. There is
    no separate pool to reconcile. This is the main protection and it is free.
-2. **`passTypes.maxIssued`** — a hard cap, checked at sale.
+2. **`passTypes.maxIssued`**: a hard cap, checked at sale.
 3. **A pass-pressure readout** on the box office performance view: passes issued that cover this
    show, against remaining capacity. A number a human can act on, not an alert.
 
@@ -274,7 +274,7 @@ passes without new code, because `validFrom`/`validTo` is doing the work:
 | **Day Pass** (£10) | Same scope. Validity = one calendar day |
 | **Performer Pass** (£10) | Same scope and validity as the festival pass; `notes` records eligibility |
 
-A day pass is not a different kind of object — it is a pass whose validity window happens to be
+A day pass is not a different kind of object: it is a pass whose validity window happens to be
 24 hours. The only thing needed for StuFF 2027 is data entry, plus a decision about whether performer
 eligibility should be enforced (recommend not: the box office knows who is performing, and encoding
 it means a cast list in the database).
@@ -284,7 +284,7 @@ Fringe/Edinburgh transfers, and anything sold by an external venue, stay outside
 ## 8. What happens to the historic pass data
 
 Nothing is retro-fitted. The legacy import maps historic pass activity onto archived ticket types of
-kind `PASS_SALE` and `PASS_ADMISSION` — 135 sales and 1,186 admissions — and creates **no `passes`
+kind `PASS_SALE` and `PASS_ADMISSION` (135 sales and 1,186 admissions) and creates **no `passes`
 rows**, because no holder was ever recorded and inventing one would be fabricating an archive.
 
 The consequence to document: revenue from the legacy period sits in `tickets.pricePaid`, revenue
@@ -299,13 +299,13 @@ See [ADR-0003](./decisions/0003-legacy-ticketing-import.md).
 |---|---|---|
 | **1** ✅ | Schema + migration (`0011`); `seasons` and `shows.seasonId`; pass type admin at `/admin/passes`; sell and admit at the box office; `canRedeem` in `server/utils/passes.ts` | **Built August 2026** |
 | **2** | Online redemption in the booking flow for logged-in holders; pass in "my account" | Ideally the same term; season is usable without it |
-| **3** | Reporting — pass revenue in stats, utilisation, renewal list | End of Autumn term, when you first want the numbers |
+| **3** | Reporting: pass revenue in stats, utilisation, renewal list | End of Autumn term, when you first want the numbers |
 | **4** | Festival pass types for StuFF | Spring, ahead of the festival |
 
 Phase 1 depends on `ticket_types.kind`, which is introduced by the legacy-import migration
 (`0009`). If passes ship first, move that column into the passes migration.
 
-**Do not build:** online pass *purchase* (there is no payment integration at all — see
+**Do not build:** online pass *purchase* (there is no payment integration at all: see
 [02-architecture](./02-architecture.md)), pass PDFs or wallet passes, transfer between holders, or
 partial refunds. None are needed to sell a pass in September.
 
@@ -320,7 +320,7 @@ request is not a purchase and not a pass.
    utilisation figure.
 2. **Does the pass cover External hires?** Legacy allowed it per-show via an `allow_season_tickets`
    flag that visiting companies presumably negotiated. Only 10 admissions in a decade, so the
-   simplest answer is no — but it is the hirer's revenue, so it is a conversation, not a default.
+   simplest answer is no, but it is the hirer's revenue, so it is a conversation, not a default.
 3. **Does a pass guarantee entry?** §2 says no. Confirm before anything is printed.
 4. **Concessions.** Two price variants exist today. A student/concession pass would be a third row,
    not new code.

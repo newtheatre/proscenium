@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
 import { manageShifts } from '~~/shared/utils/abilities'
 
-/** DELETE /api/shifts/:id — remove a slot from the rota. */
+/** DELETE /api/shifts/:id. Remove a slot from the rota. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageShifts)
 

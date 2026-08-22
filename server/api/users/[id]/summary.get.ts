@@ -3,7 +3,7 @@ import { count, desc, eq } from 'drizzle-orm'
 import { canVerifyAccess, readUser } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/users/:id/summary — everything this app knows about one person's
+ * GET /api/users/:id/summary: everything this app knows about one person's
  * relationship with it. Identity itself belongs to stage-door (docs/04).
  */
 export default defineEventHandler(async (event) => {

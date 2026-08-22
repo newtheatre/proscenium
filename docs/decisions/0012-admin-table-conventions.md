@@ -14,7 +14,7 @@ wrappers (`min-h-screen … p-6`, `p-6 space-y-8`, `space-y-8`, bare `flex flex-
 
 **A render loop with no fixed point.** `UTable` rebuilds its TanStack row models whenever its `data`
 changes *identity*, and rebuilding writes back through `v-model:pagination`, `:row-selection` and
-`:column-visibility` — which re-renders the page. Binding `:data="data ?? []"` against a value that
+`:column-visibility`, which re-renders the page. Binding `:data="data ?? []"` against a value that
 is null until a fetch resolves therefore allocates a fresh array per render, and each render causes
 the next. `/admin/ticket-types` locked the browser tab.
 
@@ -54,5 +54,5 @@ to one.
 - The render loop is closed at the binding, not only by server-rendering the fetch. Server rendering
   removes the null window; the array-identity rule is what makes it safe regardless.
 - `AdminFetchError` exists because no admin page previously rendered anything for a failed fetch. An
-  empty table reads exactly like "there are no venues" — the worst message to show someone who is
+  empty table reads exactly like "there are no venues": the worst message to show someone who is
   about to create a duplicate.

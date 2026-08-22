@@ -51,7 +51,7 @@ if (error.value) {
 }
 
 // The server moved the token into a cookie on first use, so take it out of the
-// address bar — it would otherwise sit in history and Referer.
+// address bar: it would otherwise sit in history and Referer.
 onMounted(() => {
   if (!accessToken) return
   const url = new URL(window.location.href)

@@ -1,5 +1,5 @@
 <!--
-Create a pass product. Pick the covered shows explicitly — the scope is a
+Create a pass product. Pick the covered shows explicitly: the scope is a
 list, not a rule, and stays editable afterwards (ADR-0002).
 -->
 <script setup lang="ts">
@@ -39,7 +39,7 @@ const slug = computed(() =>
     .replace(/^-+|-+$/g, ''),
 )
 
-// Only shows with a future performance are plausible pass scope — the imported
+// Only shows with a future performance are plausible pass scope: the imported
 // archive would otherwise swamp the picker.
 const { data: shows } = useFetch<Paginated<ShowOption>>('/api/shows', {
   query: { scope: 'upcoming', view: 'options', limit: 500 },
@@ -113,7 +113,7 @@ async function save() {
   <UModal
     v-model:open="modelOpen"
     title="New pass type"
-    description="A pass product — what it is called, when it is valid, what it costs and which shows it covers."
+    description="A pass product: what it is called, when it is valid, what it costs and which shows it covers."
   >
     <template #body>
       <div class="space-y-4">
@@ -242,7 +242,7 @@ async function save() {
             class="w-full"
           />
           <template #help>
-            Only shows with an upcoming performance are listed. Editable later —
+            Only shows with an upcoming performance are listed. Editable later:
             adding a show grants it to every existing holder.
           </template>
         </UFormField>

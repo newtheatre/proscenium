@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { and, asc, eq, gte, isNull, lte, ne } from 'drizzle-orm'
 import { workFoh } from '~~/shared/utils/abilities'
 
-/** GET /api/bar/tonight — the till's opening state: session, products, prices. */
+/** GET /api/bar/tonight: the till's opening state: session, products, prices. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

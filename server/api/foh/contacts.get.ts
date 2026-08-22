@@ -5,7 +5,7 @@ import { workFoh } from '~~/shared/utils/abilities'
 
 const querySchema = z.object({ performanceId: z.string().trim().min(1) })
 
-/** GET /api/foh/contacts — who is on tonight, and the numbers to call. */
+/** GET /api/foh/contacts: who is on tonight, and the numbers to call. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

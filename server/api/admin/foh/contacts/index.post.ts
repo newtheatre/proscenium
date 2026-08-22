@@ -10,7 +10,7 @@ const bodySchema = z.object({
   sort: z.coerce.number().int().min(0).max(999).optional().default(0),
 })
 
-/** POST /api/admin/foh/contacts — add a number the door may need. */
+/** POST /api/admin/foh/contacts: add a number the door may need. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageFohReference)
 

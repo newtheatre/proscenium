@@ -6,7 +6,7 @@ export default defineAppConfig({
       neutral: 'neutral',
     },
     /**
-     * The admin table look — a theme, not a per-page decision (ADR-0012). UTable
+     * The admin table look: a theme, not a per-page decision (ADR-0012). UTable
      * merges this under any `:ui` a page passes.
      */
     table: {

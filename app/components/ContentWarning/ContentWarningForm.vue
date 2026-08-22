@@ -1,5 +1,5 @@
 <!--
-The fields, shared by the create and edit modals — the rules about which
+The fields, shared by the create and edit modals: the rules about which
 apply are easy to get subtly different.
 -->
 <script setup lang="ts">

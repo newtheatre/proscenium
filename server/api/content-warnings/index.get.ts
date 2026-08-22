@@ -10,7 +10,7 @@ const querySchema = z.object({
 })
 
 /**
- * GET /api/content-warnings — the warning vocabulary.
+ * GET /api/content-warnings: the warning vocabulary.
  */
 export default defineEventHandler(async (event) => {
   await authorize(event, listContentWarnings)
@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
     .from(schema.contentWarnings)
     .where(filters.length ? and(...filters) : undefined)
     .orderBy(
-      // Technical first — not `asc(kind)`, which would sort GENERAL above it.
+      // Technical first: not `asc(kind)`, which would sort GENERAL above it.
       sql`CASE ${schema.contentWarnings.kind} WHEN 'TECHNICAL' THEN 0 ELSE 1 END`,
       asc(schema.contentWarnings.sort),
       asc(schema.contentWarnings.title),

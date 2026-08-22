@@ -8,28 +8,28 @@ import { isAdmin, isAdminOrManager, isStaff } from './types'
 
 // ── Show abilities ───────────────────────────────────────────────
 
-/** List shows via /api/shows (exposes drafts and internal fields) — staff only. */
+/** List shows via /api/shows (exposes drafts and internal fields): staff only. */
 export const listShows = defineAbility((user: AbilityUser) => isStaff(user))
 
-/** Create a show — ADMIN and MANAGER. */
+/** Create a show: ADMIN and MANAGER. */
 export const createShow = defineAbility((user: AbilityUser) => isAdminOrManager(user))
 
-/** Read a show via /api/shows/:id (exposes drafts and internal fields) — staff only. */
+/** Read a show via /api/shows/:id (exposes drafts and internal fields): staff only. */
 export const readShow = defineAbility((user: AbilityUser) => isStaff(user))
 
-/** Update a show — ADMIN and MANAGER. */
+/** Update a show: ADMIN and MANAGER. */
 export const updateShow = defineAbility((user: AbilityUser) => isAdminOrManager(user))
 
-/** Delete a show — ADMIN only. */
+/** Delete a show: ADMIN only. */
 export const deleteShow = defineAbility((user: AbilityUser) => isAdmin(user))
 
 // ── Performance abilities ────────────────────────────────────────
 
-/** Create a performance — ADMIN and MANAGER. */
+/** Create a performance: ADMIN and MANAGER. */
 export const createPerformance = defineAbility((user: AbilityUser) => isAdminOrManager(user))
 
-/** Update a performance — ADMIN and MANAGER. */
+/** Update a performance: ADMIN and MANAGER. */
 export const updatePerformance = defineAbility((user: AbilityUser) => isAdminOrManager(user))
 
-/** Delete a performance — ADMIN and MANAGER. */
+/** Delete a performance: ADMIN and MANAGER. */
 export const deletePerformance = defineAbility((user: AbilityUser) => isAdminOrManager(user))

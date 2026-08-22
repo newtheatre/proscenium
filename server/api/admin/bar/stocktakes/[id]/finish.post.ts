@@ -8,7 +8,7 @@ const bodySchema = z.object({
   notes: z.string().trim().max(500).nullable().optional(),
 }).optional().default({})
 
-/** POST /api/admin/bar/stocktakes/:id/finish — apply the count as movements. */
+/** POST /api/admin/bar/stocktakes/:id/finish: apply the count as movements. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
   const id = getRouterParam(event, 'id')!

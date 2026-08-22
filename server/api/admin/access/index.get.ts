@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { asc, eq, ne, sql } from 'drizzle-orm'
 import { verifyAccess } from '~~/shared/utils/abilities'
 
-/** GET /api/admin/access — profiles to verify, waiting ones first. */
+/** GET /api/admin/access: profiles to verify, waiting ones first. */
 export default defineEventHandler(async (event) => {
   await authorize(event, verifyAccess)
 

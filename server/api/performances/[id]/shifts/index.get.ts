@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { asc, eq } from 'drizzle-orm'
 import { listShifts } from '~~/shared/utils/abilities'
 
-/** GET /api/performances/:id/shifts — the rota for one performance. */
+/** GET /api/performances/:id/shifts: the rota for one performance. */
 export default defineEventHandler(async (event) => {
   await authorize(event, listShifts)
 

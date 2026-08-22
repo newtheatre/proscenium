@@ -17,7 +17,7 @@ definePageMeta({
   <div class="flex flex-col gap-6">
     <UPageCard
       title="Profile"
-      description="Your NNT account is shared across all NNT sites — changes made there apply everywhere."
+      description="Your NNT account is shared across all NNT sites: changes made there apply everywhere."
       variant="subtle"
     >
       <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">

@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { and, asc, eq, gt, lte, or, isNull } from 'drizzle-orm'
 
 /**
- * GET /api/pass-types/on-sale — what a member may ask for. Public, because a
+ * GET /api/pass-types/on-sale: what a member may ask for. Public, because a
  * requester cannot ask for something they cannot see (ADR-0028).
  */
 export default defineEventHandler(async () => {

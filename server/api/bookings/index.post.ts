@@ -24,7 +24,7 @@ const bodySchema = z.object({
 })
 
 /**
- * POST /api/bookings — create a new public booking.
+ * POST /api/bookings: create a new public booking.
  */
 export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, bodySchema.parse)
@@ -79,7 +79,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Staff endpoints do not call this — the box office takes walk-ups after
+  // Staff endpoints do not call this: the box office takes walk-ups after
   // online booking closes, which is the point of closing it early.
   assertBookingOpen(performance)
 
@@ -101,7 +101,7 @@ export default defineEventHandler(async (event) => {
   else {
     const config = useRuntimeConfig(event)
     if (!config.authServiceToken) {
-      throw createError({ statusCode: 502, statusMessage: 'Booking is temporarily unavailable — please try again shortly' })
+      throw createError({ statusCode: 502, statusMessage: 'Booking is temporarily unavailable, please try again shortly' })
     }
 
     let shadow: { id: string, existing: boolean }
@@ -119,12 +119,12 @@ export default defineEventHandler(async (event) => {
       // Fail the booking with a retry message rather than inventing a local id that
       // would diverge from the canonical store.
       console.error('[bookings] shadow-account call failed:', error)
-      throw createError({ statusCode: 502, statusMessage: 'Booking is temporarily unavailable — please try again shortly' })
+      throw createError({ statusCode: 502, statusMessage: 'Booking is temporarily unavailable, please try again shortly' })
     }
 
     resolvedUserId = shadow.id
     // Mirror row may not exist yet (new shadow, or existing user who has
-    // never hit this app since cutover) — upsert it in the booking batch.
+    // never hit this app since cutover): upsert it in the booking batch.
     const mirror = await db
       .select({ id: schema.users.id })
       .from(schema.users)

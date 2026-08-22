@@ -25,7 +25,7 @@ there.
 - `DELETE` remains available and is **refused** while anything references the row, with an
   explanation rather than a raw foreign-key 500.
 - The same shape applies to users: `reservations.userId` is `restrict`, so a customer with booking
-  history cannot be deleted. The answer there is anonymisation — see
+  history cannot be deleted. The answer there is anonymisation: see
   [ADR-0014](0014-anonymise-never-delete.md).
 
 `archived` is distinct from `activeByDefault` on ticket types, and the two answer different
@@ -44,6 +44,6 @@ leaves the decision with a human.
 - Retiring something is reversible. Deleting it, where permitted, is not.
 - Pickers stay short without the history becoming unreadable.
 - Every screen that lists these records needs an "include archived" mode; exactly one screen per
-  vocabulary uses it — the page where archiving and restoring happen.
+  vocabulary uses it: the page where archiving and restoring happen.
 - The `restrict` keys are a backstop, not the primary guard. The application refuses first so a
   volunteer gets an explanation; the constraint catches the paths nobody has thought of yet.

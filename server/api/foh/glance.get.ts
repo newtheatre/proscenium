@@ -5,7 +5,7 @@ import { workFoh } from '~~/shared/utils/abilities'
 
 const querySchema = z.object({ performanceId: z.string().trim().min(1) })
 
-/** GET /api/foh/glance — the numbers, and what the door gets asked. */
+/** GET /api/foh/glance: the numbers, and what the door gets asked. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

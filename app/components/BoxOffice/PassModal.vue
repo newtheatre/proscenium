@@ -143,7 +143,7 @@ watch(modelOpen, (isOpen) => {
 const selectedType = computed(() => onSaleTypes.value.find(t => t.id === sellTypeId.value))
 const priceOptions = computed(() =>
   (selectedType.value?.prices ?? []).filter(p => p.active)
-    .map(p => ({ label: `${p.label} — £${(p.price / 100).toFixed(2)}`, value: p.id })),
+    .map(p => ({ label: `${p.label}, £${(p.price / 100).toFixed(2)}`, value: p.id })),
 )
 
 watch(sellTypeId, () => {
@@ -169,7 +169,7 @@ async function sell() {
     })
     toast.add({
       title: 'Pass sold',
-      description: `Reference ${created.reference} — take payment as usual.`,
+      description: `Reference ${created.reference}, take payment as usual.`,
       icon: 'i-lucide-check-circle',
       color: 'success',
     })
@@ -359,7 +359,7 @@ async function sell() {
                 class="w-full"
               />
               <template #help>
-                A pass belongs to a person — this is how they are found at the
+                A pass belongs to a person: this is how they are found at the
                 door and how renewals reach them.
               </template>
             </UFormField>

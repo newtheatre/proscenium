@@ -32,7 +32,7 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
   const djanogly = venues.find(v => v.name === 'Djanogly Theatre')
 
   if (!newTheatre || !lakeside || !djanogly) {
-    throw new Error('Required venues not found — run venue seed first')
+    throw new Error('Required venues not found: run venue seed first')
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
       slug: 'into-the-woods',
       title: 'Into the Woods',
       subtitle: null,
-      description: 'Sondheim and Lapine\'s beloved musical interweaves classic fairy tales to explore the consequences of wishes — and what happens after "happily ever after".',
+      description: 'Sondheim and Lapine\'s beloved musical interweaves classic fairy tales to explore the consequences of wishes, and what happens after "happily ever after".',
       status: 'DRAFT' as const,
     },
     {
@@ -101,7 +101,7 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
   // whenever the seed runs.
 
   const performancesToCreate = [
-    // The Importance of Being Earnest — completed run at New Theatre
+    // The Importance of Being Earnest: completed run at New Theatre
     {
       showId: earnest.id,
       venueId: newTheatre.id,
@@ -148,7 +148,7 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
       status: 'ON_SALE' as const,
     },
 
-    // Hamlet — currently running at New Theatre
+    // Hamlet: currently running at New Theatre
     {
       showId: hamlet.id,
       venueId: newTheatre.id,
@@ -205,7 +205,7 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
       status: 'ON_SALE' as const,
     },
 
-    // Oscar Night — free one-off event at New Theatre, one week from seeding date
+    // Oscar Night: free one-off event at New Theatre, one week from seeding date
     {
       showId: oscars.id,
       venueId: newTheatre.id,
@@ -216,7 +216,7 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
       status: 'ON_SALE' as const,
     },
 
-    // Into the Woods — upcoming draft at Lakeside Arts
+    // Into the Woods: upcoming draft at Lakeside Arts
     {
       showId: intoTheWoods.id,
       venueId: lakeside.id,
@@ -268,7 +268,7 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
   console.log(`  ✅ Created ${seededPerformances.length} performances`)
 
   // ── Ticket Type Overrides ─────────────────────────────────────────────────
-  // Oscar Night is a free event — disable all paid ticket types and enable Complimentary.
+  // Oscar Night is a free event: disable all paid ticket types and enable Complimentary.
   const resolvedTicketTypes = ticketTypes ?? await db.select().from(ticketTypesTable)
   const overridesToCreate = resolvedTicketTypes
     .filter(tt => tt.price > 0 || tt.name === 'Complimentary')
@@ -311,7 +311,7 @@ export async function seedShows(venues: SeededVenues, ticketTypes?: TicketType[]
     console.log(`  ✅ Created ${hamletWarnings.length} content warnings for Hamlet`)
   }
   else {
-    console.log('  ⚠️  No content warning vocabulary found — run migrations first')
+    console.log('  ⚠️  No content warning vocabulary found: run migrations first')
   }
 
   await db.update(shows).set({ warningsConfirmedNone: true }).where(eq(shows.id, earnest.id))
@@ -327,6 +327,6 @@ export function printShowsSummary(
   console.log('\n🎭 Shows:')
   for (const show of seededShows) {
     const count = seededPerformances.filter(p => p.showId === show.id).length
-    console.log(`  • [${show.status}] ${show.title} — ${count} performance${count !== 1 ? 's' : ''}`)
+    console.log(`  • [${show.status}] ${show.title}: ${count} performance${count !== 1 ? 's' : ''}`)
   }
 }

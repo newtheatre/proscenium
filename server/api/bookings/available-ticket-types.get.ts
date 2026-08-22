@@ -3,7 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { createReservation } from '~~/shared/utils/abilities'
 
 /**
- * GET /api/bookings/available-ticket-types — effective prices and active state
+ * GET /api/bookings/available-ticket-types: effective prices and active state
  * for a performance, before any reservation exists.
  */
 export default defineEventHandler(async (event) => {

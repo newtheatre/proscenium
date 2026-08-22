@@ -361,7 +361,7 @@ async function stampShifts() {
             v-for="row in unstaffed"
             :key="row.performanceId"
           >
-            {{ formatDateTime(row.startsAt) }} — {{ row.showTitle }} ({{ row.venueName }})
+            {{ formatDateTime(row.startsAt) }}: {{ row.showTitle }} ({{ row.venueName }})
           </li>
         </ul>
       </template>

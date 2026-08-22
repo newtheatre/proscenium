@@ -7,8 +7,8 @@
 `/admin/box-office/reservations` exists to work tonight's door. It is used by front-of-house
 volunteers, under time pressure, in a foyer.
 
-It originally built its performance navigator by loading `/api/shows` with no query string — every
-show in the archive, 498 of them with 1,304 performances nested — to render one dropdown.
+It originally built its performance navigator by loading `/api/shows` with no query string: every
+show in the archive, 498 of them with 1,304 performances nested: to render one dropdown.
 
 Making the whole archive reachable from that screen is also a correctness problem, not only a
 performance one. Landing on a show that finished last March invites collecting tickets against the
@@ -32,7 +32,7 @@ wrong night, and there is no workflow on this screen that needs a finished perfo
 
 The navigator is fed by `GET /api/performances`, a flat chronological list that exists because the
 box office wants exactly that and nothing else. Its `near` mode returns the performances *closest to*
-a date — half before, half after — rather than a fixed window: the theatre goes quiet over the
+a date (half before, half after) rather than a fixed window: the theatre goes quiet over the
 summer, so any fixed window is sometimes empty, and an empty navigator on the door is worse than an
 old one.
 

@@ -11,7 +11,7 @@ const querySchema = z.object({
 })
 
 /**
- * GET /api/ticket-types — list ticket types.
+ * GET /api/ticket-types: list ticket types.
  */
 export default defineEventHandler(async (event) => {
   const { includeArchived } = await getValidatedQuery(event, querySchema.parse)

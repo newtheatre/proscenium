@@ -1,6 +1,6 @@
 # Domain model
 
-The schema lives in `server/db/schema/` — five files: `show.ts`, `venue.ts`, `ticket.ts`,
+The schema lives in `server/db/schema/`: five files: `show.ts`, `venue.ts`, `ticket.ts`,
 `reservation.ts`, `user.ts`. Migrations are in `server/db/migrations/sqlite/`, `0000` to `0008`.
 
 Read this before changing the schema. Several of the constraints below are load-bearing in ways
@@ -30,10 +30,10 @@ erDiagram
 
 Four groups:
 
-- **Programme** — `shows` → `performances` → `venues` (+ `venue_features`). What is on, when, where.
-- **Money** — `ticket_types` with two layers of override. What things cost.
-- **Sales** — `users` → `reservations` → `tickets`. Who is coming and what they paid.
-- **Staffing** — `performance_shifts` (+ `shift_templates`). Who is working, which is also what
+- **Programme**: `shows` → `performances` → `venues` (+ `venue_features`). What is on, when, where.
+- **Money**: `ticket_types` with two layers of override. What things cost.
+- **Sales**: `users` → `reservations` → `tickets`. Who is coming and what they paid.
+- **Staffing**: `performance_shifts` (+ `shift_templates`). Who is working, which is also what
   scopes the show night screen ([ADR-0019](./decisions/0019-the-rota-scopes-the-front-of-house-role.md)).
 
 ## Entities
@@ -54,10 +54,10 @@ A production. The top-level programming unit.
 **Invariants and gotchas**
 
 - A show is only visible on `/whats-on` when `PUBLISHED`. It is visible on `GET /api/shows`
-  regardless — see [09-known-issues](./09-known-issues.md#drafts-are-public).
+  regardless: see [09-known-issues](./09-known-issues.md#drafts-are-public).
 - `slug` uniqueness is enforced by index *and* checked in the handler. Both are needed: the handler
   check gives a decent error, the index prevents the race.
-- Deleting a show cascades to performances, and thence would cascade into reservations — except
+- Deleting a show cascades to performances, and thence would cascade into reservations: except
   `reservations.performanceId` is `onDelete: restrict`, so the delete fails instead. That is
   deliberate. Do not relax it.
 
@@ -105,7 +105,7 @@ resolution rules.
 
 `show_ticket_type_overrides` and `performance_ticket_type_overrides` both carry a nullable `price`
 and a nullable `active`, unique on `(showId, ticketTypeId)` and `(performanceId, ticketTypeId)`
-respectively. **`NULL` at a layer means "inherit", not "unset"** — this is the single most
+respectively. **`NULL` at a layer means "inherit", not "unset"**: this is the single most
 misread thing in the schema.
 
 ### `users`
@@ -116,19 +116,19 @@ central auth service (stage-door); migration 0014 dropped `password`, `email_ver
 
 | Column | Notes |
 |---|---|
-| `id` | The auth service's canonical id. **Never regenerate or reuse one** — `reservations.user_id` FKs against it |
+| `id` | The auth service's canonical id. **Never regenerate or reuse one**: `reservations.user_id` FKs against it |
 | `email` | **UNIQUE, NOT NULL**, lowercase (canonical store convention) |
 | `name` | NOT NULL |
 | `anonymisedAt` | Set when the person has been erased; the row and its bookings stay |
 
 Rows appear via `ensureLocalUser` (an idempotent primary-key upsert from the session) or, for guest
 checkout, from `POST /api/users/shadow` on the auth service. The FK is `onDelete: 'restrict'`, so
-nobody with booking history can be deleted — erasure rewrites instead of removing, which is why
+nobody with booking history can be deleted: erasure rewrites instead of removing, which is why
 `anonymisedAt` exists. See [04-auth-and-permissions](./04-auth-and-permissions.md#erasure).
 
 **Shadow accounts.** A guest who books without registering gets a real central account with no
 password, mirrored here like any other. `session.user.guest` distinguishes them. There is no local
-flag, and there should not be one — this app cannot see credentials.
+flag, and there should not be one: this app cannot see credentials.
 
 ### `reservations`
 
@@ -136,15 +136,15 @@ A customer's booking for one performance.
 
 | Column | Notes |
 |---|---|
-| `bookingRef` | 6 chars from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` — no O/0, no I/L/1. **UNIQUE** |
-| `performanceId` | FK, `restrict`. **NOT NULL — a reservation is always for exactly one performance** |
+| `bookingRef` | 6 chars from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`: no O/0, no I/L/1. **UNIQUE** |
+| `performanceId` | FK, `restrict`. **NOT NULL: a reservation is always for exactly one performance** |
 | `userId` | FK, `restrict`. NOT NULL |
 | `status` | `PENDING` \| `COLLECTED` \| `DOOR` \| `CANCELLED` \| `NO_SHOW` |
 | `cancelledBy` | `CUSTOMER` \| `STAFF`, nullable |
 | `customerNotes` | Written by the customer at booking. Access needs, dietary, etc. |
 | `staffNotes` | Internal. **Never render this to a customer** |
 
-**`performanceId` being NOT NULL is why passes need their own entity** — a multi-performance
+**`performanceId` being NOT NULL is why passes need their own entity**: a multi-performance
 product cannot be a reservation. See [10-passes-design](./10-passes-design.md).
 
 The `restrict` on `userId` is deliberate and commented in the schema: it stops someone deleting a
@@ -157,7 +157,7 @@ One issued seat. The atom of both capacity and money.
 | Column | Notes |
 |---|---|
 | `reservationId` | FK, `restrict` |
-| `performanceId` | FK, `restrict`. Denormalised from the reservation — see below |
+| `performanceId` | FK, `restrict`. Denormalised from the reservation: see below |
 | `ticketTypeId` | FK, `restrict` |
 | `pricePaid` | **integer pence, snapshot at time of issue** |
 | `refundedAt` | nullable timestamp |
@@ -247,7 +247,7 @@ blocks the author re-point that an estate account merge performs
 ([ADR-0025](./decisions/0025-every-user-reference-joins-the-estate-hooks.md)), and because
 stage-door retries a failing hook indefinitely, that is a merge which can never complete. Migration
 `0019` had exactly that bug and `0023` fixes it. Any future append-only table with a user column
-needs the same scoping — what was written stays immutable; who the row points at is estate
+needs the same scoping: what was written stays immutable; who the row points at is estate
 bookkeeping.
 
 ### `backstage_nights`, `backstage_sessions`
@@ -294,11 +294,11 @@ The Challenge 25 register ([ADR-0027](./decisions/0027-the-refusals-register-is-
 
 `ACCEPTED` rows are a **bare tally** and carry no detail at all: the ratio of accepted to refused is
 the evidence that the policy is operated rather than merely displayed. Only refusals carry a reason,
-what was asked for, and a description — which is *"tall man, grey coat"* and **never a name**. There
+what was asked for, and a description, which is *"tall man, grey coat"* and **never a name**. There
 is nowhere to put a photograph, and there must not be.
 
 Append-only, enforced by triggers in migration `0025`, **scoped to the content columns** so an
-estate merge can still re-point `checked_by_user_id` — see the `incident_log` note above for why
+estate merge can still re-point `checked_by_user_id`: see the `incident_log` note above for why
 that scoping is not optional.
 
 ### `access_profiles`
@@ -311,7 +311,7 @@ Design: [12-access-and-staffing](./12-access-and-staffing-design.md) §2.
 - `consentFohAt` is **null until somebody ticks the box**, and null means nothing is shown to anyone
   on a show night. It is the lawful basis, so it is never inferred from anything else.
 - The needs are the **eight Access Card symbols plus a companion count**, which are operational
-  statements — "needs level access" — and never a diagnosis. There is no free-text field for one.
+  statements ("needs level access") and never a diagnosis. There is no free-text field for one.
 - `accessCardNumber` is recorded only if offered. **Evidence is viewed, never stored**: no document,
   scan or letter enters this system, and there is nowhere to put one.
 
@@ -342,8 +342,8 @@ bottle with `depletes_milli = 233`; a bottled beer points at itself with `1000`.
 something that itself depletes another is refused, because a bundle of bundles is a different design
 (§3.1).
 
-**Discounts are percentage, and bar lines only.** They never touch a ticket line — ticket prices have
-their own override chain — and they are snapshotted onto a transaction when used, so changing the
+**Discounts are percentage, and bar lines only.** They never touch a ticket line: ticket prices have
+their own override chain, and they are snapshotted onto a transaction when used, so changing the
 committee rate next year does not rewrite history.
 
 ### `transactions`, `transaction_lines`
@@ -353,14 +353,14 @@ One row per SumUp tap or comp, whatever mix of ticket payments, walk-ups and bar
 
 [ADR-0011](./decisions/0011-collection-is-the-payment-boundary.md) still says *when* money is taken:
 collection is the boundary. This says *what was taken*, and the two are written in **one
-`db.batch()`** — both, or neither. D1 has no interactive transactions, so nothing here takes a
+`db.batch()`**: both, or neither. D1 has no interactive transactions, so nothing here takes a
 transaction handle; the builders return statements and the caller batches them.
 
 - **`takenOn` is the Europe/London calendar day**, computed server-side. The Worker runs in UTC, so
   a 23:30 sale in August lands on tomorrow's reader total without it.
 - **Two questions, two keys.** *Did today balance* is `taken_on`. *How did that show do* is
   `transaction_lines.performance_id`. An advance payment belongs to one of each and to neither of
-  the others — confusing them is the bug this shape exists to prevent.
+  the others: confusing them is the bug this shape exists to prevent.
 - **Line amounts are gross.** The discount lives on the transaction, so "how much of that did we
   sell" stays honest and "how much did we give away" is one sum.
 - **`bar_session_id` carries no foreign key.** It was written before `bar_sessions` existed, and
@@ -470,10 +470,10 @@ approval must not also be the thing that grants the entitlement.
 
 Two different things are called external, and they behave in opposite directions (ADR-0029).
 
-- **`venues.is_external`** — somewhere we perform but do not run, like a festival venue. The venue
+- **`venues.is_external`**: somewhere we perform but do not run, like a festival venue. The venue
   sells the tickets. We advertise the show and link out; there is no rota, no bar and no
   end-of-night report, because none of it happens in a building we run.
-- **The `External` show category** — another company using *our* building, usually StuFF. **We sell
+- **The `External` show category**: another company using *our* building, usually StuFF. **We sell
   the tickets, run the bar and staff the front of house**, because the hire requires it. The strand
   is for the listing and for reporting, and carries no operational meaning at all.
 
@@ -515,7 +515,7 @@ A show goes `DRAFT` → `PUBLISHED` via `POST /api/shows/:id/publish`. There is 
 you must `PUT` the show back to `DRAFT`.
 
 A performance goes `DRAFT` → `ON_SALE`, or `→ CANCELLED`. Publishing a show optionally bulk-sets its
-performances to `ON_SALE` — and currently does so for cancelled ones too, which is a bug.
+performances to `ON_SALE`, and currently does so for cancelled ones too, which is a bug.
 
 ## Cross-cutting rules
 
@@ -527,12 +527,12 @@ means an insert without going through Drizzle's schema objects will produce a NU
 
 **Timestamps are inconsistent by design, and it is worth knowing which is which:**
 
-- `startsAt`, `doorsAt`, `refundedAt`, token `expiresAt` — integer unix seconds.
-- `createdAt`, `updatedAt`, `lastLogin` — text, SQLite `current_timestamp`, i.e. `YYYY-MM-DD HH:MM:SS`
+- `startsAt`, `doorsAt`, `refundedAt`, token `expiresAt`: integer unix seconds.
+- `createdAt`, `updatedAt`, `lastLogin`: text, SQLite `current_timestamp`, i.e. `YYYY-MM-DD HH:MM:SS`
   in **UTC**, no zone marker.
 
 The theatre operates in Europe/London. Nothing in the schema records that. Anything doing date
-arithmetic on the text columns must not assume local time — and anything displaying `startsAt` must
+arithmetic on the text columns must not assume local time, and anything displaying `startsAt` must
 convert to Europe/London or the 19:30 curtain will read as 18:30 for half the year.
 
 **Capacity is defined in exactly one way** and should stay that way:
@@ -553,11 +553,11 @@ Worth stating explicitly, because their absence shapes what you can build:
 - **No holds or expiry.** A `PENDING` reservation lives forever until someone acts on it.
 - **No audit log.** Nothing records who changed a reservation's status, or when. The legacy Django
   system had one (`django_admin_log`, 2,782 rows); this does not.
-- **No multi-performance product** — see passes.
+- **No multi-performance product**: see passes.
 - **No show categories or seasons.** Both are being added by the legacy migration; see
   [ADR-0003](./decisions/0003-legacy-ticketing-import.md).
 - **Content warnings** are modelled as a curated vocabulary (`content_warnings`) plus per-show links
-  carrying a level. A warning is either a technical effect — strobe, haze, loud noise, no level — or a
+  carrying a level. A warning is either a technical effect (strobe, haze, loud noise, no level) or a
   theme recorded as mentioned, discussed or depicted. `shows.warningsConfirmedNone` distinguishes
   "the company checked and there are none" from "nobody filled this in", and the public page says
   which. Manageable at `/admin/content-warnings`; see

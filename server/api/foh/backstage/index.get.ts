@@ -1,6 +1,6 @@
 import { workFoh } from '~~/shared/utils/abilities'
 
-/** GET /api/foh/backstage — tonight's code, and who has joined with it. */
+/** GET /api/foh/backstage: tonight's code, and who has joined with it. */
 export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 

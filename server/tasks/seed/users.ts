@@ -2,7 +2,7 @@ import { db } from '@nuxthub/db'
 import { users } from '~~/server/db/schema/user'
 
 /**
- * Mirror rows only — identity is central. No credentials are seeded; dev
+ * Mirror rows only: identity is central. No credentials are seeded; dev
  * sessions come from /dev-login.
  */
 export async function seedUsers() {
