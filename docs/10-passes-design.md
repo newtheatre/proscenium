@@ -305,9 +305,13 @@ See [ADR-0003](./decisions/0003-legacy-ticketing-import.md).
 Phase 1 depends on `ticket_types.kind`, which is introduced by the legacy-import migration
 (`0009`). If passes ship first, move that column into the passes migration.
 
-**Do not build:** online pass purchase (there is no payment integration at all — see
+**Do not build:** online pass *purchase* (there is no payment integration at all — see
 [02-architecture](./02-architecture.md)), pass PDFs or wallet passes, transfer between holders, or
 partial refunds. None are needed to sell a pass in September.
+
+**Still true.** A holder may now *request* a pass online and pay for it in person, which takes no
+money and creates no pass: see [ADR-0028](./decisions/0028-a-pass-request-is-not-a-pass.md). A
+request is not a purchase and not a pass.
 
 ## 10. Open questions for committee
 

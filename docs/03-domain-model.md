@@ -451,6 +451,21 @@ not silently rewrite it.
 Closing also revokes the night's backstage codes by bumping the epoch (docs/11 §5.1), so a code
 handed out at 19:00 stops working the moment the night is signed off.
 
+### `pass_requests`
+
+Asking for a pass online, when there is no way to pay for one online. **No `passes` row exists until
+the box office takes the money** (ADR-0028), so nothing here grants admission and `canRedeem` never
+sees it.
+
+- **`quoted_pence` is what the requester was shown**, which is not necessarily what they pay: prices
+  are date-effective and the box office charges the price on the day. Storing it makes a
+  discrepancy visible rather than arguable.
+- One `PENDING` request per person per pass type, so the queue does not fill with duplicates.
+- `pass_id` is set on fulfilment and points at the pass that was actually issued.
+
+The shape deliberately mirrors `comp_requests`: where an approval is the control, the thing awaiting
+approval must not also be the thing that grants the entitlement.
+
 ## Status lifecycles
 
 ### Reservation
