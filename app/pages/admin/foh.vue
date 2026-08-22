@@ -73,6 +73,17 @@ watchEffect(() => {
   }
 })
 
+/**
+ * An unfilled emergency card is a safety gap, so the table shows how complete
+ * each one is rather than making someone open all of them to find out.
+ */
+function filledCount(venue: EmergencyRow): number {
+  return FIELDS.filter(field => (venue[field.key] as string | null)?.trim()).length
+}
+
+const editingVenueId = ref<string | null>(null)
+const editingVenue = computed(() => venues.value.find(v => v.venueId === editingVenueId.value) ?? null)
+
 const saving = ref<string | null>(null)
 async function saveVenue(venueId: string) {
   saving.value = venueId
@@ -84,6 +95,7 @@ async function saveVenue(venueId: string) {
       ),
     })
     await refreshVenues()
+    editingVenueId.value = null
     toast.add({ title: 'Emergency card saved', color: 'success' })
   }
   catch {
@@ -131,49 +143,55 @@ async function setArchived(contact: Contact, archived: boolean) {
     </div>
 
     <section class="space-y-4">
-      <h2 class="text-lg font-medium">
-        Emergency card
-      </h2>
-      <UCard
-        v-for="venue in venues"
-        :key="venue.venueId"
-      >
-        <template #header>
-          <p class="font-medium">
-            {{ venue.venueName }}
-          </p>
-          <p
-            v-if="venue.venueAddress"
-            class="text-sm text-muted"
-          >
-            {{ venue.venueAddress }}
-          </p>
-        </template>
+      <div>
+        <h2 class="text-lg font-medium">
+          Emergency cards
+        </h2>
+        <p class="text-sm text-muted">
+          One per venue, read out on the show night screen. Open a venue to fill it in.
+        </p>
+      </div>
 
-        <div class="space-y-3">
-          <UFormField
-            v-for="field in FIELDS"
-            :key="field.key"
-            :label="field.label"
+      <UCard>
+        <ul class="divide-y divide-default">
+          <li
+            v-for="venue in venues"
+            :key="venue.venueId"
+            class="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
           >
-            <UTextarea
-              v-if="drafts[venue.venueId]"
-              v-model="drafts[venue.venueId]![field.key]"
-              :rows="field.key === 'evacuationProcedure' ? 4 : 2"
-              :disabled="!canEdit"
-              class="w-full"
-            />
-          </UFormField>
-        </div>
-
-        <template #footer>
-          <UButton
-            :disabled="!canEdit"
-            :loading="saving === venue.venueId"
-            label="Save"
-            @click="saveVenue(venue.venueId)"
-          />
-        </template>
+            <div>
+              <p class="font-medium">
+                {{ venue.venueName }}
+              </p>
+              <p
+                v-if="venue.venueAddress"
+                class="text-sm text-muted"
+              >
+                {{ venue.venueAddress }}
+              </p>
+            </div>
+            <div class="flex items-center gap-3">
+              <UBadge
+                variant="subtle"
+                :color="filledCount(venue) === 0 ? 'error' : filledCount(venue) < FIELDS.length ? 'warning' : 'success'"
+              >
+                {{ filledCount(venue) }} of {{ FIELDS.length }} filled
+              </UBadge>
+              <UButton
+                size="sm"
+                variant="subtle"
+                :label="canEdit ? 'Edit' : 'View'"
+                @click="editingVenueId = venue.venueId"
+              />
+            </div>
+          </li>
+          <li
+            v-if="!venues.length"
+            class="py-3 text-sm text-muted"
+          >
+            No venues yet.
+          </li>
+        </ul>
       </UCard>
     </section>
 
@@ -259,5 +277,47 @@ async function setArchived(contact: Contact, archived: boolean) {
         </p>
       </UCard>
     </section>
+
+    <UModal
+      :open="editingVenueId !== null"
+      :title="`Emergency card — ${editingVenue?.venueName ?? ''}`"
+      @update:open="value => { if (!value) editingVenueId = null }"
+    >
+      <template #body>
+        <div
+          v-if="editingVenueId && drafts[editingVenueId]"
+          class="space-y-3"
+        >
+          <UFormField
+            v-for="field in FIELDS"
+            :key="field.key"
+            :label="field.label"
+          >
+            <UTextarea
+              v-model="drafts[editingVenueId]![field.key]"
+              :rows="field.key === 'evacuationProcedure' ? 4 : 2"
+              :disabled="!canEdit"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            label="Close"
+            @click="editingVenueId = null"
+          />
+          <UButton
+            v-if="canEdit"
+            :loading="saving === editingVenueId"
+            label="Save"
+            @click="saveVenue(editingVenueId!)"
+          />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
