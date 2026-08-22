@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, count, desc, eq, gt, gte, inArray, lte, ne, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, gte, inArray, lte, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { listShows } from '~~/shared/utils/abilities'
 
@@ -32,12 +32,9 @@ export default defineEventHandler(async (event) => {
     = await getValidatedQuery(event, querySchema.parse)
 
   const filters = []
-  // Externally ticketed shows never reach the box office: front of house must
-  // not be able to sell a walk-in against one (#136). Subquery, not an id list.
-  filters.push(sql`not exists (
-    select 1 from shows s
-    where s.id = ${schema.performances.showId} and s.external_url is not null
-  )`)
+  // Externally ticketed performances never reach the box office: front of house
+  // must not be able to sell a walk-in against one (#136).
+  filters.push(ourTicketingPredicate())
   if (showId) filters.push(eq(schema.performances.showId, showId))
   if (status) filters.push(eq(schema.performances.status, status))
   else filters.push(ne(schema.performances.status, 'CANCELLED'))

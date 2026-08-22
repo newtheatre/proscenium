@@ -16,6 +16,7 @@ interface Performance {
   intervalMinutes?: number | null
   capacityOverride?: number | null
   bookingClosesHoursBefore?: number | null
+  externalBookingUrl?: string | null
   status: 'DRAFT' | 'ON_SALE' | 'CANCELLED'
   notes?: string | null
 }
@@ -43,6 +44,7 @@ const schema = z.object({
   intervalMinutes: z.number().int().positive().optional().nullable(),
   capacityOverride: z.number().int().positive().optional().nullable(),
   bookingClosesHoursBefore: z.number().int().nonnegative().max(168).optional().nullable(),
+  externalBookingUrl: z.string().trim().url('Must be a full link').nullable().optional(),
   notes: z.string().optional(),
 })
 
@@ -58,6 +60,7 @@ const state = reactive<Partial<Schema>>({
   intervalMinutes: null,
   capacityOverride: null,
   bookingClosesHoursBefore: null,
+  externalBookingUrl: null,
   notes: '',
 })
 
@@ -108,6 +111,7 @@ watch(
       state.intervalMinutes = perf.intervalMinutes ?? null
       state.capacityOverride = perf.capacityOverride ?? null
       state.bookingClosesHoursBefore = perf.bookingClosesHoursBefore ?? null
+      state.externalBookingUrl = perf.externalBookingUrl ?? null
       state.notes = perf.notes ?? ''
       doorsManuallyEdited = !!perf.doorsAt // treat existing doors as manually set
     }
@@ -149,6 +153,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           intervalMinutes: event.data.intervalMinutes,
           capacityOverride: event.data.capacityOverride,
           bookingClosesHoursBefore: event.data.bookingClosesHoursBefore,
+          externalBookingUrl: event.data.externalBookingUrl || null,
           // Status is intentionally omitted here — managed via show publish/cancel actions
           notes: event.data.notes || null,
         },
@@ -292,6 +297,19 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
             />
           </UFormField>
         </div>
+
+        <UFormField
+          name="externalBookingUrl"
+          label="Sold by someone else"
+          help="Only for a date we do not sell, like a Fringe run. Leave blank for our own dates: a link here takes this performance off sale here and sends people to it instead."
+        >
+          <UInput
+            v-model="state.externalBookingUrl"
+            type="url"
+            placeholder="https://…"
+            class="w-full"
+          />
+        </UFormField>
 
         <UFormField
           name="bookingClosesHoursBefore"

@@ -267,6 +267,20 @@
       "when": 1787359654683,
       "tag": "0037_equal_nocturne",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1787392867395,
+      "tag": "0038_shocking_lethal_legion",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "6",
+      "when": 1787393293050,
+      "tag": "0039_broken_sharon_carter",
+      "breakpoints": true
     }
   ]
 }

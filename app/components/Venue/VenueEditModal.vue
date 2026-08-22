@@ -19,6 +19,7 @@ interface Venue {
   capacity?: number
   imageUrl?: string
   description?: string
+  isExternal?: boolean
   features: VenueFeature[]
 }
 
@@ -36,6 +37,7 @@ const schema = z.object({
   address: z.string().optional().nullable(),
   capacity: z.number().int().positive('Capacity must be positive').optional().nullable(),
   description: z.string().optional().nullable(),
+  isExternal: z.boolean().optional(),
   featureIds: z.array(z.string()).optional(),
 })
 
@@ -85,6 +87,7 @@ watch(() => props.venue, (venue) => {
     state.address = venue.address
     state.capacity = venue.capacity
     state.description = venue.description
+    state.isExternal = venue.isExternal ?? false
     state.featureIds = venue.features.map(f => f.id)
   }
   // Always reset staged image state when the venue prop changes
@@ -326,6 +329,17 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
               placeholder="Brief description of the venue..."
               :rows="3"
               class="w-full"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Somebody else's venue"
+            name="isExternal"
+            help="A venue we perform at rather than run, like a festival. We still advertise the show, but tickets are sold by the venue and we do not staff or bar it. Not for a hire of our own space."
+          >
+            <UCheckbox
+              v-model="state.isExternal"
+              label="Tickets are sold by the venue"
             />
           </UFormField>
 

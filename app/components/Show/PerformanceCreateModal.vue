@@ -30,6 +30,7 @@ const schema = z.object({
   intervalMinutes: z.number().int().positive().optional().nullable(),
   capacityOverride: z.number().int().positive().optional().nullable(),
   bookingClosesHoursBefore: z.number().int().nonnegative().max(168).optional().nullable(),
+  externalBookingUrl: z.string().trim().url('Must be a full link').nullable().optional(),
   notes: z.string().optional(),
 })
 

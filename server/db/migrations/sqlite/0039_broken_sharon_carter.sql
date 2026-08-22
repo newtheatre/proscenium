@@ -1,0 +1,1 @@
+ALTER TABLE `performances` ADD `external_booking_url` text;

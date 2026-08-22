@@ -9,6 +9,7 @@ import type { Row } from '@tanstack/table-core'
 const UButton = resolveComponent('UButton')
 const UDropdownMenu = resolveComponent('UDropdownMenu')
 const UCheckbox = resolveComponent('UCheckbox')
+const UBadge = resolveComponent('UBadge')
 
 definePageMeta({
   layout: 'admin',
@@ -38,6 +39,7 @@ interface Venue {
   capacity?: number
   imageUrl?: string
   description?: string
+  isExternal?: boolean
   createdAt: string
   updatedAt: string
   features: VenueFeature[]
@@ -197,7 +199,12 @@ const columns: TableColumn<Venue>[] = [
               class: 'w-10 h-10 rounded bg-neutral-500/10 flex items-center justify-center',
             }, h('span', { class: 'text-lg' }, '🏛️')),
         h('div', undefined, [
-          h('p', { class: 'font-medium text-highlighted' }, venue.name),
+          h('div', { class: 'flex items-center gap-2' }, [
+            h('p', { class: 'font-medium text-highlighted' }, venue.name),
+            venue.isExternal
+              ? h(UBadge, { size: 'sm', variant: 'subtle', color: 'neutral' }, () => 'Not ours')
+              : null,
+          ]),
           h('p', { class: 'text-sm text-muted' }, venue.address || 'No address'),
         ]),
       ])

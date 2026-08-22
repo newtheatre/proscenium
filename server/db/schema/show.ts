@@ -89,6 +89,10 @@ export const performances = sqliteTable('performances', {
   // 789 performances used 2, 440 used 1, 25 used 0.
   bookingClosesHoursBefore: integer('booking_closes_hours_before'),
 
+  // Where this one performance is sold, when it is not ours. Overrides the
+  // show's link, which marks the whole run (ADR-0029).
+  externalBookingUrl: text('external_booking_url'),
+
   // SOLD_OUT is calculated from ticket counts vs. effective capacity.
   // COMPLETED is inferred from startsAt < now AND status != CANCELLED.
   status: text('status', {

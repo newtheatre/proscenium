@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
     where: (p, { and, eq }) => and(eq(p.id, body.performanceId), eq(p.status, 'ON_SALE')),
     with: {
       show: { columns: { id: true, title: true, slug: true, status: true, externalUrl: true } },
-      venue: { columns: { id: true, name: true, capacity: true } },
+      venue: { columns: { id: true, name: true, capacity: true, isExternal: true } },
     },
   })
 
@@ -70,9 +70,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Show is not currently published' })
   }
 
-  // Tickets for this show are sold and counted somewhere else, so a booking
-  // here is one NNT has no seat to honour (#135).
-  if (performance.show.externalUrl) {
+  // Sold and counted somewhere else, so a booking here is one NNT has no seat
+  // to honour (#135). Either the show says so, or the venue is not ours.
+  if (externallyTicketed(performance)) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Tickets for this show are sold elsewhere. Use the link on the show page.',

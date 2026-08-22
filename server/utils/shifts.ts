@@ -88,8 +88,9 @@ export async function performancesMissingDutyManager(days = DUTY_MANAGER_WARNING
       gte(schema.performances.startsAt, now),
       lte(schema.performances.startsAt, until),
       eq(schema.performances.status, 'ON_SALE'),
-      // An externally ticketed show is not ours to staff (#136).
-      isNull(schema.shows.externalUrl),
+      // Someone else's venue is not ours to staff. A hire in our building is
+      // still ours, so this asks about ticketing, not about the strand.
+      ourTicketingPredicate(),
       sql`not exists (
         select 1 from performance_shifts ps
         where ps.performance_id = ${schema.performances.id}
@@ -129,10 +130,9 @@ export async function stampMissingShifts(from: Date, to: Date) {
     venueId: schema.performances.venueId,
   })
     .from(schema.performances)
-    .innerJoin(schema.shows, eq(schema.shows.id, schema.performances.showId))
     .where(and(
-      // An externally ticketed show is not ours to staff (#136).
-      isNull(schema.shows.externalUrl),
+      // Someone else's venue is not ours to staff (ADR-0029).
+      ourTicketingPredicate(),
       gte(schema.performances.startsAt, from),
       lte(schema.performances.startsAt, to),
       ne(schema.performances.status, 'CANCELLED'),

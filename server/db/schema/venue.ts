@@ -10,6 +10,10 @@ export const venues = sqliteTable('venues', {
   imageUrl: text('image_url'), // Reference to NuxtHub blob storage (Cloudflare R2)
   description: text('description'),
 
+  // Not our building: tickets are sold by whoever runs it, and we neither staff
+  // nor bar it. Edinburgh, not a StuFF hire (ADR-0029).
+  isExternal: integer('is_external', { mode: 'boolean' }).notNull().default(false),
+
   // Metadata
   createdAt: text('created_at').notNull().default(sql`(current_timestamp)`),
   updatedAt: text('updated_at').notNull().$onUpdate(() => sql`(current_timestamp)`),

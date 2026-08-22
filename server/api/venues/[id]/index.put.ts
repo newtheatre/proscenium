@@ -8,6 +8,7 @@ const bodySchema = z.object({
   address: z.string().optional().nullable(),
   capacity: z.number().int().positive().optional().nullable(),
   description: z.string().optional().nullable(),
+  isExternal: z.boolean().optional(),
   featureIds: z.array(z.string()).optional(),
 })
 
