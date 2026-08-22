@@ -63,6 +63,13 @@ useSeoMeta({
 
 // ── State ────────────────────────────────────────────────────────────────────
 
+// Externally ticketed: the booking flow cannot complete, so do not start it (#135).
+watchEffect(() => {
+  if (show.value?.externalUrl) {
+    navigateTo(`/whats-on/${slug}`, { replace: true })
+  }
+})
+
 const currentStep = ref(0)
 const selectedPerformanceId = ref<string | null>((route.query.performance as string) ?? null)
 const selectedTickets = ref<Array<{ ticketTypeId: string, quantity: number }>>([])

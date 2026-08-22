@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
   const performance = await db.query.performances.findFirst({
     where: (p, { and, eq }) => and(eq(p.id, body.performanceId), eq(p.status, 'ON_SALE')),
     with: {
-      show: { columns: { id: true, title: true, slug: true, status: true } },
+      show: { columns: { id: true, title: true, slug: true, status: true, externalUrl: true } },
       venue: { columns: { id: true, name: true, capacity: true } },
     },
   })
@@ -68,6 +68,15 @@ export default defineEventHandler(async (event) => {
 
   if (performance.show.status !== 'PUBLISHED') {
     throw createError({ statusCode: 400, statusMessage: 'Show is not currently published' })
+  }
+
+  // Tickets for this show are sold and counted somewhere else, so a booking
+  // here is one NNT has no seat to honour (#135).
+  if (performance.show.externalUrl) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Tickets for this show are sold elsewhere. Use the link on the show page.',
+    })
   }
 
   // Staff endpoints do not call this — the box office takes walk-ups after

@@ -69,6 +69,24 @@ Fixed by excluding access types from the public payload and adding
 `/api/bookings/my-options`, which is session-dependent and offers them only to an entitled account.
 The public show payload stays cacheable.
 
+### Performances created before the rota existed had no shifts
+
+`stampTemplateShifts` was called from exactly one place, `POST /api/shows/:id/performances`, so a
+performance only ever got its rota at the moment it was created. Every performance predating the
+rota had none, with no way to add them; the rota page's own empty state described the gap without
+offering a way out.
+
+Fixed with `POST /api/shifts/stamp` and a **Stamp missing shifts** button. It finds performances
+with no shifts in one query and writes one statement per performance, so it is neither an N+1 nor a
+statement whose parameters grow with the rows. Idempotent: a performance with any shift is left
+alone.
+
+### External shows were staffed, warned about and bookable
+
+Three places treated an externally ticketed show as ours: the rota stamped shifts onto it, the
+duty-manager warning demanded one for it, and the box office feed offered it for walk-ins (#136).
+The booking route created reservations for it (#135). All four now check `shows.external_url`.
+
 ### Fixed in the August 2026 full-repo review
 
 Also fixed, and worth knowing about because several were silent:
