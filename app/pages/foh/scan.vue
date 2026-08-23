@@ -52,7 +52,7 @@ const training = useTrainingMode()
 if (route.query.practice) await training.enter('door-scan')
 await training.refresh()
 training.leaveWhenPracticeEnds()
-const api = (path: string) => `${training.prefix.value}${path}`
+const api = training.api
 
 const term = ref('')
 const results = ref<Match[]>([])

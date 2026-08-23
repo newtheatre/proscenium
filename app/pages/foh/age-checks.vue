@@ -41,7 +41,7 @@ const training = useTrainingMode()
 if (route.query.practice) await training.enter('challenge-25')
 await training.refresh()
 training.leaveWhenPracticeEnds()
-const api = (path: string) => `${training.prefix.value}${path}`
+const api = training.api
 
 const { data, refresh } = await useAsyncData('foh-age-checks',
   () => requestFetch<Register>(api('/api/foh/age-checks')),

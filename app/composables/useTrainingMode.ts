@@ -1,4 +1,4 @@
-import { computed, navigateTo, ref, useRequestFetch, useState, watch } from '#imports'
+import { computed, createError, navigateTo, ref, useRequestFetch, useState, watch } from '#imports'
 
 export type TrainingTarget = 'bar-till' | 'challenge-25' | 'door-scan'
 
@@ -31,12 +31,28 @@ export const SURFACE_TARGET: Record<string, TrainingTarget> = {
  */
 export function useTrainingMode() {
   const state = useState<TrainingState>('training-state', () => ({ ...IDLE }))
+  // Pinned per page, not per state: a screen entered as practice stays that
+  // way, so a run ending mid-basket cannot quietly retarget it at real data.
+  const pinned = useState<boolean>('training-pinned', () => false)
   const requestFetch = useRequestFetch()
   const busy = ref(false)
 
   const active = computed(() => state.value.active)
   /** Prepended to every fetch on a dual-mode screen. */
   const prefix = computed(() => (state.value.active ? '/api/training' : ''))
+
+  /**
+   * The URL for a dual-mode fetch. Refuses rather than resolving to the live
+   * route once a pinned run has ended (ADR-0032).
+   */
+  function api(path: string): string {
+    if (pinned.value && !state.value.active) {
+      const message = 'Practice has ended. Nothing was sent. Go back to Front of House and start again.'
+      // `data` too: every caller's catch reads the message from there.
+      throw createError({ statusCode: 409, statusMessage: message, data: { statusMessage: message } })
+    }
+    return `${prefix.value}${path}`
+  }
 
   async function refresh() {
     try {
@@ -88,6 +104,7 @@ export function useTrainingMode() {
       await navigateTo({ path: '/foh', query: { practice: 'unavailable', reason: message ?? '' } })
       return false
     }
+    pinned.value = true
     return true
   }
 
@@ -97,9 +114,12 @@ export function useTrainingMode() {
    */
   function leaveWhenPracticeEnds() {
     watch(active, (now, before) => {
-      if (before && !now) navigateTo({ path: '/foh', query: { practice: 'ended' } })
+      if (before && !now) {
+        pinned.value = false
+        navigateTo({ path: '/foh', query: { practice: 'ended' } })
+      }
     })
   }
 
-  return { state, active, prefix, busy, refresh, start, end, enter, leaveWhenPracticeEnds, isPracticing }
+  return { state, active, prefix, api, pinned, busy, refresh, start, end, enter, leaveWhenPracticeEnds, isPracticing }
 }

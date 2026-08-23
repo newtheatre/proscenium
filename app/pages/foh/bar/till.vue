@@ -40,7 +40,7 @@ const training = useTrainingMode()
 if (route.query.practice) await training.enter('bar-till')
 await training.refresh()
 training.leaveWhenPracticeEnds()
-const api = (path: string) => `${training.prefix.value}${path}`
+const api = training.api
 
 const { data, refresh } = await useAsyncData('bar-tonight',
   () => requestFetch<Tonight>(api('/api/bar/tonight')),
