@@ -27,6 +27,35 @@ function walk(dir, out = []) {
 const files = [...walk(TRAINING_API), TRAINING_UTIL]
 const problems = []
 
+// The pages that serve both modes. Every operational path they fetch must go
+// through api(), or the sandbox quietly reads and writes the real thing.
+const DUAL_MODE_PAGES = [
+  'app/pages/foh/bar/till.vue',
+  'app/pages/foh/age-checks.vue',
+  'app/pages/foh/scan.vue',
+]
+
+const OPERATIONAL_LITERAL = /(['"`])(\/api\/(?:bar|foh)\/[^'"`]*)\1/g
+
+// Nothing is exempt: an unsandboxed route still goes through api(), so in
+// practice mode it 404s rather than reaching real data.
+const NO_SANDBOX = new Set([])
+
+for (const page of DUAL_MODE_PAGES) {
+  const source = readFileSync(page, 'utf8')
+  for (const line of source.split('\n')) {
+    // Only a fetch matters; a route string in a comment or a link does not.
+    if (!/\$fetch|requestFetch|useFetch|useAsyncData/.test(line)) continue
+    for (const [, , route] of line.matchAll(OPERATIONAL_LITERAL)) {
+      if (line.includes('api(')) continue
+      if (NO_SANDBOX.has(route)) continue
+      problems.push(`${page}: fetches ${route} without api().\n`
+        + '  On a dual-mode page every operational path must be wrapped so practice mode\n'
+        + '  retargets it, or the sandbox reaches real data (ADR-0032).')
+    }
+  }
+}
+
 for (const file of files) {
   const source = readFileSync(file, 'utf8')
 

@@ -47,6 +47,7 @@ ADR; the ADR carries the reasoning and the history. See [CONTRIBUTING.md](../../
 | [0031](0031-a-tab-charge-is-the-only-voidable-transaction.md) | The tab charge is the only voidable transaction | Accepted |
 | [0032](0032-training-mode-writes-to-its-own-table.md) | Training mode writes to its own table and nothing else | Accepted |
 | [0033](0033-the-practice-window-fails-closed.md) | The practice window fails closed | Accepted |
+| [0034](0034-an-open-sandbox-closes-only-on-a-definitive-answer.md) | An open sandbox closes only on a definitive answer | Accepted |
 
 ## Template
 

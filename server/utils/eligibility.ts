@@ -82,7 +82,14 @@ export async function isEligible(userId: string, rule: EligibilityRule): Promise
  */
 export type PracticeTarget = 'bar-till' | 'challenge-25' | 'door-scan'
 
+/**
+ * CLOSED is rehearsal's answer; UNREACHABLE is no answer at all. Opening a
+ * sandbox needs OPEN, but only CLOSED may end one (ADR-0033).
+ */
+export type PracticeStatus = 'OPEN' | 'CLOSED' | 'UNREACHABLE'
+
 export interface PracticeAnswer {
+  status: PracticeStatus
   active: boolean
   /** When the sandbox must shut, straight from rehearsal. */
   expiresAt: string | null
@@ -90,7 +97,8 @@ export interface PracticeAnswer {
   sessionId: string | null
 }
 
-const CLOSED: PracticeAnswer = { active: false, expiresAt: null, sessionId: null }
+const CLOSED: PracticeAnswer = { status: 'CLOSED', active: false, expiresAt: null, sessionId: null }
+const UNREACHABLE: PracticeAnswer = { status: 'UNREACHABLE', active: false, expiresAt: null, sessionId: null }
 
 /**
  * Is this person being taught this, right now? **Fails closed** and is never
@@ -111,6 +119,7 @@ export async function practiceWindow(userId: string, target: PracticeTarget): Pr
     if (!response.active) return CLOSED
 
     return {
+      status: 'OPEN',
       active: true,
       expiresAt: response.expiresAt ?? null,
       sessionId: response.sessionId ?? null,
@@ -120,18 +129,17 @@ export async function practiceWindow(userId: string, target: PracticeTarget): Pr
     const status = (error as { statusCode?: number, response?: { status?: number } }).statusCode
       ?? (error as { response?: { status?: number } }).response?.status
 
-    // A renamed or retired target is a configuration break across two repos,
-    // not somebody who happens not to be practising.
+    // A retired or renamed target is a definitive "no such sandbox", and a
+    // configuration break across two repos, so it is loud.
     if (status === 404) {
       console.error(`[practice] rehearsal has no active target "${target}": someone renamed or retired it`)
-    }
-    else {
-      console.error(`[practice] could not reach rehearsal for "${target}":`, error)
+      return CLOSED
     }
 
-    // Refusing costs a trainee an evening's practice; the fallback is
-    // shadowing a real shift, which is how this was learned before (ADR-0033).
-    return CLOSED
+    // No answer at all. Refusing to open costs a trainee an evening (ADR-0033),
+    // but ending a run already open on this would be destructive.
+    console.error(`[practice] could not reach rehearsal for "${target}":`, error)
+    return UNREACHABLE
   }
 }
 

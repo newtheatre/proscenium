@@ -36,8 +36,10 @@ const toast = useToast()
 // practises cannot drift from the thing itself (docs/14 §8).
 const route = useRoute()
 const training = useTrainingMode()
-if (route.query.practice) await training.start('bar-till').catch(() => {})
+// A refused start must never fall through to the live screen.
+if (route.query.practice) await training.enter('bar-till')
 await training.refresh()
+training.leaveWhenPracticeEnds()
 const api = (path: string) => `${training.prefix.value}${path}`
 
 const { data, refresh } = await useAsyncData('bar-tonight',
@@ -107,8 +109,10 @@ const myPending = computed(() => comps.value.mine.find(c => c.status === 'PENDIN
 const myDecided = ref<CompRequest | null>(null)
 
 async function pollComps() {
+  // No sandbox exists for this, so it must not run in practice mode.
+  if (training.active.value) return
   try {
-    const next = await $fetch<typeof comps.value>('/api/bar/comps')
+    const next = await $fetch<typeof comps.value>(api('/api/bar/comps'))
     // A request of mine that has just been answered: show it, then let it go.
     const wasPending = myPending.value?.id
     comps.value = next
@@ -128,9 +132,11 @@ async function pollComps() {
   }
 }
 
-// Same short-polling transport as the comms board (ADR-0021).
+// Same short-polling transport as the comms board (ADR-0021). Never in
+// practice: the comps queue is live data with no sandbox equivalent.
 let compTimer: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
+  if (training.active.value) return
   pollComps()
   compTimer = setInterval(pollComps, 5000)
 })
@@ -139,9 +145,11 @@ onBeforeUnmount(() => {
 })
 
 async function requestComp() {
+  // No sandbox exists for this, so it must not run in practice mode.
+  if (training.active.value) return
   busy.value = true
   try {
-    await $fetch('/api/bar/comps', {
+    await $fetch(api('/api/bar/comps'), {
       method: 'POST',
       body: {
         items: basketBar.value.map(l => ({ productId: l.product.id, qty: l.qty })),
@@ -167,9 +175,11 @@ async function requestComp() {
 }
 
 async function decideComp(id: string, decision: 'approve' | 'decline') {
+  // No sandbox exists for this, so it must not run in practice mode.
+  if (training.active.value) return
   busy.value = true
   try {
-    await $fetch(`/api/bar/comps/${id}/${decision}`, { method: 'POST' })
+    await $fetch(api(`/api/bar/comps/${id}/${decision}`), { method: 'POST' })
     await pollComps()
   }
   catch (error) {
@@ -249,12 +259,14 @@ const shownHolders = computed(() => {
 })
 
 async function openTab() {
+  // No sandbox exists for this, so it must not run in practice mode.
+  if (training.active.value) return
   debtor.value = null
   tabEmail.value = ''
   holderSearch.value = ''
   tabOpen.value = true
   try {
-    const list = await $fetch<{ available: boolean, holders: Holder[], softCapPence: number }>('/api/bar/tabs/holders')
+    const list = await $fetch<{ available: boolean, holders: Holder[], softCapPence: number }>(api('/api/bar/tabs/holders'))
     holders.value = list.holders
     holdersAvailable.value = list.available
     softCap.value = list.softCapPence
@@ -270,9 +282,11 @@ function pick(holder: Holder) {
 }
 
 async function findDebtor() {
+  // No sandbox exists for this, so it must not run in practice mode.
+  if (training.active.value) return
   finding.value = true
   try {
-    debtor.value = await $fetch<Debtor>('/api/bar/tabs/debtor', { query: { email: tabEmail.value } })
+    debtor.value = await $fetch<Debtor>(api('/api/bar/tabs/debtor'), { query: { email: tabEmail.value } })
   }
   catch (error) {
     debtor.value = null
@@ -288,10 +302,12 @@ async function findDebtor() {
 }
 
 async function chargeToTab() {
+  // No sandbox exists for this, so it must not run in practice mode.
+  if (training.active.value) return
   if (!debtor.value) return
   busy.value = true
   try {
-    const result = await requestFetch<{ totalPence: number }>('/api/bar/transactions', {
+    const result = await requestFetch<{ totalPence: number }>(api('/api/bar/transactions'), {
       method: 'POST',
       body: {
         tender: 'TAB',
@@ -320,10 +336,12 @@ async function chargeToTab() {
 }
 
 async function settleTab() {
+  // No sandbox exists for this, so it must not run in practice mode.
+  if (training.active.value) return
   if (!debtor.value) return
   busy.value = true
   try {
-    const result = await requestFetch<{ totalPence: number }>('/api/bar/tabs/settle', {
+    const result = await requestFetch<{ totalPence: number }>(api('/api/bar/tabs/settle'), {
       method: 'POST',
       body: {
         debtorUserId: debtor.value.userId,
@@ -377,7 +395,9 @@ async function takeCard() {
 }
 
 async function openBar() {
-  await requestFetch('/api/bar/sessions', {
+  // No sandbox exists for this, so it must not run in practice mode.
+  if (training.active.value) return
+  await requestFetch(api('/api/bar/sessions'), {
     method: 'POST',
     body: { performanceIds: tonight.value?.performances.map(p => p.id) ?? [] },
   })
@@ -388,11 +408,13 @@ const closingNote = ref('')
 
 /** Until this runs, every end-of-night report calls the bar unclosed. */
 async function closeBar() {
+  // No sandbox exists for this, so it must not run in practice mode.
+  if (training.active.value) return
   const sessionId = tonight.value?.session?.id
   if (!sessionId) return
   busy.value = true
   try {
-    await requestFetch(`/api/bar/sessions/${sessionId}/close`, {
+    await requestFetch(api(`/api/bar/sessions/${sessionId}/close`), {
       method: 'POST',
       body: { closingNote: closingNote.value || null },
     })
@@ -661,6 +683,7 @@ async function closeBar() {
               @click="takeCard"
             />
             <UButton
+              v-if="!training.active.value"
               size="xl"
               variant="soft"
               :disabled="!canTab || busy"
@@ -668,6 +691,7 @@ async function closeBar() {
               @click="openTab"
             />
             <UButton
+              v-if="!training.active.value"
               size="xl"
               variant="soft"
               :disabled="!canComp || busy || Boolean(myPending)"
