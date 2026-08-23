@@ -142,7 +142,8 @@ the point of entry, since that is where it matters.
 ### 5.3 Door (`door-scan`)
 
 Lookup by scan, reference or name against the fixture; the standing verdict, green, amber or red; the
-party size; admission. `POST /api/training/foh/admit` writes an `ADMISSION` event.
+party size. There is no admit action: the real door screen has none either, so a sandbox
+button would teach a control that does not exist.
 
 Payment and admission stay separate states here as they are for real, because confusing them is the
 mistake this screen actually produces.
@@ -156,7 +157,7 @@ training_runs        id · user_id FK · target_key
                      ended_at NULL · ended_reason ('ENDED'|'EXPIRED'|'PURGED') NULL
 
 training_run_events  id · run_id FK (cascade) · at
-                     kind ('SALE'|'AGE_CHECK'|'ADMISSION'|'LOOKUP') · payload JSON
+                     kind ('SALE'|'AGE_CHECK'|'LOOKUP') · payload JSON
 ```
 
 **These two tables are the only thing a training request may write.** Nothing else in the app reads
@@ -189,7 +190,6 @@ one.
 | GET | `/api/training/bar/tonight` | Fixture performances, live catalogue |
 | POST | `/api/training/bar/transactions` | Real arithmetic, a `SALE` event |
 | GET | `/api/training/foh/lookup` | The fixture only, never the database |
-| POST | `/api/training/foh/admit` | An `ADMISSION` event |
 | GET/POST | `/api/training/foh/age-checks` | The run's own entries, an `AGE_CHECK` event |
 
 Every one of them requires an active run whose `target_key` covers the surface, so an open `bar-till`

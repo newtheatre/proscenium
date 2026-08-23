@@ -32,7 +32,7 @@ export const trainingRuns = sqliteTable('training_runs', {
   index('training_runs_expires_idx').on(table.expiresAt),
 ])
 
-export const TRAINING_EVENT_KINDS = ['SALE', 'AGE_CHECK', 'ADMISSION', 'LOOKUP'] as const
+export const TRAINING_EVENT_KINDS = ['SALE', 'AGE_CHECK', 'LOOKUP'] as const
 
 /**
  * What a trainee did, for the debrief and the banner's tally. Scratch data:

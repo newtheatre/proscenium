@@ -7,6 +7,7 @@ const bodySchema = z.object({
   productDescription: z.string().trim().max(120).optional(),
   description: z.string().trim().max(300).optional(),
   notes: z.string().trim().max(500).optional(),
+  supersedesId: z.string().trim().min(1).optional(),
 })
 
 /**
@@ -22,11 +23,20 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'A refusal needs a reason for the register.' })
   }
 
+  // Corrections point at this run's own entries, never a real register id.
+  if (input.supersedesId) {
+    const own = await eventsFor(run.id)
+    if (!own.some(item => item.id === input.supersedesId)) {
+      throw createError({ statusCode: 404, statusMessage: 'That entry does not exist.' })
+    }
+  }
+
   await recordEvent(run.id, 'AGE_CHECK', {
     outcome: input.outcome,
     reason: input.outcome === 'REFUSED' ? input.reason ?? null : null,
     productDescription: input.outcome === 'REFUSED' ? input.productDescription ?? null : null,
     description: input.outcome === 'REFUSED' ? input.description ?? null : null,
+    supersedesId: input.supersedesId ?? null,
   })
 
   return { outcome: input.outcome, recorded: true }

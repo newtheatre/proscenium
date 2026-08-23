@@ -29,7 +29,9 @@ export const SURFACE_TARGET: Record<string, TrainingTarget> = {
  * Whether this screen is practice, and where its API lives. One page serves
  * both modes so what you practise cannot drift from the real thing (docs/14 §8).
  */
-export function useTrainingMode() {
+export type TrainingSurface = keyof typeof SURFACE_TARGET
+
+export function useTrainingMode(surface?: TrainingSurface) {
   const state = useState<TrainingState>('training-state', () => ({ ...IDLE }))
   // Pinned per page, not per state: a screen entered as practice stays that
   // way, so a run ending mid-basket cannot quietly retarget it at real data.
@@ -37,7 +39,10 @@ export function useTrainingMode() {
   const requestFetch = useRequestFetch()
   const busy = ref(false)
 
-  const active = computed(() => state.value.active)
+  // Scoped to the screen asking: a till run must not make the door screen
+  // believe it is in practice.
+  const active = computed(() => state.value.active
+    && (!surface || state.value.targetKey === SURFACE_TARGET[surface]))
   /** Prepended to every fetch on a dual-mode screen. */
   const prefix = computed(() => (state.value.active ? '/api/training' : ''))
 
@@ -88,11 +93,6 @@ export function useTrainingMode() {
     }
   }
 
-  /** True when this screen is the one the open sandbox is for. */
-  function isPracticing(surface: keyof typeof SURFACE_TARGET) {
-    return computed(() => state.value.active && state.value.targetKey === SURFACE_TARGET[surface])
-  }
-
   /**
    * Enter a sandbox from a `?practice=1` link. A refusal must never fall
    * through to the live screen, so it leaves rather than continuing.
@@ -122,5 +122,5 @@ export function useTrainingMode() {
     })
   }
 
-  return { state, active, prefix, api, pinned, busy, refresh, start, end, enter, leaveWhenPracticeEnds, isPracticing }
+  return { state, active, prefix, api, pinned, busy, refresh, start, end, enter, leaveWhenPracticeEnds }
 }

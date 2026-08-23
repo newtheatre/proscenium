@@ -36,7 +36,7 @@ const toast = useToast()
 
 // One page, two modes (docs/14 §8).
 const route = useRoute()
-const training = useTrainingMode()
+const training = useTrainingMode('ageChecks')
 // A refused start must never fall through to the live screen.
 if (route.query.practice) await training.enter('challenge-25')
 await training.refresh()

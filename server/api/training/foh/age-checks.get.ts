@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
         productDescription: (item.payload?.productDescription as string | null) ?? null,
         description: (item.payload?.description as string | null) ?? null,
         notes: (item.payload?.notes as string | null) ?? null,
-        supersedesId: null,
+        supersedesId: (item.payload?.supersedesId as string | null) ?? null,
         checkedAt: item.at,
         checkedByName: user.name,
       })),

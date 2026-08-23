@@ -35,7 +35,7 @@ const toast = useToast()
 // One page, two modes. The prefix is the only difference, so what a trainee
 // practises cannot drift from the thing itself (docs/14 §8).
 const route = useRoute()
-const training = useTrainingMode()
+const training = useTrainingMode('till')
 // A refused start must never fall through to the live screen.
 if (route.query.practice) await training.enter('bar-till')
 await training.refresh()
