@@ -58,9 +58,11 @@ export function useTrainingMode() {
     try {
       state.value = await requestFetch<TrainingState>('/api/training/state')
     }
-    catch {
-      // A member who cannot work FOH gets a 403 here, which is not an error.
-      state.value = { ...IDLE }
+    catch (error) {
+      // Only a refusal means no run: a transient failure must leave the last
+      // known state alone, or a blip ends practice client-side (ADR-0034).
+      const status = (error as { statusCode?: number }).statusCode
+      if (status === 401 || status === 403) state.value = { ...IDLE }
     }
   }
 
@@ -104,7 +106,6 @@ export function useTrainingMode() {
       await navigateTo({ path: '/foh', query: { practice: 'unavailable', reason: message ?? '' } })
       return false
     }
-    pinned.value = true
     return true
   }
 
@@ -113,11 +114,11 @@ export function useTrainingMode() {
    * whose buttons have quietly become real.
    */
   function leaveWhenPracticeEnds() {
+    // Pinned at setup and never cleared as the run ends: clearing it there
+    // hands the live API back to the screen while navigation is in flight.
+    pinned.value = state.value.active
     watch(active, (now, before) => {
-      if (before && !now) {
-        pinned.value = false
-        navigateTo({ path: '/foh', query: { practice: 'ended' } })
-      }
+      if (before && !now) navigateTo({ path: '/foh', query: { practice: 'ended' } })
     })
   }
 

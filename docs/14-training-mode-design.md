@@ -215,7 +215,15 @@ misdirected.
 
 **One page per screen, not two.** `app/pages/foh/bar/till.vue`, `app/pages/foh/age-checks.vue` and
 `app/pages/foh/scan.vue` take their API prefix from a `useTrainingMode()` composable: `''` normally,
-`'/api/training'` in a run. Duplicating them would let the practice drift from the thing being
+`'/api/training'` in a run.
+
+**A screen entered as practice is pinned to it for as long as it is open.** Once pinned, a dual-mode
+fetch made after the run has ended **refuses** rather than resolving to the live route, so the worst
+outcome of a tap during the moment between a run ending and the page leaving is a message saying
+nothing was sent. Resolving live there is the one thing this feature must never do, and it is not
+enough to rely on navigating away: the poll is once a minute and the navigation is asynchronous, so
+there is a real window. The pin has exactly one writer, set from the state at setup, because clearing
+it as the run ends reopens the window it exists to close. Duplicating them would let the practice drift from the thing being
 practised, which is the one failure that would make the whole feature worse than useless.
 
 The banner is a layout-level component so it cannot be forgotten on a new screen.
