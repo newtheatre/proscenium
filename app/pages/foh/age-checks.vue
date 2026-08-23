@@ -4,7 +4,7 @@
  */
 <script setup lang="ts">
 definePageMeta({
-  layout: false,
+  layout: 'foh',
   middleware: ['foh'],
   title: 'Challenge 25',
 })
@@ -34,8 +34,16 @@ const { performance } = await useFohTonight()
 const requestFetch = useRequestFetch()
 const toast = useToast()
 
-const { data, refresh } = await useAsyncData('foh-age-checks', () =>
-  requestFetch<Register>('/api/foh/age-checks'))
+// One page, two modes (docs/14 §8).
+const route = useRoute()
+const training = useTrainingMode()
+if (route.query.practice) await training.start('challenge-25').catch(() => {})
+await training.refresh()
+const api = (path: string) => `${training.prefix.value}${path}`
+
+const { data, refresh } = await useAsyncData('foh-age-checks',
+  () => requestFetch<Register>(api('/api/foh/age-checks')),
+  { watch: [training.active] })
 
 const register = computed<Register>(() => data.value ?? { night: '', accepted: 0, refused: 0, entries: [] })
 
@@ -53,7 +61,7 @@ const form = reactive<{ reason: Reason, productDescription: string, description:
 async function record(outcome: 'ACCEPTED' | 'REFUSED') {
   busy.value = true
   try {
-    await requestFetch('/api/foh/age-checks', {
+    await requestFetch(api('/api/foh/age-checks'), {
       method: 'POST',
       body: {
         outcome,

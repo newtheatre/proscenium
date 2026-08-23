@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "check:comments": "node scripts/check-comments.mjs",
     "check:user-refs": "node scripts/check-user-references.mjs",
+    "check:training": "node scripts/check-training-isolation.mjs",
     "lint:fix": "eslint . --fix",
     "typecheck": "nuxt typecheck",
     "postinstall": "nuxt prepare"

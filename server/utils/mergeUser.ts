@@ -148,6 +148,9 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
       .where(eq(schema.passes.issuedByUserId, fromUserId)),
     db.update(schema.passAdmissions).set({ redeemedByUserId: toUserId })
       .where(eq(schema.passAdmissions.redeemedByUserId, fromUserId)),
+    // Scratch data, so the loser's practice is dropped rather than carried
+    // across: it aggregates to nothing and expires anyway (ADR-0032).
+    db.delete(schema.trainingRuns).where(eq(schema.trainingRuns.userId, fromUserId)),
     db.delete(schema.users).where(eq(schema.users.id, fromUserId)),
   ])
 

@@ -309,6 +309,13 @@
       "when": 1787409883852,
       "tag": "0043_tiny_big_bertha",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "6",
+      "when": 1787423881427,
+      "tag": "0044_stale_the_fury",
+      "breakpoints": true
     }
   ]
 }

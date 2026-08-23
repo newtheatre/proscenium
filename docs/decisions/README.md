@@ -41,6 +41,12 @@ ADR; the ADR carries the reasoning and the history. See [CONTRIBUTING.md](../../
 | [0025](0025-every-user-reference-joins-the-estate-hooks.md) | Every user-referencing column joins the estate hooks, checked in CI | Accepted |
 | [0026](0026-eligibility-is-read-from-rehearsal-behind-one-seam.md) | Eligibility is read from rehearsal, behind one seam, failing open with a flag | Accepted |
 | [0027](0027-the-refusals-register-is-append-only.md) | The refusals register is append-only, enforced by the database | Accepted |
+| [0028](0028-a-pass-request-is-not-a-pass.md) | A pass request is not a pass | Accepted |
+| [0029](0029-external-is-a-venue-not-a-strand.md) | "External" is a venue, not a strand | Accepted |
+| [0030](0030-a-tab-is-a-sale-on-credit.md) | A tab is a sale on credit; settlement is its own card transaction | Accepted |
+| [0031](0031-a-tab-charge-is-the-only-voidable-transaction.md) | The tab charge is the only voidable transaction | Accepted |
+| [0032](0032-training-mode-writes-to-its-own-table.md) | Training mode writes to its own table and nothing else | Accepted |
+| [0033](0033-the-practice-window-fails-closed.md) | The practice window fails closed | Accepted |
 
 ## Template
 

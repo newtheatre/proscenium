@@ -2731,6 +2731,46 @@ oracle over a six-character space, so it is capped like the other public booking
 
 ---
 
+### 3.10c Training mode
+
+---
+
+Sandboxes on the till, Challenge 25 and the door, reachable only while `rehearsal` says the caller
+is being taught the thing ([14-training-mode](./14-training-mode-design.md),
+[ADR-0032](./decisions/0032-training-mode-writes-to-its-own-table.md)).
+
+**These are parallel routes on purpose.** The real handlers under `/api/bar/**` and `/api/foh/**` are
+not modified, take no training parameter and have no training branch, so a practice request cannot
+reach the code that moves money, depletes stock or transitions a reservation. Every route here
+reuses the same **pure** helpers (`currentPrices`, `buildTransaction`, `basketMovements`,
+`bookingStanding`) and none of the persistence.
+
+**The only tables any of them write are `training_runs` and `training_run_events`.**
+
+| Method | Route | Auth | Does |
+|---|---|---|---|
+| POST | `/api/training/start` | `foh.work` + an open window | Opens a run. 403 unless rehearsal says the window is open |
+| POST | `/api/training/end` | `foh.work` | Ends it and deletes its events. Idempotent |
+| GET | `/api/training/state` | `foh.work` | Active, time left, tally. **Re-asks rehearsal**, so a lead closing the register ends the run within a poll |
+| GET | `/api/training/available` | `foh.work` | Which sandboxes could be opened. Empty for everybody else, so the FOH home shows no tile |
+| GET | `/api/training/bar/tonight` | run: `bar-till` | Live catalogue and prices, fixture performances |
+| GET | `/api/training/bar/lookup` | run: `bar-till` | The fixture, shaped for the Tickets tab |
+| POST | `/api/training/bar/transactions` | run: `bar-till` | Real arithmetic including the expected-total check; writes a `SALE` event |
+| GET/POST | `/api/training/foh/age-checks` | run: `challenge-25` | This run's own entries. Never the real register |
+| GET | `/api/training/foh/lookup` | run: `door-scan` | Searches the fixture only |
+| POST | `/api/training/foh/admit` | run: `door-scan` | Writes an `ADMISSION` event |
+
+Each surface route requires a run **for that target**, so an open till sandbox cannot reach the door.
+The fixture is `shared/utils/trainingScenario.ts`; no row of it is ever inserted anywhere.
+
+`server/middleware/trainingMode.ts` closes the loop from the other side: while a run is open, any
+mutating request to `/api/bar/**` or `/api/foh/**` answers `409`. Belt and braces.
+
+**Not in any sandbox:** opening or closing a bar session, comps (they need a duty manager's approval,
+and a fictional approval teaches the wrong lesson), voids, and anything under `/admin`.
+
+---
+
 ### 3.11 Media
 
 #### `GET /images/**`

@@ -6,7 +6,7 @@
 import { canRunBarTab } from '~~/shared/utils/abilities'
 
 definePageMeta({
-  layout: false,
+  layout: 'foh',
   middleware: ['foh'],
   title: 'Front of House',
 })
@@ -65,6 +65,28 @@ const buttons = computed(() => {
  * Only the duty manager is shown a comp queue, and only tonight's. The till
  * carries the approve buttons; this is the badge that gets them there.
  */
+/**
+ * Practice tiles, one per sandbox rehearsal says is open for this person.
+ * Nothing is shown when none are (docs/14 §3.1).
+ */
+const PRACTICE_TILES: Record<string, { label: string, to: string }> = {
+  'bar-till': { label: 'Practise the till', to: '/foh/bar/till?practice=1' },
+  'challenge-25': { label: 'Practise Challenge 25', to: '/foh/age-checks?practice=1' },
+  'door-scan': { label: 'Practise the door', to: '/foh/scan?practice=1' },
+}
+
+// Deliberately not awaited: this asks the training system, and the show night
+// screen must never wait on it. The tiles appear when the answer does.
+const { data: practice } = useLazyAsyncData('training-available', () =>
+  requestFetch<{ targets: string[] }>('/api/training/available').catch(() => ({ targets: [] })),
+{ server: false, default: () => ({ targets: [] }) })
+
+const practiceTiles = computed(() =>
+  (practice.value?.targets ?? [])
+    .map(target => ({ key: target, ...PRACTICE_TILES[target]! }))
+    .filter(tile => tile.label),
+)
+
 const pendingComps = ref(0)
 async function pollComps() {
   try {
@@ -100,6 +122,29 @@ onBeforeUnmount(() => {
           Leave
         </NuxtLink>
       </header>
+
+      <!-- Practice needs no shift and no show: it is the one screen here the
+           rota does not scope, because there are no real customers on it. -->
+      <div
+        v-if="practiceTiles.length"
+        class="mb-6 space-y-2"
+      >
+        <p class="text-sm font-medium text-amber-400">
+          You are being taught these. Practising changes nothing real.
+        </p>
+        <NuxtLink
+          v-for="tile in practiceTiles"
+          :key="tile.key"
+          :to="tile.to"
+          class="flex items-center gap-3 rounded-xl border border-amber-600/60 bg-amber-950/30 p-4 transition hover:border-amber-500"
+        >
+          <UIcon
+            name="i-lucide-graduation-cap"
+            class="size-6 shrink-0 text-amber-400"
+          />
+          <span class="font-medium">{{ tile.label }}</span>
+        </NuxtLink>
+      </div>
 
       <div
         v-if="status === 'pending'"

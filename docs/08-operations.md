@@ -220,6 +220,7 @@ Cloudflare to call it.
 | `comps:sweep` | Marks unanswered comp requests `EXPIRED`, every 15 minutes. **Tidying only**: expiry is derived at read and refused at approval, so a missed run changes no behaviour (`docs/13` §4.1.2) |
 | `reports:auto-close` | Files an end-of-night report for any performance nobody signed off, banner-marked *auto-closed, no duty manager sign-off*. **Idempotent**: the unique index on `performance_id` means a second run closes nothing (`docs/12` §4.1) |
 | `shifts:remind` | Emails everyone confirmed on tomorrow's performances, with an ICS attachment. **Not idempotent**: running it twice sends twice, which is why it is scheduled once and not retried |
+| `training:purge` | Deletes finished and expired training runs and their events, after a day's grace so a trainer can debrief the morning after. Practice is scratch: nothing aggregates it (`docs/14` §9) |
 
 Run one by hand in development with `POST /_nitro/tasks/<name>`: note the name is the task's
 `meta.name` (`backstage:sweep`), not its file path. In production, check it ran with
@@ -232,6 +233,44 @@ dashboard.
 in winter and at 13:00 London in summer. That is deliberate: it is never *early*, and the deadline
 belongs to the duty manager. Which performances are due is decided in Europe/London from the show
 night, not from the trigger time, so an hour's drift delays the report and never mis-selects it.
+
+## 4c. Turning training mode on
+
+Training mode ([14-training-mode](./14-training-mode-design.md)) is a sandbox on the till,
+Challenge 25 and the door, open only to somebody `rehearsal` says is being taught that thing. **It
+needs work in rehearsal before anything here does anything**, and until that is done the feature is
+invisible: no window means no tile, and nobody can reach a sandbox.
+
+In order:
+
+1. **In rehearsal, `/admin/practice-targets`**: create `bar-till`, `challenge-25` and `door-scan`,
+   each naming the modules whose teaching should open it (the ADMN modules
+   [13-bar-design §5](./13-bar-design.md) proposes). The targets ship empty, which is the safe state.
+   **Never rename a key**: this app hardcodes the three, and a rename becomes a loud 404.
+2. **In rehearsal, issue this app a service token** and set it here as the worker secret
+   `NUXT_TRAINING_API_TOKEN`. The `NUXT_` prefix is load-bearing. It is the same token the
+   eligibility seam uses; one token, one seam file.
+3. **Check it.** With a practice window open for a test account, `/foh` shows a Practice tile.
+   Without one, it shows nothing.
+
+**With no token, nobody gets a sandbox.** That is the opposite of what a missing token does to
+eligibility, where it silently takes the fail-open path and flags every claim
+([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md)). Here the
+failure direction is closed and deliberate
+([ADR-0033](./decisions/0033-the-practice-window-fails-closed.md)): a trainee shadows a real shift
+instead, which is how this was learned before the feature existed.
+
+**How to satisfy yourself it is really inert.** After a practice session, nothing new should exist
+in `transactions`, `transaction_lines`, `stock_movements`, `age_checks` or `reservations`. That is a
+query, not a promise, and it is the check to run if anybody ever asks whether practice can touch the
+books:
+
+```bash
+bunx wrangler d1 execute proscenium --remote --command "select count(*) from training_runs where ended_at is null"
+```
+
+Anything still open is somebody mid-lesson or a run whose expiry has not been swept yet; the daily
+`training:purge` clears the finished ones.
 
 ## 5. Running a migration against production
 

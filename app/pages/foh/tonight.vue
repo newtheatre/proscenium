@@ -4,7 +4,7 @@
  */
 <script setup lang="ts">
 definePageMeta({
-  layout: false,
+  layout: 'foh',
   middleware: ['foh'],
   title: 'Tonight at a glance',
 })

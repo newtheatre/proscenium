@@ -56,3 +56,4 @@ There is no test suite. CI gates on typecheck, lint and build ([.github/workflow
 - Any customer-facing response built without a `columns` allow-list.
 - Drift between `docs/07-api-reference.md` and the actual routes.
 - A comment over two lines: see [CONTRIBUTING.md](CONTRIBUTING.md) §Comments; `bun run check:comments` catches it.
+- Anything under `server/api/training/` touching an operational table; `bun run check:training` catches it ([ADR-0032](docs/decisions/0032-training-mode-writes-to-its-own-table.md)).

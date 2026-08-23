@@ -7,7 +7,7 @@ import jsQR from 'jsqr'
 import { isStaff } from '~~/shared/utils/abilities'
 
 definePageMeta({
-  layout: false,
+  layout: 'foh',
   middleware: ['foh'],
   title: 'Scan ticket',
 })
@@ -45,6 +45,13 @@ const NEED_LABELS: Record<string, string> = {
 const { user } = useUserSession()
 const staffView = computed(() => (user.value ? isStaff(user.value) : false))
 
+// One page, two modes (docs/14 §8).
+const route = useRoute()
+const training = useTrainingMode()
+if (route.query.practice) await training.start('door-scan').catch(() => {})
+await training.refresh()
+const api = (path: string) => `${training.prefix.value}${path}`
+
 const term = ref('')
 const results = ref<Match[]>([])
 const searching = ref(false)
@@ -56,8 +63,12 @@ async function search(q: string) {
   searching.value = true
   problem.value = null
   try {
-    results.value = await $fetch<Match[]>('/api/foh/lookup', { query: { q: trimmed } })
-    if (!results.value.length) problem.value = `Nothing matching "${trimmed}" on tonight's performances.`
+    results.value = await $fetch<Match[]>(api('/api/foh/lookup'), { query: { q: trimmed } })
+    if (!results.value.length) {
+      problem.value = training.active.value
+        ? `Nothing matching "${trimmed}" in the practice bookings.`
+        : `Nothing matching "${trimmed}" on tonight's performances.`
+    }
   }
   catch {
     problem.value = 'That lookup failed. Try again, or use the booking reference.'

@@ -344,6 +344,7 @@ None of these are code, and all of them will be discovered mid-build if they are
 |---|---|---|
 | Create the `door` and `bar` eligibility rules; confirm what `duty-manager` requires | rehearsal admin UI | B2, B3, G8 |
 | Issue Proscenium a training API service token, and add it as a worker secret | rehearsal operations, then Cloudflare | B2 |
+| Create the `bar-till`, `challenge-25` and `door-scan` practice targets, and ship practice windows | rehearsal admin UI, after its scheduling work | [14-training-mode](./14-training-mode-design.md), which is a follow-on programme, not part of this one |
 | Add access profiles and backstage messages to the Workspace & Data Retention Policy | stage-door `docs/gdpr-retention.md` | F1, E2 |
 | Create the `access@newtheatre.org.uk` alias | Workspace/GAM | F1 |
 | Register the theatre with Nimbus and confirm the verification mechanism | FOH manager | F2 (soft: sight of card works meanwhile) |

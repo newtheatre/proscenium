@@ -481,6 +481,32 @@ sees it.
 The shape deliberately mirrors `comp_requests`: where an approval is the control, the thing awaiting
 approval must not also be the thing that grants the entitlement.
 
+### `training_runs`, `training_run_events`
+
+Practice mode's own tables, and **the only two a training request may write**
+([ADR-0032](./decisions/0032-training-mode-writes-to-its-own-table.md)). Design:
+[14-training-mode](./14-training-mode-design.md).
+
+- `training_runs`: `user_id` · `target_key` (`bar-till` | `challenge-25` | `door-scan`) ·
+  `training_session_id` (rehearsal's, kept only so a trainer can find the lesson again) ·
+  `started_at` · `expires_at` · `ended_at` · `ended_reason` (`ENDED` | `EXPIRED` | `PURGED`).
+- `training_run_events`: `run_id` (cascade) · `kind` (`SALE` | `AGE_CHECK` | `ADMISSION` | `LOOKUP`)
+  · `payload` JSON · `at`.
+
+**`expires_at` comes from rehearsal and is never extended here.** This app does not decide how long
+somebody may practise; it asks, and it obeys the answer.
+
+**Nothing else in this app reads either table.** That is what makes practice invisible to every
+report, reconciliation and Z-total by construction, rather than by a filter each of them has to
+remember. Do not add a join from anything operational.
+
+They are also the exception to "erasure is anonymisation, never deletion"
+([ADR-0014](./decisions/0014-anonymise-never-delete.md)): an erasure **deletes** a person's runs and
+their events. That rule exists because sales statistics must survive an erasure, and practice is not
+a statistic. `training_runs.user_id` still joins the estate hooks like every other user reference
+([ADR-0025](./decisions/0025-every-user-reference-joins-the-estate-hooks.md)); it just takes the
+deletion path on both erasure and merge.
+
 ### External: a venue, not a strand
 
 Two different things are called external, and they behave in opposite directions (ADR-0029).
