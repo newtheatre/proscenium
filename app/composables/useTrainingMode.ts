@@ -1,4 +1,4 @@
-import { computed, ref, useRequestFetch, useState } from '#imports'
+import { computed, navigateTo, ref, useRequestFetch, useState, watch } from '#imports'
 
 export type TrainingTarget = 'bar-till' | 'challenge-25' | 'door-scan'
 
@@ -75,5 +75,31 @@ export function useTrainingMode() {
     return computed(() => state.value.active && state.value.targetKey === SURFACE_TARGET[surface])
   }
 
-  return { state, active, prefix, busy, refresh, start, end, isPracticing }
+  /**
+   * Enter a sandbox from a `?practice=1` link. A refusal must never fall
+   * through to the live screen, so it leaves rather than continuing.
+   */
+  async function enter(target: TrainingTarget) {
+    try {
+      await start(target)
+    }
+    catch (error) {
+      const message = (error as { data?: { statusMessage?: string } }).data?.statusMessage
+      await navigateTo({ path: '/foh', query: { practice: 'unavailable', reason: message ?? '' } })
+      return false
+    }
+    return true
+  }
+
+  /**
+   * Leave the moment a run ends, however it ended. The alternative is a screen
+   * whose buttons have quietly become real.
+   */
+  function leaveWhenPracticeEnds() {
+    watch(active, (now, before) => {
+      if (before && !now) navigateTo({ path: '/foh', query: { practice: 'ended' } })
+    })
+  }
+
+  return { state, active, prefix, busy, refresh, start, end, enter, leaveWhenPracticeEnds, isPracticing }
 }

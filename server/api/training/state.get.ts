@@ -10,10 +10,10 @@ export default defineEventHandler(async (event) => {
 
   if (!run) return { active: false as const, targetKey: null, expiresAt: null, events: [] }
 
-  // Re-asked, not assumed: a lead marking the register in rehearsal ends the
-  // sandbox here within a poll, which is the reset promise (docs/14 §9).
+  // Re-asked, not assumed, so closing the register upstream ends this within a
+  // poll (docs/14 §9). Only CLOSED ends it: ending a run deletes its events.
   const upstream = await practiceWindow(user.id, run.targetKey)
-  if (!upstream.active) {
+  if (upstream.status === 'CLOSED') {
     await endRun(run.id, 'ENDED')
     return { active: false as const, targetKey: null, expiresAt: null, events: [] }
   }

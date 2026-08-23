@@ -163,9 +163,12 @@ training_run_events  id · run_id FK (cascade) · at
 them, which is what makes the exclusion from every report structural rather than a filter somebody
 has to remember ([ADR-0032](./decisions/0032-training-mode-writes-to-its-own-table.md)).
 
-`bun run check:training` enforces it in CI: it reads every file under `server/api/training/` and
-fails on a write to anything else, or a read of a table not on its allow-list. If you genuinely need
-the sandbox to read something new, add it there with a reason; there is no way to add a write.
+`bun run check:training` enforces it in CI on both sides. It reads every file under
+`server/api/training/` and fails on a write to anything else, or a read of a table not on its
+allow-list. It **also** reads the dual-mode pages and fails on any `/api/bar/**` or `/api/foh/**`
+path fetched without `api(...)`. That second half is the one that matters most in practice: a
+server-only check passes happily while a page reaches straight past the sandbox, which is exactly
+what happened.
 
 Events exist so a trainer can debrief ("show me what you rang up") and so the banner can show a
 tally. They are scratch data, they aggregate to nothing, and they are deleted with the run.
@@ -192,8 +195,21 @@ one.
 Every one of them requires an active run whose `target_key` covers the surface, so an open `bar-till`
 run cannot reach the door sandbox.
 
-`server/middleware/training-mode.ts` completes it from the other side: while a run is live, mutating
-`/api/bar/**` and `/api/foh/**` requests are refused. Belt and braces, per ADR-0032.
+`server/middleware/trainingMode.ts` completes it from the other side: while a run is live,
+`/api/bar/**` and `/api/foh/**` are refused, **reads included**. The only exceptions are a named
+allow-list of show-night shell reads (`/api/foh/tonight`, `/emergency`, `/contacts`) that carry no
+customer or money data. Belt and braces, per ADR-0032.
+
+Blocking only writes is not enough, and it is worth saying because the first implementation did
+exactly that: a practice screen that reads live data shows a trainee the real comps queue and real
+people's tab balances. The guarantee is about what a sandbox can *reach*, not only what it can
+change.
+
+**Every operational path on a dual-mode page goes through `api()`, including ones with no sandbox
+equivalent.** Wrapped, they 404 in practice mode; unwrapped, they reach real data, and a 404 is the
+safe failure. Tabs, comps and opening or closing the bar have no sandbox, so they are additionally
+hidden in practice mode and return early on `training.active`: unreachable rather than merely
+misdirected.
 
 ## 8. Pages
 
@@ -213,6 +229,11 @@ Three paths, one destination:
 | Explicit | **End practice**: the run is `ENDED` and its events are deleted in the same batch |
 | Expiry | Past `expires_at` every training route refuses, and the run is marked `EXPIRED` |
 | Upstream | The lead marks the register in rehearsal, the window closes, the next state poll ends the run |
+
+Only a **definitive** closure ends a run. If rehearsal cannot be reached, the run continues on the
+expiry it already has, because ending a run also deletes its events and a transient blip must not do
+that ([ADR-0034](./decisions/0034-an-open-sandbox-closes-only-on-a-definitive-answer.md)). Opening a
+sandbox still needs a positive answer, so ADR-0033's direction is unchanged.
 
 Plus a daily task that deletes ended and expired runs with their events, so nothing accumulates.
 

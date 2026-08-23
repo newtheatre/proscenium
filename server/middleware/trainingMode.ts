@@ -1,20 +1,29 @@
 /**
- * While a sandbox is open, this user may not write anything real (ADR-0032).
- * Belt and braces: training requests already go to their own handlers.
+ * While a sandbox is open, this user reaches nothing operational (ADR-0032).
+ * Default-deny, including reads: a practice screen must not show real data.
  */
 
 import type { H3Event } from 'h3'
 
-/** The subtrees a run must not write to. Reads are left alone. */
+/** The subtrees a run is sealed off from. */
 const OPERATIONAL = /^\/api\/(bar|foh)\//
-const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+
+/**
+ * Reads the show-night shell itself needs, which carry no customer or money
+ * data. Everything else under the subtrees above is refused.
+ */
+const SHELL_READS = [
+  /^\/api\/foh\/tonight\/?$/,
+  /^\/api\/foh\/emergency\/?$/,
+  /^\/api\/foh\/contacts\/?$/,
+]
 
 export default defineEventHandler(async (event: H3Event) => {
-  const path = event.path ?? ''
-  if (!MUTATING.has(event.method)) return
+  const path = (event.path ?? '').split('?')[0] ?? ''
   if (!OPERATIONAL.test(path)) return
-  // The sandbox's own routes live under /api/training and are never blocked.
-  if (path.startsWith('/api/training/')) return
+
+  const isRead = event.method === 'GET' || event.method === 'HEAD'
+  if (isRead && SHELL_READS.some(allowed => allowed.test(path))) return
 
   const session = await getUserSession(event)
   const userId = session.user?.id
@@ -25,6 +34,8 @@ export default defineEventHandler(async (event: H3Event) => {
 
   throw createError({
     statusCode: 409,
-    statusMessage: 'You are in practice mode. End practice before doing anything for real.',
+    statusMessage: isRead
+      ? 'That is real data, and you are in practice mode.'
+      : 'You are in practice mode. End practice before doing anything for real.',
   })
 })

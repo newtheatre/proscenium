@@ -37,8 +37,10 @@ const toast = useToast()
 // One page, two modes (docs/14 §8).
 const route = useRoute()
 const training = useTrainingMode()
-if (route.query.practice) await training.start('challenge-25').catch(() => {})
+// A refused start must never fall through to the live screen.
+if (route.query.practice) await training.enter('challenge-25')
 await training.refresh()
+training.leaveWhenPracticeEnds()
 const api = (path: string) => `${training.prefix.value}${path}`
 
 const { data, refresh } = await useAsyncData('foh-age-checks',

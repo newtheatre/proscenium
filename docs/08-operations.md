@@ -253,6 +253,11 @@ In order:
 3. **Check it.** With a practice window open for a test account, `/foh` shows a Practice tile.
    Without one, it shows nothing.
 
+**An outage does not interrupt a lesson.** If the training system stops answering, sandboxes already
+open keep working until their expiry, and only new ones are refused
+([ADR-0034](./decisions/0034-an-open-sandbox-closes-only-on-a-definitive-answer.md)). So a training
+outage during a show night is not an incident for this app.
+
 **With no token, nobody gets a sandbox.** That is the opposite of what a missing token does to
 eligibility, where it silently takes the fail-open path and flags every claim
 ([ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md)). Here the

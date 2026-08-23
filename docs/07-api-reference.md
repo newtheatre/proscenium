@@ -2764,7 +2764,13 @@ Each surface route requires a run **for that target**, so an open till sandbox c
 The fixture is `shared/utils/trainingScenario.ts`; no row of it is ever inserted anywhere.
 
 `server/middleware/trainingMode.ts` closes the loop from the other side: while a run is open, any
-mutating request to `/api/bar/**` or `/api/foh/**` answers `409`. Belt and braces.
+request to `/api/bar/**` or `/api/foh/**` answers `409`, **reads included**, except a named allow-list
+of show-night shell reads (`/api/foh/tonight`, `/emergency`, `/contacts`). Belt and braces.
+
+`POST /api/training/start` answers `403` both when the caller is not being taught the thing and when
+rehearsal cannot be reached, with different messages: opening a sandbox needs a positive answer
+(ADR-0033). `GET /api/training/state` ends a run only on a definitive closure, never on an outage
+([ADR-0034](./decisions/0034-an-open-sandbox-closes-only-on-a-definitive-answer.md)).
 
 **Not in any sandbox:** opening or closing a bar session, comps (they need a duty manager's approval,
 and a fictional approval teaches the wrong lesson), voids, and anything under `/admin`.
