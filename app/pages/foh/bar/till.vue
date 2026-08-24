@@ -27,6 +27,7 @@ interface Discount { id: string, name: string, percent: number }
 interface Tonight {
   night: string
   session: { id: string } | null
+  closedTonight: { at: string, by: string } | null
   alcoholTrained: boolean
   trainingNeedsReview: boolean
   performances: Array<{ id: string, startsAt: string, showTitle: string, venueName: string }>
@@ -474,8 +475,10 @@ async function takeCard() {
   }
 }
 
-/** `tonight.session` carries an open session only, so the close is held here. */
-const closed = ref<{ at: string, by: string } | null>(null)
+// The server is the authority, so a reload after closing still shows it. The
+// local ref only covers the gap before the refresh lands.
+const justClosed = ref<{ at: string, by: string } | null>(null)
+const closed = computed(() => justClosed.value ?? tonight.value?.closedTonight ?? null)
 
 async function openBar() {
   // No sandbox exists for this, so it must not run in practice mode.
@@ -486,7 +489,7 @@ async function openBar() {
       method: 'POST',
       body: { performanceIds: tonight.value?.performances.map(p => p.id) ?? [] },
     })
-    closed.value = null
+    justClosed.value = null
     await refresh()
   }
   catch (error) {
@@ -516,7 +519,7 @@ async function closeBar() {
       body: { closingNote: closingNote.value || null },
     })
     closingNote.value = ''
-    closed.value = { at: new Date().toISOString(), by: user.value?.name ?? 'you' }
+    justClosed.value = { at: new Date().toISOString(), by: user.value?.name ?? 'you' }
     await refresh()
     toast.add({ title: 'Bar closed', icon: 'i-lucide-check', color: 'success' })
   }

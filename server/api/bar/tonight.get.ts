@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, eq, gte, isNull, lte, ne } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, isNotNull, isNull, lte, ne } from 'drizzle-orm'
 import { workFoh } from '~~/shared/utils/abilities'
 
 /** GET /api/bar/tonight: the till's opening state: session, products, prices. */
@@ -9,9 +9,20 @@ export default defineEventHandler(async (event) => {
   const { user } = await requireUserSession(event)
   const night = await requireBarScope(user)
 
-  const [session, performances, products, discounts] = await Promise.all([
+  const [session, closedTonight, performances, products, discounts] = await Promise.all([
     db.select().from(schema.barSessions)
       .where(and(eq(schema.barSessions.night, night), isNull(schema.barSessions.closedAt))).get(),
+    // Separate, so `session` keeps meaning "open" for every existing caller and
+    // a till reloaded after closing still knows the night is over.
+    db.select({
+      closedAt: schema.barSessions.closedAt,
+      closedByName: schema.users.name,
+    })
+      .from(schema.barSessions)
+      .leftJoin(schema.users, eq(schema.barSessions.closedByUserId, schema.users.id))
+      .where(and(eq(schema.barSessions.night, night), isNotNull(schema.barSessions.closedAt)))
+      .orderBy(desc(schema.barSessions.closedAt))
+      .get(),
     db.select({
       id: schema.performances.id,
       startsAt: schema.performances.startsAt,
@@ -56,6 +67,9 @@ export default defineEventHandler(async (event) => {
   return {
     night,
     session: session ?? null,
+    closedTonight: closedTonight?.closedAt
+      ? { at: closedTonight.closedAt.toISOString(), by: closedTonight.closedByName ?? 'somebody' }
+      : null,
     alcoholTrained: training.eligible,
     trainingNeedsReview: training.needsReview,
     performances,
