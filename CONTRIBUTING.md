@@ -44,12 +44,16 @@ under `.data/`; D1 only exists in production.
 ## Before you push
 
 CI runs on every pull request ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) and gates on
-all three of these. Run them locally first: it is much faster than waiting for the workflow:
+every one of these. Run them locally first: it is much faster than waiting for the workflow:
 
 ```bash
-bun run typecheck   # type errors
-bun run lint        # ESLint (bun run lint:fix to autofix)
-bun run build       # the production Worker bundle must build
+bun run typecheck         # type errors
+bun run lint              # ESLint (bun run lint:fix to autofix)
+bun run check:comments    # comment length, and em dashes anywhere
+bun run check:user-refs   # a users.id reference that skipped the estate hooks
+bun run check:training    # training mode reaching an operational table
+bun run check:migrations  # a table rebuild that would cascade away its dependents
+bun run build             # the production Worker bundle must build
 ```
 
 ## Changing the database schema
@@ -59,8 +63,12 @@ bun run build       # the production Worker bundle must build
 
 1. Edit the relevant file in `server/db/schema/`.
 2. `bunx nuxt db generate`, then **read the generated `.sql` before committing**. SQLite rebuilds
-   tables for most constraint changes, and any column missing from the copying `INSERT` silently
-   loses its data.
+   tables for most constraint changes, and a rebuild fails silently in two directions under D1: any
+   column missing from the copying `INSERT` loses its data, and the `DROP TABLE` **cascades to every
+   dependent row**, because `PRAGMA foreign_keys=OFF` is a no-op inside a transaction. Generate
+   additions, renames and constraint changes as **separate migrations** so nothing is rebuilt;
+   `bun run check:migrations` refuses the dangerous shape
+   ([ADR-0037](docs/decisions/0037-a-table-rebuild-takes-its-dependents-with-it.md)).
 3. Restart `bun run dev`; the dev plugin applies the migration locally.
 4. Commit the schema change, the new `.sql` file, **and** the `meta/` snapshot **together**:
    splitting them across commits corrupts the migration history for everyone else.

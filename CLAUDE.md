@@ -41,7 +41,7 @@ There is no test suite. CI gates on typecheck, lint and build ([.github/workflow
 
 ## Repo conventions
 
-- Drizzle schema in `server/db/schema/`, one file per domain area; migrations generated then hand-reviewed: D1 is SQLite, so most constraint changes are table rebuilds and a column missing from the copying `INSERT` silently loses its data.
+- Drizzle schema in `server/db/schema/`, one file per domain area; migrations generated then hand-reviewed: D1 is SQLite, so most constraint changes are table rebuilds, and a rebuild both loses a column missing from the copying `INSERT` and **cascades to every dependent row** ([ADR-0037](docs/decisions/0037-a-table-rebuild-takes-its-dependents-with-it.md)). Split the change so nothing is rebuilt.
 - **Merging to `main` applies migrations to production.** Anything destructive is applied by hand before merging: see [CONTRIBUTING.md](CONTRIBUTING.md) and `docs/08-operations.md` §5.
 - Zod for every request body and query string. One route = one file under `server/api/`.
 - Admin pages fetch on the server with `$fetch: useRequestFetch()`; a plain `useFetch` does not forward the session cookie and 403s during SSR. ([ADR-0013](docs/decisions/0013-admin-pages-fetch-on-the-server.md))
@@ -57,3 +57,4 @@ There is no test suite. CI gates on typecheck, lint and build ([.github/workflow
 - Drift between `docs/07-api-reference.md` and the actual routes.
 - A comment over two lines: see [CONTRIBUTING.md](CONTRIBUTING.md) §Comments; `bun run check:comments` catches it.
 - Anything under `server/api/training/` touching an operational table; `bun run check:training` catches it ([ADR-0032](docs/decisions/0032-training-mode-writes-to-its-own-table.md)).
+- Any generated migration that rebuilds a table (`CREATE TABLE __new_…`): under D1 the drop cascades and takes dependent rows with it. `bun run check:migrations` catches it ([ADR-0037](docs/decisions/0037-a-table-rebuild-takes-its-dependents-with-it.md)).
