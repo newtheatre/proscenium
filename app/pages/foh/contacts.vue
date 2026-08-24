@@ -22,7 +22,7 @@ const ROLE_LABELS: Record<OnTonight['role'], string> = {
 const { performance, performances } = await useFohTonight()
 const requestFetch = useRequestFetch()
 
-const { data: contactData, refresh: refreshContacts } = await useAsyncData(
+const { data: contactData, refresh: refreshContacts, error: contactError } = await useAsyncData(
   'foh-contacts',
   () => (performance.value
     ? requestFetch<{ onTonight: OnTonight[], contacts: Contact[] }>('/api/foh/contacts', {
@@ -32,7 +32,7 @@ const { data: contactData, refresh: refreshContacts } = await useAsyncData(
   { watch: [performance] },
 )
 
-const { data: entryData, refresh: refreshEntries } = await useAsyncData(
+const { data: entryData, refresh: refreshEntries, error: entryError } = await useAsyncData(
   'foh-incidents',
   () => (performance.value
     ? requestFetch<Entry[]>('/api/foh/incidents', { query: { performanceId: performance.value.id } })
@@ -48,9 +48,31 @@ const draft = ref('')
 const correcting = ref<Entry | null>(null)
 const saving = ref(false)
 const toast = useToast()
+const composer = useTemplateRef<{ textareaRef: HTMLTextAreaElement | null }>('composer')
+
+// The control that started the correction, so closing can hand focus back to it.
+let correctionTrigger: HTMLElement | null = null
+
+async function startCorrection(entry: Entry, trigger: EventTarget | null) {
+  correcting.value = entry
+  correctionTrigger = trigger instanceof HTMLElement ? trigger : null
+  await nextTick()
+  composer.value?.textareaRef?.focus()
+}
+
+async function endCorrection() {
+  const trigger = correctionTrigger
+  correcting.value = null
+  correctionTrigger = null
+  await nextTick()
+  if (trigger?.isConnected) trigger.focus()
+  else composer.value?.textareaRef?.focus()
+}
 
 async function addEntry() {
   if (!performance.value || !draft.value.trim()) return
+  const wasCorrecting = Boolean(correcting.value)
+  let saved = false
   saving.value = true
   try {
     await requestFetch('/api/foh/incidents', {
@@ -61,16 +83,25 @@ async function addEntry() {
         supersedesId: correcting.value?.id,
       },
     })
-    draft.value = ''
-    correcting.value = null
-    await Promise.all([refreshEntries(), refreshContacts()])
+    saved = true
   }
-  catch {
-    toast.add({ title: 'That entry was not saved', color: 'error' })
+  catch (error) {
+    toast.add({
+      title: 'That entry was not saved',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
   }
   finally {
     saving.value = false
   }
+
+  // The typed text survives a failure, and the refresh sits outside the save so
+  // a failed reload cannot report a filed entry as lost.
+  if (!saved) return
+  draft.value = ''
+  if (wasCorrecting) await endCorrection()
+  await Promise.all([refreshEntries(), refreshContacts()])
 }
 </script>
 
@@ -144,7 +175,13 @@ async function addEntry() {
             <span class="font-mono text-neutral-300">{{ contact.phone }}</span>
           </a>
           <p
-            v-if="!contacts.length"
+            v-if="contactError"
+            class="rounded-xl border border-red-900 bg-red-950/30 p-4 text-sm text-red-200"
+          >
+            The numbers did not load. Check the connection and try again.
+          </p>
+          <p
+            v-else-if="!contacts.length"
             class="rounded-xl bg-neutral-900 p-4 text-sm text-neutral-400"
           >
             No numbers recorded yet.
@@ -156,38 +193,45 @@ async function addEntry() {
             Incident log
           </h2>
 
-          <div
-            v-if="correcting"
-            class="mb-2 rounded-lg bg-amber-950/60 p-3 text-sm text-amber-200"
-          >
-            Correcting an earlier entry. Both are kept.
-            <button
-              type="button"
-              class="ml-2 underline"
-              @click="correcting = null"
+          <div id="incident-composer">
+            <div
+              v-if="correcting"
+              id="correction-note"
+              role="status"
+              class="mb-2 rounded-lg bg-amber-950/60 p-3 text-sm text-amber-200"
             >
-              Cancel
-            </button>
-          </div>
+              Correcting an earlier entry. Both are kept.
+              <button
+                type="button"
+                class="ml-2 underline"
+                @click="endCorrection"
+              >
+                Cancel
+              </button>
+            </div>
 
-          <form
-            class="mb-4 space-y-2"
-            @submit.prevent="addEntry"
-          >
-            <UTextarea
-              v-model="draft"
-              :rows="3"
-              placeholder="What happened, and when. Names only if they matter."
-              class="w-full"
-            />
-            <UButton
-              type="submit"
-              block
-              size="lg"
-              :loading="saving"
-              label="Add to the log"
-            />
-          </form>
+            <form
+              class="mb-4 space-y-2"
+              @submit.prevent="addEntry"
+            >
+              <UTextarea
+                ref="composer"
+                v-model="draft"
+                :rows="3"
+                placeholder="What happened, and when. Names only if they matter."
+                class="w-full"
+                :aria-describedby="correcting ? 'correction-note' : undefined"
+                @keydown.esc="correcting && endCorrection()"
+              />
+              <UButton
+                type="submit"
+                block
+                size="lg"
+                :loading="saving"
+                :label="correcting ? 'File the correction' : 'Add to the log'"
+              />
+            </form>
+          </div>
 
           <article
             v-for="entry in entries"
@@ -204,14 +248,22 @@ async function addEntry() {
             <button
               type="button"
               class="mt-2 text-xs text-neutral-400 underline"
-              @click="correcting = entry"
+              aria-controls="incident-composer"
+              :aria-expanded="correcting?.id === entry.id"
+              @click="startCorrection(entry, $event.currentTarget)"
             >
               Correct this
             </button>
           </article>
 
           <p
-            v-if="!entries.length"
+            v-if="entryError"
+            class="rounded-xl border border-red-900 bg-red-950/30 p-4 text-sm text-red-200"
+          >
+            The log did not load. Check the connection and try again.
+          </p>
+          <p
+            v-else-if="!entries.length"
             class="rounded-xl bg-neutral-900 p-4 text-sm text-neutral-400"
           >
             Nothing logged tonight.

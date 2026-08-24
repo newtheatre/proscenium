@@ -3,6 +3,8 @@
  * It records money; it never charges anything (ADR-0024). Design: docs/13 §4.1
  */
 <script setup lang="ts">
+import { isStaff } from '~~/shared/utils/abilities'
+
 definePageMeta({
   layout: 'foh',
   middleware: ['foh'],
@@ -25,6 +27,7 @@ interface Discount { id: string, name: string, percent: number }
 interface Tonight {
   night: string
   session: { id: string } | null
+  closedTonight: { at: string, by: string } | null
   alcoholTrained: boolean
   trainingNeedsReview: boolean
   performances: Array<{ id: string, startsAt: string, showTitle: string, venueName: string }>
@@ -43,6 +46,7 @@ interface Found {
 
 const requestFetch = useRequestFetch()
 const toast = useToast()
+const { user } = useUserSession()
 
 // One page, two modes. The prefix is the only difference, so what a trainee
 // practises cannot drift from the thing itself (docs/14 §8).
@@ -54,9 +58,12 @@ await training.refresh()
 training.leaveWhenPracticeEnds()
 const api = training.api
 
-const { data, refresh } = await useAsyncData('bar-tonight',
+const { data, refresh, status, error: loadError } = await useAsyncData('bar-tonight',
   () => requestFetch<Tonight>(api('/api/bar/tonight')),
   { watch: [training.active] })
+
+/** The desk is a staff route: offering it to anyone else lands them on the homepage. */
+const mayUseDesk = computed(() => !training.active.value && Boolean(user.value && isStaff(user.value)))
 
 const tonight = computed(() => data.value ?? null)
 const products = computed<Product[]>(() => tonight.value?.products ?? [])
@@ -91,6 +98,18 @@ const subLabel = computed(() => {
   if (ticketSubtotal.value) return 'Tickets only'
   return 'Bar only'
 })
+
+// The basket is a glance for a sighted server, so every change is spoken with
+// the figure that gets typed into SumUp.
+const announcement = ref('')
+function announce(change: string) {
+  announcement.value = `${change}. Total ${formatMoney(total.value)}.`
+}
+
+function applyDiscount(id: string | null) {
+  discountId.value = id
+  announce(discount.value ? `${discount.value.name} ${discount.value.percent}% applied` : 'Discount removed')
+}
 
 // Comps
 interface CompLine { productId: string, name: string, qty: number, unitPricePence: number }
@@ -244,6 +263,7 @@ function addLine(product: Product, choices: BasketLine['choices']) {
   const line = basketBar.value.find(l => l.key === key)
   if (line) line.qty++
   else basketBar.value.push({ key, product, qty: 1, choices })
+  announce(`Added ${lineLabel({ key, product, qty: 1, choices })}`)
 }
 
 function confirmChoices() {
@@ -257,19 +277,32 @@ function removeProduct(key: string) {
   const index = basketBar.value.findIndex(l => l.key === key)
   if (index === -1) return
   const line = basketBar.value[index]!
+  const label = lineLabel(line)
   if (line.qty > 1) line.qty--
   else basketBar.value.splice(index, 1)
+  announce(`Removed one ${label}`)
 }
 
 const term = ref('')
 const results = ref<Found[]>([])
 const searching = ref(false)
+const problem = ref<string | null>(null)
 
 async function search() {
-  if (term.value.trim().length < 2) return
+  const trimmed = term.value.trim()
+  if (trimmed.length < 2) return
   searching.value = true
+  problem.value = null
   try {
-    results.value = await requestFetch<Found[]>(api('/api/bar/lookup'), { query: { q: term.value.trim() } })
+    results.value = await requestFetch<Found[]>(api('/api/bar/lookup'), { query: { q: trimmed } })
+    if (!results.value.length) {
+      problem.value = training.active.value
+        ? `Nothing matching "${trimmed}" in the practice bookings.`
+        : `Nothing matching "${trimmed}" on tonight's performances.`
+    }
+  }
+  catch {
+    problem.value = 'That lookup failed. Try again, or use the booking reference.'
   }
   finally {
     searching.value = false
@@ -280,7 +313,9 @@ function addReservation(found: Found) {
   if (basketTickets.value.some(r => r.id === found.id)) return
   basketTickets.value.push(found)
   results.value = []
+  problem.value = null
   term.value = ''
+  announce(`Added booking ${found.bookingRef}`)
 }
 
 // Tabs
@@ -440,14 +475,33 @@ async function takeCard() {
   }
 }
 
+// The server is the authority, so a reload after closing still shows it. The
+// local ref only covers the gap before the refresh lands.
+const justClosed = ref<{ at: string, by: string } | null>(null)
+const closed = computed(() => justClosed.value ?? tonight.value?.closedTonight ?? null)
+
 async function openBar() {
   // No sandbox exists for this, so it must not run in practice mode.
   if (training.active.value) return
-  await requestFetch(api('/api/bar/sessions'), {
-    method: 'POST',
-    body: { performanceIds: tonight.value?.performances.map(p => p.id) ?? [] },
-  })
-  await refresh()
+  busy.value = true
+  try {
+    await requestFetch(api('/api/bar/sessions'), {
+      method: 'POST',
+      body: { performanceIds: tonight.value?.performances.map(p => p.id) ?? [] },
+    })
+    justClosed.value = null
+    await refresh()
+  }
+  catch (error) {
+    toast.add({
+      title: 'Not opened',
+      description: (error as { data?: { statusMessage?: string } }).data?.statusMessage,
+      color: 'error',
+    })
+  }
+  finally {
+    busy.value = false
+  }
 }
 
 const closingNote = ref('')
@@ -465,6 +519,7 @@ async function closeBar() {
       body: { closingNote: closingNote.value || null },
     })
     closingNote.value = ''
+    justClosed.value = { at: new Date().toISOString(), by: user.value?.name ?? 'you' }
     await refresh()
     toast.add({ title: 'Bar closed', icon: 'i-lucide-check', color: 'success' })
   }
@@ -496,8 +551,20 @@ async function closeBar() {
         </NuxtLink>
       </header>
 
+      <div
+        v-if="!training.active.value && closed"
+        class="mb-4 rounded-xl border border-neutral-800 bg-neutral-900 p-4"
+      >
+        <p class="text-sm font-medium text-neutral-200">
+          Bar closed by {{ closed.by }}
+        </p>
+        <p class="text-xs text-neutral-500">
+          {{ formatDateTime(closed.at) }} &middot; tonight's takings are in that session.
+        </p>
+      </div>
+
       <UAlert
-        v-if="!training.active.value && tonight && !tonight.session"
+        v-else-if="!training.active.value && tonight && !tonight.session"
         class="mb-4"
         color="warning"
         variant="subtle"
@@ -507,6 +574,8 @@ async function closeBar() {
         <template #actions>
           <UButton
             size="xs"
+            :loading="busy"
+            :disabled="busy"
             label="Open the bar"
             @click="openBar"
           />
@@ -547,36 +616,64 @@ async function closeBar() {
       </div>
 
       <section v-if="tab === 'bar'">
-        <div class="mb-3 flex flex-wrap gap-2">
+        <div
+          v-if="status === 'pending'"
+          class="rounded-xl bg-neutral-900 p-6 text-neutral-400"
+        >
+          Loading tonight's bar&hellip;
+        </div>
+
+        <div
+          v-else-if="loadError"
+          class="rounded-xl border border-amber-600/60 bg-neutral-900 p-6"
+        >
+          <p class="font-medium text-amber-300">
+            Tonight's bar did not load.
+          </p>
+          <p class="mt-2 text-sm text-neutral-400">
+            Nothing can be rung up until it does. Try again, and tell the duty manager if it keeps
+            failing.
+          </p>
           <UButton
-            size="xs"
-            :variant="activeCategory === null ? 'solid' : 'soft'"
-            label="All"
-            @click="activeCategory = null"
-          />
-          <UButton
-            v-for="category in categories"
-            :key="category"
-            size="xs"
-            :variant="activeCategory === category ? 'solid' : 'soft'"
-            :label="category"
-            @click="activeCategory = category"
+            class="mt-3"
+            size="sm"
+            label="Try again"
+            @click="refresh()"
           />
         </div>
-        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <button
-            v-for="product in shown"
-            :key="product.id"
-            type="button"
-            class="min-h-20 rounded-xl border border-neutral-800 bg-neutral-900 p-3 text-left hover:border-violet-600"
-            @click="addProduct(product)"
-          >
-            <span class="block text-sm font-medium leading-tight">{{ product.name }}</span>
-            <span class="mt-1 block text-sm text-neutral-400">
-              {{ formatMoney(product.pricePence) }}<template v-if="product.slots.length"> · choose</template>
-            </span>
-          </button>
-        </div>
+
+        <template v-else>
+          <div class="mb-3 flex flex-wrap gap-2">
+            <UButton
+              size="xs"
+              :variant="activeCategory === null ? 'solid' : 'soft'"
+              label="All"
+              @click="activeCategory = null"
+            />
+            <UButton
+              v-for="category in categories"
+              :key="category"
+              size="xs"
+              :variant="activeCategory === category ? 'solid' : 'soft'"
+              :label="category"
+              @click="activeCategory = category"
+            />
+          </div>
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <button
+              v-for="product in shown"
+              :key="product.id"
+              type="button"
+              class="min-h-20 rounded-xl border border-neutral-800 bg-neutral-900 p-3 text-left hover:border-violet-600"
+              @click="addProduct(product)"
+            >
+              <span class="block text-sm font-medium leading-tight">{{ product.name }}</span>
+              <span class="mt-1 block text-sm text-neutral-400">
+                {{ formatMoney(product.pricePence) }}<template v-if="product.slots.length"> · choose</template>
+              </span>
+            </button>
+          </div>
+        </template>
       </section>
 
       <section v-else>
@@ -597,6 +694,12 @@ async function closeBar() {
             label="Find"
           />
         </form>
+        <p
+          v-if="problem"
+          class="mb-3 rounded-xl bg-neutral-900 p-4 text-sm text-neutral-300"
+        >
+          {{ problem }}
+        </p>
         <div
           v-for="found in results"
           :key="found.id"
@@ -629,6 +732,7 @@ async function closeBar() {
               @click="addReservation(found)"
             />
             <NuxtLink
+              v-if="mayUseDesk"
               to="/admin/box-office/reservations"
               class="text-xs text-neutral-500 underline"
             >
@@ -656,12 +760,18 @@ async function closeBar() {
             :key="line.key"
             class="flex items-center justify-between py-0.5"
           >
-            <span>
+            <span class="flex items-center gap-2">
               <button
                 type="button"
-                class="mr-2 text-neutral-500"
+                class="-my-1.5 inline-flex size-11 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-800"
+                :aria-label="`Remove one ${lineLabel(line)}`"
                 @click="removeProduct(line.key)"
-              >−</button>
+              >
+                <UIcon
+                  name="i-lucide-minus"
+                  class="size-4"
+                />
+              </button>
               {{ line.qty }} × {{ lineLabel(line) }}
             </span>
             <span>{{ formatMoney(line.product.pricePence * line.qty) }}</span>
@@ -674,6 +784,14 @@ async function closeBar() {
           </p>
         </div>
 
+        <p
+          class="sr-only"
+          role="status"
+          aria-live="polite"
+        >
+          {{ announcement }}
+        </p>
+
         <div
           v-if="tonight?.discounts.length"
           class="mt-2 flex flex-wrap gap-1"
@@ -682,7 +800,7 @@ async function closeBar() {
             size="xs"
             :variant="discountId === null ? 'solid' : 'soft'"
             label="None"
-            @click="discountId = null"
+            @click="applyDiscount(null)"
           />
           <UButton
             v-for="option in tonight.discounts"
@@ -690,7 +808,7 @@ async function closeBar() {
             size="xs"
             :variant="discountId === option.id ? 'solid' : 'soft'"
             :label="`${option.name} ${option.percent}%`"
-            @click="discountId = option.id"
+            @click="applyDiscount(option.id)"
           />
         </div>
 
@@ -710,7 +828,7 @@ async function closeBar() {
               v-if="showTrainingWarning"
               class="mb-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-300"
             >
-              You&rsquo;re not recorded as trained to sell alcohol &mdash; ask the DM.
+              You&rsquo;re not recorded as trained to sell alcohol. Ask the duty manager.
             </p>
             <p class="text-xs uppercase tracking-widest text-amber-300">
               Type into SumUp
