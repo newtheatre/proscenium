@@ -182,6 +182,19 @@ export default defineNuxtConfig({
       '/alumni/register': { redirect: ALUMNI_SIGNUP_URL },
       '/alumni/register/': { redirect: ALUMNI_SIGNUP_URL },
 
+      // The door scanner reads a ticket QR, so it is the one route allowed the
+      // camera. Same-origin only; every other header matches the baseline below.
+      '/foh/scan': {
+        headers: {
+          'Referrer-Policy': 'strict-origin-when-cross-origin',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+          'Strict-Transport-Security': 'max-age=15552000',
+          'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(), payment=()',
+          'Content-Security-Policy': 'frame-ancestors \'none\'; object-src \'none\'; base-uri \'self\'',
+        },
+      },
+
       // Baseline security headers on every response.
       '/**': {
         headers: {
