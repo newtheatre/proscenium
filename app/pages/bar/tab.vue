@@ -216,7 +216,7 @@ async function removeCharge(id: string) {
           :variant="activeCategory === null ? 'solid' : 'soft'"
           size="sm"
           label="All"
-          @click="activeCategory = null"
+          @click="() => { activeCategory = null }"
         />
         <UButton
           v-for="category in categories"
@@ -224,7 +224,7 @@ async function removeCharge(id: string) {
           :variant="activeCategory === category ? 'solid' : 'soft'"
           size="sm"
           :label="category"
-          @click="activeCategory = category"
+          @click="() => { activeCategory = category }"
         />
       </div>
 
@@ -314,7 +314,7 @@ async function removeCharge(id: string) {
                 size="lg"
                 :variant="picks[slot.itemId] === option.id ? 'solid' : 'soft'"
                 :label="option.name"
-                @click="picks[slot.itemId] = option.id"
+                @click="() => { picks[slot.itemId] = option.id }"
               />
             </div>
           </div>
@@ -326,7 +326,7 @@ async function removeCharge(id: string) {
             variant="ghost"
             color="neutral"
             label="Cancel"
-            @click="choosing = null"
+            @click="() => { choosing = null }"
           />
           <UButton
             :disabled="!picksComplete"

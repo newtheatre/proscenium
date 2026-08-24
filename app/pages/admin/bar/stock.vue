@@ -358,14 +358,14 @@ async function startStocktake() {
                 variant="ghost"
                 color="neutral"
                 aria-label="Remove line"
-                @click="delivery.lines.splice(i, 1)"
+                @click="() => { delivery.lines.splice(i, 1) }"
               />
             </div>
             <UButton
               size="xs"
               variant="subtle"
               icon="i-lucide-plus"
-              @click="delivery.lines.push({ productId: '', qtyContainers: null, costPencePerContainer: null })"
+              @click="() => { delivery.lines.push({ productId: '', qtyContainers: null, costPencePerContainer: null }) }"
             >
               Add line
             </UButton>
@@ -377,7 +377,7 @@ async function startStocktake() {
           <UButton
             variant="ghost"
             color="neutral"
-            @click="deliveryOpen = false"
+            @click="() => { deliveryOpen = false }"
           >
             Cancel
           </UButton>
@@ -441,7 +441,7 @@ async function startStocktake() {
           <UButton
             variant="ghost"
             color="neutral"
-            @click="adjustOpen = false"
+            @click="() => { adjustOpen = false }"
           >
             Cancel
           </UButton>

@@ -139,7 +139,7 @@ async function join() {
         variant="subtle"
         icon="i-lucide-triangle-alert"
         :label="showEmergency ? 'Hide emergency information' : 'Emergency information'"
-        @click="showEmergency = !showEmergency"
+        @click="() => { showEmergency = !showEmergency }"
       />
 
       <div

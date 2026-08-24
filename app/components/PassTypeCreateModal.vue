@@ -256,7 +256,7 @@ async function save() {
           variant="ghost"
           color="neutral"
           :disabled="saving"
-          @click="modelOpen = false"
+          @click="() => { modelOpen = false }"
         />
         <UButton
           label="Create"

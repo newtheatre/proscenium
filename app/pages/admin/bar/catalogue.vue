@@ -674,7 +674,7 @@ async function moveCategory(category: Category, by: number) {
                   variant="ghost"
                   color="neutral"
                   aria-label="Remove ingredient"
-                  @click="newProduct.recipe.splice(i, 1)"
+                  @click="() => { newProduct.recipe.splice(i, 1) }"
                 />
               </div>
               <UButton
@@ -699,7 +699,7 @@ async function moveCategory(category: Category, by: number) {
               color="neutral"
               :label="`${ml} ml`"
               :disabled="!newProduct.recipe.length"
-              @click="newProduct.recipe[newProduct.recipe.length - 1]!.qty = ml"
+              @click="() => { newProduct.recipe[newProduct.recipe.length - 1]!.qty = ml }"
             />
           </div>
           <template v-if="!newProduct.recipe.length">
@@ -721,14 +721,14 @@ async function moveCategory(category: Category, by: number) {
                 variant="subtle"
                 color="neutral"
                 :label="`${ml} ml`"
-                @click="newProduct.containerMl = ml"
+                @click="() => { newProduct.containerMl = ml }"
               />
               <UButton
                 size="xs"
                 variant="subtle"
                 color="neutral"
                 label="Whole items"
-                @click="newProduct.containerMl = null"
+                @click="() => { newProduct.containerMl = null }"
               />
             </div>
             <UFormField
@@ -754,7 +754,7 @@ async function moveCategory(category: Category, by: number) {
             variant="ghost"
             color="neutral"
             label="Cancel"
-            @click="newProductOpen = false"
+            @click="() => { newProductOpen = false }"
           />
           <UButton
             :loading="busy"
@@ -834,7 +834,7 @@ async function moveCategory(category: Category, by: number) {
                   variant="ghost"
                   color="neutral"
                   aria-label="Remove ingredient"
-                  @click="form.recipe.splice(i, 1)"
+                  @click="() => { form.recipe.splice(i, 1) }"
                 />
               </div>
               <UButton
@@ -859,7 +859,7 @@ async function moveCategory(category: Category, by: number) {
               color="neutral"
               :label="`${ml} ml`"
               :disabled="!form.recipe.length"
-              @click="form.recipe[form.recipe.length - 1]!.qty = ml"
+              @click="() => { form.recipe[form.recipe.length - 1]!.qty = ml }"
             />
           </div>
           <template v-if="!form.recipe.length">
@@ -881,14 +881,14 @@ async function moveCategory(category: Category, by: number) {
                 variant="subtle"
                 color="neutral"
                 :label="`${ml} ml`"
-                @click="form.containerMl = ml"
+                @click="() => { form.containerMl = ml }"
               />
               <UButton
                 size="xs"
                 variant="subtle"
                 color="neutral"
                 label="Whole items"
-                @click="form.containerMl = null"
+                @click="() => { form.containerMl = null }"
               />
             </div>
             <UFormField
@@ -921,7 +921,7 @@ async function moveCategory(category: Category, by: number) {
             variant="ghost"
             color="neutral"
             label="Cancel"
-            @click="editOpen = false"
+            @click="() => { editOpen = false }"
           />
           <UButton
             :loading="busy"
@@ -1008,7 +1008,7 @@ async function moveCategory(category: Category, by: number) {
             variant="ghost"
             color="neutral"
             label="Cancel"
-            @click="priceOpen = false"
+            @click="() => { priceOpen = false }"
           />
           <UButton
             :loading="busy"

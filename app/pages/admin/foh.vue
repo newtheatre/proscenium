@@ -181,7 +181,7 @@ async function setArchived(contact: Contact, archived: boolean) {
                 size="sm"
                 variant="subtle"
                 :label="canEdit ? 'Edit' : 'View'"
-                @click="editingVenueId = venue.venueId"
+                @click="() => { editingVenueId = venue.venueId }"
               />
             </div>
           </li>
@@ -308,7 +308,7 @@ async function setArchived(contact: Contact, archived: boolean) {
             variant="ghost"
             color="neutral"
             label="Close"
-            @click="editingVenueId = null"
+            @click="() => { editingVenueId = null }"
           />
           <UButton
             v-if="canEdit"

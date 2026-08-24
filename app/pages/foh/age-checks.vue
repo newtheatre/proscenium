@@ -179,7 +179,7 @@ function reasonLabel(value: string | null) {
           variant="subtle"
           label="Log a refusal"
           class="mb-5"
-          @click="showForm = true"
+          @click="() => { showForm = true }"
         />
 
         <section

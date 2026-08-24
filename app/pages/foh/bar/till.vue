@@ -602,13 +602,13 @@ async function closeBar() {
           :variant="tab === 'bar' ? 'solid' : 'soft'"
           size="lg"
           label="Bar"
-          @click="tab = 'bar'"
+          @click="() => { tab = 'bar' }"
         />
         <UButton
           :variant="tab === 'tickets' ? 'solid' : 'soft'"
           size="lg"
           label="Tickets"
-          @click="tab = 'tickets'"
+          @click="() => { tab = 'tickets' }"
         />
       </div>
 
@@ -645,7 +645,7 @@ async function closeBar() {
               size="xs"
               :variant="activeCategory === null ? 'solid' : 'soft'"
               label="All"
-              @click="activeCategory = null"
+              @click="() => { activeCategory = null }"
             />
             <UButton
               v-for="category in categories"
@@ -653,7 +653,7 @@ async function closeBar() {
               size="xs"
               :variant="activeCategory === category ? 'solid' : 'soft'"
               :label="category"
-              @click="activeCategory = category"
+              @click="() => { activeCategory = category }"
             />
           </div>
           <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -859,7 +859,7 @@ async function closeBar() {
               variant="soft"
               :disabled="!canComp || busy || Boolean(myPending)"
               :label="myPending ? 'Waiting…' : 'Comp'"
-              @click="compOpen = true"
+              @click="() => { compOpen = true }"
             />
           </div>
         </div>
@@ -942,7 +942,7 @@ async function closeBar() {
           color="neutral"
           class="mt-2"
           label="Clear"
-          @click="myDecided = null"
+          @click="() => { myDecided = null }"
         />
       </template>
     </div>
@@ -971,7 +971,7 @@ async function closeBar() {
                 size="lg"
                 :variant="picks[slot.itemId] === option.id ? 'solid' : 'soft'"
                 :label="option.name"
-                @click="picks[slot.itemId] = option.id"
+                @click="() => { picks[slot.itemId] = option.id }"
               />
             </div>
             <p
@@ -989,7 +989,7 @@ async function closeBar() {
             variant="ghost"
             color="neutral"
             label="Cancel"
-            @click="choosing = null"
+            @click="() => { choosing = null }"
           />
           <UButton
             :disabled="!picksComplete"
@@ -1053,7 +1053,7 @@ async function closeBar() {
             variant="ghost"
             color="neutral"
             label="Cancel"
-            @click="compOpen = false"
+            @click="() => { compOpen = false }"
           />
           <UButton
             :loading="busy"
@@ -1149,7 +1149,7 @@ async function closeBar() {
               variant="ghost"
               color="neutral"
               label="Someone else"
-              @click="debtor = null"
+              @click="() => { debtor = null }"
             />
           </div>
         </div>
@@ -1160,7 +1160,7 @@ async function closeBar() {
             variant="ghost"
             color="neutral"
             label="Cancel"
-            @click="tabOpen = false"
+            @click="() => { tabOpen = false }"
           />
           <UButton
             v-if="debtor && debtor.outstandingPence > 0"

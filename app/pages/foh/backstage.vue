@@ -335,7 +335,7 @@ async function reset() {
             <UButton
               variant="ghost"
               label="Cancel"
-              @click="confirming = false"
+              @click="() => { confirming = false }"
             />
           </div>
           <UButton
@@ -344,7 +344,7 @@ async function reset() {
             color="error"
             variant="subtle"
             label="Reset code"
-            @click="confirming = true"
+            @click="() => { confirming = true }"
           />
         </section>
       </template>

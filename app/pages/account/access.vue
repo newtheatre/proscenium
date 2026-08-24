@@ -193,7 +193,7 @@ async function remove() {
           <UButton
             variant="subtle"
             label="Update my requirements"
-            @click="editing = true"
+            @click="() => { editing = true }"
           />
           <UButton
             variant="ghost"
@@ -289,7 +289,7 @@ async function remove() {
             v-if="editing"
             variant="ghost"
             label="Cancel"
-            @click="editing = false"
+            @click="() => { editing = false }"
           />
           <UButton
             v-else-if="data && data.status !== 'WITHDRAWN'"

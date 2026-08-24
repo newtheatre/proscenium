@@ -211,7 +211,7 @@ async function sell() {
             size="sm"
             class="flex-1 justify-center"
             :aria-pressed="tab === 'admit'"
-            @click="tab = 'admit'"
+            @click="() => { tab = 'admit' }"
           />
           <UButton
             label="Sell a pass"
@@ -220,7 +220,7 @@ async function sell() {
             size="sm"
             class="flex-1 justify-center"
             :aria-pressed="tab === 'sell'"
-            @click="tab = 'sell'"
+            @click="() => { tab = 'sell' }"
           />
         </div>
 

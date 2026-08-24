@@ -203,7 +203,7 @@ const facts = computed(() => [
         class="mb-5"
         icon="i-lucide-clipboard-check"
         label="Close the night"
-        @click="closeOpen = true"
+        @click="() => { closeOpen = true }"
       />
 
       <p
@@ -461,7 +461,7 @@ const facts = computed(() => [
             variant="ghost"
             color="neutral"
             label="Not yet"
-            @click="closeOpen = false"
+            @click="() => { closeOpen = false }"
           />
           <UButton
             :loading="closing"
