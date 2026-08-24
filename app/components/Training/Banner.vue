@@ -15,8 +15,9 @@ const now = ref(Date.now())
 let ticker: ReturnType<typeof setInterval> | undefined
 let poller: ReturnType<typeof setInterval> | undefined
 
-onMounted(async () => {
-  await refresh()
+// The layout has already resolved the state, so only the clock and the
+// poller start here.
+onMounted(() => {
   ticker = setInterval(() => {
     now.value = Date.now()
   }, 1000)
