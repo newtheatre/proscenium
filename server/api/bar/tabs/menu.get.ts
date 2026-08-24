@@ -21,6 +21,7 @@ export default defineEventHandler(async (event) => {
     .innerJoin(schema.barCategories, eq(schema.barProducts.categoryId, schema.barCategories.id))
     .where(and(
       eq(schema.barProducts.status, 'ACTIVE'),
+      eq(schema.barProducts.stockOnly, false),
       eq(schema.barProducts.ageRestricted, false),
     ))
     .orderBy(asc(schema.barCategories.sort), asc(schema.barProducts.sort), asc(schema.barProducts.name))

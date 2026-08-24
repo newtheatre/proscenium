@@ -155,17 +155,36 @@ In order, from an empty database:
 
 1. **`/admin/bar/catalogue` → add a category.** Every product belongs to one, because the till
    groups its tiles by category. The Add product button stays disabled until one exists.
-2. **Add your products**, each with its first price. A measure poured from a bottle points at the
-   bottle and says how much it takes: a 175 ml glass of a 750 ml bottle is `233`.
-3. **`/admin/bar/stock` → Count opening stock.** Count what is actually on the shelf.
+2. **Add your products**, each with its first price and its **container size in millilitres**:
+   700 for a 70 cl bottle of gin, 750 for wine. Leave the size empty for anything counted in whole
+   items, which is cans, bottled beer and packets of crisps.
+3. **Add the measures you pour**, each pointing at the bottle it comes out of and saying how much
+   it takes in millilitres: a single is `25`, a large glass of wine `175`. A bottle of spirits you
+   never sell whole is **stock only**, so it needs no price and never reaches the till.
+4. **`/admin/bar/stock` → Count opening stock.** Count what is actually on the shelf, in
+   containers: a part bottle is a decimal, so half a bottle is `0.5`.
 
-**Do not enter what you already have as a delivery.** A delivery carries a cost per unit, and stock
-at cost and GP are both computed from the most recent one. Inventing a cost to get the levels right
+**Get the container sizes right before you record any stock.** Every movement means what it means
+in the size that was current when it was written, so once anything has moved the size is fixed and
+the app refuses to change it. Correcting it afterwards means retiring the product and adding the
+new size as its own.
+
+**Do not enter what you already have as a delivery.** A delivery carries a cost per container, and
+stock at cost and GP are both computed from the most recent one. Inventing a cost to get the levels right
 puts a wrong number into every report that reads it, and it is not visible afterwards as a guess.
 
 The opening count is an ordinary stocktake against an empty ledger: expected is zero, so what you
 count becomes the level. Its movements are stamped `Opening stock`, and carry **no cost**, so stock
 at cost stays honest until a real delivery arrives with a real invoice.
+
+### Once, after the real-units migration
+
+Migration `0048` gives every product that already existed a nominal container size of 1000 ml,
+because thousandths of a container are exactly millilitres of a 1000 ml one. Every level, par and
+ratio therefore still means what it meant. It is a placeholder, not a size, so **before recording
+any stock, open `/admin/bar/catalogue` and set each product's real size**: 750 for a bottle of
+wine, and empty for anything counted in whole items. A measure's figure is then real millilitres,
+so a 125 ml glass is `125` rather than `166`.
 
 ## 4c. Bar tabs: running them, and clearing them at end of term
 

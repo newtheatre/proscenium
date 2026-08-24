@@ -25,11 +25,11 @@ export default defineEventHandler(async (event) => {
   const counted = await db.select({
     id: schema.stocktakeLines.id,
     productId: schema.stocktakeLines.productId,
-    expectedMilli: schema.stocktakeLines.expectedMilli,
-    countedMilli: schema.stocktakeLines.countedMilli,
+    expectedQty: schema.stocktakeLines.expectedQty,
+    countedQty: schema.stocktakeLines.countedQty,
     reason: schema.stocktakeLines.reason,
   }).from(schema.stocktakeLines)
-    .where(sql`${schema.stocktakeLines.stocktakeId} = ${id} and ${isNotNull(schema.stocktakeLines.countedMilli)}`)
+    .where(sql`${schema.stocktakeLines.stocktakeId} = ${id} and ${isNotNull(schema.stocktakeLines.countedQty)}`)
 
   if (!counted.length) {
     throw createError({ statusCode: 400, statusMessage: 'Nothing was counted. Abandon it instead.' })
@@ -43,19 +43,19 @@ export default defineEventHandler(async (event) => {
 
   // Opening stock, not variance: nothing was expected and nothing is on hand.
   // Judged per counted line, so an unrelated product's history cannot mask it.
-  const opening = counted.every(line => line.expectedMilli === 0 && (onHand.get(line.productId) ?? 0) === 0)
+  const opening = counted.every(line => line.expectedQty === 0 && (onHand.get(line.productId) ?? 0) === 0)
 
   const movements = counted
     .map(line => ({
       productId: line.productId,
-      qtyMilli: line.countedMilli! - (onHand.get(line.productId) ?? 0),
+      qty: line.countedQty! - (onHand.get(line.productId) ?? 0),
       kind: 'STOCKTAKE' as const,
       refTable: 'stocktake_lines',
       refId: line.id,
       reason: line.reason ?? (opening ? 'Opening stock' : null),
       createdByUserId: user.id,
     }))
-    .filter(m => m.qtyMilli !== 0)
+    .filter(m => m.qty !== 0)
 
   await db.batch([
     db.update(schema.stocktakes).set({

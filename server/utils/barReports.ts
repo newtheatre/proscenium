@@ -159,8 +159,9 @@ export async function grossProfit() {
   const products = await db.select({
     id: schema.barProducts.id,
     name: schema.barProducts.name,
+    containerMl: schema.barProducts.containerMl,
     stockProductId: schema.barProducts.stockProductId,
-    depletesMilli: schema.barProducts.depletesMilli,
+    depletesQty: schema.barProducts.depletesQty,
     status: schema.barProducts.status,
   }).from(schema.barProducts).orderBy(asc(schema.barProducts.sort))
 
@@ -168,15 +169,21 @@ export async function grossProfit() {
     currentPrices(products.map(p => p.id)),
     latestCostByProduct(),
   ])
+  const sizes = new Map(products.map(p => [p.id, p.containerMl]))
 
   return products
     .filter(p => p.status !== 'RETIRED')
     .map((product) => {
       const price = prices.get(product.id)?.pricePence ?? null
+      const taken = product.stockProductId && product.depletesQty == null
+        ? null
+        : Math.abs(depletion(product, 1).qty)
       const stockId = product.stockProductId ?? product.id
-      const unitCost = costs.get(stockId) ?? null
-      // Cost of what this sale takes off the shelf, not of a whole unit.
-      const cost = unitCost == null ? null : Math.round((unitCost * product.depletesMilli) / 1000)
+      const containerCost = costs.get(stockId) ?? null
+      // Cost of what this sale takes off the shelf, not of a whole container.
+      const cost = containerCost == null || taken == null
+        ? null
+        : Math.round((containerCost * taken) / containerSize({ containerMl: sizes.get(stockId) ?? null }))
       const margin = price == null || cost == null ? null : price - cost
       return {
         name: product.name,
@@ -194,7 +201,8 @@ export async function varianceOverTime(from: string, to: string) {
     stocktakeId: schema.stocktakes.id,
     finishedAt: schema.stocktakes.finishedAt,
     productName: schema.barProducts.name,
-    varianceMilli: sql<number>`${schema.stocktakeLines.countedMilli} - ${schema.stocktakeLines.expectedMilli}`,
+    containerMl: schema.barProducts.containerMl,
+    varianceQty: sql<number>`${schema.stocktakeLines.countedQty} - ${schema.stocktakeLines.expectedQty}`,
   })
     .from(schema.stocktakeLines)
     .innerJoin(schema.stocktakes, eq(schema.stocktakes.id, schema.stocktakeLines.stocktakeId))
@@ -203,7 +211,7 @@ export async function varianceOverTime(from: string, to: string) {
       eq(schema.stocktakes.status, 'APPLIED'),
       gte(schema.stocktakes.finishedAt, from),
       lte(schema.stocktakes.finishedAt, `${to} 23:59:59`),
-      sql`${schema.stocktakeLines.countedMilli} is not null`,
+      sql`${schema.stocktakeLines.countedQty} is not null`,
     ))
     .orderBy(desc(schema.stocktakes.finishedAt))
 
@@ -211,7 +219,9 @@ export async function varianceOverTime(from: string, to: string) {
     stocktakeId: r.stocktakeId,
     finishedAt: r.finishedAt,
     productName: r.productName,
-    varianceMilli: Number(r.varianceMilli ?? 0),
+    containerMl: r.containerMl,
+    varianceQty: Number(r.varianceQty ?? 0),
+    varianceContainers: qtyToContainers(r, Number(r.varianceQty ?? 0)),
   }))
 }
 

@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { TRAINING_PERFORMANCES } from '~~/shared/utils/trainingScenario'
 
 /** GET /api/training/bar/tonight: the real menu, an invented night. */
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
     })
       .from(schema.barProducts)
       .innerJoin(schema.barCategories, eq(schema.barProducts.categoryId, schema.barCategories.id))
-      .where(eq(schema.barProducts.status, 'ACTIVE'))
+      .where(and(eq(schema.barProducts.status, 'ACTIVE'), eq(schema.barProducts.stockOnly, false)))
       .orderBy(asc(schema.barCategories.sort), asc(schema.barProducts.sort), asc(schema.barProducts.name)),
     db.select({ id: schema.barDiscounts.id, name: schema.barDiscounts.name, percent: schema.barDiscounts.percent })
       .from(schema.barDiscounts)

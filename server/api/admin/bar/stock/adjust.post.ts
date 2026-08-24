@@ -5,8 +5,8 @@ import { manageBar } from '~~/shared/utils/abilities'
 
 const bodySchema = z.object({
   productId: z.string().trim().min(1),
-  /** Whole units, signed: wastage is negative. */
-  qtyUnits: z.coerce.number().refine(n => n !== 0, 'Nothing to adjust.').min(-100_000).max(100_000),
+  /** Whole containers, signed: wastage is negative. */
+  qtyContainers: z.coerce.number().refine(n => n !== 0, 'Nothing to adjust.').min(-100_000).max(100_000),
   kind: z.enum(['WASTAGE', 'TRANSFER', 'ADJUST']),
   reason: z.string().trim().min(1).max(200),
 })
@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
 
   await db.batch(movementStatements([{
     productId: input.productId,
-    qtyMilli: Math.round(input.qtyUnits * 1000),
+    qty: containersToQty(product, input.qtyContainers),
     kind: input.kind,
     reason: input.reason,
     createdByUserId: user.id,

@@ -14,9 +14,10 @@ interface Line {
   productId: string
   name: string
   unit: string
-  expectedMilli: number
-  countedMilli: number | null
-  varianceMilli: number | null
+  containerMl: number | null
+  expectedQty: number
+  countedQty: number | null
+  varianceQty: number | null
   reason: string | null
 }
 
@@ -43,19 +44,19 @@ function statusMessage(error: unknown): string | undefined {
 const counts = reactive<Record<string, number | null>>({})
 watchEffect(() => {
   for (const line of data.value?.lines ?? []) {
-    if (!(line.id in counts)) counts[line.id] = line.countedMilli == null ? null : line.countedMilli / 1000
+    if (!(line.id in counts)) counts[line.id] = line.countedQty == null ? null : qtyToContainers(line, line.countedQty)
   }
 })
 
 const rows = computed(() => data.value?.lines ?? [])
 const isOpen = computed(() => data.value?.status === 'OPEN')
 /** Every line expected nothing, so this count establishes the ledger (#208). */
-const isOpening = computed(() => rows.value.length > 0 && rows.value.every(line => line.expectedMilli === 0))
+const isOpening = computed(() => rows.value.length > 0 && rows.value.every(line => line.expectedQty === 0))
 const saving = ref(false)
 
 const columns = [
   { accessorKey: 'name', header: 'Product' },
-  { accessorKey: 'expectedMilli', header: 'Expected' },
+  { accessorKey: 'expectedQty', header: 'Expected' },
   { id: 'counted', header: 'Counted' },
   { id: 'variance', header: 'Variance' },
 ]
@@ -63,7 +64,7 @@ const columns = [
 function variance(line: Line): number | null {
   const counted = counts[line.id]
   if (counted == null) return null
-  return Math.round(counted * 1000) - line.expectedMilli
+  return containersToQty(line, counted) - line.expectedQty
 }
 
 /** Saved in batches, so a long count is not one request per keystroke. */
@@ -72,7 +73,7 @@ async function saveCounts() {
   try {
     const lines = rows.value
       .filter(l => counts[l.id] !== undefined)
-      .map(l => ({ lineId: l.id, countedUnits: counts[l.id] ?? null }))
+      .map(l => ({ lineId: l.id, countedContainers: counts[l.id] ?? null }))
     for (let i = 0; i < lines.length; i += 50) {
       await $fetch(`/api/admin/bar/stocktakes/${route.params.id}/lines`, {
         method: 'PATCH',
@@ -174,7 +175,7 @@ async function abandon() {
       icon="i-lucide-info"
       color="neutral"
       variant="subtle"
-      :title="isOpening ? 'Count everything you have' : 'Count in whole units'"
+      :title="isOpening ? 'Count everything you have' : 'Count in containers'"
       :description="isOpening
         ? 'This is the opening count, so what you enter becomes the level. A part bottle is a decimal: half a bottle is 0.5. Leave a line blank and it stays at zero.'
         : 'A part bottle is a decimal: half a bottle is 0.5. Leave a line blank and it is not adjusted.'"
@@ -192,8 +193,8 @@ async function abandon() {
           per {{ row.original.unit }}
         </div>
       </template>
-      <template #expectedMilli-cell="{ row }">
-        <span class="tabular-nums text-muted">{{ (row.original.expectedMilli / 1000).toFixed(2) }}</span>
+      <template #expectedQty-cell="{ row }">
+        <span class="tabular-nums text-muted">{{ formatContainers(row.original, row.original.expectedQty) }}</span>
       </template>
       <template #counted-cell="{ row }">
         <UInput
@@ -209,7 +210,7 @@ async function abandon() {
           v-else
           class="tabular-nums"
         >
-          {{ row.original.countedMilli == null ? '-' : (row.original.countedMilli / 1000).toFixed(2) }}
+          {{ row.original.countedQty == null ? '-' : formatContainers(row.original, row.original.countedQty) }}
         </span>
       </template>
       <template #variance-cell="{ row }">
@@ -218,7 +219,7 @@ async function abandon() {
           class="tabular-nums font-medium"
           :class="variance(row.original)! < 0 ? 'text-error' : variance(row.original)! > 0 ? 'text-success' : 'text-muted'"
         >
-          {{ variance(row.original)! > 0 ? '+' : '' }}{{ (variance(row.original)! / 1000).toFixed(2) }}
+          {{ variance(row.original)! > 0 ? '+' : '' }}{{ formatContainers(row.original, variance(row.original)!) }}
         </span>
         <span
           v-else

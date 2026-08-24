@@ -213,8 +213,8 @@ export async function settleTab(opts: {
 export async function reversalMovementsFor(transactionId: string, byUserId: string) {
   const sales = await db.select({
     productId: schema.stockMovements.productId,
-    qtyMilli: schema.stockMovements.qtyMilli,
-    costPencePerUnit: schema.stockMovements.costPencePerUnit,
+    qty: schema.stockMovements.qty,
+    costPencePerContainer: schema.stockMovements.costPencePerContainer,
   }).from(schema.stockMovements)
     .where(and(
       eq(schema.stockMovements.refTable, 'transactions'),
@@ -225,11 +225,11 @@ export async function reversalMovementsFor(transactionId: string, byUserId: stri
 
   return sales.map(sale => ({
     productId: sale.productId,
-    qtyMilli: -sale.qtyMilli,
+    qty: -sale.qty,
     kind: 'VOID' as const,
     refTable: 'transactions',
     refId: transactionId,
-    costPencePerUnit: sale.costPencePerUnit,
+    costPencePerContainer: sale.costPencePerContainer,
     reason: 'Tab charge voided',
     createdByUserId: byUserId,
   }))

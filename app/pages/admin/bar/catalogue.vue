@@ -14,10 +14,12 @@ interface Product {
   id: string
   categoryId: string
   name: string
-  unit: string
+  unit: ProductUnit
+  containerMl: number | null
+  stockOnly: boolean
   stockProductId: string | null
-  depletesMilli: number
-  parMilli: number | null
+  depletesQty: number | null
+  parQty: number | null
   status: 'ACTIVE' | 'HIDDEN' | 'RETIRED'
   sort: number
   ageRestricted: boolean
@@ -57,15 +59,36 @@ function fail(error: unknown, title: string) {
 
 const categoryName = (id: string) => categories.value.find(c => c.id === id)?.name ?? '-'
 
-/** Only products that hold stock may be pointed at (docs/13 §3.1). */
-const stockTargets = computed(() =>
-  products.value.filter(p => !p.stockProductId).map(p => ({ label: p.name, value: p.id })))
+/** Only products that hold stock may be poured from (docs/13 §3.1). */
+const stockTargets = computed(() => products.value
+  .filter(p => !p.stockProductId)
+  .map(p => ({ label: p.containerMl ? `${p.name} (${p.containerMl} ml)` : p.name, value: p.id })))
+
+const productById = (id: string) => products.value.find(p => p.id === id) ?? null
+
+const unitItems = [...PRODUCT_UNITS]
+const statusItems = [...PRODUCT_STATUSES]
+
+/** "25 ml of Gin, 70 cl bottle", or "1 of Tonic water". */
+function takesLabel(product: Product) {
+  const target = productById(product.stockProductId!)
+  const unit = target?.containerMl == null ? '' : ' ml'
+  return `${product.depletesQty ?? '?'}${unit} of ${target?.name ?? 'a missing product'}`
+}
+
+/** Undefined is what UInputNumber clears to; the API wants an explicit null. */
+function nullableProxy(read: () => number | null, write: (value: number | null) => void) {
+  return computed({
+    get: () => read() ?? undefined,
+    set: (value: number | undefined) => write(value == null ? null : value),
+  })
+}
 
 const productColumns = [
   { accessorKey: 'name', header: 'Product' },
   { accessorKey: 'categoryId', header: 'Category' },
   { accessorKey: 'pricePence', header: 'Price' },
-  { accessorKey: 'depletesMilli', header: 'Depletes' },
+  { accessorKey: 'size', header: 'Size' },
   { accessorKey: 'status', header: 'Status' },
   { id: 'actions', header: '' },
 ]
@@ -76,14 +99,28 @@ const editing = ref<Product | null>(null)
 const form = reactive({
   name: '',
   categoryId: '',
-  unit: 'each',
+  unit: 'each' as ProductUnit,
+  containerMl: null as number | null,
+  stockOnly: false,
   stockProductId: undefined as string | undefined,
-  depletesMilli: 1000,
-  parMilli: null as number | null,
+  depletesQty: null as number | null,
+  /** Held in containers so it survives a change of container size. */
+  parContainers: null as number | null,
   ageRestricted: true,
   sort: 0,
   status: 'ACTIVE' as Product['status'],
 })
+
+const formContainerMl = nullableProxy(() => form.containerMl, (v) => {
+  form.containerMl = v
+})
+const formDepletesQty = nullableProxy(() => form.depletesQty, (v) => {
+  form.depletesQty = v
+})
+const formPar = nullableProxy(() => form.parContainers, (v) => {
+  form.parContainers = v
+})
+const formTarget = computed(() => form.stockProductId ? productById(form.stockProductId) : null)
 
 function openEdit(product: Product) {
   editing.value = product
@@ -91,9 +128,11 @@ function openEdit(product: Product) {
     name: product.name,
     categoryId: product.categoryId,
     unit: product.unit,
+    containerMl: product.containerMl,
+    stockOnly: product.stockOnly,
     stockProductId: product.stockProductId ?? undefined,
-    depletesMilli: product.depletesMilli,
-    parMilli: product.parMilli,
+    depletesQty: product.depletesQty,
+    parContainers: product.parQty == null ? null : product.parQty / (product.containerMl ?? 1),
     ageRestricted: product.ageRestricted,
     sort: product.sort,
     status: product.status,
@@ -107,7 +146,7 @@ async function saveProduct() {
     await requestFetch(`/api/admin/bar/products/${editing.value!.id}`, {
       method: 'PATCH',
       // Explicit null, not undefined: clearing the pointer must reach the server.
-      body: { ...form, stockProductId: form.stockProductId ?? null },
+      body: { ...productBody(form), stockProductId: form.stockProductId ?? null },
     })
     editOpen.value = false
     await refresh()
@@ -122,23 +161,55 @@ const newProductOpen = ref(false)
 const newProduct = reactive({
   name: '',
   categoryId: '',
-  unit: 'each',
+  unit: 'each' as ProductUnit,
+  containerMl: null as number | null,
+  stockOnly: false,
   stockProductId: undefined as string | undefined,
-  depletesMilli: 1000,
-  parMilli: null as number | null,
+  depletesQty: null as number | null,
+  parContainers: null as number | null,
   ageRestricted: true,
   sort: 0,
   pricePence: 0,
 })
+
+const newContainerMl = nullableProxy(() => newProduct.containerMl, (v) => {
+  newProduct.containerMl = v
+})
+const newDepletesQty = nullableProxy(() => newProduct.depletesQty, (v) => {
+  newProduct.depletesQty = v
+})
+const newPar = nullableProxy(() => newProduct.parContainers, (v) => {
+  newProduct.parContainers = v
+})
+const newTarget = computed(() => newProduct.stockProductId ? productById(newProduct.stockProductId) : null)
+
+function takesLabelFor(target: Product | null) {
+  return target?.containerMl ? 'Taken per sale (ml)' : 'Taken per sale'
+}
+
+function takesHelpFor(target: Product | null) {
+  if (!target) return ''
+  return target.containerMl
+    ? `A single is 25, a large glass 175. One ${target.name} holds ${target.containerMl} ml.`
+    : `How many whole ${unitLabel(target.unit)} a sale takes.`
+}
+
+/** Par is typed in containers; the API stores it in the product's own basis. */
+function productBody<T extends { parContainers: number | null, containerMl: number | null }>(source: T) {
+  const { parContainers, ...rest } = source
+  return { ...rest, parQty: parContainers == null ? null : Math.round(parContainers * (source.containerMl ?? 1)) }
+}
 
 function openNewProduct() {
   Object.assign(newProduct, {
     name: '',
     categoryId: categories.value[0]?.id ?? '',
     unit: 'each',
+    containerMl: null,
+    stockOnly: false,
     stockProductId: undefined,
-    depletesMilli: 1000,
-    parMilli: null,
+    depletesQty: null,
+    parContainers: null,
     ageRestricted: true,
     sort: 0,
     pricePence: 0,
@@ -151,7 +222,12 @@ async function createProduct() {
   try {
     await requestFetch('/api/admin/bar/products', {
       method: 'POST',
-      body: { ...newProduct, stockProductId: newProduct.stockProductId ?? null },
+      body: {
+        ...productBody(newProduct),
+        stockProductId: newProduct.stockProductId ?? null,
+        // Nothing stock-only is sold, so it carries no price at all.
+        pricePence: newProduct.stockOnly ? undefined : newProduct.pricePence,
+      },
     })
     newProductOpen.value = false
     await refresh()
@@ -305,6 +381,15 @@ async function moveCategory(category: Category, by: number) {
             >
               Age restricted
             </UBadge>
+            <UBadge
+              v-if="row.original.stockOnly"
+              size="sm"
+              variant="subtle"
+              color="neutral"
+              class="ml-1"
+            >
+              Stock only
+            </UBadge>
           </div>
         </template>
         <template #categoryId-cell="{ row }">
@@ -313,17 +398,19 @@ async function moveCategory(category: Category, by: number) {
         <template #pricePence-cell="{ row }">
           <span class="tabular-nums">{{ row.original.pricePence == null ? 'No price' : formatMoney(row.original.pricePence) }}</span>
         </template>
-        <template #depletesMilli-cell="{ row }">
+        <template #size-cell="{ row }">
           <span
             v-if="row.original.stockProductId"
             class="text-xs text-muted"
-          >
-            {{ row.original.depletesMilli }} of another product
-          </span>
+          >{{ takesLabel(row.original) }}</span>
+          <span
+            v-else-if="row.original.containerMl"
+            class="text-xs text-muted"
+          >{{ row.original.containerMl }} ml {{ row.original.unit }}</span>
           <span
             v-else
             class="text-xs text-muted"
-          >holds stock</span>
+          >counted in {{ unitLabel(row.original.unit) }}</span>
         </template>
         <template #status-cell="{ row }">
           <UBadge
@@ -503,12 +590,18 @@ async function moveCategory(category: Category, by: number) {
             <UFormField label="Sold as">
               <USelectMenu
                 v-model="newProduct.unit"
-                :items="['bottle', 'can', 'measure', 'glass', 'each']"
+                :items="unitItems"
                 class="w-full"
               />
             </UFormField>
           </div>
+          <UCheckbox
+            v-model="newProduct.stockOnly"
+            label="Stock only: held, but never sold"
+            description="A spirits bottle poured as measures. It needs no price and never reaches the till."
+          />
           <UFormField
+            v-if="!newProduct.stockOnly"
             label="Price"
             required
             help="Sets the first price, effective today."
@@ -522,7 +615,8 @@ async function moveCategory(category: Category, by: number) {
             />
           </UFormField>
           <UFormField
-            label="Draws stock from"
+            v-if="!newProduct.stockOnly"
+            label="Poured from"
             help="Leave empty when this product holds its own stock."
           >
             <USelectMenu
@@ -532,27 +626,72 @@ async function moveCategory(category: Category, by: number) {
               class="w-full"
             />
           </UFormField>
-          <UFormField
-            v-if="newProduct.stockProductId"
-            label="Thousandths taken per sale"
-            help="A 175 ml glass of a 750 ml bottle is 233."
-          >
-            <UInput
-              v-model.number="newProduct.depletesMilli"
-              type="number"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField
-            label="Par level (thousandths)"
-            help="Flags the product when stock drops below this."
-          >
-            <UInput
-              v-model.number="newProduct.parMilli"
-              type="number"
-              class="w-full"
-            />
-          </UFormField>
+          <template v-if="newProduct.stockProductId">
+            <UFormField
+              :label="takesLabelFor(newTarget)"
+              :help="takesHelpFor(newTarget)"
+            >
+              <UInputNumber
+                v-model="newDepletesQty"
+                :min="1"
+                class="w-full"
+              />
+            </UFormField>
+            <div
+              v-if="newTarget?.containerMl"
+              class="flex flex-wrap gap-1"
+            >
+              <UButton
+                v-for="ml in SERVE_ML_PRESETS"
+                :key="ml"
+                size="xs"
+                variant="subtle"
+                color="neutral"
+                :label="`${ml} ml`"
+                @click="newProduct.depletesQty = ml"
+              />
+            </div>
+          </template>
+          <template v-else>
+            <UFormField
+              label="Container size (ml)"
+              help="700 for a 70 cl bottle. Leave it empty to count this in whole items: cans, packets, bottled beer."
+            >
+              <UInputNumber
+                v-model="newContainerMl"
+                :min="1"
+                class="w-full"
+              />
+            </UFormField>
+            <div class="flex flex-wrap gap-1">
+              <UButton
+                v-for="ml in CONTAINER_ML_PRESETS"
+                :key="ml"
+                size="xs"
+                variant="subtle"
+                color="neutral"
+                :label="`${ml} ml`"
+                @click="newProduct.containerMl = ml"
+              />
+              <UButton
+                size="xs"
+                variant="subtle"
+                color="neutral"
+                label="Whole items"
+                @click="newProduct.containerMl = null"
+              />
+            </div>
+            <UFormField
+              :label="`Par level (${unitLabel(newProduct.unit)})`"
+              help="Flags the product when stock drops below this."
+            >
+              <UInputNumber
+                v-model="newPar"
+                :min="0"
+                class="w-full"
+              />
+            </UFormField>
+          </template>
           <UCheckbox
             v-model="newProduct.ageRestricted"
             label="Age restricted"
@@ -604,13 +743,19 @@ async function moveCategory(category: Category, by: number) {
             <UFormField label="Sold as">
               <USelectMenu
                 v-model="form.unit"
-                :items="['bottle', 'can', 'measure', 'glass', 'each']"
+                :items="unitItems"
                 class="w-full"
               />
             </UFormField>
           </div>
+          <UCheckbox
+            v-model="form.stockOnly"
+            label="Stock only: held, but never sold"
+            description="It needs no price and never reaches the till."
+          />
           <UFormField
-            label="Draws stock from"
+            v-if="!form.stockOnly"
+            label="Poured from"
             help="Leave empty when this product holds its own stock."
           >
             <USelectMenu
@@ -620,33 +765,79 @@ async function moveCategory(category: Category, by: number) {
               class="w-full"
             />
           </UFormField>
-          <UFormField
-            v-if="form.stockProductId"
-            label="Thousandths taken per sale"
-            help="A 175 ml glass of a 750 ml bottle is 233."
-          >
-            <UInput
-              v-model.number="form.depletesMilli"
-              type="number"
+          <template v-if="form.stockProductId">
+            <UFormField
+              :label="takesLabelFor(formTarget)"
+              :help="takesHelpFor(formTarget)"
+            >
+              <UInputNumber
+                v-model="formDepletesQty"
+                :min="1"
+                class="w-full"
+              />
+            </UFormField>
+            <div
+              v-if="formTarget?.containerMl"
+              class="flex flex-wrap gap-1"
+            >
+              <UButton
+                v-for="ml in SERVE_ML_PRESETS"
+                :key="ml"
+                size="xs"
+                variant="subtle"
+                color="neutral"
+                :label="`${ml} ml`"
+                @click="form.depletesQty = ml"
+              />
+            </div>
+          </template>
+          <template v-else>
+            <UFormField
+              label="Container size (ml)"
+              help="700 for a 70 cl bottle. Leave it empty to count this in whole items: cans, packets, bottled beer."
+            >
+              <UInputNumber
+                v-model="formContainerMl"
+                :min="1"
+                class="w-full"
+              />
+            </UFormField>
+            <div class="flex flex-wrap gap-1">
+              <UButton
+                v-for="ml in CONTAINER_ML_PRESETS"
+                :key="ml"
+                size="xs"
+                variant="subtle"
+                color="neutral"
+                :label="`${ml} ml`"
+                @click="form.containerMl = ml"
+              />
+              <UButton
+                size="xs"
+                variant="subtle"
+                color="neutral"
+                label="Whole items"
+                @click="form.containerMl = null"
+              />
+            </div>
+            <UFormField
+              :label="`Par level (${unitLabel(form.unit)})`"
+              help="Flags the product when stock drops below this."
+            >
+              <UInputNumber
+                v-model="formPar"
+                :min="0"
+                class="w-full"
+              />
+            </UFormField>
+          </template>
+          <UFormField label="Status">
+            <USelectMenu
+              v-model="form.status"
+              :items="statusItems"
               class="w-full"
             />
           </UFormField>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <UFormField label="Par level (thousandths)">
-              <UInput
-                v-model.number="form.parMilli"
-                type="number"
-                class="w-full"
-              />
-            </UFormField>
-            <UFormField label="Status">
-              <USelectMenu
-                v-model="form.status"
-                :items="['ACTIVE', 'HIDDEN', 'RETIRED']"
-                class="w-full"
-              />
-            </UFormField>
-          </div>
           <UCheckbox
             v-model="form.ageRestricted"
             label="Age restricted"
