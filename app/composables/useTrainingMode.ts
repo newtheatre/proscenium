@@ -1,4 +1,5 @@
-import { computed, createError, navigateTo, ref, useRequestFetch, useState, watch } from '#imports'
+import { computed, createError, navigateTo, ref, useNuxtApp, useRequestFetch, useState, watch } from '#imports'
+import { callWithNuxt } from '#app'
 
 export type TrainingTarget = 'bar-till' | 'challenge-25' | 'door-scan'
 
@@ -37,26 +38,29 @@ export function useTrainingMode(surface?: TrainingSurface) {
   // way, so a run ending mid-basket cannot quietly retarget it at real data.
   const pinned = useState<boolean>('training-pinned', () => false)
   const requestFetch = useRequestFetch()
+  const nuxtApp = useNuxtApp()
   const busy = ref(false)
 
   // Scoped to the screen asking: a till run must not make the door screen
   // believe it is in practice.
   const active = computed(() => state.value.active
     && (!surface || state.value.targetKey === SURFACE_TARGET[surface]))
-  /** Prepended to every fetch on a dual-mode screen. */
-  const prefix = computed(() => (state.value.active ? '/api/training' : ''))
-
   /**
    * The URL for a dual-mode fetch. Refuses rather than resolving to the live
    * route once a pinned run has ended (ADR-0032).
    */
   function api(path: string): string {
-    if (pinned.value && !state.value.active) {
+    if (pinned.value && !active.value) {
       const message = 'Practice has ended. Nothing was sent. Go back to Front of House and start again.'
       // `data` too: every caller's catch reads the message from there.
       throw createError({ statusCode: 409, statusMessage: message, data: { statusMessage: message } })
     }
-    return `${prefix.value}${path}`
+    // Scoped to this screen, not to any open run: a door run must never point
+    // the real till at the sandbox.
+    if (!active.value) return path
+    // Training mirrors the real routes under /api/training, so the shared
+    // /api segment is replaced rather than stacked.
+    return `/api/training${path.replace(/^\/api/, '')}`
   }
 
   async function refresh() {
@@ -103,7 +107,12 @@ export function useTrainingMode(surface?: TrainingSurface) {
     }
     catch (error) {
       const message = (error as { data?: { statusMessage?: string } }).data?.statusMessage
-      await navigateTo({ path: '/foh', query: { practice: 'unavailable', reason: message ?? '' } })
+      // The await above loses the Nuxt instance, and navigateTo without one
+      // throws a 500 over the refusal it is trying to report.
+      await callWithNuxt(nuxtApp, () => navigateTo({
+        path: '/foh',
+        query: { practice: 'unavailable', reason: message ?? '' },
+      }))
       return false
     }
     return true
@@ -116,11 +125,13 @@ export function useTrainingMode(surface?: TrainingSurface) {
   function leaveWhenPracticeEnds() {
     // Pinned at setup and never cleared as the run ends: clearing it there
     // hands the live API back to the screen while navigation is in flight.
-    pinned.value = state.value.active
+    pinned.value = active.value
     watch(active, (now, before) => {
-      if (before && !now) navigateTo({ path: '/foh', query: { practice: 'ended' } })
+      if (before && !now) {
+        callWithNuxt(nuxtApp, () => navigateTo({ path: '/foh', query: { practice: 'ended' } }))
+      }
     })
   }
 
-  return { state, active, prefix, api, pinned, busy, refresh, start, end, enter, leaveWhenPracticeEnds }
+  return { state, active, api, pinned, busy, refresh, start, end, enter, leaveWhenPracticeEnds }
 }
