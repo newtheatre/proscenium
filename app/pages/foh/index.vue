@@ -20,6 +20,7 @@ const ROLE_LABELS: Record<NonNullable<FohPerformance['shiftRole']>, string> = {
 }
 
 const requestFetch = useRequestFetch()
+const route = useRoute()
 // The composable owns the fetch and the types; four sibling pages use it, and
 // a third copy of FohScope goes stale without a type error.
 const { scope: data, status, performances } = await useFohTonight()
@@ -48,17 +49,31 @@ const ALL_TILES = [
   { key: 'age-checks', label: 'Challenge 25', icon: 'i-lucide-shield-check', to: '/foh/age-checks', note: '', roles: ['BAR'] },
 ]
 
-/** Every confirmed role held tonight, across all of tonight's performances. */
-const rolesTonight = computed(() =>
-  new Set(performances.value.map(p => p.shiftRole).filter(Boolean) as string[]))
+/**
+ * The confirmed roles the tiles answer to: the chosen performance alone, or
+ * every performance tonight while the choice is still open.
+ */
+const rolesInScope = computed(() => {
+  const scoped = selected.value ? [selected.value] : performances.value
+  return new Set(scoped.map(p => p.shiftRole).filter(Boolean) as string[])
+})
 
-/** Seeing everything: staff seniority, or the duty manager's whole-night remit. */
+/** Seeing everything: staff seniority, or the duty manager's remit on this show. */
 const seesEverything = computed(() =>
-  Boolean(data.value?.bypassedRota) || rolesTonight.value.has('DUTY_MANAGER'))
+  Boolean(data.value?.bypassedRota) || rolesInScope.value.has('DUTY_MANAGER'))
 
+// Every tile carries the chosen performance, so the screen it opens does not
+// ask which show all over again.
 const buttons = computed(() => {
-  if (seesEverything.value) return ALL_TILES
-  return ALL_TILES.filter(tile => tile.roles.some(role => rolesTonight.value.has(role)))
+  const tiles = seesEverything.value
+    ? ALL_TILES
+    : ALL_TILES.filter(tile => tile.roles.some(role => rolesInScope.value.has(role)))
+  return tiles.map(tile => ({
+    ...tile,
+    to: tile.to && selectedId.value
+      ? { path: tile.to, query: { performance: selectedId.value } }
+      : tile.to,
+  }))
 })
 
 /**
@@ -86,6 +101,27 @@ const practiceTiles = computed(() =>
     .map(target => ({ key: target, ...PRACTICE_TILES[target]! }))
     .filter(tile => tile.label),
 )
+
+/**
+ * A refused or finished practice run is redirected back here with its reason.
+ * This screen is the only place the trainee is told what happened.
+ */
+const practiceNotice = computed(() => {
+  const reason = typeof route.query.reason === 'string' ? route.query.reason.trim() : ''
+  if (route.query.practice === 'unavailable') {
+    return {
+      title: 'Practice could not be opened',
+      detail: reason || 'The training system turned it down. Ask whoever is teaching you, then try again.',
+    }
+  }
+  if (route.query.practice === 'ended') {
+    return {
+      title: 'Practice has ended',
+      detail: 'Nothing you did was real, and nothing was sent. A practice tile appears here whenever one is open.',
+    }
+  }
+  return null
+})
 
 const pendingComps = ref(0)
 async function pollComps() {
@@ -122,6 +158,19 @@ onBeforeUnmount(() => {
           Leave
         </NuxtLink>
       </header>
+
+      <div
+        v-if="practiceNotice"
+        role="status"
+        class="mb-6 rounded-xl border border-amber-600/60 bg-amber-950/30 p-4"
+      >
+        <p class="font-medium text-amber-300">
+          {{ practiceNotice.title }}
+        </p>
+        <p class="mt-1 text-sm text-neutral-300">
+          {{ practiceNotice.detail }}
+        </p>
+      </div>
 
       <!-- Practice needs no shift and no show: it is the one screen here the
            rota does not scope, because there are no real customers on it. -->
@@ -176,11 +225,17 @@ onBeforeUnmount(() => {
         <!-- Performance picker, only when there is a choice (docs/11 §2.2). -->
         <div
           v-if="performances.length > 1"
+          role="group"
+          aria-labelledby="foh-performance-picker"
           class="mb-4 space-y-2"
         >
-          <p class="text-sm text-neutral-400">
+          <p
+            id="foh-performance-picker"
+            class="text-sm text-neutral-400"
+          >
             More than one show tonight. Which are you working?
           </p>
+          <!-- The colour says which is chosen; aria-pressed says it to a screen reader. -->
           <button
             v-for="performance in performances"
             :key="performance.id"
@@ -189,6 +244,7 @@ onBeforeUnmount(() => {
             :class="performance.id === selectedId
               ? 'border-violet-500 bg-violet-950/40'
               : 'border-neutral-800 bg-neutral-900 hover:border-neutral-700'"
+            :aria-pressed="performance.id === selectedId"
             @click="selectedId = performance.id"
           >
             <span class="block font-medium">{{ performance.showTitle }}</span>

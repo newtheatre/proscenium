@@ -97,13 +97,19 @@ async function closeNight() {
 
 /** Only the duty manager sees a queue; the till is where it is answered. */
 const pendingComps = ref(0)
+const compsUnreachable = ref(false)
 async function pollComps() {
   try {
     const res = await requestFetch<{ mayApprove: boolean, awaitingApproval: unknown[] }>('/api/bar/comps')
     pendingComps.value = res.mayApprove ? res.awaitingApproval.length : 0
+    compsUnreachable.value = false
   }
-  catch {
-    // Not everyone working tonight can reach the bar: a 403 here is expected.
+  catch (error) {
+    // A 403 is the expected refusal for someone not on the bar tonight. Any
+    // other failure leaves the last known count alone and says so on screen.
+    const status = (error as { statusCode?: number }).statusCode
+    if (status === 403) pendingComps.value = 0
+    compsUnreachable.value = status !== 403
   }
 }
 
@@ -116,7 +122,7 @@ onBeforeUnmount(() => {
   if (compTimer) clearInterval(compTimer)
 })
 
-const { data } = await useAsyncData(
+const { data, error: glanceError, refresh: refreshGlance } = await useAsyncData(
   'foh-glance',
   () => (performance.value
     ? requestFetch<Glance>('/api/foh/glance', { query: { performanceId: performance.value.id } })
@@ -174,15 +180,15 @@ const facts = computed(() => [
         class="mb-5 rounded-xl border border-neutral-800 bg-neutral-900 p-4"
       >
         <p class="text-sm font-medium text-neutral-200">
-          Night closed
+          Night closed.
           <span
             v-if="closed.autoClosed"
             class="text-amber-400"
-          >&mdash; auto-closed, no duty manager sign-off</span>
+          >Auto-closed, with no duty manager sign-off.</span>
           <span
             v-else-if="closed.closedBy"
             class="text-neutral-400"
-          >by {{ closed.closedBy }}</span>
+          >Closed by {{ closed.closedBy }}.</span>
         </p>
         <p class="text-xs text-neutral-500">
           {{ formatDateTime(closed.closedAt) }} &middot; the report has been filed and emailed.
@@ -199,6 +205,13 @@ const facts = computed(() => [
         label="Close the night"
         @click="closeOpen = true"
       />
+
+      <p
+        v-if="compsUnreachable"
+        class="mb-5 rounded-xl border border-amber-500/50 bg-amber-500/10 p-4 text-sm text-amber-300"
+      >
+        The comps queue is not reachable, so a request waiting now would not show here. Check the till.
+      </p>
 
       <NuxtLink
         v-if="pendingComps"
@@ -229,6 +242,27 @@ const facts = computed(() => [
         >
           {{ option.showTitle }} · {{ option.venueName }}
         </NuxtLink>
+      </div>
+
+      <div
+        v-else-if="glanceError"
+        class="rounded-xl border border-red-800 bg-red-950/40 p-4"
+      >
+        <p class="text-sm font-medium text-red-200">
+          Tonight's numbers did not load
+        </p>
+        <p class="mt-1 text-sm text-red-300/90">
+          {{ getErrorMessage(glanceError, 'Something went wrong.') }} This is not an empty house: try again, and check with the box office before turning anyone away.
+        </p>
+        <UButton
+          class="mt-3"
+          size="sm"
+          color="error"
+          variant="outline"
+          icon="i-lucide-rotate-ccw"
+          label="Try again"
+          @click="() => refreshGlance()"
+        />
       </div>
 
       <template v-else-if="numbers && show">

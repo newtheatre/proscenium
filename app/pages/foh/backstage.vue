@@ -52,16 +52,28 @@ const presets = ref<Preset[]>(initialBoard.value?.presets ?? [])
 const timings = ref<Timing[]>(initialBoard.value?.timings ?? [])
 const sending = ref(false)
 const text = ref('')
+const acknowledging = ref(new Set<string>())
+const toast = useToast()
 
 const at = (m: Message) => new Date(m.createdAt).getTime()
 const ordered = computed(() => [...messages.value].sort((a, b) => at(b) - at(a)))
 const unacked = computed(() => messages.value.filter(m => m.direction === 'BACKSTAGE' && !m.acknowledgedAt))
 const latestOurs = computed(() => ordered.value.find(m => m.direction === 'FOH') ?? null)
 
+// A poll must not swap out the button a finger is on: a row whose
+// acknowledgement is in flight keeps the copy already on screen.
+function keepInFlight(incoming: Message[]) {
+  if (!acknowledging.value.size) return incoming
+  return incoming.map((message) => {
+    if (!acknowledging.value.has(message.id)) return message
+    return messages.value.find(held => held.id === message.id) ?? message
+  })
+}
+
 async function loadBoard() {
   try {
     const board = await requestFetch<{ messages: Message[], presets: Preset[], timings: Timing[] }>('/api/foh/backstage/board')
-    messages.value = board.messages
+    messages.value = keepInFlight(board.messages)
     presets.value = board.presets
     timings.value = board.timings
   }
@@ -79,13 +91,28 @@ async function call(presetId?: string) {
     text.value = ''
     await loadBoard()
   }
+  catch {
+    // Clearing the box stays inside the try: a failed call keeps its text.
+    toast.add({ title: 'That call did not send', description: 'Nothing has gone backstage.', color: 'error' })
+  }
   finally {
     sending.value = false
   }
 }
 
 async function acknowledge(message: Message) {
-  await requestFetch(`/api/foh/backstage/messages/${message.id}/ack`, { method: 'POST' })
+  if (acknowledging.value.has(message.id)) return
+  acknowledging.value.add(message.id)
+  try {
+    await requestFetch(`/api/foh/backstage/messages/${message.id}/ack`, { method: 'POST' })
+  }
+  catch {
+    toast.add({ title: 'That did not acknowledge', description: 'The call is still open: tap it again.', color: 'error' })
+    return
+  }
+  finally {
+    acknowledging.value.delete(message.id)
+  }
   await loadBoard()
 }
 
@@ -99,7 +126,6 @@ onBeforeUnmount(() => {
 
 const resetting = ref(false)
 const confirming = ref(false)
-const toast = useToast()
 
 /** Grouped, because it gets read aloud over a headset. */
 const grouped = computed(() => {
@@ -169,14 +195,17 @@ async function reset() {
             v-for="message in unacked"
             :key="message.id"
             type="button"
-            class="mb-2 w-full rounded-xl bg-emerald-700 p-4 text-left text-white"
+            :disabled="acknowledging.has(message.id)"
+            class="mb-2 w-full rounded-xl bg-emerald-700 p-4 text-left text-white disabled:opacity-80"
             @click="acknowledge(message)"
           >
             <span class="block text-xs uppercase tracking-widest text-emerald-200">
               Backstage · {{ formatTime(message.createdAt) }}
             </span>
             <span class="mt-1 block text-2xl font-bold leading-tight">{{ message.label }}</span>
-            <span class="mt-2 block text-sm text-emerald-100">Tap to acknowledge</span>
+            <span class="mt-2 block text-sm text-emerald-100">
+              {{ acknowledging.has(message.id) ? 'Acknowledging' : 'Tap to acknowledge' }}
+            </span>
           </button>
 
           <div class="grid grid-cols-2 gap-2">
