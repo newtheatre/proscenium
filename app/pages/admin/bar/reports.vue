@@ -281,7 +281,7 @@ const registerUrl = computed(() =>
       <template #footer>
         <p class="text-xs text-muted">
           Cost is the most recent delivery cost, scaled by what a sale depletes: a 175&nbsp;ml glass
-          costs 233 thousandths of its bottle. A product with no delivery recorded has no cost.
+          costs 175/750ths of its bottle. A product with no delivery recorded has no cost.
         </p>
       </template>
     </UCard>

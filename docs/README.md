@@ -41,7 +41,7 @@ Gaps section of [08-operations](./08-operations.md) are what you have actually i
 | 10 | [Passes: design](./10-passes-design.md) | Season passes and festival passes. **Phase 1 built** (Aug 2026); phases 2–4 outstanding. | Implementing passes |
 | 11 | [Show night screen: design](./11-show-night-screen-design.md) | The `/foh` screen: scanner and QR, tonight at a glance, emergency, incidents, backstage comms. **Agreed Aug 2026, not built.** | Implementing the show night screen |
 | 12 | [Access, staffing and end-of-night: design](./12-access-and-staffing-design.md) | Access needs, the volunteer rota, the end-of-night report. **Its §5 is the programme order for 11, 12 and 13 together.** | Before starting any part of 11, 12 or 13 |
-| 13 | [Bar: design](./13-bar-design.md) | The counter till, the stock ledger, Challenge 25, the daily reconciliation. **Agreed Aug 2026, not built.** | Implementing the bar |
+| 13 | [Bar: design](./13-bar-design.md) | The counter till, the stock ledger, Challenge 25, the daily reconciliation. **Agreed Aug 2026, largely built.** | Implementing the bar |
 | 14 | [Training mode: design](./14-training-mode-design.md) | Sandboxes on the till, Challenge 25 and the door, for people currently being taught them. **Agreed and built Aug 2026**; needs practice targets creating in rehearsal before it does anything. | Working on training mode |
 
 **Documents 11, 12 and 13 are one programme, not three features.** They interleave: the rota gates

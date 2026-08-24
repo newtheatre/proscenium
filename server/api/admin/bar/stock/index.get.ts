@@ -12,9 +12,11 @@ export default defineEventHandler(async (event) => {
       categoryId: schema.barProducts.categoryId,
       name: schema.barProducts.name,
       unit: schema.barProducts.unit,
+      containerMl: schema.barProducts.containerMl,
+      stockOnly: schema.barProducts.stockOnly,
       stockProductId: schema.barProducts.stockProductId,
-      depletesMilli: schema.barProducts.depletesMilli,
-      parMilli: schema.barProducts.parMilli,
+      depletesQty: schema.barProducts.depletesQty,
+      parQty: schema.barProducts.parQty,
       status: schema.barProducts.status,
     }).from(schema.barProducts).orderBy(asc(schema.barProducts.sort), asc(schema.barProducts.name)),
     db.select().from(schema.barCategories).orderBy(asc(schema.barCategories.sort)),
@@ -27,15 +29,16 @@ export default defineEventHandler(async (event) => {
   const rows = products
     .filter(p => (!p.stockProductId || depleted.has(p.id)) && p.status !== 'RETIRED')
     .map((p) => {
-      const milli = onHand.get(p.id) ?? 0
+      const qty = onHand.get(p.id) ?? 0
+      const containers = qtyToContainers(p, qty)
       const cost = costs.get(p.id) ?? null
       return {
         ...p,
-        onHandMilli: milli,
-        onHandUnits: milli / 1000,
+        onHandQty: qty,
+        onHandContainers: containers,
         lastCostPence: cost,
-        valuePence: cost == null ? null : Math.round((milli / 1000) * cost),
-        belowPar: p.parMilli != null && milli < p.parMilli,
+        valuePence: cost == null ? null : Math.round(containers * cost),
+        belowPar: p.parQty != null && qty < p.parQty,
       }
     })
 

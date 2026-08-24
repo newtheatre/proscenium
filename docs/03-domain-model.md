@@ -330,17 +330,28 @@ a decision this app should make on someone's behalf.
 
 The bar catalogue. Design: [13-bar-design](./13-bar-design.md) §3.
 
-**Money is integer pence and quantities are thousandths of a unit** (`qty_milli`), so a 25 ml
-measure out of a 70 cl bottle is an exact integer rather than a rounding argument.
+**Money is integer pence and stock is counted in the product's own basis** (ADR-0035):
+millilitres when it has a `container_ml`, whole items when it does not. A 70 cl bottle is
+`container_ml = 700` and a single takes 25 of them, so 28 singles empty it exactly and nobody
+works out a ratio by hand. Deliveries, stocktakes and adjustments are still entered in
+**containers**, which is how an invoice and a shelf read; the app converts.
 
 **`bar_prices` is append-only and date-effective.** A price change is a new row, never an update, so
 the current price is a query (`effective_from <= today`, latest wins) and the history *is* the audit
 trail. Setting a future date is how a change is planned rather than remembered.
 
-**A product may point at what it depletes**, one level only: a 175 ml glass points at the 750 ml
-bottle with `depletes_milli = 233`; a bottled beer points at itself with `1000`. Pointing at
-something that itself depletes another is refused, because a bundle of bundles is a different design
-(§3.1).
+**A product may point at what it depletes**, one level only: a 175 ml glass points at the 75 cl
+bottle with `depletes_qty = 175`. A product that points at nothing depletes one whole container of
+itself, so a bottled beer needs no figure. Pointing at something that itself depletes another is
+refused, because a bundle of bundles is a different design (§3.1).
+
+**`stock_only` is stock you never sell.** A spirits bottle is delivered, counted and poured from
+but never rung up, so it needs no price and the till never offers it.
+
+**`container_ml` is fixed once anything has moved against the product.** Every movement means what
+it means in the size current when it was written, so changing it would re-base the history with no
+trace. The API refuses it and says to retire the product and add the new size as its own
+(ADR-0035).
 
 **Discounts are percentage, and bar lines only.** They never touch a ticket line: ticket prices have
 their own override chain, and they are snapshotted onto a transaction when used, so changing the
@@ -397,7 +408,7 @@ the same night.
 
 ### `stock_movements`, `stock_deliveries`, `stocktakes`
 
-A signed, append-only ledger. **`on_hand` is always `SUM(qty_milli)` and is never stored**, so the
+A signed, append-only ledger. **`on_hand` is always `SUM(qty)` and is never stored**, so the
 level cannot drift from the movements that explain it. Two SQLite triggers enforce the append-only
 half: the content columns cannot be updated and no row can be deleted.
 
@@ -408,21 +419,22 @@ half: the content columns cannot be updated and no row can be deleted.
   re-points it, and a blanket `BEFORE UPDATE` would stall the merge hook for ever, which is exactly
   what happened to `incident_log` (ADR-0025, and migration `0023`).
 - **Movements are always against the stock product.** A 175 ml glass resolves through
-  `bar_products.stock_product_id` and depletes 233 milli of the 750 ml bottle, so no row is ever
+  `bar_products.stock_product_id` and depletes 175 ml of the 75 cl bottle, so no row is ever
   written against the measure that was sold.
 - **A correction is an opposing movement**, never an edit. `WASTAGE`, `TRANSFER` and `ADJUST` all
   require a reason, because the reason is the whole value of the row.
 - **`VOID` reverses a voided tab charge**, and it is *copied* from that charge's original `SALE`
   rows rather than recomputed from the catalogue. Recomputing would not cancel the sale if
-  `depletes_milli` or `stock_product_id` had changed in between, and `on_hand` would drift
+  `depletes_qty` or `stock_product_id` had changed in between, and `on_hand` would drift
   permanently with no trace (ADR-0031).
 - **Stocktake variance is computed against on-hand at the moment of finishing**, not against the
-  snapshot taken at the start. `expected_milli` is recorded so the sheet can show what was expected
+  snapshot taken at the start. `expected_qty` is recorded so the sheet can show what was expected
   when counting began, but correcting to it would erase any sale made during the count.
 - **An `OPEN` stocktake writes nothing.** Abandoning it is free, and only one may be open at a time.
 
-`stock_delivery_lines.cost_pence_per_unit` is per whole unit. The most recent delivery cost is what
-stock is valued at, which is the closing-stock figure the Treasurer needs at the end of term.
+`stock_delivery_lines.cost_pence_per_container` is per container, as an invoice quotes it. The most
+recent delivery cost is what stock is valued at, which is the closing-stock figure the Treasurer
+needs at the end of term, and what GP scales: a 175 ml glass costs 175/750ths of its bottle.
 
 ### `comp_requests`
 

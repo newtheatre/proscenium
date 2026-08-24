@@ -113,16 +113,20 @@ payment state, the auth roles, the end-of-night report.
 ## 3. Domain model
 
 All money in **integer pence** (matching the rest of Proscenium: see
-[06-pricing-and-ticket-types](./06-pricing-and-ticket-types.md)); all quantities in **thousandths
-of a unit** (`qty_milli`), so opened wine can be counted in tenths and a 25 ml measure out of a
-70 cl bottle is an exact integer.
+[06-pricing-and-ticket-types](./06-pricing-and-ticket-types.md)); all stock in **the product's own
+basis**: millilitres for anything with a container size, whole items for everything else
+([ADR-0035](./decisions/0035-stock-is-counted-in-real-units.md)). A 70 cl bottle of gin is
+`container_ml = 700`, a single takes 25 of them, and 28 singles empty the bottle exactly. Nobody
+converts anything by hand, and no ratio is rounded.
 
 ```
 bar_categories       id · name · sort · colour NULL
 bar_products         id · category_id FK · name · unit TEXT ('bottle'|'can'|'measure'|'glass'|'each')
+                     container_ml INTEGER NULL                    -- 700 for a 70 cl bottle; NULL counts it in whole items
+                     stock_only INTEGER                           -- held but never sold: no price, never on the till
                      stock_product_id FK NULL → bar_products      -- what this *depletes* (see §3.1)
-                     depletes_milli INTEGER                       -- e.g. a 175ml glass depletes 233 of a 750ml bottle
-                     par_milli INTEGER NULL · status ('ACTIVE'|'HIDDEN'|'RETIRED')
+                     depletes_qty INTEGER NULL                    -- a 175ml glass takes 175 of its bottle's millilitres
+                     par_qty INTEGER NULL · status ('ACTIVE'|'HIDDEN'|'RETIRED')
                      sort · age_restricted INTEGER (default 1 for alcohol)
                      timestamps
 bar_prices           id · product_id FK · price_pence · effective_from DATE · created_by
@@ -161,21 +165,21 @@ comp_requests        id · requested_by FK · requested_at · bar_session_id FK 
                      status ('PENDING'|'APPROVED'|'DECLINED'|'EXPIRED')
                      decided_by FK NULL · decided_at NULL · transaction_id FK NULL (set on approval)
 
-stock_movements      id · product_id FK (always the *stock* product) · qty_milli (signed)
+stock_movements      id · product_id FK (always the *stock* product) · qty (signed, in the product's basis)
                      kind ('DELIVERY'|'SALE'|'COMP'|'STOCKTAKE'|'WASTAGE'|'TRANSFER'|'ADJUST'|'VOID')
                      ref_table · ref_id                            -- the sale line / delivery line / stocktake line
-                     cost_pence_per_unit NULL                      -- on deliveries
+                     cost_pence_per_container NULL                 -- on deliveries
                      reason TEXT NULL · created_by · created_at
-                     -- on_hand = SUM(qty_milli) per product. Derived, never stored.
+                     -- on_hand = SUM(qty) per product. Derived, never stored.
 
 stock_deliveries     id · supplier TEXT · delivered_on DATE · invoice_ref NULL · total_pence NULL
                      received_by · notes · created_at
-stock_delivery_lines id · delivery_id FK · product_id FK · qty_milli · cost_pence_per_unit
+stock_delivery_lines id · delivery_id FK · product_id FK · qty · cost_pence_per_container
 
 stocktakes           id · started_at · started_by · finished_at NULL · finished_by NULL
                      status ('OPEN'|'APPLIED'|'ABANDONED') · notes
 stocktake_lines      id · stocktake_id FK · product_id FK
-                     expected_milli (snapshot at start) · counted_milli NULL · reason TEXT NULL
+                     expected_qty (snapshot at start) · counted_qty NULL · reason TEXT NULL
                      -- on finish: one STOCKTAKE movement per line with variance ≠ 0
 
 age_checks           id · performance_id FK NULL · checked_at · checked_by_user_id FK
@@ -197,17 +201,26 @@ day_reconciliations  day DATE PK · sumup_z_pence · entered_by · entered_at ·
 
 ### 3.1 Sellable vs stock products
 
-A 175 ml glass of house white is sold; a 750 ml bottle is stocked. Rather than two tables, a
-product may point at another product as the thing it depletes: `House white 175ml` has
-`stock_product_id = House white 750ml bottle`, `depletes_milli = 233`. Bottled beer points at
-itself with `depletes_milli = 1000`. Every sale line produces one `SALE` movement against the
-**stock** product. Keep this to one level (no bundles of bundles); a "meal deal" is a product
-whose sale handler writes several movements: implement as a small `bar_bundle_items` table if
-the committee wants deals in v1, otherwise defer.
+A 175 ml glass of house white is sold; a 75 cl bottle is stocked. Rather than two tables, a
+product may point at another product as the thing it depletes: `House white, large glass` has
+`stock_product_id = House white`, `depletes_qty = 175`, and the bottle has `container_ml = 750`.
+A product that points at nothing depletes one whole container of itself, so a bottled beer needs
+no figure at all. Every sale line produces one `SALE` movement against the **stock** product.
+
+A bottle of spirits is `stock_only`: it is delivered, counted and poured from, but it is never
+sold whole, so it carries no price and the till never offers it.
+
+Keep this to one level (no bundles of bundles); a "meal deal" is a product whose sale handler
+writes several movements: implement as a small `bar_bundle_items` table if the committee wants
+deals in v1, otherwise defer.
 
 ### 3.2 Invariants
 
-- `on_hand` is always `SUM(stock_movements.qty_milli)`; nothing writes it directly.
+- `on_hand` is always `SUM(stock_movements.qty)`; nothing writes it directly.
+- **A product's container size is fixed once anything has moved against it.** Every movement is
+  recorded in the size that was current when it was written, so changing it later would re-base
+  the history silently. The API refuses the change and says to retire the product instead
+  ([ADR-0035](./decisions/0035-stock-is-counted-in-real-units.md)).
 - A transaction is immutable once recorded. Mistakes are **voided** (reversing the movements and,
   for ticket lines, the payment) and re-rung. The reversal does exist:
   `POST /api/reservations/:id/refund`, which is manager-gated. So a void touching ticket lines
@@ -344,11 +357,11 @@ at the end of each term is the closing-stock figure the Treasurer needs.
 
 ### 4.4 Stocktake
 
-Starting a take snapshots `expected_milli` for every active stock product. Counting is the same
-table, one line at a time on a phone in the store cupboard; opened bottles in tenths. Each line
-with a variance takes an optional reason (breakage, pour variance, miscounted, wastage,
-unexplained). **Finish & apply** writes one `STOCKTAKE` movement per varying line and the take
-becomes the new baseline. The footer shows net variance at cost and as a percentage of sales since
+Starting a take snapshots `expected_qty` for every active stock product. Counting is the same
+table, one line at a time on a phone in the store cupboard, **in containers**: a part bottle is a
+decimal, and the app converts it to millilitres. Each line with a variance takes an optional
+reason (breakage, pour variance, miscounted, wastage, unexplained). **Finish & apply** writes one
+`STOCKTAKE` movement per varying line and the take becomes the new baseline. The footer shows net variance at cost and as a percentage of sales since
 the last take. A variance report over time (per take, per product) lives in reports.
 
 ### 4.5 Close the bar / end of night
@@ -520,8 +533,6 @@ Each stage is independently shippable and useful on its own.
   Committee decision; the system only needs a name.
 - **Retention for `age_checks`**: adopt with the data-protection policy (spring 2027). Until
   then: keep.
-- **Measure sizes for spirits** (25 ml vs 35 ml) and wine (125/175/250): configure per product;
-  confirm what the licence and the bar actually pour.
 - **Discount list and rates** (mockup: Committee 20%, Cast & crew 10%), committee sets them; admin data.
 - **The tab limit** is a constant, `TAB_SOFT_CAP_PENCE` in `server/utils/barTabs.ts`, currently
   £20. Committee decision whether that is the right figure and whether it should ever become a
@@ -531,7 +542,9 @@ Each stage is independently shippable and useful on its own.
   Note that [ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md) asks
   to be revisited in the same commit if this becomes hard: a licensing control that fails open is
   not one, and the eligibility seam currently fails open.
-Formerly open, now settled: **voiding a mixed transaction**, the box office reversal exists
+Formerly open, now settled: **measure sizes** are configured per product as real millilitres
+(ADR-0035), so 25 or 35 for a spirit and 125/175/250 for wine is a catalogue entry rather than a
+schema question; **voiding a mixed transaction**, the box office reversal exists
 (`POST /api/reservations/:id/refund`, manager-gated), so a void touching ticket lines needs that
 permission and everyone else is sent to the desk (§3.2); SumUp stays the payment device and is not
 integrated via API ([ADR-0024](./decisions/0024-sumup-stays-a-manual-reader.md)); this is

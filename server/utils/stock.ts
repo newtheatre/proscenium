@@ -11,25 +11,25 @@ import { desc, eq, sql } from 'drizzle-orm'
 export interface MovementDraft {
   /** Must already be the stock product: use `depletion()` to resolve a sale. */
   productId: string
-  qtyMilli: number
+  qty: number
   kind: (typeof schema.MOVEMENT_KINDS)[number]
   refTable?: string | null
   refId?: string | null
-  costPencePerUnit?: number | null
+  costPencePerContainer?: number | null
   reason?: string | null
   createdByUserId: string | null
 }
 
 export function movementStatements(drafts: MovementDraft[]): BatchItem<'sqlite'>[] {
   return drafts
-    .filter(d => d.qtyMilli !== 0)
+    .filter(d => d.qty !== 0)
     .map(d => db.insert(schema.stockMovements).values({
       productId: d.productId,
-      qtyMilli: d.qtyMilli,
+      qty: d.qty,
       kind: d.kind,
       refTable: d.refTable ?? null,
       refId: d.refId ?? null,
-      costPencePerUnit: d.costPencePerUnit ?? null,
+      costPencePerContainer: d.costPencePerContainer ?? null,
       reason: d.reason ?? null,
       createdByUserId: d.createdByUserId,
     }) as BatchItem<'sqlite'>)
@@ -37,18 +37,20 @@ export function movementStatements(drafts: MovementDraft[]): BatchItem<'sqlite'>
 
 export interface DepletingProduct {
   id: string
+  containerMl: number | null
   stockProductId: string | null
-  depletesMilli: number
+  depletesQty: number | null
 }
 
 /**
- * What selling `qty` of a product takes off the shelf. A 175ml glass of a
- * 750ml bottle is 233 milli of the *bottle* (docs/13 §3.1).
+ * What selling `qty` of a product takes off the shelf: a 125 ml glass takes
+ * 125 of its bottle's millilitres, anything else a whole container (§3.1).
  */
 export function depletion(product: DepletingProduct, qty: number) {
+  const perSale = product.stockProductId ? product.depletesQty! : containerSize(product)
   return {
     productId: product.stockProductId ?? product.id,
-    qtyMilli: -(product.depletesMilli * qty),
+    qty: -(perSale * qty),
   }
 }
 
@@ -60,11 +62,11 @@ export function basketMovements(
   const merged = new Map<string, number>()
   for (const { product, qty } of items) {
     const d = depletion(product, qty)
-    merged.set(d.productId, (merged.get(d.productId) ?? 0) + d.qtyMilli)
+    merged.set(d.productId, (merged.get(d.productId) ?? 0) + d.qty)
   }
-  return [...merged].map(([productId, qtyMilli]) => ({
+  return [...merged].map(([productId, qty]) => ({
     productId,
-    qtyMilli,
+    qty,
     kind: opts.kind,
     refTable: opts.refTable,
     refId: opts.refId,
@@ -80,7 +82,7 @@ export async function onHandByProduct(): Promise<Map<string, number>> {
   const rows = await db
     .select({
       productId: schema.stockMovements.productId,
-      onHand: sql<number>`sum(${schema.stockMovements.qtyMilli})`.as('on_hand'),
+      onHand: sql<number>`sum(${schema.stockMovements.qty})`.as('on_hand'),
     })
     .from(schema.stockMovements)
     .groupBy(schema.stockMovements.productId)
@@ -89,10 +91,19 @@ export async function onHandByProduct(): Promise<Map<string, number>> {
 
 export async function onHandFor(productId: string): Promise<number> {
   const [row] = await db
-    .select({ onHand: sql<number>`coalesce(sum(${schema.stockMovements.qtyMilli}), 0)` })
+    .select({ onHand: sql<number>`coalesce(sum(${schema.stockMovements.qty}), 0)` })
     .from(schema.stockMovements)
     .where(eq(schema.stockMovements.productId, productId))
   return Number(row?.onHand ?? 0)
+}
+
+/** Whether anything has ever moved: a container size may not change after it has. */
+export async function hasMovements(productId: string): Promise<boolean> {
+  const row = await db.select({ id: schema.stockMovements.id })
+    .from(schema.stockMovements)
+    .where(eq(schema.stockMovements.productId, productId))
+    .limit(1).get()
+  return row != null
 }
 
 /**
@@ -103,7 +114,7 @@ export async function latestCostByProduct(): Promise<Map<string, number>> {
   const rows = await db
     .select({
       productId: schema.stockDeliveryLines.productId,
-      cost: schema.stockDeliveryLines.costPencePerUnit,
+      cost: schema.stockDeliveryLines.costPencePerContainer,
       deliveredOn: schema.stockDeliveries.deliveredOn,
     })
     .from(schema.stockDeliveryLines)
@@ -119,7 +130,18 @@ export async function latestCostByProduct(): Promise<Map<string, number>> {
 /** Products a movement may be written against: stock products, not measures. */
 export async function stockProducts() {
   const all = await db.query.barProducts.findMany({
-    columns: { id: true, name: true, unit: true, stockProductId: true, depletesMilli: true, parMilli: true, status: true, categoryId: true },
+    columns: {
+      id: true,
+      name: true,
+      unit: true,
+      containerMl: true,
+      stockOnly: true,
+      stockProductId: true,
+      depletesQty: true,
+      parQty: true,
+      status: true,
+      categoryId: true,
+    },
   })
   const depletedIds = new Set(all.map(p => p.stockProductId).filter(Boolean) as string[])
   return all.filter(p => !p.stockProductId || depletedIds.has(p.id))
@@ -131,7 +153,8 @@ export async function stockProducts() {
  */
 export async function depletionRules(): Promise<Map<string, DepletingProduct>> {
   const rows = await db.query.barProducts.findMany({
-    columns: { id: true, stockProductId: true, depletesMilli: true },
+    columns: { id: true, containerMl: true, stockProductId: true, depletesQty: true },
   })
-  return new Map(rows.map(r => [r.id, r]))
+  // A measure with no size cannot be resolved, so it is absent and fails before the money.
+  return new Map(rows.filter(r => !r.stockProductId || r.depletesQty != null).map(r => [r.id, r]))
 }

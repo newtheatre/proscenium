@@ -15,8 +15,9 @@ export default defineEventHandler(async (event) => {
     productId: schema.stocktakeLines.productId,
     name: schema.barProducts.name,
     unit: schema.barProducts.unit,
-    expectedMilli: schema.stocktakeLines.expectedMilli,
-    countedMilli: schema.stocktakeLines.countedMilli,
+    containerMl: schema.barProducts.containerMl,
+    expectedQty: schema.stocktakeLines.expectedQty,
+    countedQty: schema.stocktakeLines.countedQty,
     reason: schema.stocktakeLines.reason,
   })
     .from(schema.stocktakeLines)
@@ -28,8 +29,8 @@ export default defineEventHandler(async (event) => {
     ...stocktake,
     lines: lines.map(l => ({
       ...l,
-      varianceMilli: l.countedMilli == null ? null : l.countedMilli - l.expectedMilli,
+      varianceQty: l.countedQty == null ? null : l.countedQty - l.expectedQty,
     })),
-    countedLines: lines.filter(l => l.countedMilli != null).length,
+    countedLines: lines.filter(l => l.countedQty != null).length,
   }
 })

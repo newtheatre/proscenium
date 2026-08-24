@@ -12,9 +12,9 @@ const bodySchema = z.object({
   notes: z.string().trim().max(500).nullable().optional(),
   lines: z.array(z.object({
     productId: z.string().trim().min(1),
-    /** Whole units, not milli: three cases of twelve is entered as 36. */
-    qtyUnits: z.coerce.number().min(0.001).max(100_000),
-    costPencePerUnit: z.coerce.number().int().min(0).max(1_000_000).nullable().optional(),
+    /** Whole containers, as the invoice reads: three cases of twelve is 36. */
+    qtyContainers: z.coerce.number().min(0.001).max(100_000),
+    costPencePerContainer: z.coerce.number().int().min(0).max(1_000_000).nullable().optional(),
   })).min(1).max(60),
 })
 
@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
   const { user } = await requireUserSession(event)
 
   const rules = await depletionRules()
-  for (const line of input.lines) {
+  const lines = input.lines.map((line) => {
     const product = rules.get(line.productId)
     if (!product) {
       throw createError({ statusCode: 400, statusMessage: 'One of those products no longer exists.' })
@@ -39,18 +39,18 @@ export default defineEventHandler(async (event) => {
         statusMessage: 'Book the delivery against the product that holds the stock, not the measure sold from it.',
       })
     }
-  }
+    return {
+      id: nanoid(),
+      productId: line.productId,
+      qty: containersToQty(product, line.qtyContainers),
+      qtyContainers: line.qtyContainers,
+      costPencePerContainer: line.costPencePerContainer ?? null,
+    }
+  })
 
   const deliveryId = nanoid()
-  const lines = input.lines.map(line => ({
-    id: nanoid(),
-    deliveryId,
-    productId: line.productId,
-    qtyMilli: Math.round(line.qtyUnits * 1000),
-    costPencePerUnit: line.costPencePerUnit ?? null,
-  }))
   const totalPence = lines.reduce(
-    (sum, l) => sum + (l.costPencePerUnit == null ? 0 : Math.round((l.qtyMilli / 1000) * l.costPencePerUnit)),
+    (sum, l) => sum + (l.costPencePerContainer == null ? 0 : Math.round(l.qtyContainers * l.costPencePerContainer)),
     0,
   )
 
@@ -65,14 +65,20 @@ export default defineEventHandler(async (event) => {
       receivedByUserId: user.id,
     }),
     // One statement per line: the parameter count must not grow with the delivery (ADR-0006).
-    ...lines.map(l => db.insert(schema.stockDeliveryLines).values(l) as BatchItem<'sqlite'>),
+    ...lines.map(l => db.insert(schema.stockDeliveryLines).values({
+      id: l.id,
+      deliveryId,
+      productId: l.productId,
+      qty: l.qty,
+      costPencePerContainer: l.costPencePerContainer,
+    }) as BatchItem<'sqlite'>),
     ...movementStatements(lines.map(l => ({
       productId: l.productId,
-      qtyMilli: l.qtyMilli,
+      qty: l.qty,
       kind: 'DELIVERY' as const,
       refTable: 'stock_delivery_lines',
       refId: l.id,
-      costPencePerUnit: l.costPencePerUnit,
+      costPencePerContainer: l.costPencePerContainer,
       createdByUserId: user.id,
     }))),
   ]

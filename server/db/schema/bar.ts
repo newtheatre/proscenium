@@ -1,14 +1,14 @@
 /**
- * The bar catalogue. Money in integer pence, quantities in thousandths of a
- * unit. Design: docs/13-bar-design.md §3
+ * The bar catalogue. Money in integer pence, stock in millilitres or whole
+ * items. Design: docs/13-bar-design.md §3
  */
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { relations, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { users } from './user'
+import { PRODUCT_STATUSES, PRODUCT_UNITS } from '../../../shared/utils/barCatalogue'
 
-export const PRODUCT_UNITS = ['bottle', 'can', 'measure', 'glass', 'each'] as const
-export const PRODUCT_STATUSES = ['ACTIVE', 'HIDDEN', 'RETIRED'] as const
+export { PRODUCT_STATUSES, PRODUCT_UNITS }
 
 export const barCategories = sqliteTable('bar_categories', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
@@ -27,14 +27,23 @@ export const barProducts = sqliteTable('bar_products', {
   unit: text('unit', { enum: PRODUCT_UNITS }).notNull().default('each'),
 
   /**
-   * What a sale of this depletes. A 175ml glass points at the 750ml bottle;
-   * a bottled beer points at itself. One level only (docs/13 §3.1).
+   * Millilitres in one container: 700 for a 70 cl bottle. Null counts this in
+   * whole items, and it may not change once movements exist (ADR-0035).
+   */
+  containerMl: integer('container_ml'),
+  /** Stocked but never sold: a spirits bottle poured only as measures. */
+  stockOnly: integer('stock_only', { mode: 'boolean' }).notNull().default(false),
+
+  /**
+   * What a sale of this depletes. A 125 ml glass points at the 75 cl bottle;
+   * a bottled beer points at nothing and depletes itself. One level (§3.1).
    */
   stockProductId: text('stock_product_id'),
-  /** Thousandths of the stock product per sale: a 175ml glass of 750ml is 233. */
-  depletesMilli: integer('depletes_milli').notNull().default(1000),
+  /** How much of that product one sale takes, in its basis: 125 (ml), or 1. */
+  depletesQty: integer('depletes_qty'),
 
-  parMilli: integer('par_milli'),
+  /** Flags the product below this level, in its own basis. */
+  parQty: integer('par_qty'),
   status: text('status', { enum: PRODUCT_STATUSES }).notNull().default('ACTIVE'),
   sort: integer('sort').notNull().default(0),
   ageRestricted: integer('age_restricted', { mode: 'boolean' }).notNull().default(true),

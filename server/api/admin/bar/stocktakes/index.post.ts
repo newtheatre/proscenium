@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     ...active.map(p => db.insert(schema.stocktakeLines).values({
       stocktakeId,
       productId: p.id,
-      expectedMilli: onHand.get(p.id) ?? 0,
+      expectedQty: onHand.get(p.id) ?? 0,
     }) as BatchItem<'sqlite'>),
   ]
 

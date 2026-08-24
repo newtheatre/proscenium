@@ -7,14 +7,29 @@ const bodySchema = z.object({
   categoryId: z.string().trim().min(1),
   name: z.string().trim().min(1).max(80),
   unit: z.enum(schema.PRODUCT_UNITS).optional().default('each'),
-  /** Omit to point at itself: a bottled beer depletes one of itself. */
+  /** Millilitres in one container. Omit to count this in whole items. */
+  containerMl: z.coerce.number().int().min(1).max(100_000).nullable().optional(),
+  /** Stocked but never sold, so it needs no price and reaches no till. */
+  stockOnly: z.boolean().optional().default(false),
+  /** Omit when this holds its own stock: a bottled beer depletes itself. */
   stockProductId: z.string().trim().min(1).nullable().optional(),
-  depletesMilli: z.coerce.number().int().min(1).max(1_000_000).optional().default(1000),
-  parMilli: z.coerce.number().int().min(0).nullable().optional(),
+  /** How much of that product one sale takes, in its basis: 25 (ml), or 1. */
+  depletesQty: z.coerce.number().int().min(1).max(1_000_000).nullable().optional(),
+  parQty: z.coerce.number().int().min(0).nullable().optional(),
   ageRestricted: z.boolean().optional().default(true),
   sort: z.coerce.number().int().min(0).max(999).optional().default(0),
   /** Pence. Creates the first date-effective price alongside the product. */
-  pricePence: z.coerce.number().int().min(0).max(100_000),
+  pricePence: z.coerce.number().int().min(0).max(100_000).optional(),
+}).superRefine((v, ctx) => {
+  if (!v.stockOnly && v.pricePence == null) {
+    ctx.addIssue({ code: 'custom', message: 'A price is needed unless this is stock only.', path: ['pricePence'] })
+  }
+  if (v.stockOnly && v.stockProductId) {
+    ctx.addIssue({ code: 'custom', message: 'Something stock only holds its own stock.', path: ['stockProductId'] })
+  }
+  if (v.stockOnly && v.pricePence != null) {
+    ctx.addIssue({ code: 'custom', message: 'Something stock only is never sold, so it has no price.', path: ['pricePence'] })
+  }
 })
 
 /** POST /api/admin/bar/products: add something to sell, with its first price. */
@@ -24,25 +39,37 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBody(event, bodySchema.parse)
   const { user } = await requireUserSession(event)
 
+  let depletesQty = input.depletesQty ?? null
   if (input.stockProductId) {
-    const target = await db.select({ id: schema.barProducts.id, stockProductId: schema.barProducts.stockProductId })
-      .from(schema.barProducts).where(eq(schema.barProducts.id, input.stockProductId)).get()
+    const target = await db.select({
+      id: schema.barProducts.id,
+      stockProductId: schema.barProducts.stockProductId,
+      containerMl: schema.barProducts.containerMl,
+    }).from(schema.barProducts).where(eq(schema.barProducts.id, input.stockProductId)).get()
     if (!target) throw createError({ statusCode: 404, statusMessage: 'That stock product does not exist' })
     // One level only: a bundle of bundles is a different design (docs/13 §3.1).
     if (target.stockProductId && target.stockProductId !== target.id) {
       throw createError({ statusCode: 409, statusMessage: 'That product already depletes another. Point at the thing actually stocked.' })
     }
+    depletesQty ??= containerSize(target)
   }
 
   const { pricePence, ...product } = input
-  const [row] = await db.insert(schema.barProducts).values(product).returning()
+  const [row] = await db.insert(schema.barProducts).values({
+    ...product,
+    // A measure takes from its bottle, so its own container size means nothing.
+    containerMl: input.stockProductId ? null : input.containerMl ?? null,
+    depletesQty,
+  }).returning()
 
-  await db.insert(schema.barPrices).values({
-    productId: row!.id,
-    pricePence,
-    effectiveFrom: pricingDate(),
-    createdByUserId: user.id,
-  })
+  if (pricePence != null) {
+    await db.insert(schema.barPrices).values({
+      productId: row!.id,
+      pricePence,
+      effectiveFrom: pricingDate(),
+      createdByUserId: user.id,
+    })
+  }
 
-  return { ...row, pricePence }
+  return { ...row, pricePence: pricePence ?? null }
 })

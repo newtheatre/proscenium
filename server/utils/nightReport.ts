@@ -261,11 +261,11 @@ async function lowStockNames(): Promise<string[]> {
   const products = await db.select({
     id: schema.barProducts.id,
     name: schema.barProducts.name,
-    parMilli: schema.barProducts.parMilli,
-  }).from(schema.barProducts).where(isNotNull(schema.barProducts.parMilli))
+    parQty: schema.barProducts.parQty,
+  }).from(schema.barProducts).where(isNotNull(schema.barProducts.parQty))
 
   return products
-    .filter(p => (onHand.get(p.id) ?? 0) < p.parMilli!)
+    .filter(p => (onHand.get(p.id) ?? 0) < p.parQty!)
     .map(p => p.name)
 }
 

@@ -13,10 +13,12 @@ interface StockRow {
   id: string
   name: string
   unit: string
+  containerMl: number | null
+  stockOnly: boolean
   stockProductId: string | null
-  parMilli: number | null
-  onHandMilli: number
-  onHandUnits: number
+  parQty: number | null
+  onHandQty: number
+  onHandContainers: number
   lastCostPence: number | null
   valuePence: number | null
   belowPar: boolean
@@ -46,12 +48,12 @@ const GBP = { style: 'currency' as const, currency: 'GBP' as const }
 
 // Nothing has ever moved, so the first count is the opening stock. Entering it
 // as a delivery would put an invented cost into the ledger (#208).
-const ledgerEmpty = computed(() => rows.value.length > 0 && rows.value.every(row => row.onHandMilli === 0))
+const ledgerEmpty = computed(() => rows.value.length > 0 && rows.value.every(row => row.onHandQty === 0))
 
 const columns = [
   { accessorKey: 'name', header: 'Product' },
-  { accessorKey: 'onHandUnits', header: 'On hand' },
-  { accessorKey: 'parMilli', header: 'Par' },
+  { accessorKey: 'onHandContainers', header: 'On hand' },
+  { accessorKey: 'parQty', header: 'Par' },
   { accessorKey: 'lastCostPence', header: 'Last cost' },
   { accessorKey: 'valuePence', header: 'Value' },
   { id: 'actions', header: '' },
@@ -59,22 +61,27 @@ const columns = [
 
 // Deliveries
 const deliveryOpen = ref(false)
-const delivery = reactive({ supplier: '', invoiceRef: '', lines: [] as { productId: string, qtyUnits: number | null, costPencePerUnit: number | null }[] })
+const delivery = reactive({ supplier: '', invoiceRef: '', lines: [] as { productId: string, qtyContainers: number | null, costPencePerContainer: number | null }[] })
 const saving = ref(false)
 
 function openDelivery() {
   delivery.supplier = ''
   delivery.invoiceRef = ''
-  delivery.lines = [{ productId: rows.value[0]?.id ?? '', qtyUnits: null, costPencePerUnit: null }]
+  delivery.lines = [{ productId: rows.value[0]?.id ?? '', qtyContainers: null, costPencePerContainer: null }]
   deliveryOpen.value = true
 }
 
-const productOptions = computed(() => rows.value.map(r => ({ label: r.name, value: r.id })))
+const productOptions = computed(() => rows.value.map(r => ({
+  label: r.containerMl ? `${r.name} (${r.containerMl} ml)` : r.name,
+  value: r.id,
+})))
+
+const adjustRow = computed(() => rows.value.find(r => r.id === adjust.productId) ?? null)
 
 async function saveDelivery() {
   saving.value = true
   try {
-    const lines = delivery.lines.filter(l => l.productId && l.qtyUnits)
+    const lines = delivery.lines.filter(l => l.productId && l.qtyContainers)
     if (!lines.length) throw new Error('Add at least one line.')
     await $fetch('/api/admin/bar/deliveries', {
       method: 'POST',
@@ -98,11 +105,11 @@ async function saveDelivery() {
 
 // Adjustments
 const adjustOpen = ref(false)
-const adjust = reactive({ productId: '', qtyUnits: null as number | null, kind: 'WASTAGE' as 'WASTAGE' | 'TRANSFER' | 'ADJUST', reason: '' })
+const adjust = reactive({ productId: '', qtyContainers: null as number | null, kind: 'WASTAGE' as 'WASTAGE' | 'TRANSFER' | 'ADJUST', reason: '' })
 
 function openAdjust(row: StockRow) {
   adjust.productId = row.id
-  adjust.qtyUnits = null
+  adjust.qtyContainers = null
   adjust.kind = 'WASTAGE'
   adjust.reason = ''
   adjustOpen.value = true
@@ -112,12 +119,12 @@ async function saveAdjust() {
   saving.value = true
   try {
     // Wastage is a loss however it is typed, so the sign is not the user's to get wrong.
-    const magnitude = Math.abs(adjust.qtyUnits ?? 0)
+    const magnitude = Math.abs(adjust.qtyContainers ?? 0)
     await $fetch('/api/admin/bar/stock/adjust', {
       method: 'POST',
       body: {
         productId: adjust.productId,
-        qtyUnits: adjust.kind === 'WASTAGE' ? -magnitude : adjust.qtyUnits,
+        qtyContainers: adjust.kind === 'WASTAGE' ? -magnitude : adjust.qtyContainers,
         kind: adjust.kind,
         reason: adjust.reason,
       },
@@ -239,13 +246,17 @@ async function startStocktake() {
           per {{ row.original.unit }}
         </div>
       </template>
-      <template #onHandUnits-cell="{ row }">
+      <template #onHandContainers-cell="{ row }">
         <span
           class="tabular-nums"
           :class="row.original.belowPar ? 'text-warning font-semibold' : ''"
         >
-          {{ row.original.onHandUnits.toFixed(2) }}
+          {{ formatContainers(row.original, row.original.onHandQty) }}
         </span>
+        <span
+          v-if="row.original.containerMl"
+          class="ml-2 text-xs text-muted tabular-nums"
+        >{{ formatQty(row.original, row.original.onHandQty) }}</span>
         <UBadge
           v-if="row.original.belowPar"
           color="warning"
@@ -256,9 +267,9 @@ async function startStocktake() {
           Below par
         </UBadge>
       </template>
-      <template #parMilli-cell="{ row }">
+      <template #parQty-cell="{ row }">
         <span class="tabular-nums text-muted">
-          {{ row.original.parMilli == null ? '-' : (row.original.parMilli / 1000).toFixed(2) }}
+          {{ row.original.parQty == null ? '-' : formatContainers(row.original, row.original.parQty) }}
         </span>
       </template>
       <template #lastCostPence-cell="{ row }">
@@ -318,11 +329,11 @@ async function startStocktake() {
                 />
               </UFormField>
               <UFormField
-                label="Units"
+                label="Containers"
                 class="w-24"
               >
                 <UInput
-                  v-model.number="line.qtyUnits"
+                  v-model.number="line.qtyContainers"
                   type="number"
                   min="0"
                   step="1"
@@ -334,12 +345,12 @@ async function startStocktake() {
                 class="w-40"
               >
                 <UInputNumber
-                  :model-value="line.costPencePerUnit === null ? undefined : line.costPencePerUnit / 100"
+                  :model-value="line.costPencePerContainer === null ? undefined : line.costPencePerContainer / 100"
                   :min="0"
                   :step="0.1"
                   :format-options="GBP"
                   class="w-full"
-                  @update:model-value="value => line.costPencePerUnit = value == null ? null : Math.round(value * 100)"
+                  @update:model-value="value => line.costPencePerContainer = value == null ? null : Math.round(value * 100)"
                 />
               </UFormField>
               <UButton
@@ -354,7 +365,7 @@ async function startStocktake() {
               size="xs"
               variant="subtle"
               icon="i-lucide-plus"
-              @click="delivery.lines.push({ productId: '', qtyUnits: null, costPencePerUnit: null })"
+              @click="delivery.lines.push({ productId: '', qtyContainers: null, costPencePerContainer: null })"
             >
               Add line
             </UButton>
@@ -402,12 +413,12 @@ async function startStocktake() {
             />
           </UFormField>
           <UFormField
-            label="Units"
+            :label="adjustRow ? `Containers (${unitLabel(adjustRow.unit)})` : 'Containers'"
             required
-            :help="adjust.kind === 'WASTAGE' ? 'Recorded as a loss.' : 'Negative to take stock out.'"
+            :help="adjust.kind === 'WASTAGE' ? 'Recorded as a loss. Half a bottle is 0.5.' : 'Negative to take stock out. Half a bottle is 0.5.'"
           >
             <UInput
-              v-model.number="adjust.qtyUnits"
+              v-model.number="adjust.qtyContainers"
               type="number"
               step="0.01"
               class="w-full"
@@ -436,7 +447,7 @@ async function startStocktake() {
           </UButton>
           <UButton
             :loading="saving"
-            :disabled="!adjust.reason || !adjust.qtyUnits"
+            :disabled="!adjust.reason || !adjust.qtyContainers"
             @click="saveAdjust"
           >
             Record

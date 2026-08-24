@@ -1,6 +1,6 @@
 /**
- * The stock ledger. Quantities in thousandths of a unit, signed: on-hand is
- * always SUM(qty_milli) and is never stored. Design: docs/13-bar-design.md §3
+ * The stock ledger. Quantities in the product's own basis, signed: on-hand is
+ * always SUM(qty) and is never stored. Design: docs/13-bar-design.md §3
  */
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
@@ -19,15 +19,15 @@ export const stockMovements = sqliteTable('stock_movements', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   /** Always the *stock* product, resolved through `stockProductId` (§3.1). */
   productId: text('product_id').notNull().references(() => barProducts.id, { onDelete: 'restrict' }),
-  /** Signed: a delivery is positive, a sale negative. */
-  qtyMilli: integer('qty_milli').notNull(),
+  /** Signed, in the product's basis: millilitres, or whole items. */
+  qty: integer('qty').notNull(),
   kind: text('kind', { enum: MOVEMENT_KINDS }).notNull(),
 
   /** What caused it, for tracing back without a foreign key per kind. */
   refTable: text('ref_table'),
   refId: text('ref_id'),
 
-  costPencePerUnit: integer('cost_pence_per_unit'),
+  costPencePerContainer: integer('cost_pence_per_container'),
   reason: text('reason'),
 
   createdByUserId: text('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
@@ -57,9 +57,9 @@ export const stockDeliveryLines = sqliteTable('stock_delivery_lines', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   deliveryId: text('delivery_id').notNull().references(() => stockDeliveries.id, { onDelete: 'cascade' }),
   productId: text('product_id').notNull().references(() => barProducts.id, { onDelete: 'restrict' }),
-  qtyMilli: integer('qty_milli').notNull(),
-  /** Per whole unit, not per milli. The latest one is what stock is valued at. */
-  costPencePerUnit: integer('cost_pence_per_unit'),
+  qty: integer('qty').notNull(),
+  /** Per container, not per millilitre. The latest is what stock is valued at. */
+  costPencePerContainer: integer('cost_pence_per_container'),
 }, table => [
   index('stock_delivery_lines_delivery_idx').on(table.deliveryId),
   index('stock_delivery_lines_product_idx').on(table.productId),
@@ -83,8 +83,8 @@ export const stocktakeLines = sqliteTable('stocktake_lines', {
   stocktakeId: text('stocktake_id').notNull().references(() => stocktakes.id, { onDelete: 'cascade' }),
   productId: text('product_id').notNull().references(() => barProducts.id, { onDelete: 'restrict' }),
   /** On-hand at the moment the take started, so trading during it is visible. */
-  expectedMilli: integer('expected_milli').notNull(),
-  countedMilli: integer('counted_milli'),
+  expectedQty: integer('expected_qty').notNull(),
+  countedQty: integer('counted_qty'),
   reason: text('reason'),
 }, table => [
   index('stocktake_lines_stocktake_idx').on(table.stocktakeId),
