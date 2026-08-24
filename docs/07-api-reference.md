@@ -2796,7 +2796,6 @@ reuses the same **pure** helpers (`currentPrices`, `buildTransaction`, `basketMo
 | POST | `/api/training/bar/transactions` | run: `bar-till` | Real arithmetic including the expected-total check; writes a `SALE` event |
 | GET/POST | `/api/training/foh/age-checks` | run: `challenge-25` | This run's own entries. Never the real register |
 | GET | `/api/training/foh/lookup` | run: `door-scan` | Searches the fixture only |
-| POST | `/api/training/foh/admit` | run: `door-scan` | Writes an `ADMISSION` event |
 
 Each surface route requires a run **for that target**, so an open till sandbox cannot reach the door.
 The fixture is `shared/utils/trainingScenario.ts`; no row of it is ever inserted anywhere.

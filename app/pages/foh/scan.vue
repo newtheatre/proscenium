@@ -47,12 +47,12 @@ const staffView = computed(() => (user.value ? isStaff(user.value) : false))
 
 // One page, two modes (docs/14 §8).
 const route = useRoute()
-const training = useTrainingMode()
+const training = useTrainingMode('door')
 // A refused start must never fall through to the live screen.
 if (route.query.practice) await training.enter('door-scan')
 await training.refresh()
 training.leaveWhenPracticeEnds()
-const api = (path: string) => `${training.prefix.value}${path}`
+const api = training.api
 
 const term = ref('')
 const results = ref<Match[]>([])

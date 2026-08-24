@@ -8,7 +8,8 @@ export default defineTask({
     description: 'Delete finished and expired training runs, and their events',
   },
   async run() {
-    // A day's grace so a trainer can debrief the morning after.
+    // The run row outlives the lesson by a day so an operator can see one ran
+    // and why it ended. Its events go the moment the run does.
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)
     const purged = await purgeRuns(cutoff)
 

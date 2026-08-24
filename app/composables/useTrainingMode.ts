@@ -1,4 +1,4 @@
-import { computed, navigateTo, ref, useRequestFetch, useState, watch } from '#imports'
+import { computed, createError, navigateTo, ref, useRequestFetch, useState, watch } from '#imports'
 
 export type TrainingTarget = 'bar-till' | 'challenge-25' | 'door-scan'
 
@@ -29,22 +29,45 @@ export const SURFACE_TARGET: Record<string, TrainingTarget> = {
  * Whether this screen is practice, and where its API lives. One page serves
  * both modes so what you practise cannot drift from the real thing (docs/14 §8).
  */
-export function useTrainingMode() {
+export type TrainingSurface = keyof typeof SURFACE_TARGET
+
+export function useTrainingMode(surface?: TrainingSurface) {
   const state = useState<TrainingState>('training-state', () => ({ ...IDLE }))
+  // Pinned per page, not per state: a screen entered as practice stays that
+  // way, so a run ending mid-basket cannot quietly retarget it at real data.
+  const pinned = useState<boolean>('training-pinned', () => false)
   const requestFetch = useRequestFetch()
   const busy = ref(false)
 
-  const active = computed(() => state.value.active)
+  // Scoped to the screen asking: a till run must not make the door screen
+  // believe it is in practice.
+  const active = computed(() => state.value.active
+    && (!surface || state.value.targetKey === SURFACE_TARGET[surface]))
   /** Prepended to every fetch on a dual-mode screen. */
   const prefix = computed(() => (state.value.active ? '/api/training' : ''))
+
+  /**
+   * The URL for a dual-mode fetch. Refuses rather than resolving to the live
+   * route once a pinned run has ended (ADR-0032).
+   */
+  function api(path: string): string {
+    if (pinned.value && !state.value.active) {
+      const message = 'Practice has ended. Nothing was sent. Go back to Front of House and start again.'
+      // `data` too: every caller's catch reads the message from there.
+      throw createError({ statusCode: 409, statusMessage: message, data: { statusMessage: message } })
+    }
+    return `${prefix.value}${path}`
+  }
 
   async function refresh() {
     try {
       state.value = await requestFetch<TrainingState>('/api/training/state')
     }
-    catch {
-      // A member who cannot work FOH gets a 403 here, which is not an error.
-      state.value = { ...IDLE }
+    catch (error) {
+      // Only a refusal means no run: a transient failure must leave the last
+      // known state alone, or a blip ends practice client-side (ADR-0034).
+      const status = (error as { statusCode?: number }).statusCode
+      if (status === 401 || status === 403) state.value = { ...IDLE }
     }
   }
 
@@ -70,11 +93,6 @@ export function useTrainingMode() {
     }
   }
 
-  /** True when this screen is the one the open sandbox is for. */
-  function isPracticing(surface: keyof typeof SURFACE_TARGET) {
-    return computed(() => state.value.active && state.value.targetKey === SURFACE_TARGET[surface])
-  }
-
   /**
    * Enter a sandbox from a `?practice=1` link. A refusal must never fall
    * through to the live screen, so it leaves rather than continuing.
@@ -96,10 +114,13 @@ export function useTrainingMode() {
    * whose buttons have quietly become real.
    */
   function leaveWhenPracticeEnds() {
+    // Pinned at setup and never cleared as the run ends: clearing it there
+    // hands the live API back to the screen while navigation is in flight.
+    pinned.value = state.value.active
     watch(active, (now, before) => {
       if (before && !now) navigateTo({ path: '/foh', query: { practice: 'ended' } })
     })
   }
 
-  return { state, active, prefix, busy, refresh, start, end, enter, leaveWhenPracticeEnds, isPracticing }
+  return { state, active, prefix, api, pinned, busy, refresh, start, end, enter, leaveWhenPracticeEnds }
 }

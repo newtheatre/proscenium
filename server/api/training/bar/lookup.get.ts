@@ -10,7 +10,9 @@ export default defineEventHandler(async (event) => {
   const { run } = await requireRun(event, 'bar-till')
   const { q } = await getValidatedQuery(event, querySchema.parse)
 
-  const matches = findTrainingBookings(q)
+  // The real till lookup excludes cancelled bookings, so this must too, or a
+  // trainee is taught to take money for one.
+  const matches = findTrainingBookings(q).filter(booking => booking.status !== 'CANCELLED')
   await recordEvent(run.id, 'LOOKUP', { query: q, matches: matches.length })
 
   return matches.map((booking) => {

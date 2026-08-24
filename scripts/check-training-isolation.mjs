@@ -68,9 +68,15 @@ for (const file of files) {
     }
   }
 
-  // A raw statement could write anything, so it is refused outright here.
-  if (/db\s*\.\s*run\s*\(/.test(source)) {
-    problems.push(`${file}: uses db.run(), which this check cannot read. Use the query builder.`)
+  // Raw SQL carries anything and is unreadable here. A batch is readable only
+  // because every statement in these files is inline, which the scan below sees.
+  if (/db\s*\.\s*(run|execute)\s*\(/.test(source)) {
+    problems.push(`${file}: uses raw SQL, which this check cannot read. Use the query builder.`)
+  }
+
+  // A route has no reason to batch: only trainingRun.ts writes the run itself.
+  if (file !== TRAINING_UTIL && /db\s*\.\s*batch\s*\(/.test(source)) {
+    problems.push(`${file}: uses db.batch(). Only ${TRAINING_UTIL} writes the training tables directly.`)
   }
 
   // Reads are allowed, but only from tables somebody decided about.

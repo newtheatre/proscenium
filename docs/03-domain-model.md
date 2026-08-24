@@ -512,7 +512,7 @@ Practice mode's own tables, and **the only two a training request may write**
 - `training_runs`: `user_id` · `target_key` (`bar-till` | `challenge-25` | `door-scan`) ·
   `training_session_id` (rehearsal's, kept only so a trainer can find the lesson again) ·
   `started_at` · `expires_at` · `ended_at` · `ended_reason` (`ENDED` | `EXPIRED` | `PURGED`).
-- `training_run_events`: `run_id` (cascade) · `kind` (`SALE` | `AGE_CHECK` | `ADMISSION` | `LOOKUP`)
+- `training_run_events`: `run_id` (cascade) · `kind` (`SALE` | `AGE_CHECK` | `LOOKUP`)
   · `payload` JSON · `at`.
 
 **`expires_at` comes from rehearsal and is never extended here.** This app does not decide how long

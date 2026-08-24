@@ -19,8 +19,6 @@ export interface ScenarioBooking {
   tickets: ScenarioTicket[]
   /** Symbols the door would see, when the booking has a profile. */
   accessNeeds: string[] | null
-  /** Already through the door once, so a rescan should say so. */
-  admitted: boolean
 }
 
 export interface ScenarioPerformance {
@@ -66,7 +64,6 @@ export const TRAINING_BOOKINGS: readonly ScenarioBooking[] = Object.freeze([
       { pricePaid: 500, refundedAt: null, ticketTypeName: 'Concession' },
     ],
     accessNeeds: null,
-    admitted: false,
   },
   {
     id: 'training-res-2',
@@ -77,7 +74,6 @@ export const TRAINING_BOOKINGS: readonly ScenarioBooking[] = Object.freeze([
     performanceId: 'training-perf-1',
     tickets: [{ pricePaid: 700, refundedAt: null, ticketTypeName: 'Standard' }],
     accessNeeds: null,
-    admitted: false,
   },
   {
     id: 'training-res-3',
@@ -93,7 +89,6 @@ export const TRAINING_BOOKINGS: readonly ScenarioBooking[] = Object.freeze([
       { pricePaid: 500, refundedAt: null, ticketTypeName: 'Concession' },
     ],
     accessNeeds: ['levelAccess', 'difficultyStanding'],
-    admitted: false,
   },
   {
     id: 'training-res-4',
@@ -104,7 +99,6 @@ export const TRAINING_BOOKINGS: readonly ScenarioBooking[] = Object.freeze([
     performanceId: 'training-perf-1',
     tickets: [{ pricePaid: 700, refundedAt: null, ticketTypeName: 'Standard' }],
     accessNeeds: null,
-    admitted: true,
   },
   {
     id: 'training-res-5',
@@ -115,7 +109,6 @@ export const TRAINING_BOOKINGS: readonly ScenarioBooking[] = Object.freeze([
     performanceId: 'training-perf-1',
     tickets: [{ pricePaid: 700, refundedAt: null, ticketTypeName: 'Standard' }],
     accessNeeds: null,
-    admitted: false,
   },
 ])
 
