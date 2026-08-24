@@ -41,8 +41,8 @@ const isSubmitting = ref(false)
 const schema = z.object({
   status: z.enum(['PENDING', 'COLLECTED', 'DOOR', 'CANCELLED', 'NO_SHOW']),
   cancelledBy: z.enum(['CUSTOMER', 'STAFF']).optional(),
-  customerNotes: z.string().nullable().optional(),
-  staffNotes: z.string().nullable().optional(),
+  customerNotes: z.string().optional(),
+  staffNotes: z.string().optional(),
 }).refine(
   data => !(data.status === 'CANCELLED' && !data.cancelledBy),
   { message: 'Please specify who cancelled this reservation', path: ['cancelledBy'] },
@@ -55,8 +55,8 @@ type Schema = z.output<typeof schema>
 const state = reactive<{
   status?: Schema['status']
   cancelledBy?: 'CUSTOMER' | 'STAFF'
-  customerNotes?: string | null
-  staffNotes?: string | null
+  customerNotes?: string
+  staffNotes?: string
 }>({
   status: undefined,
   cancelledBy: undefined,

@@ -34,9 +34,9 @@ const emit = defineEmits<{
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
-  address: z.string().optional().nullable(),
-  capacity: z.number().int().positive('Capacity must be positive').optional().nullable(),
-  description: z.string().optional().nullable(),
+  address: z.string().optional(),
+  capacity: z.number().int().positive('Capacity must be positive').optional(),
+  description: z.string().optional(),
   isExternal: z.boolean().optional(),
   featureIds: z.array(z.string()).optional(),
 })
@@ -149,7 +149,14 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   try {
     await $fetch(`/api/venues/${props.venue.id}`, {
       method: 'PUT',
-      body: event.data,
+      // Spelled out so a cleared field sends null and actually clears it.
+      // An omitted key leaves the stored value alone.
+      body: {
+        ...event.data,
+        address: event.data.address ?? null,
+        capacity: event.data.capacity ?? null,
+        description: event.data.description ?? null,
+      },
     })
 
     // Apply staged image changes

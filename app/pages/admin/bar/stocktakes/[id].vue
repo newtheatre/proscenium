@@ -41,10 +41,10 @@ function statusMessage(error: unknown): string | undefined {
   return (error as { data?: { statusMessage?: string } }).data?.statusMessage
 }
 
-const counts = reactive<Record<string, number | null>>({})
+const counts = reactive<Record<string, number | undefined>>({})
 watchEffect(() => {
   for (const line of data.value?.lines ?? []) {
-    if (!(line.id in counts)) counts[line.id] = line.countedQty == null ? null : qtyToContainers(line, line.countedQty)
+    if (!(line.id in counts)) counts[line.id] = line.countedQty == null ? undefined : qtyToContainers(line, line.countedQty)
   }
 })
 

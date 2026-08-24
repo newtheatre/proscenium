@@ -280,3 +280,20 @@ sales figures and the second term's SumUp totals. That is inherent in selling on
 bug: the reconciling figure is the outstanding balance, which `/admin/bar/tabs` reports. The
 Treasurer needs that number at both ends of a term. Recorded here so nobody spends an afternoon
 hunting a discrepancy that is the design working.
+
+### Thirteen dependency advisories need major upgrades {#audit-remaining-2026-08}
+
+**P2 · dependencies.** `bun audit` went from 90 findings to 13 on 2026-08-24. What is left needs a
+major version bump of a declared dependency, so none of it is drive-by work.
+
+| Package | Reached through | Why it is still here |
+| --- | --- | --- |
+| `nuxt-og-image` (3 moderate) | `@nuxtjs/seo` | Reflected XSS via a query parameter, SSRF, and unbounded image dimensions. Fixed in 6.2.5. This repo pins `@nuxtjs/seo` at 3.4.0 and the fix landed in its 5.x line. **This is the one to do first: it is reachable on a public site.** |
+| `unhead` (2 moderate, 1 low) | `nuxt` | `useHeadSafe` protocol bypasses. Moves with the Nuxt version. |
+| `image-size`, `sharp` (3 high) | `@nuxt/image` | Parser denial of service and inherited libvips issues. Both run at build time here, not in the Worker. |
+| `ws` (1 high, 1 moderate) | dev tooling | Memory exhaustion and uninitialised memory disclosure. Not in the production bundle. |
+| `esbuild` (1 moderate, 1 low) | `vite` | Dev-server only, and no version in range fixes it. |
+
+Read the reachability column before ranking these by severity alone. The two `high` entries against
+`image-size` are a build-time parser, while the `moderate` XSS in Nuxt OG Image is a live endpoint
+on `newtheatre.org.uk`.

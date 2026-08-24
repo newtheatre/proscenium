@@ -81,7 +81,20 @@ function startEditing() {
  * Nuxt UI's item types want `string | undefined`, not the `string | null` the
  * API returns, so the pickers get purpose-built items rather than raw rows.
  */
-function toItem(warning: WarningOption) {
+type PickerItem = {
+  id: string
+  title: string
+  description: string | undefined
+  category: string | undefined
+}
+
+/**
+ * One shape, because the picker reads labelKey and valueKey off `keyof` the
+ * entry type, and a union of a header and an item has no keys in common.
+ */
+type PickerEntry = Partial<PickerItem> & { type?: 'label', label?: string }
+
+function toItem(warning: WarningOption): PickerItem {
   return {
     id: warning.id,
     title: warning.title,
@@ -98,7 +111,7 @@ const technicalOptions = computed(() =>
  * A `{ type: 'label' }` header per category, unlabelled separators would not
  * say what the groups are.
  */
-const generalOptions = computed(() => {
+const generalOptions = computed<PickerEntry[]>(() => {
   const byCategory = new Map<string, WarningOption[]>()
   for (const warning of vocabulary.value) {
     if (warning.kind === 'TECHNICAL') continue
