@@ -41,6 +41,7 @@ Kept as a record of what changed and why, so nobody re-fixes them.
 | 8 | `DOOR` status is never set | Walk-ins create `DOOR` |
 | 24 | Bar sales and night reports counted voided transactions | `isNull(voidedAt)` added to `barLineRange()` and the night report's tender group-by |
 | 25 | The sales report had a `cash` column for a tender that never existed | Replaced with `tab`, so the tender columns sum to gross again |
+| 26 | Migration `0047` deleted every `bar_prices` row: a generated table rebuild cascades under D1, where `PRAGMA foreign_keys=OFF` is a no-op inside a transaction | `bun run check:migrations` refuses a generated rebuild of any table something cascades onto (ADR-0037). The four lost rows were not recovered; the catalogue was re-seeded the same day |
 | 22 | `bar.tab` was not enforceable on the debtor at the till | stage-door serves `GET /api/role-holders`; the till lists names and the server refuses a debtor who is not on it |
 | 11 | Publish resurrects cancelled performances | `ne(status, 'CANCELLED')` on the update |
 | 12 | Refunds do not exist | `POST /api/reservations/:id/refund` (see also the lifecycle rule below) |

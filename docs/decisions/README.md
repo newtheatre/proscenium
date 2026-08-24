@@ -50,6 +50,7 @@ ADR; the ADR carries the reasoning and the history. See [CONTRIBUTING.md](../../
 | [0034](0034-an-open-sandbox-closes-only-on-a-definitive-answer.md) | An open sandbox closes only on a definitive answer | Accepted |
 | [0035](0035-stock-is-counted-in-real-units.md) | Stock is counted in real units, not in thousandths of a container | Accepted |
 | [0036](0036-a-sold-product-is-a-recipe.md) | A sold product is a recipe over the things we stock | Accepted |
+| [0037](0037-a-table-rebuild-takes-its-dependents-with-it.md) | A generated table rebuild takes its dependents with it | Accepted |
 
 ## Template
 

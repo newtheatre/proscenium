@@ -47,3 +47,8 @@ jobs:
       # is meant to be checkable, not reviewable, so this is the check.
       - name: Training isolation
         run: bun run check:training
+
+      # A generated table rebuild silently deleting rows that cascade onto it,
+      # which cost four production price rows before it was noticed (ADR-0037).
+      - name: Migrations
+        run: bun run check:migrations
