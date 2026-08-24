@@ -236,7 +236,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
                 size="sm"
                 :color="pendingImageAction ? 'neutral' : 'error'"
                 variant="ghost"
-                @click="pendingImageAction ? clearPoster() : (pendingImageAction = 'delete')"
+                @click="() => { pendingImageAction ? clearPoster() : (pendingImageAction = 'delete') }"
               />
               <p class="text-xs text-muted">
                 JPEG, PNG or WebP, max 5 MB

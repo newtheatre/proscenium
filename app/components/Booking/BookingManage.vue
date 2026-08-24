@@ -219,7 +219,7 @@ async function saveTickets() {
           variant="ghost"
           color="neutral"
           :disabled="saving"
-          @click="editing = false"
+          @click="() => { editing = false }"
         />
         <UButton
           label="Save changes"

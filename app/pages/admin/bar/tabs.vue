@@ -264,7 +264,7 @@ async function voidCharge(id: string) {
             variant="ghost"
             color="neutral"
             label="Close"
-            @click="open = false"
+            @click="() => { open = false }"
           />
           <UButton
             :loading="busy"

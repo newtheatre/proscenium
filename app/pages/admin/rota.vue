@@ -402,7 +402,7 @@ async function stampShifts() {
             variant="ghost"
             icon="i-lucide-plus"
             label="Add slot"
-            @click="addingTo = addingTo === performance.key ? null : performance.key"
+            @click="() => { addingTo = addingTo === performance.key ? null : performance.key }"
           />
         </div>
       </template>
@@ -587,7 +587,7 @@ async function stampShifts() {
             variant="ghost"
             color="neutral"
             label="Cancel"
-            @click="templateOpen = false"
+            @click="() => { templateOpen = false }"
           />
           <UButton
             :loading="savingTemplate"

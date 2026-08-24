@@ -208,7 +208,7 @@ async function declineRequest(row: PassRequestRow) {
         <UButton
           label="New pass type"
           icon="i-lucide-plus"
-          @click="createOpen = true"
+          @click="() => { createOpen = true }"
         />
       </template>
     </AdminTableToolbar>

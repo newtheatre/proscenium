@@ -486,7 +486,7 @@ async function save() {
             color="neutral"
             variant="ghost"
             :disabled="isSubmitting"
-            @click="isEditing = false"
+            @click="() => { isEditing = false }"
           />
           <UButton
             label="Save warnings"

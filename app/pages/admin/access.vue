@@ -237,7 +237,7 @@ async function decide(profile: Profile, status: 'VERIFIED' | 'DECLINED') {
           variant="ghost"
           size="sm"
           :label="showSettled ? `Hide recorded (${settled.length})` : `Show recorded (${settled.length})`"
-          @click="showSettled = !showSettled"
+          @click="() => { showSettled = !showSettled }"
         />
         <ul
           v-if="showSettled"
