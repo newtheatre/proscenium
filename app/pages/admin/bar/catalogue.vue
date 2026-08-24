@@ -211,20 +211,24 @@ function productBody<T extends { parContainers: number | null, containerMl: numb
   }
 }
 
-/** A blank row starts on the first thing that could plausibly go in a drink. */
+/** A blank row starts on the first ingredient, at a single or at one of it. */
 function addIngredient(target: { recipe: RecipeItem[] }) {
   const first = ingredientItems.value[0]?.value ?? ''
   target.recipe.push({
     id: `new-${target.recipe.length}`,
     componentProductId: first.startsWith('p:') ? first.slice(2) : null,
     choiceCategoryId: first.startsWith('c:') ? first.slice(2) : null,
-    qty: 25,
+    qty: ingredientUnit(first) === 'ml' ? 25 : 1,
   })
 }
 
+/** Switching between a bottle and a can changes what the amount counts. */
 function setIngredient(item: RecipeItem, key: string) {
+  const was = ingredientUnit(ingredientKey(item))
   item.componentProductId = key.startsWith('p:') ? key.slice(2) : null
   item.choiceCategoryId = key.startsWith('c:') ? key.slice(2) : null
+  const now = ingredientUnit(key)
+  if (now !== was) item.qty = now === 'ml' ? 25 : 1
 }
 
 function openNewProduct() {
