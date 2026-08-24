@@ -32,7 +32,9 @@ export default defineEventHandler(async (event) => {
   const depleting = request.lines.map((line) => {
     const product = rules.get(line.productId)
     if (!product) throw createError({ statusCode: 409, statusMessage: 'One of those is no longer on the menu.' })
-    return { product, qty: line.qty }
+    const resolved = resolveLine(product, line.qty, line.choices ?? [], rules)
+    if (!resolved.ok) throw createError({ statusCode: 409, statusMessage: resolved.error })
+    return resolved.line
   })
 
   // Recorded as taken by the requester and approved by whoever is deciding.
@@ -41,11 +43,12 @@ export default defineEventHandler(async (event) => {
     tender: 'COMP',
     takenByUserId: request.requestedByUserId,
     barSessionId: request.barSessionId,
-    barLines: request.lines.map(line => ({
+    barLines: request.lines.map((line, i) => ({
       productId: line.productId,
       qty: line.qty,
       unitPricePence: line.unitPricePence,
       priceId: line.priceId,
+      choices: depleting[i]!.choices,
     })),
     compReason: request.reason,
     compApprovedByUserId: user.id,

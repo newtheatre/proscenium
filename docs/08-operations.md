@@ -158,10 +158,16 @@ In order, from an empty database:
 2. **Add your products**, each with its first price and its **container size in millilitres**:
    700 for a 70 cl bottle of gin, 750 for wine. Leave the size empty for anything counted in whole
    items, which is cans, bottled beer and packets of crisps.
-3. **Add the measures you pour**, each pointing at the bottle it comes out of and saying how much
+3. **Add the measures you pour.** Each is made from the bottle it comes out of, and says how much
    it takes in millilitres: a single is `25`, a large glass of wine `175`. A bottle of spirits you
    never sell whole is **stock only**, so it needs no price and never reaches the till.
-4. **`/admin/bar/stock` → Count opening stock.** Count what is actually on the shelf, in
+4. **Add the mixed drinks**, if you sell them. *Gin and mixer* is made from 25 ml of the gin bottle
+   plus **any from Mixers**, and the till asks which mixer when it is tapped. A cocktail is the
+   same thing with three fixed ingredients. Put the mixers in a category of their own: whatever is
+   in that category is what the till will offer, so a category holding crisps as well would offer
+   crisps. One price covers the drink however it is filled, so keep a pool to things you charge
+   the same for.
+5. **`/admin/bar/stock` → Count opening stock.** Count what is actually on the shelf, in
    containers: a part bottle is a decimal, so half a bottle is `0.5`.
 
 **Get the container sizes right before you record any stock.** Every movement means what it means

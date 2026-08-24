@@ -6,6 +6,7 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { users } from './user'
+import type { LineChoice } from './transactions'
 import { transactions } from './transactions'
 
 export const COMP_REASONS = ['CAST_CREW', 'COMMITTEE', 'SPILLAGE', 'OTHER'] as const
@@ -43,4 +44,6 @@ export interface CompLine {
   qty: number
   unitPricePence: number
   priceId: string
+  /** Validated when the comp is asked for, so approval cannot be ambiguous. */
+  choices?: LineChoice[]
 }

@@ -1,4 +1,5 @@
 import { db, schema } from '@nuxthub/db'
+import type { BatchItem } from 'drizzle-orm/batch'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { manageBar } from '~~/shared/utils/abilities'
@@ -9,8 +10,12 @@ const bodySchema = z.object({
   unit: z.enum(schema.PRODUCT_UNITS).optional(),
   containerMl: z.coerce.number().int().min(1).max(100_000).nullable().optional(),
   stockOnly: z.boolean().optional(),
-  stockProductId: z.string().trim().min(1).nullable().optional(),
-  depletesQty: z.coerce.number().int().min(1).max(1_000_000).nullable().optional(),
+  /** Replaces the whole recipe when present. Omit it to leave the recipe alone. */
+  recipe: z.array(z.object({
+    componentProductId: z.string().trim().min(1).nullable().optional(),
+    choiceCategoryId: z.string().trim().min(1).nullable().optional(),
+    qty: z.coerce.number().int().min(1).max(1_000_000),
+  })).max(MAX_RECIPE_ITEMS).optional(),
   parQty: z.coerce.number().int().min(0).nullable().optional(),
   ageRestricted: z.boolean().optional(),
   sort: z.coerce.number().int().min(0).max(999).optional(),
@@ -27,20 +32,23 @@ export default defineEventHandler(async (event) => {
   const product = await db.select({
     id: schema.barProducts.id,
     containerMl: schema.barProducts.containerMl,
-    stockProductId: schema.barProducts.stockProductId,
   }).from(schema.barProducts).where(eq(schema.barProducts.id, id)).get()
   if (!product) throw createError({ statusCode: 404, statusMessage: 'No such product.' })
 
-  if (input.stockProductId === id) {
-    throw createError({ statusCode: 400, statusMessage: 'A product cannot deplete itself through a pointer. Leave it unset.' })
-  }
+  const catalogue = await depletionRules()
+  const recipe = input.recipe ?? catalogue.get(id)?.recipe.map(item => ({
+    componentProductId: item.componentProductId,
+    choiceCategoryId: item.choiceCategoryId,
+    qty: item.qty,
+  })) ?? []
 
-  const stockProductId = input.stockProductId === undefined ? product.stockProductId : input.stockProductId
-  if (input.stockOnly && stockProductId) {
-    throw createError({ statusCode: 400, statusMessage: 'Something stock only holds its own stock. Clear what it is poured from first.' })
+  if (input.stockOnly && recipe.length) {
+    throw createError({ statusCode: 400, statusMessage: 'Something stock only holds its own stock. Clear its recipe first.' })
   }
-  // A measure takes from its bottle, so its own container size means nothing.
-  const containerMl = stockProductId
+  if (input.recipe) await assertRecipeIsSellable(id, input.recipe)
+
+  // Something made of other things holds no stock, so it has no size.
+  const containerMl = recipe.length
     ? null
     : input.containerMl === undefined ? product.containerMl : input.containerMl
 
@@ -52,22 +60,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  let depletesQty = input.depletesQty === undefined ? undefined : input.depletesQty
-  // One level only: a measure may not point at another measure (docs/13 §3.1).
-  if (input.stockProductId) {
-    const target = await db.select({
-      stockProductId: schema.barProducts.stockProductId,
-      containerMl: schema.barProducts.containerMl,
-    }).from(schema.barProducts).where(eq(schema.barProducts.id, input.stockProductId)).get()
-    if (!target) throw createError({ statusCode: 400, statusMessage: 'That stock product does not exist.' })
-    if (target.stockProductId) {
-      throw createError({ statusCode: 400, statusMessage: 'That product already draws from another. Point at the one that holds the stock.' })
-    }
-    depletesQty ??= containerSize(target)
-  }
-  if (input.stockProductId === null) depletesQty = null
+  const { recipe: _replaced, ...fields } = input
+  const statements: BatchItem<'sqlite'>[] = [
+    db.update(schema.barProducts).set({ ...fields, containerMl }).where(eq(schema.barProducts.id, id)),
+    ...(input.recipe ? recipeStatements(id, input.recipe) : []),
+  ]
 
-  await db.update(schema.barProducts).set({ ...input, containerMl, depletesQty })
-    .where(eq(schema.barProducts.id, id))
+  await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
   return { ok: true }
 })

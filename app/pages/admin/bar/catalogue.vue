@@ -10,6 +10,13 @@ definePageMeta({
 })
 
 interface Category { id: string, name: string, sort: number, colour: string | null }
+/** An ingredient is one product, or a choice from one category (ADR-0036). */
+interface RecipeItem {
+  id: string
+  componentProductId: string | null
+  choiceCategoryId: string | null
+  qty: number
+}
 interface Product {
   id: string
   categoryId: string
@@ -17,8 +24,7 @@ interface Product {
   unit: ProductUnit
   containerMl: number | null
   stockOnly: boolean
-  stockProductId: string | null
-  depletesQty: number | null
+  recipe: RecipeItem[]
   parQty: number | null
   status: 'ACTIVE' | 'HIDDEN' | 'RETIRED'
   sort: number
@@ -59,21 +65,40 @@ function fail(error: unknown, title: string) {
 
 const categoryName = (id: string) => categories.value.find(c => c.id === id)?.name ?? '-'
 
-/** Only products that hold stock may be poured from (docs/13 §3.1). */
-const stockTargets = computed(() => products.value
-  .filter(p => !p.stockProductId)
-  .map(p => ({ label: p.containerMl ? `${p.name} (${p.containerMl} ml)` : p.name, value: p.id })))
-
 const productById = (id: string) => products.value.find(p => p.id === id) ?? null
 
 const unitItems = [...PRODUCT_UNITS]
 const statusItems = [...PRODUCT_STATUSES]
 
-/** "25 ml of Gin, 70 cl bottle", or "1 of Tonic water". */
-function takesLabel(product: Product) {
-  const target = productById(product.stockProductId!)
-  const unit = target?.containerMl == null ? '' : ' ml'
-  return `${product.depletesQty ?? '?'}${unit} of ${target?.name ?? 'a missing product'}`
+/** One picker for both kinds of ingredient, so a row is one choice. */
+const ingredientItems = computed(() => [
+  ...products.value
+    .filter(p => !p.recipe.length && p.status !== 'RETIRED')
+    .map(p => ({ label: p.containerMl ? `${p.name} (${p.containerMl} ml)` : p.name, value: `p:${p.id}` })),
+  ...categories.value.map(c => ({ label: `Any from ${c.name}`, value: `c:${c.id}` })),
+])
+
+function ingredientKey(item: { componentProductId: string | null, choiceCategoryId: string | null }) {
+  return item.componentProductId ? `p:${item.componentProductId}` : item.choiceCategoryId ? `c:${item.choiceCategoryId}` : ''
+}
+
+/** Whichever the row points at, an amount is in millilitres or in items. */
+function ingredientUnit(key: string) {
+  if (key.startsWith('p:')) return productById(key.slice(2))?.containerMl ? 'ml' : 'items'
+  const pool = products.value.filter(p => p.categoryId === key.slice(2) && !p.recipe.length && p.status === 'ACTIVE')
+  return pool[0]?.containerMl ? 'ml' : 'items'
+}
+
+function ingredientName(item: RecipeItem) {
+  if (item.componentProductId) return productById(item.componentProductId)?.name ?? 'a missing product'
+  return `any ${categoryName(item.choiceCategoryId!).toLowerCase()}`
+}
+
+/** "25 ml gin, 1 any mixers", the whole recipe on one line. */
+function recipeLabel(product: Product) {
+  return product.recipe
+    .map(item => `${item.qty}${ingredientUnit(ingredientKey(item)) === 'ml' ? ' ml' : ''} ${ingredientName(item)}`)
+    .join(', ')
 }
 
 /** Undefined is what UInputNumber clears to; the API wants an explicit null. */
@@ -102,8 +127,7 @@ const form = reactive({
   unit: 'each' as ProductUnit,
   containerMl: null as number | null,
   stockOnly: false,
-  stockProductId: undefined as string | undefined,
-  depletesQty: null as number | null,
+  recipe: [] as RecipeItem[],
   /** Held in containers so it survives a change of container size. */
   parContainers: null as number | null,
   ageRestricted: true,
@@ -114,13 +138,9 @@ const form = reactive({
 const formContainerMl = nullableProxy(() => form.containerMl, (v) => {
   form.containerMl = v
 })
-const formDepletesQty = nullableProxy(() => form.depletesQty, (v) => {
-  form.depletesQty = v
-})
 const formPar = nullableProxy(() => form.parContainers, (v) => {
   form.parContainers = v
 })
-const formTarget = computed(() => form.stockProductId ? productById(form.stockProductId) : null)
 
 function openEdit(product: Product) {
   editing.value = product
@@ -130,8 +150,7 @@ function openEdit(product: Product) {
     unit: product.unit,
     containerMl: product.containerMl,
     stockOnly: product.stockOnly,
-    stockProductId: product.stockProductId ?? undefined,
-    depletesQty: product.depletesQty,
+    recipe: product.recipe.map(item => ({ ...item })),
     parContainers: product.parQty == null ? null : product.parQty / (product.containerMl ?? 1),
     ageRestricted: product.ageRestricted,
     sort: product.sort,
@@ -146,7 +165,7 @@ async function saveProduct() {
     await requestFetch(`/api/admin/bar/products/${editing.value!.id}`, {
       method: 'PATCH',
       // Explicit null, not undefined: clearing the pointer must reach the server.
-      body: { ...productBody(form), stockProductId: form.stockProductId ?? null },
+      body: productBody(form),
     })
     editOpen.value = false
     await refresh()
@@ -164,8 +183,7 @@ const newProduct = reactive({
   unit: 'each' as ProductUnit,
   containerMl: null as number | null,
   stockOnly: false,
-  stockProductId: undefined as string | undefined,
-  depletesQty: null as number | null,
+  recipe: [] as RecipeItem[],
   parContainers: null as number | null,
   ageRestricted: true,
   sort: 0,
@@ -175,29 +193,38 @@ const newProduct = reactive({
 const newContainerMl = nullableProxy(() => newProduct.containerMl, (v) => {
   newProduct.containerMl = v
 })
-const newDepletesQty = nullableProxy(() => newProduct.depletesQty, (v) => {
-  newProduct.depletesQty = v
-})
 const newPar = nullableProxy(() => newProduct.parContainers, (v) => {
   newProduct.parContainers = v
 })
-const newTarget = computed(() => newProduct.stockProductId ? productById(newProduct.stockProductId) : null)
-
-function takesLabelFor(target: Product | null) {
-  return target?.containerMl ? 'Taken per sale (ml)' : 'Taken per sale'
-}
-
-function takesHelpFor(target: Product | null) {
-  if (!target) return ''
-  return target.containerMl
-    ? `A single is 25, a large glass 175. One ${target.name} holds ${target.containerMl} ml.`
-    : `How many whole ${unitLabel(target.unit)} a sale takes.`
-}
 
 /** Par is typed in containers; the API stores it in the product's own basis. */
-function productBody<T extends { parContainers: number | null, containerMl: number | null }>(source: T) {
-  const { parContainers, ...rest } = source
-  return { ...rest, parQty: parContainers == null ? null : Math.round(parContainers * (source.containerMl ?? 1)) }
+function productBody<T extends { parContainers: number | null, containerMl: number | null, recipe: RecipeItem[] }>(source: T) {
+  const { parContainers, recipe, ...rest } = source
+  return {
+    ...rest,
+    parQty: parContainers == null ? null : Math.round(parContainers * (source.containerMl ?? 1)),
+    recipe: recipe.map(item => ({
+      componentProductId: item.componentProductId,
+      choiceCategoryId: item.choiceCategoryId,
+      qty: item.qty,
+    })),
+  }
+}
+
+/** A blank row starts on the first thing that could plausibly go in a drink. */
+function addIngredient(target: { recipe: RecipeItem[] }) {
+  const first = ingredientItems.value[0]?.value ?? ''
+  target.recipe.push({
+    id: `new-${target.recipe.length}`,
+    componentProductId: first.startsWith('p:') ? first.slice(2) : null,
+    choiceCategoryId: first.startsWith('c:') ? first.slice(2) : null,
+    qty: 25,
+  })
+}
+
+function setIngredient(item: RecipeItem, key: string) {
+  item.componentProductId = key.startsWith('p:') ? key.slice(2) : null
+  item.choiceCategoryId = key.startsWith('c:') ? key.slice(2) : null
 }
 
 function openNewProduct() {
@@ -207,8 +234,7 @@ function openNewProduct() {
     unit: 'each',
     containerMl: null,
     stockOnly: false,
-    stockProductId: undefined,
-    depletesQty: null,
+    recipe: [],
     parContainers: null,
     ageRestricted: true,
     sort: 0,
@@ -224,7 +250,6 @@ async function createProduct() {
       method: 'POST',
       body: {
         ...productBody(newProduct),
-        stockProductId: newProduct.stockProductId ?? null,
         // Nothing stock-only is sold, so it carries no price at all.
         pricePence: newProduct.stockOnly ? undefined : newProduct.pricePence,
       },
@@ -400,9 +425,9 @@ async function moveCategory(category: Category, by: number) {
         </template>
         <template #size-cell="{ row }">
           <span
-            v-if="row.original.stockProductId"
+            v-if="row.original.recipe.length"
             class="text-xs text-muted"
-          >{{ takesLabel(row.original) }}</span>
+          >{{ recipeLabel(row.original) }}</span>
           <span
             v-else-if="row.original.containerMl"
             class="text-xs text-muted"
@@ -616,43 +641,64 @@ async function moveCategory(category: Category, by: number) {
           </UFormField>
           <UFormField
             v-if="!newProduct.stockOnly"
-            label="Poured from"
-            help="Leave empty when this product holds its own stock."
+            label="Made from"
+            help="Leave it empty when this product holds its own stock. An amount is in millilitres, or in whole items."
           >
-            <USelectMenu
-              v-model="newProduct.stockProductId"
-              :items="stockTargets"
-              value-key="value"
-              class="w-full"
-            />
-          </UFormField>
-          <template v-if="newProduct.stockProductId">
-            <UFormField
-              :label="takesLabelFor(newTarget)"
-              :help="takesHelpFor(newTarget)"
-            >
-              <UInputNumber
-                v-model="newDepletesQty"
-                :min="1"
-                class="w-full"
-              />
-            </UFormField>
-            <div
-              v-if="newTarget?.containerMl"
-              class="flex flex-wrap gap-1"
-            >
+            <div class="space-y-2">
+              <div
+                v-for="(item, i) in newProduct.recipe"
+                :key="item.id"
+                class="flex items-end gap-2"
+              >
+                <USelectMenu
+                  :model-value="ingredientKey(item)"
+                  :items="ingredientItems"
+                  value-key="value"
+                  class="flex-1"
+                  :aria-label="`Ingredient ${i + 1}`"
+                  @update:model-value="key => setIngredient(item, key)"
+                />
+                <UInputNumber
+                  v-model="item.qty"
+                  :min="1"
+                  class="w-28"
+                  :aria-label="`Amount of ingredient ${i + 1}`"
+                />
+                <span class="pb-2 text-xs text-muted w-10">{{ ingredientUnit(ingredientKey(item)) }}</span>
+                <UButton
+                  icon="i-lucide-x"
+                  variant="ghost"
+                  color="neutral"
+                  aria-label="Remove ingredient"
+                  @click="newProduct.recipe.splice(i, 1)"
+                />
+              </div>
               <UButton
-                v-for="ml in SERVE_ML_PRESETS"
-                :key="ml"
                 size="xs"
                 variant="subtle"
-                color="neutral"
-                :label="`${ml} ml`"
-                @click="newProduct.depletesQty = ml"
+                icon="i-lucide-plus"
+                label="Add an ingredient"
+                :disabled="!ingredientItems.length"
+                @click="addIngredient(newProduct)"
               />
             </div>
-          </template>
-          <template v-else>
+          </UFormField>
+          <div
+            v-if="newProduct.recipe.length"
+            class="flex flex-wrap gap-1"
+          >
+            <UButton
+              v-for="ml in SERVE_ML_PRESETS"
+              :key="ml"
+              size="xs"
+              variant="subtle"
+              color="neutral"
+              :label="`${ml} ml`"
+              :disabled="!newProduct.recipe.length"
+              @click="newProduct.recipe[newProduct.recipe.length - 1]!.qty = ml"
+            />
+          </div>
+          <template v-if="!newProduct.recipe.length">
             <UFormField
               label="Container size (ml)"
               help="700 for a 70 cl bottle. Leave it empty to count this in whole items: cans, packets, bottled beer."
@@ -755,43 +801,64 @@ async function moveCategory(category: Category, by: number) {
           />
           <UFormField
             v-if="!form.stockOnly"
-            label="Poured from"
-            help="Leave empty when this product holds its own stock."
+            label="Made from"
+            help="Leave it empty when this product holds its own stock. An amount is in millilitres, or in whole items."
           >
-            <USelectMenu
-              v-model="form.stockProductId"
-              :items="stockTargets"
-              value-key="value"
-              class="w-full"
-            />
-          </UFormField>
-          <template v-if="form.stockProductId">
-            <UFormField
-              :label="takesLabelFor(formTarget)"
-              :help="takesHelpFor(formTarget)"
-            >
-              <UInputNumber
-                v-model="formDepletesQty"
-                :min="1"
-                class="w-full"
-              />
-            </UFormField>
-            <div
-              v-if="formTarget?.containerMl"
-              class="flex flex-wrap gap-1"
-            >
+            <div class="space-y-2">
+              <div
+                v-for="(item, i) in form.recipe"
+                :key="item.id"
+                class="flex items-end gap-2"
+              >
+                <USelectMenu
+                  :model-value="ingredientKey(item)"
+                  :items="ingredientItems"
+                  value-key="value"
+                  class="flex-1"
+                  :aria-label="`Ingredient ${i + 1}`"
+                  @update:model-value="key => setIngredient(item, key)"
+                />
+                <UInputNumber
+                  v-model="item.qty"
+                  :min="1"
+                  class="w-28"
+                  :aria-label="`Amount of ingredient ${i + 1}`"
+                />
+                <span class="pb-2 text-xs text-muted w-10">{{ ingredientUnit(ingredientKey(item)) }}</span>
+                <UButton
+                  icon="i-lucide-x"
+                  variant="ghost"
+                  color="neutral"
+                  aria-label="Remove ingredient"
+                  @click="form.recipe.splice(i, 1)"
+                />
+              </div>
               <UButton
-                v-for="ml in SERVE_ML_PRESETS"
-                :key="ml"
                 size="xs"
                 variant="subtle"
-                color="neutral"
-                :label="`${ml} ml`"
-                @click="form.depletesQty = ml"
+                icon="i-lucide-plus"
+                label="Add an ingredient"
+                :disabled="!ingredientItems.length"
+                @click="addIngredient(form)"
               />
             </div>
-          </template>
-          <template v-else>
+          </UFormField>
+          <div
+            v-if="form.recipe.length"
+            class="flex flex-wrap gap-1"
+          >
+            <UButton
+              v-for="ml in SERVE_ML_PRESETS"
+              :key="ml"
+              size="xs"
+              variant="subtle"
+              color="neutral"
+              :label="`${ml} ml`"
+              :disabled="!form.recipe.length"
+              @click="form.recipe[form.recipe.length - 1]!.qty = ml"
+            />
+          </div>
+          <template v-if="!form.recipe.length">
             <UFormField
               label="Container size (ml)"
               help="700 for a 70 cl bottle. Leave it empty to count this in whole items: cans, packets, bottled beer."

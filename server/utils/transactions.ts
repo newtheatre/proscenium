@@ -2,6 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import type { BatchItem } from 'drizzle-orm/batch'
 import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
+import type { LineChoice } from '~~/server/db/schema/transactions'
 
 /**
  * The one writer of the money record (ADR-0023). D1 has no interactive
@@ -22,6 +23,8 @@ export interface BarItemLine {
   qty: number
   unitPricePence: number
   priceId: string
+  /** What the till picked for each choice slot, already validated (ADR-0036). */
+  choices?: LineChoice[]
 }
 
 export interface SettlementLine {
@@ -149,6 +152,7 @@ export function buildTransaction(draft: TransactionDraft): BuiltTransaction {
       qty: line.qty,
       unitPricePence: line.unitPricePence,
       priceId: line.priceId,
+      choices: line.choices?.length ? line.choices : null,
     }))))
   }
 

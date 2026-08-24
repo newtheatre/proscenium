@@ -340,10 +340,20 @@ works out a ratio by hand. Deliveries, stocktakes and adjustments are still ente
 the current price is a query (`effective_from <= today`, latest wins) and the history *is* the audit
 trail. Setting a future date is how a change is planned rather than remembered.
 
-**A product may point at what it depletes**, one level only: a 175 ml glass points at the 75 cl
-bottle with `depletes_qty = 175`. A product that points at nothing depletes one whole container of
-itself, so a bottled beer needs no figure. Pointing at something that itself depletes another is
-refused, because a bundle of bundles is a different design (§3.1).
+**What a sold product is made of is its recipe**, a row per ingredient in `bar_recipe_items`
+(ADR-0036). A 175 ml glass is one ingredient: 175 of its bottle's millilitres. **No rows means the
+product holds its own stock**, so a bottled beer needs no figure and a sale takes one whole
+container of itself.
+
+**An ingredient is either one product or a choice from one category**, filled at the till, which
+is how a gin and mixer is one button. Exactly one of `component_product_id` and
+`choice_category_id` is set, and a choice pool must be counted the same way throughout, or its
+`qty` would mean millilitres for one option and whole items for another. **One level:** an
+ingredient must itself hold stock, so a recipe of recipes is refused.
+
+**The price is on the sold product, not on what is picked**, so a choice pool should be things
+you charge the same for. `transaction_lines.choices` records what was actually picked, because
+stock movements are merged per transaction and the mixer would otherwise be unrecoverable.
 
 **`stock_only` is stock you never sell.** A spirits bottle is delivered, counted and poured from
 but never rung up, so it needs no price and the till never offers it.
@@ -419,13 +429,13 @@ half: the content columns cannot be updated and no row can be deleted.
   re-points it, and a blanket `BEFORE UPDATE` would stall the merge hook for ever, which is exactly
   what happened to `incident_log` (ADR-0025, and migration `0023`).
 - **Movements are always against the stock product.** A 175 ml glass resolves through
-  `bar_products.stock_product_id` and depletes 175 ml of the 75 cl bottle, so no row is ever
-  written against the measure that was sold.
+  its recipe and depletes 175 ml of the 75 cl bottle, so no row is ever written against the
+  measure that was sold.
 - **A correction is an opposing movement**, never an edit. `WASTAGE`, `TRANSFER` and `ADJUST` all
   require a reason, because the reason is the whole value of the row.
 - **`VOID` reverses a voided tab charge**, and it is *copied* from that charge's original `SALE`
   rows rather than recomputed from the catalogue. Recomputing would not cancel the sale if
-  `depletes_qty` or `stock_product_id` had changed in between, and `on_hand` would drift
+  the product's recipe had changed in between, and `on_hand` would drift
   permanently with no trace (ADR-0031).
 - **Stocktake variance is computed against on-hand at the moment of finishing**, not against the
   snapshot taken at the start. `expected_qty` is recorded so the sheet can show what was expected

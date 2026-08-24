@@ -344,6 +344,27 @@
       "when": 1787529050220,
       "tag": "0048_bar_sizes_from_thousandths",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1787530986860,
+      "tag": "0049_shocking_northstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "6",
+      "when": 1787530986861,
+      "tag": "0050_recipes_from_stock_pointers",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "6",
+      "when": 1787531015802,
+      "tag": "0051_unknown_roulette",
+      "breakpoints": true
     }
   ]
 }

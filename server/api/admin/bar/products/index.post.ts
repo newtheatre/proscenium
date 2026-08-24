@@ -1,7 +1,16 @@
 import { db, schema } from '@nuxthub/db'
+import type { BatchItem } from 'drizzle-orm/batch'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { nanoid } from 'nanoid'
 import { manageBar } from '~~/shared/utils/abilities'
+
+const recipeSchema = z.array(z.object({
+  componentProductId: z.string().trim().min(1).nullable().optional(),
+  choiceCategoryId: z.string().trim().min(1).nullable().optional(),
+  /** In the ingredient's own basis: 25 for a single, 1 for a can of tonic. */
+  qty: z.coerce.number().int().min(1).max(1_000_000),
+})).max(MAX_RECIPE_ITEMS).optional().default([])
 
 const bodySchema = z.object({
   categoryId: z.string().trim().min(1),
@@ -11,10 +20,8 @@ const bodySchema = z.object({
   containerMl: z.coerce.number().int().min(1).max(100_000).nullable().optional(),
   /** Stocked but never sold, so it needs no price and reaches no till. */
   stockOnly: z.boolean().optional().default(false),
-  /** Omit when this holds its own stock: a bottled beer depletes itself. */
-  stockProductId: z.string().trim().min(1).nullable().optional(),
-  /** How much of that product one sale takes, in its basis: 25 (ml), or 1. */
-  depletesQty: z.coerce.number().int().min(1).max(1_000_000).nullable().optional(),
+  /** What it is made of. Empty means it holds its own stock. */
+  recipe: recipeSchema,
   parQty: z.coerce.number().int().min(0).nullable().optional(),
   ageRestricted: z.boolean().optional().default(true),
   sort: z.coerce.number().int().min(0).max(999).optional().default(0),
@@ -24,11 +31,11 @@ const bodySchema = z.object({
   if (!v.stockOnly && v.pricePence == null) {
     ctx.addIssue({ code: 'custom', message: 'A price is needed unless this is stock only.', path: ['pricePence'] })
   }
-  if (v.stockOnly && v.stockProductId) {
-    ctx.addIssue({ code: 'custom', message: 'Something stock only holds its own stock.', path: ['stockProductId'] })
-  }
   if (v.stockOnly && v.pricePence != null) {
     ctx.addIssue({ code: 'custom', message: 'Something stock only is never sold, so it has no price.', path: ['pricePence'] })
+  }
+  if (v.stockOnly && v.recipe.length) {
+    ctx.addIssue({ code: 'custom', message: 'Something stock only holds its own stock, so it has no recipe.', path: ['recipe'] })
   }
 })
 
@@ -39,37 +46,31 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBody(event, bodySchema.parse)
   const { user } = await requireUserSession(event)
 
-  let depletesQty = input.depletesQty ?? null
-  if (input.stockProductId) {
-    const target = await db.select({
-      id: schema.barProducts.id,
-      stockProductId: schema.barProducts.stockProductId,
-      containerMl: schema.barProducts.containerMl,
-    }).from(schema.barProducts).where(eq(schema.barProducts.id, input.stockProductId)).get()
-    if (!target) throw createError({ statusCode: 404, statusMessage: 'That stock product does not exist' })
-    // One level only: a bundle of bundles is a different design (docs/13 §3.1).
-    if (target.stockProductId && target.stockProductId !== target.id) {
-      throw createError({ statusCode: 409, statusMessage: 'That product already depletes another. Point at the thing actually stocked.' })
-    }
-    depletesQty ??= containerSize(target)
-  }
+  await assertRecipeIsSellable(null, input.recipe)
 
-  const { pricePence, ...product } = input
-  const [row] = await db.insert(schema.barProducts).values({
-    ...product,
-    // A measure takes from its bottle, so its own container size means nothing.
-    containerMl: input.stockProductId ? null : input.containerMl ?? null,
-    depletesQty,
-  }).returning()
+  const { pricePence, recipe, ...product } = input
+  const id = nanoid()
 
+  const statements: BatchItem<'sqlite'>[] = [
+    db.insert(schema.barProducts).values({
+      ...product,
+      id,
+      // Something made of other things holds no stock, so it has no size.
+      containerMl: recipe.length ? null : input.containerMl ?? null,
+    }),
+    ...recipeStatements(id, recipe),
+  ]
   if (pricePence != null) {
-    await db.insert(schema.barPrices).values({
-      productId: row!.id,
+    statements.push(db.insert(schema.barPrices).values({
+      productId: id,
       pricePence,
       effectiveFrom: pricingDate(),
       createdByUserId: user.id,
-    })
+    }))
   }
 
+  await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+
+  const row = await db.select().from(schema.barProducts).where(eq(schema.barProducts.id, id)).get()
   return { ...row, pricePence: pricePence ?? null }
 })

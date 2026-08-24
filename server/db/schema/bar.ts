@@ -34,14 +34,6 @@ export const barProducts = sqliteTable('bar_products', {
   /** Stocked but never sold: a spirits bottle poured only as measures. */
   stockOnly: integer('stock_only', { mode: 'boolean' }).notNull().default(false),
 
-  /**
-   * What a sale of this depletes. A 125 ml glass points at the 75 cl bottle;
-   * a bottled beer points at nothing and depletes itself. One level (§3.1).
-   */
-  stockProductId: text('stock_product_id'),
-  /** How much of that product one sale takes, in its basis: 125 (ml), or 1. */
-  depletesQty: integer('depletes_qty'),
-
   /** Flags the product below this level, in its own basis. */
   parQty: integer('par_qty'),
   status: text('status', { enum: PRODUCT_STATUSES }).notNull().default('ACTIVE'),
@@ -54,8 +46,36 @@ export const barProducts = sqliteTable('bar_products', {
   index('bar_products_category_idx').on(table.categoryId, table.sort),
 ])
 
-export const barProductsRelations = relations(barProducts, ({ one }) => ({
+export const barProductsRelations = relations(barProducts, ({ many, one }) => ({
   category: one(barCategories, { fields: [barProducts.categoryId], references: [barCategories.id] }),
+  recipe: many(barRecipeItems),
+}))
+
+/**
+ * What a sold product is made of. No rows means it holds its own stock, and an
+ * ingredient must hold its own stock too: one level (docs/13 §3.1).
+ */
+export const barRecipeItems = sqliteTable('bar_recipe_items', {
+  id: text('id').primaryKey().$defaultFn(() => nanoid()),
+  productId: text('product_id').notNull().references(() => barProducts.id, { onDelete: 'cascade' }),
+
+  /** A fixed ingredient, or null when the till picks one from the category. */
+  componentProductId: text('component_product_id').references(() => barProducts.id, { onDelete: 'restrict' }),
+  /** Exactly one of these two is set, checked by the API (ADR-0036). */
+  choiceCategoryId: text('choice_category_id').references(() => barCategories.id, { onDelete: 'restrict' }),
+
+  /** In the ingredient's own basis: 25 for a single, 1 for a can of tonic. */
+  qty: integer('qty').notNull(),
+  sort: integer('sort').notNull().default(0),
+}, table => [
+  index('bar_recipe_items_product_idx').on(table.productId, table.sort),
+  index('bar_recipe_items_component_idx').on(table.componentProductId),
+])
+
+export const barRecipeItemsRelations = relations(barRecipeItems, ({ one }) => ({
+  product: one(barProducts, { fields: [barRecipeItems.productId], references: [barProducts.id] }),
+  component: one(barProducts, { fields: [barRecipeItems.componentProductId], references: [barProducts.id] }),
+  choiceCategory: one(barCategories, { fields: [barRecipeItems.choiceCategoryId], references: [barCategories.id] }),
 }))
 
 /**

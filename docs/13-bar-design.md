@@ -124,9 +124,12 @@ bar_categories       id · name · sort · colour NULL
 bar_products         id · category_id FK · name · unit TEXT ('bottle'|'can'|'measure'|'glass'|'each')
                      container_ml INTEGER NULL                    -- 700 for a 70 cl bottle; NULL counts it in whole items
                      stock_only INTEGER                           -- held but never sold: no price, never on the till
-                     stock_product_id FK NULL → bar_products      -- what this *depletes* (see §3.1)
-                     depletes_qty INTEGER NULL                    -- a 175ml glass takes 175 of its bottle's millilitres
                      par_qty INTEGER NULL · status ('ACTIVE'|'HIDDEN'|'RETIRED')
+bar_recipe_items     id · product_id FK → bar_products · sort     -- what a sold product is made of (see §3.1)
+                     component_product_id FK NULL → bar_products  -- a fixed ingredient, or
+                     choice_category_id FK NULL → bar_categories  -- one from this category, picked at the till
+                     qty INTEGER                                  -- in the ingredient's basis: 25 (ml), or 1 (item)
+                     -- exactly one of component_product_id / choice_category_id. No rows = holds its own stock.
                      sort · age_restricted INTEGER (default 1 for alcohol)
                      timestamps
 bar_prices           id · product_id FK · price_pence · effective_from DATE · created_by
@@ -154,6 +157,7 @@ transaction_lines    id · transaction_id FK
                      amount_pence                                  -- signed total for the line
                      reservation_id FK NULL · performance_id FK NULL   -- ticket kinds
                      product_id FK NULL · qty INTEGER NULL · unit_price_pence NULL · price_id FK NULL  -- BAR_ITEM
+                     choices JSON NULL                             -- what the till picked per choice slot (§3.1)
                      -- price snapshotted, same principle as ticket pricePaid
                      -- The bar ledger is simply WHERE kind = 'BAR_ITEM'. Line amounts are gross;
                      -- the discount is on the transaction, so product reports stay honest.
@@ -201,18 +205,30 @@ day_reconciliations  day DATE PK · sumup_z_pence · entered_by · entered_at ·
 
 ### 3.1 Sellable vs stock products
 
-A 175 ml glass of house white is sold; a 75 cl bottle is stocked. Rather than two tables, a
-product may point at another product as the thing it depletes: `House white, large glass` has
-`stock_product_id = House white`, `depletes_qty = 175`, and the bottle has `container_ml = 750`.
-A product that points at nothing depletes one whole container of itself, so a bottled beer needs
-no figure at all. Every sale line produces one `SALE` movement against the **stock** product.
+A 175 ml glass of house white is sold; a 75 cl bottle is stocked. What a sold product is made of
+is its **recipe**, a row per ingredient in `bar_recipe_items`
+([ADR-0036](./decisions/0036-a-sold-product-is-a-recipe.md)). `House white, large glass` is one
+ingredient: 175 of the bottle's millilitres. **No rows means the product holds its own stock**, so
+a bottled beer needs no figure at all and a sale takes one whole container of itself.
+
+An ingredient is either **one product** or **a choice from one category**, filled at the till. That
+covers the three things the bar actually pours:
+
+| Sold as | Recipe |
+| --- | --- |
+| Gin, single | 25 ml of the gin bottle |
+| Gin and mixer | 25 ml of the gin bottle, **plus one from Mixers** |
+| Espresso martini | 50 ml vodka, 25 ml coffee liqueur, 25 ml espresso |
 
 A bottle of spirits is `stock_only`: it is delivered, counted and poured from, but it is never
 sold whole, so it carries no price and the till never offers it.
 
-Keep this to one level (no bundles of bundles); a "meal deal" is a product whose sale handler
-writes several movements: implement as a small `bar_bundle_items` table if the committee wants
-deals in v1, otherwise defer.
+Two rules hold this together. **One level:** an ingredient must itself hold stock, so a recipe of
+recipes is refused. And **the price is on the sold product, not on what is picked**, so a choice
+pool should be things you charge the same for. Per-choice surcharges are deliberately not built.
+
+Every sale line still produces `SALE` movements against **stock** products only, merged per
+product across the basket, one statement each (ADR-0006).
 
 ### 3.2 Invariants
 
@@ -527,8 +543,6 @@ Each stage is independently shippable and useful on its own.
 
 ## 8. Open questions
 
-- **Bundles/deals in v1?** The mockup shows a "Deals" category; it is a small table but a
-  design decision for the bar manager. Default: defer.
 - **Who holds `bar.manage`** this year: FOH manager, Theatre Manager, or a named bar manager?
   Committee decision; the system only needs a name.
 - **Retention for `age_checks`**: adopt with the data-protection policy (spring 2027). Until
@@ -542,7 +556,9 @@ Each stage is independently shippable and useful on its own.
   Note that [ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md) asks
   to be revisited in the same commit if this becomes hard: a licensing control that fails open is
   not one, and the eligibility seam currently fails open.
-Formerly open, now settled: **measure sizes** are configured per product as real millilitres
+Formerly open, now settled: **bundles and deals** are recipes, the same mechanism a gin and tonic
+uses (ADR-0036), so a "Deals" category needs no new table; **measure sizes** are configured per
+product as real millilitres
 (ADR-0035), so 25 or 35 for a spirit and 125/175/250 for wine is a catalogue entry rather than a
 schema question; **voiding a mixed transaction**, the box office reversal exists
 (`POST /api/reservations/:id/refund`, manager-gated), so a void touching ticket lines needs that

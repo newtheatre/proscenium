@@ -20,8 +20,8 @@ export default defineEventHandler(async (event) => {
   const rules = await depletionRules()
   const product = rules.get(input.productId)
   if (!product) throw createError({ statusCode: 404, statusMessage: 'No such product.' })
-  if (product.stockProductId) {
-    throw createError({ statusCode: 400, statusMessage: 'Adjust the stock product, not the measure sold from it.' })
+  if (!isStockProduct(product)) {
+    throw createError({ statusCode: 400, statusMessage: 'Adjust the stock product, not something poured from it.' })
   }
 
   await db.batch(movementStatements([{

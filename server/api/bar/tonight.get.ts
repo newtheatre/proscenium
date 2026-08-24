@@ -45,7 +45,10 @@ export default defineEventHandler(async (event) => {
       .orderBy(asc(schema.barDiscounts.sort)),
   ])
 
-  const prices = await currentPrices(products.map(p => p.id))
+  const [prices, choices] = await Promise.all([
+    currentPrices(products.map(p => p.id)),
+    choiceSlots(),
+  ])
 
   // Soft gate: the till warns and still sells (docs/13 §5, §8).
   const training = await isEligible(user.id, 'bar')
@@ -60,6 +63,12 @@ export default defineEventHandler(async (event) => {
     // A product with no price cannot be sold, so it is not offered.
     products: products
       .filter(product => prices.has(product.id))
-      .map(product => ({ ...product, pricePence: prices.get(product.id)!.pricePence })),
+      .map(product => ({
+        ...product,
+        pricePence: prices.get(product.id)!.pricePence,
+        slots: choices.slots.get(product.id) ?? [],
+      })),
+    // Sent once rather than per product, because pools are shared (ADR-0036).
+    choiceOptions: choices.options,
   }
 })

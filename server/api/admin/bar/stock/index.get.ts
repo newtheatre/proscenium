@@ -14,8 +14,6 @@ export default defineEventHandler(async (event) => {
       unit: schema.barProducts.unit,
       containerMl: schema.barProducts.containerMl,
       stockOnly: schema.barProducts.stockOnly,
-      stockProductId: schema.barProducts.stockProductId,
-      depletesQty: schema.barProducts.depletesQty,
       parQty: schema.barProducts.parQty,
       status: schema.barProducts.status,
     }).from(schema.barProducts).orderBy(asc(schema.barProducts.sort), asc(schema.barProducts.name)),
@@ -23,11 +21,11 @@ export default defineEventHandler(async (event) => {
     onHandByProduct(),
     latestCostByProduct(),
   ])
+  const catalogue = await depletionRules()
 
   // Only what stock is held against: a 175ml measure is counted as its bottle.
-  const depleted = new Set(products.map(p => p.stockProductId).filter(Boolean) as string[])
   const rows = products
-    .filter(p => (!p.stockProductId || depleted.has(p.id)) && p.status !== 'RETIRED')
+    .filter(p => isStockProduct(catalogue.get(p.id) ?? { recipe: [] }) && p.status !== 'RETIRED')
     .map((p) => {
       const qty = onHand.get(p.id) ?? 0
       const containers = qtyToContainers(p, qty)
