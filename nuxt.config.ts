@@ -93,6 +93,12 @@ export default defineNuxtConfig({
       baseURL: 'https://newtheatre.org.uk',
     },
   },
+
+  experimental: {
+    // A deploy rotates every asset hash, so an open tab asks for chunks that
+    // no longer exist. 'automatic' only recovers on navigation (docs/09).
+    emitRouteChunkError: 'automatic-immediate',
+  },
   compatibilityDate: '2025-07-15',
 
   nitro: {
