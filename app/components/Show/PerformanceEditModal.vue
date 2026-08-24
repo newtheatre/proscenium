@@ -39,12 +39,12 @@ const schema = z.object({
   date: z.string().min(1, 'Date is required'),
   time: z.string().min(1, 'Start time is required'),
   doorsTime: z.string().optional(),
-  durationMinutes: z.number().int().positive().optional().nullable(),
+  durationMinutes: z.number().int().positive().optional(),
   intervalCount: z.number().int().nonnegative().default(0),
-  intervalMinutes: z.number().int().positive().optional().nullable(),
-  capacityOverride: z.number().int().positive().optional().nullable(),
-  bookingClosesHoursBefore: z.number().int().nonnegative().max(168).optional().nullable(),
-  externalBookingUrl: z.string().trim().url('Must be a full link').nullable().optional(),
+  intervalMinutes: z.number().int().positive().optional(),
+  capacityOverride: z.number().int().positive().optional(),
+  bookingClosesHoursBefore: z.number().int().nonnegative().max(168).optional(),
+  externalBookingUrl: z.string().trim().url('Must be a full link').optional(),
   notes: z.string().optional(),
 })
 
@@ -55,12 +55,12 @@ const state = reactive<Partial<Schema>>({
   date: '',
   time: '19:30',
   doorsTime: '',
-  durationMinutes: null,
+  durationMinutes: undefined,
   intervalCount: 0,
-  intervalMinutes: null,
-  capacityOverride: null,
-  bookingClosesHoursBefore: null,
-  externalBookingUrl: null,
+  intervalMinutes: undefined,
+  capacityOverride: undefined,
+  bookingClosesHoursBefore: undefined,
+  externalBookingUrl: undefined,
   notes: '',
 })
 
@@ -106,12 +106,12 @@ watch(
       state.date = toDateString(perf.startsAt)
       state.time = toTimeString(perf.startsAt)
       state.doorsTime = perf.doorsAt ? toTimeString(perf.doorsAt) : ''
-      state.durationMinutes = perf.durationMinutes ?? null
+      state.durationMinutes = perf.durationMinutes ?? undefined
       state.intervalCount = perf.intervalCount
-      state.intervalMinutes = perf.intervalMinutes ?? null
-      state.capacityOverride = perf.capacityOverride ?? null
-      state.bookingClosesHoursBefore = perf.bookingClosesHoursBefore ?? null
-      state.externalBookingUrl = perf.externalBookingUrl ?? null
+      state.intervalMinutes = perf.intervalMinutes ?? undefined
+      state.capacityOverride = perf.capacityOverride ?? undefined
+      state.bookingClosesHoursBefore = perf.bookingClosesHoursBefore ?? undefined
+      state.externalBookingUrl = perf.externalBookingUrl ?? undefined
       state.notes = perf.notes ?? ''
       doorsManuallyEdited = !!perf.doorsAt // treat existing doors as manually set
     }
@@ -148,11 +148,11 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           venueId: event.data.venueId,
           startsAt,
           doorsAt: event.data.doorsTime ? toUnix(event.data.date, event.data.doorsTime) : null,
-          durationMinutes: event.data.durationMinutes,
+          durationMinutes: event.data.durationMinutes ?? null,
           intervalCount: event.data.intervalCount,
-          intervalMinutes: event.data.intervalMinutes,
-          capacityOverride: event.data.capacityOverride,
-          bookingClosesHoursBefore: event.data.bookingClosesHoursBefore,
+          intervalMinutes: event.data.intervalMinutes ?? null,
+          capacityOverride: event.data.capacityOverride ?? null,
+          bookingClosesHoursBefore: event.data.bookingClosesHoursBefore ?? null,
           externalBookingUrl: event.data.externalBookingUrl || null,
           // Status is intentionally omitted here: managed via show publish/cancel actions
           notes: event.data.notes || null,

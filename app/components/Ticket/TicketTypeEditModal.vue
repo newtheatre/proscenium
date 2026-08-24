@@ -27,7 +27,7 @@ const emit = defineEmits<{
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
-  description: z.string().optional().nullable(),
+  description: z.string().optional(),
   price: z.number().nonnegative('Price must be 0 or greater'),
   activeByDefault: z.boolean(),
 })
