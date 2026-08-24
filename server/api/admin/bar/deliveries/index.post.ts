@@ -33,10 +33,10 @@ export default defineEventHandler(async (event) => {
     }
     // Sales deplete the stock product, so a delivery booked against a measure
     // piles up stock that never moves while its bottle runs negative.
-    if (product.stockProductId) {
+    if (!isStockProduct(product)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Book the delivery against the product that holds the stock, not the measure sold from it.',
+        statusMessage: 'Book the delivery against the product that holds the stock, not something poured from it.',
       })
     }
     return {

@@ -8,6 +8,10 @@ const bodySchema = z.object({
   items: z.array(z.object({
     productId: z.string().trim().min(1),
     qty: z.coerce.number().int().min(1).max(20),
+    choices: z.array(z.object({
+      itemId: z.string().trim().min(1),
+      productId: z.string().trim().min(1),
+    })).max(8).optional().default([]),
   })).min(1).max(20),
   /** The figure the screen showed. Checked, not trusted (ADR-0023). */
   expectedTotalPence: z.coerce.number().int().min(0),
@@ -40,14 +44,16 @@ export default defineEventHandler(async (event) => {
   const barLines = input.items.map((item) => {
     const price = prices.get(item.productId)
     if (!price) throw createError({ statusCode: 409, statusMessage: 'One of those has no price set. Reload your tab.' })
-    return { productId: item.productId, qty: item.qty, unitPricePence: price.pricePence, priceId: price.priceId }
+    return { productId: item.productId, qty: item.qty, choices: item.choices, unitPricePence: price.pricePence, priceId: price.priceId }
   })
 
   const rules = await depletionRules()
   const depleting = barLines.map((line) => {
     const product = rules.get(line.productId)
     if (!product) throw createError({ statusCode: 409, statusMessage: 'One of those is no longer on the menu. Reload your tab.' })
-    return { product, qty: line.qty }
+    const resolved = resolveLine(product, line.qty, line.choices, rules)
+    if (!resolved.ok) throw createError({ statusCode: 409, statusMessage: resolved.error })
+    return resolved.line
   })
 
   // A tab outside a show night has no session, and that is fine.
@@ -61,7 +67,8 @@ export default defineEventHandler(async (event) => {
     takenByUserId: user.id,
     tabDebtorUserId: user.id,
     barSessionId: session?.id ?? null,
-    barLines,
+    // The picks the catalogue accepted, not what the client sent.
+    barLines: barLines.map((line, i) => ({ ...line, choices: depleting[i]!.choices })),
   })
 
   if (built.totalPence !== input.expectedTotalPence) {

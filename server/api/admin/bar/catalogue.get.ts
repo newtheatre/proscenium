@@ -15,8 +15,6 @@ export default defineEventHandler(async (event) => {
       unit: schema.barProducts.unit,
       containerMl: schema.barProducts.containerMl,
       stockOnly: schema.barProducts.stockOnly,
-      stockProductId: schema.barProducts.stockProductId,
-      depletesQty: schema.barProducts.depletesQty,
       parQty: schema.barProducts.parQty,
       status: schema.barProducts.status,
       sort: schema.barProducts.sort,
@@ -26,13 +24,24 @@ export default defineEventHandler(async (event) => {
       .orderBy(asc(schema.barDiscounts.sort), asc(schema.barDiscounts.name)),
   ])
 
-  const prices = await currentPrices(products.map(p => p.id))
+  const [prices, recipeItems] = await Promise.all([
+    currentPrices(products.map(p => p.id)),
+    // The whole table, unparameterised: a bar menu is tens of rows (ADR-0006).
+    db.select().from(schema.barRecipeItems).orderBy(asc(schema.barRecipeItems.sort)),
+  ])
+  const recipes = new Map<string, typeof recipeItems>()
+  for (const item of recipeItems) {
+    const existing = recipes.get(item.productId)
+    if (existing) existing.push(item)
+    else recipes.set(item.productId, [item])
+  }
 
   return {
     categories,
     products: products.map(product => ({
       ...product,
       pricePence: prices.get(product.id)?.pricePence ?? null,
+      recipe: recipes.get(product.id) ?? [],
     })),
     discounts,
   }

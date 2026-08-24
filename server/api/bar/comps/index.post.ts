@@ -7,6 +7,10 @@ const bodySchema = z.object({
   items: z.array(z.object({
     productId: z.string().trim().min(1),
     qty: z.coerce.number().int().min(1).max(99),
+    choices: z.array(z.object({
+      itemId: z.string().trim().min(1),
+      productId: z.string().trim().min(1),
+    })).max(8).optional().default([]),
   })).min(1).max(40),
   reason: z.enum(schema.COMP_REASONS),
   note: z.string().trim().max(200).nullable().optional(),
@@ -32,15 +36,19 @@ export default defineEventHandler(async (event) => {
   const nameFor = new Map(names.map(n => [n.id, n.name]))
   const lines = input.items.map((item) => {
     const price = prices.get(item.productId)
-    if (!price || !products.has(item.productId)) {
+    const product = products.get(item.productId)
+    if (!price || !product) {
       throw createError({ statusCode: 409, statusMessage: 'One of those is no longer on the menu. Reload the till.' })
     }
+    const resolved = resolveLine(product, item.qty, item.choices, products)
+    if (!resolved.ok) throw createError({ statusCode: 409, statusMessage: resolved.error })
     return {
       productId: item.productId,
       name: nameFor.get(item.productId) ?? 'Item',
       qty: item.qty,
       unitPricePence: price.pricePence,
       priceId: price.priceId,
+      choices: resolved.line.choices,
     }
   })
 

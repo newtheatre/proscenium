@@ -64,6 +64,11 @@ export const transactions = sqliteTable('transactions', {
   index('transactions_tab_debtor_idx').on(table.tabDebtorUserId, table.tabSettledAt),
 ])
 
+export interface LineChoice {
+  itemId: string
+  productId: string
+}
+
 export const transactionLines = sqliteTable('transaction_lines', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
   transactionId: text('transaction_id').notNull().references(() => transactions.id, { onDelete: 'cascade' }),
@@ -80,6 +85,8 @@ export const transactionLines = sqliteTable('transaction_lines', {
   unitPricePence: integer('unit_price_pence'),
   /** Snapshotted like a ticket's pricePaid, so a later price change is invisible here. */
   priceId: text('price_id'),
+  /** What the till picked for each choice slot, since movements merge per transaction. */
+  choices: text('choices', { mode: 'json' }).$type<LineChoice[]>(),
 }, table => [
   index('transaction_lines_transaction_idx').on(table.transactionId),
   index('transaction_lines_kind_performance_idx').on(table.kind, table.performanceId),

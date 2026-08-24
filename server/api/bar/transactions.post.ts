@@ -12,6 +12,11 @@ const bodySchema = z.object({
   barItems: z.array(z.object({
     productId: z.string().trim().min(1),
     qty: z.coerce.number().int().min(1).max(99),
+    /** One per choice slot on the product, checked against the catalogue. */
+    choices: z.array(z.object({
+      itemId: z.string().trim().min(1),
+      productId: z.string().trim().min(1),
+    })).max(8).optional().default([]),
   })).max(40).optional().default([]),
   /** Reservations to settle. The till pays what is owed; it never edits. */
   reservationIds: z.array(z.string().trim().min(1)).max(10).optional().default([]),
@@ -48,7 +53,7 @@ export default defineEventHandler(async (event) => {
   const barLines = input.barItems.map((item) => {
     const price = prices.get(item.productId)
     if (!price) throw createError({ statusCode: 409, statusMessage: 'One of those has no price set. Reload the till.' })
-    return { productId: item.productId, qty: item.qty, unitPricePence: price.pricePence, priceId: price.priceId }
+    return { productId: item.productId, qty: item.qty, choices: item.choices, unitPricePence: price.pricePence, priceId: price.priceId }
   })
 
   // Ticket lines: what is owed, and the collection transition alongside.
@@ -95,7 +100,9 @@ export default defineEventHandler(async (event) => {
   const depleting = barLines.map((line) => {
     const product = rules.get(line.productId)
     if (!product) throw createError({ statusCode: 409, statusMessage: 'One of those is no longer on the menu. Reload the till.' })
-    return { product, qty: line.qty }
+    const resolved = resolveLine(product, line.qty, line.choices, rules)
+    if (!resolved.ok) throw createError({ statusCode: 409, statusMessage: resolved.error })
+    return resolved.line
   })
 
   // Checked here rather than left to the foreign key, which fails opaquely.
@@ -126,7 +133,8 @@ export default defineEventHandler(async (event) => {
     tabDebtorUserId: input.tabDebtorUserId ?? null,
     barSessionId: session?.id ?? null,
     ticketLines,
-    barLines,
+    // The picks the catalogue accepted, not what the client sent.
+    barLines: barLines.map((line, i) => ({ ...line, choices: depleting[i]!.choices })),
     discount,
   })
 

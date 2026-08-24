@@ -9,8 +9,15 @@ definePageMeta({
   title: 'My bar tab',
 })
 
-interface Product { id: string, categoryId: string, categoryName: string, name: string, pricePence: number }
-interface Menu { outstandingPence: number, softCapPence: number, products: Product[] }
+interface ChoiceSlot { itemId: string, categoryId: string, categoryName: string, qty: number }
+interface Product { id: string, categoryId: string, categoryName: string, name: string, pricePence: number, slots: ChoiceSlot[] }
+interface BasketLine { key: string, product: Product, qty: number, choices: Array<{ itemId: string, productId: string }> }
+interface Menu {
+  outstandingPence: number
+  softCapPence: number
+  products: Product[]
+  choiceOptions: Record<string, Array<{ id: string, name: string }>>
+}
 interface ChargeItem { name: string, qty: number, unitPricePence: number }
 interface Charge { id: string, takenAt: string, takenOn: string, totalPence: number, items: ChargeItem[] }
 
@@ -36,18 +43,51 @@ const outstanding = computed<Charge[]>(() => mine.value?.outstanding ?? [])
 const outstandingPence = computed(() => mine.value?.outstandingPence ?? 0)
 const overCap = computed(() => outstandingPence.value > (menu.value?.softCapPence ?? Infinity))
 
-const basket = ref<Array<{ product: Product, qty: number }>>([])
+const basket = ref<BasketLine[]>([])
 const total = computed(() => basket.value.reduce((t, l) => t + l.product.pricePence * l.qty, 0))
 const busy = ref(false)
 
-function add(product: Product) {
-  const line = basket.value.find(l => l.product.id === product.id)
-  if (line) line.qty += 1
-  else basket.value.push({ product, qty: 1 })
+// Choices, so the same drink with two different mixers is two basket lines.
+const choosing = ref<Product | null>(null)
+const picks = ref<Record<string, string>>({})
+const optionsFor = (categoryId: string) => menu.value?.choiceOptions[categoryId] ?? []
+const optionName = (categoryId: string, id: string) => optionsFor(categoryId).find(o => o.id === id)?.name ?? 'Something'
+const picksComplete = computed(() => choosing.value?.slots.every(slot => picks.value[slot.itemId]) ?? false)
+
+function lineLabel(line: BasketLine) {
+  if (!line.choices.length) return line.product.name
+  const names = line.choices.map((choice) => {
+    const slot = line.product.slots.find(s => s.itemId === choice.itemId)
+    return slot ? optionName(slot.categoryId, choice.productId) : 'Something'
+  })
+  return `${line.product.name} (${names.join(', ')})`
 }
 
-function remove(productId: string) {
-  const index = basket.value.findIndex(l => l.product.id === productId)
+function add(product: Product) {
+  if (product.slots.length) {
+    choosing.value = product
+    picks.value = {}
+    return
+  }
+  addLine(product, [])
+}
+
+function addLine(product: Product, choices: BasketLine['choices']) {
+  const key = [product.id, ...choices.map(c => c.productId)].join('|')
+  const line = basket.value.find(l => l.key === key)
+  if (line) line.qty += 1
+  else basket.value.push({ key, product, qty: 1, choices })
+}
+
+function confirmChoices() {
+  const product = choosing.value
+  if (!product) return
+  addLine(product, product.slots.map(slot => ({ itemId: slot.itemId, productId: picks.value[slot.itemId]! })))
+  choosing.value = null
+}
+
+function remove(key: string) {
+  const index = basket.value.findIndex(l => l.key === key)
   if (index < 0) return
   const line = basket.value[index]!
   if (line.qty > 1) line.qty -= 1
@@ -60,7 +100,7 @@ async function putOnTab() {
     const result = await requestFetch<{ totalPence: number }>('/api/bar/tabs', {
       method: 'POST',
       body: {
-        items: basket.value.map(l => ({ productId: l.product.id, qty: l.qty })),
+        items: basket.value.map(l => ({ productId: l.product.id, qty: l.qty, choices: l.choices })),
         expectedTotalPence: total.value,
       },
     })
@@ -197,7 +237,9 @@ async function removeCharge(id: string) {
           @click="add(product)"
         >
           <span class="block text-sm font-medium">{{ product.name }}</span>
-          <span class="block font-mono text-xs text-neutral-400">{{ formatMoney(product.pricePence) }}</span>
+          <span class="block font-mono text-xs text-neutral-400">
+            {{ formatMoney(product.pricePence) }}<template v-if="product.slots.length"> · choose</template>
+          </span>
         </button>
       </div>
 
@@ -220,7 +262,7 @@ async function removeCharge(id: string) {
           <ul class="mb-2 space-y-1">
             <li
               v-for="line in basket"
-              :key="line.product.id"
+              :key="line.key"
               class="flex items-center gap-2 text-sm"
             >
               <UButton
@@ -229,9 +271,9 @@ async function removeCharge(id: string) {
                 color="neutral"
                 icon="i-lucide-minus"
                 :aria-label="`One fewer ${line.product.name}`"
-                @click="remove(line.product.id)"
+                @click="remove(line.key)"
               />
-              <span class="truncate">{{ line.qty }} x {{ line.product.name }}</span>
+              <span class="truncate">{{ line.qty }} x {{ lineLabel(line) }}</span>
             </li>
           </ul>
           <p class="font-mono text-2xl font-bold">
@@ -247,5 +289,52 @@ async function removeCharge(id: string) {
         />
       </div>
     </div>
+
+    <UModal
+      :open="Boolean(choosing)"
+      :title="choosing ? `What goes in the ${choosing.name.toLowerCase()}?` : ''"
+      @update:open="open => { if (!open) choosing = null }"
+    >
+      <template #body>
+        <div
+          v-if="choosing"
+          class="space-y-4"
+        >
+          <div
+            v-for="slot in choosing.slots"
+            :key="slot.itemId"
+          >
+            <p class="mb-2 text-sm font-medium">
+              {{ slot.categoryName }}
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                v-for="option in optionsFor(slot.categoryId)"
+                :key="option.id"
+                size="lg"
+                :variant="picks[slot.itemId] === option.id ? 'solid' : 'soft'"
+                :label="option.name"
+                @click="picks[slot.itemId] = option.id"
+              />
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            label="Cancel"
+            @click="choosing = null"
+          />
+          <UButton
+            :disabled="!picksComplete"
+            label="Add"
+            @click="confirmChoices"
+          />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

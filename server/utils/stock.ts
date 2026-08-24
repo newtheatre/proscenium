@@ -1,6 +1,7 @@
 import { db, schema } from '@nuxthub/db'
 import type { BatchItem } from 'drizzle-orm/batch'
 import { desc, eq, sql } from 'drizzle-orm'
+import type { LineChoice } from '~~/server/db/schema/transactions'
 
 /**
  * The one writer of the stock ledger (docs/13 §3.2). Nothing else inserts into
@@ -9,7 +10,7 @@ import { desc, eq, sql } from 'drizzle-orm'
 
 /** One INSERT per movement, so no statement's parameters grow with the rows (ADR-0006). */
 export interface MovementDraft {
-  /** Must already be the stock product: use `depletion()` to resolve a sale. */
+  /** Must already be the stock product: use `resolveLine()` to resolve a sale. */
   productId: string
   qty: number
   kind: (typeof schema.MOVEMENT_KINDS)[number]
@@ -35,34 +36,96 @@ export function movementStatements(drafts: MovementDraft[]): BatchItem<'sqlite'>
     }) as BatchItem<'sqlite'>)
 }
 
-export interface DepletingProduct {
+export interface RecipeIngredient {
   id: string
+  componentProductId: string | null
+  choiceCategoryId: string | null
+  qty: number
+}
+
+export interface CatalogueProduct {
+  id: string
+  categoryId: string
   containerMl: number | null
-  stockProductId: string | null
-  depletesQty: number | null
+  stockOnly: boolean
+  status: (typeof schema.PRODUCT_STATUSES)[number]
+  /** Empty means it holds its own stock, so a sale takes one whole container. */
+  recipe: RecipeIngredient[]
+}
+
+/** One sale's worth of each thing it takes off the shelf, choices resolved. */
+export interface ResolvedLine {
+  productId: string
+  qty: number
+  choices: LineChoice[]
+  ingredients: { productId: string, qty: number }[]
+}
+
+type Resolution = { ok: true, line: ResolvedLine } | { ok: false, error: string }
+
+/** Something a movement may be written against: it holds stock itself. */
+export function isStockProduct(product: Pick<CatalogueProduct, 'recipe'>) {
+  return product.recipe.length === 0
+}
+
+/** What a choice slot may offer: stock, on sale, and in the named category. */
+export function choicePool(categoryId: string, catalogue: Map<string, CatalogueProduct>) {
+  return [...catalogue.values()]
+    .filter(p => p.categoryId === categoryId && p.status === 'ACTIVE' && isStockProduct(p))
 }
 
 /**
- * What selling `qty` of a product takes off the shelf: a 125 ml glass takes
- * 125 of its bottle's millilitres, anything else a whole container (§3.1).
+ * What selling `qty` of a product takes off the shelf. A product with no
+ * recipe takes one whole container of itself (docs/13 §3.1, ADR-0036).
  */
-export function depletion(product: DepletingProduct, qty: number) {
-  const perSale = product.stockProductId ? product.depletesQty! : containerSize(product)
-  return {
-    productId: product.stockProductId ?? product.id,
-    qty: -(perSale * qty),
+export function resolveLine(
+  product: CatalogueProduct,
+  qty: number,
+  choices: LineChoice[],
+  catalogue: Map<string, CatalogueProduct>,
+): Resolution {
+  if (isStockProduct(product)) {
+    return { ok: true, line: { productId: product.id, qty, choices: [], ingredients: [{ productId: product.id, qty: containerSize(product) }] } }
   }
+
+  const ingredients: { productId: string, qty: number }[] = []
+  const picked: LineChoice[] = []
+
+  for (const item of product.recipe) {
+    if (item.componentProductId) {
+      const component = catalogue.get(item.componentProductId)
+      if (!component || !isStockProduct(component)) {
+        return { ok: false, error: 'One of its ingredients is no longer stocked. Reload the till.' }
+      }
+      ingredients.push({ productId: component.id, qty: item.qty })
+      continue
+    }
+
+    const pool = choicePool(item.choiceCategoryId!, catalogue)
+    // A pool counted two ways makes the recipe's figure mean two things (ADR-0036).
+    if (pool.some(p => (p.containerMl == null) !== (pool[0]!.containerMl == null))) {
+      return { ok: false, error: 'Its options are not all counted the same way. Fix the catalogue before selling it.' }
+    }
+    const chosen = pool.find(p => p.id === choices.find(c => c.itemId === item.id)?.productId)
+    if (!chosen) return { ok: false, error: 'Choose what goes in it before ringing it up.' }
+
+    ingredients.push({ productId: chosen.id, qty: item.qty })
+    picked.push({ itemId: item.id, productId: chosen.id })
+  }
+
+  return { ok: true, line: { productId: product.id, qty, choices: picked, ingredients } }
 }
 
 /** Sale or comp movements for a basket. Comps deplete exactly as sales do. */
 export function basketMovements(
-  items: { product: DepletingProduct, qty: number }[],
+  lines: ResolvedLine[],
   opts: { kind: 'SALE' | 'COMP', refTable: string, refId: string, createdByUserId: string | null },
 ): MovementDraft[] {
   const merged = new Map<string, number>()
-  for (const { product, qty } of items) {
-    const d = depletion(product, qty)
-    merged.set(d.productId, (merged.get(d.productId) ?? 0) + d.qty)
+  for (const line of lines) {
+    for (const ingredient of line.ingredients) {
+      merged.set(ingredient.productId, (merged.get(ingredient.productId) ?? 0) - ingredient.qty * line.qty)
+    }
   }
   return [...merged].map(([productId, qty]) => ({
     productId,
@@ -127,34 +190,52 @@ export async function latestCostByProduct(): Promise<Map<string, number>> {
   return out
 }
 
-/** Products a movement may be written against: stock products, not measures. */
-export async function stockProducts() {
-  const all = await db.query.barProducts.findMany({
-    columns: {
-      id: true,
-      name: true,
-      unit: true,
-      containerMl: true,
-      stockOnly: true,
-      stockProductId: true,
-      depletesQty: true,
-      parQty: true,
-      status: true,
-      categoryId: true,
-    },
-  })
-  const depletedIds = new Set(all.map(p => p.stockProductId).filter(Boolean) as string[])
-  return all.filter(p => !p.stockProductId || depletedIds.has(p.id))
+/**
+ * The whole catalogue with its recipes, unparameterised: a bar menu is tens of
+ * rows, and an id list here would grow with the basket (ADR-0006).
+ */
+export async function depletionRules(): Promise<Map<string, CatalogueProduct>> {
+  const [products, items] = await Promise.all([
+    db.select({
+      id: schema.barProducts.id,
+      categoryId: schema.barProducts.categoryId,
+      containerMl: schema.barProducts.containerMl,
+      stockOnly: schema.barProducts.stockOnly,
+      status: schema.barProducts.status,
+    }).from(schema.barProducts),
+    db.select({
+      id: schema.barRecipeItems.id,
+      productId: schema.barRecipeItems.productId,
+      componentProductId: schema.barRecipeItems.componentProductId,
+      choiceCategoryId: schema.barRecipeItems.choiceCategoryId,
+      qty: schema.barRecipeItems.qty,
+      sort: schema.barRecipeItems.sort,
+    }).from(schema.barRecipeItems).orderBy(schema.barRecipeItems.sort),
+  ])
+
+  const catalogue = new Map<string, CatalogueProduct>(
+    products.map(p => [p.id, { ...p, recipe: [] as RecipeIngredient[] }]),
+  )
+  for (const item of items) catalogue.get(item.productId)?.recipe.push(item)
+  return catalogue
 }
 
-/**
- * Depletion rules for the whole catalogue, unparameterised: a bar menu is tens
- * of rows, and an id list here would grow with the basket (ADR-0006).
- */
-export async function depletionRules(): Promise<Map<string, DepletingProduct>> {
-  const rows = await db.query.barProducts.findMany({
-    columns: { id: true, containerMl: true, stockProductId: true, depletesQty: true },
-  })
-  // A measure with no size cannot be resolved, so it is absent and fails before the money.
-  return new Map(rows.filter(r => !r.stockProductId || r.depletesQty != null).map(r => [r.id, r]))
+/** Products a movement may be written against: stock products, not measures. */
+export async function stockProducts() {
+  const [rows, catalogue] = await Promise.all([
+    db.query.barProducts.findMany({
+      columns: {
+        id: true,
+        name: true,
+        unit: true,
+        containerMl: true,
+        stockOnly: true,
+        parQty: true,
+        status: true,
+        categoryId: true,
+      },
+    }),
+    depletionRules(),
+  ])
+  return rows.filter(r => isStockProduct(catalogue.get(r.id) ?? { recipe: [] }))
 }

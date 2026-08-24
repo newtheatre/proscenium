@@ -160,30 +160,45 @@ export async function grossProfit() {
     id: schema.barProducts.id,
     name: schema.barProducts.name,
     containerMl: schema.barProducts.containerMl,
-    stockProductId: schema.barProducts.stockProductId,
-    depletesQty: schema.barProducts.depletesQty,
+    stockOnly: schema.barProducts.stockOnly,
     status: schema.barProducts.status,
   }).from(schema.barProducts).orderBy(asc(schema.barProducts.sort))
 
-  const [prices, costs] = await Promise.all([
+  const [prices, costs, catalogue] = await Promise.all([
     currentPrices(products.map(p => p.id)),
     latestCostByProduct(),
+    depletionRules(),
   ])
   const sizes = new Map(products.map(p => [p.id, p.containerMl]))
 
+  /** What `qty` of a product costs, from its latest delivery cost per container. */
+  const costOf = (productId: string, qty: number) => {
+    const perContainer = costs.get(productId)
+    if (perContainer == null) return null
+    return (perContainer * qty) / containerSize({ containerMl: sizes.get(productId) ?? null })
+  }
+
+  /** A choice slot costs whatever its dearest option does, so GP is not flattered. */
+  const costOfSale = (product: CatalogueProduct) => {
+    if (isStockProduct(product)) return costOf(product.id, containerSize(product))
+    let total = 0
+    for (const item of product.recipe) {
+      const options = item.componentProductId
+        ? [costOf(item.componentProductId, item.qty)]
+        : choicePool(item.choiceCategoryId!, catalogue).map(p => costOf(p.id, item.qty))
+      if (!options.length || options.some(c => c == null)) return null
+      total += Math.max(...options as number[])
+    }
+    return total
+  }
+
   return products
-    .filter(p => p.status !== 'RETIRED')
+    .filter(p => p.status !== 'RETIRED' && !p.stockOnly)
     .map((product) => {
       const price = prices.get(product.id)?.pricePence ?? null
-      const taken = product.stockProductId && product.depletesQty == null
-        ? null
-        : Math.abs(depletion(product, 1).qty)
-      const stockId = product.stockProductId ?? product.id
-      const containerCost = costs.get(stockId) ?? null
-      // Cost of what this sale takes off the shelf, not of a whole container.
-      const cost = containerCost == null || taken == null
-        ? null
-        : Math.round((containerCost * taken) / containerSize({ containerMl: sizes.get(stockId) ?? null }))
+      const rules = catalogue.get(product.id)
+      const raw = rules ? costOfSale(rules) : null
+      const cost = raw == null ? null : Math.round(raw)
       const margin = price == null || cost == null ? null : price - cost
       return {
         name: product.name,

@@ -8,6 +8,10 @@ const bodySchema = z.object({
   barItems: z.array(z.object({
     productId: z.string().trim().min(1),
     qty: z.coerce.number().int().min(1).max(99),
+    choices: z.array(z.object({
+      itemId: z.string().trim().min(1),
+      productId: z.string().trim().min(1),
+    })).max(8).optional().default([]),
   })).max(40).optional().default([]),
   reservationIds: z.array(z.string().trim().min(1)).max(10).optional().default([]),
   discountId: z.string().trim().min(1).nullable().optional(),
@@ -30,7 +34,7 @@ export default defineEventHandler(async (event) => {
   const barLines = input.barItems.map((item) => {
     const price = prices.get(item.productId)
     if (!price) throw createError({ statusCode: 409, statusMessage: 'One of those has no price set. Reload the till.' })
-    return { productId: item.productId, qty: item.qty, unitPricePence: price.pricePence, priceId: price.priceId }
+    return { productId: item.productId, qty: item.qty, choices: item.choices, unitPricePence: price.pricePence, priceId: price.priceId }
   })
 
   // Fixture bookings only. A real reference typed in here finds nothing,
@@ -55,7 +59,9 @@ export default defineEventHandler(async (event) => {
   const depleting = barLines.map((line) => {
     const product = rules.get(line.productId)
     if (!product) throw createError({ statusCode: 409, statusMessage: 'One of those is no longer on the menu. Reload the till.' })
-    return { product, qty: line.qty }
+    const resolved = resolveLine(product, line.qty, line.choices, rules)
+    if (!resolved.ok) throw createError({ statusCode: 409, statusMessage: resolved.error })
+    return resolved.line
   })
 
   const discount = input.discountId
@@ -73,7 +79,7 @@ export default defineEventHandler(async (event) => {
     takenByUserId: user.id,
     barSessionId: null,
     ticketLines,
-    barLines,
+    barLines: barLines.map((line, i) => ({ ...line, choices: depleting[i]!.choices })),
     discount,
   })
 

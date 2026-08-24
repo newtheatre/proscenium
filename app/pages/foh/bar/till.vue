@@ -9,7 +9,18 @@ definePageMeta({
   title: 'Till',
 })
 
-interface Product { id: string, categoryId: string, categoryName: string, name: string, pricePence: number, ageRestricted: boolean }
+/** A slot the till has to fill before it can ring the product up (ADR-0036). */
+interface ChoiceSlot { itemId: string, categoryId: string, categoryName: string, qty: number }
+interface Product {
+  id: string
+  categoryId: string
+  categoryName: string
+  name: string
+  pricePence: number
+  ageRestricted: boolean
+  slots: ChoiceSlot[]
+}
+interface BasketLine { key: string, product: Product, qty: number, choices: Array<{ itemId: string, productId: string }> }
 interface Discount { id: string, name: string, percent: number }
 interface Tonight {
   night: string
@@ -19,6 +30,7 @@ interface Tonight {
   performances: Array<{ id: string, startsAt: string, showTitle: string, venueName: string }>
   products: Product[]
   discounts: Discount[]
+  choiceOptions: Record<string, Array<{ id: string, name: string }>>
 }
 interface Found {
   id: string
@@ -53,7 +65,7 @@ const activeCategory = ref<string | null>(null)
 const shown = computed(() => products.value.filter(p => !activeCategory.value || p.categoryName === activeCategory.value))
 
 const tab = ref<'tickets' | 'bar'>('bar')
-const basketBar = ref<Array<{ product: Product, qty: number }>>([])
+const basketBar = ref<BasketLine[]>([])
 const basketTickets = ref<Found[]>([])
 const discountId = ref<string | null>(null)
 const busy = ref(false)
@@ -152,7 +164,7 @@ async function requestComp() {
     await $fetch(api('/api/bar/comps'), {
       method: 'POST',
       body: {
-        items: basketBar.value.map(l => ({ productId: l.product.id, qty: l.qty })),
+        items: basketBar.value.map(l => ({ productId: l.product.id, qty: l.qty, choices: l.choices })),
         reason: compReason.value,
         note: compNote.value || null,
       },
@@ -201,14 +213,48 @@ const REASON_LABELS: Record<string, string> = {
   OTHER: 'Other',
 }
 
-function addProduct(product: Product) {
-  const line = basketBar.value.find(l => l.product.id === product.id)
-  if (line) line.qty++
-  else basketBar.value.push({ product, qty: 1 })
+// Choices, so the same drink with two different mixers is two basket lines.
+const choosing = ref<Product | null>(null)
+const picks = ref<Record<string, string>>({})
+const optionsFor = (categoryId: string) => tonight.value?.choiceOptions[categoryId] ?? []
+const optionName = (categoryId: string, id: string) => optionsFor(categoryId).find(o => o.id === id)?.name ?? 'Something'
+const picksComplete = computed(() => choosing.value?.slots.every(slot => picks.value[slot.itemId]) ?? false)
+
+/** "Gin and mixer (Tonic water)", so the basket says what was actually poured. */
+function lineLabel(line: BasketLine) {
+  if (!line.choices.length) return line.product.name
+  const names = line.choices.map((choice) => {
+    const slot = line.product.slots.find(s => s.itemId === choice.itemId)
+    return slot ? optionName(slot.categoryId, choice.productId) : 'Something'
+  })
+  return `${line.product.name} (${names.join(', ')})`
 }
 
-function removeProduct(productId: string) {
-  const index = basketBar.value.findIndex(l => l.product.id === productId)
+function addProduct(product: Product) {
+  if (product.slots.length) {
+    choosing.value = product
+    picks.value = {}
+    return
+  }
+  addLine(product, [])
+}
+
+function addLine(product: Product, choices: BasketLine['choices']) {
+  const key = [product.id, ...choices.map(c => c.productId)].join('|')
+  const line = basketBar.value.find(l => l.key === key)
+  if (line) line.qty++
+  else basketBar.value.push({ key, product, qty: 1, choices })
+}
+
+function confirmChoices() {
+  const product = choosing.value
+  if (!product) return
+  addLine(product, product.slots.map(slot => ({ itemId: slot.itemId, productId: picks.value[slot.itemId]! })))
+  choosing.value = null
+}
+
+function removeProduct(key: string) {
+  const index = basketBar.value.findIndex(l => l.key === key)
   if (index === -1) return
   const line = basketBar.value[index]!
   if (line.qty > 1) line.qty--
@@ -312,7 +358,7 @@ async function chargeToTab() {
       body: {
         tender: 'TAB',
         tabDebtorUserId: debtor.value.userId,
-        barItems: basketBar.value.map(l => ({ productId: l.product.id, qty: l.qty })),
+        barItems: basketBar.value.map(l => ({ productId: l.product.id, qty: l.qty, choices: l.choices })),
         discountId: discountId.value,
         expectedTotalPence: total.value,
       },
@@ -370,7 +416,7 @@ async function takeCard() {
       method: 'POST',
       body: {
         tender: 'CARD',
-        barItems: basketBar.value.map(l => ({ productId: l.product.id, qty: l.qty })),
+        barItems: basketBar.value.map(l => ({ productId: l.product.id, qty: l.qty, choices: l.choices })),
         reservationIds: basketTickets.value.map(r => r.id),
         discountId: discountId.value,
         expectedTotalPence: total.value,
@@ -526,7 +572,9 @@ async function closeBar() {
             @click="addProduct(product)"
           >
             <span class="block text-sm font-medium leading-tight">{{ product.name }}</span>
-            <span class="mt-1 block text-sm text-neutral-400">{{ formatMoney(product.pricePence) }}</span>
+            <span class="mt-1 block text-sm text-neutral-400">
+              {{ formatMoney(product.pricePence) }}<template v-if="product.slots.length"> · choose</template>
+            </span>
           </button>
         </div>
       </section>
@@ -605,16 +653,16 @@ async function closeBar() {
           </p>
           <p
             v-for="line in basketBar"
-            :key="line.product.id"
+            :key="line.key"
             class="flex items-center justify-between py-0.5"
           >
             <span>
               <button
                 type="button"
                 class="mr-2 text-neutral-500"
-                @click="removeProduct(line.product.id)"
+                @click="removeProduct(line.key)"
               >−</button>
-              {{ line.qty }} × {{ line.product.name }}
+              {{ line.qty }} × {{ lineLabel(line) }}
             </span>
             <span>{{ formatMoney(line.product.pricePence * line.qty) }}</span>
           </p>
@@ -785,13 +833,66 @@ async function closeBar() {
     </div>
 
     <UModal
+      :open="Boolean(choosing)"
+      :title="choosing ? `What goes in the ${choosing.name.toLowerCase()}?` : ''"
+      @update:open="open => { if (!open) choosing = null }"
+    >
+      <template #body>
+        <div
+          v-if="choosing"
+          class="space-y-4"
+        >
+          <div
+            v-for="slot in choosing.slots"
+            :key="slot.itemId"
+          >
+            <p class="mb-2 text-sm font-medium">
+              {{ slot.categoryName }}
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                v-for="option in optionsFor(slot.categoryId)"
+                :key="option.id"
+                size="lg"
+                :variant="picks[slot.itemId] === option.id ? 'solid' : 'soft'"
+                :label="option.name"
+                @click="picks[slot.itemId] = option.id"
+              />
+            </div>
+            <p
+              v-if="!optionsFor(slot.categoryId).length"
+              class="text-sm text-muted"
+            >
+              Nothing in {{ slot.categoryName }} is stocked, so this cannot be sold.
+            </p>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            label="Cancel"
+            @click="choosing = null"
+          />
+          <UButton
+            :disabled="!picksComplete"
+            label="Add to basket"
+            @click="confirmChoices"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
       v-model:open="compOpen"
       title="Comp this round"
     >
       <template #body>
         <div class="space-y-4">
           <p class="text-sm text-muted">
-            {{ basketBar.map(l => `${l.qty} x ${l.product.name}`).join(', ') }}
+            {{ basketBar.map(l => `${l.qty} x ${lineLabel(l)}`).join(', ') }}
             &middot; {{ formatMoney(barSubtotal) }}
           </p>
           <UFormField

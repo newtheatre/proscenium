@@ -26,9 +26,10 @@ export default defineEventHandler(async (event) => {
     ))
     .orderBy(asc(schema.barCategories.sort), asc(schema.barProducts.sort), asc(schema.barProducts.name))
 
-  const [prices, outstandingPence] = await Promise.all([
+  const [prices, outstandingPence, choices] = await Promise.all([
     currentPrices(products.map(product => product.id)),
     outstandingFor(user.id),
+    choiceSlots(),
   ])
 
   return {
@@ -37,6 +38,11 @@ export default defineEventHandler(async (event) => {
     // A product with no price cannot be sold, so it is not offered.
     products: products
       .filter(product => prices.has(product.id))
-      .map(product => ({ ...product, pricePence: prices.get(product.id)!.pricePence })),
+      .map(product => ({
+        ...product,
+        pricePence: prices.get(product.id)!.pricePence,
+        slots: choices.slots.get(product.id) ?? [],
+      })),
+    choiceOptions: choices.options,
   }
 })
