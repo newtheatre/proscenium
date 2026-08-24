@@ -326,7 +326,7 @@ so a future booking stops offering access ticket types. The tombstone is swept a
 **A merge drops the loser's profile rather than moving it.** Merging two sets of access needs is not
 a decision this app should make on someone's behalf.
 
-### `bar_categories`, `bar_products`, `bar_prices`, `bar_discounts`
+### `bar_categories`, `bar_products`, `bar_recipe_items`, `bar_prices`, `bar_discounts`
 
 The bar catalogue. Design: [13-bar-design](./13-bar-design.md) §3.
 
