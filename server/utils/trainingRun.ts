@@ -11,6 +11,7 @@ import { type AbilityUser, workFoh } from '~~/shared/utils/abilities'
 
 export type TrainingRun = typeof schema.trainingRuns.$inferSelect
 export type TrainingEventKind = typeof schema.TRAINING_EVENT_KINDS[number]
+export type TrainingEndReason = typeof schema.TRAINING_END_REASONS[number]
 
 /** Which sandbox each screen belongs to, so one run cannot open another. */
 export const SURFACE_TARGET = {
@@ -87,17 +88,15 @@ export async function startRun(user: AbilityUser, target: PracticeTarget): Promi
     })
   }
 
-  // One sandbox at a time: leaving the old one open would leave a banner
-  // pointing at a screen they are no longer on.
-  if (existing && existing.targetKey !== target) await endRun(existing.id, 'ENDED')
-
+  // Every refusal sits above this line: nothing may throw once the old sandbox
+  // and its events are on their way out.
   const now = new Date()
   const expiresAt = answer.expiresAt ? new Date(answer.expiresAt) : null
   if (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt <= now) {
     throw createError({ statusCode: 403, statusMessage: 'That practice window has closed.' })
   }
 
-  const [run] = await db.insert(schema.trainingRuns).values({
+  const opening = db.insert(schema.trainingRuns).values({
     userId: user.id,
     targetKey: target,
     trainingSessionId: answer.sessionId,
@@ -105,17 +104,33 @@ export async function startRun(user: AbilityUser, target: PracticeTarget): Promi
     expiresAt,
   }).returning()
 
+  // One sandbox at a time, and in one batch: D1 runs a batch as a single
+  // transaction, so a switch cannot end the old run without opening the new one.
+  if (existing && existing.targetKey !== target) {
+    const [, , opened] = await db.batch([...endRunStatements(existing.id, 'ENDED'), opening])
+    return opened[0]!
+  }
+
+  const [run] = await opening
   return run!
 }
 
 /** End a run and delete what it did, together (docs/14 §9). */
-export async function endRun(runId: string, reason: 'ENDED' | 'EXPIRED' | 'PURGED'): Promise<void> {
-  await db.batch([
+export async function endRun(runId: string, reason: TrainingEndReason): Promise<void> {
+  await db.batch(endRunStatements(runId, reason))
+}
+
+/**
+ * Ending a run, as statements a switch can fold into the batch that opens the
+ * next one. The isNull guard keeps it idempotent; it arbitrates nothing.
+ */
+function endRunStatements(runId: string, reason: TrainingEndReason) {
+  return [
     db.update(schema.trainingRuns)
       .set({ endedAt: new Date(), endedReason: reason })
       .where(and(eq(schema.trainingRuns.id, runId), isNull(schema.trainingRuns.endedAt))),
     db.delete(schema.trainingRunEvents).where(eq(schema.trainingRunEvents.runId, runId)),
-  ])
+  ] as const
 }
 
 /** The one write a training request makes, besides the run itself. */

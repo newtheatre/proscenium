@@ -288,6 +288,13 @@ sandbox still needs a positive answer, so ADR-0033's direction is unchanged.
 
 Plus a daily task that deletes ended and expired runs with their events, so nothing accumulates.
 
+**Switching sandbox is not a fourth path, and it is one write.** Opening a different target ends the
+old run, deletes its events and inserts the new run in a single `db.batch`, so a trainee moving from
+the till to Challenge 25 cannot land with no run at all and their old sandbox gone. D1 rejects
+`BEGIN`, so a batch is the only atomic write there is here. Every refusal, the closed window and a
+lapsed expiry alike, is answered before that batch runs: a switch this app declines must leave the
+sandbox the trainee already had exactly where it was.
+
 The upstream path is why the seam is uncached and why rehearsal serves the endpoint `no-store`. A
 cached yes anywhere between the two apps would keep a sandbox open after the lesson finished, which
 is the one thing "reset afterwards" cannot allow.

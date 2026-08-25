@@ -2948,7 +2948,10 @@ of show-night shell reads (`/api/foh/tonight`, `/emergency`, `/contacts`). Belt 
 
 `POST /api/training/start` answers `403` both when the caller is not being taught the thing and when
 rehearsal cannot be reached, with different messages: opening a sandbox needs a positive answer
-(ADR-0033). `GET /api/training/state` ends a run only on a definitive closure, never on an outage
+(ADR-0033). It is also how a trainee **switches** sandbox, and that switch is one `db.batch`: the old
+run is ended, its events deleted and the new run inserted together, with every refusal answered
+before the batch runs. A declined or failed switch therefore leaves the sandbox they already had
+untouched, rather than leaving them with none. `GET /api/training/state` ends a run only on a definitive closure, never on an outage
 ([ADR-0034](./decisions/0034-an-open-sandbox-closes-only-on-a-definitive-answer.md)).
 
 **Not in any sandbox:** opening or closing a bar session, comps (they need a duty manager's approval,
