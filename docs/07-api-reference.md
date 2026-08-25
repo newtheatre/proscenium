@@ -404,7 +404,7 @@ and no password-reset route here.
 | POST | `/api/admin/bar/stocktakes/:id/finish` | `bar.manage` (`manageBar`) | Apply the count as movements |
 | POST | `/api/admin/bar/stocktakes/:id/abandon` | `bar.manage` (`manageBar`) | Walk away, writing nothing |
 | GET | `/api/admin/bar/reports/term` | `bar.manage` (`manageBar`) | What the date pickers should open on |
-| GET | `/api/admin/bar/reports/sales` | `bar.manage` (`manageBar`) | Sales by product, category, performance or month |
+| GET | `/api/admin/bar/reports/sales` | `bar.manage` (`manageBar`) | Sales by product, category or month |
 | GET | `/api/admin/bar/reports/discounts` | `bar.manage` (`manageBar`) | By type, and by who rang it up |
 | GET | `/api/admin/bar/reports/comps` | `bar.manage` (`manageBar`) | By reason, with requester and approver |
 | GET | `/api/admin/bar/reports/gp` | `bar.manage` (`manageBar`) | Margin per product at the latest cost |

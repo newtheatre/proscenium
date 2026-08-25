@@ -4,11 +4,11 @@ import { manageBar } from '~~/shared/utils/abilities'
 const querySchema = paginationSchema.extend({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  groupBy: z.enum(['product', 'category', 'performance', 'month']).optional().default('product'),
+  groupBy: z.enum(['product', 'category', 'month']).optional().default('product'),
   format: z.enum(['json', 'csv']).optional().default('json'),
 })
 
-/** GET /api/admin/bar/reports/sales: sales by product, category, show or month. */
+/** GET /api/admin/bar/reports/sales: sales by product, category or month. */
 export default defineEventHandler(async (event) => {
   await authorize(event, manageBar)
 

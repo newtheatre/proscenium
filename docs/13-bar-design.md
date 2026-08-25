@@ -1,7 +1,8 @@
 # Bar (sales, stock and Challenge 25) design
 
 **Status: agreed, largely built.** Drafted August 2026 by Matt Adcock (ITM 26/27); agreed
-2026-08-21 and reconciled against the code the same day. Amended 2026-08-22 to add tabs (§4.6). Depends on the
+2026-08-21 and reconciled against the code the same day. Amended 2026-08-22 to add tabs (§4.6), and
+2026-08-25 to drop the sales-by-performance grouping (§6). Depends on the
 [show night screen design](./11-show-night-screen-design.md) for the route shell, role scoping and
 QR/ref lookup, and on the [access, staffing & end-of-night design](./12-access-and-staffing-design.md)
 (referred to below as *12-access-and-staffing*) for the rota's `BAR` shift and the end-of-night
@@ -25,7 +26,8 @@ an ID-check tally, and a reconciliation that explains the SumUp reader's daily t
 
 Three goals, in order:
 
-1. **Know what was sold.** Itemised sales per performance, per product, per tender, per person.
+1. **Know what was sold.** Itemised sales per product, per tender, per person, and per night. Bar
+   money is attributed to the night's session rather than to a performance (§4.5).
 2. **Know what we have.** A stock ledger the bar manager and Treasurer can trust, and variance
    they can question.
 3. **Replace the paper refusals register** with something that is always with the bar staff,
@@ -515,10 +517,15 @@ claim filter quietly enforces the refresh each October.
 
 ## 6. Reports and exports (`/admin/bar/reports`)
 
-Sales by product / category / performance / month; tender split; discounts by type and by staff member; comps by reason with requester and approver; GP by product;
+Sales by product / category / month; tender split; discounts by type and by staff member; comps by reason with requester and approver; GP by product;
 stocktake variance over time; Challenge 25 register (PDF); everything as CSV. Date-range pickers
 default to the current term. The Treasurer's monthly ask is: sales by month by tender, closing
 stock at cost: make those two one click.
+
+**There is no sales-by-performance grouping.** A `BAR_ITEM` line carries no `performance_id`, and a
+session that served a double bill cannot be split between the two shows without inventing the split
+(§4.5). Per-night bar takings are on the reconciliation card and in each linked performance's
+end-of-night report.
 
 ## 7. Build order
 

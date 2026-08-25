@@ -54,6 +54,7 @@ Kept as a record of what changed and why, so nobody re-fixes them.
 | 21 | Production migration ledger empty; `d1 migrations list` always said "nothing to apply" | `migrations_dir` pinned in `nuxt.config.ts`; ledger backfilled and `0015` applied 2026-08-13 |
 | 22 | [Editing a show wiped its write-up](#editing-a-show-wiped-its-write-up) | `ShowEditModal` loads the full record from `GET /api/shows/:id`; the five projected-away fields are omitted from the PUT unless it succeeded |
 | 27 | The discounts report counted voided tab charges | `isNull(voidedAt)` added to `discountsIn()`, matching `barLineRange()`. Re-running a past range can now show less given away, and one fewer use against a staff member |
+| 28 | The sales report's "By performance" grouping returned one `Unattributed` row holding the whole range | The option is gone from the type, the query, the endpoint and the page. Bar money is attributed by session, not per line (docs/13 §4.5, §6) |
 
 ### The companion entitlement was enforced per basket, not per performance
 
