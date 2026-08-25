@@ -76,6 +76,8 @@ export async function discountsIn(from: string, to: string) {
   const range = and(
     gte(schema.transactions.takenOn, from),
     lte(schema.transactions.takenOn, to),
+    // A voided tab charge was never paid for, so nothing was given away on it.
+    isNull(schema.transactions.voidedAt),
     sql`${schema.transactions.discountPence} > 0`,
   )
 

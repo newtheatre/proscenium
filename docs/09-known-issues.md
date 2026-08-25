@@ -53,6 +53,7 @@ Kept as a record of what changed and why, so nobody re-fixes them.
 | 20 | No CI, no lint script | `.github/workflows/ci.yml`; `lint` / `lint:fix` scripts |
 | 21 | Production migration ledger empty; `d1 migrations list` always said "nothing to apply" | `migrations_dir` pinned in `nuxt.config.ts`; ledger backfilled and `0015` applied 2026-08-13 |
 | 22 | [Editing a show wiped its write-up](#editing-a-show-wiped-its-write-up) | `ShowEditModal` loads the full record from `GET /api/shows/:id`; the five projected-away fields are omitted from the PUT unless it succeeded |
+| 27 | The discounts report counted voided tab charges | `isNull(voidedAt)` added to `discountsIn()`, matching `barLineRange()`. Re-running a past range can now show less given away, and one fewer use against a staff member |
 
 ### The companion entitlement was enforced per basket, not per performance
 

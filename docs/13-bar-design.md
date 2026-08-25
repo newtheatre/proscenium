@@ -307,7 +307,8 @@ admin-maintained `bar_discounts` list. Rules:
 - **Snapshotted** onto the transaction (`discount_id`, `discount_percent`, `discount_pence`) so
   changing the committee rate next year does not rewrite history. Line amounts stay gross, so
   "how much Neck Oil did we sell" is unaffected and "how much did we give away in committee
-  discount" is one sum.
+  discount" is one sum. A voided tab charge is not in that sum: nobody was ever given it, and it
+  is out of the sales and night reports for the same reason (ADR-0031).
 - Who may apply one is a matter of trust and training, not code, in v1: anyone working the till
   can pick a chip, and every use is attributed. Reports show discounts by staff member; a pattern
   is a conversation, not a feature.
