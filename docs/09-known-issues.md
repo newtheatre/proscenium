@@ -13,53 +13,60 @@ Severity is about consequences for the theatre, not code aesthetics:
 - **P2**: wrong numbers, or a foot-gun that will cause P1 later.
 - **P3**: hygiene, drift, missing scaffolding.
 
+**Cite an issue by its anchor, never by a number**: `docs/09-known-issues.md#void-double-credit`,
+not "known issue 24". The anchor says which issue it is without anyone counting rows, and it
+survives the row being fixed and moving to the second table. Rows here carried numbers until
+2026-08-26, by which point the two tables had numbered themselves into four collisions, so a
+reference of the form "known issue 24" in an older commit dates from then and has to be resolved by
+reading the rows rather than by counting them.
+
 ## Open
 
-| | Issue | Sev | Effort |
-|---|---|---|---|
-| 13 | [Roles are stale until re-login](#roles-are-stale-until-re-login) | P2 | Small |
-| 9 | [Nothing is transactional](#nothing-is-transactional) | P2 | Medium |
-| 10a | [Capacity is still read-then-write](#capacity-is-still-read-then-write) | P2 | Medium |
-| 10b | [A PENDING hold is never reclaimed](#pending-holds-never-expire) | P2 | Medium |
-| 14 | [Customers cannot cancel their own booking](#customers-cannot-cancel) | P2 | Small |
-| 16 | [No shared types](#no-shared-types) | P3 | Medium |
-| 20a | [No tests](#no-tests) | P3 | Medium |
-| 21 | [The dev server loses its D1 binding after a hot reload](#dev-d1-binding) | P3 | Small |
-| 23 | [Tab sales and tab cash split across a term boundary](#tab-accrual-split) | P3 | Won't fix |
-| 24 | [An approved comp can be left with no transaction](#comp-claim-window) | P3 | Small |
-| 25 | [Seven seed helper modules show up as broken tasks](#seed-phantom-tasks) | P3 | Small |
+| Issue | Sev | Effort |
+|---|---|---|
+| [Roles are stale until re-login](#roles-are-stale-until-re-login) | P2 | Small |
+| [Nothing is transactional](#nothing-is-transactional) | P2 | Medium |
+| [Capacity is still read-then-write](#capacity-is-still-read-then-write) | P2 | Medium |
+| [A PENDING hold is never reclaimed](#pending-holds-never-expire) | P2 | Medium |
+| [Customers cannot cancel their own booking](#customers-cannot-cancel) | P2 | Small |
+| [No shared types](#no-shared-types) | P3 | Medium |
+| [No tests](#no-tests) | P3 | Medium |
+| [The dev server loses its D1 binding after a hot reload](#dev-d1-binding) | P3 | Small |
+| [Tab sales and tab cash split across a term boundary](#tab-accrual-split) | P3 | Won't fix |
+| [An approved comp can be left with no transaction](#comp-claim-window) | P3 | Small |
+| [Seven seed helper modules show up as broken tasks](#seed-phantom-tasks) | P3 | Small |
 
 ## Fixed
 
 Kept as a record of what changed and why, so nobody re-fixes them.
 
-| | Issue | Fixed |
-|---|---|---|
-| 1 | All emailed links are broken (`baseUrl` vs `baseURL`) | Casing aligned; `email.ts` reads `public.baseURL` |
-| 2 | Booking confirmation links 404 | `/api/bookings/:id` accepts an id *or* a reference |
-| 3 | Draft shows are publicly readable | `authorize(listShows / readShow)` on both routes |
-| 4 | Walk-in lookup leaks the user table | `GET /api/users?email=` returns at most one row |
-| 6 | Resend key crashes the whole worker | Client constructed lazily; missing key degrades to a no-op |
-| 7 | Collection charges current prices | Existing tickets show `pricePaid` |
-| 8 | `DOOR` status is never set | Walk-ins create `DOOR` |
-| 24 | Bar sales and night reports counted voided transactions | `isNull(voidedAt)` added to `barLineRange()` and the night report's tender group-by |
-| 25 | The sales report had a `cash` column for a tender that never existed | Replaced with `tab`, so the tender columns sum to gross again |
-| 26 | Migration `0047` deleted every `bar_prices` row: a generated table rebuild cascades under D1, where `PRAGMA foreign_keys=OFF` is a no-op inside a transaction | `bun run check:migrations` refuses a generated rebuild of any table something cascades onto (ADR-0037). The four lost rows were not recovered; the catalogue was re-seeded the same day |
-| 22 | `bar.tab` was not enforceable on the debtor at the till | stage-door serves `GET /api/role-holders`; the till lists names and the server refuses a debtor who is not on it |
-| 11 | Publish resurrects cancelled performances | `ne(status, 'CANCELLED')` on the update |
-| 12 | Refunds do not exist | `POST /api/reservations/:id/refund` (see also the lifecycle rule below) |
-| 15 | Five copies of the price rule | `resolveEffectiveTicketType()` is the only copy |
-| 17 | `/calendar` calls an endpoint that does not exist | Page deleted |
-| 19 | Dependency hygiene | Deps declared; build tooling moved to `devDependencies` |
-| 20 | No CI, no lint script | `.github/workflows/ci.yml`; `lint` / `lint:fix` scripts |
-| 21 | Production migration ledger empty; `d1 migrations list` always said "nothing to apply" | `migrations_dir` pinned in `nuxt.config.ts`; ledger backfilled and `0015` applied 2026-08-13 |
-| 22 | [Editing a show wiped its write-up](#editing-a-show-wiped-its-write-up) | `ShowEditModal` loads the full record from `GET /api/shows/:id`; the five projected-away fields are omitted from the PUT unless it succeeded |
-| 27 | The discounts report counted voided tab charges | `isNull(voidedAt)` added to `discountsIn()`, matching `barLineRange()`. Re-running a past range can now show less given away, and one fewer use against a staff member |
-| 28 | The sales report's "By performance" grouping returned one `Unattributed` row holding the whole range | The option is gone from the type, the query, the endpoint and the page. Bar money is attributed by session, not per line (docs/13 §4.5, §6) |
-| 29 | Six CSV exports, the Challenge 25 register among them, emitted volunteer-typed text a spreadsheet would evaluate | The formula guard moved from the ticket export's private escaper into the shared `csvCell()`, which every export already used |
-| 30 | Refunds were bucketed by the UTC day, so during BST a refund taken between midnight and 01:00 London came off the previous day's expected Z | `refundedOn()` bounds `refunded_at` by the London day, like `performanceIdsOn()` beside it. The expected figure is computed at read time, so re-opening an affected day now shows the corrected pair of totals |
-| 31 | Refunding a comped booking took the full ticket price off the day's expected Z and off the night report, though the reader never took it | `notComped()` in `server/utils/transactions.ts` excludes a booking with an unvoided `COMP` ticket payment, and both figures use it |
-| 32 | A failed report email threw after the report was stored, so the duty manager saw "Not closed" on a night that was closed, and the archive copy was lost with no retry | The send is caught and logged, each address is tried on its own, `emailed_at` is stamped only on a copy that went out, and `reports:email-unsent` retries the last seven nights |
+| Issue | Fixed |
+|---|---|
+| All emailed links are broken (`baseUrl` vs `baseURL`) | Casing aligned; `email.ts` reads `public.baseURL` |
+| Booking confirmation links 404 | `/api/bookings/:id` accepts an id *or* a reference |
+| Draft shows are publicly readable | `authorize(listShows / readShow)` on both routes |
+| Walk-in lookup leaks the user table | `GET /api/users?email=` returns at most one row |
+| Resend key crashes the whole worker | Client constructed lazily; missing key degrades to a no-op |
+| Collection charges current prices | Existing tickets show `pricePaid` |
+| `DOOR` status is never set | Walk-ins create `DOOR` |
+| Bar sales and night reports counted voided transactions | `isNull(voidedAt)` added to `barLineRange()` and the night report's tender group-by |
+| The sales report had a `cash` column for a tender that never existed | Replaced with `tab`, so the tender columns sum to gross again |
+| Migration `0047` deleted every `bar_prices` row: a generated table rebuild cascades under D1, where `PRAGMA foreign_keys=OFF` is a no-op inside a transaction | `bun run check:migrations` refuses a generated rebuild of any table something cascades onto (ADR-0037). The four lost rows were not recovered; the catalogue was re-seeded the same day |
+| `bar.tab` was not enforceable on the debtor at the till | stage-door serves `GET /api/role-holders`; the till lists names and the server refuses a debtor who is not on it |
+| Publish resurrects cancelled performances | `ne(status, 'CANCELLED')` on the update |
+| Refunds do not exist | `POST /api/reservations/:id/refund` (see also the lifecycle rule below) |
+| Five copies of the price rule | `resolveEffectiveTicketType()` is the only copy |
+| `/calendar` calls an endpoint that does not exist | Page deleted |
+| Dependency hygiene | Deps declared; build tooling moved to `devDependencies` |
+| No CI, no lint script | `.github/workflows/ci.yml`; `lint` / `lint:fix` scripts |
+| Production migration ledger empty; `d1 migrations list` always said "nothing to apply" | `migrations_dir` pinned in `nuxt.config.ts`; ledger backfilled and `0015` applied 2026-08-13 |
+| [Editing a show wiped its write-up](#editing-a-show-wiped-its-write-up) | `ShowEditModal` loads the full record from `GET /api/shows/:id`; the five projected-away fields are omitted from the PUT unless it succeeded |
+| The discounts report counted voided tab charges | `isNull(voidedAt)` added to `discountsIn()`, matching `barLineRange()`. Re-running a past range can now show less given away, and one fewer use against a staff member |
+| The sales report's "By performance" grouping returned one `Unattributed` row holding the whole range | The option is gone from the type, the query, the endpoint and the page. Bar money is attributed by session, not per line (docs/13 §4.5, §6) |
+| Six CSV exports, the Challenge 25 register among them, emitted volunteer-typed text a spreadsheet would evaluate | The formula guard moved from the ticket export's private escaper into the shared `csvCell()`, which every export already used |
+| Refunds were bucketed by the UTC day, so during BST a refund taken between midnight and 01:00 London came off the previous day's expected Z | `refundedOn()` bounds `refunded_at` by the London day, like `performanceIdsOn()` beside it. The expected figure is computed at read time, so re-opening an affected day now shows the corrected pair of totals |
+| Refunding a comped booking took the full ticket price off the day's expected Z and off the night report, though the reader never took it | `notComped()` in `server/utils/transactions.ts` excludes a booking with an unvoided `COMP` ticket payment, and both figures use it |
+| A failed report email threw after the report was stored, so the duty manager saw "Not closed" on a night that was closed, and the archive copy was lost with no retry | The send is caught and logged, each address is tried on its own, `emailed_at` is stamped only on a copy that went out, and `reports:email-unsent` retries the last seven nights |
 
 ### The companion entitlement was enforced per basket, not per performance
 
@@ -294,10 +301,14 @@ migration or a query broke.
 
 ## Suggested order
 
-1. **#20a**: tests for the money handlers, before the structural work below.
-2. **#16**: shared types. Everything else is safer afterwards.
-3. **#9, #10a**: transactionality and the capacity race, together.
-4. **#13, #14**: the two workflow gaps, whenever the box office next complains.
+1. **[No tests](#no-tests)**: the money handlers first, before the structural work below.
+2. **[No shared types](#no-shared-types)**: everything else is safer afterwards.
+3. **[Nothing is transactional](#nothing-is-transactional)** with
+   **[capacity is still read-then-write](#capacity-is-still-read-then-write)**: one problem, taken
+   together.
+4. **[Roles are stale until re-login](#roles-are-stale-until-re-login)** and
+   **[customers cannot cancel](#customers-cannot-cancel)**: the two workflow gaps, whenever the box
+   office next complains.
 
 ### Tab sales and tab cash split across a term boundary {#tab-accrual-split}
 

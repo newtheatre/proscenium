@@ -102,6 +102,10 @@ next maintainer cannot ask you. Follow the conventions in [docs/README.md](docs/
 When you fix something listed in [docs/09-known-issues.md](docs/09-known-issues.md), update or remove
 that entry in the same change.
 
+**Cite an entry by its anchor**, `docs/09-known-issues.md#void-double-credit`, in commits, comments
+and other documents. The rows carry no numbers: two tables numbering themselves from 1 collided, and
+an anchor names the issue without anyone counting rows.
+
 ## Comments
 
 Enforced by `bun run check:comments`, which CI runs. There are no exemptions.
