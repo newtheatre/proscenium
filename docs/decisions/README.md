@@ -61,6 +61,7 @@ ADR; the ADR carries the reasoning and the history. See [CONTRIBUTING.md](../../
 | [0045](0045-the-practice-fixture-dates-itself-against-tonight.md) | The practice fixture dates itself against tonight | Accepted |
 | [0046](0046-a-relational-query-rewrites-every-column-to-its-root-table.md) | A relational query rewrites every column to its root table | Accepted |
 | [0047](0047-an-expected-client-error-is-logged-as-one-line.md) | An expected client error is logged as one line, not as a fatal | Accepted |
+| [0048](0048-an-absent-binding-is-not-a-failed-read.md) | An absent SESSION_PASSWORD binding is not a failed read | Accepted: diagnostic, the cause is not yet known |
 
 ## Template
 
