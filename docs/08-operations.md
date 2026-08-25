@@ -437,6 +437,20 @@ Still the right move for anything destructive, and the fallback when the workflo
    More than one row means the duplicate-start race happened before the index landed. Abandon every
    sheet but the one being counted, from `/admin/bar/stocktakes/<id>`, then run the migration.
 
+   `0054_goofy_shinobi_shaw.sql` adds `stock_movements_stocktake_line_uq`, so check the same way that
+   no counted line already carries two movements:
+
+   ```bash
+   bunx wrangler d1 execute proscenium --remote \
+     --command "select ref_id, count(*) from stock_movements where ref_table = 'stocktake_lines' \
+       group by ref_id having count(*) > 1;"
+   ```
+
+   Any row here is a stocktake that was applied twice. `stock_movements` is append-only, so correct
+   it with an opposing `ADJUST` through `/admin/bar/stock`, never by deleting the duplicate, and note
+   that the index still cannot be created while both rows exist. Escalate to the IT Manager: this one
+   needs a decision, not a runbook step.
+
 ### `PRAGMA foreign_keys=OFF` does nothing on D1
 
 Drizzle opens every table rebuild with `PRAGMA foreign_keys=OFF` and closes it with `=ON`. **On D1 both lines are inert.** Cloudflare runs each migration inside an implicit transaction with foreign keys enforced, and documents that a query cannot change that; `PRAGMA defer_foreign_keys = ON` does not stop `ON DELETE CASCADE` either.

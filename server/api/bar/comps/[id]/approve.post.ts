@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import type { BatchItem } from 'drizzle-orm/batch'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { workFoh } from '~~/shared/utils/abilities'
 
 /** POST /api/bar/comps/:id/approve: the approval writes the record. */
@@ -37,6 +37,21 @@ export default defineEventHandler(async (event) => {
     return resolved.line
   })
 
+  // Claim the decision first: the read above is a round trip old, so without
+  // this two approvers both write a COMP transaction and deplete stock twice.
+  const [claimed] = await db.update(schema.compRequests).set({
+    status: 'APPROVED',
+    decidedByUserId: user.id,
+    decidedAt: sql`(current_timestamp)`,
+  }).where(and(
+    eq(schema.compRequests.id, id),
+    eq(schema.compRequests.status, 'PENDING'),
+  )).returning({ id: schema.compRequests.id })
+
+  if (!claimed) {
+    throw createError({ statusCode: 409, statusMessage: 'That request has already been decided.' })
+  }
+
   // Recorded as taken by the requester and approved by whoever is deciding.
   const built = buildTransaction({
     source: 'TILL',
@@ -65,9 +80,6 @@ export default defineEventHandler(async (event) => {
       createdByUserId: user.id,
     })),
     db.update(schema.compRequests).set({
-      status: 'APPROVED',
-      decidedByUserId: user.id,
-      decidedAt: sql`(current_timestamp)`,
       transactionId: built.transactionId,
     }).where(eq(schema.compRequests.id, id)) as BatchItem<'sqlite'>,
   ]

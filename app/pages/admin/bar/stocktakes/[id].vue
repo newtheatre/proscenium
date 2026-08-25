@@ -94,9 +94,13 @@ async function saveCounts() {
 }
 
 async function finish() {
+  if (saving.value) return
   saving.value = true
   try {
     await saveCounts()
+    // saveCounts clears the flag in its own finally, which would re-enable the
+    // button while this POST is still in flight.
+    saving.value = true
     const res = await $fetch<{ applied: number }>(`/api/admin/bar/stocktakes/${route.params.id}/finish`, { method: 'POST' })
     toast.add({ title: `Applied ${res.applied} adjustment${res.applied === 1 ? '' : 's'}`, icon: 'i-lucide-check', color: 'success' })
     await navigateTo('/admin/bar/stock')

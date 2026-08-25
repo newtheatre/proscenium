@@ -36,6 +36,10 @@ export const stockMovements = sqliteTable('stock_movements', {
   index('stock_movements_product_idx').on(table.productId),
   index('stock_movements_ref_idx').on(table.refTable, table.refId),
   index('stock_movements_created_idx').on(table.createdAt),
+  // A stocktake line yields at most one movement, so a duplicate finish fails
+  // the insert and D1 rolls its whole batch back. Partial: a sale is one-to-many.
+  uniqueIndex('stock_movements_stocktake_line_uq').on(table.refId)
+    .where(sql`ref_table = 'stocktake_lines'`),
 ])
 
 export const stockDeliveries = sqliteTable('stock_deliveries', {

@@ -2297,7 +2297,10 @@ converts to the product's basis with its `container_ml` (ADR-0035).
 - **`PATCH .../lines`** takes `countedContainers`, a part bottle as a decimal, and reads every
   line's container size in one statement rather than one per line (ADR-0006).
 - **`POST .../finish`** writes one `STOCKTAKE` movement per line whose count differs from on-hand
-  **now**, and refuses if nothing was counted, pointing the caller at abandon instead.
+  **now**, and refuses if nothing was counted, pointing the caller at abandon instead. The update
+  re-asserts `status = 'OPEN'` in its `WHERE`, and `stock_movements_stocktake_line_uq` allows one
+  movement per counted line, so two finishes in the same instant give one applied count and one
+  rolled-back batch rather than the correction applied twice.
 - **`POST .../abandon`** writes no movement at all.
 - **`POST /api/admin/bar/stock/adjust`** takes `qtyContainers`, refuses an adjustment aimed at
   something made from other things rather than the product that holds the stock, and requires a

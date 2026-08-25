@@ -25,6 +25,7 @@ Severity is about consequences for the theatre, not code aesthetics:
 | 20a | [No tests](#no-tests) | P3 | Medium |
 | 21 | [The dev server loses its D1 binding after a hot reload](#dev-d1-binding) | P3 | Small |
 | 23 | [Tab sales and tab cash split across a term boundary](#tab-accrual-split) | P3 | Won't fix |
+| 24 | [An approved comp can be left with no transaction](#comp-claim-window) | P3 | Small |
 
 ## Fixed
 
@@ -297,6 +298,23 @@ major version bump of a declared dependency, so none of it is drive-by work.
 Read the reachability column before ranking these by severity alone. The two `high` entries against
 `image-size` are a build-time parser, while the `moderate` XSS in Nuxt OG Image is a live endpoint
 on `newtheatre.org.uk`.
+
+### An approved comp can be left with no transaction {#comp-claim-window}
+
+**P3 · `server/api/bar/comps/[id]/approve.post.ts`.** Approval claims the decision in its own
+statement, re-asserting `status = 'PENDING'` in the `WHERE`, and only then batches the transaction,
+the stock movements and the `transaction_id` back onto the request. That is what stops two approvers
+writing two COMP transactions and depleting stock twice; a predicate inside the batch would not,
+because D1 does not abort a batch on rows affected.
+
+The cost is a window between the two writes. If the Worker dies or D1 refuses the batch in between,
+the request is `APPROVED` with a null `transaction_id`: the give-away shows in `compsIn` and not in
+the ledger. That is visible at reconciliation and correctable by hand, where a doubled stock ledger
+is neither: `stock_movements` is append-only, so a duplicate can only be offset, never removed.
+
+Closing it needs the decision and the transaction in one atomic write, which the foreign key from
+`comp_requests.transaction_id` to `transactions.id` forbids in a single batch statement order. It is
+recorded rather than half-fixed.
 
 ### Two settles of one tab in the same instant both record the money {#tab-settle-race}
 

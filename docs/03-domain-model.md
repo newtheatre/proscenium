@@ -466,6 +466,13 @@ and it writes them in one batch (ADR-0026).
   reporting needs; what was taken is nothing.
 - **`bar_session_id` carries no foreign key**, because a comp can be asked for before the bar is
   formally opened.
+- **The decision is claimed before the money is written.** Several people can hold the same
+  `PENDING` card, so approve and decline both re-assert `status = 'PENDING'` in the `WHERE`, not
+  only in the read above it. Approve claims the decision in its own statement first, then batches
+  the transaction, the movements and the `transaction_id` back onto the request: a batch does not
+  abort on zero rows affected, so a predicate inside it would not have stopped the second approval
+  writing a second COMP transaction and depleting stock twice. A failure between the two leaves an
+  `APPROVED` request with a null `transaction_id`, which reconciles; a doubled ledger does not.
 
 Who may approve: tonight's confirmed `DUTY_MANAGER`, or `BOX_OFFICE`+ when there is none. If nobody
 can, there are no comps tonight, which is the correct outcome rather than a fallback.

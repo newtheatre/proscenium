@@ -379,6 +379,13 @@
       "when": 1787681838166,
       "tag": "0053_complete_magik",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1787682283900,
+      "tag": "0054_goofy_shinobi_shaw",
+      "breakpoints": true
     }
   ]
 }
