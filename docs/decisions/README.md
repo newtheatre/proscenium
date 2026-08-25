@@ -60,6 +60,7 @@ ADR; the ADR carries the reasoning and the history. See [CONTRIBUTING.md](../../
 | [0044](0044-a-practice-run-is-not-a-substitute-for-the-role.md) | A practice run is not a substitute for the role | Accepted |
 | [0045](0045-the-practice-fixture-dates-itself-against-tonight.md) | The practice fixture dates itself against tonight | Accepted |
 | [0046](0046-a-relational-query-rewrites-every-column-to-its-root-table.md) | A relational query rewrites every column to its root table | Accepted |
+| [0047](0047-an-expected-client-error-is-logged-as-one-line.md) | An expected client error is logged as one line, not as a fatal | Accepted |
 
 ## Template
 

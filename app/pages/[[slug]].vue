@@ -45,6 +45,8 @@ const route = useRoute()
 const page = await queryCollection('pages').path('/pages' + route.path).first() as PageWithHero | null
 
 if (!page) {
+  // `fatal` renders the full error page; it is also what Nitro logs a stack for,
+  // so the log line is cut back to one in server/plugins/error-logging.ts (ADR-0047).
   throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
 }
 </script>

@@ -641,6 +641,23 @@ There is no backup of the R2 bucket at all. Its contents are show posters and ve
 
 Observability is enabled in the Worker config, so logs are also retained and searchable in the Cloudflare dashboard (Workers & Pages → `proscenium` → Logs). Use the dashboard for anything historical; `wrangler tail` only shows what happens while it is running.
 
+### What a line in the log means
+
+Not every line mentioning a 4xx is a problem, and since [ADR-0047](decisions/0047-an-expected-client-error-is-logged-as-one-line.md)
+the level tells you which is which. An expected client error is one line with no stack; a genuine
+failure keeps the stack it always had.
+
+| Line | Level | What it is |
+| --- | --- | --- |
+| `[404] GET /.env` | log | A vulnerability scanner probing for a file this app has never served. Constant, and not worth reading: most of what is in this stream is this |
+| `[404] GET /whats-on/old-show linked from /whats-on` | warn | Somebody followed a link on our own site that does not resolve. Worth fixing, and the referer names the page carrying the broken link |
+| `[403] GET /api/shows` | log | An API refusal. Ordinary on its own; a burst of them is not |
+| `[request error] [fatal] [GET] ...` with a stack | error | A 5xx or an unhandled exception. This is what the error level is for |
+
+In the dashboard's log stream, filter by level: anything at **error** is a real failure. Query
+strings are never logged, on the request or on the referer, because a guest booking link carries its
+access token there ([ADR-0009](decisions/0009-signed-booking-access-tokens.md)).
+
 Also worth checking during an incident: <https://www.cloudflarestatus.com> (is it us or them?) and the Resend dashboard for email delivery.
 
 ---
