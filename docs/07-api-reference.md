@@ -369,7 +369,7 @@ and no password-reset route here.
 | GET | `/api/foh/backstage/board` | `foh.work` + rostered tonight | The front-of-house side of the board. Polled |
 | POST | `/api/foh/backstage/messages` | `foh.work` + rostered tonight | Call something through to backstage |
 | POST | `/api/foh/backstage/messages/:id/ack` | `foh.work` + rostered tonight | Acknowledge a backstage call |
-| GET | `/api/backstage/emergency` | **Public** | Tonight's emergency cards. Public on purpose |
+| GET | `/api/backstage/emergency` | **Public** | Tonight's emergency cards, with the night they are for. Public on purpose |
 | GET | `/api/foh/emergency` | `foh.work` (`workFoh`) | The venue's emergency card for a performance |
 | GET | `/api/foh/contacts` | `foh.work` (`workFoh`) | Who is on tonight, and the numbers to call |
 | GET | `/api/foh/incidents` | `foh.work` (`workFoh`) | The incident log for a performance |
@@ -2653,6 +2653,13 @@ achieves a code reset, never a join.
 information is never behind a lock (§5.1), so a device that has not joined can still read the 999
 address and the assembly point. It is allow-listed to the emergency card and rate limited; nothing
 about who is coming, what was sold or who is working crosses that boundary.
+
+**Response** `{ night, cards }`. The night travels with the cards because `/backstage` mirrors the
+payload to `localStorage` and renders it when the fetch fails, and a saved copy has to be able to
+say which night it is from. Note that `cards` is empty **only** when no performance is scheduled: the
+join to `venue_emergency_info` is a LEFT JOIN, so a venue with nothing recorded still returns a row.
+An empty array on a show night therefore means the request failed, which is why the page
+distinguishes a failure from a dark night rather than printing one sentence for both.
 
 A joined backstage device gets **403 from every `/api/foh/*` and box-office route**, because those
 require a user session it does not have. That is the property to preserve if this ever changes.

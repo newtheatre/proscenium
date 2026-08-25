@@ -17,6 +17,11 @@ interface EmergencyCard {
   firePanelLocation: string | null
 }
 
+interface EmergencyPayload {
+  night: string
+  cards: EmergencyCard[]
+}
+
 const route = useRoute()
 const code = ref(typeof route.query.code === 'string' ? route.query.code : '')
 const name = ref('')
@@ -33,8 +38,46 @@ const { data: session } = await useAsyncData('backstage-session', () =>
   requestFetch<{ night: string, deviceName: string | null }>('/api/backstage/session').catch(() => null))
 if (session.value) joined.value = session.value
 
-const { data: cards } = await useAsyncData('backstage-emergency', () =>
-  requestFetch<EmergencyCard[]>('/api/backstage/emergency').catch(() => []))
+// Mirrored to the device on every success and rendered from there when the
+// fetch fails: the one button that must work with no signal (docs/11 §2.5).
+const CACHE_KEY = 'nnt-backstage-emergency'
+
+const { data: fetched, error: fetchFailed } = await useAsyncData('backstage-emergency', () =>
+  requestFetch<EmergencyPayload>('/api/backstage/emergency'))
+
+const cached = ref<EmergencyPayload | null>(null)
+const shown = computed(() => fetched.value ?? cached.value)
+const cards = computed(() => shown.value?.cards ?? [])
+const fromCache = computed(() => !fetched.value && Boolean(cached.value))
+
+onMounted(() => {
+  if (fetched.value) {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(fetched.value))
+    }
+    catch {
+      // A device refusing storage still has the copy it just fetched.
+    }
+    return
+  }
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    if (raw) cached.value = JSON.parse(raw) as EmergencyPayload
+  }
+  catch {
+    // Nothing saved, or unreadable. The page says so below.
+  }
+})
+
+/** Nothing recorded for this venue yet, as opposed to nothing fetched at all. */
+function details(card: EmergencyCard) {
+  return [
+    { label: 'Assembly point', value: card.assemblyPoint },
+    { label: 'Evacuation', value: card.evacuationProcedure },
+    { label: 'First aid', value: card.firstAidLocation },
+    { label: 'Defibrillator', value: card.defibrillatorLocation },
+  ].filter(block => block.value)
+}
 
 async function join() {
   if (code.value.replace(/\s/g, '').length < 6) return
@@ -146,8 +189,16 @@ async function join() {
         v-if="showEmergency"
         class="mt-4 space-y-3"
       >
+        <p
+          v-if="fromCache"
+          class="rounded-xl border border-amber-600 bg-amber-950/40 p-4 text-sm text-amber-100"
+        >
+          Tonight's copy did not load. This is the copy saved on this device for
+          {{ formatDate(shown?.night) }}, and it may be out of date.
+        </p>
+
         <article
-          v-for="card in cards ?? []"
+          v-for="card in cards"
           :key="card.venueName"
           class="rounded-xl border-2 border-red-700 bg-red-950/30 p-4"
         >
@@ -169,40 +220,43 @@ async function join() {
           >
             Call 999
           </a>
-          <dl class="mt-4 space-y-2 text-sm">
-            <div v-if="card.assemblyPoint">
+          <dl
+            v-if="details(card).length"
+            class="mt-4 space-y-2 text-sm"
+          >
+            <div
+              v-for="block in details(card)"
+              :key="block.label"
+            >
               <dt class="text-neutral-400">
-                Assembly point
-              </dt>
-              <dd>{{ card.assemblyPoint }}</dd>
-            </div>
-            <div v-if="card.evacuationProcedure">
-              <dt class="text-neutral-400">
-                Evacuation
+                {{ block.label }}
               </dt>
               <dd class="whitespace-pre-line">
-                {{ card.evacuationProcedure }}
+                {{ block.value }}
               </dd>
             </div>
-            <div v-if="card.firstAidLocation">
-              <dt class="text-neutral-400">
-                First aid
-              </dt>
-              <dd>{{ card.firstAidLocation }}</dd>
-            </div>
-            <div v-if="card.defibrillatorLocation">
-              <dt class="text-neutral-400">
-                Defibrillator
-              </dt>
-              <dd>{{ card.defibrillatorLocation }}</dd>
-            </div>
           </dl>
+          <p
+            v-else
+            class="mt-4 text-sm text-neutral-400"
+          >
+            No further details are recorded for {{ card.venueName }}. A manager can add them under
+            Admin, Front of house.
+          </p>
         </article>
+
         <p
-          v-if="!(cards ?? []).length"
+          v-if="!cards.length && fetchFailed"
+          class="rounded-xl border-2 border-red-700 bg-red-950/30 p-4 text-sm text-red-100"
+        >
+          Emergency information could not be loaded and nothing is saved on this device. Call 999 and
+          give the venue name and street address. Ask the duty manager for the assembly point.
+        </p>
+        <p
+          v-else-if="!cards.length"
           class="rounded-xl bg-neutral-900 p-4 text-sm text-neutral-400"
         >
-          No emergency details recorded for tonight's venues.
+          No performances are scheduled tonight, so there are no venue cards to show.
         </p>
       </div>
     </div>

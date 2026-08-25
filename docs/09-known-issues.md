@@ -344,3 +344,15 @@ because `ensureLocalUser` rewrites the mirror. Someone who never signs in stays 
 `select id, name, email from users where email like 'merged-%@placeholder.invalid'`. The repair is to
 put the person's real name and address back on the row, which staff can do through
 `POST /api/users` on the same address the customer books under.
+
+### Emergency information does not survive a genuinely offline page load {#emergency-offline}
+
+**P2 · `app/pages/backstage.vue`, `app/pages/foh/emergency.vue`.** Both pages now mirror their
+payload to `localStorage` and render the saved copy when the fetch fails, which covers a dropped
+request on a page that has already loaded. Neither survives opening the page with no signal at all,
+because `localStorage` only helps once the Worker has served the HTML.
+
+`docs/11` §2.5 asks for the emergency content to be cached in a service worker or inlined into the
+shell, so the assembly point is reachable from a phone with one bar in the foyer. There is no service
+worker and no PWA module in this app, so that is a piece of work in its own right rather than a
+tweak to either page. Recorded so nobody assumes the cache already covers it.
