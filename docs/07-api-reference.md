@@ -1640,7 +1640,7 @@ throws, and a throw inside `authorize()` **grants** ([ADR-0038](decisions/0038-n
 their shift history and their counts. The access profile is included only for a caller who holds
 `canVerifyAccess`, which is checked directly rather than through `authorize`.
 
-**Errors** `400 User ID is required`; `404 No mirror row for that account`; `403`.
+**Errors** `400 User ID is required`; `401` when nobody is signed in; `404 No mirror row for that account`; `403`.
 
 ---
 
