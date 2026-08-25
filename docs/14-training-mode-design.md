@@ -158,6 +158,33 @@ button would teach a control that does not exist.
 Payment and admission stay separate states here as they are for real, because confusing them is the
 mistake this screen actually produces.
 
+### 5.4 The practice ticket sheet
+
+Not a fourth sandbox: a sheet of paper, and the only part of this feature that exists outside a run.
+A door lesson needs something to scan. `/foh/practice-tickets` prints the five fixture bookings as QR
+cards, one per booking, for a trainer to print and cut up before the lesson
+([ADR-0043](./decisions/0043-practice-tickets-print-ahead-of-the-lesson.md)).
+
+**It is not gated by a run or a practice window**, and it must not become so: a trainer prepares on
+the afternoon nobody has anything open. `foh.work` is the whole guard, the same bar as the Practice
+tile, and the page makes no API call at all, so it works with rehearsal down.
+
+Each card carries the QR, the reference in text for when a camera will not read it, who the fixture
+customer is, and what the trainee should see: the verdict colour, the party size, the money owed and
+any access symbols. All of it is derived from the fixture through `bookingStanding`
+(`shared/utils/bookingStanding.ts`, the same function the door computes with), so a card cannot print
+an outcome the scanner disagrees with, and a change to the scenario reaches the paper.
+
+The QR encodes the **bare reference**, `TRAIN1`, which is the string the scanner matches on after
+`refFrom` unwraps it. It is deliberately not the `/t/<ref>?t=` URL a real ticket carries: a practice
+card must resolve to nothing, and a phone camera pointed at one should offer no link to follow. No
+generated reference can collide with a fixture one, because the reference alphabet excludes `I`.
+
+Two cards read alike. `TRAIN2` is meant to be the already-admitted rescan, but the door screen has no
+admit action and the fixture has no admitted-at field, so it is the same paid booking as `TRAIN4`
+under another name. The sheet says so rather than inventing a difference: a rescan is practised by
+scanning the same card twice, and the verdict must not change.
+
 ## 6. Domain model
 
 ```
@@ -237,6 +264,10 @@ it as the run ends reopens the window it exists to close. Duplicating them would
 practised, which is the one failure that would make the whole feature worse than useless.
 
 The banner is a layout-level component so it cannot be forgotten on a new screen.
+
+`app/pages/foh/practice-tickets.vue` is the exception that proves the rule: it is on the `foh` layout
+like every other screen there, but it is not dual-mode, because it fetches nothing. It reads the
+fixture directly and renders it, so there is no live counterpart for it to drift towards (§5.4).
 
 ## 9. Reset
 

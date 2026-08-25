@@ -2927,6 +2927,11 @@ rehearsal cannot be reached, with different messages: opening a sandbox needs a 
 **Not in any sandbox:** opening or closing a bar session, comps (they need a duty manager's approval,
 and a fictional approval teaches the wrong lesson), voids, and anything under `/admin`.
 
+**No route serves the practice ticket sheet.** `/foh/practice-tickets` renders the fixture's QR codes
+for a trainer to print, and does it in the page with no fetch of any kind, so it needs no run, no
+practice window and no network ([ADR-0043](./decisions/0043-practice-tickets-print-ahead-of-the-lesson.md),
+[14-training-mode §5.4](./14-training-mode-design.md)).
+
 ---
 
 ### 3.11 Media

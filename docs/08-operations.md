@@ -285,6 +285,21 @@ In order:
 3. **Check it.** With a practice window open for a test account, `/foh` shows a Practice tile.
    Without one, it shows nothing.
 
+### Printing the practice tickets
+
+A door lesson needs something to scan, and the QR codes for it are a page: **`/foh/practice-tickets`**.
+Open it, press **Print the sheet**, and cut along the dashed lines. Five cards over two sides of A4,
+one per fixture booking, each saying on its own face that it is not a real ticket.
+
+**Print it before the lesson.** The sheet needs no practice window, no run and no show: anybody who
+can work front of house can print it on the afternoon, which is the point of it
+([ADR-0043](./decisions/0043-practice-tickets-print-ahead-of-the-lesson.md)). Print in black and
+white at 100%: shrinking the page to fit shrinks the codes with it.
+
+The cards are reusable, so a set kept with the training folder lasts. One going astray in the
+building is harmless: the references on them contain letters no real booking reference can, so a real
+door scanning one finds nothing.
+
 **An outage does not interrupt a lesson.** If the training system stops answering, sandboxes already
 open keep working until their expiry, and only new ones are refused
 ([ADR-0034](./decisions/0034-an-open-sandbox-closes-only-on-a-definitive-answer.md)). So a training
