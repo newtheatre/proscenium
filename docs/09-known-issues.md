@@ -328,3 +328,19 @@ them, look for `STOCKTAKE` movements that took a product from a plausible level 
 day nobody emptied the shelf; `/admin/bar/stocktakes` lists each take with the lines it moved. The
 repair is an ordinary stock adjustment back to the real level, dated today, with a reason naming the
 stocktake it corrects. Do not edit the historic movement.
+
+### A merge before 2026-08-25 may have left a live customer on a placeholder address {#merge-placeholder-email}
+
+**P2 · data.** When an account merge's winner had no mirror row here, one was created with
+`merged-<id>@placeholder.invalid` and nothing ever replaced it. `GET /api/users` filters both its
+listing and its exact-address lookup on `email NOT LIKE '%.invalid'`, so that customer is invisible to
+the staff directory, to the box office walk-in lookup and to the rota picker, and is counted in the
+"N anonymised not shown" total as though they had been erased. Booking confirmations for them go to
+the unroutable placeholder. The merge itself now carries the losing account's real address onto the
+winner in the same batch, so no new row can be minted this way.
+
+Rows already in that state heal on their own the next time the person's session reaches this app,
+because `ensureLocalUser` rewrites the mirror. Someone who never signs in stays hidden. To find them:
+`select id, name, email from users where email like 'merged-%@placeholder.invalid'`. The repair is to
+put the person's real name and address back on the row, which staff can do through
+`POST /api/users` on the same address the customer books under.

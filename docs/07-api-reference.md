@@ -528,6 +528,17 @@ lives intact on the winner. `dryRun: true` returns the affected-row `counts` wit
 stage-door shows them in its pre-merge report. Each statement binds two parameters however many rows
 move, so no chunking is needed.
 
+**The hook may mint the winner's mirror row.** A merge whose winner has never touched this app is
+the ordinary case: a walk-in shadow account is the loser and the account the person later signed up
+with is the winner. Nothing may point at a row that does not exist, so a minimal winner row is
+inserted first, carrying a `merged-<id>@placeholder.invalid` address because the loser still holds
+theirs until the batch deletes them. The last statement of that same batch, after the delete, copies
+the loser's name and address onto the winner and is guarded on the row still holding the placeholder,
+so a retry is a no-op. The address is real and belongs to the same person, which matters: a
+`.invalid` address is filtered out of every staff listing and lookup, counted as anonymised, and used
+verbatim as the send address for booking confirmations. An **anonymised** loser has no identity to
+carry, so the placeholder stays and `ensureLocalUser` corrects it on the winner's next request.
+
 **Idempotent**, and `{ ok: true, notMirrored: true }` for a losing account this app has never seen:
 stage-door retries until every app succeeds.
 

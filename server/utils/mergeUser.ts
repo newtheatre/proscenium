@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 
 /**
  * This app's share of an estate-wide account merge (stage-door ADR-0015).
@@ -53,17 +53,22 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
     return { ok: true, notMirrored: !loser, counts }
   }
 
-  // The winner needs a mirror row before anything points at it; ensureLocalUser
-  // replaces this minimal one on their next session.
+  // The winner needs a mirror row before anything points at it, and the loser
+  // still holds their address until the batch below deletes them.
+  const placeholderEmail = `merged-${toUserId}@placeholder.invalid`
   const winner = await db.select({ id: schema.users.id }).from(schema.users)
     .where(eq(schema.users.id, toUserId)).get()
   if (!winner) {
     await db.insert(schema.users).values({
       id: toUserId,
-      email: `merged-${toUserId}@placeholder.invalid`,
+      email: placeholderEmail,
       name: loser.name,
     }).onConflictDoNothing()
   }
+
+  // An anonymised loser has no identity to carry, so the placeholder is the
+  // honest answer there and ensureLocalUser corrects it (ADR-0014).
+  const carryIdentity = !loser.anonymisedAt
 
   await db.batch([
     // Only a genuine duplicate. The rota is a record, so a confirmed row
@@ -152,6 +157,11 @@ export async function mergeUser(fromUserId: string, toUserId: string, dryRun = f
     // across: it aggregates to nothing and expires anyway (ADR-0032).
     db.delete(schema.trainingRuns).where(eq(schema.trainingRuns.userId, fromUserId)),
     db.delete(schema.users).where(eq(schema.users.id, fromUserId)),
+    // Last, because the address is only free once the loser's row is gone.
+    // Guarded on the placeholder, so a retried hook is a no-op.
+    db.update(schema.users)
+      .set({ email: carryIdentity ? loser.email : placeholderEmail, name: loser.name })
+      .where(and(eq(schema.users.id, toUserId), eq(schema.users.email, placeholderEmail))),
   ])
 
   return { ok: true, notMirrored: false, counts }
