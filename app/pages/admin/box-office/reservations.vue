@@ -258,7 +258,7 @@ async function fetchAllForPerformance(performanceId: string): Promise<Reservatio
   return rows
 }
 
-const { data: reservations, status: reservationsStatus, refresh: refreshReservations } = await useAsyncData(
+const { data: reservations, status: reservationsStatus, error: reservationsError, refresh: refreshReservations } = await useAsyncData(
   'box-office-reservations',
   () => {
     if (!selectedPerformanceId.value) return Promise.resolve([] as Reservation[])
@@ -818,7 +818,7 @@ const todayFormatted = computed(() =>
         icon="i-lucide-calendar-off"
       />
 
-      <template v-if="selectedPerformanceId">
+      <template v-if="selectedPerformanceId && !reservationsError">
         <!-- Status pills -->
         <div class="flex items-center gap-2 flex-wrap">
           <div class="flex flex-wrap gap-2">
@@ -887,8 +887,18 @@ const todayFormatted = computed(() =>
       v-if="selectedPerformanceId"
       class="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pb-6 flex flex-col gap-4 [&>*]:shrink-0 [&>*]:min-w-0"
     >
+      <!-- A failed load must never read as an empty house: a door volunteer
+           would turn away booked customers and resell their seats. -->
+      <AdminFetchError
+        v-if="reservationsError"
+        :error="reservationsError"
+        title="Could not load the door list"
+        :on-retry="refreshReservations"
+      />
+
       <!-- Reservations table -->
       <UTable
+        v-else
         :data="filteredReservations"
         :columns="columns"
         :loading="reservationsStatus === 'pending'"
@@ -903,7 +913,10 @@ const todayFormatted = computed(() =>
       </UTable>
 
       <!-- Footer count -->
-      <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto text-sm text-muted">
+      <div
+        v-if="!reservationsError"
+        class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto text-sm text-muted"
+      >
         <span>
           {{ filteredReservations.length }}
           reservation{{ filteredReservations.length === 1 ? '' : 's' }} shown
