@@ -11,7 +11,7 @@ function renderReport(report: NightReport, autoClosed: boolean, closingNote: str
 
   const banner = autoClosed
     ? `<p style="background:#fef3c7;border:1px solid #f59e0b;padding:10px;border-radius:6px">
-         <strong>Auto-closed &mdash; no duty manager sign-off.</strong>
+         <strong>Auto-closed: no duty manager sign-off.</strong>
          Nobody closed this night by noon the following day.
        </p>`
     : ''
@@ -20,7 +20,7 @@ function renderReport(report: NightReport, autoClosed: boolean, closingNote: str
   const t = report.takings
 
   const incidents = report.incidents.length
-    ? `<ul>${report.incidents.map(i => `<li><strong>${formatStamp(i.at)}</strong> ${escapeHtml(i.body)} <em>&mdash; ${escapeHtml(i.author ?? 'unknown')}</em></li>`).join('')}</ul>`
+    ? `<ul>${report.incidents.map(i => `<li><strong>${formatStamp(i.at)}</strong> ${escapeHtml(i.body)} <em>(${escapeHtml(i.author ?? 'unknown')})</em></li>`).join('')}</ul>`
     : '<p style="color:#555">Nothing logged.</p>'
 
   const milestones = report.milestones.length
@@ -40,7 +40,7 @@ function renderReport(report: NightReport, autoClosed: boolean, closingNote: str
           ['ID checks refused', String(report.bar.idChecks.refused)],
         ])}</table>
        ${report.bar.comps.length
-          ? `<p><strong>Comps</strong></p><ul>${report.bar.comps.map(c => `<li>${escapeHtml(c.what)} &mdash; ${escapeHtml(c.reason)}, asked by ${escapeHtml(c.requestedBy ?? 'unknown')}, approved by ${escapeHtml(c.approvedBy ?? 'unknown')}</li>`).join('')}</ul>`
+          ? `<p><strong>Comps</strong></p><ul>${report.bar.comps.map(c => `<li>${escapeHtml(c.what)}: ${escapeHtml(c.reason)}, asked by ${escapeHtml(c.requestedBy ?? 'unknown')}, approved by ${escapeHtml(c.approvedBy ?? 'unknown')}</li>`).join('')}</ul>`
           : '<p style="color:#555">No comps.</p>'}
        ${report.bar.lowStock.length ? `<p><strong>Below par:</strong> ${report.bar.lowStock.map(escapeHtml).join(', ')}</p>` : ''}
        ${report.bar.closingNote ? `<p><em>${escapeHtml(report.bar.closingNote)}</em></p>` : ''}`
