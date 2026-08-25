@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `stocktakes_one_open` ON `stocktakes` (`status`) WHERE status = 'OPEN';

@@ -2291,8 +2291,9 @@ converts to the product's basis with its `container_ml` (ADR-0035).
   per line in a single batch, one statement each so the parameter count cannot grow with the
   delivery (ADR-0006). `qtyContainers` is whole containers; three cases of twelve is `36`, and six
   70 cl bottles becomes `4200` ml in the ledger. `costPencePerContainer` is per container.
-- **`POST /api/admin/bar/stocktakes`** refuses if one is already open, and snapshots
-  `expected_qty` for every active stock product.
+- **`POST /api/admin/bar/stocktakes`** refuses with `409` if one is already open, and snapshots
+  `expected_qty` for every active stock product. The refusal is backed by the partial unique index
+  `stocktakes_one_open`, so two simultaneous starts give one stocktake and one `409`, never two.
 - **`PATCH .../lines`** takes `countedContainers`, a part bottle as a decimal, and reads every
   line's container size in one statement rather than one per line (ADR-0006).
 - **`POST .../finish`** writes one `STOCKTAKE` movement per line whose count differs from on-hand

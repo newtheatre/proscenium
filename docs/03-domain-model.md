@@ -441,6 +441,9 @@ half: the content columns cannot be updated and no row can be deleted.
   snapshot taken at the start. `expected_qty` is recorded so the sheet can show what was expected
   when counting began, but correcting to it would erase any sale made during the count.
 - **An `OPEN` stocktake writes nothing.** Abandoning it is free, and only one may be open at a time.
+  That rule is held by the partial unique index `stocktakes_one_open` on `status` where `status =
+  'OPEN'`, not by the route's read: two people tapping Start at once both read no open take. The
+  loser of the race gets the same `409` as anyone else, and its lines roll back with it.
 
 `stock_delivery_lines.cost_pence_per_container` is per container, as an invoice quotes it. The most
 recent delivery cost is what stock is valued at, which is the closing-stock figure the Treasurer
