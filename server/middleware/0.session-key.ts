@@ -11,6 +11,10 @@ const REPORTS_ITS_OWN_STATE = /^\/api\/health\/?$/
 let warned = false
 
 export default defineEventHandler((event: H3Event) => {
+  // The build prerenders content routes with no secret bound, and refusing
+  // those fails the build rather than protecting anything.
+  if (import.meta.prerender) return
+
   const path = (event.path ?? '').split('?')[0] ?? ''
   if (REPORTS_ITS_OWN_STATE.test(path)) return
   if (useRuntimeConfig(event).session.password) return
