@@ -2927,14 +2927,20 @@ reuses the same **pure** helpers (`currentPrices`, `buildTransaction`, `basketMo
 | POST | `/api/training/end` | `foh.work` | Ends it and deletes its events. Idempotent |
 | GET | `/api/training/state` | `foh.work` | Active, time left, tally. **Re-asks rehearsal**, so a lead closing the register ends the run within a poll |
 | GET | `/api/training/available` | `foh.work` | Which sandboxes could be opened. Empty for everybody else, so the FOH home shows no tile |
-| GET | `/api/training/bar/tonight` | run: `bar-till` | Live catalogue and prices, fixture performances |
-| GET | `/api/training/bar/lookup` | run: `bar-till` | The fixture, shaped for the Tickets tab |
-| POST | `/api/training/bar/transactions` | run: `bar-till` | Real arithmetic including the expected-total check; writes a `SALE` event |
-| GET/POST | `/api/training/foh/age-checks` | run: `challenge-25` | This run's own entries. Never the real register |
-| GET | `/api/training/foh/lookup` | run: `door-scan` | Searches the fixture only |
+| GET | `/api/training/bar/tonight` | `foh.work` + run: `bar-till` | Live catalogue and prices, fixture performances |
+| GET | `/api/training/bar/lookup` | `foh.work` + run: `bar-till` | The fixture, shaped for the Tickets tab |
+| POST | `/api/training/bar/transactions` | `foh.work` + run: `bar-till` | Real arithmetic including the expected-total check; writes a `SALE` event |
+| GET/POST | `/api/training/foh/age-checks` | `foh.work` + run: `challenge-25` | This run's own entries. Never the real register |
+| GET | `/api/training/foh/lookup` | `foh.work` + run: `door-scan` | Searches the fixture only |
 
 Each surface route requires a run **for that target**, so an open till sandbox cannot reach the door.
 The fixture is `shared/utils/trainingScenario.ts`; no row of it is ever inserted anywhere.
+
+**Both halves of that auth column are checked on every request.** The role decides whether there is a
+sandbox at all and the run decides which one, because a run row outlives a revoked role: rehearsal's
+`expires_at` can be hours away, and a member stood down mid-term would otherwise keep the sandbox
+after `state` and `end` had begun refusing them
+([ADR-0044](./decisions/0044-a-practice-run-is-not-a-substitute-for-the-role.md)).
 
 `server/middleware/trainingMode.ts` closes the loop from the other side: while a run is open, any
 request to `/api/bar/**` or `/api/foh/**` answers `409`, **reads included**, except a named allow-list

@@ -229,8 +229,10 @@ one.
 | GET | `/api/training/foh/lookup` | The fixture only, never the database |
 | GET/POST | `/api/training/foh/age-checks` | The run's own entries, an `AGE_CHECK` event |
 
-Every one of them requires an active run whose `target_key` covers the surface, so an open `bar-till`
-run cannot reach the door sandbox.
+Every one of them requires `foh.work` **and** an active run whose `target_key` covers the surface. The
+role decides whether there is a sandbox at all, the run decides which one, and both are asked on every
+request: a run row would otherwise outlive a revoked role by as long as rehearsal's expiry
+([ADR-0044](./decisions/0044-a-practice-run-is-not-a-substitute-for-the-role.md)).
 
 `server/middleware/trainingMode.ts` completes it from the other side: while a run is live,
 `/api/bar/**` and `/api/foh/**` are refused, **reads included**. The only exceptions are a named

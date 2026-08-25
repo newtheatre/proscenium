@@ -7,7 +7,7 @@ import { db, schema } from '@nuxthub/db'
 import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import { practiceWindow, type PracticeTarget } from './eligibility'
-import type { AbilityUser } from '~~/shared/utils/abilities'
+import { type AbilityUser, workFoh } from '~~/shared/utils/abilities'
 
 export type TrainingRun = typeof schema.trainingRuns.$inferSelect
 export type TrainingEventKind = typeof schema.TRAINING_EVENT_KINDS[number]
@@ -37,10 +37,15 @@ export async function activeRun(userId: string, now: Date = new Date()): Promise
 }
 
 /**
- * Guard for every `/api/training/**` route. Refuses unless a run is open for
- * this exact surface, so a till sandbox cannot reach the door.
+ * Guard for every `/api/training/**` route. The role says whether there is a
+ * sandbox at all; the run says which one (ADR-0044).
  */
 export async function requireRun(event: H3Event, target: PracticeTarget): Promise<{ run: TrainingRun, user: AbilityUser }> {
+  // First, and not the run alone: a run row outlives a revoked role (ADR-0044).
+  await authorize(event, workFoh)
+
+  // Deliberately the raw session user: foh/lookup branches on isStaff(user) to
+  // mirror the real lookup, which branches on this same user.
   const { user } = await requireUserSession(event)
   const run = await activeRun(user.id)
 
