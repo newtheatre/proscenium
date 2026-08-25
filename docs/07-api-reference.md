@@ -278,7 +278,7 @@ is a separate, incremental job, one domain file at a time.
 | POST | `/api/users` | ADMIN/MANAGER (`createUser`) | Create a shadow account via the auth service and mirror it |
 | GET | `/api/users/:id/summary` | Staff or self (`readUser`) | Everything this app knows about one person's relationship with it |
 | GET | `/api/users/:id` | Staff or self (`readUser`) | One mirror user |
-| DELETE | `/api/users/:id` | ADMIN (others) or self (`deleteUser`) | Delete the mirror row; refuses if they have bookings |
+| DELETE | `/api/users/:id` | ADMIN (others) or self (`deleteUser`) | Delete the mirror row; refuses if anything references it |
 
 Credentials, roles, verification and erasure are the auth service's: there is no `PUT /api/users/:id`
 and no password-reset route here.
@@ -1644,9 +1644,11 @@ The `deleteUser` ability is unusual: read it carefully:
 
 **Response** `200`: `{ message: 'User deleted successfully' }`
 
-**Errors** `400 User ID is required`; `404 User not found`; `403`.
+**Errors** `400 User ID is required`; `404 User not found`; `409` when anything still references the row; `403`.
 
-**Side effects** none: this deletes the mirror row only, and the central identity is untouched. **`reservations.userId` and `passes.userId` are both `onDelete: 'restrict'`**, so anyone who has ever booked or held a pass cannot be deleted; the handler pre-checks reservations and returns 409. To remove a *person*, use erasure at the auth service, which calls this app's anonymise hook. The caller's session is not cleared when they delete themselves.
+**The guard is reference-agnostic.** Thirty-odd columns across the schema point at `users.id`. The `restrict` ones would surface a raw foreign-key error as a 500, and the `set null` ones are worse: the delete would succeed and quietly blank who voided a transaction, who approved a comp and who signed a night off, while `access_profiles` and `training_runs` cascade away entirely. So `tablesReferencingUser()` (`server/utils/userReferences.ts`) reads the referencing columns out of the Drizzle schema and asks, in one statement with one bound parameter, whether any of them holds a row. Any hit is a 409 naming the tables. A new `references(() => users.id)` is covered the moment it is declared, with nothing to remember to update.
+
+**Side effects** none: this deletes the mirror row only, and the central identity is untouched. In practice anyone who has ever booked, held a pass, worked a shift or taken money is undeletable, which is the intent: to remove a *person*, use erasure at the auth service, which calls this app's anonymise hook ([ADR-0014](decisions/0014-anonymise-never-delete.md)). The caller's session is not cleared when they delete themselves.
 
 ---
 

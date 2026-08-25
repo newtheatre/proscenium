@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { count, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { deleteUser } from '~~/shared/utils/abilities'
 
 /** DELETE /api/users/:id. Delete a user. Admin or own account. */
@@ -20,17 +20,14 @@ export default defineEventHandler(async (event) => {
   // Check if user has permission to delete this user
   await authorize(event, deleteUser, { id: userId })
 
-  // reservations.userId is `restrict`, so anyone with booking history cannot be
-  // deleted. The answer there is anonymisation (ADR-0014).
-  const [bookings] = await db
-    .select({ n: count() })
-    .from(schema.reservations)
-    .where(eq(schema.reservations.userId, userId))
+  // Any reference at all, not a hand-listed few: `restrict` would surface a raw
+  // foreign-key error and `set null` would quietly erase authorship (ADR-0014).
+  const referencedBy = await tablesReferencingUser(userId)
 
-  if ((bookings?.n ?? 0) > 0) {
+  if (referencedBy.length) {
     throw createError({
       statusCode: 409,
-      statusMessage: `This account cannot be deleted because it has ${bookings!.n} booking${bookings!.n === 1 ? '' : 's'} against it. Booking history has to be kept for reporting. Close the account instead, POST /api/users/${userId}/anonymise removes the person and keeps the sales record.`,
+      statusMessage: `This account cannot be deleted because records still reference it (${referencedBy.join(', ')}). Booking, sales and rota history has to be kept for reporting. Erase the person centrally at the auth service instead: that anonymises this mirror row and keeps the record.`,
     })
   }
 
