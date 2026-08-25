@@ -1,5 +1,10 @@
 import { db, schema } from '@nuxthub/db'
-import { desc } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, inArray, not, notInArray, sql } from 'drizzle-orm'
+import { z } from 'zod'
+
+const querySchema = paginationSchema.extend({
+  upcoming: z.enum(['true', 'false']).optional().default('true'),
+})
 
 interface BookingPerformance {
   startsAt: Date
@@ -31,31 +36,47 @@ interface BookingRow {
   }>
 }
 
-/**
- * GET /api/bookings/my: get the current user's bookings.
- *
- * Requires authentication. Returns upcoming and past bookings.
- */
+/** GET /api/bookings/my: one page of the caller's own bookings, upcoming or past. */
 export default defineEventHandler(async (event) => {
   // Identity only: this handler reads no role, so it must not be gated on role
   // staleness (ADR-0008).
   const { id: userId } = await requireSessionUser(event)
-  const now = new Date()
+  const { page, limit, upcoming } = await getValidatedQuery(event, querySchema.parse)
+  const wantUpcoming = upcoming === 'true'
 
-  const bookings = await db.query.reservations.findMany({
-    where: (r, { eq }) => eq(r.userId, userId),
-    orderBy: [desc(schema.reservations.createdAt)],
-    columns: reservationCustomerColumns,
-    with: reservationCustomerWith,
-  }) as BookingRow[]
+  // A subquery, never an id list: the parameter count must not grow with the
+  // rows covered (ADR-0006).
+  const futurePerformances = db.select({ id: schema.performances.id })
+    .from(schema.performances)
+    .where(gt(schema.performances.startsAt, new Date()))
 
-  // Split into upcoming and past based on performance start time
-  const upcoming = bookings.filter(
-    b => new Date(b.performance.startsAt) > now && !['CANCELLED', 'NO_SHOW'].includes(b.status),
+  const stillToCome = and(
+    inArray(schema.reservations.performanceId, futurePerformances),
+    notInArray(schema.reservations.status, ['CANCELLED', 'NO_SHOW']),
+  )!
+
+  // Exact complements, so no booking falls into both lists or neither.
+  const where = and(
+    eq(schema.reservations.userId, userId),
+    wantUpcoming ? stillToCome : not(stillToCome),
   )
-  const past = bookings.filter(
-    b => new Date(b.performance.startsAt) <= now || ['CANCELLED', 'NO_SHOW'].includes(b.status),
-  )
 
-  return { upcoming, past }
+  // Inner names are identifiers, not columns: a relational query rewrites every
+  // Column it is given to the root table (ADR-0046).
+  const startsAt = sql`(select ${schema.performances}.${sql.identifier(schema.performances.startsAt.name)} from ${schema.performances} where ${schema.performances}.${sql.identifier(schema.performances.id.name)} = ${schema.reservations.performanceId})`
+
+  const [rows, totals] = await Promise.all([
+    db.query.reservations.findMany({
+      where: () => where,
+      // Upcoming reads by when you turn up, not by when you booked.
+      orderBy: wantUpcoming ? [asc(startsAt)] : [desc(startsAt)],
+      columns: reservationCustomerColumns,
+      with: reservationCustomerWith,
+      limit,
+      offset: offsetFor({ page, limit }),
+    }),
+    db.select({ value: count() }).from(schema.reservations).where(where),
+  ])
+
+  return paginated(rows as BookingRow[], totals[0]?.value ?? 0, { page, limit })
 })
