@@ -77,6 +77,16 @@ the register in rehearsal ends the sandbox here within a poll.
 A run belongs to a person, not a device or a tab. Somebody who starts practising on their phone and
 picks up the counter laptop is in the same run.
 
+**`POST /api/training/start` asks the seam every time, resuming as well as opening**
+([ADR-0033](./decisions/0033-the-practice-window-fails-closed.md)). Reopening a screen whose run is
+still on the row is the common way back in, from a bookmark, the back button or the Practice tile
+still on the FOH home, and a window closed since it opened must refuse there too. Only a definitive
+`CLOSED` ends the run; `UNREACHABLE` resumes it untouched, because ending deletes the run's events
+with it ([ADR-0034](./decisions/0034-an-open-sandbox-closes-only-on-a-definitive-answer.md)).
+
+The client pins on the intent rather than the outcome: a page reached with `?practice=1` refuses its
+fetches outright if practice is not open, instead of quietly resolving them to the live route.
+
 ### 3.1 The banner
 
 While a run is live, every page in `/foh` carries an unmissable persistent banner: that this is

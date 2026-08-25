@@ -1,4 +1,4 @@
-import { computed, createError, navigateTo, ref, useNuxtApp, useRequestFetch, useState, watch } from '#imports'
+import { computed, createError, navigateTo, ref, useNuxtApp, useRequestFetch, useRoute, useState, watch } from '#imports'
 import { callWithNuxt } from '#app'
 
 export type TrainingTarget = 'bar-till' | 'challenge-25' | 'door-scan'
@@ -123,9 +123,9 @@ export function useTrainingMode(surface?: TrainingSurface) {
    * whose buttons have quietly become real.
    */
   function leaveWhenPracticeEnds() {
-    // Pinned at setup and never cleared as the run ends: clearing it there
-    // hands the live API back to the screen while navigation is in flight.
-    pinned.value = active.value
+    // Pinned on the intent, never the outcome: a refused or ended run has
+    // already cleared `active`, and must not hand the live API back.
+    pinned.value = active.value || Boolean(useRoute().query.practice)
     watch(active, (now, before) => {
       if (before && !now) {
         callWithNuxt(nuxtApp, () => navigateTo({ path: '/foh', query: { practice: 'ended' } }))
