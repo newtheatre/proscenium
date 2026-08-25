@@ -131,7 +131,8 @@ async function takingsForPerformance(performanceId: string) {
     ))
     .groupBy(schema.transactionLines.kind, schema.transactions.tender)
 
-  // Refunded tickets are money given back, so they are not takings.
+  // Refunded tickets are money given back, so they are not takings. A comped
+  // booking gave none back, so it is not a refund either.
   const [refunded] = await db.select({
     total: sql<number>`coalesce(sum(${schema.tickets.pricePaid}), 0)`,
   })
@@ -139,6 +140,7 @@ async function takingsForPerformance(performanceId: string) {
     .where(and(
       eq(schema.tickets.performanceId, performanceId),
       isNotNull(schema.tickets.refundedAt),
+      notComped(),
     ))
 
   let ticketsPence = 0
@@ -300,7 +302,14 @@ export async function closeNight(input: CloseNightInput) {
     await resetCode(payload.performance.night, input.closedByUserId)
   }
 
-  await emailNightReport(stored!.id, payload, input.autoClosed)
+  try {
+    await emailNightReport(stored!.id, payload, input.autoClosed)
+  }
+  catch (error) {
+    // The night is closed either way. `reports:email-unsent` retries the copy.
+    console.error(`[night-report] ${stored!.id} stored but not emailed:`, error)
+  }
+
   return stored!
 }
 

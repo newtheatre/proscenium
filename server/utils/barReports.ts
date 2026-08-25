@@ -7,7 +7,9 @@ import { alias } from 'drizzle-orm/sqlite-core'
  * and closing stock at cost. Design: docs/13-bar-design.md §6
  */
 
-export type SalesGrouping = 'product' | 'category' | 'performance' | 'month'
+// No per-performance grouping: bar money belongs to the night's session, and a
+// session can serve two performances, so a per-line split would double-count (docs/13 §4.5).
+export type SalesGrouping = 'product' | 'category' | 'month'
 
 /** Bar lines only. Ticket money is the box office's report, not the bar's. */
 function barLineRange(from: string, to: string) {
@@ -23,7 +25,6 @@ export async function salesBy(grouping: SalesGrouping, from: string, to: string,
   const key = {
     product: schema.barProducts.name,
     category: schema.barCategories.name,
-    performance: schema.shows.title,
     month: sql<string>`substr(${schema.transactions.takenOn}, 1, 7)`,
   }[grouping]
 
@@ -39,8 +40,6 @@ export async function salesBy(grouping: SalesGrouping, from: string, to: string,
     .innerJoin(schema.transactions, eq(schema.transactions.id, schema.transactionLines.transactionId))
     .leftJoin(schema.barProducts, eq(schema.barProducts.id, schema.transactionLines.productId))
     .leftJoin(schema.barCategories, eq(schema.barCategories.id, schema.barProducts.categoryId))
-    .leftJoin(schema.performances, eq(schema.performances.id, schema.transactionLines.performanceId))
-    .leftJoin(schema.shows, eq(schema.shows.id, schema.performances.showId))
     .where(barLineRange(from, to))
     .groupBy(sql`label`)
 
@@ -53,8 +52,6 @@ export async function salesBy(grouping: SalesGrouping, from: string, to: string,
     .innerJoin(schema.transactions, eq(schema.transactions.id, schema.transactionLines.transactionId))
     .leftJoin(schema.barProducts, eq(schema.barProducts.id, schema.transactionLines.productId))
     .leftJoin(schema.barCategories, eq(schema.barCategories.id, schema.barProducts.categoryId))
-    .leftJoin(schema.performances, eq(schema.performances.id, schema.transactionLines.performanceId))
-    .leftJoin(schema.shows, eq(schema.shows.id, schema.performances.showId))
     .where(barLineRange(from, to))
 
   return { rows: rows.map(normaliseSales), total: Number(total?.value ?? 0) }
@@ -76,6 +73,8 @@ export async function discountsIn(from: string, to: string) {
   const range = and(
     gte(schema.transactions.takenOn, from),
     lte(schema.transactions.takenOn, to),
+    // A voided tab charge was never paid for, so nothing was given away on it.
+    isNull(schema.transactions.voidedAt),
     sql`${schema.transactions.discountPence} > 0`,
   )
 

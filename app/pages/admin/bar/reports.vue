@@ -17,7 +17,7 @@ const { data: term } = await useAsyncData('bar-term', () => requestFetch<Term>('
 
 const from = ref(term.value?.from ?? '')
 const to = ref(term.value?.to ?? '')
-const groupBy = ref<'product' | 'category' | 'performance' | 'month'>('month')
+const groupBy = ref<'product' | 'category' | 'month'>('month')
 
 const { data: sales } = await useAsyncData(
   'bar-sales',
@@ -123,7 +123,6 @@ const registerUrl = computed(() =>
                 { label: 'By month', value: 'month' },
                 { label: 'By product', value: 'product' },
                 { label: 'By category', value: 'category' },
-                { label: 'By performance', value: 'performance' },
               ]"
               value-key="value"
               class="w-44"

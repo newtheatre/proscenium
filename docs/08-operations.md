@@ -244,6 +244,7 @@ Cloudflare to call it.
 | `access:sweep` | Marks verified access profiles `EXPIRED` past their date, and deletes withdrawals after 30 days. Expiry is housekeeping, not deletion: the person can renew (`docs/12` §2.5) |
 | `comps:sweep` | Marks unanswered comp requests `EXPIRED`, every 15 minutes. **Tidying only**: expiry is derived at read and refused at approval, so a missed run changes no behaviour (`docs/13` §4.1.2) |
 | `reports:auto-close` | Files an end-of-night report for any performance **in our building** nobody signed off, banner-marked *auto-closed, no duty manager sign-off*. A venue marked external has no night of ours to close (ADR-0029). **Idempotent**: the unique index on `performance_id` means a second run closes nothing (`docs/12` §4.1) |
+| `reports:email-unsent` | Re-sends the courtesy copy of any report from the last seven nights that was stored but never emailed, twenty at a time. Reports for tonight are left alone, because tasks sharing a cron run together and the close may be emailing one right now |
 | `shifts:remind` | Emails everyone confirmed on tomorrow's performances, with an ICS attachment. **Not idempotent**: running it twice sends twice, which is why it is scheduled once and not retried |
 | `training:purge` | Deletes finished and expired training runs and their events, after a day's grace so a trainer can debrief the morning after. Practice is scratch: nothing aggregates it (`docs/14` §9) |
 
@@ -253,6 +254,12 @@ Run one by hand in development with `POST /_nitro/tasks/<name>`: note the name i
 dashboard.
 
 **A task that fails is silent.** Nothing pages anyone. If a sweep matters to you, check it.
+
+**When a night's report does not arrive.** The report is filed whether or not the email goes out, so
+read it at `/api/foh/performances/:id/report` and do not re-close the night: closing twice is
+refused. The copy is retried at noon the next day; a report still showing `emailed_at is null` after
+that has a delivery problem, and `wrangler tail` around noon names the address it failed on. A night
+older than seven days is past the retry window and needs the address fixed and the copy sent by hand.
 
 **On `0 12 * * *` and British Summer Time.** Cloudflare crons are UTC, so this fires at noon London
 in winter and at 13:00 London in summer. That is deliberate: it is never *early*, and the deadline
