@@ -6,6 +6,7 @@ export default defineEventHandler(async (event) => {
 
   const { user } = await requireUserSession(event)
   const scope = await requireFohScope(user)
+  requireRosteredTonight(scope)
   const id = getRouterParam(event, 'id')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Message ID is required' })
 

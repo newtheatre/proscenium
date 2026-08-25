@@ -12,6 +12,7 @@ export default defineEventHandler(async (event) => {
 
   const { user } = await requireUserSession(event)
   const scope = await requireFohScope(user)
+  requireRosteredTonight(scope)
   const input = await readValidatedBody(event, bodySchema.parse)
   const night = await ensureNight(scope.night)
 

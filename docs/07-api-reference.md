@@ -359,16 +359,16 @@ and no password-reset route here.
 | POST | `/api/foh/performances/:id/close` | Tonight's `DUTY_MANAGER`, or `BOX_OFFICE`+ | Sign the night off: file the report, revoke the codes, email it |
 | GET | `/api/foh/performances/:id/report` | `foh.work`, scoped to tonight | The stored record, if the night is closed |
 | GET | `/api/foh/access-tonight` | `foh.work` + the §2.5 rule | Consented access needs for this performance |
-| GET | `/api/foh/backstage` | `foh.work` (`workFoh`) | Tonight's backstage code, its QR, and the joined devices |
-| POST | `/api/foh/backstage/reset` | `foh.work` (`workFoh`) | The kill switch: rotate the code, sign every device out |
+| GET | `/api/foh/backstage` | `foh.work` + rostered tonight | Tonight's backstage code, its QR, and the joined devices |
+| POST | `/api/foh/backstage/reset` | `foh.work` + rostered tonight | The kill switch: rotate the code, sign every device out |
 | POST | `/api/backstage/join` | **Public** | Join tonight's board with the code. Rate limited, and self-rotating |
 | GET | `/api/backstage/session` | Backstage cookie | Is this device still joined? |
 | GET | `/api/backstage/board` | Backstage cookie | The board, the presets and the house count. Polled |
 | POST | `/api/backstage/messages` | Backstage cookie | Send a preset or free text |
 | POST | `/api/backstage/messages/:id/ack` | Backstage cookie | Acknowledge a front-of-house call |
-| GET | `/api/foh/backstage/board` | `foh.work` (`workFoh`) | The front-of-house side of the board. Polled |
-| POST | `/api/foh/backstage/messages` | `foh.work` (`workFoh`) | Call something through to backstage |
-| POST | `/api/foh/backstage/messages/:id/ack` | `foh.work` (`workFoh`) | Acknowledge a backstage call |
+| GET | `/api/foh/backstage/board` | `foh.work` + rostered tonight | The front-of-house side of the board. Polled |
+| POST | `/api/foh/backstage/messages` | `foh.work` + rostered tonight | Call something through to backstage |
+| POST | `/api/foh/backstage/messages/:id/ack` | `foh.work` + rostered tonight | Acknowledge a backstage call |
 | GET | `/api/backstage/emergency` | **Public** | Tonight's emergency cards. Public on purpose |
 | GET | `/api/foh/emergency` | `foh.work` (`workFoh`) | The venue's emergency card for a performance |
 | GET | `/api/foh/contacts` | `foh.work` (`workFoh`) | Who is on tonight, and the numbers to call |
@@ -2656,8 +2656,11 @@ else. That is the one piece of box office data that crosses to backstage (§5.2)
 by the shared seat rule ([ADR-0007](./decisions/0007-one-seat-counting-rule.md)) rather than counted
 again here.
 
-The FOH side is scoped by the rota like every other show-night route; the backstage side takes a
-code session and never a user.
+The FOH side is scoped by the rota like every other show-night route: all five
+`/api/foh/backstage/**` routes call `requireRosteredTonight()` after `requireFohScope()` and answer
+`404 You are not working tonight.` to a role holder with no confirmed shift, so an off-duty volunteer
+cannot send what the wings read as an authentic call. The backstage side takes a code session and
+never a user.
 
 `GET /api/foh/backstage/board` also returns **`timings`**: the night's curtain-up record, derived
 from preset transitions. The *first* time a milestone was called is the one that counts, and the

@@ -70,6 +70,12 @@ function keepInFlight(incoming: Message[]) {
   })
 }
 
+let boardTimer: ReturnType<typeof setInterval> | null = null
+function stopPolling() {
+  if (boardTimer) clearInterval(boardTimer)
+  boardTimer = null
+}
+
 async function loadBoard() {
   try {
     const board = await requestFetch<{ messages: Message[], presets: Preset[], timings: Timing[] }>('/api/foh/backstage/board')
@@ -77,8 +83,10 @@ async function loadBoard() {
     presets.value = board.presets
     timings.value = board.timings
   }
-  catch {
-    // The code and the device list still matter if the board fails.
+  catch (error) {
+    // 404 is "not working tonight", which no amount of retrying changes.
+    if ((error as { statusCode?: number }).statusCode === 404) stopPolling()
+    // Otherwise the code and the device list still matter if the board fails.
   }
 }
 
@@ -116,13 +124,10 @@ async function acknowledge(message: Message) {
   await loadBoard()
 }
 
-let boardTimer: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
   boardTimer = setInterval(loadBoard, 2500)
 })
-onBeforeUnmount(() => {
-  if (boardTimer) clearInterval(boardTimer)
-})
+onBeforeUnmount(stopPolling)
 
 const resetting = ref(false)
 const confirming = ref(false)
