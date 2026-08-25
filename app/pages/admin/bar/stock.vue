@@ -9,14 +9,17 @@ definePageMeta({
   title: 'Bar stock',
 })
 
+// Asserted, not inferred, so nothing compares this to the handler: keep it in
+// step with the select list in server/api/admin/bar/stock/index.get.ts by hand.
 interface StockRow {
   id: string
+  categoryId: string
   name: string
   unit: ProductUnit
   containerMl: number | null
   stockOnly: boolean
-  stockProductId: string | null
   parQty: number | null
+  status: 'ACTIVE' | 'HIDDEN' | 'RETIRED'
   onHandQty: number
   onHandContainers: number
   lastCostPence: number | null
@@ -26,6 +29,7 @@ interface StockRow {
 
 interface StockResponse {
   rows: StockRow[]
+  categories: { id: string, name: string, sort: number, colour: string | null }[]
   stockAtCostPence: number
   belowParCount: number
   lastDelivery: { id: string, supplier: string, deliveredOn: string } | null

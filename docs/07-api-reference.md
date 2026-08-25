@@ -2257,7 +2257,13 @@ offers no pass until the box office has been paid.
 - **A recipe the till could not ring up is refused**, naming which rule it broke: an ingredient
   that does not hold stock, a category with nothing stocked in it, a category that mixes things
   counted in millilitres with things counted in items, an ingredient of itself, or a recipe on
-  something another product is made from. Maximum eight ingredients.
+  something another product is made from. Maximum eight ingredients. **The status codes split by
+  kind**: an ingredient or category that does not exist, and a product named as an ingredient of
+  itself, are `400`; the one-level refusals are `409`, because the target exists and the catalogue
+  is simply the wrong shape for it. Pointing an ingredient at something that is itself a recipe is
+  `409 An ingredient has to hold its own stock. Point at the bottle, not at a measure of it.`, and
+  giving a recipe to a product something else is made from is `409 Something else is made from
+  this, so it has to hold stock. Take it out of that recipe first.`
 - **One level cuts both ways, so an edit that would empty a live choice pool is `409` too.** A
   product reached through a `choiceCategoryId` is as much an ingredient as a fixed one, and
   retiring it, hiding it, moving it to another category or giving it a recipe of its own would all
@@ -2278,9 +2284,6 @@ offers no pass until the box office has been paid.
   `stockOnly` is set and refused when it is; a recipe alongside it is refused too, because
   something stock-only holds its own stock. `GET /api/bar/tonight`, the tab menu and the
   training mirror all filter them out in SQL rather than relying on the missing price.
-- **Depletion is one level and the API enforces it.** Pointing a measure at another measure is
-  `400 That product already draws from another. Point at the one that holds the stock.`, pointing a
-  product at itself is refused, and a non-existent target is refused (`docs/13` §3.1).
 - **Retiring is not deleting.** A `RETIRED` product leaves the till and keeps every past sale,
   price row and stock movement exactly as it was.
 - **A price is added, never edited.** `POST .../prices` writes a new dated row; a future
