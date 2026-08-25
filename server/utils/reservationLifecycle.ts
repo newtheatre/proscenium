@@ -30,10 +30,12 @@ export function assertTicketsEditable(status: string): void {
 }
 
 /**
- * Guard for the refund route. Throws unless the reservation has been collected.
+ * Guard for the refund route. Throws unless the reservation has been collected,
+ * or was cancelled with money still on it (ADR-0039).
  */
-export function assertRefundable(status: string): void {
+export function assertRefundable(status: string, strandedPayment = false): void {
   if (isCollected(status)) return
+  if (status === 'CANCELLED' && strandedPayment) return
 
   if (status === 'PENDING') {
     throw createError({

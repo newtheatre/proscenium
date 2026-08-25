@@ -220,7 +220,7 @@ is a separate, incremental job, one domain file at a time.
 | PUT | `/api/reservations/:id` | Staff (`updateReservation`) | Change status, cancellation attribution, and notes |
 | DELETE | `/api/reservations/:id` | ADMIN/MANAGER (`deleteReservation`) | Hard-delete the reservation and its tickets |
 | PUT | `/api/reservations/:id/tickets` | Staff (`updateReservation`) | Set desired quantities per ticket type; server diffs and applies. **PENDING only** |
-| POST | `/api/reservations/:id/refund` | ADMIN/MANAGER (`refundTicket`) | Refund n tickets of a type. **Collected bookings only** |
+| POST | `/api/reservations/:id/refund` | ADMIN/MANAGER (`refundTicket`) | Refund n tickets of a type. Collected bookings, or a cancelled one still holding money |
 | GET | `/api/reservations/:id/available-ticket-types` | Staff (`updateReservation`) | Effective prices for this reservation's performance |
 
 ### Shows
@@ -856,7 +856,11 @@ Only keys actually present are written; explicit `null` clears the column. Movin
 | 400 | `Reservation ID is required` |
 | 400 | `No valid fields provided for update` (empty body) |
 | 404 | `Reservation not found` |
+| 409 | Moving a paid booking back to `PENDING` or `NO_SHOW`: refund it instead |
+| 409 | Cancelling a paid booking with tickets still unrefunded ([ADR-0039](decisions/0039-refund-before-cancelling-a-collected-booking.md)) |
 | 403 | Not staff |
+
+**Cancelling a collected booking needs the refund first.** Cancelling releases the seats to resale and the door then reads the booking as `CANCELLED`, so the money has to be back with the customer before it happens: `COLLECTED`/`DOOR` → `CANCELLED` is refused with a 409 naming the amount while any paid, unrefunded ticket remains. Once everything is refunded the transition is allowed, so refund-then-cancel completes normally, and a comped booking (nothing taken) cancels straight away. The reverse direction is open in the same conditions: `POST /:id/refund` accepts a `CANCELLED` booking that still carries money taken, so an already-stranded booking can be put right in the app instead of by hand in D1.
 
 **Side effects** When `status` transitions **to** `CANCELLED` from something else, a cancellation email is sent to the customer. As with the booking confirmation, it is fire-and-forget with `.catch()` logging and `event.context.cloudflare?.context.waitUntil()`. Re-cancelling an already-cancelled reservation sends nothing. Cancelling does **not** delete or refund the ticket rows: they stay, and simply stop counting towards capacity and revenue because those queries filter on status.
 

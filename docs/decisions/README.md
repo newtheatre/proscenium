@@ -52,6 +52,7 @@ ADR; the ADR carries the reasoning and the history. See [CONTRIBUTING.md](../../
 | [0036](0036-a-sold-product-is-a-recipe.md) | A sold product is a recipe over the things we stock | Accepted |
 | [0037](0037-a-table-rebuild-takes-its-dependents-with-it.md) | A generated table rebuild takes its dependents with it | Accepted |
 | [0038](0038-no-ability-may-throw.md) | No ability may throw, and a missing resource denies | Accepted |
+| [0039](0039-refund-before-cancelling-a-collected-booking.md) | Refund before cancelling a collected booking, and keep the pair symmetric | Accepted |
 
 ## Template
 

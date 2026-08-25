@@ -30,8 +30,10 @@ export default defineEventHandler(async (event) => {
 
   if (!reservation) throw createError({ statusCode: 404, statusMessage: 'Reservation not found' })
 
-  // Only a collected booking has money to give back: see reservationLifecycle.
-  assertRefundable(reservation.status)
+  // A booking cancelled with money still on it is refundable too, or the cash
+  // is stranded outside the app (ADR-0039).
+  const stranded = reservation.status === 'CANCELLED' && (await unrefundedPaidPence(id)) > 0
+  assertRefundable(reservation.status, stranded)
 
   const active = await db
     .select()
