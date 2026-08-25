@@ -2063,12 +2063,21 @@ allow-list is name and id only.
 }
 ```
 
+**Both bounds default, and the window is capped at 120 days.** `from` omitted is today in
+Europe/London; `to` omitted is `from` plus 60 days. Both figures match `/api/shifts/mine`, which
+defaults to 60 days and caps at 120. A window wider than the cap is `400`, so `?from=2016-01-01` is
+refused rather than reading a decade of stamped shifts. A bare `GET /api/shifts` still works and
+still answers.
+
 Bounded by the performance's own `startsAt`, so the bound-parameter count does not grow with the
 number of rows covered ([ADR-0006](./decisions/0006-d1-bound-parameter-limit.md)). Cancelled
 performances are excluded.
 
 **Response** `200`: a bare array of shifts, each carrying its performance, show title and venue
-name. Not paginated: the window bounds it.
+name. Not paginated: the window bounds it, which is now true of every request rather than only of
+the ones that passed a window.
+
+**Errors** `400 Ask for at most 120 days of rota at a time.`
 
 ---
 
