@@ -1,7 +1,9 @@
 /**
- * The invented night a trainee practises on. Frozen data in the shapes the
- * real endpoints return; no row of this is ever inserted (ADR-0032).
+ * The invented night a trainee practises on, in the shapes the real endpoints
+ * return. No row of it is ever inserted (ADR-0032); its dates move (ADR-0045).
  */
+
+import { daysAfter, londonInstant } from './londonTime'
 
 export interface ScenarioTicket {
   pricePaid: number
@@ -23,9 +25,18 @@ export interface ScenarioBooking {
 
 export interface ScenarioPerformance {
   id: string
-  startsAt: string
   showTitle: string
   venueName: string
+  /** Curtain-up as a Europe/London wall clock, the same on whatever night. */
+  curtain: string
+  /** Show nights after tonight. 0 runs tonight; the rest deliberately do not. */
+  nightsAhead: number
+}
+
+export interface DatedPerformance extends ScenarioPerformance {
+  startsAt: string
+  /** By the caller's window, which is the rule the real routes scope with. */
+  isTonight: boolean
 }
 
 /**
@@ -35,21 +46,47 @@ export interface ScenarioPerformance {
 export const TRAINING_PERFORMANCES: readonly ScenarioPerformance[] = Object.freeze([
   {
     id: 'training-perf-1',
-    startsAt: '2026-01-01T19:30:00.000Z',
     showTitle: 'The Rehearsal That Never Was (practice)',
     venueName: 'Practice House',
+    curtain: '19:30',
+    nightsAhead: 0,
   },
   {
     id: 'training-perf-2',
-    startsAt: '2026-01-01T21:30:00.000Z',
     showTitle: 'A Late One (practice)',
     venueName: 'Practice Studio',
+    curtain: '21:30',
+    nightsAhead: 0,
+  },
+  {
+    // The advance-payment case: payable at the till, invisible at the door.
+    id: 'training-perf-3',
+    showTitle: 'The One Next Week (practice)',
+    venueName: 'Practice House',
+    curtain: '19:30',
+    nightsAhead: 7,
   },
 ])
 
 /**
- * The cases worth rehearsing, not a tidy happy path: an unpaid booking to
- * send to the counter, a party, an already-admitted rescan, a cancellation.
+ * The fixture dated against a show night. `isTonight` is decided by the window
+ * the caller passes, so the sandbox cannot answer differently (ADR-0045).
+ */
+export function trainingPerformances(night: string, tonight: { from: Date, to: Date }): DatedPerformance[] {
+  return TRAINING_PERFORMANCES.map((performance) => {
+    const [hours, minutes] = performance.curtain.split(':').map(Number) as [number, number]
+    const startsAt = londonInstant(daysAfter(night, performance.nightsAhead), hours, minutes, 0, 0)
+    return {
+      ...performance,
+      startsAt: startsAt.toISOString(),
+      isTonight: startsAt >= tonight.from && startsAt <= tonight.to,
+    }
+  })
+}
+
+/**
+ * The cases worth rehearsing, not a tidy happy path: an unpaid booking, a
+ * party, an advance booking for another night, a rescan, a cancellation.
  */
 export const TRAINING_BOOKINGS: readonly ScenarioBooking[] = Object.freeze([
   {
@@ -91,13 +128,18 @@ export const TRAINING_BOOKINGS: readonly ScenarioBooking[] = Object.freeze([
     accessNeeds: ['levelAccess', 'difficultyStanding'],
   },
   {
+    // Another night, so the till's advance-payment case is reachable and the
+    // door, which searches tonight only, finds nothing (ADR-0045).
     id: 'training-res-4',
     bookingRef: 'TRAIN4',
-    status: 'COLLECTED',
+    status: 'PENDING',
     customerName: 'Practice Customer Four',
     customerEmail: 'four2@practice.invalid',
-    performanceId: 'training-perf-1',
-    tickets: [{ pricePaid: 700, refundedAt: null, ticketTypeName: 'Standard' }],
+    performanceId: 'training-perf-3',
+    tickets: [
+      { pricePaid: 700, refundedAt: null, ticketTypeName: 'Standard' },
+      { pricePaid: 700, refundedAt: null, ticketTypeName: 'Standard' },
+    ],
     accessNeeds: null,
   },
   {
@@ -132,6 +174,7 @@ export function findTrainingBookings(term: string): ScenarioBooking[] {
   ).slice(0, 10)
 }
 
+/** The undated fixture, for a caller with no show night to date it against. */
 export function trainingPerformance(id: string): ScenarioPerformance | undefined {
   return TRAINING_PERFORMANCES.find(performance => performance.id === id)
 }

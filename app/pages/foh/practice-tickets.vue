@@ -25,6 +25,15 @@ const NEED_LABELS: Record<string, string> = {
 }
 
 /**
+ * A booking for another night is not at the door at all: the real door lookup
+ * searches tonight's performances only, and the sandbox is scoped the same way.
+ */
+const ANOTHER_NIGHT = {
+  verdict: 'Nothing at the door: not tonight',
+  teach: 'The door finds tonight\'s bookings only. Send them to the counter, which can take payment for another night.',
+}
+
+/**
  * The lesson per verdict, keyed by the standing the door will compute, so a
  * card cannot claim an outcome the scanner disagrees with.
  */
@@ -70,7 +79,10 @@ function qrPath(text: string) {
 const cards = computed(() => TRAINING_BOOKINGS.map((booking) => {
   const standing = bookingStanding(booking)
   const performance = trainingPerformance(booking.performanceId)
-  const lesson = LESSON[standing.state]
+  // The night is a fact about the fixture, not about today, so a printed sheet
+  // keeps telling the truth however long a trainer holds on to it.
+  const tonight = (performance?.nightsAhead ?? 0) === 0
+  const lesson = tonight ? LESSON[standing.state] : ANOTHER_NIGHT
   const people = `${standing.partySize} ${standing.partySize === 1 ? 'person' : 'people'}`
   const owed = standing.amountOwedPence ? `, ${formatMoney(standing.amountOwedPence)} owed` : ''
   return {
@@ -78,7 +90,7 @@ const cards = computed(() => TRAINING_BOOKINGS.map((booking) => {
     name: booking.customerName,
     showTitle: performance?.showTitle ?? 'A practice performance',
     venueName: performance?.venueName ?? '',
-    startsAt: performance?.startsAt ?? null,
+    when: `${tonight ? 'Tonight' : 'Another night'}, ${performance?.curtain ?? ''}`,
     needs: (booking.accessNeeds ?? []).map(need => NEED_LABELS[need] ?? need),
     verdict: `${lesson.verdict}, ${people}${owed}`,
     teach: lesson.teach,
@@ -107,13 +119,15 @@ function print() {
           </NuxtLink>
         </div>
         <p class="mt-2 text-sm">
-          Five practice tickets for the door sandbox. Print them, cut along the dashed lines and hand
-          them out. They work on their own: nobody has to be in a practice run for you to print this.
+          Five practice tickets. Print them, cut along the dashed lines and hand them out. They work
+          on their own: nobody has to be in a practice run for you to print this, and no card carries
+          a calendar date, so the same printed sheet keeps working next term.
         </p>
         <p class="mt-2 text-sm">
           The trainee opens <strong>Practise the door</strong> from the Front of House screen and
           scans these. Scanning the same card twice is how you practise a rescan: the verdict must
-          not change.
+          not change. <strong>TRAIN4</strong> is the odd one out on purpose: it is booked for another
+          night, so the door finds nothing and it belongs at the till instead.
         </p>
         <UButton
           class="mt-4"
@@ -177,7 +191,7 @@ function print() {
               {{ card.showTitle }}
             </p>
             <p>
-              {{ formatTime(card.startsAt) }} · {{ card.venueName }}
+              {{ card.when }} · {{ card.venueName }}
             </p>
           </div>
 

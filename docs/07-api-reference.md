@@ -2934,7 +2934,13 @@ reuses the same **pure** helpers (`currentPrices`, `buildTransaction`, `basketMo
 | GET | `/api/training/foh/lookup` | `foh.work` + run: `door-scan` | Searches the fixture only |
 
 Each surface route requires a run **for that target**, so an open till sandbox cannot reach the door.
-The fixture is `shared/utils/trainingScenario.ts`; no row of it is ever inserted anywhere.
+The fixture is `shared/utils/trainingScenario.ts`; no row of it is ever inserted anywhere. Its nights
+are **dated against tonight** rather than being constants, and `isTonight` on the till's lookup is
+decided by the same `showNightDate` plus `validityStart`/`validityEnd` window the real routes use
+([ADR-0045](./decisions/0045-the-practice-fixture-dates-itself-against-tonight.md)). So
+`/api/training/bar/tonight` returns tonight's fixture performances only, `/api/training/foh/lookup`
+searches tonight's bookings only (as the real door lookup does), and `/api/training/bar/lookup` is
+deliberately not night-scoped, which is what makes the advance-payment case practisable.
 
 **Both halves of that auth column are checked on every request.** The role decides whether there is a
 sandbox at all and the run decides which one, because a run row outlives a revoked role: rehearsal's
@@ -2951,7 +2957,9 @@ rehearsal cannot be reached, with different messages: opening a sandbox needs a 
 (ADR-0033). It is also how a trainee **switches** sandbox, and that switch is one `db.batch`: the old
 run is ended, its events deleted and the new run inserted together, with every refusal answered
 before the batch runs. A declined or failed switch therefore leaves the sandbox they already had
-untouched, rather than leaving them with none. `GET /api/training/state` ends a run only on a definitive closure, never on an outage
+untouched, rather than leaving them with none.
+
+`GET /api/training/state` ends a run only on a definitive closure, never on an outage
 ([ADR-0034](./decisions/0034-an-open-sandbox-closes-only-on-a-definitive-answer.md)).
 
 **Not in any sandbox:** opening or closing a bar session, comps (they need a duty manager's approval,

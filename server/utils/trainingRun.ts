@@ -8,6 +8,7 @@ import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import { practiceWindow, type PracticeTarget } from './eligibility'
 import { type AbilityUser, workFoh } from '~~/shared/utils/abilities'
+import { type DatedPerformance, trainingPerformances } from '~~/shared/utils/trainingScenario'
 
 export type TrainingRun = typeof schema.trainingRuns.$inferSelect
 export type TrainingEventKind = typeof schema.TRAINING_EVENT_KINDS[number]
@@ -157,6 +158,18 @@ export async function eventsFor(runId: string) {
     .from(schema.trainingRunEvents)
     .where(eq(schema.trainingRunEvents.runId, runId))
     .orderBy(asc(schema.trainingRunEvents.at))
+}
+
+/**
+ * The fixture dated against tonight, by the window the real till and door scope
+ * themselves with, so a sandbox cannot call a night differently (ADR-0045).
+ */
+export function scenarioTonight(now: Date = new Date()): { night: string, performances: DatedPerformance[] } {
+  const night = showNightDate(now)
+  return {
+    night,
+    performances: trainingPerformances(night, { from: validityStart(night), to: validityEnd(night) }),
+  }
 }
 
 /**

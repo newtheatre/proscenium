@@ -1,6 +1,5 @@
 import { db, schema } from '@nuxthub/db'
 import { and, asc, eq } from 'drizzle-orm'
-import { TRAINING_PERFORMANCES } from '~~/shared/utils/trainingScenario'
 
 /** GET /api/training/bar/tonight: the real menu, an invented night. */
 export default defineEventHandler(async (event) => {
@@ -32,13 +31,17 @@ export default defineEventHandler(async (event) => {
     choiceSlots(),
   ])
 
+  // Tonight's only, because that is all the real route returns: its fixture
+  // sibling runs next week and belongs on the Tickets tab, not here.
+  const performances = scenarioTonight().performances.filter(performance => performance.isTonight)
+
   return {
     night: 'practice',
     session: null,
     // Trained by definition: they are being taught it right now.
     alcoholTrained: true,
     trainingNeedsReview: false,
-    performances: TRAINING_PERFORMANCES,
+    performances: performances.map(({ id, startsAt, showTitle, venueName }) => ({ id, startsAt, showTitle, venueName })),
     discounts,
     products: products
       .filter(product => prices.has(product.id))

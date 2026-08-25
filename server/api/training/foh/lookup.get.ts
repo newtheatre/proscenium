@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { findTrainingBookings, trainingPerformance } from '~~/shared/utils/trainingScenario'
+import { findTrainingBookings } from '~~/shared/utils/trainingScenario'
 import { isStaff } from '~~/shared/utils/abilities'
 
 const querySchema = z.object({
@@ -14,7 +14,13 @@ export default defineEventHandler(async (event) => {
   const { run, user } = await requireRun(event, 'door-scan')
   const { q } = await getValidatedQuery(event, querySchema.parse)
 
-  const matches = findTrainingBookings(q)
+  // Tonight's performances only, exactly as the real door lookup is scoped
+  // (ADR-0019): a fixture booking for another night must find nothing here.
+  const tonight = new Map(scenarioTonight().performances
+    .filter(performance => performance.isTonight)
+    .map(performance => [performance.id, performance]))
+
+  const matches = findTrainingBookings(q).filter(booking => tonight.has(booking.performanceId))
   await recordEvent(run.id, 'LOOKUP', { query: q, matches: matches.length })
 
   // The same role branch as the real lookup: the door gets a verdict and a
@@ -23,7 +29,7 @@ export default defineEventHandler(async (event) => {
 
   return matches.map((booking) => {
     const standing = bookingStanding(booking)
-    const performance = trainingPerformance(booking.performanceId)
+    const performance = tonight.get(booking.performanceId)
     const firstName = booking.customerName.split(' ')[0] ?? ''
 
     const base = {
