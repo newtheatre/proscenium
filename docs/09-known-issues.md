@@ -55,6 +55,7 @@ Kept as a record of what changed and why, so nobody re-fixes them.
 | 22 | [Editing a show wiped its write-up](#editing-a-show-wiped-its-write-up) | `ShowEditModal` loads the full record from `GET /api/shows/:id`; the five projected-away fields are omitted from the PUT unless it succeeded |
 | 27 | The discounts report counted voided tab charges | `isNull(voidedAt)` added to `discountsIn()`, matching `barLineRange()`. Re-running a past range can now show less given away, and one fewer use against a staff member |
 | 28 | The sales report's "By performance" grouping returned one `Unattributed` row holding the whole range | The option is gone from the type, the query, the endpoint and the page. Bar money is attributed by session, not per line (docs/13 §4.5, §6) |
+| 29 | Six CSV exports, the Challenge 25 register among them, emitted volunteer-typed text a spreadsheet would evaluate | The formula guard moved from the ticket export's private escaper into the shared `csvCell()`, which every export already used |
 
 ### The companion entitlement was enforced per basket, not per performance
 

@@ -1,7 +1,13 @@
-/** CSV for the exports. RFC 4180 quoting: the only rule that matters here. */
+/** A number, so a spreadsheet keeps summing it rather than reading an apostrophe. */
+const PLAIN_NUMBER = /^-?\d+(?:\.\d+)?$/
+
+/** CSV for every export: neutralise the cell, then quote it for RFC 4180. */
 export function csvCell(value: unknown): string {
   const text = value === null || value === undefined ? '' : String(value)
-  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+  // A cell opening = + - @ tab or CR is a formula to Excel, and staff and
+  // customers type these values (the Challenge 25 notes, a booking's name).
+  const safe = /^[=+\-@\t\r]/.test(text) && !PLAIN_NUMBER.test(text) ? `'${text}` : text
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
 }
 
 export function toCsv(headers: string[], rows: unknown[][]): string {

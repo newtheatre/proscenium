@@ -118,20 +118,6 @@ type TicketRow = {
   refundedAt: Date | string | null
 }
 
-function csvCell(val: string | number | null | undefined): string {
-  if (val == null) return ''
-  let str = String(val)
-  // Neutralise spreadsheet formula injection: a cell beginning = + - @ is
-  // treated as a formula, and these values are customer-controlled.
-  if (/^[=+\-@\t\r]/.test(str)) {
-    str = `'${str}`
-  }
-  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
-    return `"${str.replace(/"/g, '""')}"`
-  }
-  return str
-}
-
 function buildCsv(rows: TicketRow[]): string {
   const headers = [
     'Booking Ref',
