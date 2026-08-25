@@ -365,7 +365,7 @@ Two nuances before you move them:
 ## 14. Checklist: your first working local instance
 
 1. `bun install`
-2. Create `.env` with `RESEND_API_KEY` (a placeholder is acceptable)
+2. Create `.env`. It can be empty; add `NUXT_RESEND_API_KEY` only if you want email to send
 3. `bun run dev`
 4. Confirm `NUXT_SESSION_PASSWORD` has appeared in `.env`
 5. Open DevTools → Tasks → run `db:seed`
