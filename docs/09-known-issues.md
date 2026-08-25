@@ -56,6 +56,7 @@ Kept as a record of what changed and why, so nobody re-fixes them.
 | 27 | The discounts report counted voided tab charges | `isNull(voidedAt)` added to `discountsIn()`, matching `barLineRange()`. Re-running a past range can now show less given away, and one fewer use against a staff member |
 | 28 | The sales report's "By performance" grouping returned one `Unattributed` row holding the whole range | The option is gone from the type, the query, the endpoint and the page. Bar money is attributed by session, not per line (docs/13 §4.5, §6) |
 | 29 | Six CSV exports, the Challenge 25 register among them, emitted volunteer-typed text a spreadsheet would evaluate | The formula guard moved from the ticket export's private escaper into the shared `csvCell()`, which every export already used |
+| 30 | Refunds were bucketed by the UTC day, so during BST a refund taken between midnight and 01:00 London came off the previous day's expected Z | `refundedOn()` bounds `refunded_at` by the London day, like `performanceIdsOn()` beside it. The expected figure is computed at read time, so re-opening an affected day now shows the corrected pair of totals |
 
 ### The companion entitlement was enforced per basket, not per performance
 

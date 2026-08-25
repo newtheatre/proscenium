@@ -409,6 +409,11 @@ The identity to hold in your head, and the one to check when a day will not bala
 expected Z = card bar + card tickets + tabs settled − discounts − refunds
 ```
 
+**Every figure on the card is keyed to the London day, refunds included.** `taken_on` is computed
+in Europe/London when the transaction is written; a refund carries a UTC instant, so it is matched
+by bounding `refunded_at` to that day's London start and end. During BST a refund taken at 00:30
+belongs to the day the reader netted it off, not to the UTC day before it.
+
 **Two questions, two lenses.** *"Does today's SumUp match?"* is answered by `taken_on = today`,
 regardless of which performance any ticket was for. *"How did Saturday's show do?"* is answered
 by `transaction_lines.performance_id = Saturday`, regardless of when the money was taken. An

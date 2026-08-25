@@ -291,10 +291,12 @@ async function refundedOn(day: string): Promise<number> {
     total: sql<number>`coalesce(sum(${schema.tickets.pricePaid}), 0)`,
   })
     .from(schema.tickets)
-    // The column is a unix integer, so date() needs the modifier or it returns
-    // null and the refund silently never matches.
-    .where(sql`${schema.tickets.refundedAt} is not null
-      and date(${schema.tickets.refundedAt}, 'unixepoch') = ${day}`)
+    // `refunded_at` is a UTC instant and SQLite's date() has no zone, so the
+    // London day has to come from the bounds (a null matches neither).
+    .where(and(
+      gte(schema.tickets.refundedAt, validityStart(day)),
+      lte(schema.tickets.refundedAt, validityEnd(day)),
+    ))
 
   return Number(row?.total ?? 0)
 }
