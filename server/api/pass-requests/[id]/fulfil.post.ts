@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, eq, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { issuePass } from '~~/shared/utils/abilities'
@@ -33,14 +33,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: `That request was already ${request.status.toLowerCase()}.` })
   }
 
-  const price = await db.select({ id: schema.passTypePrices.id, price: schema.passTypePrices.price })
-    .from(schema.passTypePrices)
-    .where(and(
-      eq(schema.passTypePrices.id, input.passTypePriceId),
-      eq(schema.passTypePrices.passTypeId, request.passTypeId),
-    ))
-    .get()
-  if (!price) throw createError({ statusCode: 400, statusMessage: 'That price does not belong to this pass.' })
+  // The same guards the direct sale applies: fulfilling a queue is still a
+  // sale, and maxIssued is what stops it overselling the house (ADR-0028).
+  const { price } = await assertPassSellable(request.passTypeId, input.passTypePriceId)
 
   const passId = nanoid()
   await db.batch([

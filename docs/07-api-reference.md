@@ -1698,7 +1698,11 @@ decided for the whole page in four queries rather than five per pass.
 **Source** `server/api/passes/index.post.ts` · **Auth** `authorize(event, issuePass)`: staff
 
 Issues a pass to a holder, creating a shadow account via the auth service when the buyer has none.
-Enforces `maxIssued` against ACTIVE passes.
+
+The sale guards live in `assertPassSellable()` (`server/utils/passes.ts`) and are shared with
+fulfilment, so there is one definition rather than two: the pass type is `ON_SALE`, `now` is inside
+`salesOpenAt`/`salesCloseAt`, the price row belongs to the type and is `active`, and the count of
+ACTIVE passes is below `maxIssued`. `409 This pass has sold out` when it is not.
 
 #### `PUT /api/passes/:id`
 
@@ -2190,6 +2194,10 @@ offers no pass until the box office has been paid.
 - **`quoted_pence` is what the requester was shown, not what they are charged.** Fulfilment takes
   the price id used on the day, and a price belonging to a different pass type is `400`. A pass
   quoted at £35 and sold at the £28 concession is a normal outcome, and the discrepancy is visible.
+- **Fulfilment is a sale, so it applies every sale guard.** It calls the same `assertPassSellable()`
+  as `POST /api/passes`: status, sales window, price still active, and `maxIssued`. A queue longer
+  than the cap therefore stops at the cap instead of issuing every row in it, and a pass type closed
+  or expired since the request was made cannot be reopened by working the queue.
 - Fulfilling or declining twice is `409` naming the decision already made.
 - Fulfilment issues the pass through the normal columns, so `passes.pricePaid` stays a record of
   money actually taken and pass revenue keeps its single source.

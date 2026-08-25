@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, count, eq, inArray } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 
 /**
@@ -311,4 +311,55 @@ export async function admitOnPass(input: AdmitOnPassInput) {
   }
 
   return { reservationId, ticketId, joinedExisting: Boolean(existing) }
+}
+
+export interface SellablePass {
+  passType: typeof schema.passTypes.$inferSelect
+  price: typeof schema.passTypePrices.$inferSelect
+}
+
+/**
+ * Every rule that must hold before a pass exists, in one place: a second
+ * issuing path must not inherit half of them (ADR-0028).
+ */
+export async function assertPassSellable(
+  passTypeId: string,
+  passTypePriceId: string,
+  now: Date = new Date(),
+): Promise<SellablePass> {
+  const passType = await db.select().from(schema.passTypes)
+    .where(eq(schema.passTypes.id, passTypeId)).get()
+  if (!passType) throw createError({ statusCode: 404, statusMessage: 'Pass type not found' })
+  if (passType.status !== 'ON_SALE') {
+    throw createError({ statusCode: 400, statusMessage: 'This pass is not on sale' })
+  }
+  if (passType.salesOpenAt && now < passType.salesOpenAt) {
+    throw createError({ statusCode: 400, statusMessage: 'This pass is not on sale yet' })
+  }
+  if (passType.salesCloseAt && now > passType.salesCloseAt) {
+    throw createError({ statusCode: 400, statusMessage: 'Sales for this pass have closed' })
+  }
+
+  const price = await db.select().from(schema.passTypePrices)
+    .where(and(
+      eq(schema.passTypePrices.id, passTypePriceId),
+      eq(schema.passTypePrices.passTypeId, passTypeId),
+    )).get()
+  if (!price) throw createError({ statusCode: 400, statusMessage: 'That price does not belong to this pass type' })
+  if (!price.active) throw createError({ statusCode: 400, statusMessage: 'That price is no longer available' })
+
+  // maxIssued is the blunt protection against selling more passes than the
+  // house can seat. Read-then-write, like capacity: acceptable at this volume.
+  if (passType.maxIssued != null) {
+    const [issued] = await db.select({ n: count() }).from(schema.passes)
+      .where(and(
+        eq(schema.passes.passTypeId, passTypeId),
+        eq(schema.passes.status, 'ACTIVE'),
+      ))
+    if ((issued?.n ?? 0) >= passType.maxIssued) {
+      throw createError({ statusCode: 409, statusMessage: 'This pass has sold out' })
+    }
+  }
+
+  return { passType, price }
 }
