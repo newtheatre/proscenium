@@ -333,6 +333,12 @@ The options are a deterministic settlement id so the second insert collides on t
 a partial unique index; both change the shape of `transactions`, so neither is a drive-by change.
 Recorded rather than half-fixed, because a predicate on the UPDATE looks like a cure and is not.
 
+**A different window, a charge landing mid-settle, is closed.** `taken_at` is stored to whole
+seconds, so a charge the debtor posted from their phone after the read but inside the same second
+used to satisfy `taken_at <= asOf` and be stamped settled against a settlement that never covered
+it. The read now returns `max(rowid)` over the charges it summed and the `UPDATE` is bounded by
+that rowid, so a charge committed since stays outstanding. Do not swap it back for a timestamp.
+
 ### A stocktake finished before 2026-08-25 may hold a count of zero that was meant to be blank {#stocktake-blank-as-zero}
 
 **P2 · data.** The count page sent an emptied box as the string `''`, which `z.coerce.number()`

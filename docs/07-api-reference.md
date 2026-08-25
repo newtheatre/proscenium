@@ -2142,6 +2142,12 @@ the bar scope, because they are till work.
 - **Settling clears the whole balance as at now**, against `expectedTotalPence`. There is no list
   of chosen charges: an id list is the shape ADR-0006 forbids, and a predicate makes a concurrent
   double-settle a no-op rather than a race. `409` when the figure has moved, naming both amounts.
+- **"As at now" is a rowid, not a timestamp.** `taken_at` is stored to whole seconds, so a charge
+  posted to `POST /api/bar/tabs` between the read and the write can read as on or before the
+  settle's own `asOf` and be stamped settled against a settlement that never covered it. The read
+  therefore returns `max(rowid)` over the charges it summed and the `UPDATE` is bounded by it: D1
+  serialises writes, so anything committed since carries a higher rowid and stays outstanding. A
+  debt left on a tab is recoverable; one written off silently is not.
 - Settlement writes one `CARD` transaction with a single `TAB_SETTLEMENT` line and **no product**,
   and **no stock movements**: the stock left the shelf when the tab was charged.
 - The void needs all three of `tender = 'TAB'`, `voided_at IS NULL` and `tab_settled_at IS NULL`,
