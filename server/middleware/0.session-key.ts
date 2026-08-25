@@ -22,10 +22,10 @@ export default defineEventHandler((event: H3Event) => {
   if (!warned) {
     warned = true
     console.error(
-      '[session-key] no session password: the Secrets Store read failed, or '
-      + 'NUXT_SESSION_PASSWORD is unset in development. Refusing every request '
-      + 'until it arrives, because serving one would seal the isolate to an '
-      + 'empty key.',
+      '[session-key] no session password on this isolate. Refusing every '
+      + 'request until it arrives, because serving one would seal the isolate '
+      + 'to an empty key. The [secrets-store] line above says which cause this '
+      + 'is: an absent binding, a refused read, or unset in development.',
     )
   }
 
