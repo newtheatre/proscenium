@@ -297,3 +297,20 @@ major version bump of a declared dependency, so none of it is drive-by work.
 Read the reachability column before ranking these by severity alone. The two `high` entries against
 `image-size` are a build-time parser, while the `moderate` XSS in Nuxt OG Image is a live endpoint
 on `newtheatre.org.uk`.
+
+### Two settles of one tab in the same instant both record the money {#tab-settle-race}
+
+**P3 · `server/utils/barTabs.ts:198`.** A second settle of the same tab is already refused when it
+arrives after the first: `settleTab` reads what is outstanding and throws 409 "There is nothing
+outstanding on that tab" once the first has landed. That covers the double tap, which is the way
+this actually happens.
+
+What is not covered is two settles genuinely in flight together. Both read the same outstanding
+total, both insert a settlement transaction, and only one of the two UPDATEs matches a row, because
+that half is correctly scoped by predicate. The tab ends settled once, and the day's takings are
+over by the tab's value.
+
+Closing it needs the database to arbitrate, and D1 offers no way to abort a batch on rows affected.
+The options are a deterministic settlement id so the second insert collides on the primary key, or
+a partial unique index; both change the shape of `transactions`, so neither is a drive-by change.
+Recorded rather than half-fixed, because a predicate on the UPDATE looks like a cure and is not.
