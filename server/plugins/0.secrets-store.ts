@@ -11,6 +11,22 @@ interface SecretsStoreSecret {
 let sessionPassword: Promise<string> | undefined
 let warnedAboutWorkerSecret = false
 
+/** Enough to ride out a Secrets Store blip, few enough to fail fast. */
+const READ_ATTEMPTS = 3
+
+async function readSecret(secret: SecretsStoreSecret): Promise<string> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < READ_ATTEMPTS; attempt++) {
+    try {
+      return await secret.get()
+    }
+    catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError
+}
+
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('request', async (event) => {
     const env = event.context.cloudflare?.env as unknown as
@@ -32,13 +48,16 @@ export default defineNitroPlugin((nitroApp) => {
     }
 
     try {
-      sessionPassword ??= secret.get()
+      sessionPassword ??= readSecret(secret)
       useRuntimeConfig(event).session.password = await sessionPassword
     }
     catch (error) {
       // Don't pin a failed read for the life of the isolate.
       sessionPassword = undefined
       console.error('[secrets-store] could not read SESSION_PASSWORD', error)
+      // Rethrow to skip the remaining request hooks: the next one reads a
+      // session, which memoises the empty password for good (ADR-0040).
+      throw error
     }
   })
 })

@@ -9,6 +9,7 @@ export default defineEventHandler(async (event) => {
 
   const { user } = await requireUserSession(event)
   const scope = await requireFohScope(user)
+  requireRosteredTonight(scope)
   const { since } = await getValidatedQuery(event, querySchema.parse)
 
   const night = await ensureNight(scope.night)

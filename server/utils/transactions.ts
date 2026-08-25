@@ -310,6 +310,16 @@ async function performanceIdsOn(day: string): Promise<Set<string>> {
   return new Set(rows.map(r => r.id))
 }
 
+/**
+ * Money taken for this booking and not yet given back, in pence. Zero when
+ * nothing was ever collected, so a cancelled PENDING booking owes nothing.
+ */
+export async function unrefundedPaidPence(reservationId: string): Promise<number> {
+  if (!(await hasTicketPayment(reservationId))) return 0
+  const owed = await amountOwedFor(reservationId)
+  return owed?.amountPence ?? 0
+}
+
 /** Whether a payment has already been recorded against this reservation. */
 export async function hasTicketPayment(reservationId: string): Promise<boolean> {
   const row = await db.select({ id: schema.transactionLines.id })

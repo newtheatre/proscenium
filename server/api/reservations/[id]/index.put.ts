@@ -71,12 +71,24 @@ export default defineEventHandler(async (event) => {
   const uncollecting = body.status !== undefined
     && isCollected(existing.status)
     && !isCollected(body.status)
-    && body.status !== 'CANCELLED'
-  if (uncollecting && await hasTicketPayment(id)) {
+
+  if (uncollecting && body.status !== 'CANCELLED' && await hasTicketPayment(id)) {
     throw createError({
       statusCode: 409,
       statusMessage: 'This booking has been paid for. Refund it rather than moving it back to pending.',
     })
+  }
+
+  // Cancelling releases the seats, so the money must be back with the customer
+  // first: refund then cancel, never the other way round (ADR-0039).
+  if (uncollecting && body.status === 'CANCELLED') {
+    const stranded = await unrefundedPaidPence(id)
+    if (stranded > 0) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `This booking has been paid for and ${formatPence(stranded)} of it has not been refunded. Refund the tickets first, then cancel.`,
+      })
+    }
   }
 
   let built: ReturnType<typeof buildTransaction> | null = null

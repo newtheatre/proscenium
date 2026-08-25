@@ -220,7 +220,7 @@ is a separate, incremental job, one domain file at a time.
 | PUT | `/api/reservations/:id` | Staff (`updateReservation`) | Change status, cancellation attribution, and notes |
 | DELETE | `/api/reservations/:id` | ADMIN/MANAGER (`deleteReservation`) | Hard-delete the reservation and its tickets |
 | PUT | `/api/reservations/:id/tickets` | Staff (`updateReservation`) | Set desired quantities per ticket type; server diffs and applies. **PENDING only** |
-| POST | `/api/reservations/:id/refund` | ADMIN/MANAGER (`refundTicket`) | Refund n tickets of a type. **Collected bookings only** |
+| POST | `/api/reservations/:id/refund` | ADMIN/MANAGER (`refundTicket`) | Refund n tickets of a type. Collected bookings, or a cancelled one still holding money |
 | GET | `/api/reservations/:id/available-ticket-types` | Staff (`updateReservation`) | Effective prices for this reservation's performance |
 
 ### Shows
@@ -276,9 +276,9 @@ is a separate, incremental job, one domain file at a time.
 | --- | --- | --- | --- |
 | GET | `/api/users` | Staff (`listUsers`) | Mirror users, paginated; `?email=` returns at most one |
 | POST | `/api/users` | ADMIN/MANAGER (`createUser`) | Create a shadow account via the auth service and mirror it |
-| GET | `/api/users/:id/summary` | Staff (`readUser`) | Everything this app knows about one person's relationship with it |
+| GET | `/api/users/:id/summary` | Staff or self (`readUser`) | Everything this app knows about one person's relationship with it |
 | GET | `/api/users/:id` | Staff or self (`readUser`) | One mirror user |
-| DELETE | `/api/users/:id` | ADMIN (others) or self (`deleteUser`) | Delete the mirror row; refuses if they have bookings |
+| DELETE | `/api/users/:id` | ADMIN (others) or self (`deleteUser`) | Delete the mirror row; refuses if anything references it |
 
 Credentials, roles, verification and erasure are the auth service's: there is no `PUT /api/users/:id`
 and no password-reset route here.
@@ -359,17 +359,17 @@ and no password-reset route here.
 | POST | `/api/foh/performances/:id/close` | Tonight's `DUTY_MANAGER`, or `BOX_OFFICE`+ | Sign the night off: file the report, revoke the codes, email it |
 | GET | `/api/foh/performances/:id/report` | `foh.work`, scoped to tonight | The stored record, if the night is closed |
 | GET | `/api/foh/access-tonight` | `foh.work` + the §2.5 rule | Consented access needs for this performance |
-| GET | `/api/foh/backstage` | `foh.work` (`workFoh`) | Tonight's backstage code, its QR, and the joined devices |
-| POST | `/api/foh/backstage/reset` | `foh.work` (`workFoh`) | The kill switch: rotate the code, sign every device out |
+| GET | `/api/foh/backstage` | `foh.work` + rostered tonight | Tonight's backstage code, its QR, and the joined devices |
+| POST | `/api/foh/backstage/reset` | `foh.work` + rostered tonight | The kill switch: rotate the code, sign every device out |
 | POST | `/api/backstage/join` | **Public** | Join tonight's board with the code. Rate limited, and self-rotating |
 | GET | `/api/backstage/session` | Backstage cookie | Is this device still joined? |
 | GET | `/api/backstage/board` | Backstage cookie | The board, the presets and the house count. Polled |
 | POST | `/api/backstage/messages` | Backstage cookie | Send a preset or free text |
 | POST | `/api/backstage/messages/:id/ack` | Backstage cookie | Acknowledge a front-of-house call |
-| GET | `/api/foh/backstage/board` | `foh.work` (`workFoh`) | The front-of-house side of the board. Polled |
-| POST | `/api/foh/backstage/messages` | `foh.work` (`workFoh`) | Call something through to backstage |
-| POST | `/api/foh/backstage/messages/:id/ack` | `foh.work` (`workFoh`) | Acknowledge a backstage call |
-| GET | `/api/backstage/emergency` | **Public** | Tonight's emergency cards. Public on purpose |
+| GET | `/api/foh/backstage/board` | `foh.work` + rostered tonight | The front-of-house side of the board. Polled |
+| POST | `/api/foh/backstage/messages` | `foh.work` + rostered tonight | Call something through to backstage |
+| POST | `/api/foh/backstage/messages/:id/ack` | `foh.work` + rostered tonight | Acknowledge a backstage call |
+| GET | `/api/backstage/emergency` | **Public** | Tonight's emergency cards, with the night they are for. Public on purpose |
 | GET | `/api/foh/emergency` | `foh.work` (`workFoh`) | The venue's emergency card for a performance |
 | GET | `/api/foh/contacts` | `foh.work` (`workFoh`) | Who is on tonight, and the numbers to call |
 | GET | `/api/foh/incidents` | `foh.work` (`workFoh`) | The incident log for a performance |
@@ -465,7 +465,7 @@ A withdrawn profile is `409`: it is not the verifier's to reinstate.
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| GET | `/api/health` | **Public** | Uptime check. 503 naming pending migrations when the schema is behind the code |
+| GET | `/api/health` | **Public** | Uptime check. 503 naming pending migrations, or a missing session key |
 
 ---
 
@@ -527,6 +527,17 @@ mirror row: with nothing referencing it the `restrict` FKs are satisfied, and th
 lives intact on the winner. `dryRun: true` returns the affected-row `counts` without writing;
 stage-door shows them in its pre-merge report. Each statement binds two parameters however many rows
 move, so no chunking is needed.
+
+**The hook may mint the winner's mirror row.** A merge whose winner has never touched this app is
+the ordinary case: a walk-in shadow account is the loser and the account the person later signed up
+with is the winner. Nothing may point at a row that does not exist, so a minimal winner row is
+inserted first, carrying a `merged-<id>@placeholder.invalid` address because the loser still holds
+theirs until the batch deletes them. The last statement of that same batch, after the delete, copies
+the loser's name and address onto the winner and is guarded on the row still holding the placeholder,
+so a retry is a no-op. The address is real and belongs to the same person, which matters: a
+`.invalid` address is filtered out of every staff listing and lookup, counted as anonymised, and used
+verbatim as the send address for booking confirmations. An **anonymised** loser has no identity to
+carry, so the placeholder stays and `ensureLocalUser` corrects it on the winner's next request.
 
 **Idempotent**, and `{ ok: true, notMirrored: true }` for a losing account this app has never seen:
 stage-door retries until every app succeeds.
@@ -856,7 +867,11 @@ Only keys actually present are written; explicit `null` clears the column. Movin
 | 400 | `Reservation ID is required` |
 | 400 | `No valid fields provided for update` (empty body) |
 | 404 | `Reservation not found` |
+| 409 | Moving a paid booking back to `PENDING` or `NO_SHOW`: refund it instead |
+| 409 | Cancelling a paid booking with tickets still unrefunded ([ADR-0039](decisions/0039-refund-before-cancelling-a-collected-booking.md)) |
 | 403 | Not staff |
+
+**Cancelling a collected booking needs the refund first.** Cancelling releases the seats to resale and the door then reads the booking as `CANCELLED`, so the money has to be back with the customer before it happens: `COLLECTED`/`DOOR` → `CANCELLED` is refused with a 409 naming the amount while any paid, unrefunded ticket remains. Once everything is refunded the transition is allowed, so refund-then-cancel completes normally, and a comped booking (nothing taken) cancels straight away. The reverse direction is open in the same conditions: `POST /:id/refund` accepts a `CANCELLED` booking that still carries money taken, so an already-stranded booking can be put right in the app instead of by hand in D1.
 
 **Side effects** When `status` transitions **to** `CANCELLED` from something else, a cancellation email is sent to the customer. As with the booking confirmation, it is fire-and-forget with `.catch()` logging and `event.context.cloudflare?.context.waitUntil()`. Re-cancelling an already-cancelled reservation sends nothing. Cancelling does **not** delete or refund the ticket rows: they stay, and simply stop counting towards capacity and revenue because those queries filter on status.
 
@@ -1245,9 +1260,11 @@ The performance is looked up by `id` **and** `showId`, so a mismatched pair retu
 
 **Response** `200`: the updated `performances` row.
 
-**Errors** `400 Show ID and Performance ID are required`; `404 Performance not found`; `403`.
+**Errors** `400 Show ID and Performance ID are required`; `400 No such venue`; `404 Performance not found`; `409` when the update would drop capacity below what is already sold; `403`.
 
-**Side effects** Lowering `capacityOverride` below the number of tickets already sold is permitted: nothing re-validates existing bookings. Setting `status: 'CANCELLED'` sends no emails to affected customers; that has to be done by hand.
+**Capacity is guarded as one figure.** Effective capacity is `capacityOverride ?? venue.capacity` ([ADR-0007](decisions/0007-one-seat-counting-rule.md)), so the handler resolves what the update would leave in place, on both fields at once, and refuses with a 409 when that lands below `countOccupiedSeatsFor()`. All three routes into the same dead end are covered: lowering the override, clearing it, and moving the performance to a smaller venue. Only a *reduction* is checked, so raising the capacity can still repair a performance that is already past its house. Null stays uncapped, matching `assertCapacity`. Raising the override above the venue's capacity remains the sanctioned way to oversell deliberately.
+
+**Side effects** Setting `status: 'CANCELLED'` sends no emails to affected customers; that has to be done by hand.
 
 ---
 
@@ -1611,6 +1628,22 @@ The row is fetched before the check, so an unknown id yields 404 regardless of w
 
 ---
 
+#### `GET /api/users/:id/summary`
+
+**Source** `server/api/users/[id]/summary.get.ts` · **Auth** `authorize(event, readUser, { id })`: staff can read anyone; any user can read themselves
+
+The mirror row is loaded and 404s first, so the check runs on an id that exists and an unknown id
+answers the same to everyone. The resource argument is not optional: an ability called without it
+throws, and a throw inside `authorize()` **grants** ([ADR-0038](decisions/0038-no-ability-may-throw.md)).
+
+**Response** `200`: the person, their last 50 reservations with show titles and amounts, their passes,
+their shift history and their counts. The access profile is included only for a caller who holds
+`canVerifyAccess`, which is checked directly rather than through `authorize`.
+
+**Errors** `400 User ID is required`; `401` when nobody is signed in; `404 No mirror row for that account`; `403`.
+
+---
+
 #### `DELETE /api/users/:id`
 
 **Source** `server/api/users/[id]/index.delete.ts` · **Auth** `authorize(event, deleteUser, { id: userId })`
@@ -1626,9 +1659,11 @@ The `deleteUser` ability is unusual: read it carefully:
 
 **Response** `200`: `{ message: 'User deleted successfully' }`
 
-**Errors** `400 User ID is required`; `404 User not found`; `403`.
+**Errors** `400 User ID is required`; `404 User not found`; `409` when anything still references the row; `403`.
 
-**Side effects** none: this deletes the mirror row only, and the central identity is untouched. **`reservations.userId` and `passes.userId` are both `onDelete: 'restrict'`**, so anyone who has ever booked or held a pass cannot be deleted; the handler pre-checks reservations and returns 409. To remove a *person*, use erasure at the auth service, which calls this app's anonymise hook. The caller's session is not cleared when they delete themselves.
+**The guard is reference-agnostic.** Thirty-odd columns across the schema point at `users.id`. The `restrict` ones would surface a raw foreign-key error as a 500, and the `set null` ones are worse: the delete would succeed and quietly blank who voided a transaction, who approved a comp and who signed a night off, while `access_profiles` and `training_runs` cascade away entirely. So `tablesReferencingUser()` (`server/utils/userReferences.ts`) reads the referencing columns out of the Drizzle schema and asks, in one statement with one bound parameter, whether any of them holds a row. Any hit is a 409 naming the tables. A new `references(() => users.id)` is covered the moment it is declared, with nothing to remember to update.
+
+**Side effects** none: this deletes the mirror row only, and the central identity is untouched. In practice anyone who has ever booked, held a pass, worked a shift or taken money is undeletable, which is the intent: to remove a *person*, use erasure at the auth service, which calls this app's anonymise hook ([ADR-0014](decisions/0014-anonymise-never-delete.md)). The caller's session is not cleared when they delete themselves.
 
 ---
 
@@ -1678,7 +1713,11 @@ decided for the whole page in four queries rather than five per pass.
 **Source** `server/api/passes/index.post.ts` · **Auth** `authorize(event, issuePass)`: staff
 
 Issues a pass to a holder, creating a shadow account via the auth service when the buyer has none.
-Enforces `maxIssued` against ACTIVE passes.
+
+The sale guards live in `assertPassSellable()` (`server/utils/passes.ts`) and are shared with
+fulfilment, so there is one definition rather than two: the pass type is `ON_SALE`, `now` is inside
+`salesOpenAt`/`salesCloseAt`, the price row belongs to the type and is `active`, and the count of
+ACTIVE passes is below `maxIssued`. `409 This pass has sold out` when it is not.
 
 #### `PUT /api/passes/:id`
 
@@ -2170,6 +2209,10 @@ offers no pass until the box office has been paid.
 - **`quoted_pence` is what the requester was shown, not what they are charged.** Fulfilment takes
   the price id used on the day, and a price belonging to a different pass type is `400`. A pass
   quoted at £35 and sold at the £28 concession is a normal outcome, and the discrepancy is visible.
+- **Fulfilment is a sale, so it applies every sale guard.** It calls the same `assertPassSellable()`
+  as `POST /api/passes`: status, sales window, price still active, and `maxIssued`. A queue longer
+  than the cap therefore stops at the cap instead of issuing every row in it, and a pass type closed
+  or expired since the request was made cannot be reopened by working the queue.
 - Fulfilling or declining twice is `409` naming the decision already made.
 - Fulfilment issues the pass through the normal columns, so `passes.pricePaid` stays a record of
   money actually taken and pass revenue keeps its single source.
@@ -2476,20 +2519,30 @@ The one endpoint in this app where an unguarded handler is deliberate rather tha
 monitoring cannot hold a session, and the response carries no personal data. Everywhere else in this
 document, a missing guard means an open endpoint.
 
-It compares the migration journal compiled into the running build against the `_hub_migrations`
-ledger in the database.
+It answers two questions: whether the migration journal compiled into the running build matches the
+`_hub_migrations` ledger in the database, and whether this isolate actually holds the session key.
 
-**Response** `200` when they agree:
+**Response** `200` when both are well:
 
 ```json
-{ "ok": true }
+{ "ok": true, "sessionKey": "ok" }
 ```
 
 **Response** `503` when the schema is behind the deployed code, naming the files:
 
 ```json
-{ "ok": false, "pendingMigrations": ["0017_rich_husk"] }
+{ "ok": false, "pendingMigrations": ["0017_rich_husk"], "sessionKey": "ok" }
 ```
+
+**Response** `503` when the Secrets Store read failed, so no request can be served safely:
+
+```json
+{ "ok": false, "pendingMigrations": [], "sessionKey": "missing" }
+```
+
+This endpoint is the **only** path exempt from `server/middleware/0.session-key.ts`, which 503s
+everything else while the key is missing ([ADR-0040](decisions/0040-refuse-a-request-with-no-session-key.md)).
+The exemption is what lets monitoring see the cause instead of a bare 503.
 
 Three details that are load-bearing:
 
@@ -2611,6 +2664,13 @@ information is never behind a lock (§5.1), so a device that has not joined can 
 address and the assembly point. It is allow-listed to the emergency card and rate limited; nothing
 about who is coming, what was sold or who is working crosses that boundary.
 
+**Response** `{ night, cards }`. The night travels with the cards because `/backstage` mirrors the
+payload to `localStorage` and renders it when the fetch fails, and a saved copy has to be able to
+say which night it is from. Note that `cards` is empty **only** when no performance is scheduled: the
+join to `venue_emergency_info` is a LEFT JOIN, so a venue with nothing recorded still returns a row.
+An empty array on a show night therefore means the request failed, which is why the page
+distinguishes a failure from a dark night rather than printing one sentence for both.
+
 A joined backstage device gets **403 from every `/api/foh/*` and box-office route**, because those
 require a user session it does not have. That is the property to preserve if this ever changes.
 
@@ -2638,10 +2698,15 @@ Two rules the handlers enforce, not the UI:
 `GET /api/backstage/board` also returns the **house count**: admitted against expected, and nothing
 else. That is the one piece of box office data that crosses to backstage (§5.2), and it is computed
 by the shared seat rule ([ADR-0007](./decisions/0007-one-seat-counting-rule.md)) rather than counted
-again here.
+again here. **It is one performance's pair, not the day's**: the last performance whose doors have
+opened, else the next to start, else the day's last, excluding anything at an external venue. The
+title, start time and interval count returned beside it belong to that same performance.
 
-The FOH side is scoped by the rota like every other show-night route; the backstage side takes a
-code session and never a user.
+The FOH side is scoped by the rota like every other show-night route: all five
+`/api/foh/backstage/**` routes call `requireRosteredTonight()` after `requireFohScope()` and answer
+`404 You are not working tonight.` to a role holder with no confirmed shift, so an off-duty volunteer
+cannot send what the wings read as an authentic call. The backstage side takes a code session and
+never a user.
 
 `GET /api/foh/backstage/board` also returns **`timings`**: the night's curtain-up record, derived
 from preset transitions. The *first* time a milestone was called is the one that counts, and the

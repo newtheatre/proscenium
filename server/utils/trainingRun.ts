@@ -60,11 +60,19 @@ export async function requireRun(event: H3Event, target: PracticeTarget): Promis
  */
 export async function startRun(user: AbilityUser, target: PracticeTarget): Promise<TrainingRun> {
   const existing = await activeRun(user.id)
-  if (existing?.targetKey === target) return existing
 
   // Asked BEFORE anything is ended: a refused switch must not destroy the
   // sandbox, and its events, that the trainee already had.
   const answer = await practiceWindow(user.id, target)
+
+  // A resume is re-asked too, or a window closed since it opened keeps the
+  // sandbox alive and drops the trainee on the live screen (ADR-0033).
+  if (existing?.targetKey === target) {
+    if (answer.status !== 'CLOSED') return existing
+    // Only a definitive CLOSED may end a run (ADR-0034).
+    await endRun(existing.id, 'ENDED')
+  }
+
   if (answer.status !== 'OPEN') {
     throw createError({
       statusCode: 403,
@@ -76,7 +84,7 @@ export async function startRun(user: AbilityUser, target: PracticeTarget): Promi
 
   // One sandbox at a time: leaving the old one open would leave a banner
   // pointing at a screen they are no longer on.
-  if (existing) await endRun(existing.id, 'ENDED')
+  if (existing && existing.targetKey !== target) await endRun(existing.id, 'ENDED')
 
   const now = new Date()
   const expiresAt = answer.expiresAt ? new Date(answer.expiresAt) : null

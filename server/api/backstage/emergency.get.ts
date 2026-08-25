@@ -10,7 +10,7 @@ export default defineEventHandler(async () => {
 
   // Allow-listed, and scoped to tonight's venues. Nothing about who is coming,
   // what was sold or who is working crosses this boundary.
-  return db.selectDistinct({
+  const cards = await db.selectDistinct({
     venueName: schema.venues.name,
     addressForEmergencyCall: schema.venueEmergencyInfo.addressForEmergencyCall,
     what3words: schema.venueEmergencyInfo.what3words,
@@ -30,4 +30,8 @@ export default defineEventHandler(async () => {
       ne(schema.performances.status, 'CANCELLED'),
     ))
     .orderBy(asc(schema.venues.name))
+
+  // The night travels with the cards so a device rendering a saved copy can
+  // say which night it saved (docs/11 §2.5).
+  return { night, cards }
 })

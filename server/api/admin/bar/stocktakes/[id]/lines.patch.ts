@@ -7,8 +7,14 @@ import { manageBar } from '~~/shared/utils/abilities'
 const bodySchema = z.object({
   lines: z.array(z.object({
     lineId: z.string().trim().min(1),
-    /** Whole containers, a part bottle as a decimal. Null clears the count. */
-    countedContainers: z.coerce.number().min(0).max(100_000).nullable(),
+    /**
+     * Whole containers, a part bottle as a decimal. Null clears the count, and
+     * a blank box means exactly that: `Number('')` is 0, which writes stock off.
+     */
+    countedContainers: z.preprocess(
+      value => (typeof value === 'string' && value.trim() === '' ? null : value),
+      z.coerce.number().min(0).max(100_000).nullable(),
+    ),
     reason: z.string().trim().max(200).nullable().optional(),
   })).min(1).max(50),
 })

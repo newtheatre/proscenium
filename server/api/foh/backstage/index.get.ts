@@ -6,9 +6,7 @@ export default defineEventHandler(async (event) => {
 
   const { user } = await requireUserSession(event)
   const scope = await requireFohScope(user)
-  if (!scope.performances.length) {
-    throw createError({ statusCode: 404, statusMessage: 'You are not working tonight, so there is no code to give out.' })
-  }
+  requireRosteredTonight(scope)
 
   const night = await ensureNight(scope.night)
   const { public: { baseURL } } = useRuntimeConfig()

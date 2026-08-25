@@ -352,6 +352,13 @@ A green build and a green deploy are not evidence the Worker can serve a request
 on 2026-08-19 reported `ok: true` for the whole hour it was down
 (stage-door ADR-0021, which this endpoint is the second half of).
 
+The same endpoint reports the session key. `{"ok": false, "sessionKey": "missing"}` with a 503 means
+the Secrets Store read for `SESSION_PASSWORD` failed, so no request can be served safely and the app
+is refusing them all with a 503 ([ADR-0040](decisions/0040-refuse-a-request-with-no-session-key.md)).
+Check the Cloudflare Secrets Store and the binding in `wrangler.jsonc`, then `wrangler tail` for the
+`[secrets-store]` line naming the read error. Deploying again is the blunt fix: it starts fresh
+isolates. `/api/health` is deliberately exempt from that 503 so it can name the cause.
+
 Both ledger spellings are folded together, because production carries a mix: `nuxt-db migrate`
 records `0016_lying_maverick` and `wrangler d1 migrations apply` records `0016_lying_maverick.sql`.
 Which spelling a row has says nothing about whether it ran.
@@ -666,6 +673,16 @@ header before adding a plugin that touches sessions.
 
 A logged-out `{ id }` with no `user` key is the signature: `curl` alone will
 not distinguish it from health, so check the body, not just the status.
+
+**A failed Secrets Store read now refuses the request instead of serving it.**
+`server/middleware/0.session-key.ts` answers 503 "Starting up, please try again
+shortly." for every path except `/api/health` while
+`runtimeConfig.session.password` is empty, because serving one request in that
+state seals the whole isolate to an empty key for its lifetime (ADR-0040). The
+middleware logs the reason once per isolate; `/api/health` reports it as
+`sessionKey: "missing"`. In development the same 503 means
+`NUXT_SESSION_PASSWORD` is missing from `.env`, which `bootstrap.sh` normally
+sets.
 
 **Rotating invalidates every existing session.** Every logged-in user (customers and staff alike) is signed out and must log in again. Nothing is lost, but do not do it fifteen minutes before curtain-up. Rotate at a quiet time, then confirm you can still log in yourself. Workers pick the new value up as isolates recycle rather than instantly, so allow a few minutes for the estate to settle.
 

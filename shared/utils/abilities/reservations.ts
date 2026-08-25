@@ -12,8 +12,12 @@ export const listReservations = defineAbility((user: AbilityUser) => isStaff(use
 /** Create a reservation: staff only. */
 export const createReservation = defineAbility((user: AbilityUser) => isStaff(user))
 
-/** Read a specific reservation: staff can read any, customers only their own. */
+/**
+ * Read a specific reservation: staff any, customers only their own. A missing
+ * resource denies: throwing here would grant instead (ADR-0008).
+ */
 export const readReservation = defineAbility((user: AbilityUser, resource: { userId: string }) => {
+  if (!resource) return false
   if (isStaff(user)) return true
   return user.id === resource.userId
 })

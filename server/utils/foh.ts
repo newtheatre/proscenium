@@ -131,3 +131,15 @@ export async function requireFohScope(user: AbilityUser | null | undefined, now:
   }
   return scope
 }
+
+/**
+ * Narrow to a caller who holds a shift tonight (ADR-0019). Staff keep their
+ * bypass: fohScope already fills their performances in.
+ */
+export function requireRosteredTonight(scope: FohScope): FohPerformance {
+  const performance = scope.performances[0]
+  if (!performance) {
+    throw createError({ statusCode: 404, statusMessage: 'You are not working tonight.' })
+  }
+  return performance
+}

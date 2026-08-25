@@ -41,7 +41,9 @@ function statusMessage(error: unknown): string | undefined {
   return (error as { data?: { statusMessage?: string } }).data?.statusMessage
 }
 
-const counts = reactive<Record<string, number | undefined>>({})
+// `''` is a real state, not an impossible one: a number input emits it for an
+// emptied or unparseable box, and it must clear the count, never save as zero.
+const counts = reactive<Record<string, number | '' | undefined>>({})
 watchEffect(() => {
   for (const line of data.value?.lines ?? []) {
     if (!(line.id in counts)) counts[line.id] = line.countedQty == null ? undefined : qtyToContainers(line, line.countedQty)
@@ -63,7 +65,7 @@ const columns = [
 
 function variance(line: Line): number | null {
   const counted = counts[line.id]
-  if (counted == null) return null
+  if (counted == null || counted === '') return null
   return containersToQty(line, counted) - line.expectedQty
 }
 
@@ -73,7 +75,7 @@ async function saveCounts() {
   try {
     const lines = rows.value
       .filter(l => counts[l.id] !== undefined)
-      .map(l => ({ lineId: l.id, countedContainers: counts[l.id] ?? null }))
+      .map(l => ({ lineId: l.id, countedContainers: counts[l.id] === '' ? null : counts[l.id]! }))
     for (let i = 0; i < lines.length; i += 50) {
       await $fetch(`/api/admin/bar/stocktakes/${route.params.id}/lines`, {
         method: 'PATCH',

@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, eq, gte, inArray, isNotNull, lte, ne } from 'drizzle-orm'
+import { and, asc, eq, gte, isNotNull, lte, ne } from 'drizzle-orm'
 
 /**
  * The comms board. Polled with a cursor rather than socketed (ADR-0021), and
@@ -117,13 +117,27 @@ export async function acknowledgeMessage(nightId: string, messageId: string, by:
 }
 
 /**
- * The one piece of box office data that crosses to backstage: admitted against
- * expected, and nothing else (docs/11 §5.2).
+ * Which of the day's performances the board is for: the last one whose doors
+ * have opened, else the next to start, else the day's last (docs/11 §5.2).
  */
-export async function houseCountFor(night: string) {
+function boardPerformance<T extends { startsAt: Date, doorsAt: Date | null }>(
+  performances: T[],
+  now: Date,
+): T | null {
+  if (!performances.length) return null
+  const open = performances.filter(p => (p.doorsAt ?? p.startsAt) <= now)
+  return open.at(-1) ?? performances.find(p => p.startsAt > now) ?? performances.at(-1) ?? null
+}
+
+/**
+ * The one piece of box office data that crosses to backstage: admitted against
+ * expected, for one performance and never a day's total (docs/11 §5.2).
+ */
+export async function houseCountFor(night: string, now: Date = new Date()) {
   const performances = await db.select({
     id: schema.performances.id,
     startsAt: schema.performances.startsAt,
+    doorsAt: schema.performances.doorsAt,
     showTitle: schema.shows.title,
     intervalCount: schema.performances.intervalCount,
   })
@@ -133,39 +147,22 @@ export async function houseCountFor(night: string) {
       gte(schema.performances.startsAt, validityStart(night)),
       lte(schema.performances.startsAt, validityEnd(night)),
       ne(schema.performances.status, 'CANCELLED'),
+      // Somebody else's building is not a night of ours to run (ADR-0029).
+      ourBuildingPredicate(),
     ))
     .orderBy(asc(schema.performances.startsAt))
 
-  // Polled every 2.5s by every resident display, so two grouped queries.
-  // Scoped by subquery, never an id list from the rows above (ADR-0006).
-  const tonight = db
-    .select({ id: schema.performances.id })
-    .from(schema.performances)
-    .where(and(
-      gte(schema.performances.startsAt, validityStart(night)),
-      lte(schema.performances.startsAt, validityEnd(night)),
-      ne(schema.performances.status, 'CANCELLED'),
-    ))
+  const chosen = boardPerformance(performances, now)
+  const [admitted, expected] = chosen
+    ? await Promise.all([countCollectedSeatsFor(chosen.id), countOccupiedSeatsFor(chosen.id)])
+    : [0, 0]
 
-  const scope = inArray(schema.tickets.performanceId, tonight)
-  const [collected, occupied] = performances.length
-    ? await Promise.all([countCollectedSeats(scope), countOccupiedSeats(scope)])
-    : [new Map<string, number>(), new Map<string, number>()]
-
-  let admitted = 0
-  let expected = 0
-  for (const performance of performances) {
-    admitted += collected.get(performance.id) ?? 0
-    expected += occupied.get(performance.id) ?? 0
-  }
-
-  const first = performances[0]
   return {
     admitted,
     expected,
-    showTitle: first?.showTitle ?? null,
-    startsAt: first?.startsAt ?? null,
-    intervalCount: first?.intervalCount ?? 0,
+    showTitle: chosen?.showTitle ?? null,
+    startsAt: chosen?.startsAt ?? null,
+    intervalCount: chosen?.intervalCount ?? 0,
   }
 }
 
