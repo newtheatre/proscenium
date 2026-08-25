@@ -4,7 +4,7 @@ useSeoMeta({
   description: 'See what shows are currently on and book your tickets at the Nottingham New Theatre.',
 })
 
-const { data: shows, status } = await useFetch('/api/whats-on', {
+const { data: shows, status, refresh } = await useFetch('/api/whats-on', {
   key: 'whats-on',
   default: () => [],
 })
@@ -48,6 +48,28 @@ const { data: shows, status } = await useFetch('/api/whats-on', {
         v-for="show in shows"
         :key="show.id"
         :show="show"
+      />
+    </div>
+
+    <!-- A failed load must not read as "nothing is on sale". -->
+    <div
+      v-else-if="status === 'error'"
+      class="mt-12"
+    >
+      <UAlert
+        color="error"
+        variant="soft"
+        icon="i-lucide-triangle-alert"
+        title="We could not load the listings"
+        description="Something went wrong at our end. Please try again in a moment."
+      />
+      <UButton
+        class="mt-4"
+        color="error"
+        variant="outline"
+        icon="i-lucide-rotate-ccw"
+        label="Try again"
+        @click="() => refresh()"
       />
     </div>
 

@@ -139,6 +139,10 @@ const canComp = computed(() => Boolean(basketBar.value.length) && !basketTickets
 const myPending = computed(() => comps.value.mine.find(c => c.status === 'PENDING') ?? null)
 const myDecided = ref<CompRequest | null>(null)
 
+const COMP_POLL_FAILURES_BEFORE_WARNING = 3
+let compFailures = 0
+const compsStale = ref(false)
+
 async function pollComps() {
   // No sandbox exists for this, so it must not run in practice mode.
   if (training.active.value) return
@@ -157,9 +161,14 @@ async function pollComps() {
         }
       }
     }
+    compFailures = 0
+    compsStale.value = false
   }
   catch {
-    // A poll that fails is not worth a toast; the next one will be along.
+    // One dropped poll is not worth saying anything about, a queue that has stopped
+    // arriving is: an empty overlay otherwise reads as "nobody is waiting".
+    compFailures++
+    if (compFailures >= COMP_POLL_FAILURES_BEFORE_WARNING) compsStale.value = true
   }
 }
 
@@ -293,6 +302,8 @@ async function search() {
   if (trimmed.length < 2) return
   searching.value = true
   problem.value = null
+  // A failed lookup must not leave the previous booking on screen, addable to this basket.
+  results.value = []
   try {
     results.value = await requestFetch<Found[]>(api('/api/bar/lookup'), { query: { q: trimmed } })
     if (!results.value.length) {
@@ -871,9 +882,20 @@ async function closeBar() {
 
     <!-- The approver's queue. Inline, because the DM is often the one serving. -->
     <div
-      v-if="comps.awaitingApproval.length"
+      v-if="comps.awaitingApproval.length || compsStale"
       class="fixed bottom-4 left-4 right-4 z-40 mx-auto max-w-2xl space-y-2 sm:left-auto sm:right-4 sm:mx-0"
     >
+      <div
+        v-if="compsStale"
+        class="rounded-lg border border-red-500/50 bg-neutral-900 p-4 shadow-xl"
+      >
+        <p class="text-sm font-semibold text-red-300">
+          Comp requests are not loading
+        </p>
+        <p class="mt-1 text-sm text-neutral-300">
+          Do not read this as nobody waiting. Check with the duty manager before comping anything.
+        </p>
+      </div>
       <div
         v-for="request in comps.awaitingApproval"
         :key="request.id"

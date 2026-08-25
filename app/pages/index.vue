@@ -8,7 +8,7 @@ useSeoMeta({
   twitterCard: 'summary_large_image',
 })
 
-const { data: shows, status: showsStatus } = await useFetch('/api/whats-on', {
+const { data: shows, status: showsStatus, refresh: refreshShows } = await useFetch('/api/whats-on', {
   key: 'homepage-whats-on',
   default: () => [],
 })
@@ -97,6 +97,28 @@ const showsLoading = computed(() => showsStatus.value === 'pending')
             v-for="show in featuredShows"
             :key="show.id"
             :show="show"
+          />
+        </div>
+
+        <!-- A failed load must not read as "nothing is on sale". -->
+        <div
+          v-else-if="showsStatus === 'error'"
+          class="mb-8"
+        >
+          <UAlert
+            color="error"
+            variant="soft"
+            icon="i-lucide-triangle-alert"
+            title="We could not load the listings"
+            description="Something went wrong at our end. Please try again in a moment."
+          />
+          <UButton
+            class="mt-4"
+            color="error"
+            variant="outline"
+            icon="i-lucide-rotate-ccw"
+            label="Try again"
+            @click="() => refreshShows()"
           />
         </div>
 

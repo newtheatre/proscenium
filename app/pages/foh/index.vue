@@ -124,24 +124,41 @@ const practiceNotice = computed(() => {
 })
 
 const pendingComps = ref(0)
+// One dropped poll is not worth saying anything about; a badge stuck on a stale
+// count is, so the tile stops claiming a number after three failures in a row.
+const COMP_POLL_FAILURES_BEFORE_WARNING = 3
+let compFailures = 0
+const compsStale = ref(false)
+
 async function pollComps() {
   try {
     const res = await requestFetch<{ mayApprove: boolean, awaitingApproval: unknown[] }>('/api/bar/comps')
     pendingComps.value = res.mayApprove ? res.awaitingApproval.length : 0
+    compFailures = 0
+    compsStale.value = false
   }
-  catch {
-    // Not everyone on the FOH home can work the bar: a 403 here is expected.
+  catch (err) {
+    // Not everyone on the FOH home can work the bar, so a 403 is the answer, not a fault.
+    if ((err as { statusCode?: number }).statusCode === 403) {
+      stopCompPolling()
+      pendingComps.value = 0
+      return
+    }
+    compFailures++
+    if (compFailures >= COMP_POLL_FAILURES_BEFORE_WARNING) compsStale.value = true
   }
 }
 
 let compTimer: ReturnType<typeof setInterval> | null = null
+function stopCompPolling() {
+  if (compTimer) clearInterval(compTimer)
+  compTimer = null
+}
 onMounted(() => {
   pollComps()
   compTimer = setInterval(pollComps, 8000)
 })
-onBeforeUnmount(() => {
-  if (compTimer) clearInterval(compTimer)
-})
+onBeforeUnmount(stopCompPolling)
 </script>
 
 <template>
@@ -301,7 +318,13 @@ onBeforeUnmount(() => {
                 class="size-7"
               />
               <span
-                v-if="button.key === 'till' && pendingComps"
+                v-if="button.key === 'till' && compsStale"
+                class="rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-neutral-950"
+              >
+                Comps not loading
+              </span>
+              <span
+                v-else-if="button.key === 'till' && pendingComps"
                 class="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-neutral-950"
               >
                 {{ pendingComps }} to approve
