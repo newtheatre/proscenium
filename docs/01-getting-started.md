@@ -31,7 +31,7 @@ server/api/          REST endpoints (shows, venues, reservations, bookings, user
 server/db/schema/    Drizzle table definitions: the source of truth for the schema
 server/db/migrations/sqlite/   Generated SQL migrations (do not hand-edit)
 server/routes/images/[...pathname].get.ts   Serves R2 blobs at /images/**
-server/tasks/        Nitro tasks: currently just db:seed
+server/tasks/        Nitro tasks: currently just seed
 server/utils/        Email, auth tokens, image upload, query helpers, validation
 shared/utils/abilities/   Authorisation rules shared between client and server
 public/              Static assets served as-is
@@ -167,7 +167,7 @@ write the session", guarded by `import.meta.dev` so it does not exist in a produ
 | `/dev-login?staff=front-of-house` | `proscenium:FRONT_OF_HOUSE` |
 
 `front-of-house` is the one worth using deliberately: `/foh` is scoped by the rota, so that persona
-sees only what it is confirmed on, and `db:seed` rosters it on the door of a performance tonight so
+sees only what it is confirmed on, and `seed` rosters it on the door of a performance tonight so
 there is something to see ([ADR-0019](./decisions/0019-the-rota-scopes-the-front-of-house-role.md)).
 
 The client middleware sends logged-out visitors here in dev and to the hosted login in production.
@@ -262,12 +262,12 @@ Different from development, and worth understanding:
 
 ## 9. Seeding local data
 
-The seed lives in `server/tasks/seed.ts` (task name `db:seed`) with per-entity modules in `server/tasks/seed/`. It relies on Nitro's **experimental tasks** feature, enabled in `nuxt.config.ts` via `nitro.experimental.tasks`.
+The seed lives in `server/tasks/seed.ts` (task name `seed`, which Nitro derives from the file path, not from `meta.name`) with per-entity modules in `server/tasks/seed/`. It relies on Nitro's **experimental tasks** feature, enabled in `nuxt.config.ts` via `nitro.experimental.tasks`.
 
 With `bun run dev` running, choose either:
 
-- **Nuxt DevTools → Tasks tab → `db:seed`** (what `server/tasks/seed/README.md` recommends), or
-- `curl -X POST http://localhost:3000/_nitro/tasks/db:seed`
+- **Nuxt DevTools → Tasks tab → `seed`** (what `server/tasks/seed/README.md` recommends), or
+- `curl -X POST http://localhost:3000/_nitro/tasks/seed`
 
 The task is guarded: if the `users` table has any rows it logs *"Database already has users. Skipping seed."* and does nothing. To re-seed you must empty the database first.
 
@@ -368,7 +368,7 @@ Two nuances before you move them:
 2. Create `.env`. It can be empty; add `NUXT_RESEND_API_KEY` only if you want email to send
 3. `bun run dev`
 4. Confirm `NUXT_SESSION_PASSWORD` has appeared in `.env`
-5. Open DevTools → Tasks → run `db:seed`
+5. Open DevTools → Tasks → run `seed`
 6. Visit <http://localhost:3000> and log in as `admin@newtheatre.org.uk` / `DevPassword123!`
 7. Check `/admin` and `/admin/box-office` both load
 8. `bunx eslint .`: should be clean before you start changing things

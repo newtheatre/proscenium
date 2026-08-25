@@ -27,7 +27,7 @@ Create a `.env` (see [docs/01-getting-started.md](docs/01-getting-started.md) §
 bun run dev          # http://localhost:3000, HMR
 ```
 
-The local database starts empty. Seed it via Nuxt DevTools → Tasks → `db:seed`
+The local database starts empty. Seed it via Nuxt DevTools → Tasks → `seed`
 ([docs/01-getting-started.md](docs/01-getting-started.md) §9). Development uses a local SQLite file
 under `.data/`; D1 only exists in production.
 

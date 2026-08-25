@@ -16,7 +16,12 @@ server/tasks/
 
 ## Running Seeds
 
-**To seed the database:** Open the `Tasks` tab in Nuxt DevTools and click on the `db:seed` task
+**To seed the database:** Open the `Tasks` tab in Nuxt DevTools and click on the `seed` task
+
+**Nitro names a task after its file path, not after `meta.name`.** `server/tasks/seed.ts` is
+registered as `seed` and `server/tasks/seed/shows.ts` as `seed:shows`, whatever `meta.name` says.
+Keep the two equal when adding a task: a `meta.name` that disagrees is inert, and it is the name
+that ends up copied into the documentation, where it 404s.
 
 **To reset the database:**
 
