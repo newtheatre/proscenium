@@ -356,3 +356,37 @@ because `localStorage` only helps once the Worker has served the HTML.
 shell, so the assembly point is reachable from a phone with one bar in the foyer. There is no service
 worker and no PWA module in this app, so that is a piece of work in its own right rather than a
 tweak to either page. Recorded so nobody assumes the cache already covers it.
+
+### Migration 0052 put a depletion quantity into `container_ml` and the real size is gone {#bar-container-size-lost}
+
+**P2 · `server/db/migrations/sqlite/0052_unstack_self_referencing_recipes.sql`.** 0050 turned every
+`stock_product_id` pointer into a recipe row with `qty = coalesce(depletes_qty, 1)`, then nulled
+`container_ml` for every product that gained one. 0052 unstacked the products that pointed at
+themselves and restored `container_ml` from that recipe row's `qty`, on the stated but false premise
+that 0050 had put the container size there. `qty` is a depletion quantity: a 70 cl spirits bottle
+that stocked itself came out of 0052 holding 25, 35 or 1, not 700. 0051 dropped `depletes_qty` and
+`stock_product_id`, so nothing left in the database holds the real size, and the migration file's
+header now says so.
+
+**What it does to the numbers.** `containerSize()` returns `container_ml ?? 1`, so a sale of that
+product writes a movement of 1 ml per bottle instead of a measure, `containersToQty()` books a
+delivery of twelve bottles as twelve millilitres, and `formatContainers()` reports the level as
+thousands of bottles. Every figure derived from those movements, on-hand, par alerts, stock at cost
+and the variance report, is in the wrong basis.
+
+**Finding them.** There is no marker left on the row, so look for the shape:
+
+```sql
+SELECT id, name, unit, container_ml FROM bar_products
+WHERE container_ml IS NOT NULL AND container_ml < 100 AND unit IN ('bottle', 'measure');
+```
+
+A bottle whose container is under 100 ml is a depletion quantity wearing the wrong hat. Cross-check
+against the bar manager's own list of sizes, or a Time Travel restore point from before 0050, which
+is the only place the pre-0050 value survives.
+
+**Repair.** `container_ml` cannot be edited once movements exist:
+`PATCH /api/admin/bar/products/:id` returns 409 "its size is fixed", and that is correct, because
+every movement means what it means in the size that was current when it was written (ADR-0035). The
+supported repair is to retire the product and add it again at the right size, then take a stocktake
+against the new one. Do not edit the historic movements; the ledger is append-only.

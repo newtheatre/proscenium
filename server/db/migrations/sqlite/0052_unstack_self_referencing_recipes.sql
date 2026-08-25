@@ -5,9 +5,13 @@
 -- of itself" (ADR-0036), but reads a self-referencing one as an ingredient
 -- that is not stocked, and refuses the sale.
 --
--- The container size those products lost is recoverable: 0050 copied it into
--- the recipe row's qty before nulling the column, so it is restored from there
--- first and the rows are dropped second.
+-- WARNING, and the reason this file is left exactly as it ran: the restore
+-- below is wrong. It claimed 0050 had copied container_ml into the recipe
+-- row's qty. 0050 copied `coalesce(depletes_qty, 1)`, which is a depletion
+-- quantity and never a container size, so a 70 cl bottle that pointed at
+-- itself came out of this holding 25, 35 or 1 rather than 700. 0051 has since
+-- dropped depletes_qty, so nothing in the database can recover the real size.
+-- Detection and repair: docs/09-known-issues.md #bar-container-size-lost.
 UPDATE bar_products SET container_ml = (
   SELECT r.qty FROM bar_recipe_items r
   WHERE r.product_id = bar_products.id AND r.component_product_id = bar_products.id
