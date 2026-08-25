@@ -136,9 +136,18 @@ export async function houseCountFor(night: string) {
     ))
     .orderBy(asc(schema.performances.startsAt))
 
-  // Two grouped queries, not two per performance: this is polled every 2.5s
-  // by every resident display.
-  const scope = inArray(schema.tickets.performanceId, performances.map(p => p.id))
+  // Polled every 2.5s by every resident display, so two grouped queries.
+  // Scoped by subquery, never an id list from the rows above (ADR-0006).
+  const tonight = db
+    .select({ id: schema.performances.id })
+    .from(schema.performances)
+    .where(and(
+      gte(schema.performances.startsAt, validityStart(night)),
+      lte(schema.performances.startsAt, validityEnd(night)),
+      ne(schema.performances.status, 'CANCELLED'),
+    ))
+
+  const scope = inArray(schema.tickets.performanceId, tonight)
   const [collected, occupied] = performances.length
     ? await Promise.all([countCollectedSeats(scope), countOccupiedSeats(scope)])
     : [new Map<string, number>(), new Map<string, number>()]

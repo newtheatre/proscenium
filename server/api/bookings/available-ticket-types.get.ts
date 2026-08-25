@@ -32,26 +32,21 @@ export default defineEventHandler(async (event) => {
   // Only types a human may sell: archived legacy types and the pass
   // bookkeeping kinds are excluded. See sellableTicketTypes().
   const allTypes = await db.select().from(schema.ticketTypes).where(sellableTicketTypes())
-  const typeIds = allTypes.map(t => t.id)
 
   // Load show-level and performance-level overrides
   const [showOverrides, perfOverrides] = await Promise.all([
-    typeIds.length > 0
-      ? db.select().from(schema.showTicketTypeOverrides).where(
-          and(
-            eq(schema.showTicketTypeOverrides.showId, showId),
-            inArray(schema.showTicketTypeOverrides.ticketTypeId, typeIds),
-          ),
-        )
-      : Promise.resolve([]),
-    typeIds.length > 0
-      ? db.select().from(schema.performanceTicketTypeOverrides).where(
-          and(
-            eq(schema.performanceTicketTypeOverrides.performanceId, performanceId),
-            inArray(schema.performanceTicketTypeOverrides.ticketTypeId, typeIds),
-          ),
-        )
-      : Promise.resolve([]),
+    db.select().from(schema.showTicketTypeOverrides).where(
+      and(
+        eq(schema.showTicketTypeOverrides.showId, showId),
+        inArray(schema.showTicketTypeOverrides.ticketTypeId, sellableTicketTypeIds()),
+      ),
+    ),
+    db.select().from(schema.performanceTicketTypeOverrides).where(
+      and(
+        eq(schema.performanceTicketTypeOverrides.performanceId, performanceId),
+        inArray(schema.performanceTicketTypeOverrides.ticketTypeId, sellableTicketTypeIds()),
+      ),
+    ),
   ])
 
   // Access types are offered only to accounts entitled to them. The gate on
