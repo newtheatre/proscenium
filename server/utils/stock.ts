@@ -36,6 +36,32 @@ export function movementStatements(drafts: MovementDraft[]): BatchItem<'sqlite'>
     }) as BatchItem<'sqlite'>)
 }
 
+/**
+ * The reversal for a voided tab charge, copied from its own SALE rows (ADR-0031).
+ * Guarded in SQL, so a duplicate void or a settle that won credits nothing.
+ */
+export function reversalStatement(transactionId: string, byUserId: string | null) {
+  // Batched before the void stamp, so the guard reads the charge as it was.
+  // `randomblob` because nanoid is applied in the app, not by SQLite.
+  return db.run(sql`
+    insert into stock_movements
+      (id, product_id, qty, kind, ref_table, ref_id, cost_pence_per_container, reason, created_by_user_id)
+    select lower(hex(randomblob(12))), sale.product_id, -sale.qty, 'VOID', 'transactions', sale.ref_id,
+           sale.cost_pence_per_container, 'Tab charge voided', ${byUserId}
+    from stock_movements sale
+    where sale.ref_table = 'transactions'
+      and sale.ref_id = ${transactionId}
+      and sale.kind = 'SALE'
+      and sale.qty <> 0
+      and exists (
+        select 1 from transactions t
+        where t.id = ${transactionId}
+          and t.voided_at is null
+          and t.tab_settled_at is null
+      )
+  `)
+}
+
 export interface RecipeIngredient {
   id: string
   componentProductId: string | null

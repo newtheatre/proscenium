@@ -2147,6 +2147,13 @@ the bar scope, because they are till work.
 - The void needs all three of `tender = 'TAB'`, `voided_at IS NULL` and `tab_settled_at IS NULL`,
   and the last two are in the SQL predicate as well as the read. Voiding a settled charge would
   take money out of a day the reader really took it in, possibly against a recorded Z-total.
+- **Both halves of the void carry that predicate**, not just the stamp. The stock reversal is a
+  single `INSERT ... SELECT` over the charge's own `SALE` movements, batched *before* the stamp and
+  conditional on the charge still being unvoided and unsettled, so a second void or a settle that
+  got there first credits nothing back to the shelf. When the stamp matches no row the response is
+  `409 That charge was paid for or taken off while you were looking at it. Reload the tab.`, never
+  `{ ok: true }`: the debtor and the bar manager may both void the same charge, and telling the
+  debtor it was removed when it was in fact paid for is how a balance goes missing.
 
 ---
 

@@ -347,6 +347,30 @@ day nobody emptied the shelf; `/admin/bar/stocktakes` lists each take with the l
 repair is an ordinary stock adjustment back to the real level, dated today, with a reason naming the
 stocktake it corrects. Do not edit the historic movement.
 
+### A tab charge voided twice before 2026-08-25 credited its stock back twice {#void-double-credit}
+
+**P2 · data.** The void stamped the charge behind a predicate that could match only once, but wrote
+the stock reversal unconditionally alongside it. Where the debtor and the bar manager voided the
+same charge at once, or a settle landed first, a second full set of `VOID` movements was written:
+`on_hand` reads a container heavy for every product on that charge, and the next stocktake books
+the difference as shrinkage in the wrong direction. The reversal is now one guarded statement, so
+no new pair can be written.
+
+Pairs already in the ledger stay there, because it is append-only. To find them:
+
+```sql
+SELECT ref_id, product_id, count(*) AS void_rows, sum(qty) AS credited_back
+FROM stock_movements
+WHERE ref_table = 'transactions' AND kind = 'VOID'
+GROUP BY ref_id, product_id
+HAVING count(*) > 1;
+```
+
+One `VOID` row per product per voided charge is the correct shape, so every row this returns is a
+duplicate. Check it against the charge's `SALE` rows for the same `ref_id`: the reversal should
+cancel them exactly. The repair is an ordinary stock adjustment back to the real level, dated
+today, with a reason naming the charge it corrects. Do not edit the historic movements.
+
 ### A merge before 2026-08-25 may have left a live customer on a placeholder address {#merge-placeholder-email}
 
 **P2 · data.** When an account merge's winner had no mirror row here, one was created with

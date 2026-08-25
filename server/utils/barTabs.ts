@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import type { BatchItem } from 'drizzle-orm/batch'
-import { and, asc, count, desc, eq, inArray, isNull, lte, sql, sum } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, isNull, lte, sql, sum } from 'drizzle-orm'
 
 /**
  * Bar tabs: a sale on credit, settled later by card on the reader (ADR-0030).
@@ -204,33 +204,4 @@ export async function settleTab(opts: {
   await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
 
   return { transactionId: built.transactionId, totalPence }
-}
-
-/**
- * Opposing movements for a voided charge, copied from the original SALE rows.
- * Never recomputed: the catalogue may have changed since (ADR-0031).
- */
-export async function reversalMovementsFor(transactionId: string, byUserId: string) {
-  const sales = await db.select({
-    productId: schema.stockMovements.productId,
-    qty: schema.stockMovements.qty,
-    costPencePerContainer: schema.stockMovements.costPencePerContainer,
-  }).from(schema.stockMovements)
-    .where(and(
-      eq(schema.stockMovements.refTable, 'transactions'),
-      eq(schema.stockMovements.refId, transactionId),
-      eq(schema.stockMovements.kind, 'SALE'),
-    ))
-    .orderBy(asc(schema.stockMovements.createdAt))
-
-  return sales.map(sale => ({
-    productId: sale.productId,
-    qty: -sale.qty,
-    kind: 'VOID' as const,
-    refTable: 'transactions',
-    refId: transactionId,
-    costPencePerContainer: sale.costPencePerContainer,
-    reason: 'Tab charge voided',
-    createdByUserId: byUserId,
-  }))
 }

@@ -422,9 +422,9 @@ A signed, append-only ledger. **`on_hand` is always `SUM(qty)` and is never stor
 level cannot drift from the movements that explain it. Two SQLite triggers enforce the append-only
 half: the content columns cannot be updated and no row can be deleted.
 
-- **One writer.** Every insert goes through `movementStatements()` in `server/utils/stock.ts`.
-  Nothing else writes the table, which is what makes the ledger a reliable account of why a level is
-  what it is.
+- **One writer.** Every insert is built in `server/utils/stock.ts`, by `movementStatements()` or by
+  `reversalStatement()`. Nothing else writes the table, which is what makes the ledger a reliable
+  account of why a level is what it is.
 - **`created_by_user_id` is deliberately outside the update trigger.** An estate account merge
   re-points it, and a blanket `BEFORE UPDATE` would stall the merge hook for ever, which is exactly
   what happened to `incident_log` (ADR-0025, and migration `0023`).
@@ -437,6 +437,11 @@ half: the content columns cannot be updated and no row can be deleted.
   rows rather than recomputed from the catalogue. Recomputing would not cancel the sale if
   the product's recipe had changed in between, and `on_hand` would drift
   permanently with no trace (ADR-0031).
+- **The reversal is one `INSERT ... SELECT`, guarded on the charge**, batched ahead of the void
+  stamp and conditional on that charge still being unvoided and unsettled. Two people voting the
+  same charge off a tab at once, or a settle landing first, would otherwise credit the stock a
+  second time: the ledger is append-only, so a duplicate can only ever be offset, never removed.
+  It is also a fixed number of bound parameters however many products the charge covers (ADR-0006).
 - **Stocktake variance is computed against on-hand at the moment of finishing**, not against the
   snapshot taken at the start. `expected_qty` is recorded so the sheet can show what was expected
   when counting began, but correcting to it would erase any sale made during the count.
