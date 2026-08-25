@@ -9,7 +9,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'User ID is required' })
   }
 
+  // Allow-listed: without a column list Drizzle returns the whole row, so a
+  // column added later would reach a customer asking about themselves.
   const user = await db.query.users.findFirst({
+    columns: { id: true, name: true, email: true },
     where: (users, { eq }) => eq(users.id, userId),
   })
 

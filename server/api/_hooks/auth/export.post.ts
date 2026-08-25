@@ -79,6 +79,18 @@ export default defineEventHandler(async (event) => {
     expiresAt: schema.accessProfiles.expiresAt,
   }).from(schema.accessProfiles).where(eq(schema.accessProfiles.userId, userId)).get()
 
+  // The subject wrote the note on this one, so leaving it out means a subject
+  // access request answers with less than the person actually supplied.
+  const passRequests = await db.select({
+    status: schema.passRequests.status,
+    note: schema.passRequests.note,
+    requestedAt: schema.passRequests.requestedAt,
+    decidedAt: schema.passRequests.decidedAt,
+    typeName: schema.passTypes.name,
+  }).from(schema.passRequests)
+    .leftJoin(schema.passTypes, eq(schema.passRequests.passTypeId, schema.passTypes.id))
+    .where(eq(schema.passRequests.userId, userId))
+
   // Their own debt, so it belongs in the bundle (ADR-0025). Scoped by debtor,
   // not by a bound list of transaction ids (ADR-0006).
   const tabCharges = await db.select({
@@ -129,6 +141,13 @@ export default defineEventHandler(async (event) => {
         status: p.status,
         pricePaid: p.pricePaid,
         issuedAt: p.createdAt,
+      })),
+      passRequests: passRequests.map(r => ({
+        type: r.typeName,
+        status: r.status,
+        note: r.note,
+        requestedAt: r.requestedAt,
+        decidedAt: r.decidedAt,
       })),
       barTabs: tabCharges.map(charge => ({
         chargedOn: charge.takenOn,

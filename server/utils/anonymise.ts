@@ -24,7 +24,7 @@ export interface AnonymiseResult {
 
 /**
  * One batch: a half-applied anonymisation would clear the name and leave the
- * notes. Both note fields go: a staff note names people too.
+ * notes. Every free text keyed to the subject goes, staff-written too.
  */
 export async function anonymiseUser(userId: string): Promise<AnonymiseResult> {
   const user = await db
@@ -56,6 +56,21 @@ export async function anonymiseUser(userId: string): Promise<AnonymiseResult> {
       .set({ customerNotes: null, staffNotes: null, anonymisedAt: now })
       .where(eq(schema.reservations.userId, userId)),
 
+    // The subject wrote the request note, and a staff note about them names
+    // them just as a reservation note does.
+    db.update(schema.passRequests)
+      .set({ note: null })
+      .where(eq(schema.passRequests.userId, userId)),
+
+    db.update(schema.passes)
+      .set({ notes: null })
+      .where(eq(schema.passes.userId, userId)),
+
+    // `reason` is an enum, so it carries no personal data; `note` is free text.
+    db.update(schema.compRequests)
+      .set({ note: null })
+      .where(eq(schema.compRequests.requestedByUserId, userId)),
+
     // Deleted outright, not anonymised: special category data held on consent,
     // and consent is what an erasure withdraws (ADR-0022).
     db.delete(schema.accessProfiles).where(eq(schema.accessProfiles.userId, userId)),
@@ -66,4 +81,19 @@ export async function anonymiseUser(userId: string): Promise<AnonymiseResult> {
   ])
 
   return { alreadyAnonymised: false, reservationsAffected: Number(n) }
+}
+
+/**
+ * An erasure for somebody this app never mirrored still needs a row, or
+ * ensureLocalUser's insert branch recreates them on their next page load.
+ */
+export async function tombstoneUser(userId: string): Promise<void> {
+  await db.insert(schema.users)
+    .values({
+      id: userId,
+      email: anonymisedEmail(userId),
+      name: ANONYMISED_NAME,
+      anonymisedAt: sql`(current_timestamp)`,
+    })
+    .onConflictDoNothing()
 }
