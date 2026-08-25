@@ -3,7 +3,7 @@ import { ticketTypes } from '~~/server/db/schema/ticket'
 
 export default defineTask({
   meta: {
-    name: 'db:seed:ticket-types',
+    name: 'seed:ticketTypes',
     description: 'Seed database with initial data',
   },
   async run() {

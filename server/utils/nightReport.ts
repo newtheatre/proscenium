@@ -259,14 +259,18 @@ async function barSectionFor(performanceId: string, night: string): Promise<Nigh
 }
 
 async function lowStockNames(): Promise<string[]> {
-  const onHand = await onHandByProduct()
+  const [onHand, catalogue] = await Promise.all([onHandByProduct(), depletionRules()])
   const products = await db.select({
     id: schema.barProducts.id,
     name: schema.barProducts.name,
     parQty: schema.barProducts.parQty,
+    status: schema.barProducts.status,
   }).from(schema.barProducts).where(isNotNull(schema.barProducts.parQty))
 
+  // The same two filters the stock screen applies: something retired is never
+  // restocked, and something made from other things never holds stock itself.
   return products
+    .filter(p => p.status !== 'RETIRED' && isStockProduct(catalogue.get(p.id) ?? { recipe: [] }))
     .filter(p => (onHand.get(p.id) ?? 0) < p.parQty!)
     .map(p => p.name)
 }

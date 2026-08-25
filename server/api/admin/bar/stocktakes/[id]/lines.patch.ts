@@ -15,6 +15,7 @@ const bodySchema = z.object({
       value => (typeof value === 'string' && value.trim() === '' ? null : value),
       z.coerce.number().min(0).max(100_000).nullable(),
     ),
+    /** Why the line varies. Omit it to leave it alone; null clears it. */
     reason: z.string().trim().max(200).nullable().optional(),
   })).min(1).max(50),
 })
@@ -47,7 +48,9 @@ export default defineEventHandler(async (event) => {
     countedQty: line.countedContainers == null
       ? null
       : containersToQty({ containerMl: containerMl.get(line.lineId) ?? null }, line.countedContainers),
-    reason: line.reason ?? null,
+    // Omitted leaves the stored reason standing; only an explicit null clears it.
+    // It is the sole record of where the missing stock went.
+    ...(line.reason !== undefined ? { reason: line.reason } : {}),
   }).where(and(
     eq(schema.stocktakeLines.id, line.lineId),
     eq(schema.stocktakeLines.stocktakeId, id),

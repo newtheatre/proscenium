@@ -44,9 +44,12 @@ function statusMessage(error: unknown): string | undefined {
 // `''` is a real state, not an impossible one: a number input emits it for an
 // emptied or unparseable box, and it must clear the count, never save as zero.
 const counts = reactive<Record<string, number | '' | undefined>>({})
+// Why a line varies, kept beside the count so one save carries both.
+const reasons = reactive<Record<string, string>>({})
 watchEffect(() => {
   for (const line of data.value?.lines ?? []) {
     if (!(line.id in counts)) counts[line.id] = line.countedQty == null ? undefined : qtyToContainers(line, line.countedQty)
+    if (!(line.id in reasons)) reasons[line.id] = line.reason ?? ''
   }
 })
 
@@ -61,6 +64,7 @@ const columns = [
   { accessorKey: 'expectedQty', header: 'Expected' },
   { id: 'counted', header: 'Counted' },
   { id: 'variance', header: 'Variance' },
+  { id: 'reason', header: 'Reason' },
 ]
 
 function variance(line: Line): number | null {
@@ -74,8 +78,15 @@ async function saveCounts() {
   saving.value = true
   try {
     const lines = rows.value
-      .filter(l => counts[l.id] !== undefined)
-      .map(l => ({ lineId: l.id, countedContainers: counts[l.id] === '' ? null : counts[l.id]! }))
+      .filter(l => counts[l.id] !== undefined || (reasons[l.id] ?? '') !== (l.reason ?? ''))
+      .map((l) => {
+        const counted = counts[l.id]
+        return {
+          lineId: l.id,
+          countedContainers: counted == null || counted === '' ? null : counted,
+          reason: (reasons[l.id] ?? '').trim() || null,
+        }
+      })
     for (let i = 0; i < lines.length; i += 50) {
       await $fetch(`/api/admin/bar/stocktakes/${route.params.id}/lines`, {
         method: 'PATCH',
@@ -231,6 +242,19 @@ async function abandon() {
           v-else
           class="text-muted"
         >-</span>
+      </template>
+      <template #reason-cell="{ row }">
+        <UInput
+          v-if="isOpen"
+          v-model="reasons[row.original.id]"
+          class="w-56"
+          placeholder="Breakage, pour variance, miscounted"
+          :aria-label="`Reason for ${row.original.name}`"
+        />
+        <span
+          v-else
+          class="text-sm"
+        >{{ row.original.reason || '-' }}</span>
       </template>
     </UTable>
   </UContainer>

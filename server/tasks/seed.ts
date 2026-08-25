@@ -16,7 +16,7 @@ import { seedBar } from './seed/bar'
  */
 export default defineTask({
   meta: {
-    name: 'db:seed',
+    name: 'seed',
     description: 'Seed database with initial data',
   },
   async run() {

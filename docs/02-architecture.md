@@ -48,7 +48,7 @@ server/
   db/schema/    Drizzle tables: the source of truth for the data model
   db/migrations/sqlite/   0000–0016
   utils/        Shared server logic: auth, email, images, tickets, validation
-  tasks/        Nitro tasks. Only `db:seed`
+  tasks/        Nitro tasks. Only `seed`
   routes/       Non-API routes. Only blob serving
 shared/         Code used by both sides. Abilities live here: this is why
                 the same permission check runs on client and server

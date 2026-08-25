@@ -10,9 +10,18 @@ export const PRODUCT_STATUSES = ['ACTIVE', 'HIDDEN', 'RETIRED'] as const
 export type ProductUnit = (typeof PRODUCT_UNITS)[number]
 
 /** "bottles", "items": what a count of containers is a count of. */
-export function unitLabel(unit: string, plural = true) {
-  if (unit === 'each') return 'items'
-  return plural ? `${unit}s` : unit
+const UNIT_LABELS: Record<ProductUnit, string> = {
+  bottle: 'bottles',
+  can: 'cans',
+  measure: 'measures',
+  glass: 'glasses',
+  each: 'items',
+}
+
+// Spelled out, not suffixed: "glass" pluralises irregularly. Typed on
+// ProductUnit so a sixth unit is a typecheck failure, not another bad label.
+export function unitLabel(unit: ProductUnit) {
+  return UNIT_LABELS[unit]
 }
 
 export interface Countable {

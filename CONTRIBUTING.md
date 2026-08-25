@@ -27,7 +27,7 @@ Create a `.env` (see [docs/01-getting-started.md](docs/01-getting-started.md) §
 bun run dev          # http://localhost:3000, HMR
 ```
 
-The local database starts empty. Seed it via Nuxt DevTools → Tasks → `db:seed`
+The local database starts empty. Seed it via Nuxt DevTools → Tasks → `seed`
 ([docs/01-getting-started.md](docs/01-getting-started.md) §9). Development uses a local SQLite file
 under `.data/`; D1 only exists in production.
 
@@ -134,7 +134,9 @@ The comment then states the constraint and cites where the argument lives:
 ## Em dashes
 
 `bun run check:comments` also fails on any em dash (U+2014), in code, comments, UI copy and docs
-alike. Use a comma, a colon, a semicolon, parentheses, or two sentences. The rule is the estate's
+alike, **including its HTML entity spellings**: named, decimal and hexadecimal. A Vue template
+decodes an entity at build time and a mail client decodes one on the way in, so an entity is the
+same banned character to every reader, and it would otherwise be a legal way to write one. Use a comma, a colon, a semicolon, parentheses, or two sentences. The rule is the estate's
 (see the workspace `CLAUDE.md`); the check is what makes it real, because a hard rule nothing tests
 is a rule the codebase quietly stops following.
 

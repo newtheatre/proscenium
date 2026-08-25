@@ -16,8 +16,8 @@ export default defineEventHandler(async (event) => {
 
   if (query.format === 'csv') {
     return sendCsv(event, `bar-variance-${query.from}-to-${query.to}.csv`, toCsv(
-      ['stocktake', 'finished', 'product', 'variance (containers)', 'variance'],
-      rows.map(r => [r.stocktakeId, r.finishedAt, r.productName, r.varianceContainers.toFixed(3), formatQty(r, r.varianceQty)]),
+      ['stocktake', 'finished', 'product', 'variance (containers)', 'variance', 'reason'],
+      rows.map(r => [r.stocktakeId, r.finishedAt, r.productName, r.varianceContainers.toFixed(3), formatQty(r, r.varianceQty), r.reason ?? '']),
     ))
   }
 

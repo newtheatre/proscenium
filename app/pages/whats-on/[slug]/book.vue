@@ -362,7 +362,7 @@ async function submitBooking() {
             class="mb-6 rounded-lg border border-primary/40 bg-primary/5 p-4"
           >
             <p class="font-medium">
-              Use my pass &mdash; &pound;0
+              Use my pass: &pound;0
             </p>
             <p class="mt-1 text-sm text-muted">
               {{ redeemablePass.name }} &middot; {{ redeemablePass.reference }}.

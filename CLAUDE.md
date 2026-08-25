@@ -18,7 +18,7 @@ bun run build          # the production Worker bundle must build
 bunx wrangler d1 ...   # production D1: read docs/08-operations.md before touching
 ```
 
-There is no test suite. CI gates on typecheck, lint and build ([.github/workflows/ci.yml](.github/workflows/ci.yml)); seeding is via Nuxt DevTools → Tasks → `db:seed`.
+There is no test suite. CI gates on typecheck, lint and build ([.github/workflows/ci.yml](.github/workflows/ci.yml)); seeding is via Nuxt DevTools → Tasks → `seed`.
 
 ## Source of truth & docs discipline
 

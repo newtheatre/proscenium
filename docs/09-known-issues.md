@@ -27,6 +27,7 @@ Severity is about consequences for the theatre, not code aesthetics:
 | 21 | [The dev server loses its D1 binding after a hot reload](#dev-d1-binding) | P3 | Small |
 | 23 | [Tab sales and tab cash split across a term boundary](#tab-accrual-split) | P3 | Won't fix |
 | 24 | [An approved comp can be left with no transaction](#comp-claim-window) | P3 | Small |
+| 25 | [Seven seed helper modules show up as broken tasks](#seed-phantom-tasks) | P3 | Small |
 
 ## Fixed
 
@@ -462,6 +463,23 @@ is the only place the pre-0050 value survives.
 every movement means what it means in the size that was current when it was written (ADR-0035). The
 supported repair is to retire the product and add it again at the right size, then take a stocktake
 against the new one. Do not edit the historic movements; the ledger is append-only.
+
+### Seven seed helper modules show up as broken tasks {#seed-phantom-tasks}
+
+**P3 · `server/tasks/seed/`.** Nitro registers every file it globs under `server/tasks/` as a
+task, named after its path. Seven modules in that directory are plain helpers with no
+`export default defineTask`: `users.ts`, `venues.ts`, `reservations.ts`, `shifts.ts`, `foh.ts`,
+`backstage.ts` and `bar.ts`. They are all in the built registry, so the DevTools Tasks tab lists
+`seed:users`, `seed:venues` and five more alongside the real ones. `runTask` resolves
+`r.default || r` to the module namespace and calls `handler.run(...)`, which is undefined, so
+clicking any of them throws a TypeError. Nothing is written and nothing is damaged; the cost is
+that a newcomer's first look at the Tasks tab offers seven entries that fail.
+
+The fix is to move the helpers out of the scanned tree, for example to `server/db/seed/`, leaving
+only genuine `defineTask` files under `server/tasks/`. It is mechanical but it moves seven files
+and rewrites the import list in `server/tasks/seed.ts` and the structure diagram in
+`server/tasks/seed/README.md`, so it wants its own pull request rather than riding along with a
+naming fix. `shows.ts` and `ticketTypes.ts` stay: they are real tasks that also export helpers.
 
 ### A price mistyped today cannot be corrected until tomorrow {#price-typo-same-day}
 

@@ -9,7 +9,7 @@ type TicketType = { id: string, name: string, price: number, activeByDefault: bo
 
 export default defineTask({
   meta: {
-    name: 'db:seed:shows',
+    name: 'seed:shows',
     description: 'Seed database with sample shows and performances',
   },
   async run() {

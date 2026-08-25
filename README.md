@@ -50,7 +50,7 @@ bun run dev
 ```
 
 Then open <http://localhost:3000>. The local database starts **empty**: seed it via
-Nuxt DevTools → Tasks → `db:seed` (see [docs/01-getting-started.md](docs/01-getting-started.md) §9).
+Nuxt DevTools → Tasks → `seed` (see [docs/01-getting-started.md](docs/01-getting-started.md) §9).
 
 ## Documentation
 

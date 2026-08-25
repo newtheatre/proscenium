@@ -120,15 +120,10 @@ const exportTo = ref<string>('')
 // Worker. USelect also refuses an item whose value is ''.
 const showOptions = computed(() => (shows.value?.rows ?? []).map(s => ({ label: s.title, value: s.id })))
 
-/** The season the theatre is currently in: 1 August to 31 July. */
-function currentSeason(): { from: string, to: string } {
-  const now = new Date()
-  const startYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1
-  return { from: `${startYear}-08-01`, to: `${startYear + 1}-07-31` }
-}
-
 function useCurrentSeason() {
-  const { from, to } = currentSeason()
+  // seasonBounds is the server's rule too, so this panel cannot offer a window
+  // the dashboard above it disagrees with.
+  const { from, to } = seasonBounds()
   exportShowId.value = ''
   exportFrom.value = from
   exportTo.value = to

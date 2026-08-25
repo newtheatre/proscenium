@@ -17,7 +17,7 @@ export const STOCKTAKE_STATUSES = ['OPEN', 'APPLIED', 'ABANDONED'] as const
  */
 export const stockMovements = sqliteTable('stock_movements', {
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
-  /** Always the *stock* product, resolved through `stockProductId` (§3.1). */
+  /** Always a stock product: one with no recipe rows of its own (§3.1). */
   productId: text('product_id').notNull().references(() => barProducts.id, { onDelete: 'restrict' }),
   /** Signed, in the product's basis: millilitres, or whole items. */
   qty: integer('qty').notNull(),

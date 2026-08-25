@@ -380,8 +380,9 @@ Starting a take snapshots `expected_qty` for every active stock product. Countin
 table, one line at a time on a phone in the store cupboard, **in containers**: a part bottle is a
 decimal, and the app converts it to millilitres. Each line with a variance takes an optional
 reason (breakage, pour variance, miscounted, wastage, unexplained). **Finish & apply** writes one
-`STOCKTAKE` movement per varying line and the take becomes the new baseline. The footer shows net variance at cost and as a percentage of sales since
-the last take. A variance report over time (per take, per product) lives in reports.
+`STOCKTAKE` movement per varying line, carrying that reason onto the movement, and the take
+becomes the new baseline. The footer shows net variance at cost and as a percentage of sales since
+the last take. A variance report over time (per take, per product, with the reason) lives in reports.
 
 ### 4.5 Close the bar / end of night
 
@@ -430,7 +431,10 @@ figure is computed the same way.
 Then a short checklist (reconciled, refusals reviewed with the DM, low stock flagged, closing
 note) and **Close the bar**. Closing writes the `bar_session` and contributes a
 *Bar* section to each linked performance's end-of-night report (12-access-and-staffing §4.3):
-takings by tender, comps, ID checks accepted/refused, stock warnings, closing note. Where two
+takings by tender, comps, ID checks accepted/refused, stock warnings, closing note. **The stock
+warnings are the same set the stock screen shows**: a product below its par that holds its own
+stock and is not retired. A retired line is never restocked and a recipe serve never holds stock,
+so either would sit below par permanently and teach the duty manager to ignore the list. Where two
 performances shared a bar, the section is the night's bar figures, labelled as such: we do not
 pretend to split a pint between the studio and the auditorium. Ticket money in the report is by
 `performance_id`, so it *is* per show. If the bar is not closed by the

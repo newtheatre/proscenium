@@ -2257,7 +2257,13 @@ offers no pass until the box office has been paid.
 - **A recipe the till could not ring up is refused**, naming which rule it broke: an ingredient
   that does not hold stock, a category with nothing stocked in it, a category that mixes things
   counted in millilitres with things counted in items, an ingredient of itself, or a recipe on
-  something another product is made from. Maximum eight ingredients.
+  something another product is made from. Maximum eight ingredients. **The status codes split by
+  kind**: an ingredient or category that does not exist, and a product named as an ingredient of
+  itself, are `400`; the one-level refusals are `409`, because the target exists and the catalogue
+  is simply the wrong shape for it. Pointing an ingredient at something that is itself a recipe is
+  `409 An ingredient has to hold its own stock. Point at the bottle, not at a measure of it.`, and
+  giving a recipe to a product something else is made from is `409 Something else is made from
+  this, so it has to hold stock. Take it out of that recipe first.`
 - **One level cuts both ways, so an edit that would empty a live choice pool is `409` too.** A
   product reached through a `choiceCategoryId` is as much an ingredient as a fixed one, and
   retiring it, hiding it, moving it to another category or giving it a recipe of its own would all
@@ -2267,6 +2273,10 @@ offers no pass until the box office has been paid.
   and the category. A pool that is *already* empty does not block an unrelated edit. Without this
   the sold product stayed on the menu with an unfillable slot: the tile could never be added to a
   basket, and nothing said why (ADR-0036).
+- **A recipe clears the size and the par.** Something made from other things holds no stock of its
+  own, so `containerMl` and `parQty` are both nulled whenever a recipe is present, on create and on
+  edit alike. A par kept on such a product could never be met: no movement can be written against
+  it, so it would sit below par forever and be named in every night report.
 - **`containerMl` cannot change once anything has moved.** `409`, naming the fix: retire the
   product and add the new size as its own. Every movement means what it means in the size that was
   current when it was written.
@@ -2274,9 +2284,6 @@ offers no pass until the box office has been paid.
   `stockOnly` is set and refused when it is; a recipe alongside it is refused too, because
   something stock-only holds its own stock. `GET /api/bar/tonight`, the tab menu and the
   training mirror all filter them out in SQL rather than relying on the missing price.
-- **Depletion is one level and the API enforces it.** Pointing a measure at another measure is
-  `400 That product already draws from another. Point at the one that holds the stock.`, pointing a
-  product at itself is refused, and a non-existent target is refused (`docs/13` §3.1).
 - **Retiring is not deleting.** A `RETIRED` product leaves the till and keeps every past sale,
   price row and stock movement exactly as it was.
 - **A price is added, never edited.** `POST .../prices` writes a new dated row; a future
@@ -2310,7 +2317,9 @@ from what the page showed.
   slot is priced at its **dearest** option, so GP is never flattered by assuming the cheap mixer.
   A product with no delivery recorded has a null cost rather than a flattering zero.
 - **Variance is reported in both.** The CSV carries `variance (containers)` and the raw level, so
-  a half bottle reads as `-0.5` and as `-375 ml`.
+  a half bottle reads as `-0.5` and as `-375 ml`, plus the `reason` recorded against the line on
+  the count sheet. An unexplained variance is a blank cell, which is the shrinkage question the
+  report is read to answer.
 - **One escaper for every CSV in the app** (`server/utils/csv.ts`). A cell that opens with `=`, `+`,
   `-`, `@`, a tab or a carriage return is prefixed with an apostrophe, so Excel reads a refusal note
   typed as `=HYPERLINK(...)` instead of running it. A plain number keeps its value, so a negative
@@ -2338,7 +2347,11 @@ converts to the product's basis with its `container_ml` (ADR-0035).
   `expected_qty` for every active stock product. The refusal is backed by the partial unique index
   `stocktakes_one_open`, so two simultaneous starts give one stocktake and one `409`, never two.
 - **`PATCH .../lines`** takes `countedContainers`, a part bottle as a decimal, and reads every
-  line's container size in one statement rather than one per line (ADR-0006).
+  line's container size in one statement rather than one per line (ADR-0006). It also takes an
+  optional `reason` for the line's variance. **The two fields differ deliberately**:
+  `countedContainers` is required on every line, and null clears the count; `reason` is optional,
+  and an omitted `reason` leaves the stored one alone, so a save that carries only counts cannot
+  wipe the explanation. Send `reason: null` to clear it.
 - **`POST .../finish`** writes one `STOCKTAKE` movement per line whose count differs from on-hand
   **now**, and refuses if nothing was counted, pointing the caller at abandon instead. The update
   re-asserts `status = 'OPEN'` in its `WHERE`, and `stock_movements_stocktake_line_uq` allows one
@@ -2478,7 +2491,15 @@ Both are optional; with neither, the counts cover every reservation.
 
 **Source** `server/api/admin/stats.get.ts` · **Auth** inline ability: ADMIN or MANAGER
 
-**Query** none.
+**Query** `from` and `to`, both optional, both `YYYY-MM-DD`, bounding performance dates
+inclusively. Omit them and the window is **the current season**, 1 August to 31 July, which is the
+university year and the committee handover.
+
+**The season boundary is resolved in Europe/London**, like the window bounds it feeds. Resolved in
+UTC it is wrong for the hour after midnight on 1 August, when the Worker still reads 31 July: the
+dashboard would default to the season that had just ended and report it as the current one. The
+response echoes the resolved window as `window` (`from`, `to`, `isCurrentSeason`), which is what
+the dashboard heading is built from.
 
 **Response** `200`
 
