@@ -43,12 +43,14 @@ export default defineEventHandler(async (event) => {
     ))
     .orderBy(asc(schema.performances.startsAt), asc(schema.performanceShifts.role))
 
-  // Per role, not per slot: three questions however long the rota is, and
-  // `isEligible` caches, so this does not hammer rehearsal (ADR-0026).
-  const eligibility: Record<string, { eligible: boolean, missing: string[], needsReview: boolean }> = {}
-  for (const role of schema.SHIFT_ROLES) {
-    eligibility[role] = await isEligible(user.id, SHIFT_ELIGIBILITY[role])
-  }
+  // Per role, not per slot: three questions however long the rota is. Asked
+  // together, so a training outage costs one timeout rather than three.
+  const answers = await Promise.all(schema.SHIFT_ROLES.map(
+    role => isEligible(user.id, SHIFT_ELIGIBILITY[role]),
+  ))
+  const eligibility = Object.fromEntries(
+    schema.SHIFT_ROLES.map((role, i) => [role, answers[i]!]),
+  ) as Record<string, { eligible: boolean, missing: string[], needsReview: boolean }>
 
   return {
     slots: rows

@@ -54,6 +54,7 @@ ADR; the ADR carries the reasoning and the history. See [CONTRIBUTING.md](../../
 | [0038](0038-no-ability-may-throw.md) | No ability may throw, and a missing resource denies | Accepted |
 | [0039](0039-refund-before-cancelling-a-collected-booking.md) | Refund before cancelling a collected booking, and keep the pair symmetric | Accepted |
 | [0040](0040-refuse-a-request-with-no-session-key.md) | Refuse a request rather than serve one with no session key | Accepted |
+| [0041](0041-a-fail-open-eligibility-answer-is-cached-too.md) | A fail-open eligibility answer is cached too, briefly | Accepted |
 
 ## Template
 

@@ -6,6 +6,10 @@
 /** Advisory-fresh, never transactional: rehearsal's own guidance. */
 const CACHE_TTL_MS = 5 * 60 * 1000
 
+// A fail-open answer is cached too, well under CACHE_TTL_MS: long enough that
+// an outage is answered locally, short enough to notice recovery (ADR-0041).
+const OUTAGE_TTL_MS = 45 * 1000
+
 export type EligibilityRule = 'duty-manager' | 'door' | 'bar'
 
 export interface EligibilityAnswer {
@@ -19,7 +23,8 @@ export interface EligibilityAnswer {
   needsReview: boolean
 }
 
-interface CacheEntry { answer: EligibilityAnswer, at: number }
+// `ttl` because a fail-open entry lives far more briefly than a real answer.
+interface CacheEntry { answer: EligibilityAnswer, at: number, ttl: number }
 
 // Per-isolate, which is enough: this exists to avoid hammering rehearsal
 // inside a burst, not to be a shared cache.
@@ -36,7 +41,7 @@ function cacheKey(userId: string, rule: string) {
 export async function isEligible(userId: string, rule: EligibilityRule): Promise<EligibilityAnswer> {
   const key = cacheKey(userId, rule)
   const hit = cache.get(key)
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.answer
+  if (hit && Date.now() - hit.at < hit.ttl) return hit.answer
 
   const config = useRuntimeConfig()
   const token = config.trainingApiToken
@@ -44,20 +49,22 @@ export async function isEligible(userId: string, rule: EligibilityRule): Promise
 
   if (!token) {
     // No token yet is the same shape as an outage, and takes the same path.
-    return failOpen(hit)
+    return failOpen(key, hit)
   }
 
   try {
     const response = await $fetch<{ eligible: boolean, missing?: string[] }>(
       `${base}/api/v1/eligibility/${rule}`,
-      { query: { userId }, headers: { Authorization: `Bearer ${token}` }, timeout: 4000 },
+      // retry: 0 because ofetch retries a GET once and reads a network error as
+      // a 500, which doubles the requests aimed at a service already down.
+      { query: { userId }, headers: { Authorization: `Bearer ${token}` }, timeout: 4000, retry: 0 },
     )
     const answer: EligibilityAnswer = {
       eligible: response.eligible,
       missing: response.missing ?? [],
       needsReview: false,
     }
-    cache.set(key, { answer, at: Date.now() })
+    cache.set(key, { answer, at: Date.now(), ttl: CACHE_TTL_MS })
     return answer
   }
   catch (error) {
@@ -72,7 +79,7 @@ export async function isEligible(userId: string, rule: EligibilityRule): Promise
     else {
       console.error(`[eligibility] could not reach rehearsal for "${rule}":`, error)
     }
-    return failOpen(hit)
+    return failOpen(key, hit)
   }
 }
 
@@ -148,9 +155,12 @@ export async function practiceWindow(userId: string, target: PracticeTarget): Pr
  * Allow, and flag it. Failing closed would empty the rota during a training
  * outage, and an unstaffed performance is a real harm tonight (ADR-0026).
  */
-function failOpen(stale: CacheEntry | undefined): EligibilityAnswer {
-  if (stale) return stale.answer
-  return { eligible: true, missing: [], needsReview: true }
+function failOpen(key: string, stale: CacheEntry | undefined): EligibilityAnswer {
+  const answer = stale?.answer ?? { eligible: true, missing: [], needsReview: true }
+  // Cached, or an expired entry re-asks on every single call: the retry-hammer
+  // ADR-0026 forbids, three deep on the members' rota page (ADR-0041).
+  cache.set(key, { answer, at: Date.now(), ttl: OUTAGE_TTL_MS })
+  return answer
 }
 
 /** Testing seam: the cache is per-isolate and otherwise invisible. */

@@ -200,7 +200,10 @@ Chosen scope: a full volunteer rota, not just a staffing record.
   every call goes behind one seam, `isEligible(userId, ruleKey)`, so the rota never encodes what a
   rule requires; and the failure direction when the API is unreachable is a choice this repo must
   state, document and test, which it does in
-  [ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md).
+  [ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md). Answers are
+  cached for five minutes, and a fail-open answer for 45 seconds, so an outage is answered locally
+  instead of re-asked on every call
+  ([ADR-0041](./decisions/0041-a-fail-open-eligibility-answer-is-cached-too.md)).
 - **Confirmation:** claims either auto-confirm or require FOH-manager confirmation: a per-season
   toggle, because trust levels differ year to year. The manager can always assign, reassign or
   bump directly.
