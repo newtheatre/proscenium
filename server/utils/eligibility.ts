@@ -108,8 +108,9 @@ export async function practiceWindow(userId: string, target: PracticeTarget): Pr
   const config = useRuntimeConfig()
   const token = config.trainingApiToken
 
-  // No token is the same as an outage, and takes the same path: no sandbox.
-  if (!token) return CLOSED
+  // No token is no answer, not a closure: it refuses to open a sandbox, and
+  // never ends one already open (ADR-0034).
+  if (!token) return UNREACHABLE
 
   try {
     const response = await $fetch<{ active: boolean, expiresAt?: string | null, sessionId?: string | null }>(
