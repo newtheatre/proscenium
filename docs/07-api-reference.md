@@ -276,7 +276,7 @@ is a separate, incremental job, one domain file at a time.
 | --- | --- | --- | --- |
 | GET | `/api/users` | Staff (`listUsers`) | Mirror users, paginated; `?email=` returns at most one |
 | POST | `/api/users` | ADMIN/MANAGER (`createUser`) | Create a shadow account via the auth service and mirror it |
-| GET | `/api/users/:id/summary` | Staff (`readUser`) | Everything this app knows about one person's relationship with it |
+| GET | `/api/users/:id/summary` | Staff or self (`readUser`) | Everything this app knows about one person's relationship with it |
 | GET | `/api/users/:id` | Staff or self (`readUser`) | One mirror user |
 | DELETE | `/api/users/:id` | ADMIN (others) or self (`deleteUser`) | Delete the mirror row; refuses if they have bookings |
 
@@ -1608,6 +1608,22 @@ local-only user, because an id this app invented would never match the central o
 The row is fetched before the check, so an unknown id yields 404 regardless of who is asking.
 
 **Response** `200`: the formatted user. **Errors** `400 User ID is required`; `404 User not found`; `403`.
+
+---
+
+#### `GET /api/users/:id/summary`
+
+**Source** `server/api/users/[id]/summary.get.ts` · **Auth** `authorize(event, readUser, { id })`: staff can read anyone; any user can read themselves
+
+The mirror row is loaded and 404s first, so the check runs on an id that exists and an unknown id
+answers the same to everyone. The resource argument is not optional: an ability called without it
+throws, and a throw inside `authorize()` **grants** ([ADR-0038](decisions/0038-no-ability-may-throw.md)).
+
+**Response** `200`: the person, their last 50 reservations with show titles and amounts, their passes,
+their shift history and their counts. The access profile is included only for a caller who holds
+`canVerifyAccess`, which is checked directly rather than through `authorize`.
+
+**Errors** `400 User ID is required`; `404 No mirror row for that account`; `403`.
 
 ---
 

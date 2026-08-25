@@ -7,8 +7,6 @@ import { canVerifyAccess, readUser } from '~~/shared/utils/abilities'
  * relationship with it. Identity itself belongs to stage-door (docs/04).
  */
 export default defineEventHandler(async (event) => {
-  await authorize(event, readUser)
-
   const id = getRouterParam(event, 'id')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'User ID is required' })
 
@@ -23,6 +21,10 @@ export default defineEventHandler(async (event) => {
   }).from(schema.users).where(eq(schema.users.id, id)).get()
 
   if (!person) throw createError({ statusCode: 404, statusMessage: 'No mirror row for that account' })
+
+  // After the 404, so existence reads the same either way. The resource is not
+  // optional: without it the ability throws, and authorize() grants (ADR-0008).
+  await authorize(event, readUser, { id })
 
   // One batch: each of these depends only on `id`, and the page paid six
   // serial round-trips on every load.
