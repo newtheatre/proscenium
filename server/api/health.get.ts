@@ -7,6 +7,10 @@ import journal from '../db/migrations/sqlite/meta/_journal.json'
  * session. 503 when the schema is behind the code (stage-door ADR-0021).
  */
 export default defineEventHandler(async (event) => {
+  // A failed Secrets Store read would otherwise be invisible: every session
+  // reads as signed out and nothing else notices (ADR-0040).
+  const sessionKey = useRuntimeConfig(event).session.password ? 'ok' : 'missing'
+
   const expected = journal.entries.map(entry => entry.tag)
   let pending: string[] = []
 
@@ -25,10 +29,10 @@ export default defineEventHandler(async (event) => {
     pending = expected
   }
 
-  if (pending.length) {
+  if (pending.length || sessionKey === 'missing') {
     setResponseStatus(event, 503)
-    return { ok: false, pendingMigrations: pending }
+    return { ok: false, pendingMigrations: pending, sessionKey }
   }
 
-  return { ok: true }
+  return { ok: true, sessionKey }
 })

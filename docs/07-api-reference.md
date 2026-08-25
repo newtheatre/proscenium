@@ -465,7 +465,7 @@ A withdrawn profile is `409`: it is not the verifier's to reinstate.
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| GET | `/api/health` | **Public** | Uptime check. 503 naming pending migrations when the schema is behind the code |
+| GET | `/api/health` | **Public** | Uptime check. 503 naming pending migrations, or a missing session key |
 
 ---
 
@@ -2519,20 +2519,30 @@ The one endpoint in this app where an unguarded handler is deliberate rather tha
 monitoring cannot hold a session, and the response carries no personal data. Everywhere else in this
 document, a missing guard means an open endpoint.
 
-It compares the migration journal compiled into the running build against the `_hub_migrations`
-ledger in the database.
+It answers two questions: whether the migration journal compiled into the running build matches the
+`_hub_migrations` ledger in the database, and whether this isolate actually holds the session key.
 
-**Response** `200` when they agree:
+**Response** `200` when both are well:
 
 ```json
-{ "ok": true }
+{ "ok": true, "sessionKey": "ok" }
 ```
 
 **Response** `503` when the schema is behind the deployed code, naming the files:
 
 ```json
-{ "ok": false, "pendingMigrations": ["0017_rich_husk"] }
+{ "ok": false, "pendingMigrations": ["0017_rich_husk"], "sessionKey": "ok" }
 ```
+
+**Response** `503` when the Secrets Store read failed, so no request can be served safely:
+
+```json
+{ "ok": false, "pendingMigrations": [], "sessionKey": "missing" }
+```
+
+This endpoint is the **only** path exempt from `server/middleware/0.session-key.ts`, which 503s
+everything else while the key is missing ([ADR-0040](decisions/0040-refuse-a-request-with-no-session-key.md)).
+The exemption is what lets monitoring see the cause instead of a bare 503.
 
 Three details that are load-bearing:
 
