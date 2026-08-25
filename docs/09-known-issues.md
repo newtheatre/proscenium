@@ -333,6 +333,12 @@ The options are a deterministic settlement id so the second insert collides on t
 a partial unique index; both change the shape of `transactions`, so neither is a drive-by change.
 Recorded rather than half-fixed, because a predicate on the UPDATE looks like a cure and is not.
 
+**A different window, a charge landing mid-settle, is closed.** `taken_at` is stored to whole
+seconds, so a charge the debtor posted from their phone after the read but inside the same second
+used to satisfy `taken_at <= asOf` and be stamped settled against a settlement that never covered
+it. The read now returns `max(rowid)` over the charges it summed and the `UPDATE` is bounded by
+that rowid, so a charge committed since stays outstanding. Do not swap it back for a timestamp.
+
 ### A stocktake finished before 2026-08-25 may hold a count of zero that was meant to be blank {#stocktake-blank-as-zero}
 
 **P2 · data.** The count page sent an emptied box as the string `''`, which `z.coerce.number()`
@@ -346,6 +352,30 @@ them, look for `STOCKTAKE` movements that took a product from a plausible level 
 day nobody emptied the shelf; `/admin/bar/stocktakes` lists each take with the lines it moved. The
 repair is an ordinary stock adjustment back to the real level, dated today, with a reason naming the
 stocktake it corrects. Do not edit the historic movement.
+
+### A tab charge voided twice before 2026-08-25 credited its stock back twice {#void-double-credit}
+
+**P2 · data.** The void stamped the charge behind a predicate that could match only once, but wrote
+the stock reversal unconditionally alongside it. Where the debtor and the bar manager voided the
+same charge at once, or a settle landed first, a second full set of `VOID` movements was written:
+`on_hand` reads a container heavy for every product on that charge, and the next stocktake books
+the difference as shrinkage in the wrong direction. The reversal is now one guarded statement, so
+no new pair can be written.
+
+Pairs already in the ledger stay there, because it is append-only. To find them:
+
+```sql
+SELECT ref_id, product_id, count(*) AS void_rows, sum(qty) AS credited_back
+FROM stock_movements
+WHERE ref_table = 'transactions' AND kind = 'VOID'
+GROUP BY ref_id, product_id
+HAVING count(*) > 1;
+```
+
+One `VOID` row per product per voided charge is the correct shape, so every row this returns is a
+duplicate. Check it against the charge's `SALE` rows for the same `ref_id`: the reversal should
+cancel them exactly. The repair is an ordinary stock adjustment back to the real level, dated
+today, with a reason naming the charge it corrects. Do not edit the historic movements.
 
 ### A merge before 2026-08-25 may have left a live customer on a placeholder address {#merge-placeholder-email}
 
@@ -408,3 +438,25 @@ is the only place the pre-0050 value survives.
 every movement means what it means in the size that was current when it was written (ADR-0035). The
 supported repair is to retire the product and add it again at the right size, then take a stocktake
 against the new one. Do not edit the historic movements; the ledger is append-only.
+
+### A price mistyped today cannot be corrected until tomorrow {#price-typo-same-day}
+
+**P3 · `server/api/admin/bar/products/[id]/prices.post.ts`.** `bar_prices` holds one row per
+product per date and the route is append only, so a second POST for a date already in the history
+is refused with `409`. That is what stops a repeat POST rewriting what a price was and who set it,
+which is the only price audit trail the system has. The cost is that the current price is the
+latest row dated on or before today, so a figure keyed in wrongly this morning cannot be beaten by
+another row today: dating one from tomorrow fixes tomorrow and leaves the bar on the wrong figure
+tonight.
+
+Until somebody needs it enough to build the alternative, the workarounds are both blunt: set the
+product `HIDDEN` for the rest of the night and ring the drink up as another product, or retire it
+and add it again at the right price, which is the same repair `container_ml` already uses. Both
+keep the history honest.
+
+Closing it properly means letting a date hold several rows and having the latest `created_at` win.
+That is not a drive-by change: `bar_prices_product_from_unique` has to go, and both readers in
+`server/utils/barPricing.ts` order by `effective_from` alone, so without a `created_at` tiebreaker
+in each of them the till would resolve either row and could charge either price. It needs a
+decision record, because "one row per date" is the rule the schema, the route and `docs/13` §3 all
+state today.

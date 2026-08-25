@@ -2142,11 +2142,24 @@ the bar scope, because they are till work.
 - **Settling clears the whole balance as at now**, against `expectedTotalPence`. There is no list
   of chosen charges: an id list is the shape ADR-0006 forbids, and a predicate makes a concurrent
   double-settle a no-op rather than a race. `409` when the figure has moved, naming both amounts.
+- **"As at now" is a rowid, not a timestamp.** `taken_at` is stored to whole seconds, so a charge
+  posted to `POST /api/bar/tabs` between the read and the write can read as on or before the
+  settle's own `asOf` and be stamped settled against a settlement that never covered it. The read
+  therefore returns `max(rowid)` over the charges it summed and the `UPDATE` is bounded by it: D1
+  serialises writes, so anything committed since carries a higher rowid and stays outstanding. A
+  debt left on a tab is recoverable; one written off silently is not.
 - Settlement writes one `CARD` transaction with a single `TAB_SETTLEMENT` line and **no product**,
   and **no stock movements**: the stock left the shelf when the tab was charged.
 - The void needs all three of `tender = 'TAB'`, `voided_at IS NULL` and `tab_settled_at IS NULL`,
   and the last two are in the SQL predicate as well as the read. Voiding a settled charge would
   take money out of a day the reader really took it in, possibly against a recorded Z-total.
+- **Both halves of the void carry that predicate**, not just the stamp. The stock reversal is a
+  single `INSERT ... SELECT` over the charge's own `SALE` movements, batched *before* the stamp and
+  conditional on the charge still being unvoided and unsettled, so a second void or a settle that
+  got there first credits nothing back to the shelf. When the stamp matches no row the response is
+  `409 That charge was paid for or taken off while you were looking at it. Reload the tab.`, never
+  `{ ok: true }`: the debtor and the bar manager may both void the same charge, and telling the
+  debtor it was removed when it was in fact paid for is how a balance goes missing.
 
 ---
 
@@ -2233,6 +2246,15 @@ offers no pass until the box office has been paid.
   that does not hold stock, a category with nothing stocked in it, a category that mixes things
   counted in millilitres with things counted in items, an ingredient of itself, or a recipe on
   something another product is made from. Maximum eight ingredients.
+- **One level cuts both ways, so an edit that would empty a live choice pool is `409` too.** A
+  product reached through a `choiceCategoryId` is as much an ingredient as a fixed one, and
+  retiring it, hiding it, moving it to another category or giving it a recipe of its own would all
+  take it out of the pool. `PATCH` therefore recomputes every affected pool as it would be after
+  the change whenever `status`, `categoryId` or `recipe` is present, and refuses when one that
+  an `ACTIVE` recipe depends on would be left with nothing to pick, naming the dependent product
+  and the category. A pool that is *already* empty does not block an unrelated edit. Without this
+  the sold product stayed on the menu with an unfillable slot: the tile could never be added to a
+  basket, and nothing said why (ADR-0036).
 - **`containerMl` cannot change once anything has moved.** `409`, naming the fix: retire the
   product and add the new size as its own. Every movement means what it means in the size that was
   current when it was written.
@@ -2247,7 +2269,12 @@ offers no pass until the box office has been paid.
   price row and stock movement exactly as it was.
 - **A price is added, never edited.** `POST .../prices` writes a new dated row; a future
   `effectiveFrom` schedules a change and does **not** affect what the till charges today. The
-  history is the audit trail, so there is no endpoint that updates a price row.
+  history is the audit trail, so there is no endpoint that updates a price row. A second price for
+  a date already in the history is `409 A price already starts on that date. Date the correction
+  from another day.`, decided by the unique index rather than by a prior read, so a repeated POST
+  cannot rewrite what a price was or who set it. **The cost is that a figure mistyped today cannot
+  be corrected until tomorrow**, because the current price is the latest row dated on or before
+  today: see [known issues](./09-known-issues.md#price-typo-same-day) for what to do instead.
 - **Editing a discount is not retrospective.** A transaction stores the percentage it was rung up
   at, so changing one here only affects future sales.
 

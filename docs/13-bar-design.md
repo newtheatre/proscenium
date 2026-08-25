@@ -450,6 +450,11 @@ money lands in that day's Z. It clears the balance *as at that moment* rather th
 charges: a list of ids is the shape ADR-0006 forbids, and a predicate makes two people settling at
 once a no-op rather than a race. A charge someone disputes is voided, not deselected.
 
+*That moment* is the rowid the balance was read at, not the clock. `taken_at` is stored to whole
+seconds, so a charge the debtor puts on their own phone while staff are settling at the counter can
+read as on or before the settle's own timestamp; stamped settled, it would drop off the tab against
+a settlement whose amount never included it, and the theatre would simply never take that money.
+
 **The limit is soft.** Over `TAB_SOFT_CAP_PENCE` the screen asks them to settle up and the admin
 page flags them, and the charge still goes through. A blocked charge does not stop somebody taking
 a packet of crisps; it stops the crisps being recorded.
@@ -475,7 +480,9 @@ a term.
   stocktakes, voids, exports, the Challenge 25 register export. `MANAGER` and `ADMIN` carry it too.
   Permission keys here are dotted and role-mapped in the manifest; this app has no ad-hoc ability
   strings.
-- Every write records the acting user. Voids and price changes are audit-logged. This module adds
+- Every write records the acting user. There is no separate audit log: a void carries who did it
+  and why on the transaction, and a price change is a new dated row rather than an edit, so the
+  price history is the record. Neither can be rewritten in place. This module adds
   more user-referencing columns than the rest of the app put together, and every one of them joins
   the estate merge and erasure hooks on the commit that creates it
   ([ADR-0025](./decisions/0025-every-user-reference-joins-the-estate-hooks.md)).

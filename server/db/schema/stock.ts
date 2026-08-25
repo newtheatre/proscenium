@@ -12,7 +12,7 @@ export const MOVEMENT_KINDS = ['DELIVERY', 'SALE', 'COMP', 'STOCKTAKE', 'WASTAGE
 export const STOCKTAKE_STATUSES = ['OPEN', 'APPLIED', 'ABANDONED'] as const
 
 /**
- * Append-only. Every row is written by `movementStatements` and by nothing
+ * Append-only. Every row is written from `server/utils/stock.ts` and nowhere
  * else; a mistake is corrected with an opposing movement, never an edit.
  */
 export const stockMovements = sqliteTable('stock_movements', {

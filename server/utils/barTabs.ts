@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import type { BatchItem } from 'drizzle-orm/batch'
-import { and, asc, count, desc, eq, inArray, isNull, lte, sql, sum } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, isNull, lte, sql, sum } from 'drizzle-orm'
 
 /**
  * Bar tabs: a sale on credit, settled later by card on the reader (ADR-0030).
@@ -168,13 +168,19 @@ export async function settleTab(opts: {
   barSessionId?: string | null
 }) {
   const asOf = new Date()
-  const owed = await db.select({ total: sum(schema.transactions.totalPence) })
+  // `taken_at` is whole seconds, so a charge landing in this same second reads as
+  // on or before `asOf`. The rowid it was summed at is the cutoff that cannot.
+  const owed = await db.select({
+    total: sum(schema.transactions.totalPence),
+    lastRowId: sql<number>`max(rowid)`,
+  })
     .from(schema.transactions)
     .where(and(unsettled(opts.debtorUserId), lte(schema.transactions.takenAt, asOf)))
     .get()
   const totalPence = Number(owed?.total ?? 0)
+  const lastRowId = Number(owed?.lastRowId ?? 0)
 
-  if (totalPence <= 0) {
+  if (totalPence <= 0 || lastRowId <= 0) {
     throw createError({ statusCode: 409, statusMessage: 'There is nothing outstanding on that tab.' })
   }
   if (totalPence !== opts.expectedTotalPence) {
@@ -196,41 +202,17 @@ export async function settleTab(opts: {
   // moves: the stock left the shelf when the tab was charged.
   const statements: BatchItem<'sqlite'>[] = [
     ...built.statements,
-    // Scoped by predicate, never an id list, so a concurrent settle is a no-op.
+    // Predicate, never an id list, and bounded by the rowid the total was read
+    // at: a charge committed since carries a higher one and stays outstanding.
     db.update(schema.transactions)
       .set({ tabSettledAt: asOf, tabSettlementTransactionId: built.transactionId })
-      .where(and(unsettled(opts.debtorUserId), lte(schema.transactions.takenAt, asOf))),
+      .where(and(
+        unsettled(opts.debtorUserId),
+        lte(schema.transactions.takenAt, asOf),
+        sql`rowid <= ${lastRowId}`,
+      )),
   ]
   await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
 
   return { transactionId: built.transactionId, totalPence }
-}
-
-/**
- * Opposing movements for a voided charge, copied from the original SALE rows.
- * Never recomputed: the catalogue may have changed since (ADR-0031).
- */
-export async function reversalMovementsFor(transactionId: string, byUserId: string) {
-  const sales = await db.select({
-    productId: schema.stockMovements.productId,
-    qty: schema.stockMovements.qty,
-    costPencePerContainer: schema.stockMovements.costPencePerContainer,
-  }).from(schema.stockMovements)
-    .where(and(
-      eq(schema.stockMovements.refTable, 'transactions'),
-      eq(schema.stockMovements.refId, transactionId),
-      eq(schema.stockMovements.kind, 'SALE'),
-    ))
-    .orderBy(asc(schema.stockMovements.createdAt))
-
-  return sales.map(sale => ({
-    productId: sale.productId,
-    qty: -sale.qty,
-    kind: 'VOID' as const,
-    refTable: 'transactions',
-    refId: transactionId,
-    costPencePerContainer: sale.costPencePerContainer,
-    reason: 'Tab charge voided',
-    createdByUserId: byUserId,
-  }))
 }

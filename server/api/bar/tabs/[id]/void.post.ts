@@ -1,5 +1,4 @@
 import { db, schema } from '@nuxthub/db'
-import type { BatchItem } from 'drizzle-orm/batch'
 import { and, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { canManageBar } from '~~/shared/utils/abilities'
@@ -39,19 +38,26 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'That one has been paid for. Ask the bar manager for a refund.' })
   }
 
-  const reversals = await reversalMovementsFor(charge.id, user.id)
-
-  await db.batch([
-    // The two null checks live in the predicate, not just in the read above.
+  // Both statements carry the two null checks in their own predicate, not just
+  // in the read above, and the reversal runs first so it sees the charge unvoided.
+  const [, stamped] = await db.batch([
+    reversalStatement(charge.id, user.id),
     db.update(schema.transactions)
       .set({ voidedAt: new Date(), voidedByUserId: user.id, voidReason: input.reason ?? 'Taken off the tab' })
       .where(and(
         eq(schema.transactions.id, charge.id),
         isNull(schema.transactions.voidedAt),
         isNull(schema.transactions.tabSettledAt),
-      )),
-    ...movementStatements(reversals),
-  ] as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+      ))
+      .returning({ id: schema.transactions.id }),
+  ])
+
+  if (!stamped.length) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'That charge was paid for or taken off while you were looking at it. Reload the tab.',
+    })
+  }
 
   return { ok: true, outstandingPence: await outstandingFor(charge.debtorUserId!) }
 })

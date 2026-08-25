@@ -26,15 +26,21 @@ export default defineEventHandler(async (event) => {
     .where(eq(schema.barProducts.id, productId)).get()
   if (!product) throw createError({ statusCode: 404, statusMessage: 'Product not found' })
 
+  // The unique index arbitrates, so a second price for a date cannot rewrite
+  // the first: no row back means the date is taken.
   const [row] = await db.insert(schema.barPrices).values({
     productId,
     pricePence: input.pricePence,
     effectiveFrom: input.effectiveFrom ?? pricingDate(),
     createdByUserId: user.id,
-  }).onConflictDoUpdate({
-    target: [schema.barPrices.productId, schema.barPrices.effectiveFrom],
-    set: { pricePence: input.pricePence, createdByUserId: user.id },
-  }).returning()
+  }).onConflictDoNothing().returning()
+
+  if (!row) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'A price already starts on that date. Date the correction from another day.',
+    })
+  }
 
   return row
 })
