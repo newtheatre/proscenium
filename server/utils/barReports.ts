@@ -217,6 +217,7 @@ export async function varianceOverTime(from: string, to: string) {
     productName: schema.barProducts.name,
     containerMl: schema.barProducts.containerMl,
     varianceQty: sql<number>`${schema.stocktakeLines.countedQty} - ${schema.stocktakeLines.expectedQty}`,
+    reason: schema.stocktakeLines.reason,
   })
     .from(schema.stocktakeLines)
     .innerJoin(schema.stocktakes, eq(schema.stocktakes.id, schema.stocktakeLines.stocktakeId))
@@ -236,6 +237,7 @@ export async function varianceOverTime(from: string, to: string) {
     containerMl: r.containerMl,
     varianceQty: Number(r.varianceQty ?? 0),
     varianceContainers: qtyToContainers(r, Number(r.varianceQty ?? 0)),
+    reason: r.reason,
   }))
 }
 

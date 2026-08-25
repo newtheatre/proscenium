@@ -380,8 +380,9 @@ Starting a take snapshots `expected_qty` for every active stock product. Countin
 table, one line at a time on a phone in the store cupboard, **in containers**: a part bottle is a
 decimal, and the app converts it to millilitres. Each line with a variance takes an optional
 reason (breakage, pour variance, miscounted, wastage, unexplained). **Finish & apply** writes one
-`STOCKTAKE` movement per varying line and the take becomes the new baseline. The footer shows net variance at cost and as a percentage of sales since
-the last take. A variance report over time (per take, per product) lives in reports.
+`STOCKTAKE` movement per varying line, carrying that reason onto the movement, and the take
+becomes the new baseline. The footer shows net variance at cost and as a percentage of sales since
+the last take. A variance report over time (per take, per product, with the reason) lives in reports.
 
 ### 4.5 Close the bar / end of night
 

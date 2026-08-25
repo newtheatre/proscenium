@@ -2310,7 +2310,9 @@ from what the page showed.
   slot is priced at its **dearest** option, so GP is never flattered by assuming the cheap mixer.
   A product with no delivery recorded has a null cost rather than a flattering zero.
 - **Variance is reported in both.** The CSV carries `variance (containers)` and the raw level, so
-  a half bottle reads as `-0.5` and as `-375 ml`.
+  a half bottle reads as `-0.5` and as `-375 ml`, plus the `reason` recorded against the line on
+  the count sheet. An unexplained variance is a blank cell, which is the shrinkage question the
+  report is read to answer.
 - **One escaper for every CSV in the app** (`server/utils/csv.ts`). A cell that opens with `=`, `+`,
   `-`, `@`, a tab or a carriage return is prefixed with an apostrophe, so Excel reads a refusal note
   typed as `=HYPERLINK(...)` instead of running it. A plain number keeps its value, so a negative
@@ -2338,7 +2340,11 @@ converts to the product's basis with its `container_ml` (ADR-0035).
   `expected_qty` for every active stock product. The refusal is backed by the partial unique index
   `stocktakes_one_open`, so two simultaneous starts give one stocktake and one `409`, never two.
 - **`PATCH .../lines`** takes `countedContainers`, a part bottle as a decimal, and reads every
-  line's container size in one statement rather than one per line (ADR-0006).
+  line's container size in one statement rather than one per line (ADR-0006). It also takes an
+  optional `reason` for the line's variance. **The two fields differ deliberately**:
+  `countedContainers` is required on every line, and null clears the count; `reason` is optional,
+  and an omitted `reason` leaves the stored one alone, so a save that carries only counts cannot
+  wipe the explanation. Send `reason: null` to clear it.
 - **`POST .../finish`** writes one `STOCKTAKE` movement per line whose count differs from on-hand
   **now**, and refuses if nothing was counted, pointing the caller at abandon instead. The update
   re-asserts `status = 'OPEN'` in its `WHERE`, and `stock_movements_stocktake_line_uq` allows one
