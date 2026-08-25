@@ -11,15 +11,6 @@ const querySchema = z.object({
 })
 
 /**
- * The theatre's season runs 1 August to 31 July, matching the university year
- * and the committee handover.
- */
-function currentSeason(now: Date): { from: string, to: string } {
-  const startYear = now.getUTCMonth() >= 7 ? now.getUTCFullYear() : now.getUTCFullYear() - 1
-  return { from: `${startYear}-08-01`, to: `${startYear + 1}-07-31` }
-}
-
-/**
  * GET /api/admin/stats: aggregate dashboard statistics.
  */
 export default defineEventHandler(async (event) => {
@@ -27,7 +18,7 @@ export default defineEventHandler(async (event) => {
 
   const now = new Date()
   const { from, to } = await getValidatedQuery(event, querySchema.parse)
-  const season = currentSeason(now)
+  const season = seasonBounds(now)
   // Whole days in Europe/London, not UTC midnights: the Worker runs in UTC and
   // an unpinned bound moves the season boundary by an hour through BST.
   const windowFrom = validityStart(from ?? season.from)

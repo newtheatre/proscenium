@@ -2488,7 +2488,15 @@ Both are optional; with neither, the counts cover every reservation.
 
 **Source** `server/api/admin/stats.get.ts` · **Auth** inline ability: ADMIN or MANAGER
 
-**Query** none.
+**Query** `from` and `to`, both optional, both `YYYY-MM-DD`, bounding performance dates
+inclusively. Omit them and the window is **the current season**, 1 August to 31 July, which is the
+university year and the committee handover.
+
+**The season boundary is resolved in Europe/London**, like the window bounds it feeds. Resolved in
+UTC it is wrong for the hour after midnight on 1 August, when the Worker still reads 31 July: the
+dashboard would default to the season that had just ended and report it as the current one. The
+response echoes the resolved window as `window` (`from`, `to`, `isCurrentSeason`), which is what
+the dashboard heading is built from.
 
 **Response** `200`
 
