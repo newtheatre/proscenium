@@ -132,6 +132,9 @@ export function resolveLine(
     if (pool.some(p => (p.containerMl == null) !== (pool[0]!.containerMl == null))) {
       return { ok: false, error: 'Its options are not all counted the same way. Fix the catalogue before selling it.' }
     }
+    if (!pool.length) {
+      return { ok: false, error: 'Nothing that goes in it is stocked, so it cannot be sold. Ask the bar manager.' }
+    }
     const chosen = pool.find(p => p.id === choices.find(c => c.itemId === item.id)?.productId)
     if (!chosen) return { ok: false, error: 'Choose what goes in it before ringing it up.' }
 

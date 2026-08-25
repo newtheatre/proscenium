@@ -2240,6 +2240,15 @@ offers no pass until the box office has been paid.
   that does not hold stock, a category with nothing stocked in it, a category that mixes things
   counted in millilitres with things counted in items, an ingredient of itself, or a recipe on
   something another product is made from. Maximum eight ingredients.
+- **One level cuts both ways, so an edit that would empty a live choice pool is `409` too.** A
+  product reached through a `choiceCategoryId` is as much an ingredient as a fixed one, and
+  retiring it, hiding it, moving it to another category or giving it a recipe of its own would all
+  take it out of the pool. `PATCH` therefore recomputes every affected pool as it would be after
+  the change whenever `status`, `categoryId` or `recipe` is present, and refuses when one that
+  an `ACTIVE` recipe depends on would be left with nothing to pick, naming the dependent product
+  and the category. A pool that is *already* empty does not block an unrelated edit. Without this
+  the sold product stayed on the menu with an unfillable slot: the tile could never be added to a
+  basket, and nothing said why (ADR-0036).
 - **`containerMl` cannot change once anything has moved.** `409`, naming the fix: retire the
   product and add the new size as its own. Every movement means what it means in the size that was
   current when it was written.

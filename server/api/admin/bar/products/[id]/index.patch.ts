@@ -32,6 +32,8 @@ export default defineEventHandler(async (event) => {
   const product = await db.select({
     id: schema.barProducts.id,
     containerMl: schema.barProducts.containerMl,
+    categoryId: schema.barProducts.categoryId,
+    status: schema.barProducts.status,
   }).from(schema.barProducts).where(eq(schema.barProducts.id, id)).get()
   if (!product) throw createError({ statusCode: 404, statusMessage: 'No such product.' })
 
@@ -57,6 +59,17 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 409,
       statusMessage: 'This has stock movements against it, so its size is fixed. Retire it and add the new size as its own product.',
+    })
+  }
+
+  // Status, category and recipe each decide whether this still holds stock for a
+  // choice pool, so any of the three can empty one another recipe depends on.
+  if (input.status || input.categoryId || input.recipe) {
+    await assertChoicePoolsSurvive(catalogue, {
+      id,
+      categoryId: input.categoryId ?? product.categoryId,
+      status: input.status ?? product.status,
+      recipe,
     })
   }
 

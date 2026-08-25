@@ -317,6 +317,12 @@ async function removeCharge(id: string) {
                 @click="() => { picks[slot.itemId] = option.id }"
               />
             </div>
+            <p
+              v-if="!optionsFor(slot.categoryId).length"
+              class="text-sm text-muted"
+            >
+              Nothing in {{ slot.categoryName }} is stocked, so this cannot be added to your tab.
+            </p>
           </div>
         </div>
       </template>
