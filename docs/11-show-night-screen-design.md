@@ -332,7 +332,14 @@ room, and people who are not staff will see it. The full list:
 - **House count:** admitted so far against expected: a single pair of numbers. No names, no
   money, no breakdown. This is the one piece of box office data that crosses the boundary,
   because "can we start" is backstage's decision and this number is that decision's input.
-- **Show basics:** title, advertised time, interval structure: from the public show record.
+  **The pair is one performance's, never the day's.** On a double-bill day a matinee's hundred
+  admissions added to the evening's would read as a house nearly in, and the DSM would start on
+  five people. The performance the board is for is the last one whose doors have opened, falling
+  back to the next one still to start, falling back to the day's last once all have started.
+  Performances at somebody else's venue are excluded, like everywhere else on the show night
+  screen ([ADR-0029](./decisions/0029-external-is-a-venue-not-a-strand.md)).
+- **Show basics:** title, advertised time, interval structure: from the public show record, for
+  the same performance the house count is for.
 - **Emergency:** the same cached content as §2.5, one tap away, and available even before a
   code is entered (§5.1 point 7).
 

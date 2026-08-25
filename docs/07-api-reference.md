@@ -2670,7 +2670,9 @@ Two rules the handlers enforce, not the UI:
 `GET /api/backstage/board` also returns the **house count**: admitted against expected, and nothing
 else. That is the one piece of box office data that crosses to backstage (§5.2), and it is computed
 by the shared seat rule ([ADR-0007](./decisions/0007-one-seat-counting-rule.md)) rather than counted
-again here.
+again here. **It is one performance's pair, not the day's**: the last performance whose doors have
+opened, else the next to start, else the day's last, excluding anything at an external venue. The
+title, start time and interval count returned beside it belong to that same performance.
 
 The FOH side is scoped by the rota like every other show-night route: all five
 `/api/foh/backstage/**` routes call `requireRosteredTonight()` after `requireFohScope()` and answer
