@@ -1245,9 +1245,11 @@ The performance is looked up by `id` **and** `showId`, so a mismatched pair retu
 
 **Response** `200`: the updated `performances` row.
 
-**Errors** `400 Show ID and Performance ID are required`; `404 Performance not found`; `403`.
+**Errors** `400 Show ID and Performance ID are required`; `400 No such venue`; `404 Performance not found`; `409` when the update would drop capacity below what is already sold; `403`.
 
-**Side effects** Lowering `capacityOverride` below the number of tickets already sold is permitted: nothing re-validates existing bookings. Setting `status: 'CANCELLED'` sends no emails to affected customers; that has to be done by hand.
+**Capacity is guarded as one figure.** Effective capacity is `capacityOverride ?? venue.capacity` ([ADR-0007](decisions/0007-one-seat-counting-rule.md)), so the handler resolves what the update would leave in place, on both fields at once, and refuses with a 409 when that lands below `countOccupiedSeatsFor()`. All three routes into the same dead end are covered: lowering the override, clearing it, and moving the performance to a smaller venue. Only a *reduction* is checked, so raising the capacity can still repair a performance that is already past its house. Null stays uncapped, matching `assertCapacity`. Raising the override above the venue's capacity remains the sanctioned way to oversell deliberately.
+
+**Side effects** Setting `status: 'CANCELLED'` sends no emails to affected customers; that has to be done by hand.
 
 ---
 

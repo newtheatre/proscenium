@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { updatePerformance } from '~~/shared/utils/abilities'
 
@@ -39,14 +39,32 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, bodySchema.parse)
 
-  // Capacity cannot go below what is already sold, or assertCapacity refuses
-  // every later change for this performance (ADR-0007).
-  if (body.capacityOverride !== undefined && body.capacityOverride !== null) {
+  // Effective capacity is the override or the venue's, so both fields are
+  // guarded together and neither alone (ADR-0007).
+  const nextVenueId = body.venueId ?? existing.venueId
+  const venues = await db.select({ id: schema.venues.id, capacity: schema.venues.capacity })
+    .from(schema.venues)
+    .where(inArray(schema.venues.id, [existing.venueId, nextVenueId]))
+  const capacityOf = new Map(venues.map(venue => [venue.id, venue.capacity]))
+
+  // assertCapacity joins venues, so an unknown id would make every later
+  // booking answer "Performance not found" instead.
+  if (body.venueId !== undefined && !capacityOf.has(body.venueId)) {
+    throw createError({ statusCode: 400, statusMessage: 'No such venue' })
+  }
+
+  const nextOverride = body.capacityOverride !== undefined ? body.capacityOverride : existing.capacityOverride
+  const nextCapacity = nextOverride ?? capacityOf.get(nextVenueId) ?? null
+  const nowCapacity = existing.capacityOverride ?? capacityOf.get(existing.venueId) ?? null
+
+  // Only a reduction is checked, so raising capacity can still repair a
+  // performance already past its house.
+  if (nextCapacity !== null && (nowCapacity === null || nextCapacity < nowCapacity)) {
     const sold = await countOccupiedSeatsFor(performanceId)
-    if (body.capacityOverride < sold) {
+    if (nextCapacity < sold) {
       throw createError({
         statusCode: 409,
-        statusMessage: `This performance has already sold ${sold} tickets, so capacity cannot be set to ${body.capacityOverride}. Refund or cancel tickets first.`,
+        statusMessage: `This performance has already sold ${sold} tickets, so its capacity cannot drop to ${nextCapacity}. Refund or cancel tickets first, or pick a bigger venue.`,
       })
     }
   }
