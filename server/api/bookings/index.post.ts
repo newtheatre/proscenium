@@ -4,6 +4,10 @@ import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { sendBookingConfirmationEmail } from '~~/server/utils/email'
 
+// One party, one booking. Without a total the per-line cap is no cap: repeating
+// a ticketTypeId would take the whole house in one unauthenticated request.
+const MAX_SEATS_PER_BOOKING = 10
+
 const bodySchema = z.object({
   performanceId: z.string().min(1),
 
@@ -15,8 +19,13 @@ const bodySchema = z.object({
   // Tickets to book
   tickets: z.array(z.object({
     ticketTypeId: z.string().min(1),
-    quantity: z.int().min(1).max(10),
-  })).min(1, 'At least one ticket is required'),
+    quantity: z.int().min(1).max(MAX_SEATS_PER_BOOKING),
+  }))
+    .min(1, 'At least one ticket is required')
+    .refine(
+      tickets => tickets.reduce((sum, t) => sum + t.quantity, 0) <= MAX_SEATS_PER_BOOKING,
+      { message: `A booking is at most ${MAX_SEATS_PER_BOOKING} tickets. For a larger group, please call the box office.` },
+    ),
 
   // Access requirements and similar. Capped so an unauthenticated caller cannot
   // use it as free storage, or pad an email past a provider's size limit.

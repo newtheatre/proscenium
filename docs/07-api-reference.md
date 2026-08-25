@@ -562,12 +562,21 @@ stage-door retries until every app succeeds.
 
   tickets: z.array(z.object({
     ticketTypeId: z.string().min(1),
-    quantity:     z.int().min(1).max(10),   // per line, not per booking
-  })).min(1),                                // 'At least one ticket is required'
+    quantity:     z.int().min(1).max(10),   // per line
+  }))
+    .min(1)                                 // 'At least one ticket is required'
+    // and per booking: 'A booking is at most 10 tickets…'
+    .refine(t => t.reduce((sum, x) => sum + x.quantity, 0) <= 10),
 
   customerNotes: z.string().optional(),
 }
 ```
+
+**Ten seats is the whole booking, not the line.** The array has no length limit, so without the
+summed check a caller could repeat one `ticketTypeId` and take every remaining seat of a performance
+in a single unauthenticated request. Duplicate `ticketTypeId` entries are still accepted and are
+additive: each line creates its own ticket rows. A party larger than ten rings the box office, which
+uses `POST /api/reservations` instead.
 
 **Response** `200`: the created reservation with relations:
 
@@ -592,6 +601,7 @@ One `tickets` row is created per seat: a line of `quantity: 3` yields three rows
 | Code | Cause |
 | --- | --- |
 | 400 | `Name and email are required for guest bookings` |
+| 400 | `A booking is at most 10 tickets. For a larger group, please call the box office.` |
 | 404 | `Performance not found or not on sale`: the lookup filters on `status = 'ON_SALE'`, so a DRAFT or CANCELLED performance is indistinguishable from a missing one |
 | 400 | `Show is not currently published` |
 | 400 | `This performance has already started` |
@@ -807,21 +817,23 @@ z.object({
 | 404 | `Performance not found` |
 | 404 | `User not found` (when `userId` was supplied) |
 | 400 | `Ticket type <id> not found` |
+| 409 | `Not enough tickets available for this performance` |
 | 500 | `Failed to create guest account` / `Failed to create reservation` |
 
 **Differences from the public `POST /api/bookings`: read this before reusing either.**
 
 | | `POST /api/bookings` (public) | `POST /api/reservations` (staff) |
 | --- | --- | --- |
-| Capacity check | Yes, 409 when it would oversell | **None: never checks capacity** |
+| Capacity check | Yes, 409 when it would oversell | Yes, 409 when it would oversell |
 | Performance status | Must be `ON_SALE` | Any status, including DRAFT and CANCELLED |
 | Show status | Must be `PUBLISHED` | Not checked |
 | Past performances | Rejected | Allowed |
 | Max quantity per line | 10 | 20 |
+| Max seats per booking | 10 | No limit |
 | Confirmation email | Sent | **Not sent** |
 | `staffNotes` | Not accepted | Accepted |
 
-The staff route is deliberately permissive so the box office can overbook, sell into an unpublished show, and record retrospective sales. The consequence is that it is the only way to oversell a house: nothing downstream re-validates capacity.
+The staff route is deliberately permissive so the box office can sell into an unpublished show, take block bookings and record retrospective sales. It is **not** a way round capacity: `server/api/reservations/index.post.ts` calls the same `assertCapacity`, and staff who need to oversell raise the performance's `capacityOverride` rather than bypassing the check.
 
 **Side effects** Resolves or creates a shadow account exactly as the public route does (match on email, else insert with `password: null`). Inserts one ticket row per seat with `pricePaid` resolved at current rates.
 
