@@ -599,7 +599,7 @@ There is no backup of the R2 bucket at all. Its contents are show posters and ve
 
 - Uploads go through `server/utils/images.ts` (`validateAndUploadImage`): JPEG, PNG and WebP only, maximum 5 MB, filename generated as `image-<timestamp>.<ext>`.
 - Path prefixes: `shows/<showId>/…` (posters, `server/api/shows/[id]/poster.post.ts`) and `venues/<venueId>/…` (`server/api/venues/[id]/image.post.ts`). The database stores the pathname, not the bytes.
-- Replacing an image deletes the previous object first. A failed delete is logged and swallowed, so it does not block the upload.
+- An object is deleted only once no row addresses it: `validateAndUploadImage` hands back a `deletePrevious()` the caller runs **after** the row is repointed, and `DELETE /api/venues/:id` removes the image after the row delete succeeds. A failed delete is logged and swallowed, so it never blocks the write.
 - Serving is `server/routes/images/[...pathname].get.ts`, i.e. `https://newtheatre.org.uk/images/shows/<id>/image-123.jpg`. It sets `Content-Security-Policy: default-src 'none'` on every response, so that if someone manages to upload something that a browser would treat as HTML, it cannot load scripts, styles or subresources. **Do not remove that header.**
 - Locally the same code path writes to `.data/blob/` instead of R2, so image handling is testable without Cloudflare credentials.
 

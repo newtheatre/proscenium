@@ -1847,9 +1847,9 @@ Venue responses come from `formatVenueResponse` (`server/utils/queries/venues.ts
 
 **Response** `200`: `{ message: 'Venue deleted successfully' }`
 
-**Errors** `400 Venue ID is required`; `404 Venue not found`; `403`.
+**Errors** `400 Venue ID is required`; `404 Venue not found`; `403`; `409 This venue cannot be deleted because it has N performances against it…`.
 
-**Side effects** Deletes the venue image from R2 first, logging and continuing if that fails. `venues_to_features` rows cascade. **`performances.venueId` is `onDelete: 'restrict'`**, so a venue with any performance cannot be deleted and the FK error surfaces as an uncaught 500, note the R2 image may already have been destroyed by that point.
+**Side effects** `venues_to_features`, `venue_emergency_info`, `venue_aliases` and shift-template rows cascade. **`performances.venueId` is `onDelete: 'restrict'`**, so the handler counts performances at the venue first and refuses with a 409 naming the count, in the shape `DELETE /api/shows/:id` uses. The R2 image is deleted **after** the row delete succeeds, logging and continuing if that fails, so a refused delete never leaves the venue page pointing at an object that is gone.
 
 ---
 
