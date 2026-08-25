@@ -14,6 +14,16 @@ export function sellableTicketTypes() {
 }
 
 /**
+ * The same set as a subquery, so an override lookup scopes by predicate
+ * rather than by an id list that grows with the catalogue (ADR-0006).
+ */
+export function sellableTicketTypeIds() {
+  return db.select({ id: schema.ticketTypes.id })
+    .from(schema.ticketTypes)
+    .where(sellableTicketTypes())
+}
+
+/**
  * Loaded override data used by `resolveEffectivePrice`.
  */
 export interface TicketPriceContext {
@@ -30,20 +40,30 @@ export async function loadTicketPriceContext(
   showId: string,
   performanceId: string,
 ): Promise<TicketPriceContext> {
+  // The caller chooses how many type ids to pass, so the list is chunked
+  // rather than bound whole (ADR-0006).
+  const batches = chunked(ticketTypeIds, IDS_PER_STATEMENT)
+
   const [baseTypes, showOverrides, perfOverrides] = await Promise.all([
-    db.select().from(schema.ticketTypes).where(inArray(schema.ticketTypes.id, ticketTypeIds)),
-    db.select().from(schema.showTicketTypeOverrides).where(
-      and(
-        eq(schema.showTicketTypeOverrides.showId, showId),
-        inArray(schema.showTicketTypeOverrides.ticketTypeId, ticketTypeIds),
+    Promise.all(batches.map(ids =>
+      db.select().from(schema.ticketTypes).where(inArray(schema.ticketTypes.id, ids)),
+    )).then(rows => rows.flat()),
+    Promise.all(batches.map(ids =>
+      db.select().from(schema.showTicketTypeOverrides).where(
+        and(
+          eq(schema.showTicketTypeOverrides.showId, showId),
+          inArray(schema.showTicketTypeOverrides.ticketTypeId, ids),
+        ),
       ),
-    ),
-    db.select().from(schema.performanceTicketTypeOverrides).where(
-      and(
-        eq(schema.performanceTicketTypeOverrides.performanceId, performanceId),
-        inArray(schema.performanceTicketTypeOverrides.ticketTypeId, ticketTypeIds),
+    )).then(rows => rows.flat()),
+    Promise.all(batches.map(ids =>
+      db.select().from(schema.performanceTicketTypeOverrides).where(
+        and(
+          eq(schema.performanceTicketTypeOverrides.performanceId, performanceId),
+          inArray(schema.performanceTicketTypeOverrides.ticketTypeId, ids),
+        ),
       ),
-    ),
+    )).then(rows => rows.flat()),
   ])
 
   return { baseTypes, showOverrides, perfOverrides }

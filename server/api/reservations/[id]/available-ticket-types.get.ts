@@ -35,20 +35,19 @@ export default defineEventHandler(async (event) => {
   // Only types a human may sell: archived legacy types and the pass
   // bookkeeping kinds are excluded. See sellableTicketTypes().
   const allTypes = await db.select().from(schema.ticketTypes).where(sellableTicketTypes())
-  const typeIds = allTypes.map(t => t.id)
 
   // Load show-level and performance-level overrides for these types
   const [showOverrides, perfOverrides] = await Promise.all([
     db.select().from(schema.showTicketTypeOverrides).where(
       and(
         eq(schema.showTicketTypeOverrides.showId, showId),
-        inArray(schema.showTicketTypeOverrides.ticketTypeId, typeIds),
+        inArray(schema.showTicketTypeOverrides.ticketTypeId, sellableTicketTypeIds()),
       ),
     ),
     db.select().from(schema.performanceTicketTypeOverrides).where(
       and(
         eq(schema.performanceTicketTypeOverrides.performanceId, performanceId),
-        inArray(schema.performanceTicketTypeOverrides.ticketTypeId, typeIds),
+        inArray(schema.performanceTicketTypeOverrides.ticketTypeId, sellableTicketTypeIds()),
       ),
     ),
   ])
