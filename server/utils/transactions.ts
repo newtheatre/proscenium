@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import type { BatchItem } from 'drizzle-orm/batch'
-import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNull, lte, notExists, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import type { LineChoice } from '~~/server/db/schema/transactions'
 
@@ -285,6 +285,24 @@ export async function reconciliation(day: string): Promise<DayReconciliation> {
   return totals
 }
 
+/**
+ * For a query over `tickets`: drops a comped booking, whose lines carry the
+ * full price although the reader took nothing (docs/13 §4.5).
+ */
+export function notComped() {
+  return notExists(
+    db.select({ one: sql`1` })
+      .from(schema.transactionLines)
+      .innerJoin(schema.transactions, eq(schema.transactions.id, schema.transactionLines.transactionId))
+      .where(and(
+        eq(schema.transactionLines.reservationId, schema.tickets.reservationId),
+        inArray(schema.transactionLines.kind, ['TICKET_PAYMENT', 'WALK_UP']),
+        eq(schema.transactions.tender, 'COMP'),
+        isNull(schema.transactions.voidedAt),
+      )),
+  )
+}
+
 /** Ticket money given back on a given London day. */
 async function refundedOn(day: string): Promise<number> {
   const [row] = await db.select({
@@ -296,6 +314,7 @@ async function refundedOn(day: string): Promise<number> {
     .where(and(
       gte(schema.tickets.refundedAt, validityStart(day)),
       lte(schema.tickets.refundedAt, validityEnd(day)),
+      notComped(),
     ))
 
   return Number(row?.total ?? 0)

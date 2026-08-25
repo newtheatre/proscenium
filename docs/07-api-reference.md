@@ -2394,7 +2394,10 @@ Two optional fields:
 - **`expectedTotalPence`**: what the screen showed. Checked, not trusted: the customer typed that
   figure into a card reader, so a disagreement is a real one and returns `409` with both amounts,
   having written nothing.
-- **`tender`**: `CARD` (default) or `COMP`. A comp records `0` and who approved it.
+- **`tender`**: `CARD` (default) or `COMP`. A comp records `0` and who approved it. Its ticket lines
+  still carry the full price, so reversing a comped booking goes down the refund path like any other
+  collected booking; the refund gives no money back and is therefore in neither the day's expected
+  Z-total nor the night report's refunded figure.
 
 The amount is the sum of **unrefunded tickets at the price they were sold at**, never the current
 price.

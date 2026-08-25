@@ -414,6 +414,11 @@ in Europe/London when the transaction is written; a refund carries a UTC instant
 by bounding `refunded_at` to that day's London start and end. During BST a refund taken at 00:30
 belongs to the day the reader netted it off, not to the UTC day before it.
 
+**`refunds` is money the reader gave back, so a comped booking is not in it.** A comp writes ticket
+lines at the full price and a transaction total of zero, so refunding one returns nothing; counting
+it would leave the Z reading over by the ticket price on a day nobody could explain. The same
+exclusion applies to the `Refunded` line in the end-of-night report.
+
 **Two questions, two lenses.** *"Does today's SumUp match?"* is answered by `taken_on = today`,
 regardless of which performance any ticket was for. *"How did Saturday's show do?"* is answered
 by `transaction_lines.performance_id = Saturday`, regardless of when the money was taken. An
