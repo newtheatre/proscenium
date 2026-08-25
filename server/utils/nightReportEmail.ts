@@ -104,8 +104,8 @@ function formatStamp(value: string): string {
   }).format(date)
 }
 
-/** Recipients: the closing DM, plus the standing archive addresses. */
-export async function emailNightReport(reportId: string, report: NightReport, autoClosed: boolean): Promise<void> {
+/** Recipients: the closing DM, plus the standing archive addresses. Returns how many were sent. */
+export async function emailNightReport(reportId: string, report: NightReport, autoClosed: boolean): Promise<number> {
   const stored = await db.select({
     closingNote: schema.performanceReports.closingNote,
     closedByUserId: schema.performanceReports.closedByUserId,
@@ -122,17 +122,31 @@ export async function emailNightReport(reportId: string, report: NightReport, au
   const recipients = [...new Set([...standing, closer?.email].filter(Boolean) as string[])]
   if (!recipients.length) {
     console.warn('[night-report] no recipients configured; the stored report is still the record')
-    return
+    return 0
   }
 
   const html = renderReport(report, autoClosed, stored?.closingNote ?? null)
   const subject = `${report.performance.showTitle}: ${report.performance.night}${autoClosed ? ' (auto-closed)' : ''}`
 
+  let sent = 0
   for (const to of recipients) {
-    await sendEmail({ to, subject, html })
+    try {
+      await sendEmail({ to, subject, html })
+      sent++
+    }
+    catch (error) {
+      // One stale standing address must not cost the duty manager their copy.
+      console.error(`[night-report] could not email ${to}:`, error)
+    }
   }
 
-  await db.update(schema.performanceReports)
-    .set({ emailedAt: sql`(current_timestamp)` })
-    .where(eq(schema.performanceReports.id, reportId))
+  // Stamped on the first send that works, so a null still means nobody has this
+  // and `reports:email-unsent` can pick the report up.
+  if (sent) {
+    await db.update(schema.performanceReports)
+      .set({ emailedAt: sql`(current_timestamp)` })
+      .where(eq(schema.performanceReports.id, reportId))
+  }
+
+  return sent
 }

@@ -302,7 +302,14 @@ export async function closeNight(input: CloseNightInput) {
     await resetCode(payload.performance.night, input.closedByUserId)
   }
 
-  await emailNightReport(stored!.id, payload, input.autoClosed)
+  try {
+    await emailNightReport(stored!.id, payload, input.autoClosed)
+  }
+  catch (error) {
+    // The night is closed either way. `reports:email-unsent` retries the copy.
+    console.error(`[night-report] ${stored!.id} stored but not emailed:`, error)
+  }
+
   return stored!
 }
 

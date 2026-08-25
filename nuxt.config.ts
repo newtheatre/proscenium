@@ -117,7 +117,7 @@ export default defineNuxtConfig({
       '0 10 * * *': ['shifts:remind'],
       // 12:00 UTC: noon in winter, an hour after it in summer. Never early,
       // which is what matters when the deadline is the duty manager's.
-      '0 12 * * *': ['reports:auto-close'],
+      '0 12 * * *': ['reports:auto-close', 'reports:email-unsent'],
     },
     rollupConfig: {
       plugins: [

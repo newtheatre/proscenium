@@ -356,7 +356,7 @@ and no password-reset route here.
 | GET | `/api/foh/tonight` | `foh.work` (`workFoh`) | Tonight's performances this user may work, scoped by the rota |
 | GET | `/api/foh/lookup` | `foh.work` (`workFoh`) | Find a booking on tonight's performances, by reference, name or email |
 | GET | `/api/foh/glance` | `foh.work` (`workFoh`) | Tonight's numbers, and the questions the door gets asked |
-| POST | `/api/foh/performances/:id/close` | Tonight's `DUTY_MANAGER`, or `BOX_OFFICE`+ | Sign the night off: file the report, revoke the codes, email it |
+| POST | `/api/foh/performances/:id/close` | Tonight's `DUTY_MANAGER`, or `BOX_OFFICE`+ | Sign the night off: file the report, revoke the codes, email it. A failed email is logged, not raised |
 | GET | `/api/foh/performances/:id/report` | `foh.work`, scoped to tonight | The stored record, if the night is closed |
 | GET | `/api/foh/access-tonight` | `foh.work` + the §2.5 rule | Consented access needs for this performance |
 | GET | `/api/foh/backstage` | `foh.work` + rostered tonight | Tonight's backstage code, its QR, and the joined devices |

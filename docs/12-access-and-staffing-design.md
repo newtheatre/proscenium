@@ -252,6 +252,11 @@ copy while the system beds in: expect to drop this one after a term). Stored in 
 `performance_reports` table regardless, so the email is a courtesy copy of a record, not the
 record itself.
 
+**A failed send never fails the close.** Each address is tried on its own, so one stale standing
+address cannot cost the DM their copy, and the close reports success because the record is filed
+either way. `emailed_at` is stamped only once a copy has actually gone out, which makes a null the
+queue that `reports:email-unsent` works through the next day.
+
 ### 4.3 Contents
 
 Attendance (sold / collected / no-shows / walk-ups / pass admissions), takings summary at

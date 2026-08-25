@@ -58,6 +58,7 @@ Kept as a record of what changed and why, so nobody re-fixes them.
 | 29 | Six CSV exports, the Challenge 25 register among them, emitted volunteer-typed text a spreadsheet would evaluate | The formula guard moved from the ticket export's private escaper into the shared `csvCell()`, which every export already used |
 | 30 | Refunds were bucketed by the UTC day, so during BST a refund taken between midnight and 01:00 London came off the previous day's expected Z | `refundedOn()` bounds `refunded_at` by the London day, like `performanceIdsOn()` beside it. The expected figure is computed at read time, so re-opening an affected day now shows the corrected pair of totals |
 | 31 | Refunding a comped booking took the full ticket price off the day's expected Z and off the night report, though the reader never took it | `notComped()` in `server/utils/transactions.ts` excludes a booking with an unvoided `COMP` ticket payment, and both figures use it |
+| 32 | A failed report email threw after the report was stored, so the duty manager saw "Not closed" on a night that was closed, and the archive copy was lost with no retry | The send is caught and logged, each address is tried on its own, `emailed_at` is stamped only on a copy that went out, and `reports:email-unsent` retries the last seven nights |
 
 ### The companion entitlement was enforced per basket, not per performance
 
