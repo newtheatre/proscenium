@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `stock_movements_stocktake_line_uq` ON `stock_movements` (`ref_id`) WHERE ref_table = 'stocktake_lines';

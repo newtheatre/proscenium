@@ -49,7 +49,7 @@ const allowed = computed(() => (user.value ? canVerifyAccess(user.value) : false
 const requestFetch = useRequestFetch()
 const toast = useToast()
 const { data, refresh, error } = await useAsyncData('admin-access', () =>
-  requestFetch<Profile[]>('/api/admin/access').catch(() => []))
+  requestFetch<Profile[]>('/api/admin/access'), { default: () => [] })
 
 const all = computed<Profile[]>(() => data.value ?? [])
 /** Split so recording something clears it out of the queue. */
@@ -103,11 +103,18 @@ async function decide(profile: Profile, status: 'VERIFIED' | 'DECLINED') {
     </div>
 
     <UAlert
-      v-if="!allowed || error"
+      v-if="!allowed"
       color="neutral"
       variant="subtle"
       title="You do not hold access verification"
       description="This is deliberately a one-or-two-people privilege, and is not part of box office access. The IT Manager grants it in the auth service."
+    />
+
+    <AdminFetchError
+      v-else-if="error"
+      :error="error"
+      title="Could not load the verification queue"
+      :on-retry="refresh"
     />
 
     <template v-else>

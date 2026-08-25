@@ -141,13 +141,21 @@ async function saveAdjust() {
   }
 }
 
+// Its own flag, not the modals' shared `saving`: a second tap races the insert.
+const starting = ref(false)
+
 async function startStocktake() {
+  if (starting.value) return
+  starting.value = true
   try {
     const res = await $fetch<{ id: string }>('/api/admin/bar/stocktakes', { method: 'POST' })
     await navigateTo(`/admin/bar/stocktakes/${res.id}`)
   }
   catch (error) {
     toast.add({ title: 'Could not start a stocktake', description: statusMessage(error), color: 'error' })
+  }
+  finally {
+    starting.value = false
   }
 }
 </script>
@@ -208,6 +216,7 @@ async function startStocktake() {
           v-else
           icon="i-lucide-clipboard-list"
           :variant="ledgerEmpty ? 'solid' : 'subtle'"
+          :loading="starting"
           @click="startStocktake"
         >
           {{ ledgerEmpty ? 'Count opening stock' : 'Start stocktake' }}

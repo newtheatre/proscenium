@@ -34,6 +34,21 @@ export default defineEventHandler(async (event) => {
     }) as BatchItem<'sqlite'>),
   ]
 
-  await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+  try {
+    await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+  }
+  catch (err) {
+    // stocktakes_one_open is what actually holds the rule; the read above only
+    // gives a double tap a civil answer rather than a driver error.
+    if (isOneOpenViolation(err)) {
+      throw createError({ statusCode: 409, statusMessage: 'A stocktake is already open. Finish or abandon it first.' })
+    }
+    throw err
+  }
   return { id: stocktakeId, lines: active.length }
 })
+
+function isOneOpenViolation(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.includes('stocktakes_one_open')
+}

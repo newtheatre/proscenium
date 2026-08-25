@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import type { BatchItem } from 'drizzle-orm/batch'
-import { eq, isNotNull, sql } from 'drizzle-orm'
+import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { manageBar } from '~~/shared/utils/abilities'
 
@@ -57,13 +57,15 @@ export default defineEventHandler(async (event) => {
     }))
     .filter(m => m.qty !== 0)
 
+  // The status lives in the predicate as well as the read above: two finishes
+  // in the same instant would otherwise both apply, and both rewrite who closed it.
   await db.batch([
     db.update(schema.stocktakes).set({
       status: 'APPLIED',
       finishedByUserId: user.id,
       finishedAt: sql`(current_timestamp)`,
       notes: input.notes ?? null,
-    }).where(eq(schema.stocktakes.id, id)),
+    }).where(and(eq(schema.stocktakes.id, id), eq(schema.stocktakes.status, 'OPEN'))),
     ...movementStatements(movements),
   ] as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
 

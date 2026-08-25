@@ -25,6 +25,7 @@ interface Glance {
 }
 
 interface AccessEntry {
+  reservationId: string
   firstName: string
   partySize: number
   needs: string[]
@@ -130,7 +131,7 @@ const { data, error: glanceError, refresh: refreshGlance } = await useAsyncData(
   { watch: [performance] },
 )
 
-const { data: accessData } = await useAsyncData(
+const { data: accessData, error: accessError, refresh: refreshAccess } = await useAsyncData(
   'foh-access-tonight',
   () => (performance.value
     ? requestFetch<AccessEntry[]>('/api/foh/access-tonight', { query: { performanceId: performance.value.id } })
@@ -138,7 +139,7 @@ const { data: accessData } = await useAsyncData(
   { watch: [performance] },
 )
 
-/** Empty when the rule does not admit you, which the screen simply does not show. */
+/** Empty means the rule does not admit you; a failed load is accessError, not empty. */
 const access = computed<AccessEntry[]>(() => accessData.value ?? [])
 
 const numbers = computed(() => data.value?.numbers ?? null)
@@ -310,10 +311,31 @@ const facts = computed(() => [
           </template>
         </p>
 
+        <div
+          v-if="accessError"
+          class="mb-4 rounded-xl border border-red-800 bg-red-950/40 p-4"
+        >
+          <p class="text-sm font-medium text-red-200">
+            Access needs did not load
+          </p>
+          <p class="mt-1 text-sm text-red-300/90">
+            Do not assume there are none, check with the box office before seating.
+          </p>
+          <UButton
+            class="mt-3"
+            size="sm"
+            color="error"
+            variant="outline"
+            icon="i-lucide-rotate-ccw"
+            label="Try again"
+            @click="() => refreshAccess()"
+          />
+        </div>
+
         <!-- Consented needs only, and only for the people working tonight
              (ADR-0022). Absent entirely when the rule does not admit you. -->
         <section
-          v-if="access.length"
+          v-else-if="access.length"
           class="mb-4 rounded-xl border border-violet-800 bg-violet-950/30 p-4"
         >
           <h2 class="mb-1 text-xs uppercase tracking-widest text-violet-300">
@@ -324,7 +346,7 @@ const facts = computed(() => [
           </p>
           <article
             v-for="entry in access"
-            :key="entry.firstName"
+            :key="entry.reservationId"
             class="mb-2 rounded-lg bg-neutral-900/80 p-3"
           >
             <p class="font-medium">

@@ -372,6 +372,20 @@
       "when": 1787531015803,
       "tag": "0052_unstack_self_referencing_recipes",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1787681838166,
+      "tag": "0053_complete_magik",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1787682283900,
+      "tag": "0054_goofy_shinobi_shaw",
+      "breakpoints": true
     }
   ]
 }

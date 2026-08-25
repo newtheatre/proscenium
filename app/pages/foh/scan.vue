@@ -59,13 +59,21 @@ const results = ref<Match[]>([])
 const searching = ref(false)
 const problem = ref<string | null>(null)
 
+// Sequences the lookups so a slow earlier reply cannot overwrite a newer verdict.
+let latest = 0
+
 async function search(q: string) {
   const trimmed = q.trim()
   if (trimmed.length < 2) return
   searching.value = true
   problem.value = null
+  // A failed or superseded lookup must not leave the previous booking's verdict on the door screen.
+  results.value = []
+  const token = ++latest
   try {
-    results.value = await $fetch<Match[]>(api('/api/foh/lookup'), { query: { q: trimmed } })
+    const matches = await $fetch<Match[]>(api('/api/foh/lookup'), { query: { q: trimmed } })
+    if (token !== latest) return
+    results.value = matches
     if (!results.value.length) {
       problem.value = training.active.value
         ? `Nothing matching "${trimmed}" in the practice bookings.`
@@ -73,10 +81,11 @@ async function search(q: string) {
     }
   }
   catch {
+    if (token !== latest) return
     problem.value = 'That lookup failed. Try again, or use the booking reference.'
   }
   finally {
-    searching.value = false
+    if (token === latest) searching.value = false
   }
 }
 

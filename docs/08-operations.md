@@ -425,6 +425,31 @@ Still the right move for anything destructive, and the fallback when the workflo
 2. Check there is no performance on sale in the next hour or so: `/admin` shows what is upcoming.
 3. Read the generated `.sql`. If it contains `PRAGMA foreign_keys=OFF` and a `__new_*` table, it is a full table rebuild: SQLite copies the data across via an explicit `INSERT … SELECT`, and **any column omitted from that list is silently dropped**. On a large `tickets` or `reservations` table this is also the slowest and riskiest kind of migration.
 4. If that rebuild touches a table other tables reference, read the next section before going any further.
+5. If it adds a `CREATE UNIQUE INDEX`, check the existing rows satisfy it first. The index is created
+   against live data, and a duplicate fails the whole migration part-way. `0053_complete_magik.sql`
+   adds `stocktakes_one_open`, so before it runs check that at most one stocktake is open:
+
+   ```bash
+   bunx wrangler d1 execute proscenium --remote \
+     --command "select id, started_at from stocktakes where status = 'OPEN';"
+   ```
+
+   More than one row means the duplicate-start race happened before the index landed. Abandon every
+   sheet but the one being counted, from `/admin/bar/stocktakes/<id>`, then run the migration.
+
+   `0054_goofy_shinobi_shaw.sql` adds `stock_movements_stocktake_line_uq`, so check the same way that
+   no counted line already carries two movements:
+
+   ```bash
+   bunx wrangler d1 execute proscenium --remote \
+     --command "select ref_id, count(*) from stock_movements where ref_table = 'stocktake_lines' \
+       group by ref_id having count(*) > 1;"
+   ```
+
+   Any row here is a stocktake that was applied twice. `stock_movements` is append-only, so correct
+   it with an opposing `ADJUST` through `/admin/bar/stock`, never by deleting the duplicate, and note
+   that the index still cannot be created while both rows exist. Escalate to the IT Manager: this one
+   needs a decision, not a runbook step.
 
 ### `PRAGMA foreign_keys=OFF` does nothing on D1
 

@@ -2,7 +2,7 @@
  * The stock ledger. Quantities in the product's own basis, signed: on-hand is
  * always SUM(qty) and is never stored. Design: docs/13-bar-design.md §3
  */
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { users } from './user'
@@ -36,6 +36,10 @@ export const stockMovements = sqliteTable('stock_movements', {
   index('stock_movements_product_idx').on(table.productId),
   index('stock_movements_ref_idx').on(table.refTable, table.refId),
   index('stock_movements_created_idx').on(table.createdAt),
+  // A stocktake line yields at most one movement, so a duplicate finish fails
+  // the insert and D1 rolls its whole batch back. Partial: a sale is one-to-many.
+  uniqueIndex('stock_movements_stocktake_line_uq').on(table.refId)
+    .where(sql`ref_table = 'stocktake_lines'`),
 ])
 
 export const stockDeliveries = sqliteTable('stock_deliveries', {
@@ -76,6 +80,9 @@ export const stocktakes = sqliteTable('stocktakes', {
   finishedAt: text('finished_at'),
 }, table => [
   index('stocktakes_status_idx').on(table.status),
+  // At most one open take at a time (docs/03 §stocktakes), held here because a
+  // read-then-insert cannot hold it across two requests.
+  uniqueIndex('stocktakes_one_open').on(table.status).where(sql`status = 'OPEN'`),
 ])
 
 export const stocktakeLines = sqliteTable('stocktake_lines', {
