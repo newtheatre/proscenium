@@ -243,7 +243,7 @@ Cloudflare to call it.
 | `backstage:sweep` | Deletes backstage **free text** older than 30 days. Preset calls are kept: they carry the milestone the curtain-up record and the end-of-night report are built from (`docs/11` §5.5) |
 | `access:sweep` | Marks verified access profiles `EXPIRED` past their date, and deletes withdrawals after 30 days. Expiry is housekeeping, not deletion: the person can renew (`docs/12` §2.5) |
 | `comps:sweep` | Marks unanswered comp requests `EXPIRED`, every 15 minutes. **Tidying only**: expiry is derived at read and refused at approval, so a missed run changes no behaviour (`docs/13` §4.1.2) |
-| `reports:auto-close` | Files an end-of-night report for any performance nobody signed off, banner-marked *auto-closed, no duty manager sign-off*. **Idempotent**: the unique index on `performance_id` means a second run closes nothing (`docs/12` §4.1) |
+| `reports:auto-close` | Files an end-of-night report for any performance **in our building** nobody signed off, banner-marked *auto-closed, no duty manager sign-off*. A venue marked external has no night of ours to close (ADR-0029). **Idempotent**: the unique index on `performance_id` means a second run closes nothing (`docs/12` §4.1) |
 | `shifts:remind` | Emails everyone confirmed on tomorrow's performances, with an ICS attachment. **Not idempotent**: running it twice sends twice, which is why it is scheduled once and not retried |
 | `training:purge` | Deletes finished and expired training runs and their events, after a day's grace so a trainer can debrief the morning after. Practice is scratch: nothing aggregates it (`docs/14` §9) |
 

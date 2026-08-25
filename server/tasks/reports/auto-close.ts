@@ -25,6 +25,8 @@ export default defineTask({
         lt(schema.performances.startsAt, now),
         gt(schema.performances.startsAt, window),
         ne(schema.performances.status, 'CANCELLED'),
+        // Not our building, so there is no night of ours to close (ADR-0029).
+        ourBuildingPredicate(),
         isNull(schema.performanceReports.id),
       ))
       .orderBy(asc(schema.performances.startsAt))

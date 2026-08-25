@@ -238,7 +238,9 @@ A **Close the night** action inside Tonight at a glance, visible to tonight's DM
 add, then generates the report, stores it, and emails it. Closing the night also revokes all
 backstage code sessions for the performance (show night screen design §5.1). If nobody closes
 the night by noon the next day, a scheduled job auto-closes with the banner
-*"auto-closed: no duty manager sign-off"*, so gaps are visible rather than silent.
+*"auto-closed: no duty manager sign-off"*, so gaps are visible rather than silent. Like every other
+rota and show-night query it asks `ourBuildingPredicate()` first: a performance at a venue we do not
+run is nobody here's to close, and never had a rota to sign it off ([ADR-0029](./decisions/0029-external-is-a-venue-not-a-strand.md)).
 
 ### 4.2 Recipients
 
