@@ -109,7 +109,7 @@ here.
 
 | Secret | Consequence if missing in production |
 | --- | --- |
-| `RESEND_API_KEY` | **The entire site goes down.** `server/utils/resend.ts` throws at module load, so the Worker fails to start and every request errors. See `docs/01-getting-started.md` §5. |
+| `NUXT_RESEND_API_KEY` | **No email at all**: confirmations, cancellations, shift reminders. The site stays up: `server/utils/resend.ts` builds the client lazily and logs `[Email] No Resend API key configured; email sending is disabled.` rather than throwing. The bare `RESEND_API_KEY` is still read as a fallback for deployments configured before the rename, so **do not remove that fallback without checking what production is actually set to**. See `docs/01-getting-started.md` §5. |
 | `NUXT_SESSION_PASSWORD` (Secrets Store) | Nobody can log in; `/api/_auth/session` returns 500 while the homepage still serves, which makes it easy to miss. Must be at least 32 characters |
 | `NUXT_RESEND_FROM_EMAIL` | Falls back to `no-reply@tickets.newtheatre.org.uk`; sends fail if that address is not verified in Resend |
 
@@ -243,7 +243,7 @@ Cloudflare to call it.
 | `backstage:sweep` | Deletes backstage **free text** older than 30 days. Preset calls are kept: they carry the milestone the curtain-up record and the end-of-night report are built from (`docs/11` §5.5) |
 | `access:sweep` | Marks verified access profiles `EXPIRED` past their date, and deletes withdrawals after 30 days. Expiry is housekeeping, not deletion: the person can renew (`docs/12` §2.5) |
 | `comps:sweep` | Marks unanswered comp requests `EXPIRED`, every 15 minutes. **Tidying only**: expiry is derived at read and refused at approval, so a missed run changes no behaviour (`docs/13` §4.1.2) |
-| `reports:auto-close` | Files an end-of-night report for any performance nobody signed off, banner-marked *auto-closed, no duty manager sign-off*. **Idempotent**: the unique index on `performance_id` means a second run closes nothing (`docs/12` §4.1) |
+| `reports:auto-close` | Files an end-of-night report for any performance **in our building** nobody signed off, banner-marked *auto-closed, no duty manager sign-off*. A venue marked external has no night of ours to close (ADR-0029). **Idempotent**: the unique index on `performance_id` means a second run closes nothing (`docs/12` §4.1) |
 | `shifts:remind` | Emails everyone confirmed on tomorrow's performances, with an ICS attachment. **Not idempotent**: running it twice sends twice, which is why it is scheduled once and not retried |
 | `training:purge` | Deletes finished and expired training runs and their events, after a day's grace so a trainer can debrief the morning after. Practice is scratch: nothing aggregates it (`docs/14` §9) |
 
@@ -599,7 +599,7 @@ There is no backup of the R2 bucket at all. Its contents are show posters and ve
 
 - Uploads go through `server/utils/images.ts` (`validateAndUploadImage`): JPEG, PNG and WebP only, maximum 5 MB, filename generated as `image-<timestamp>.<ext>`.
 - Path prefixes: `shows/<showId>/…` (posters, `server/api/shows/[id]/poster.post.ts`) and `venues/<venueId>/…` (`server/api/venues/[id]/image.post.ts`). The database stores the pathname, not the bytes.
-- Replacing an image deletes the previous object first. A failed delete is logged and swallowed, so it does not block the upload.
+- An object is deleted only once no row addresses it: `validateAndUploadImage` hands back a `deletePrevious()` the caller runs **after** the row is repointed, and `DELETE /api/venues/:id` removes the image after the row delete succeeds. A failed delete is logged and swallowed, so it never blocks the write.
 - Serving is `server/routes/images/[...pathname].get.ts`, i.e. `https://newtheatre.org.uk/images/shows/<id>/image-123.jpg`. It sets `Content-Security-Policy: default-src 'none'` on every response, so that if someone manages to upload something that a browser would treat as HTML, it cannot load scripts, styles or subresources. **Do not remove that header.**
 - Locally the same code path writes to `.data/blob/` instead of R2, so image handling is testable without Cloudflare credentials.
 
@@ -629,7 +629,7 @@ Also worth checking during an incident: <https://www.cloudflarestatus.com> (is i
 
 1. **Fall back to paper immediately.** Take names, ticket types and payment on paper. Everything can be entered afterwards; a queue in the foyer cannot be undone.
 2. Establish the blast radius: does the public site load? Does `/whats-on` load? Does `/admin/box-office` load? A dead public site *and* a dead admin means the Worker itself; a working public site with a broken admin page means an application error.
-3. `bunx wrangler tail proscenium --format pretty` and reproduce the failure. Look for the exception. A boot-time throw (§8, email section) shows as the same error on every single request.
+3. `bunx wrangler tail proscenium --format pretty` and reproduce the failure. Look for the exception. Anything that throws while the isolate starts shows as the same error on every single request, whatever was asked for. A missing Resend key is **not** one of those: it disables email and nothing else (§8).
 4. Check <https://www.cloudflarestatus.com> for D1 or Workers incidents in Europe.
 5. If a deploy went out in the last few hours, **roll it back** (§4) before diagnosing further. Restoring service beats understanding it.
 6. If the cause is a migration applied today, consider Time Travel to just before it (§6): accepting that bookings taken since are lost and must be re-entered from the paper record.
@@ -637,13 +637,12 @@ Also worth checking during an incident: <https://www.cloudflarestatus.com> (is i
 
 ### Incident: emails are not sending
 
-Symptoms range from "confirmation emails never arrive" to "the whole site is 500-ing", because of how the Resend client is wired.
+The symptom is always "email is not arriving", never "the site is down": a missing or broken key disables email and leaves every other request working.
 
-1. **Is the whole site down?** If so, suspect `RESEND_API_KEY` first. `server/utils/resend.ts` throws at module load when it is unset, which kills the Worker rather than just email. Check `wrangler tail` for `RESEND_API_KEY is not set in environment variables`; fix by `bunx wrangler secret put RESEND_API_KEY --name proscenium` and redeploying.
-2. **Site up, emails silent?** Check the Resend dashboard: is the API key still valid, is the sending domain still verified, are messages bouncing or being rate-limited? A failed send raises a 500 from `sendEmail()` and logs `[Email] Failed to send email:`, search the logs for that string.
+1. **Is the key set at all?** Check `wrangler tail` for `[Email] No Resend API key configured; email sending is disabled.`, and `bunx wrangler secret list --name proscenium` for the name. Fix by `bunx wrangler secret put NUXT_RESEND_API_KEY --name proscenium` and redeploying. Individual skipped sends log `[Email] Skipping send (no Resend key configured):` with the subject and recipient.
+2. **Key set, emails still silent?** Check the Resend dashboard: is the API key still valid, is the sending domain still verified, are messages bouncing or being rate-limited? A failed send raises a 500 from `sendEmail()` and logs `[Email] Failed to send email:`, search the logs for that string.
 3. **Wrong sender?** With `NUXT_RESEND_FROM_EMAIL` unset the code falls back to `no-reply@tickets.newtheatre.org.uk`. If that address is not verified in Resend, every send fails.
 4. **Emails arrive but the links are broken?** That is the known `baseUrl` / `baseURL` bug documented in `docs/01-getting-started.md` §6: links render as `undefined/…`. It is a one-line fix and should be prioritised, since it breaks email verification and password resets outright.
-5. Remember the three-way naming muddle: only the bare `RESEND_API_KEY` is actually read. Setting `NUXT_RESEND_API_KEY` alone changes nothing.
 
 While email is broken: staff can create bookings from `/admin/box-office` and read the booking reference to the customer directly, and admins can trigger a password reset for a user from `/admin/users`.
 
@@ -784,7 +783,7 @@ Do this in the summer, alongside the wider IT handover.
 - [ ] Confirm the outgoing IT Manager has walked you through a full deploy, at least once, on a real change.
 - [ ] Transfer or re-issue Cloudflare account access; remove the outgoing holder's access afterwards.
 - [ ] Rotate `NUXT_SESSION_PASSWORD` (above).
-- [ ] Rotate `RESEND_API_KEY` in the Resend dashboard and update the Worker secret. Confirm the sending domain is still verified and that domain DNS has not drifted.
+- [ ] Rotate the Resend key in the Resend dashboard and update the Worker secret `NUXT_RESEND_API_KEY`. Confirm the sending domain is still verified and that domain DNS has not drifted.
 - [ ] Rotate any `NUXT_HUB_CLOUDFLARE_API_TOKEN` used for migrations; create a fresh scoped token for the incoming holder.
 - [ ] Audit `/admin/users`: remove `ADMIN` and `MANAGER` from anyone who has left committee; check no development seed accounts (`admin@newtheatre.org.uk` etc., password `DevPassword123!`) exist in production. **If they do, treat it as a security incident, not a tidy-up.**
 - [ ] Confirm GitHub access to `newtheatre/proscenium` for the incoming holder, and confirm it is not the only copy of anything.

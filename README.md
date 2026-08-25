@@ -30,12 +30,16 @@ cd proscenium
 bun install
 ```
 
-Create a `.env` in the project root (it is gitignored). The minimum to boot locally:
+Create a `.env` in the project root (it is gitignored). **Nothing in it is required to boot**: an
+empty file works, email degrades to a logged warning, and `/dev-login?staff=admin` seals a local
+session. Set this if you want email to actually send:
 
 ```dotenv
-# Required, or the Worker will not boot at all
-RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
+# Optional; without it email is disabled and logs a warning, the site still runs
+NUXT_RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
 ```
+
+The `NUXT_` prefix is load-bearing: only `NUXT_*` variables reach `runtimeConfig`.
 
 `nuxt-auth-utils` generates `NUXT_SESSION_PASSWORD` and appends it to `.env` on first run. The full
 list of variables (and the Resend key naming pitfall) is in

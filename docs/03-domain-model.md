@@ -241,6 +241,11 @@ other register this app keeps: one you can tidy is not a record.
 The trigger is hand-authored, because a trigger cannot be expressed in the Drizzle schema. That is
 authoring a new migration, not editing a generated one, which stays forbidden.
 
+**A table rebuild drops the triggers with the table**, and no snapshot carries them, so a
+regenerated migration cannot bring them back. `bun run check:migrations` refuses that shape; a
+hand-authored rebuild must re-create the triggers *after* the rename
+([ADR-0042](./decisions/0042-a-rebuild-also-drops-what-the-snapshot-cannot-see.md)).
+
 **An append-only trigger must be scoped to the content columns**, as
 `BEFORE UPDATE OF body, performance_id, supersedes_id, created_at`. A blanket `BEFORE UPDATE` also
 blocks the author re-point that an estate account merge performs

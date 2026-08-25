@@ -1,0 +1,89 @@
+# ADR-0042: A table rebuild also drops what the snapshot cannot see
+
+**Status:** Accepted · **Date:** 2026-08-25 · **Deciders:** Matt Adcock (ITM 26/27)
+
+Refines [ADR-0037](0037-a-table-rebuild-takes-its-dependents-with-it.md), which stands.
+
+## Context
+
+ADR-0037 made "a generated migration may not rebuild a table that anything cascades onto" a CI
+check rather than a thing reviewers must remember. The check reads the newest Drizzle snapshot for
+`ON DELETE cascade` relationships and fails when a `CREATE TABLE __new_…` names a table that
+anything cascades onto.
+
+That is only half of what a rebuild destroys. A rebuild is `DROP TABLE` plus a rename, and
+**`DROP TABLE` takes the table's triggers with it**. Three tables carry triggers that exist only in
+hand-authored migrations and appear in no snapshot: `stock_movements` (`0034`, `0041`),
+`incident_log` (`0019`, `0023`) and `age_checks` (`0025`). `nuxt db generate` has never seen them,
+so a regenerated rebuild cannot re-emit them, and nothing cascades onto any of the three, so the
+existing check waves the rebuild straight through.
+
+Indexes come back because the snapshot carries them: `0047` re-creates `bar_products_category_idx`
+after its rename for exactly that reason. Triggers do not.
+
+The failure would be silent in the way ADR-0037 was written about. `DROP TABLE`'s implicit delete
+does not fire delete triggers, so `stock_movements_no_delete` neither aborts the drop nor logs
+anything. The migration succeeds, `check:migrations` prints its reassuring summary, review sees
+generated SQL in the shape ADR-0037 already blessed, and production ends up with a stock ledger
+whose rows can be UPDATEd and DELETEd. `on_hand` is `SUM(qty)` and is never stored, so one edited
+movement rewrites a history a stocktake has already reconciled against. The same applies to the
+Challenge 25 register and the incident log, both of which the data model describes as append-only,
+enforced by the database ([ADR-0027](0027-the-refusals-register-is-append-only.md)).
+
+This is latent rather than live: no migration in the tree rebuilds any of the three. It fires on the
+next constraint change to one of them.
+
+## Decision
+
+**`scripts/check-migrations.mjs` also refuses a rebuild that would drop a live trigger.** Three
+details are load-bearing, and each of them is a way of getting this wrong:
+
+1. **Replay `CREATE` and `DROP TRIGGER` in migration order** rather than collecting every
+   `CREATE TRIGGER` in the directory. `0023` and `0041` both drop and re-create triggers, and a
+   trigger deliberately retired for good must stop being guarded. A fail-closed check that cries
+   wolf is the one a successor comments out.
+2. **Resolve the target table from the trigger body**, `BEFORE UPDATE [OF …] ON <table>`, never from
+   the trigger's name prefix. The naming convention holds today and nothing enforces it, and the
+   filenames already diverge from it: `0041_stock_reason_append_only.sql` carries the
+   `stock_movements` triggers.
+3. **The same-migration exemption requires the re-`CREATE` to come after the
+   `ALTER TABLE __new_<table> RENAME TO <table>`.** A `CREATE TRIGGER` before the rename attaches to
+   the table that is about to be dropped and goes with it, so a position-blind exemption would wave
+   through exactly the migration it exists to catch.
+
+**The rule is general, and the error text says so.** The hazard is any schema object a rebuild drops
+that the Drizzle snapshot does not carry, not triggers specifically. Triggers are the only such
+objects today, because every `CREATE INDEX` in the directory matches an index the snapshot holds.
+That may not stay true, and a check that names the general rule is one a successor can extend.
+
+No migration needs grandfathering: the six existing rebuilds (`0006`, `0008`, `0015`, `0040`,
+`0042`, `0047`) touch `bar_products`, `bar_sessions`, `pass_admissions`, `performance_reports`,
+`performance_ticket_type_overrides`, `show_ticket_type_overrides` and `tickets`, and none of those
+carries a trigger.
+
+## Alternatives considered
+
+- **Put the triggers in the Drizzle schema so the snapshot carries them.** The real fix, and not
+  available: Drizzle's SQLite dialect has no trigger primitive, which is why every one of them is
+  hand-authored and says so in its header.
+- **Refuse every rebuild, full stop.** Tempting, and it would cover the general case with no
+  parsing. Rejected because rebuilds are sometimes the only way through, and the two ways out
+  ADR-0037 lists both stay available: a rule that cannot be complied with is not enforced, it is
+  worked around.
+- **Check the live database after the migration instead.** Tells you afterwards, against a database
+  you have already deployed code for, which ADR-0037 rejected for the cascade case and which is no
+  better here.
+- **Trust the header comment on each trigger migration.** They are well written and they did not
+  help: the hazard is in a migration nobody has written yet, generated by a tool, reviewed by
+  someone thinking about a column.
+
+## Consequences
+
+- `bun run check:migrations` still costs nothing and still needs no database. It now reports how
+  many triggers are live as well as how many tables have cascading rows, so a trigger that goes
+  missing from the count is visible in a CI log.
+- **A constraint change to `stock_movements`, `incident_log` or `age_checks` will now fail CI.**
+  That is the point. The way through is a hand-authored migration that re-creates the triggers after
+  the rename, and the error text says so.
+- The parser is regex over SQL text, which is fine for Drizzle's generated shapes and for our own
+  hand-authored ones, and would need revisiting if either changed materially.

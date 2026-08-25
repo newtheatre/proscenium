@@ -22,10 +22,14 @@ export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 
   const { user } = await requireUserSession(event)
-  const scope = await requireFohScope(user)
+  // The BAR shift is the scope, not performanceId (ADR-0019, docs/13 §5): an
+  // unscoped row is one the database will never let anyone remove (ADR-0027).
+  await requireBarScope(user)
   const input = await readValidatedBody(event, bodySchema.parse)
 
-  if (input.performanceId) scopedPerformance(scope, input.performanceId)
+  if (input.performanceId) {
+    scopedPerformance(await requireFohScope(user), input.performanceId)
+  }
 
   if (input.outcome === 'REFUSED' && !input.reason) {
     throw createError({ statusCode: 400, statusMessage: 'A refusal needs a reason for the register.' })

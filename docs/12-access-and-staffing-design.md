@@ -200,7 +200,10 @@ Chosen scope: a full volunteer rota, not just a staffing record.
   every call goes behind one seam, `isEligible(userId, ruleKey)`, so the rota never encodes what a
   rule requires; and the failure direction when the API is unreachable is a choice this repo must
   state, document and test, which it does in
-  [ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md).
+  [ADR-0026](./decisions/0026-eligibility-is-read-from-rehearsal-behind-one-seam.md). Answers are
+  cached for five minutes, and a fail-open answer for 45 seconds, so an outage is answered locally
+  instead of re-asked on every call
+  ([ADR-0041](./decisions/0041-a-fail-open-eligibility-answer-is-cached-too.md)).
 - **Confirmation:** claims either auto-confirm or require FOH-manager confirmation: a per-season
   toggle, because trust levels differ year to year. The manager can always assign, reassign or
   bump directly.
@@ -238,7 +241,9 @@ A **Close the night** action inside Tonight at a glance, visible to tonight's DM
 add, then generates the report, stores it, and emails it. Closing the night also revokes all
 backstage code sessions for the performance (show night screen design §5.1). If nobody closes
 the night by noon the next day, a scheduled job auto-closes with the banner
-*"auto-closed: no duty manager sign-off"*, so gaps are visible rather than silent.
+*"auto-closed: no duty manager sign-off"*, so gaps are visible rather than silent. Like every other
+rota and show-night query it asks `ourBuildingPredicate()` first: a performance at a venue we do not
+run is nobody here's to close, and never had a rota to sign it off ([ADR-0029](./decisions/0029-external-is-a-venue-not-a-strand.md)).
 
 ### 4.2 Recipients
 

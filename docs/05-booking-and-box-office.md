@@ -58,14 +58,19 @@ non-transactional inserts. Differences that matter:
 | | Public `/api/bookings` | Staff `/api/reservations` |
 |---|---|---|
 | Max per ticket type | 10 | 20 |
-| Capacity checked | ✅ | **❌ none** |
+| Max per booking | 10 | no limit |
+| Capacity checked | ✅ | ✅ |
 | Performance status | must be `ON_SALE` | any, including `DRAFT`/`CANCELLED` |
 | Accepts `userId` | - | ✅ |
 | Accepts `staffNotes` | - | ✅ |
 
 The staff path deliberately allows overriding the rules: a manager selling into a cancelled
-performance is doing so knowingly. The missing capacity check is not deliberate; it means the box
-office can oversell the house with no warning.
+performance is doing so knowingly. Capacity is not one of them: both paths call `assertCapacity`,
+and raising the performance's `capacityOverride` is the sanctioned way to oversell.
+
+The public route's ten is the **whole booking**, not each line. The array has no length limit, so a
+per-line cap alone would let one unauthenticated request repeat a ticket type and hold every
+remaining seat. A larger party rings the box office.
 
 After creating the reservation, the UI immediately opens the collection modal so taking payment is
 one continuous flow.

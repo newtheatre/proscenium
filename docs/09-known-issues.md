@@ -20,6 +20,7 @@ Severity is about consequences for the theatre, not code aesthetics:
 | 13 | [Roles are stale until re-login](#roles-are-stale-until-re-login) | P2 | Small |
 | 9 | [Nothing is transactional](#nothing-is-transactional) | P2 | Medium |
 | 10a | [Capacity is still read-then-write](#capacity-is-still-read-then-write) | P2 | Medium |
+| 10b | [A PENDING hold is never reclaimed](#pending-holds-never-expire) | P2 | Medium |
 | 14 | [Customers cannot cancel their own booking](#customers-cannot-cancel) | P2 | Small |
 | 16 | [No shared types](#no-shared-types) | P3 | Medium |
 | 20a | [No tests](#no-tests) | P3 | Medium |
@@ -204,6 +205,23 @@ concurrent bookings can both pass a check that only one should.
 
 At this booking volume that is defensible, and it is written down here rather than pretended away.
 Closing it needs either a conditional insert in a batch or a per-performance lock.
+
+### A PENDING hold is never reclaimed {#pending-holds-never-expire}
+
+A `PENDING` reservation occupies a seat under `countOccupiedSeats` ([ADR-0007](decisions/0007-one-seat-counting-rule.md)),
+and nothing releases one. There is no expiry sweep among the scheduled tasks, and closing the night
+only records the `noShowsReleased` checkbox: it does not cancel anything. A hold therefore sits on
+the seat until a human cancels the booking by hand.
+
+Nobody pays online, so a hold costs whoever placed it nothing. `POST /api/bookings` caps a booking
+at ten seats and the per-IP limit is 30 requests per 600 seconds, which together bound how fast a
+house can be filled but do not stop it: repeated requests still read as sold out to real customers
+until someone notices.
+
+Closing it means a scheduled task that cancels `PENDING` reservations older than some window, which
+is a real decision rather than a tidy-up: the window has to be long enough that a customer who books
+on Monday for Friday is not cancelled under them, and short enough to be worth having. It wants a
+decision record before it is written.
 
 ### Customers cannot cancel
 
