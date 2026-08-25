@@ -105,8 +105,16 @@ POST /api/_hooks/auth/anonymise { userId }  →  { ok: true }
 ```
 
 Ours is `server/api/_hooks/auth/anonymise.post.ts`, delegating to `anonymiseUser`, which rewrites
-the mirror row and scrubs **both** reservation note fields (`customerNotes` and `staffNotes`: a
-staff note saying who collected the tickets identifies someone just as well as a name). It writes
+the mirror row and scrubs every free-text field keyed to the subject: both reservation notes
+(`customerNotes` and `staffNotes`, because a staff note saying who collected the tickets identifies
+someone just as well as a name), `pass_requests.note` and `comp_requests.note`, which the subject
+wrote themselves, and `passes.notes`, which staff wrote about them.
+
+`performance_shifts.notes` is deliberately left alone. The note is attached to the slot when it is
+created, before anyone holds it, so it describes the shift rather than whoever ends up working it.
+Nulling it on an erasure would destroy rota information that is not about the subject.
+
+It writes
 byte-identical values to stage-door's: `deleted-<userId>@anonymised.invalid` and `Deleted user`:
 because the mirror is upserted *from the session*, so a locally-invented placeholder would be
 overwritten by the central one on the next refresh. Deriving the address from the user id also makes

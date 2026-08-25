@@ -15,7 +15,9 @@ export default defineEventHandler(async (event) => {
   const exists = await db.select({ id: schema.users.id })
     .from(schema.users).where(eq(schema.users.id, userId)).get()
   if (!exists) {
-    // Nothing mirrored here: an erasure of someone who never used this app.
+    // Nothing mirrored, but their cookie stays readable for 30 days and
+    // ensureLocalUser's insert branch would write them back (ADR-0014).
+    await tombstoneUser(userId)
     return { ok: true }
   }
 

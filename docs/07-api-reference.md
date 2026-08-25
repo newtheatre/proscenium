@@ -167,7 +167,7 @@ Authenticated by the SHA-256 of this app's `AUTH_SERVICE_TOKEN`, compared consta
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | POST | `/api/_hooks/auth/export` | Service token | This app's contribution to a subject-access bundle |
-| POST | `/api/_hooks/auth/anonymise` | Service token | GDPR erasure: scrub the mirror row and reservation notes. Idempotent |
+| POST | `/api/_hooks/auth/anonymise` | Service token | GDPR erasure: scrub the mirror row and every free text keyed to the subject. Tombstones a user this app never mirrored. Idempotent |
 | POST | `/api/_hooks/auth/last-activity` | Service token | Most recent booking or pass per user, feeding the retention sweep |
 | POST | `/api/_hooks/auth/merge` | Service token | Account merge: re-point every user-referencing row onto the winner, delete the losing mirror row. Idempotent |
 | GET | `/api/_hooks/auth/manifest` | Service token | This app's role and permission declaration, polled by the auth service (stage-door ADR-0017) |

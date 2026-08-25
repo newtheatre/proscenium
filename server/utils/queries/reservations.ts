@@ -78,6 +78,17 @@ const customerTicketsConfig = {
 export const reservationCustomerWith = {
   user: { columns: { id: true, name: true, email: true } },
   performance: {
+    // Allow-listed like every relation beside it: `notes` on this table is
+    // internal production detail, and without a list Drizzle returns it.
+    columns: {
+      id: true,
+      startsAt: true,
+      doorsAt: true,
+      durationMinutes: true,
+      intervalCount: true,
+      intervalMinutes: true,
+      status: true,
+    },
     with: {
       show: { columns: { id: true, title: true, slug: true, posterUrl: true } },
       venue: { columns: { id: true, name: true, address: true } },
