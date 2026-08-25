@@ -12,7 +12,7 @@ const EXTS = ['.ts', '.vue', '.mjs', '.js', '.prisma']
 const BANNED_TAGS = /@(param|returns?|prop|props|emits?|module|route|authenticated|admin-only|method|example|see|throws)\b/
 // Whole files, not only their comments: the rule covers UI copy and docs too.
 // The entity spellings count, or the character stays legal in one encoding.
-const EM_DASH = /\u2014|&mdash;|&#8212;|&#x2014;/i
+const EM_DASH = /\u2014|&(?:mdash|#8212|#x2014);/i
 const EM_DASH_EXTS = ['.ts', '.vue', '.mjs', '.js', '.md', '.yml', '.yaml', '.sql', '.sh', '.json']
 const HISTORY = /\b(used to|originally|an earlier version|previously|it used to|we used to|this used to|no longer needed|before this)\b/i
 // Thousands-separated counts and precise percentages rot; years and ADR
