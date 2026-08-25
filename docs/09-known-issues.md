@@ -408,3 +408,25 @@ is the only place the pre-0050 value survives.
 every movement means what it means in the size that was current when it was written (ADR-0035). The
 supported repair is to retire the product and add it again at the right size, then take a stocktake
 against the new one. Do not edit the historic movements; the ledger is append-only.
+
+### A price mistyped today cannot be corrected until tomorrow {#price-typo-same-day}
+
+**P3 · `server/api/admin/bar/products/[id]/prices.post.ts`.** `bar_prices` holds one row per
+product per date and the route is append only, so a second POST for a date already in the history
+is refused with `409`. That is what stops a repeat POST rewriting what a price was and who set it,
+which is the only price audit trail the system has. The cost is that the current price is the
+latest row dated on or before today, so a figure keyed in wrongly this morning cannot be beaten by
+another row today: dating one from tomorrow fixes tomorrow and leaves the bar on the wrong figure
+tonight.
+
+Until somebody needs it enough to build the alternative, the workarounds are both blunt: set the
+product `HIDDEN` for the rest of the night and ring the drink up as another product, or retire it
+and add it again at the right price, which is the same repair `container_ml` already uses. Both
+keep the history honest.
+
+Closing it properly means letting a date hold several rows and having the latest `created_at` win.
+That is not a drive-by change: `bar_prices_product_from_unique` has to go, and both readers in
+`server/utils/barPricing.ts` order by `effective_from` alone, so without a `created_at` tiebreaker
+in each of them the till would resolve either row and could charge either price. It needs a
+decision record, because "one row per date" is the rule the schema, the route and `docs/13` §3 all
+state today.

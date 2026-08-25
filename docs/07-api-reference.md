@@ -2247,7 +2247,12 @@ offers no pass until the box office has been paid.
   price row and stock movement exactly as it was.
 - **A price is added, never edited.** `POST .../prices` writes a new dated row; a future
   `effectiveFrom` schedules a change and does **not** affect what the till charges today. The
-  history is the audit trail, so there is no endpoint that updates a price row.
+  history is the audit trail, so there is no endpoint that updates a price row. A second price for
+  a date already in the history is `409 A price already starts on that date. Date the correction
+  from another day.`, decided by the unique index rather than by a prior read, so a repeated POST
+  cannot rewrite what a price was or who set it. **The cost is that a figure mistyped today cannot
+  be corrected until tomorrow**, because the current price is the latest row dated on or before
+  today: see [known issues](./09-known-issues.md#price-typo-same-day) for what to do instead.
 - **Editing a discount is not retrospective.** A transaction stores the percentage it was rung up
   at, so changing one here only affects future sales.
 

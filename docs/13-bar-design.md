@@ -475,7 +475,9 @@ a term.
   stocktakes, voids, exports, the Challenge 25 register export. `MANAGER` and `ADMIN` carry it too.
   Permission keys here are dotted and role-mapped in the manifest; this app has no ad-hoc ability
   strings.
-- Every write records the acting user. Voids and price changes are audit-logged. This module adds
+- Every write records the acting user. There is no separate audit log: a void carries who did it
+  and why on the transaction, and a price change is a new dated row rather than an edit, so the
+  price history is the record. Neither can be rewritten in place. This module adds
   more user-referencing columns than the rest of the app put together, and every one of them joins
   the estate merge and erasure hooks on the commit that creates it
   ([ADR-0025](./decisions/0025-every-user-reference-joins-the-estate-hooks.md)).
