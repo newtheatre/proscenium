@@ -108,9 +108,17 @@ exists.
 | Performances, shows, venues | `shared/utils/trainingScenario.ts` |
 | Bookings, references, QR payloads, customer names | `shared/utils/trainingScenario.ts` |
 
-The scenario is a frozen object in the shapes the real endpoints return. **No fixture row is ever
-inserted into `performances`, `reservations`, `users` or anything else**, so there is no seeded data
-to leak into a real screen, and nothing to clean up.
+The scenario is an object in the shapes the real endpoints return, and the guarantee about it is that
+**no fixture row is ever inserted into `performances`, `reservations`, `users` or anything else**, so
+there is no seeded data to leak into a real screen, and nothing to clean up.
+
+Its **dates are not constant**, which is the one thing about it that moves. Each fixture performance
+carries a curtain time and a number of nights ahead, and is dated against tonight's show night when it
+is read, so a trainee never sees a booking for a year that has been and gone
+([ADR-0045](./decisions/0045-the-practice-fixture-dates-itself-against-tonight.md)). Whether one is
+tonight's is **decided** by the same `showNightDate` plus `validityStart`/`validityEnd` window the
+real till and door scope themselves with, never asserted by the fixture, so the sandbox's verdict
+cannot drift from the till's.
 
 Its customers are obviously invented in the UI, but its booking references match the real
 `^[A-Z0-9]{6}$` shape so the scanner behaves exactly as it will on the night. That is safe because
@@ -118,7 +126,15 @@ training lookups only ever search the fixture: a real reference typed into a san
 
 The scenario should include the cases worth rehearsing rather than a tidy happy path: an unpaid
 booking to send to the counter, a paid one, a party of four, a booking already admitted, a customer
-with an access symbol, and a reference that does not exist.
+with an access symbol, an advance booking for a night that is not tonight, and a reference that does
+not exist.
+
+The advance booking is the reason there are three fixture performances and not two. Two run tonight;
+`training-perf-3` runs a week out and `TRAIN4` sits on it. The till finds it and flags it amber,
+because paying in advance is a designed case and the real till is deliberately not night-scoped
+([13 §2.2](./13-bar-design.md)). The door does **not** find it, because the real door lookup searches
+tonight's performances only ([ADR-0019](./decisions/0019-the-rota-scopes-the-front-of-house-role.md)),
+and the sandbox is scoped the same way.
 
 ## 5. The three sandboxes
 
@@ -175,15 +191,23 @@ any access symbols. All of it is derived from the fixture through `bookingStandi
 (`shared/utils/bookingStanding.ts`, the same function the door computes with), so a card cannot print
 an outcome the scanner disagrees with, and a change to the scenario reaches the paper.
 
+**No card carries a calendar date.** The fixture's nights move with the clock (ADR-0045), and a sheet
+printed ahead of a lesson is kept and reused, so a printed date would be wrong within the week. A card
+says "Tonight" or "Another night" and the curtain time, both of which stay true.
+
 The QR encodes the **bare reference**, `TRAIN1`, which is the string the scanner matches on after
 `refFrom` unwraps it. It is deliberately not the `/t/<ref>?t=` URL a real ticket carries: a practice
 card must resolve to nothing, and a phone camera pointed at one should offer no link to follow. No
 generated reference can collide with a fixture one, because the reference alphabet excludes `I`.
 
-Two cards read alike. `TRAIN2` is meant to be the already-admitted rescan, but the door screen has no
-admit action and the fixture has no admitted-at field, so it is the same paid booking as `TRAIN4`
-under another name. The sheet says so rather than inventing a difference: a rescan is practised by
-scanning the same card twice, and the verdict must not change.
+A rescan needs no second card. The door screen has no admit action and the fixture has no admitted-at
+field, so there is no second state for one to hold: a rescan is practised by scanning the same card
+twice, and the verdict must not change.
+
+`TRAIN4` is deliberately not a door card at all. It is the advance booking on the performance a week
+out, so the door finds nothing for it and a trainee meets a reference that looks real and resolves to
+nothing, while the till finds it and flags it amber. The sheet says which it is, on the card and in
+its heading, rather than leaving a trainer to discover that one of their cards will not scan.
 
 ## 6. Domain model
 
@@ -229,8 +253,10 @@ one.
 | GET | `/api/training/foh/lookup` | The fixture only, never the database |
 | GET/POST | `/api/training/foh/age-checks` | The run's own entries, an `AGE_CHECK` event |
 
-Every one of them requires an active run whose `target_key` covers the surface, so an open `bar-till`
-run cannot reach the door sandbox.
+Every one of them requires `foh.work` **and** an active run whose `target_key` covers the surface. The
+role decides whether there is a sandbox at all, the run decides which one, and both are asked on every
+request: a run row would otherwise outlive a revoked role by as long as rehearsal's expiry
+([ADR-0044](./decisions/0044-a-practice-run-is-not-a-substitute-for-the-role.md)).
 
 `server/middleware/trainingMode.ts` completes it from the other side: while a run is live,
 `/api/bar/**` and `/api/foh/**` are refused, **reads included**. The only exceptions are a named
@@ -285,6 +311,13 @@ that ([ADR-0034](./decisions/0034-an-open-sandbox-closes-only-on-a-definitive-an
 sandbox still needs a positive answer, so ADR-0033's direction is unchanged.
 
 Plus a daily task that deletes ended and expired runs with their events, so nothing accumulates.
+
+**Switching sandbox is not a fourth path, and it is one write.** Opening a different target ends the
+old run, deletes its events and inserts the new run in a single `db.batch`, so a trainee moving from
+the till to Challenge 25 cannot land with no run at all and their old sandbox gone. D1 rejects
+`BEGIN`, so a batch is the only atomic write there is here. Every refusal, the closed window and a
+lapsed expiry alike, is answered before that batch runs: a switch this app declines must leave the
+sandbox the trainee already had exactly where it was.
 
 The upstream path is why the seam is uncached and why rehearsal serves the endpoint `no-store`. A
 cached yes anywhere between the two apps would keep a sandbox open after the lesson finished, which

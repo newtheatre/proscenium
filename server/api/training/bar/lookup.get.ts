@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { findTrainingBookings, trainingPerformance } from '~~/shared/utils/trainingScenario'
+import { findTrainingBookings } from '~~/shared/utils/trainingScenario'
 
 const querySchema = z.object({
   q: z.string().trim().min(2).max(100),
@@ -15,9 +15,13 @@ export default defineEventHandler(async (event) => {
   const matches = findTrainingBookings(q).filter(booking => booking.status !== 'CANCELLED')
   await recordEvent(run.id, 'LOOKUP', { query: q, matches: matches.length })
 
+  // Not night-scoped, like the real till: paying in advance for next week is a
+  // designed case (docs/13 §2.2), and one fixture booking is exactly that.
+  const dated = new Map(scenarioTonight().performances.map(performance => [performance.id, performance]))
+
   return matches.map((booking) => {
     const standing = bookingStanding(booking)
-    const performance = trainingPerformance(booking.performanceId)
+    const performance = dated.get(booking.performanceId)
 
     return {
       id: booking.id,
@@ -29,7 +33,9 @@ export default defineEventHandler(async (event) => {
         showTitle: performance?.showTitle ?? 'Practice',
         startsAt: performance?.startsAt ?? new Date().toISOString(),
         venueName: performance?.venueName ?? 'Practice House',
-        isTonight: true,
+        // An unknown performance flags rather than asserts: the amber card is
+        // the safe answer, and it is still payable.
+        isTonight: performance?.isTonight ?? false,
       },
     }
   })

@@ -36,6 +36,7 @@ export default defineEventHandler(async (event) => {
     reason: input.outcome === 'REFUSED' ? input.reason ?? null : null,
     productDescription: input.outcome === 'REFUSED' ? input.productDescription ?? null : null,
     description: input.outcome === 'REFUSED' ? input.description ?? null : null,
+    notes: input.outcome === 'REFUSED' ? input.notes ?? null : null,
     supersedesId: input.supersedesId ?? null,
   })
 

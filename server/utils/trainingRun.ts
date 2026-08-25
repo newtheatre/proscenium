@@ -7,10 +7,12 @@ import { db, schema } from '@nuxthub/db'
 import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import { practiceWindow, type PracticeTarget } from './eligibility'
-import type { AbilityUser } from '~~/shared/utils/abilities'
+import { type AbilityUser, workFoh } from '~~/shared/utils/abilities'
+import { type DatedPerformance, trainingPerformances } from '~~/shared/utils/trainingScenario'
 
 export type TrainingRun = typeof schema.trainingRuns.$inferSelect
 export type TrainingEventKind = typeof schema.TRAINING_EVENT_KINDS[number]
+export type TrainingEndReason = typeof schema.TRAINING_END_REASONS[number]
 
 /** Which sandbox each screen belongs to, so one run cannot open another. */
 export const SURFACE_TARGET = {
@@ -37,10 +39,15 @@ export async function activeRun(userId: string, now: Date = new Date()): Promise
 }
 
 /**
- * Guard for every `/api/training/**` route. Refuses unless a run is open for
- * this exact surface, so a till sandbox cannot reach the door.
+ * Guard for every `/api/training/**` route. The role says whether there is a
+ * sandbox at all; the run says which one (ADR-0044).
  */
 export async function requireRun(event: H3Event, target: PracticeTarget): Promise<{ run: TrainingRun, user: AbilityUser }> {
+  // First, and not the run alone: a run row outlives a revoked role (ADR-0044).
+  await authorize(event, workFoh)
+
+  // Deliberately the raw session user: foh/lookup branches on isStaff(user) to
+  // mirror the real lookup, which branches on this same user.
   const { user } = await requireUserSession(event)
   const run = await activeRun(user.id)
 
@@ -82,17 +89,15 @@ export async function startRun(user: AbilityUser, target: PracticeTarget): Promi
     })
   }
 
-  // One sandbox at a time: leaving the old one open would leave a banner
-  // pointing at a screen they are no longer on.
-  if (existing && existing.targetKey !== target) await endRun(existing.id, 'ENDED')
-
+  // Every refusal sits above this line: nothing may throw once the old sandbox
+  // and its events are on their way out.
   const now = new Date()
   const expiresAt = answer.expiresAt ? new Date(answer.expiresAt) : null
   if (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt <= now) {
     throw createError({ statusCode: 403, statusMessage: 'That practice window has closed.' })
   }
 
-  const [run] = await db.insert(schema.trainingRuns).values({
+  const opening = db.insert(schema.trainingRuns).values({
     userId: user.id,
     targetKey: target,
     trainingSessionId: answer.sessionId,
@@ -100,17 +105,33 @@ export async function startRun(user: AbilityUser, target: PracticeTarget): Promi
     expiresAt,
   }).returning()
 
+  // One sandbox at a time, and in one batch: D1 runs a batch as a single
+  // transaction, so a switch cannot end the old run without opening the new one.
+  if (existing && existing.targetKey !== target) {
+    const [, , opened] = await db.batch([...endRunStatements(existing.id, 'ENDED'), opening])
+    return opened[0]!
+  }
+
+  const [run] = await opening
   return run!
 }
 
 /** End a run and delete what it did, together (docs/14 §9). */
-export async function endRun(runId: string, reason: 'ENDED' | 'EXPIRED' | 'PURGED'): Promise<void> {
-  await db.batch([
+export async function endRun(runId: string, reason: TrainingEndReason): Promise<void> {
+  await db.batch(endRunStatements(runId, reason))
+}
+
+/**
+ * Ending a run, as statements a switch can fold into the batch that opens the
+ * next one. The isNull guard keeps it idempotent; it arbitrates nothing.
+ */
+function endRunStatements(runId: string, reason: TrainingEndReason) {
+  return [
     db.update(schema.trainingRuns)
       .set({ endedAt: new Date(), endedReason: reason })
       .where(and(eq(schema.trainingRuns.id, runId), isNull(schema.trainingRuns.endedAt))),
     db.delete(schema.trainingRunEvents).where(eq(schema.trainingRunEvents.runId, runId)),
-  ])
+  ] as const
 }
 
 /** The one write a training request makes, besides the run itself. */
@@ -137,6 +158,18 @@ export async function eventsFor(runId: string) {
     .from(schema.trainingRunEvents)
     .where(eq(schema.trainingRunEvents.runId, runId))
     .orderBy(asc(schema.trainingRunEvents.at))
+}
+
+/**
+ * The fixture dated against tonight, by the window the real till and door scope
+ * themselves with, so a sandbox cannot call a night differently (ADR-0045).
+ */
+export function scenarioTonight(now: Date = new Date()): { night: string, performances: DatedPerformance[] } {
+  const night = showNightDate(now)
+  return {
+    night,
+    performances: trainingPerformances(night, { from: validityStart(night), to: validityEnd(night) }),
+  }
 }
 
 /**

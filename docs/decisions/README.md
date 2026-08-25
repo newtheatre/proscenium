@@ -57,6 +57,8 @@ ADR; the ADR carries the reasoning and the history. See [CONTRIBUTING.md](../../
 | [0041](0041-a-fail-open-eligibility-answer-is-cached-too.md) | A fail-open eligibility answer is cached too, briefly | Accepted |
 | [0042](0042-a-rebuild-also-drops-what-the-snapshot-cannot-see.md) | A table rebuild also drops what the snapshot cannot see | Accepted |
 | [0043](0043-practice-tickets-print-ahead-of-the-lesson.md) | Practice tickets are printed ahead of the lesson, and every card says so | Accepted |
+| [0044](0044-a-practice-run-is-not-a-substitute-for-the-role.md) | A practice run is not a substitute for the role | Accepted |
+| [0045](0045-the-practice-fixture-dates-itself-against-tonight.md) | The practice fixture dates itself against tonight | Accepted |
 
 ## Template
 
