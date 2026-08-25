@@ -7,7 +7,9 @@ export default defineEventHandler(async (event) => {
   await authorize(event, workFoh)
 
   const { user } = await requireUserSession(event)
-  const scope = await requireFohScope(user)
+  // The register carries refusal descriptions and notes, so reading it needs
+  // the same BAR shift that writing it does (ADR-0019, docs/13 §5).
+  const night = await requireBarScope(user)
 
   const rows = await db.select({
     id: schema.ageChecks.id,
@@ -24,13 +26,13 @@ export default defineEventHandler(async (event) => {
     .innerJoin(schema.users, eq(schema.ageChecks.checkedByUserId, schema.users.id))
     .where(and(
       // The night runs to 04:00, so a refusal logged at 00:20 is still tonight's.
-      gte(schema.ageChecks.checkedAt, showNightWindow(scope.night).from),
-      lte(schema.ageChecks.checkedAt, showNightWindow(scope.night).to),
+      gte(schema.ageChecks.checkedAt, showNightWindow(night).from),
+      lte(schema.ageChecks.checkedAt, showNightWindow(night).to),
     ))
     .orderBy(desc(schema.ageChecks.checkedAt))
 
   return {
-    night: scope.night,
+    night,
     accepted: rows.filter(r => r.outcome === 'ACCEPTED').length,
     refused: rows.filter(r => r.outcome === 'REFUSED').length,
     // Only refusals carry detail, so only they are worth listing.

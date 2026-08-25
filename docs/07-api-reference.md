@@ -373,8 +373,8 @@ and no password-reset route here.
 | GET | `/api/foh/emergency` | `foh.work` (`workFoh`) | The venue's emergency card for a performance |
 | GET | `/api/foh/contacts` | `foh.work` (`workFoh`) | Who is on tonight, and the numbers to call |
 | GET | `/api/foh/incidents` | `foh.work` (`workFoh`) | The incident log for a performance |
-| GET | `/api/foh/age-checks` | `foh.work` (`workFoh`) | Tonight's Challenge 25 register and its two counters |
-| POST | `/api/foh/age-checks` | `foh.work` (`workFoh`) | Record an ID check. **There is no update or delete** |
+| GET | `/api/foh/age-checks` | `foh.work` + a `BAR` shift | Tonight's Challenge 25 register and its two counters |
+| POST | `/api/foh/age-checks` | `foh.work` + a `BAR` shift | Record an ID check. **There is no update or delete** |
 | GET | `/api/bar/tonight` | `foh.work` + a `BAR` shift | The till's opening state: session, products, prices, discounts, training |
 | GET | `/api/bar/lookup` | `foh.work` + a `BAR` shift | Find a booking to take payment for. **Not night-scoped** |
 | POST | `/api/bar/sessions` | `foh.work` + a `BAR` shift | Open the bar for tonight |
