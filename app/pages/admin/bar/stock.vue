@@ -12,7 +12,7 @@ definePageMeta({
 interface StockRow {
   id: string
   name: string
-  unit: string
+  unit: ProductUnit
   containerMl: number | null
   stockOnly: boolean
   stockProductId: string | null
