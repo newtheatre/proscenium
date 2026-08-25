@@ -59,6 +59,7 @@ ADR; the ADR carries the reasoning and the history. See [CONTRIBUTING.md](../../
 | [0043](0043-practice-tickets-print-ahead-of-the-lesson.md) | Practice tickets are printed ahead of the lesson, and every card says so | Accepted |
 | [0044](0044-a-practice-run-is-not-a-substitute-for-the-role.md) | A practice run is not a substitute for the role | Accepted |
 | [0045](0045-the-practice-fixture-dates-itself-against-tonight.md) | The practice fixture dates itself against tonight | Accepted |
+| [0046](0046-a-relational-query-rewrites-every-column-to-its-root-table.md) | A relational query rewrites every column to its root table | Accepted |
 
 ## Template
 

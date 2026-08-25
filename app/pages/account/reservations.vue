@@ -5,10 +5,27 @@ definePageMeta({
   middleware: 'auth',
 })
 
-const { data, status } = await useFetch('/api/bookings/my', {
-  key: 'my-bookings',
-  default: () => ({ upcoming: [], past: [] }),
+/** Small: an account page is read at a glance, not scrolled through. */
+const PAGE_SIZE = 10
+
+const upcomingPage = ref(1)
+const pastPage = ref(1)
+
+const { data: upcomingData, status } = await useFetch('/api/bookings/my', {
+  key: 'my-bookings-upcoming',
+  query: { upcoming: 'true', page: upcomingPage, limit: PAGE_SIZE },
 })
+
+const { data: pastData } = await useFetch('/api/bookings/my', {
+  key: 'my-bookings-past',
+  query: { upcoming: 'false', page: pastPage, limit: PAGE_SIZE },
+})
+
+/** Always an array: a null binding is the render-loop trap (ADR-0012). */
+const upcoming = computed(() => upcomingData.value?.rows ?? [])
+const past = computed(() => pastData.value?.rows ?? [])
+const upcomingTotal = computed(() => upcomingData.value?.total ?? 0)
+const pastTotal = computed(() => pastData.value?.total ?? 0)
 
 // A pass is not a booking, so it is its own page. This is the signpost to it,
 // because this is where a holder comes looking.
@@ -133,10 +150,10 @@ function getStatusLabel(status: string) {
         description="Shows you have tickets for."
         variant="subtle"
       >
-        <template v-if="data.upcoming.length > 0">
+        <template v-if="upcoming.length > 0">
           <div class="space-y-3">
             <UCard
-              v-for="booking in data.upcoming"
+              v-for="booking in upcoming"
               :key="booking.id"
             >
               <div class="flex items-start justify-between gap-4">
@@ -193,6 +210,13 @@ function getStatusLabel(status: string) {
               </div>
             </UCard>
           </div>
+          <UPagination
+            v-if="upcomingTotal > PAGE_SIZE"
+            v-model:page="upcomingPage"
+            :items-per-page="PAGE_SIZE"
+            :total="upcomingTotal"
+            class="mt-4 flex justify-center"
+          />
         </template>
 
         <UEmpty
@@ -217,10 +241,10 @@ function getStatusLabel(status: string) {
         description="Shows you've previously attended."
         variant="subtle"
       >
-        <template v-if="data.past.length > 0">
+        <template v-if="past.length > 0">
           <div class="space-y-3">
             <UCard
-              v-for="booking in data.past"
+              v-for="booking in past"
               :key="booking.id"
               class="opacity-75"
             >
@@ -262,6 +286,13 @@ function getStatusLabel(status: string) {
               </div>
             </UCard>
           </div>
+          <UPagination
+            v-if="pastTotal > PAGE_SIZE"
+            v-model:page="pastPage"
+            :items-per-page="PAGE_SIZE"
+            :total="pastTotal"
+            class="mt-4 flex justify-center"
+          />
         </template>
 
         <UEmpty

@@ -96,7 +96,9 @@ Status codes used across the codebase:
 
 Two independent mechanisms are in play.
 
-**`requireUserSession(event)`**: from `nuxt-auth-utils`. Throws **401 Unauthorized** when there is no session cookie. Used by exactly one handler (`GET /api/bookings/my`).
+**`requireUserSession(event)`**: from `nuxt-auth-utils`. Throws **401 Unauthorized** when there is no session cookie. Used by handlers that need to know who is asking and then check the rota or the till rather than a role.
+
+**`requireSessionUser(event)`** (`server/utils/session.ts`): the same 401, but through `sessionUserForAuthorization`, so the handler gets a user whose stale roles have already been stripped ([ADR-0008](decisions/0008-roles-go-stale-identity-does-not.md)). `GET /api/bookings/my` uses this one.
 
 **`authorize(event, ability, ...args)`**: from `nuxt-authorization`. Resolves the session user via the Nitro plugin in `server/plugins/authorization-resolver.ts`, then runs the ability. Abilities live in `shared/utils/abilities/` and are re-exported from the barrel `shared/utils/abilities/index.ts`:
 
@@ -196,7 +198,7 @@ is a separate, incremental job, one domain file at a time.
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | POST | `/api/bookings` | Public | Public booking flow: capacity-checked, sends a confirmation email |
-| GET | `/api/bookings/my` | Logged in | The current user's bookings, split into upcoming and past |
+| GET | `/api/bookings/my` | Logged in | One page of the current user's bookings, upcoming or past |
 | GET | `/api/passes/mine` | Signed in | The holder's own passes, what they cover and what has been used |
 | POST | `/api/passes/mine/redeem` | Signed in, own pass | Book a seat on your own pass |
 | GET | `/api/pass-types/on-sale` | Public | What a member may ask for |
@@ -439,8 +441,40 @@ and no password-reset route here.
 | GET | `/api/account/access` | Any logged-in user | Your own access profile, or null |
 | PUT | `/api/account/access` | Any logged-in user | Request verification, or update what you asked for |
 | DELETE | `/api/account/access` | Any logged-in user | Remove it. No questions asked |
-| GET | `/api/admin/access` | `access.verify` (`verifyAccess`) | Profiles to verify, waiting ones first |
+| GET | `/api/admin/access` | `access.verify` (`verifyAccess`) | One page of profiles, waiting or already recorded |
 | PUT | `/api/admin/access/:userId` | `access.verify` (`verifyAccess`) | Record the conclusion of a verification conversation |
+
+#### `GET /api/admin/access`
+
+**Source** `server/api/admin/access/index.get.ts` · **Auth** `authorize(event, verifyAccess)`: `access.verify`
+
+**Query**
+
+| Name | Type | Notes |
+| --- | --- | --- |
+| `page` | int ≥ 1, default `1` | |
+| `limit` | int 1..100, default `25` | |
+| `status` | `'PENDING'` or `'SETTLED'`, default `'PENDING'` | The two lists the verifier works from |
+| `q` | string, optional | Matches the person's **name or email** only |
+
+**Response** `200`: the `Paginated<T>` envelope ([ADR-0005](decisions/0005-paginate-list-endpoints-in-sql.md)).
+`WITHDRAWN` profiles are excluded from both lists: a tombstone carries nothing and is not the
+verifier's to reinstate. `PENDING` sorts oldest first, because the queue is worked from the top;
+`SETTLED` sorts most recently recorded first.
+
+**`q` never searches the notes.** `requesterNote` and `fohNote` are the Article 9 free text
+([ADR-0022](./decisions/0022-access-needs-are-special-category-data.md)), and a search term that
+matched them would let someone fish for a condition. The search is over `users.name` and
+`users.email`, which identify the row to a human, and nothing else.
+
+**The two lists carry different columns.** `PENDING` rows carry everything the verification
+conversation needs: the eight need flags, `companions`, `accessCardNumber`, `requesterNote`,
+`fohNote`, `consentFohAt`, `email`, `verifiedAt`, `expiresAt`. `SETTLED` rows carry only what the
+recorded list displays: `userId`, `name`, `status`, the need flags, `companions`, `expiresAt` and
+`updatedAt`. A recorded profile is nobody's outstanding work, so its free text is not sent to a
+screen that never shows it.
+
+---
 
 #### `PUT /api/admin/access/:userId`
 
@@ -619,22 +653,27 @@ One `tickets` row is created per seat: a line of `quantity: 3` yields three rows
 
 #### `GET /api/bookings/my`
 
-**Source** `server/api/bookings/my.get.ts` · **Auth** `requireUserSession`: any logged-in user, no role needed
+**Source** `server/api/bookings/my.get.ts` · **Auth** `requireSessionUser`: any logged-in user, no role needed
 
-**Query** none.
+**Query**
 
-**Response** `200`
+| Name | Type | Notes |
+| --- | --- | --- |
+| `page` | int ≥ 1, default `1` | |
+| `limit` | int 1..100, default `25` | |
+| `upcoming` | `'true'` or `'false'`, default `'true'` | Which half to page |
+
+**Response** `200`: the `Paginated<T>` envelope ([ADR-0005](decisions/0005-paginate-list-endpoints-in-sql.md)).
 
 ```jsonc
-{
-  "upcoming": [ /* reservations, newest-created first */ ],
-  "past":     [ /* … */ ]
-}
+{ "rows": [ /* reservations */ ], "total": 42, "page": 1, "limit": 25 }
 ```
 
-Each entry uses the shared `reservationDetailWith` shape (`server/utils/queries/reservations.ts`): the reservation columns plus `user` (id, name, email, verified, never the password hash), `performance` with nested `show` (id, title, slug) and `venue` (id, name), and `tickets` ordered by `createdAt` with `ticketType` (id, name, description).
+A booking is **upcoming** when the performance starts in the future *and* the status is not `CANCELLED` or `NO_SHOW`; everything else is **past**. The two predicates are exact complements, so no booking is in both halves or in neither. `upcoming=true` sorts by the performance's `startsAt` ascending, which is when the customer has to turn up rather than when they booked; `upcoming=false` sorts by it descending.
 
-A booking is **upcoming** when the performance starts in the future *and* the status is not `CANCELLED` or `NO_SHOW`; everything else is **past**. Note that `staffNotes` is included in this customer-facing payload.
+Each row is the **customer** shape, allow-listed by `reservationCustomerColumns` and `reservationCustomerWith` (`server/utils/queries/reservations.ts`): the reservation columns plus `user` (id, name, email), an allow-listed `performance` (so the internal `notes` column is not returned) with nested `show` (id, title, slug, posterUrl) and `venue` (id, name, address), and `tickets` ordered by `createdAt` with `ticketType` (id, name, description). It does **not** include `staffNotes` or `legacyRef`.
+
+The upcoming/past split is a subquery over `performances`, never a bound list of ids, so the statement's parameter count does not grow with the bookings it covers ([ADR-0006](decisions/0006-d1-bound-parameter-limit.md)).
 
 **Errors** `401` when there is no session.
 
@@ -2024,12 +2063,21 @@ allow-list is name and id only.
 }
 ```
 
+**Both bounds default, and the window is capped at 120 days.** `from` omitted is today in
+Europe/London; `to` omitted is `from` plus 60 days. Both figures match `/api/shifts/mine`, which
+defaults to 60 days and caps at 120. A window wider than the cap is `400`, so `?from=2016-01-01` is
+refused rather than reading a decade of stamped shifts. A bare `GET /api/shifts` still works and
+still answers.
+
 Bounded by the performance's own `startsAt`, so the bound-parameter count does not grow with the
 number of rows covered ([ADR-0006](./decisions/0006-d1-bound-parameter-limit.md)). Cancelled
 performances are excluded.
 
 **Response** `200`: a bare array of shifts, each carrying its performance, show title and venue
-name. Not paginated: the window bounds it.
+name. Not paginated: the window bounds it, which is now true of every request rather than only of
+the ones that passed a window.
+
+**Errors** `400 Ask for at most 120 days of rota at a time.`
 
 ---
 
