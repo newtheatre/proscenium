@@ -171,7 +171,8 @@ front-of-house side of it are [11-show-night-screen-design](./11-show-night-scre
 An earlier revision of this section reported that every link in these emails was broken, from
 `baseUrl` against `baseURL`, and that the booking link 404'd because it used the reference where the
 endpoint wanted a nanoid. **Both were fixed** and are recorded in
-[09-known-issues](./09-known-issues.md) under Fixed, items 1 and 2.
+[09-known-issues](./09-known-issues.md) under Fixed, as "All emailed links are broken" and
+"Booking confirmation links 404".
 
 **Customers cannot cancel their own booking.** `updateReservation` is staff-only. The schema and UI
 both support `cancelledBy: 'CUSTOMER'`, but only staff can set it, on the customer's behalf. The
