@@ -1,6 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import type { BatchItem } from 'drizzle-orm/batch'
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNull, notInArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { workFoh } from '~~/shared/utils/abilities'
 
@@ -19,7 +19,8 @@ const bodySchema = z.object({
     })).max(8).optional().default([]),
   })).max(40).optional().default([]),
   /** Reservations to settle. The till pays what is owed; it never edits. */
-  reservationIds: z.array(z.string().trim().min(1)).max(10).optional().default([]),
+  reservationIds: z.array(z.string().trim().min(1)).max(10).optional().default([])
+    .refine(ids => new Set(ids).size === ids.length, 'That booking is in the basket twice.'),
   discountId: z.string().trim().min(1).nullable().optional(),
   /** The gold figure the screen showed. Checked, not trusted (ADR-0023). */
   expectedTotalPence: z.coerce.number().int().min(0),
@@ -74,7 +75,9 @@ export default defineEventHandler(async (event) => {
     const reservation = byId.get(reservationId)
 
     if (!reservation) throw createError({ statusCode: 404, statusMessage: 'That booking no longer exists.' })
-    if (isCollected(reservation.status)) {
+    // The backstop the desk path already has: no route should reach here with
+    // a payment recorded (reservations/[id]/index.put.ts).
+    if (isCollected(reservation.status) || await hasTicketPayment(reservationId)) {
       throw createError({ statusCode: 409, statusMessage: 'That booking has already been paid. Reload the till.' })
     }
 
@@ -89,9 +92,13 @@ export default defineEventHandler(async (event) => {
     if (!owed) throw createError({ statusCode: 404, statusMessage: 'That booking no longer exists.' })
 
     ticketLines.push({ reservationId, performanceId: owed.performanceId, amountPence: owed.amountPence })
+    // The guard lives in the predicate too, not only in the read above.
     collections.push(
       db.update(schema.reservations).set({ status: 'COLLECTED' })
-        .where(eq(schema.reservations.id, reservationId)),
+        .where(and(
+          eq(schema.reservations.id, reservationId),
+          notInArray(schema.reservations.status, [...COLLECTED_STATUSES]),
+        )),
     )
   }
 
