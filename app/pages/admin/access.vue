@@ -11,12 +11,11 @@ definePageMeta({
   title: 'Access',
 })
 
-interface Profile {
+/** What the recorded list renders. The notes are not sent to it (ADR-0022). */
+interface SettledProfile {
   userId: string
   name: string
-  email: string
   status: 'PENDING' | 'VERIFIED' | 'EXPIRED' | 'DECLINED'
-  accessCardNumber: string | null
   difficultyStanding: boolean
   difficultyWithCrowds: boolean
   levelAccess: boolean
@@ -26,10 +25,16 @@ interface Profile {
   audibleInformation: boolean
   miscellaneous: boolean
   companions: number
+  expiresAt: string | null
+}
+
+/** A profile still waiting, which is the only one carrying the free text. */
+interface Profile extends SettledProfile {
+  email: string
+  accessCardNumber: string | null
   requesterNote: string | null
   fohNote: string | null
   consentFohAt: string | null
-  expiresAt: string | null
 }
 
 /** Same difficulty framing as the requester sees, so they read as one thing. */
@@ -48,18 +53,45 @@ const allowed = computed(() => (user.value ? canVerifyAccess(user.value) : false
 
 const requestFetch = useRequestFetch()
 const toast = useToast()
-const { data, refresh, error } = await useAsyncData('admin-access', () =>
-  requestFetch<Profile[]>('/api/admin/access'), { default: () => [] })
 
-const all = computed<Profile[]>(() => data.value ?? [])
-/** Split so recording something clears it out of the queue. */
-const waiting = computed(() => all.value.filter(p => p.status === 'PENDING'))
-const settled = computed(() => all.value.filter(p => p.status !== 'PENDING'))
+const PAGE_SIZE = 25
+const waitingPage = ref(1)
+const settledPage = ref(1)
+
+const { data: waitingData, refresh, error } = await useAsyncData(
+  'admin-access-waiting',
+  () => requestFetch<Paginated<Profile>>('/api/admin/access', {
+    query: { status: 'PENDING', page: waitingPage.value, limit: PAGE_SIZE },
+  }),
+  { watch: [waitingPage] },
+)
+
+// Fetched only when someone asks for it: a recorded profile is nobody's
+// outstanding work, and it is still special category data (ADR-0022).
+const { data: settledData, refresh: refreshSettled, status: settledStatus } = await useAsyncData(
+  'admin-access-settled',
+  () => requestFetch<Paginated<SettledProfile>>('/api/admin/access', {
+    query: { status: 'SETTLED', page: settledPage.value, limit: PAGE_SIZE },
+  }),
+  { immediate: false, watch: [settledPage] },
+)
+
+/** Always an array: a null binding is the render-loop trap (ADR-0012). */
+const waiting = computed<Profile[]>(() => waitingData.value?.rows ?? [])
+const settled = computed<SettledProfile[]>(() => settledData.value?.rows ?? [])
+const waitingTotal = computed(() => waitingData.value?.total ?? 0)
+const settledTotal = computed(() => settledData.value?.total ?? 0)
+
 const showSettled = ref(false)
 const drafts = ref<Record<string, Record<string, unknown>>>({})
 
+async function toggleSettled() {
+  showSettled.value = !showSettled.value
+  if (showSettled.value && settledStatus.value === 'idle') await refreshSettled()
+}
+
 watchEffect(() => {
-  for (const profile of all.value) {
+  for (const profile of waiting.value) {
     if (drafts.value[profile.userId]) continue
     drafts.value[profile.userId] = {
       ...Object.fromEntries(SYMBOLS.map(s => [s.key, profile[s.key]])),
@@ -79,6 +111,7 @@ async function decide(profile: Profile, status: 'VERIFIED' | 'DECLINED') {
       body: { ...drafts.value[profile.userId], status, fohNote: (drafts.value[profile.userId]?.fohNote as string) || null },
     })
     await refresh()
+    if (settledStatus.value !== 'idle') await refreshSettled()
     toast.add({ title: status === 'VERIFIED' ? 'Recorded, and they have been told' : 'Marked as not recorded', color: 'success' })
   }
   catch {
@@ -119,7 +152,7 @@ async function decide(profile: Profile, status: 'VERIFIED' | 'DECLINED') {
 
     <template v-else>
       <h2 class="text-sm font-medium">
-        Waiting ({{ waiting.length }})
+        Waiting ({{ waitingTotal }})
       </h2>
       <UCard
         v-for="profile in waiting"
@@ -235,19 +268,25 @@ async function decide(profile: Profile, status: 'VERIFIED' | 'DECLINED') {
         </p>
       </UCard>
 
+      <UPagination
+        v-if="waitingTotal > PAGE_SIZE"
+        v-model:page="waitingPage"
+        :items-per-page="PAGE_SIZE"
+        :total="waitingTotal"
+        class="flex justify-center"
+      />
+
       <!-- Recorded profiles leave the queue, but stay reachable. -->
-      <div
-        v-if="settled.length"
-        class="pt-2"
-      >
+      <div class="pt-2">
         <UButton
           variant="ghost"
           size="sm"
-          :label="showSettled ? `Hide recorded (${settled.length})` : `Show recorded (${settled.length})`"
-          @click="() => { showSettled = !showSettled }"
+          :loading="settledStatus === 'pending'"
+          :label="showSettled ? `Hide recorded (${settledTotal})` : 'Show recorded'"
+          @click="toggleSettled"
         />
         <ul
-          v-if="showSettled"
+          v-if="showSettled && settled.length"
           class="mt-3 divide-y divide-default rounded-lg border border-default"
         >
           <li
@@ -282,6 +321,19 @@ async function decide(profile: Profile, status: 'VERIFIED' | 'DECLINED') {
             </div>
           </li>
         </ul>
+        <p
+          v-if="showSettled && settledStatus === 'success' && !settled.length"
+          class="mt-3 text-sm text-muted"
+        >
+          Nothing recorded yet.
+        </p>
+        <UPagination
+          v-if="showSettled && settledTotal > PAGE_SIZE"
+          v-model:page="settledPage"
+          :items-per-page="PAGE_SIZE"
+          :total="settledTotal"
+          class="mt-3 flex justify-center"
+        />
       </div>
     </template>
   </div>

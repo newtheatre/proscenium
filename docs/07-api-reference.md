@@ -441,8 +441,40 @@ and no password-reset route here.
 | GET | `/api/account/access` | Any logged-in user | Your own access profile, or null |
 | PUT | `/api/account/access` | Any logged-in user | Request verification, or update what you asked for |
 | DELETE | `/api/account/access` | Any logged-in user | Remove it. No questions asked |
-| GET | `/api/admin/access` | `access.verify` (`verifyAccess`) | Profiles to verify, waiting ones first |
+| GET | `/api/admin/access` | `access.verify` (`verifyAccess`) | One page of profiles, waiting or already recorded |
 | PUT | `/api/admin/access/:userId` | `access.verify` (`verifyAccess`) | Record the conclusion of a verification conversation |
+
+#### `GET /api/admin/access`
+
+**Source** `server/api/admin/access/index.get.ts` · **Auth** `authorize(event, verifyAccess)`: `access.verify`
+
+**Query**
+
+| Name | Type | Notes |
+| --- | --- | --- |
+| `page` | int ≥ 1, default `1` | |
+| `limit` | int 1..100, default `25` | |
+| `status` | `'PENDING'` or `'SETTLED'`, default `'PENDING'` | The two lists the verifier works from |
+| `q` | string, optional | Matches the person's **name or email** only |
+
+**Response** `200`: the `Paginated<T>` envelope ([ADR-0005](decisions/0005-paginate-list-endpoints-in-sql.md)).
+`WITHDRAWN` profiles are excluded from both lists: a tombstone carries nothing and is not the
+verifier's to reinstate. `PENDING` sorts oldest first, because the queue is worked from the top;
+`SETTLED` sorts most recently recorded first.
+
+**`q` never searches the notes.** `requesterNote` and `fohNote` are the Article 9 free text
+([ADR-0022](./decisions/0022-access-needs-are-special-category-data.md)), and a search term that
+matched them would let someone fish for a condition. The search is over `users.name` and
+`users.email`, which identify the row to a human, and nothing else.
+
+**The two lists carry different columns.** `PENDING` rows carry everything the verification
+conversation needs: the eight need flags, `companions`, `accessCardNumber`, `requesterNote`,
+`fohNote`, `consentFohAt`, `email`, `verifiedAt`, `expiresAt`. `SETTLED` rows carry only what the
+recorded list displays: `userId`, `name`, `status`, the need flags, `companions`, `expiresAt` and
+`updatedAt`. A recorded profile is nobody's outstanding work, so its free text is not sent to a
+screen that never shows it.
+
+---
 
 #### `PUT /api/admin/access/:userId`
 
