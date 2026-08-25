@@ -431,7 +431,10 @@ figure is computed the same way.
 Then a short checklist (reconciled, refusals reviewed with the DM, low stock flagged, closing
 note) and **Close the bar**. Closing writes the `bar_session` and contributes a
 *Bar* section to each linked performance's end-of-night report (12-access-and-staffing §4.3):
-takings by tender, comps, ID checks accepted/refused, stock warnings, closing note. Where two
+takings by tender, comps, ID checks accepted/refused, stock warnings, closing note. **The stock
+warnings are the same set the stock screen shows**: a product below its par that holds its own
+stock and is not retired. A retired line is never restocked and a recipe serve never holds stock,
+so either would sit below par permanently and teach the duty manager to ignore the list. Where two
 performances shared a bar, the section is the night's bar figures, labelled as such: we do not
 pretend to split a pint between the studio and the auditorium. Ticket money in the report is by
 `performance_id`, so it *is* per show. If the bar is not closed by the

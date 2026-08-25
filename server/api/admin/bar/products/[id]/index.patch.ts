@@ -54,6 +54,10 @@ export default defineEventHandler(async (event) => {
     ? null
     : input.containerMl === undefined ? product.containerMl : input.containerMl
 
+  // Nor a par. The catalogue form hides the field once a recipe is set, so
+  // without this a stale par survives and reads as permanently below par.
+  const parQty = recipe.length ? null : input.parQty
+
   // Every movement is in the size that was current when it was written (ADR-0035).
   if (containerMl !== product.containerMl && await hasMovements(id)) {
     throw createError({
@@ -75,7 +79,7 @@ export default defineEventHandler(async (event) => {
 
   const { recipe: _replaced, ...fields } = input
   const statements: BatchItem<'sqlite'>[] = [
-    db.update(schema.barProducts).set({ ...fields, containerMl }).where(eq(schema.barProducts.id, id)),
+    db.update(schema.barProducts).set({ ...fields, containerMl, parQty }).where(eq(schema.barProducts.id, id)),
     ...(input.recipe ? recipeStatements(id, input.recipe) : []),
   ]
 

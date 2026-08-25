@@ -55,8 +55,10 @@ export default defineEventHandler(async (event) => {
     db.insert(schema.barProducts).values({
       ...product,
       id,
-      // Something made of other things holds no stock, so it has no size.
+      // Something made of other things holds no stock, so it has no size and
+      // no par: it can never be counted, so it could only sit below par forever.
       containerMl: recipe.length ? null : input.containerMl ?? null,
+      parQty: recipe.length ? null : input.parQty ?? null,
     }),
     ...recipeStatements(id, recipe),
   ]

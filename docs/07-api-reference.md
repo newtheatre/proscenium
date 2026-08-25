@@ -2267,6 +2267,10 @@ offers no pass until the box office has been paid.
   and the category. A pool that is *already* empty does not block an unrelated edit. Without this
   the sold product stayed on the menu with an unfillable slot: the tile could never be added to a
   basket, and nothing said why (ADR-0036).
+- **A recipe clears the size and the par.** Something made from other things holds no stock of its
+  own, so `containerMl` and `parQty` are both nulled whenever a recipe is present, on create and on
+  edit alike. A par kept on such a product could never be met: no movement can be written against
+  it, so it would sit below par forever and be named in every night report.
 - **`containerMl` cannot change once anything has moved.** `409`, naming the fix: retire the
   product and add the new size as its own. Every movement means what it means in the size that was
   current when it was written.
