@@ -314,3 +314,17 @@ Closing it needs the database to arbitrate, and D1 offers no way to abort a batc
 The options are a deterministic settlement id so the second insert collides on the primary key, or
 a partial unique index; both change the shape of `transactions`, so neither is a drive-by change.
 Recorded rather than half-fixed, because a predicate on the UPDATE looks like a cure and is not.
+
+### A stocktake finished before 2026-08-25 may hold a count of zero that was meant to be blank {#stocktake-blank-as-zero}
+
+**P2 · data.** The count page sent an emptied box as the string `''`, which `z.coerce.number()`
+turned into `0`. A counter who mistyped a figure, cleared the box and saved therefore recorded the
+line as counted zero rather than blank, and "Finish and apply" wrote a movement of minus the whole
+on-hand for that product. The coercion is fixed: a blank box now clears the count, which is what the
+page has always said it does.
+
+Stocktakes already applied cannot be unwound, because the movement ledger is append-only. To find
+them, look for `STOCKTAKE` movements that took a product from a plausible level to exactly zero on a
+day nobody emptied the shelf; `/admin/bar/stocktakes` lists each take with the lines it moved. The
+repair is an ordinary stock adjustment back to the real level, dated today, with a reason naming the
+stocktake it corrects. Do not edit the historic movement.
