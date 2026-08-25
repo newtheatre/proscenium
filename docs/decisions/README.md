@@ -55,6 +55,7 @@ ADR; the ADR carries the reasoning and the history. See [CONTRIBUTING.md](../../
 | [0039](0039-refund-before-cancelling-a-collected-booking.md) | Refund before cancelling a collected booking, and keep the pair symmetric | Accepted |
 | [0040](0040-refuse-a-request-with-no-session-key.md) | Refuse a request rather than serve one with no session key | Accepted |
 | [0041](0041-a-fail-open-eligibility-answer-is-cached-too.md) | A fail-open eligibility answer is cached too, briefly | Accepted |
+| [0042](0042-a-rebuild-also-drops-what-the-snapshot-cannot-see.md) | A table rebuild also drops what the snapshot cannot see | Accepted |
 
 ## Template
 

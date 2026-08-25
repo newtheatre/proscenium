@@ -57,4 +57,4 @@ There is no test suite. CI gates on typecheck, lint and build ([.github/workflow
 - Drift between `docs/07-api-reference.md` and the actual routes.
 - A comment over two lines: see [CONTRIBUTING.md](CONTRIBUTING.md) §Comments; `bun run check:comments` catches it.
 - Anything under `server/api/training/` touching an operational table; `bun run check:training` catches it ([ADR-0032](docs/decisions/0032-training-mode-writes-to-its-own-table.md)).
-- Any generated migration that rebuilds a table (`CREATE TABLE __new_…`): under D1 the drop cascades and takes dependent rows with it. `bun run check:migrations` catches it ([ADR-0037](docs/decisions/0037-a-table-rebuild-takes-its-dependents-with-it.md)).
+- Any generated migration that rebuilds a table (`CREATE TABLE __new_…`): under D1 the drop cascades and takes dependent rows with it, and it drops the table's append-only triggers, which no snapshot carries. `bun run check:migrations` catches both ([ADR-0037](docs/decisions/0037-a-table-rebuild-takes-its-dependents-with-it.md), [ADR-0042](docs/decisions/0042-a-rebuild-also-drops-what-the-snapshot-cannot-see.md)).
