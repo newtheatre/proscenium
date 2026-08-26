@@ -8,5 +8,5 @@
   "proscenium:FRONT_OF_HOUSE": "FRONT_OF_HOUSE",
   "proscenium:COMMITTEE": "COMMITTEE",
   "rooms:ADMIN": "THEATRE_MANAGER",
-  "training:ADMIN": "TRAINING_OFFICER"
+  "training:ADMIN": "TRAINING_MANAGER"
 }

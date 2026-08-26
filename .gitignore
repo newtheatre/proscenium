@@ -12,3 +12,8 @@ coverage/
 .DS_Store
 migration/dumps/
 migration/out/
+
+
+# The end-to-end suite's throwaway database. Declared here so the hub module
+# does not append a line of its own on every run.
+.data/e2e
