@@ -31,6 +31,10 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      # tests/, scripts/ and migration/ run under Bun, so Nuxt's typecheck does not see them.
+      - name: Typecheck (Bun projects)
+        run: bun run typecheck:bun
+
       - name: Tests
         run: bun test
 

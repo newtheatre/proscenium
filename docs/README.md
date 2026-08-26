@@ -13,6 +13,7 @@ development has started.
 | `backlog/` | The full story backlog, one file per module, tracker-ready. Each story has a role, a testable acceptance list, a phase and its sources. |
 | `decisions/` | Foundational architecture decision records, all accepted at the gate on 26 August 2026. |
 | `workshops.md` | The configuration defaults register: every number that is currently folklore, with a proposed value for the committee to confirm, plus the workshop agenda. The proposed values are what the system ships until a workshop amends them (0019). |
+| `design-language.md` | The reasoning behind the tokens, the two intensities, and the rules for using them. |
 | `spikes.md` | Time-boxed investigations that must land before their dependent build work. |
 |  `../CONTRIBUTING.md` | Engineering standards, at the repository root as CONTRIBUTING.md. |
 
