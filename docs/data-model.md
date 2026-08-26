@@ -64,6 +64,16 @@ holds a shift or production role (A-3).
 `evidence` (grant note or import run id) · `granted_by` · `created_at`.
 UNIQUE (`user_id`, `year`). Current membership = row for the current committee year.
 
+### fellowships
+`id` PK · `user_id` → users restrict · `awarded_on` (date, London) · `awarded_by` (the
+committee or meeting that resolved it, not an individual) · `citation` (the public wording of
+what it was awarded for) · `pass_id` NULL → passes (the lifetime entitlement, 0023) ·
+`revoked_at` NULL · `revoked_by` NULL · `revocation_reason` scrub · `created_at`.
+UNIQUE (`user_id`): a person is a Fellow once. `restrict` rather than `cascade` on purpose, so
+deleting a user cannot silently remove an award from the theatre's own record; erasure
+anonymises the person and the award stands.
+A revoked fellowship stops future admissions and rewrites nothing (0023).
+
 ### role_grants
 `id` PK · `user_id` → users cascade · `role` (namespace-free officer role, validated against
 the permission map in code) · `expires_at` NULL = permanent (default: next 31 July, London) ·
