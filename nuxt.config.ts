@@ -1,4 +1,5 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import { SENDER_ADDRESSES } from './shared/senders'
 
 export default defineNuxtConfig({
 
@@ -70,8 +71,6 @@ export default defineNuxtConfig({
     // named GOOGLE_CLIENT_SECRET is silently ignored.
     googleClientId: '',
     googleClientSecret: '',
-    // Sender for the send_email binding (0002). Email Service replaces the estate's Resend.
-    mailFromAddress: '',
     public: {
       baseURL: 'https://newtheatre.org.uk',
     },
@@ -110,6 +109,16 @@ export default defineNuxtConfig({
       nodeCompat: true,
       wrangler: {
         name: 'nnt-unified',
+        // Pinned to the registry so the worker cannot send as an unreviewed address (0020).
+        // Cast: nitropack's wrangler schema predates the field; a test asserts the emitted output.
+        ...({
+          send_email: [
+            {
+              name: 'EMAIL',
+              allowed_sender_addresses: SENDER_ADDRESSES,
+            },
+          ],
+        } as object),
         d1_databases: [
           {
             binding: 'DB',
