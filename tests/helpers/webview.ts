@@ -48,7 +48,10 @@ export interface AppUnderTest {
 export async function startApp(): Promise<AppUnderTest> {
   const controller = new AbortController()
   const port = new URL(BASE_URL).port
-  const hubDir = `.data/e2e-${crypto.randomUUID().slice(0, 8)}`
+  // A stable path, wiped on the way in rather than out: a crashed run leaves nothing behind,
+  // and the hub module appends its own .gitignore line for every distinct directory it sees.
+  const hubDir = '.data/e2e'
+  await Bun.$`rm -rf ${hubDir}`.quiet().nothrow()
 
   const server: Subprocess = Bun.spawn(['bun', 'run', 'dev', '--port', port], {
     env: { ...process.env, NUXT_PORT: port, NUXT_HUB_DIR: hubDir },
@@ -63,7 +66,6 @@ export async function startApp(): Promise<AppUnderTest> {
       controller.abort()
       server.kill()
       await server.exited
-      await Bun.$`rm -rf ${hubDir}`.quiet().nothrow()
     },
   }
 }

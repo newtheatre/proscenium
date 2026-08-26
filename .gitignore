@@ -13,12 +13,7 @@ coverage/
 migration/dumps/
 migration/out/
 
-.data/e2e-70e22036
-.data/e2e-126a6a2a
-.data/e2e-088502dc
-.data/e2e-d9b16899
-.data/e2e-e50b36b0
-.data/e2e-09e84970
-.data/e2e-a1a8b509
-.data/e2e-2668d197
-.data/e2e-6a866a32
+
+# The end-to-end suite's throwaway database. Declared here so the hub module
+# does not append a line of its own on every run.
+.data/e2e
