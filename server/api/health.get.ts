@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const sessionKey = useRuntimeConfig(event).session.password ? 'ok' : 'missing'
 
   const expected = journal.entries.map((entry: { tag: string }) => entry.tag)
-  let pending: string[] = []
+  let pending: string[]
 
   try {
     // Raw SQL on purpose: NuxtHub owns this table, so declaring it in the Drizzle schema

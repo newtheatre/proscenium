@@ -175,4 +175,8 @@ export default defineNuxtConfig({
   },
 
   image: { provider: 'none' },
+
+  // @nuxtjs/seo pulls in og-image, whose renderer needs a WASM dependency the worker bundle
+  // cannot externalise. Nothing uses OG images yet; enabling it is a deliberate Phase 2 act.
+  ogImage: { enabled: false },
 })
