@@ -8,9 +8,11 @@ the shape. Companion: `data-model.md` for every table.
 One Nuxt 4 application on Cloudflare Workers (`cloudflare_module` preset), one D1 database,
 one deployed worker serving `newtheatre.org.uk`. There are no other services: no queues, no
 Durable Objects, no cross-app calls. Email leaves through the `send_email` binding (Email
-Service, decision 0002); files (posters, venue images) live in R2; secrets shared beyond one
-worker live in the account Secrets Store, hydrated by the first-registered server plugin
-before anything reads a session (the `0.` prefix pattern carried from the estate).
+Service, decision 0002) as one of five sender identities on the single onboarded domain
+`newtheatre.org.uk`, none of them a `no-reply` (0020); files (posters, venue images) live in
+R2; secrets shared beyond one worker live in the account Secrets Store, hydrated by the
+first-registered server plugin before anything reads a session (the `0.` prefix pattern
+carried from the estate).
 
 ```mermaid
 flowchart LR
@@ -21,7 +23,7 @@ flowchart LR
     CRON[Cron triggers] --> TASKS[Scheduled tasks] --> CORE
   end
   CORE --> D1[(D1 database)]
-  CORE --> MAIL[send_email binding]
+  CORE --> MAIL[send_email binding, five sender identities]
   CORE --> R2[(R2 assets)]
   SS[Secrets Store] -.hydrates first.-> CORE
 ```
