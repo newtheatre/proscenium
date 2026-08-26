@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { ProductionRefusal, assertLocalTarget, assertNotProduction, generatePassword, syntheticPerson } from '../helpers/seed'
+import { ProductionRefusal, assertLocalTarget, assertNotProduction, generatePassword, syntheticPerson } from '#tests/helpers/seed'
 
 describe('seed tooling refuses production (K-120)', () => {
   test('local targets are allowed', () => {

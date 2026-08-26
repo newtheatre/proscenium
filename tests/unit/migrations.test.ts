@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { normaliseMigrationTag, pendingMigrations } from '../../shared/migrations'
+import { normaliseMigrationTag, pendingMigrations } from '#shared/utils/migrations'
 
 describe('pending migrations (K-107)', () => {
   test('a schema level with its code reports nothing pending', () => {

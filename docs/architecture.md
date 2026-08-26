@@ -41,8 +41,10 @@ server/
                         config, audit, dates (Europe/London), conditional-write helpers
   tasks/                scheduled tasks (below)
   plugins/              0.secrets-store, authorisation resolver
-shared/                 zod schemas, permission map, enums, pure domain logic
-                        (expiry arithmetic, pricing resolution, validity)
+shared/utils/           zod schemas, permission map, enums, pure domain logic
+                        (expiry arithmetic, pricing resolution, validity). Auto-imported
+                        into both the application and the server.
+shared/types/           types shared across the same boundary
 content/                Nuxt Content: editorial pages, policy pages with config tokens
 migration/              the SP-3 tooling (standalone, never imported by the app)
 tests/                  unit / integration / e2e, bun test

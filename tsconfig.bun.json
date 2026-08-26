@@ -13,6 +13,15 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    // The same spellings Nuxt gives app and server code, so one import line works everywhere.
+    "baseUrl": ".",
+    "paths": {
+      "#shared": ["./shared"],
+      "#shared/*": ["./shared/*"],
+      "#server": ["./server"],
+      "#server/*": ["./server/*"],
+      "#tests/*": ["./tests/*"]
+    }
   }
 }

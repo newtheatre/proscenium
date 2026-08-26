@@ -40,6 +40,17 @@ repository at speed. Read this before your first change.
   parents; anything else keeps `mkdirSync` with a comment saying why.
 - Scripts are TypeScript run by `bun`, not `.mjs` run by `node`.
 
+- **Domain rules live in `shared/utils/`**, which Nuxt auto-imports into both the application
+  and the server. A route or a server utility names them with no import at all.
+- Everything in `server/utils/` is auto-imported into server code the same way. Only types need
+  naming, because auto-import covers values and not types.
+- Outside the application, in `tests/` and `scripts/`, nothing is auto-imported: reach in by
+  alias, `#shared/utils/...`, `#server/...`, `#tests/...`. Those paths are declared twice, by
+  Nuxt for the application and in `tsconfig.bun.json` for the Bun projects, so one spelling
+  means the same thing everywhere.
+- Never climb out of a directory with `../..`. A sibling inside the same directory stays
+  relative, and that is the only relative import that should appear.
+
 ## Decisions
 
 - Decision records live in `docs/decisions/` from day one. Accepted records are never edited,

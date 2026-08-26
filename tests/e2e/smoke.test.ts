@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { openView, skipReason, startApp } from '../helpers/webview'
-import type { AppUnderTest } from '../helpers/webview'
+import { openView, skipReason, startApp } from '#tests/helpers/webview'
+import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
 // Booting the application is far past bun's five second default for a hook.
