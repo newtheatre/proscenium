@@ -27,3 +27,4 @@ afterwards, only superseded.
 | 0019 | The Phase 0 gate passed with provisional configuration defaults | |
 | 0020 | Mail carries one of five sender identities on a single sending domain | mailboxes for the five addresses |
 | 0021 | The design language is vendored, not extended as a layer | |
+| 0022 | Integration tests run on SQLite, end-to-end tests drive Bun.WebView | |
