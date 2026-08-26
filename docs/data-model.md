@@ -500,9 +500,13 @@ the default. The settings surface shows default, current and last editor; wide-b
 take a typed confirmation (J-104, J-105). Policy pages resolve `{{TOKENS}}` against this
 table (0012).
 
-### audit_log  APPEND-ONLY (exception: erasure redacts identifying values in `detail`)
+### audit_log  APPEND-ONLY
 `id` PK · `actor_id` NULL = system · `action` · `target` · `detail` JSON (never personal
 free text) · `created_at`. Indexes on actor, action, target, created_at.
+Strictly append-only: triggers refuse UPDATE and DELETE outright, and a correction supersedes
+with a new entry. There is no erasure exception, because `detail` holds no personal free text
+and erasure therefore never needs to reach it (0011). An UPDATE path kept for a case that
+cannot arise is a hole in the guarantee, not a safety net.
 
 ### audit_archive
 The four old estates' audit histories imported read-only for reference (J-108), same shape
