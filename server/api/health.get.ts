@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { pendingMigrations } from '../../shared/migrations'
-import journal from '../db/migrations/sqlite/meta/_journal.json'
+import { pendingMigrations } from '#shared/migrations'
+import journal from '#server/db/migrations/sqlite/meta/_journal.json'
 
 // Deliberately public: monitoring holds no session. 503 whenever the schema is behind the
 // code, naming the pending files (K-107).

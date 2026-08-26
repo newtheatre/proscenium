@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { MAX_BOUND_PARAMETERS, createTestDatabase, rows } from '../helpers/database'
+import { MAX_BOUND_PARAMETERS, createTestDatabase, rows } from '#tests/helpers/database'
 
 describe('the integration harness', () => {
   test('applies the compiled migrations and gives a usable database', async () => {

@@ -1,7 +1,7 @@
 import { db, schema } from '@nuxthub/db'
 import { eq } from 'drizzle-orm'
-import { auditEntry } from '../../shared/audit'
-import { isWorkspaceEmail, normaliseEmail } from '../../shared/auth'
+import { auditEntry } from '#shared/audit'
+import { isWorkspaceEmail, normaliseEmail } from '#shared/auth'
 
 export interface AccountRow {
   id: string

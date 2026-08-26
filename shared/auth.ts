@@ -1,5 +1,6 @@
 // Rules that hold wherever they run: the browser, the worker, or a test.
 
+// A sibling, so a plain relative import: the #shared alias is for reaching in from outside.
 import { CONFIG_KEYS } from './config'
 
 export interface PasswordPolicy {

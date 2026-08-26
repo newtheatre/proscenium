@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { generatePassword, syntheticPerson } from '../helpers/seed'
-import { skipReason, startApp } from '../helpers/webview'
-import type { AppUnderTest } from '../helpers/webview'
+import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
+import { skipReason, startApp } from '#tests/helpers/webview'
+import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000

@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { ABSOLUTE_PASSWORD_LIMIT, defaultPasswordPolicy, normaliseEmail, passwordProblem } from '../../../shared/auth'
-import type { PasswordProblem } from '../../../shared/auth'
+import { ABSOLUTE_PASSWORD_LIMIT, defaultPasswordPolicy, normaliseEmail, passwordProblem } from '#shared/auth'
+import type { PasswordProblem } from '#shared/auth'
 
 // The schema guards shape and the outer limit; the length policy lives in passwordProblem so
 // there is one place to change it and no second copy to drift (0012).

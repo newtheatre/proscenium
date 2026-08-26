@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import type { ConfigKey } from '../../shared/config'
-import { CONFIG_KEYS, CONFIG_KEY_NAMES, hasDefault, isConfigKey } from '../../shared/config'
+import type { ConfigKey } from '#shared/config'
+import { CONFIG_KEYS, CONFIG_KEY_NAMES, hasDefault, isConfigKey } from '#shared/config'
 
 // The keys the workshop register proposes no value for (0019). They ship unset, and the
 // features needing them wait rather than guessing. Typed, so a typo here is a build error.

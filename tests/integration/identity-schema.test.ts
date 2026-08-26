@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { auditEntry } from '../../shared/audit'
-import { createTestDatabase, rows } from '../helpers/database'
-import type { TestDatabase } from '../helpers/database'
+import { auditEntry } from '#shared/audit'
+import { createTestDatabase, rows } from '#tests/helpers/database'
+import type { TestDatabase } from '#tests/helpers/database'
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()

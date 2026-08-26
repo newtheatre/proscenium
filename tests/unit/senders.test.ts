@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { SENDERS, SENDER_ADDRESSES, SENDING_DOMAIN, senderForTopic } from '../../shared/senders'
+import { SENDERS, SENDER_ADDRESSES, SENDING_DOMAIN, senderForTopic } from '#shared/senders'
 
 const TOPICS = ['BOOKINGS', 'SHIFTS', 'TRAINING', 'ROOMS', 'ANNOUNCEMENTS'] as const
 
