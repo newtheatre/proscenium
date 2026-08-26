@@ -9,6 +9,7 @@ let app: AppUnderTest
 
 // A fresh synthetic person per run, so the suite never depends on what a previous run left.
 const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
+// generatePassword returns a uuid-based string, comfortably over the shipped minimum.
 const password = generatePassword()
 
 beforeAll(async () => {

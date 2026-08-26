@@ -211,6 +211,37 @@ export const CONFIG_KEYS = {
     describes: 'Grace on a practice window before it lapses. The old documents flagged this as a guess.',
   },
 
+  PASSWORD_MIN_LENGTH: {
+    schema: z.number().int().min(8).max(64),
+    default: 15,
+    workshop: 'people-and-communications',
+    describes: 'Shortest accepted password. NIST SP 800-63B rev 4 asks for 15 where a password can be the only authenticator, which it is until MFA is compulsory.',
+  },
+  PASSWORD_MAX_LENGTH: {
+    schema: z.number().int().min(64).max(256),
+    default: 128,
+    workshop: 'people-and-communications',
+    describes: 'Longest accepted password. A cap exists because hashing is deliberately expensive: without one, a very long password is a cheap way to make the worker do work. OWASP ASVS 2.1.2 puts it at 128.',
+  },
+  PASSWORD_REQUIRE_MIXED_CASE: {
+    schema: z.boolean(),
+    default: false,
+    workshop: 'people-and-communications',
+    describes: 'Require upper and lower case. Off: composition rules push people towards Password1! and a sticky note, and NIST advises against them.',
+  },
+  PASSWORD_REQUIRE_NUMBER: {
+    schema: z.boolean(),
+    default: false,
+    workshop: 'people-and-communications',
+    describes: 'Require a digit. Off, for the same reason as mixed case.',
+  },
+  PASSWORD_REQUIRE_SYMBOL: {
+    schema: z.boolean(),
+    default: false,
+    workshop: 'people-and-communications',
+    describes: 'Require a symbol. Off, for the same reason as mixed case.',
+  },
+
   NOTIFICATION_TOPICS: {
     schema: z.array(z.string()).nonempty(),
     default: ['bookings', 'shifts', 'training', 'rooms', 'announcements'],
