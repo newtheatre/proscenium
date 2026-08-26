@@ -138,8 +138,8 @@ describe('auth tokens and access profiles', () => {
     })
   })
 
-  // access_profiles waits for D-127: the data model says nine boolean need flags and names
-  // none of them, and special category data is not something to guess at.
+  // access_profiles waits for D-127, which owns the encryption at rest and the consent path.
+  // Its nine flags are settled: the Nimbus Access Card categories (docs/data-model.md).
   test.todo('companions are capped at two (D-127)', () => {})
 })
 
@@ -159,11 +159,26 @@ describe('the audit log is append-only (0010)', () => {
     })
   })
 
-  test('an entry cannot be updated', async () => {
+  test('no field but detail may be rewritten', async () => {
     await withDatabase((database) => {
       seedEntry(database)
-      expect(() => database.batch([['UPDATE audit_log SET action = ? WHERE id = ?', 'role.revoked', 'a-1']]))
-        .toThrow(/append-only/i)
+      for (const [column, value] of [['action', 'role.revoked'], ['target', 'user:u-2'], ['actor_id', 'u-9'], ['created_at', 0]] as const) {
+        expect(() => database.batch([[`UPDATE audit_log SET ${column} = ? WHERE id = ?`, value, 'a-1']]))
+          .toThrow(/append-only/i)
+      }
+    })
+  })
+
+  // Erasure redacts an entry that has picked up identifying values (0011). Nothing else about
+  // the entry may move, so the record of what happened survives the redaction.
+  test('detail may be redacted, and the rest of the entry survives it', async () => {
+    await withDatabase((database) => {
+      seedEntry(database)
+      database.batch([['UPDATE audit_log SET detail = ? WHERE id = ?', '{"redacted":true}', 'a-1']])
+      const [entry] = rows<{ action: string, target: string, detail: string }>(
+        database, 'SELECT action, target, detail FROM audit_log',
+      )
+      expect(entry).toEqual({ action: 'role.granted', target: 'user:u-1', detail: '{"redacted":true}' })
     })
   })
 
