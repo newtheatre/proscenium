@@ -40,6 +40,16 @@ repository at speed. Read this before your first change.
   parents; anything else keeps `mkdirSync` with a comment saying why.
 - Scripts are TypeScript run by `bun`, not `.mjs` run by `node`.
 
+## Imports
+
+- Reach across a directory by alias, never by climbing out of one. `#shared/...` for domain
+  rules, `#server/...` for server code, `#tests/...` for test helpers. A sibling in the same
+  directory stays relative.
+- Prefer no import at all where Nitro provides one: everything in `server/utils/` is
+  auto-imported into server code, and only its types need naming.
+- The aliases are declared twice, by Nuxt for the application and in `tsconfig.bun.json` for the
+  Bun projects, so one import line means the same thing in a route and in a test.
+
 ## Decisions
 
 - Decision records live in `docs/decisions/` from day one. Accepted records are never edited,
