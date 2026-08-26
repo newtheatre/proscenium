@@ -38,12 +38,14 @@ app/                    pages, components, composables (grouped per module)
 server/
   api/<module>/         one route per file, Nitro conventions
   utils/                the shared spine: db, session, authorise, ledger, notify,
-                        config, audit, dates (Europe/London), conditional-write helpers
+                        config, audit, conditional-write helpers
   tasks/                scheduled tasks (below)
   plugins/              0.secrets-store, authorisation resolver
 shared/utils/           zod schemas, permission map, enums, pure domain logic
-                        (expiry arithmetic, pricing resolution, validity). Auto-imported
-                        into both the application and the server.
+                        (Europe/London dates, expiry arithmetic, pricing resolution,
+                        validity). Auto-imported into both the application and the server,
+                        because a time shown to a member is pinned the same way as one the
+                        server reasons about.
 shared/types/           types shared across the same boundary
 content/                Nuxt Content: editorial pages, policy pages with config tokens
 migration/              the SP-3 tooling (standalone, never imported by the app)
