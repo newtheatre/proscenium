@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test'
+import type { ConfigKey } from '../../shared/config'
 import { CONFIG_KEYS, CONFIG_KEY_NAMES, hasDefault, isConfigKey } from '../../shared/config'
 
 // The keys the workshop register proposes no value for (0019). They ship unset, and the
-// features needing them wait rather than guessing.
-const UNSET = ['PASS_PRODUCTS', 'ROOM_OPENING_HOURS', 'NIGHT_REPORT_RECIPIENTS']
+// features needing them wait rather than guessing. Typed, so a typo here is a build error.
+const UNSET: ConfigKey[] = ['PASS_PRODUCTS', 'ROOM_OPENING_HOURS', 'NIGHT_REPORT_RECIPIENTS']
 
 describe('configuration surface (0012, 0019)', () => {
   test('every shipped default validates against its own key schema', () => {

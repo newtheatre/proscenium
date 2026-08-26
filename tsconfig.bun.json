@@ -1,0 +1,18 @@
+{
+  // tests/, scripts/ and migration/ run under Bun, not Nitro, so Nuxt's generated projects do
+  // not cover them. Without this their Bun globals and bun: imports resolve to nothing.
+  "compilerOptions": {
+    "types": ["bun"],
+    "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  }
+}

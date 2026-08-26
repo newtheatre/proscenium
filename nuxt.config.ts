@@ -50,7 +50,7 @@ export default defineNuxtConfig({
 
   devtools: { enabled: true },
 
-  css: ['~/assets/css/main.css'],
+  css: ['~/assets/css/theme.css'],
 
   content: {
     database: {

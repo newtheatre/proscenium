@@ -16,9 +16,13 @@
     "check:content-tokens": "bun scripts/check-content-tokens.ts",
     "migration:export": "./migration/export.sh",
     "migration:dry-run": "bun migration/inventory.ts && bun migration/transform-identity.ts && bun migration/reconcile.ts",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "typecheck:bun": "tsc -p tests --noEmit && tsc -p scripts --noEmit && tsc -p migration --noEmit"
   },
   "dependencies": {
+    "@fontsource-variable/bricolage-grotesque": "^5.2.5",
+    "@fontsource-variable/figtree": "^5.2.5",
+    "@fontsource-variable/jetbrains-mono": "^5.2.5",
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/content": "3.15.2",
     "@nuxt/eslint": "1.17.0",
@@ -36,6 +40,8 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@iconify-json/lucide": "^1.2.68",
+    "@iconify-json/simple-icons": "^1.2.54",
     "@libsql/client": "^0.17.4",
     "@types/bun": "1.4.0",
     "better-sqlite3": "^12.11.1",
