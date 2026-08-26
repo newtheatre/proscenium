@@ -129,6 +129,11 @@ The rule that a colour must be a token is a test, not a review habit:
 `theme.css` itself, which is where the tokens are defined. It also asserts that the three brand
 scales exist and that no Google Fonts request has crept in.
 
-The rules that are not yet mechanical, the one-per-view budget on the expressive kit and the
-calm-versus-expressive split, are review's job. They are the ones most likely to erode, because
-each individual breach looks harmless.
+`tests/e2e/shells.test.ts` holds the rest to the same standard, in a real browser: a public view
+spends its expressive budget at most once each, the admin shell uses none of the kit at all, and
+the public chrome resolves stage black from the subtree it is marked on rather than from
+overridden slot classes.
+
+What is still review's job is judgement: whether a surface is calm or expressive in the first
+place, whether a photograph is scrimmed, and whether show artwork has been left alone. A count
+cannot see any of those.
