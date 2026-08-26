@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, unified]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # postinstall runs `nuxt prepare`, which typecheck, lint and build all need.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The production build is the hard gate: a red build means a broken deploy.
+      - name: Build
+        run: bun run build
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Tests
+        run: bun test
+
+      - name: Comments
+        run: bun run check:comments
+
+      # A generated rebuild of an append-only table, or one that drops a cascade or a
+      # trigger the snapshot cannot re-emit (invariant 0010).
+      - name: Migrations
+        run: bun run check:migrations
