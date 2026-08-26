@@ -41,3 +41,8 @@ jobs:
       # trigger the snapshot cannot re-emit (invariant 0010).
       - name: Migrations
         run: bun run check:migrations
+
+      # A policy page quoting a configuration key that does not exist would publish a rule
+      # the write path does not enforce (0012).
+      - name: Content tokens
+        run: bun run check:content-tokens
