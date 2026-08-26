@@ -1,6 +1,5 @@
 import type { H3Event } from 'h3'
 import type { AccountRow } from '#server/utils/accounts'
-import { sessionIsCurrent } from '#shared/auth'
 
 // Privileged requests re-verify the account every time, so there is no staleness window
 // between a revocation and the next request (0007).

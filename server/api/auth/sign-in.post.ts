@@ -1,7 +1,5 @@
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { auditEntry } from '#shared/audit'
-import { ABSOLUTE_PASSWORD_LIMIT, normaliseEmail } from '#shared/auth'
 
 // Never the policy bounds: a password set before the policy tightened must still be able to
 // sign in, and telling an attacker the current rules from the sign-in form helps only them.

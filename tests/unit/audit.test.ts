@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { MAX_DETAIL_STRING, auditEntry } from '#shared/audit'
+import { MAX_DETAIL_STRING, auditEntry } from '#shared/utils/audit'
 
 const ok = { actorId: 'u-1', action: 'role.granted', target: 'user:u-2' }
 

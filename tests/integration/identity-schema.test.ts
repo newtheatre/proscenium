@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { auditEntry } from '#shared/audit'
+import { auditEntry } from '#shared/utils/audit'
 import { createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 

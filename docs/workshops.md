@@ -53,7 +53,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 Any value not settled in a session gets the proposed default and a named owner; absence of a
 decision does not block the gate, it ships the default.
 
-The proposed values are shipped in `shared/config.ts`, one validated key each, and a workshop
+The proposed values are shipped in `shared/utils/config.ts`, one validated key each, and a workshop
 amending one is a settings change rather than a release (0012, 0019). The four rows above with
 no proposed value (the pass products, the per-room opening hours, the night report recipients
 and the role vocabulary mapping) ship unset, and the features needing them wait.

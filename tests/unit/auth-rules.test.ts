@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { CONFIG_KEYS } from '#shared/config'
-import { ABSOLUTE_PASSWORD_LIMIT, defaultPasswordPolicy, isWorkspaceEmail, normaliseEmail, passwordProblem, sessionIsCurrent } from '#shared/auth'
+import { CONFIG_KEYS } from '#shared/utils/config'
+import { ABSOLUTE_PASSWORD_LIMIT, defaultPasswordPolicy, isWorkspaceEmail, normaliseEmail, passwordProblem, sessionIsCurrent } from '#shared/utils/auth'
 
 describe('addresses', () => {
   test('an address normalises to lowercase and trimmed', () => {

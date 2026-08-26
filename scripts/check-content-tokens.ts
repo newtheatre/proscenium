@@ -3,7 +3,7 @@
 // quotes the value the write path enforces (0012). An unknown token fails CI.
 
 import { join } from 'node:path'
-import { CONFIG_KEY_NAMES, isConfigKey } from '../shared/config'
+import { CONFIG_KEY_NAMES, isConfigKey } from '#shared/utils/config'
 
 const DIR = 'content'
 const TOKEN = /\{\{\s*([A-Z0-9_]+)\s*\}\}/g
@@ -40,7 +40,7 @@ if (problems.length) {
   console.error('\nA token that resolves to nothing renders as a visible error at runtime and')
   console.error('publishes a rule the write path does not enforce, which is the drift decision')
   console.error('0012 exists to prevent. Either correct the token or add the key to')
-  console.error(`shared/config.ts. Known keys: ${CONFIG_KEY_NAMES.join(', ')}`)
+  console.error(`shared/utils/config.ts. Known keys: ${CONFIG_KEY_NAMES.join(', ')}`)
   process.exit(1)
 }
 
