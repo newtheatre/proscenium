@@ -70,8 +70,6 @@ export default defineNuxtConfig({
     // named GOOGLE_CLIENT_SECRET is silently ignored.
     googleClientId: '',
     googleClientSecret: '',
-    // Sender for the send_email binding (0002). Email Service replaces the estate's Resend.
-    mailFromAddress: '',
     public: {
       baseURL: 'https://newtheatre.org.uk',
     },
