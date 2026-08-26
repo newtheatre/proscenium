@@ -1,0 +1,47 @@
+import { db, schema } from '@nuxthub/db'
+import { eq } from 'drizzle-orm'
+import { auditEntry } from '../../shared/audit'
+import { isWorkspaceEmail, normaliseEmail } from '../../shared/auth'
+
+export interface AccountRow {
+  id: string
+  email: string
+  name: string
+  password: string | null
+  verified: boolean
+  disabled: boolean
+  sessionEpoch: number
+  anonymisedAt: number | null
+}
+
+export function newId(): string {
+  return crypto.randomUUID().replaceAll('-', '')
+}
+
+export async function findByEmail(email: string): Promise<AccountRow | undefined> {
+  const [row] = await db.select().from(schema.users).where(eq(schema.users.email, normaliseEmail(email))).limit(1)
+  return row as AccountRow | undefined
+}
+
+export async function findById(id: string): Promise<AccountRow | undefined> {
+  const [row] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1)
+  return row as AccountRow | undefined
+}
+
+export interface NewAccount { email: string, name: string, passwordHash: string | null }
+
+// The account and its audit entry commit together or not at all (0001, 0003).
+export async function createAccount(input: NewAccount): Promise<string> {
+  const email = normaliseEmail(input.email)
+  if (isWorkspaceEmail(email) && input.passwordHash !== null) {
+    throw createError({ statusCode: 400, statusMessage: 'A Workspace address signs in with Google and cannot hold a password' })
+  }
+  const id = newId()
+  const entry = auditEntry({ actorId: null, action: 'account.registered', target: `user:${id}` })
+
+  await db.batch([
+    db.insert(schema.users).values({ id, email, name: input.name.trim(), password: input.passwordHash }),
+    db.insert(schema.auditLog).values(entry),
+  ])
+  return id
+}
