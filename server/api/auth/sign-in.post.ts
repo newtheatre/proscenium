@@ -19,8 +19,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: 'Those details do not match an account' })
   }
 
-  if (!account || !account.password || account.disabled || account.anonymisedAt !== null) return refuse()
-  if (!await verifyPassword(account.password, input.password)) return refuse()
+  // A verification always runs, even with nothing to verify against, so how long the answer
+  // takes cannot tell an attacker whether the address exists (A-103).
+  const usable = account && account.password && !account.disabled && account.anonymisedAt === null
+  const matches = await verifyPassword(usable ? account.password! : await decoyHash(), input.password)
+  if (!usable || !matches) return refuse()
 
   await db.batch([
     db.update(schema.users).set({ lastLoginAt: Math.floor(Date.now() / 1000) }).where(eq(schema.users.id, account.id)),
