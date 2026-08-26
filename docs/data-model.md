@@ -64,6 +64,16 @@ holds a shift or production role (A-3).
 `evidence` (grant note or import run id) · `granted_by` · `created_at`.
 UNIQUE (`user_id`, `year`). Current membership = row for the current committee year.
 
+### fellowships
+`id` PK · `user_id` → users restrict · `awarded_on` (date, London) · `awarded_by` (the
+committee or meeting that resolved it, not an individual) · `citation` (the public wording of
+what it was awarded for) · `pass_id` NULL → passes (the lifetime entitlement, 0023) ·
+`revoked_at` NULL · `revoked_by` NULL · `revocation_reason` scrub · `created_at`.
+UNIQUE (`user_id`): a person is a Fellow once. `restrict` rather than `cascade` on purpose, so
+deleting a user cannot silently remove an award from the theatre's own record; erasure
+anonymises the person and the award stands.
+A revoked fellowship stops future admissions and rewrites nothing (0023).
+
 ### role_grants
 `id` PK · `user_id` → users cascade · `role` (namespace-free officer role, validated against
 the permission map in code) · `expires_at` NULL = permanent (default: next 31 July, London) ·
@@ -92,12 +102,37 @@ delete-as-claim on redemption. Transient: never migrated, swept when expired.
 
 ### access_profiles
 `user_id` PK → users cascade · `status` CHECK `PENDING|VERIFIED|EXPIRED|DECLINED|WITHDRAWN` ·
-nine boolean need flags · `companions` int 0..2 · `access_card_number` (evidence sighted,
+the nine need flags below · `companions` int 0..2 · `access_card_number` (evidence sighted,
 value not retained beyond the reference) · `requester_note` scrub, never shown to the door ·
 `foh_note` (agreed operational wording, shown to the holder) · `consent_foh_at` NULL = the
 door sees nothing · `verified_by` · `verified_at` · `expires_at`.
 Special category data: encrypted at rest, deleted outright on erasure and 30 days after
 withdrawal (D-6).
+
+The nine flags follow the Access Card categories run by Nimbus Disability, so a patron who
+already carries one recognises our questions and we recognise their card:
+
+| Flag | What it means |
+| --- | --- |
+| `standing` | Standing for long periods is difficult or impossible. |
+| `crowds` | Crowded settings cause overwhelm. |
+| `level_access` | Wheelchair accessible facilities, or level access, are required. |
+| `distance` | Moving more than short distances is restricted. |
+| `urgent_toilet` | Prompt toilet access is needed, without queueing. |
+| `essential_companion` | Access is significantly difficult without support from another person. |
+| `visual_information` | Visual information is a barrier; alternative formats are needed. |
+| `audible_information` | Audible information is difficult to access or process. |
+| `other` | Anything the categories above do not cover, such as photosensitive epilepsy. |
+
+**A card is evidence, not a requirement.** An Access Card number is the quickest way to confirm
+a profile because Nimbus has already done the assessment, and it is one route among several. A
+patron without one is verified on other evidence and gets the same profile; nothing in the
+booking path may ask whether a card exists.
+
+These are our column names, chosen to match Nimbus's meanings rather than to mirror its
+vocabulary. The scheme's published symbol set has changed before (an assistance dog symbol has
+come and gone, and crowds were added), so the mapping is ours to maintain and a change there is
+a documentation change here, not a migration.
 
 ## Programme (shared by ticketing and show night)
 
@@ -503,6 +538,10 @@ table (0012).
 ### audit_log  APPEND-ONLY (exception: erasure redacts identifying values in `detail`)
 `id` PK · `actor_id` NULL = system · `action` · `target` · `detail` JSON (never personal
 free text) · `created_at`. Indexes on actor, action, target, created_at.
+Trigger-enforced: rows are never deleted, and no field may be rewritten except `detail`. The
+aim is that `detail` never carries identifying values (0011), but aim is not guarantee, so
+erasure can redact one that has. Everything that says what happened, and when, and to whom it
+was done, survives the redaction. A correction supersedes with a new entry.
 
 ### audit_archive
 The four old estates' audit histories imported read-only for reference (J-108), same shape

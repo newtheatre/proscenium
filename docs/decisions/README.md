@@ -28,3 +28,4 @@ afterwards, only superseded.
 | 0020 | Mail carries one of five sender identities on a single sending domain | mailboxes for the five addresses |
 | 0021 | The design language is vendored, not extended as a layer | |
 | 0022 | Integration tests run on SQLite, end-to-end tests drive Bun.WebView | |
+| 0023 | A fellowship is a permanent honour, and its entitlement is a pass | what it covers, guests, erasure |

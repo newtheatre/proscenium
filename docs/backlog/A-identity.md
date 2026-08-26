@@ -10,7 +10,7 @@ password; there is one unified app, so the old cross-app session contract does n
 passkeys enrolled against the old relying-party id cannot cross to the new one (SP-4 found one
 affected account, so no re-enrolment flow is built).
 
-**Counts: 25 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
+**Counts: 26 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
 
 Open questions for the committee:
 
@@ -394,6 +394,34 @@ Open questions for the committee:
   5. The sweep ships in dry-run: it computes, reports and emails a digest but changes nothing. Arming it is an explicit configuration change with a preview of who is affected, a typed confirmation, and an audit entry (J-3).
   6. Every automated anonymisation is attributed to system in the audit trail and uses the same code path as A-125.
 - Source: Prompt Book A-5; audit SD-12 (periods, caps and dry-run discipline carry); Get-In part 2 (retention row: carry, dry-run-first).
+
+## A-127: Award, record and revoke a fellowship
+
+- Role: Administrator
+- Phase: MVP
+- Story: As the committee, I want to record a fellowship awarded to an alumna or alumnus so that
+  the theatre keeps its own roll of the people it has honoured, and their lifetime entitlement
+  follows from it.
+- Depends on: A-116
+- Acceptance criteria:
+  1. An administrator records an award against an account with the date, the meeting that
+     resolved it and the citation; the citation is public wording and is displayed as written.
+  2. A person can hold at most one fellowship, enforced by a unique constraint rather than by the
+     form.
+  3. Awarding issues the lifetime entitlement in the same batch as the record, so a Fellow can
+     never exist without one or an entitlement without an award (0023).
+  4. A fellowship can be revoked with a reason; revocation stops future admissions and rewrites
+     nothing, so the award, the revocation and every admission already taken all stand.
+  5. Awarding and revoking are audited, and the audit detail carries the fellowship id and never
+     the citation or the reason.
+  6. Deleting a user cannot remove an award: the reference restricts, and an erasure anonymises
+     the person while the award stands as part of the theatre's record.
+  7. The roll of existing Fellows is entered through this same path, because no database holds
+     it.
+- Open questions: whether an erasure should also redact the citation, which names the person it
+  honours. It ships unredacted, because the roll is a public record the theatre published at the
+  time, and the committee is asked to confirm.
+- Source: Committee direction, 26 August 2026; decision 0023.
 
 ## A-201: Import an SU membership list by hand
 

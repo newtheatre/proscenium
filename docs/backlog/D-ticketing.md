@@ -7,7 +7,7 @@ half of this module reserves and the desk takes payment (Get-In constraint 1). G
 the core model; capacity is a count enforced by the database, and seat maps are deliberately Later
 (Get-In constraint 4).
 
-Stories: 37 total. 29 MVP (D-101 to D-129), 5 V2 (D-201 to D-206, with D-205 resolved as
+Stories: 38 total. 30 MVP (D-101 to D-130), 5 V2 (D-201 to D-206, with D-205 resolved as
 won't-build), 2 Later epics (D-301, D-302).
 
 Open questions:
@@ -627,6 +627,32 @@ Open questions:
   4. Exports of personal data are audited with actor, filter and row count.
   5. The season boundary for reporting runs 1 August to 31 July.
 - Source: Prompt Book D-1 reporting, K-1; audit PR-7 (20,000-row cap and injection guard carried)
+
+## D-130: Admit a Fellow on their lifetime entitlement
+
+- Role: Audience account
+- Phase: MVP
+- Story: As a Fellow of the theatre, I want my free admission to work like any other booking so
+  that I choose a seat in the ordinary way and the door lets me in without a conversation.
+- Depends on: D-128, A-127
+- Acceptance criteria:
+  1. A Fellow books through the ordinary reservation flow; the entitlement resolves the price to
+     zero and snapshots it as zero, and the line posts to the ledger at zero value like a
+     companion ticket.
+  2. Capacity applies unchanged: the entitlement is admission at no charge, not priority and not
+     a guaranteed seat, so a sold-out performance is sold out for a Fellow too (0006, 0023).
+  3. Admission is recorded append-only, at most once per performance, through the same pass
+     admission path the door already scans; a second attempt on the same performance is refused
+     with the first admission quoted.
+  4. A revoked fellowship refuses new bookings and new admissions, and admissions already taken
+     stay valid in the record.
+  5. Reports count fellowship admissions separately from paid and comped ones, by count and by
+     value, never by name.
+  6. Nothing in the public booking path reveals who holds a fellowship.
+- Open questions: whether the entitlement covers a guest seat, which ships as no guest until the
+  committee decides; and whether it covers external hires, which ships as our own productions
+  only, because an external hire's house is not ours to give away.
+- Source: Committee direction, 26 August 2026; decision 0023.
 
 ## D-201: Named allocations reserve capacity without tickets
 

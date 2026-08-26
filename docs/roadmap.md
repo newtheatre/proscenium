@@ -53,7 +53,9 @@ workshops in the week of 31 August and ship meanwhile as the proposed values in
 
 - New repository from `standards.md`: CI, test harness with the named regression cases seeded,
   deploy pipeline, health checks, migration gating.
-- Identity: accounts, Workspace-only Google, passkeys, MFA, roles with committee-year expiry.
+- Identity: accounts, Workspace-only Google, passkeys, MFA, roles with committee-year expiry,
+  and the roll of Fellows (A-127, decision 0023): a permanent honour, so it sits beside the
+  deliberately expiring role grants rather than inside them.
 - Platform spine: configuration surface, audit trail, ledger schema, notification centre
   skeleton, design system, phone-first operational shell.
 - First data import: all users and roles, re-runnable from fresh exports weekly thereafter.
@@ -67,11 +69,15 @@ action they take lands in the audit trail.**
 | --- | --- | --- |
 | Room booking (calendar, policy engine, approvals) | 14 to 25 September | **28 September**, term start, as the pilot module |
 | Training records and rota (catalogue, records, registers, shift claiming) | 21 September to 3 October | **5 October** |
-| Box office and passes (public site, reservations with expiring holds, desk collection, pass issue and redemption, door scanning) | 28 September to 10 October | **12 October**, in time for season on-sale |
+| Box office and passes (public site, reservations with expiring holds, desk collection, pass issue and redemption, fellowship admission, door scanning) | 28 September to 10 October | **12 October**, in time for season on-sale |
 | Show night and bar (tonight screens, registers, backstage board, till with variants, stock, tabs, reconciliation, night reports) | 5 to 17 October | shadow first (Phase 3) |
 
 - The committee authors the real training catalogue in parallel, owner named, deadline
   30 September.
+- The committee assembles the roll of existing Fellows in parallel, owner named, deadline
+  30 September. No database holds it, so it is entered by hand through the ordinary award path
+  (A-127). A Fellow missing at cutover is turned away at a door that should have known them,
+  which is why this has a date and an owner rather than a good intention.
 - Migration rehearsals run weekly from fresh production exports, checksummed and reconciled by
   row counts and money totals.
 
@@ -109,7 +115,8 @@ system. The production module is specified in summer 2027 for the 2027/28 season
 1. Gate review turnaround inside a week; a fortnight's delay here is a fortnight off the back.
 2. The SP-3 migration tooling reaching its first green dry-run by 13 September (the other
    four spikes are already answered).
-3. The training catalogue authored by 30 September (committee work, not code).
+3. The training catalogue and the roll of Fellows authored by 30 September (committee work, not
+   code).
 4. The pre-migration repairs done in September.
 5. Shadow nights actually happening at the season's first shows; if the season opens later than
    mid-October, cutover slips with it, not the other way round.
