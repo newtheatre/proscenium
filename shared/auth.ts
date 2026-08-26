@@ -22,9 +22,8 @@ export function defaultPasswordPolicy(): PasswordPolicy {
   }
 }
 
-// A transport guard, not policy. The configurable maximum decides what is an acceptable
-// password; this decides what is worth reading and hashing at all, so abuse is refused before
-// any expensive work. It sits far above any value the configuration schema will accept.
+// A transport guard, not policy: not what makes an acceptable password, but what is worth
+// reading and hashing at all. A test pins it above anything the configuration will accept.
 export const ABSOLUTE_PASSWORD_LIMIT = 1024
 
 // An address on this domain is Google-only and may never hold a password (0008).
