@@ -2,32 +2,34 @@
 // Every {{TOKEN}} in a content page must name a configuration key, so a policy page always
 // quotes the value the write path enforces (0012). An unknown token fails CI.
 
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
 import { CONFIG_KEY_NAMES, isConfigKey } from '../shared/config'
 
 const DIR = 'content'
 const TOKEN = /\{\{\s*([A-Z0-9_]+)\s*\}\}/g
 
-function markdownFiles(dir: string, out: string[] = []): string[] {
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry)
-    if (statSync(full).isDirectory()) markdownFiles(full, out)
-    else if (entry.endsWith('.md')) out.push(full)
+// Paths relative to `content`, so a message names the page the author edits.
+function markdownFiles(): string[] {
+  try {
+    return [...new Bun.Glob('**/*.md').scanSync({ cwd: DIR, onlyFiles: true })].sort()
   }
-  return out
+  catch {
+    return []
+  }
 }
 
 const problems: string[] = []
 let tokensSeen = 0
 
-for (const file of markdownFiles(DIR)) {
-  const lines = readFileSync(file, 'utf8').split('\n')
+const pages = markdownFiles()
+
+for (const file of pages) {
+  const lines = (await Bun.file(join(DIR, file)).text()).split('\n')
   lines.forEach((line, index) => {
     for (const match of line.matchAll(TOKEN)) {
       tokensSeen++
       if (isConfigKey(match[1])) continue
-      problems.push(`${relative(process.cwd(), file)}:${index + 1}  unknown configuration key \`${match[1]}\``)
+      problems.push(`${join(DIR, file)}:${index + 1}  unknown configuration key \`${match[1]}\``)
     }
   })
 }
@@ -42,4 +44,4 @@ if (problems.length) {
   process.exit(1)
 }
 
-console.log(`check-content-tokens: ${tokensSeen} token(s) across ${markdownFiles(DIR).length} page(s), all known.`)
+console.log(`check-content-tokens: ${tokensSeen} token(s) across ${pages.length} page(s), all known.`)

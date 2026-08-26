@@ -1,9 +1,8 @@
 // Per-table counts and domain checksums for all four dumps: the rehearsal baseline.
-import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { OUT, SOURCES, count, ensureOut, latestStamp, loadDump, sum, tables } from './lib'
 
-const stamp = latestStamp()
+const stamp = await latestStamp()
 ensureOut()
 
 type Manifest = {
@@ -14,7 +13,7 @@ type Manifest = {
 const manifest: Manifest = { stamp, generatedAt: new Date().toISOString(), sources: {} }
 
 for (const source of SOURCES) {
-  const db = loadDump(source, stamp)
+  const db = await loadDump(source, stamp)
   const tableCounts: Record<string, number> = {}
   for (const t of tables(db)) tableCounts[t] = count(db, t)
   const checks: Record<string, number> = {}
@@ -44,7 +43,7 @@ for (const source of SOURCES) {
   db.close()
 }
 
-writeFileSync(join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2))
+await Bun.write(join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2))
 
 let md = `# Migration inventory: dumps of ${stamp}\n`
 for (const [source, data] of Object.entries(manifest.sources)) {
@@ -56,5 +55,5 @@ for (const [source, data] of Object.entries(manifest.sources)) {
       .join(' · ')}\n`
   }
 }
-writeFileSync(join(OUT, 'manifest.md'), md)
+await Bun.write(join(OUT, 'manifest.md'), md)
 console.log(`Inventory written for ${stamp}: out/manifest.json, out/manifest.md`)

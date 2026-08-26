@@ -1,8 +1,7 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // A generated table rebuild silently deletes every cascading row, and every schema object
 // the snapshot does not carry. Refusing one is invariant 0010; there are no exemptions.
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 const DIR = 'server/db/migrations/sqlite'
@@ -10,27 +9,36 @@ const META = join(DIR, 'meta')
 
 // The estate carried two rebuilds applied before the rule existed. This schema starts clean,
 // so a rebuild here is always a defect.
-const GRANDFATHERED = new Set()
+const GRANDFATHERED = new Set<string>()
 
-if (!existsSync(META)) {
-  console.log('check-migrations: no migrations generated yet, nothing to check.')
-  process.exit(0)
+function scan(dir: string, pattern: string): string[] {
+  try {
+    return [...new Bun.Glob(pattern).scanSync({ cwd: dir, onlyFiles: true })].sort()
+  }
+  catch {
+    // A directory that does not exist yet is an empty one, not a failure.
+    return []
+  }
 }
 
-const snapshots = readdirSync(META).filter(f => f.endsWith('_snapshot.json')).sort()
-if (!snapshots.length) {
+const snapshots = scan(META, '*_snapshot.json')
+const newest = snapshots.at(-1)
+if (!newest) {
   console.log('check-migrations: no snapshots generated yet, nothing to check.')
   process.exit(0)
 }
-const latest = JSON.parse(readFileSync(join(META, snapshots.at(-1)), 'utf8'))
+
+interface SnapshotForeignKey { onDelete?: string, tableTo: string }
+interface SnapshotTable { name: string, foreignKeys?: Record<string, SnapshotForeignKey> }
+const latest: { tables?: Record<string, SnapshotTable> } = await Bun.file(join(META, newest)).json()
 
 // Which tables lose rows when a given table is dropped.
-const cascadesOnto = new Map()
+const cascadesOnto = new Map<string, Set<string>>()
 for (const table of Object.values(latest.tables ?? {})) {
   for (const fk of Object.values(table.foreignKeys ?? {})) {
     if (fk.onDelete !== 'cascade') continue
     if (!cascadesOnto.has(fk.tableTo)) cascadesOnto.set(fk.tableTo, new Set())
-    cascadesOnto.get(fk.tableTo).add(table.name)
+    cascadesOnto.get(fk.tableTo)!.add(table.name)
   }
 }
 
@@ -41,9 +49,11 @@ const DROP_TRIGGER = /drop\s+trigger\s+(?:if\s+exists\s+)?`?(\w+)`?/gi
 const REBUILD = /CREATE TABLE `__new_(\w+)`/g
 const RENAME = /ALTER TABLE `__new_(\w+)` RENAME TO `\1`/g
 
-/** Every statement this check cares about, in the order the migration runs them. */
-function eventsIn(sql) {
-  const events = []
+interface MigrationEvent { at: number, kind: 'create' | 'drop' | 'rebuild' | 'rename', name?: string, table?: string }
+
+// Every statement this check cares about, in the order the migration runs them.
+function eventsIn(sql: string): MigrationEvent[] {
+  const events: MigrationEvent[] = []
   for (const m of sql.matchAll(CREATE_TRIGGER)) events.push({ at: m.index, kind: 'create', name: m[1], table: m[2] })
   for (const m of sql.matchAll(DROP_TRIGGER)) events.push({ at: m.index, kind: 'drop', name: m[1] })
   for (const m of sql.matchAll(REBUILD)) events.push({ at: m.index, kind: 'rebuild', table: m[1] })
@@ -52,26 +62,26 @@ function eventsIn(sql) {
 }
 
 // Triggers live across migrations, so replay the whole directory in order.
-const liveTriggers = new Map()
-const problems = []
+const liveTriggers = new Map<string, string>()
+const problems: string[] = []
 
-for (const file of readdirSync(DIR).filter(f => f.endsWith('.sql')).sort()) {
-  const sql = readFileSync(join(DIR, file), 'utf8')
+for (const file of scan(DIR, '*.sql')) {
+  const sql = await Bun.file(join(DIR, file)).text()
   const grandfathered = GRANDFATHERED.has(file.replace(/\.sql$/, ''))
-  const rebuilt = new Map()
+  const rebuilt = new Map<string, string[]>()
 
   for (const event of eventsIn(sql)) {
     if (event.kind === 'create') {
-      liveTriggers.set(event.name, event.table)
+      liveTriggers.set(event.name!, event.table!)
       continue
     }
     if (event.kind === 'drop') {
-      liveTriggers.delete(event.name)
+      liveTriggers.delete(event.name!)
       continue
     }
     if (event.kind === 'rebuild') {
       if (grandfathered) continue
-      const dependents = cascadesOnto.get(event.table)
+      const dependents = cascadesOnto.get(event.table!)
       if (dependents?.size) {
         problems.push(`${file}: rebuilds \`${event.table}\`, and dropping it cascades to `
           + `${[...dependents].map(t => `\`${t}\``).join(', ')}. Those rows go silently.`)
@@ -82,7 +92,7 @@ for (const file of readdirSync(DIR).filter(f => f.endsWith('.sql')).sort()) {
     // the rename restores one: an earlier one attaches to the doomed table.
     const lost = [...liveTriggers].filter(([, table]) => table === event.table).map(([name]) => name)
     for (const name of lost) liveTriggers.delete(name)
-    if (!grandfathered && lost.length) rebuilt.set(event.table, lost)
+    if (!grandfathered && lost.length) rebuilt.set(event.table!, lost)
   }
 
   for (const [table, lost] of rebuilt) {

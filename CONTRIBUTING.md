@@ -31,6 +31,15 @@ repository at speed. Read this before your first change.
 5. Documentation drift check: a change to behaviour without a change to its document fails
    review. Documentation drift is a defect; the old rooms application is the cautionary tale.
 
+## Scripts and tooling
+
+- Anything that runs on this machine, in CI or at build time uses the Bun standard library:
+  `Bun.file`, `Bun.write`, `Bun.Glob`, `Bun.$`. Not `node:fs`. Worker code touches neither.
+- `node:path` stays, because Bun ships no replacement for it.
+- The exception is directory creation, which Bun has no API for. `Bun.write` creates a file's
+  parents; anything else keeps `mkdirSync` with a comment saying why.
+- Scripts are TypeScript run by `bun`, not `.mjs` run by `node`.
+
 ## Decisions
 
 - Decision records live in `docs/decisions/` from day one. Accepted records are never edited,
