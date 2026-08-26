@@ -1,6 +1,6 @@
 # 0002: Application stack stays Nuxt on Cloudflare Workers
 
-- Status: Proposed
+- Status: Accepted (Phase 0 gate, 26 August 2026)
 - Date: 2026-08-26
 
 ## Context

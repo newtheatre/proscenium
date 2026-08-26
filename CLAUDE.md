@@ -7,8 +7,10 @@ code and documentation a successor can pick up cold.
 
 ## The order of work
 
-1. **No product code before the Phase 0 gate** (`docs/roadmap.md`). Until the committee signs,
-   only definition documents and migration tooling belong here.
+1. **The Phase 0 gate passed on 26 August 2026** (0019), so product code belongs here. The
+   configuration defaults are provisional until the workshops confirm them: every operational
+   number ships as its proposed value in `docs/workshops.md`, and a key with no proposed value
+   ships unset rather than guessed.
 2. **Spec, then failing tests, then implementation.** Every change traces to a backlog story
    (`docs/backlog/`) or a decision record (`docs/decisions/`). Failing unit and integration
    tests reflecting the spec land first; the implementation follows; the tests pass.

@@ -1,8 +1,9 @@
 # Unified system: Phase 0 definition
 
 This directory is the definition package for the unified theatre management system: the single
-application that replaces stage-door, proscenium, rooms and rehearsal. Nothing in here is code,
-and no development starts until the gate at the bottom of `roadmap.md` is passed.
+application that replaces stage-door, proscenium, rooms and rehearsal. Nothing in here is code.
+The gate at the bottom of `roadmap.md`'s Phase 0 passed on 26 August 2026 (decision 0019) and
+development has started.
 
 ## Contents
 
@@ -10,8 +11,8 @@ and no development starts until the gate at the bottom of `roadmap.md` is passed
 | --- | --- |
 | `roadmap.md` | The compressed delivery plan: cutover by 31 October 2026, hardening to December, V2 from January. Phases, gates and the conditions the dates depend on. |
 | `backlog/` | The full story backlog, one file per module, tracker-ready. Each story has a role, a testable acceptance list, a phase and its sources. |
-| `decisions/` | Foundational architecture decision records, all status Proposed until the gate review accepts them. |
-| `workshops.md` | The configuration defaults register: every number that is currently folklore, with a proposed value for the committee to confirm, plus the workshop agenda. |
+| `decisions/` | Foundational architecture decision records, all accepted at the gate on 26 August 2026. |
+| `workshops.md` | The configuration defaults register: every number that is currently folklore, with a proposed value for the committee to confirm, plus the workshop agenda. The proposed values are what the system ships until a workshop amends them (0019). |
 | `spikes.md` | Time-boxed investigations that must land before their dependent build work. |
 |  `../CONTRIBUTING.md` | Engineering standards, at the repository root as CONTRIBUTING.md. |
 

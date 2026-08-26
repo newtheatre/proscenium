@@ -1,8 +1,8 @@
 # Foundational decision records
 
-Status Proposed until the Phase 0 gate review accepts them; three were settled early by the
-spike outcomes recorded on 26 August. Accepted records are never edited afterwards, only
-superseded.
+All accepted: three were settled early by the spike outcomes recorded on 26 August, and the
+rest at the Phase 0 gate on 26 August 2026 (0019). Accepted records are never edited
+afterwards, only superseded.
 
 | # | Title | Gated on |
 | --- | --- | --- |
@@ -24,3 +24,4 @@ superseded.
 | 0016 | Testing strategy: invariants first, named regressions forever | |
 | 0017 | Bar products sell as serving-size variants | |
 | 0018 | Training records semantics and delivery modes | |
+| 0019 | The Phase 0 gate passed with provisional configuration defaults | |

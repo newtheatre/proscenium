@@ -11,7 +11,7 @@ gantt
   title Cutover by 31 October 2026
   section Phase 0
   Definition and workshops     :done, 2026-08-26, 2026-09-06
-  Gate                         :milestone, 2026-09-06, 0d
+  Gate                         :milestone, 2026-08-26, 0d
   section Phase 1
   Foundations                  :2026-09-07, 2026-09-19
   First migration rehearsal    :milestone, 2026-09-13, 0d
@@ -44,8 +44,10 @@ gantt
   sizes, zeroed stocktakes, double-voided tabs and placeholder-email customers already
   documented in proscenium's known issues). They are owed regardless of migration.
 
-**Gate (target 6 September): the committee signs the backlog scope, accepts or amends the ADRs,
-and confirms the configuration defaults. No product code before this gate.**
+**Gate: passed 26 August 2026, eleven days early (decision 0019).** The committee signed the
+backlog scope and accepted the decision records; the configuration defaults are deferred to the
+workshops in the week of 31 August and ship meanwhile as the proposed values in
+`workshops.md`. Product code begins from that date.
 
 ### Phase 1: foundations (7 to 19 September)
 

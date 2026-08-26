@@ -7,12 +7,15 @@ first, and the first product commit lands only after the Phase 0 gate.
 
 ## Where things stand
 
-- **Phase 0 (definition) is delivered and under committee review.** The full package is in
-  [`docs/`](docs/README.md): a 260-story backlog, 18 accepted decision records, the roadmap,
-  the configuration workshops register and the spike outcomes.
-- **The gate:** no product code before the committee signs the backlog scope and configuration
-  defaults. Target 6 September 2026. The rule is recorded in
-  [`docs/roadmap.md`](docs/roadmap.md).
+- **Phase 0 (definition) is delivered and the gate passed on 26 August 2026.** The full package
+  is in [`docs/`](docs/README.md): a 260-story backlog, 19 accepted decision records, the
+  roadmap, the configuration workshops register and the spike outcomes.
+- **The gate:** the committee signed the backlog scope and the decision records; the
+  configuration defaults are deferred to the workshops in the week of 31 August and ship
+  meanwhile as their proposed values. Recorded in
+  [`docs/decisions/0019-phase-0-gate-passed-with-provisional-configuration.md`](docs/decisions/0019-phase-0-gate-passed-with-provisional-configuration.md).
+- **Phase 1 (foundations) is in progress:** the application scaffold, the CI gates and the
+  configuration surface.
 - **The destination:** cutover from the old estate by 31 October 2026, hardening through
   December, V2 from January 2027.
 
