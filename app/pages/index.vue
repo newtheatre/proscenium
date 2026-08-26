@@ -1,14 +1,28 @@
 <script setup lang="ts">
-useSeoMeta({ title: 'Nottingham New Theatre' })
+useSeoMeta({ title: 'The Nottingham New Theatre' })
 </script>
 
 <template>
-  <UContainer class="py-16">
-    <h1 class="text-3xl font-bold">
-      The Nottingham New Theatre
-    </h1>
-    <p class="mt-4 text-muted">
-      The unified system is in Phase 1. Nothing here is the public site yet.
-    </p>
-  </UContainer>
+  <UPageHero
+    title="The Nottingham New Theatre"
+    description="The country's only entirely student-run theatre."
+  >
+    <template #links>
+      <!-- The one CTA of the view. The budget is one marquee per view and this is it. -->
+      <UButton
+        variant="marquee"
+        size="lg"
+        to="/whats-on"
+      >
+        What's on
+      </UButton>
+      <UButton
+        variant="poster"
+        size="lg"
+        to="/get-involved"
+      >
+        Get involved
+      </UButton>
+    </template>
+  </UPageHero>
 </template>
