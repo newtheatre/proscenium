@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Nitro merges this file into the generated config (defu, this file lowest precedence), so
+  // only what its own types cannot express belongs here. Everything else is in nuxt.config.ts.
+  "send_email": [
+    {
+      // Pinned so the worker cannot send as an address the review never saw (0020). A test
+      // asserts this list equals the registry in shared/senders.ts.
+      "name": "EMAIL",
+      "allowed_sender_addresses": [
+        "boxoffice@newtheatre.org.uk",
+        "rooms@newtheatre.org.uk",
+        "training@newtheatre.org.uk",
+        "accounts@newtheatre.org.uk",
+        "hello@newtheatre.org.uk"
+      ]
+    }
+  ]
+}

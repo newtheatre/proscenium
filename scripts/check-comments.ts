@@ -14,7 +14,7 @@ const BANNED_TAGS = /@(param|returns?|prop|props|emits?|module|route|authenticat
 // Whole files, not only their comments: the rule covers UI copy and docs too.
 // The entity spellings count, or the character stays legal in one encoding.
 const EM_DASH = /\u2014|&(?:mdash|#8212|#x2014);/i
-const EM_DASH_EXTS = ['ts', 'vue', 'mjs', 'js', 'md', 'yml', 'yaml', 'sql', 'sh', 'json']
+const EM_DASH_EXTS = ['ts', 'vue', 'mjs', 'js', 'md', 'yml', 'yaml', 'sql', 'sh', 'json', 'jsonc']
 const HISTORY = /\b(used to|originally|an earlier version|previously|it used to|we used to|this used to|no longer needed|before this)\b/i
 // Thousands-separated counts and precise percentages rot; years and ADR
 // numbers do not, so they are not flagged.
