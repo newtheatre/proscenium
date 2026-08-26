@@ -66,10 +66,6 @@ export default defineNuxtConfig({
       password: '',
       maxAge: 60 * 60 * 24 * 30,
     },
-    // Workspace-only Google sign-in (0008). The NUXT_ prefix is load-bearing: a worker secret
-    // named GOOGLE_CLIENT_SECRET is silently ignored.
-    googleClientId: '',
-    googleClientSecret: '',
     public: {
       baseURL: 'https://newtheatre.org.uk',
     },

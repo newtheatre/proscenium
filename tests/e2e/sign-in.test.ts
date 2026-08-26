@@ -89,6 +89,18 @@ describe.skipIf(skip !== null)('registering and signing in (A-101, A-103, 0007)'
     expect(response.status).toBe(400)
   })
 
+  // The round trip needs a real Google login, so what is checked here is that the route is
+  // wired and asks for the right thing. The resolution it performs afterwards is unit tested.
+  test('the Google route hands off to Google, scoped to the Workspace domain', async () => {
+    const response = await fetch(`${app.baseURL}/auth/google`, { redirect: 'manual' })
+    expect(response.status).toBe(302)
+    const target = new URL(response.headers.get('location') ?? '')
+    expect(target.host).toBe('accounts.google.com')
+    expect(target.searchParams.get('hd')).toBe('newtheatre.org.uk')
+    expect(target.searchParams.get('redirect_uri')).toBe(`${app.baseURL}/auth/google`)
+    expect(target.searchParams.get('client_id')).toBeTruthy()
+  })
+
   test('a Workspace address cannot register with a password (0008)', async () => {
     const response = await post('/api/auth/register', {
       email: 'someone.synthetic@newtheatre.org.uk', name: 'Synthetic Officer (test)', password,
