@@ -158,6 +158,9 @@ export default defineNuxtConfig({
   },
 
   hub: {
+    // The end-to-end suite points this at a throwaway directory so a run cannot depend on, or
+    // disturb, whatever is in a developer's local database.
+    dir: process.env.NUXT_HUB_DIR ?? '.data',
     db: 'sqlite',
     kv: false,
     cache: false,

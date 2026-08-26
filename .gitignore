@@ -12,3 +12,10 @@ coverage/
 .DS_Store
 migration/dumps/
 migration/out/
+
+.data/e2e-70e22036
+.data/e2e-126a6a2a
+.data/e2e-088502dc
+.data/e2e-d9b16899
+.data/e2e-e50b36b0
+.data/e2e-09e84970

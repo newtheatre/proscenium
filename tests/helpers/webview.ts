@@ -39,32 +39,31 @@ async function waitForServer(url: string, signal: AbortSignal): Promise<void> {
 
 export interface AppUnderTest {
   baseURL: string
+  databaseFile: string
   stop: () => Promise<void>
 }
 
-// Reuses a server already listening on the port, so a developer with `bun run dev` open does
-// not wait for a second one to boot.
+// Its own database per run, inside the gitignored .data: sharing one lets a run depend on what
+// the last one left, which is how "the last administrator" stops being true mid-suite.
 export async function startApp(): Promise<AppUnderTest> {
   const controller = new AbortController()
-  try {
-    const response = await fetch(BASE_URL, { signal: AbortSignal.timeout(1500) })
-    if (response.ok) return { baseURL: BASE_URL, stop: async () => {} }
-  }
-  catch { /* start our own */ }
-
   const port = new URL(BASE_URL).port
+  const hubDir = `.data/e2e-${crypto.randomUUID().slice(0, 8)}`
+
   const server: Subprocess = Bun.spawn(['bun', 'run', 'dev', '--port', port], {
-    env: { ...process.env, NUXT_PORT: port },
+    env: { ...process.env, NUXT_PORT: port, NUXT_HUB_DIR: hubDir },
     stdout: 'pipe',
     stderr: 'pipe',
   })
   await waitForServer(BASE_URL, controller.signal)
   return {
     baseURL: BASE_URL,
+    databaseFile: `${hubDir}/db/sqlite.db`,
     stop: async () => {
       controller.abort()
       server.kill()
       await server.exited
+      await Bun.$`rm -rf ${hubDir}`.quiet().nothrow()
     },
   }
 }

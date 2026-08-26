@@ -1,0 +1,54 @@
+import type { H3Event } from 'h3'
+import { and, eq, gt, isNull, or } from 'drizzle-orm'
+import type { Grant, Permission, Role } from '#shared/utils/roles'
+import type { AccountRow } from '#server/utils/accounts'
+
+// Live grants only: expiry is enforced at read time, so a lapsed role stops working overnight
+// without a sweep having to run (0009).
+export async function liveGrants(userId: string, now = new Date()): Promise<Grant[]> {
+  const rows = await db.select({ role: schema.roleGrants.role, expiresAt: schema.roleGrants.expiresAt })
+    .from(schema.roleGrants)
+    .where(and(
+      eq(schema.roleGrants.userId, userId),
+      or(isNull(schema.roleGrants.expiresAt), gt(schema.roleGrants.expiresAt, Math.floor(now.getTime() / 1000))),
+    ))
+  return rows.filter(row => isRole(row.role)) as Grant[]
+}
+
+export interface Authority {
+  account: AccountRow
+  permissions: Set<Permission>
+}
+
+// Permissions from held unexpired roles, then derived authority, then ownership. Derived
+// authority arrives with the shifts and records it reads (0009).
+export async function authority(event: H3Event): Promise<Authority> {
+  const account = await requireAccount(event)
+  return { account, permissions: permissionsFor(await liveGrants(account.id), new Date()) }
+}
+
+// Guards fail closed: a permission that is not held is a 403, and nothing reaches the handler.
+export async function requirePermission(event: H3Event, permission: Permission): Promise<Authority> {
+  const resolved = await authority(event)
+  if (!resolved.permissions.has(permission)) {
+    throw createError({ statusCode: 403, statusMessage: 'You do not have permission to do that' })
+  }
+  return resolved
+}
+
+export function owns(resolved: Authority, userId: string): boolean {
+  return resolved.account.id === userId
+}
+
+// The last administrator cannot be removed: it is a write check rather than a constraint,
+// because it depends on every other row (A-120).
+export async function wouldStrandTheSystem(role: Role, userId: string, now = new Date()): Promise<boolean> {
+  if (role !== PROTECTED_ROLE) return false
+  const holders = await db.select({ userId: schema.roleGrants.userId })
+    .from(schema.roleGrants)
+    .where(and(
+      eq(schema.roleGrants.role, PROTECTED_ROLE),
+      or(isNull(schema.roleGrants.expiresAt), gt(schema.roleGrants.expiresAt, Math.floor(now.getTime() / 1000))),
+    ))
+  return holders.filter(holder => holder.userId !== userId).length === 0
+}
