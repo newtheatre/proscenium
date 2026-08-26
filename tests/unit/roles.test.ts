@@ -35,6 +35,18 @@ describe('the role vocabulary', () => {
     expect(PERMISSION_MAP[PROTECTED_ROLE]).toContain('roles.grant')
   })
 
+  // The import writes the values on the right of this map, so a rename on one side and not the
+  // other lands roles the application does not recognise (K-112).
+  test('the migration role map targets exactly this vocabulary', async () => {
+    const map = await Bun.file('migration/role-map.json').json() as Record<string, string>
+    const targets = new Set(Object.entries(map).filter(([key]) => !key.startsWith('_')).map(([, value]) => value))
+    for (const target of targets) {
+      expect(`${target}: ${isRole(target)}`).toBe(`${target}: true`)
+    }
+    // Every role should be reachable by import, or the old estate has no way to grant it.
+    expect([...ROLES].filter(role => !targets.has(role))).toEqual([])
+  })
+
   test('an unknown role is not a role', () => {
     expect(isRole('ADMIN')).toBe(true)
     expect(isRole('proscenium:ADMIN')).toBe(false)
@@ -75,7 +87,7 @@ describe('permissions come from live grants only', () => {
   test('several roles combine', () => {
     const held = permissionsFor([
       { role: 'MANAGER', expiresAt: null },
-      { role: 'TRAINING_OFFICER', expiresAt: null },
+      { role: 'TRAINING_MANAGER', expiresAt: null },
     ], now)
     expect(held.has('audit.read')).toBe(true)
     expect(held.has('accounts.read')).toBe(true)
