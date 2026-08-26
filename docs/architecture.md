@@ -17,7 +17,7 @@ flowchart LR
   B[Browser or phone] --> N[Nuxt app, SSR and islands]
   N --> API[Nitro server routes]
   subgraph W[One Cloudflare Worker]
-    API --> CORE[server/core: db, session, authorise, ledger, notify, config, audit]
+    API --> CORE[server/utils: db, session, authorise, ledger, notify, config, audit]
     CRON[Cron triggers] --> TASKS[Scheduled tasks] --> CORE
   end
   CORE --> D1[(D1 database)]
@@ -29,13 +29,13 @@ flowchart LR
 ## Code layout
 
 Modules from the backlog map one-to-one onto directories. Nothing imports across module
-boundaries except through `server/core/` and `shared/`.
+boundaries except through `server/utils/` and `shared/`.
 
 ```
 app/                    pages, components, composables (grouped per module)
 server/
   api/<module>/         one route per file, Nitro conventions
-  core/                 the shared spine: db, session, authorise, ledger, notify,
+  utils/                the shared spine: db, session, authorise, ledger, notify,
                         config, audit, dates (Europe/London), conditional-write helpers
   tasks/                scheduled tasks (below)
   plugins/              0.secrets-store, authorisation resolver
@@ -50,7 +50,7 @@ tests/                  unit / integration / e2e, bun test
 
 - Sealed first-party session cookie (nuxt-auth-utils), 30 days, epoch-revoked (0007).
   Privileged requests re-verify the user row every time; there is no staleness window.
-- Authorisation resolves in `server/core/authorise.ts` from three sources, in order:
+- Authorisation resolves in `server/utils/authorise.ts` from three sources, in order:
   1. **Permissions** from held, unexpired roles via the static permission map in `shared/`.
   2. **Derived authority**: tonight's confirmed shift (04:00 to 04:00 London), a currently
      valid training record, department leadership. Computed by joins at request time, never
@@ -77,7 +77,7 @@ flowchart TD
 ## Money and the ledger
 
 Every monetary fact posts to `ledger_entries` (+ `ledger_lines`) in the same batch as its
-domain write (0004). `server/core/ledger.ts` is the only writer. Reconciliation, dashboards
+domain write (0004). `server/utils/ledger.ts` is the only writer. Reconciliation, dashboards
 and exports are queries over the ledger; no module keeps its own money totals.
 
 ## Concurrency on D1 (0003, 0006)
@@ -108,7 +108,7 @@ decide (principle P6): no task ever awards a record, approves a request or takes
 
 ## Notifications
 
-One centre (`server/core/notify.ts`, decision 0013): per-topic preferences, transactional
+One centre (`server/utils/notify.ts`, decision 0013): per-topic preferences, transactional
 always delivers, digest coalescing, full send log with retries, undeliverable and anonymised
 addresses dropped before the provider. Channels: email now, in-app inbox now, push when it
 actually delivers.

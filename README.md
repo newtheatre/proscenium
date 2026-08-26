@@ -32,6 +32,32 @@ account for (incidents, age checks, prices, stock, audit) is append-only (0010).
 one transaction (0011). Every date is Europe/London and the show night runs 04:00 to 04:00
 (0014).
 
+## Getting started
+
+Bun 1.4 or later and Node 20 or later. No Cloudflare account is needed: the database runs as a
+local SQLite file under `.data/`.
+
+```bash
+cp .env.example .env      # then set NUXT_SESSION_PASSWORD to any long random string
+bun install
+bun run dev               # http://localhost:3001
+```
+
+Before opening a pull request, run what CI gates on:
+
+```bash
+bun run lint
+bun run typecheck
+bun run check:comments
+bun run check:migrations
+bun run check:content-tokens
+bun test
+bun run build
+```
+
+The migration tooling is standalone and has its own instructions in
+[`migration/README.md`](migration/README.md); the application never imports from it.
+
 ## How to work here
 
 1. Read [`CONTRIBUTING.md`](CONTRIBUTING.md); the order is spec, then failing tests, then

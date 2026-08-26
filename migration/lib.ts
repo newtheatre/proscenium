@@ -26,10 +26,10 @@ export function loadDump(source: Source, stamp = latestStamp()): Database {
 export function tables(db: Database): string[] {
   return db
     .query<{ name: string }, []>(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '\\_%' ESCAPE '\\' ORDER BY name",
+      'SELECT name FROM sqlite_master WHERE type=\'table\' AND name NOT LIKE \'sqlite_%\' AND name NOT LIKE \'\\_%\' ESCAPE \'\\\' ORDER BY name',
     )
     .all()
-    .map((r) => r.name)
+    .map(r => r.name)
 }
 
 export function count(db: Database, table: string, where = ''): number {

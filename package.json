@@ -3,11 +3,50 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "nuxt dev",
+    "build": "NODE_OPTIONS=--max-old-space-size=4096 nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "typecheck": "nuxt typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "bun test",
+    "check:comments": "node scripts/check-comments.mjs",
+    "check:migrations": "node scripts/check-migrations.mjs",
+    "check:content-tokens": "node scripts/check-content-tokens.mjs",
     "migration:export": "./migration/export.sh",
-    "migration:dry-run": "bun migration/inventory.ts && bun migration/transform-identity.ts && bun migration/reconcile.ts"
+    "migration:dry-run": "bun migration/inventory.ts && bun migration/transform-identity.ts && bun migration/reconcile.ts",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@nuxt/a11y": "1.0.0-alpha.1",
+    "@nuxt/content": "3.11.2",
+    "@nuxt/eslint": "1.15.1",
+    "@nuxt/hints": "1.0.0-alpha.7",
+    "@nuxt/image": "2.0.0",
+    "@nuxt/ui": "4.8.1",
+    "@nuxthub/core": "0.10.8",
+    "@nuxtjs/seo": "3.4.0",
+    "drizzle-orm": "^0.45.2",
+    "nuxt": "^4.5.2",
+    "nuxt-auth-utils": "0.5.29",
+    "nuxt-authorization": "0.3.5",
+    "vue": "^3.5.41",
+    "vue-router": "^5.2.0",
+    "zod": "^4.1.11"
   },
   "devDependencies": {
-    "wrangler": "4.33.1",
-    "@types/bun": "1.2.21"
+    "@libsql/client": "^0.17.4",
+    "@types/bun": "1.2.21",
+    "better-sqlite3": "^12.11.1",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^10.8.1",
+    "typescript": "^5.9.3",
+    "vue-tsc": "^3.3.10",
+    "wrangler": "4.33.1"
+  },
+  "overrides": {
+    "h3": "^1.15.11",
+    "@nuxt/schema": "^4.5.2"
   }
 }
