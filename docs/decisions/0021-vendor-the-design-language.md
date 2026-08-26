@@ -41,5 +41,8 @@ show artwork never restyled.
   is a rule that lasts until the first busy week.
 - If the `ui` repository is ever pushed and the estate applications adopt it, this record is
   superseded rather than edited, and the copy here is diffed against `e738cdb` to see what moved.
+- The reasoning travels with the code as `docs/design-language.md`, rewritten for one system
+  rather than four applications. A vendored stylesheet with no argument attached to it is a set
+  of numbers nobody dares change.
 - The layer shipped `@nuxt/ui` as a dependency. This application already carries its own, and the
   two must not diverge by a major version.
