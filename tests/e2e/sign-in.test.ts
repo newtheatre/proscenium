@@ -75,6 +75,20 @@ describe.skipIf(skip !== null)('registering and signing in (A-101, A-103, 0007)'
     expect(await response.json()).toMatchObject({ signedIn: false })
   })
 
+  test('a password under the configured minimum is refused, quoting the rule', async () => {
+    const other = syntheticPerson(888_888)
+    const response = await post('/api/auth/register', { email: other.email, name: other.name, password: 'short' })
+    expect(response.status).toBe(400)
+    expect((await response.json()).statusMessage ?? '').toMatch(/at least \d+ characters/)
+  })
+
+  // Refused by the schema before any hashing happens, which is what the outer bound is for.
+  test('an absurdly long password is refused before it is hashed', async () => {
+    const other = syntheticPerson(777_777)
+    const response = await post('/api/auth/register', { email: other.email, name: other.name, password: 'x'.repeat(5000) })
+    expect(response.status).toBe(400)
+  })
+
   test('a Workspace address cannot register with a password (0008)', async () => {
     const response = await post('/api/auth/register', {
       email: 'someone.synthetic@newtheatre.org.uk', name: 'Synthetic Officer (test)', password,

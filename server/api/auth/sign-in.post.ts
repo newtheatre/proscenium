@@ -1,11 +1,13 @@
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { auditEntry } from '../../../shared/audit'
-import { normaliseEmail } from '../../../shared/auth'
+import { ABSOLUTE_PASSWORD_LIMIT, normaliseEmail } from '../../../shared/auth'
 
+// Never the policy bounds: a password set before the policy tightened must still be able to
+// sign in, and telling an attacker the current rules from the sign-in form helps only them.
 const body = z.object({
   email: z.string().email().max(320),
-  password: z.string().min(1).max(400),
+  password: z.string().min(1).max(ABSOLUTE_PASSWORD_LIMIT),
 })
 
 // Sign in with an address and a password.

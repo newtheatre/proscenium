@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { defaultPasswordPolicy, isWorkspaceEmail, normaliseEmail, passwordProblem, sessionIsCurrent } from '../../shared/auth'
+import { CONFIG_KEYS } from '../../shared/config'
+import { ABSOLUTE_PASSWORD_LIMIT, defaultPasswordPolicy, isWorkspaceEmail, normaliseEmail, passwordProblem, sessionIsCurrent } from '../../shared/auth'
 
 describe('addresses', () => {
   test('an address normalises to lowercase and trimmed', () => {
@@ -39,6 +40,14 @@ describe('password rules (0008, 0012)', () => {
     // Sixteen emoji: four UTF-16 code units each, so a naive length would pass a short password.
     expect(passwordProblem(address, '🎭'.repeat(policy.minLength - 1))?.reason).toBe('too-short')
     expect(passwordProblem(address, '🎭'.repeat(policy.minLength))).toBeNull()
+  })
+
+  // The routes bound the body at the absolute limit and leave the policy to passwordProblem.
+  // That only holds if the configuration can never be set above the bound the routes accept.
+  test('the configuration can never exceed the transport limit', () => {
+    expect(CONFIG_KEYS.PASSWORD_MAX_LENGTH.schema.safeParse(ABSOLUTE_PASSWORD_LIMIT + 1).success).toBe(false)
+    expect(CONFIG_KEYS.PASSWORD_MAX_LENGTH.schema.safeParse(policy.maxLength).success).toBe(true)
+    expect(ABSOLUTE_PASSWORD_LIMIT).toBeGreaterThan(policy.maxLength)
   })
 
   test('composition rules ship off', () => {

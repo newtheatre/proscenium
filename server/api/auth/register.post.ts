@@ -1,11 +1,14 @@
 import { z } from 'zod'
-import { defaultPasswordPolicy, normaliseEmail, passwordProblem } from '../../../shared/auth'
+import { ABSOLUTE_PASSWORD_LIMIT, defaultPasswordPolicy, normaliseEmail, passwordProblem } from '../../../shared/auth'
 import type { PasswordProblem } from '../../../shared/auth'
 
+// The schema guards shape and the outer limit; the length policy lives in passwordProblem so
+// there is one place to change it and no second copy to drift (0012).
 const body = z.object({
+  // 320 is the longest address RFC 5321 permits: 64 local, an @, 255 domain.
   email: z.string().email().max(320),
   name: z.string().trim().min(1).max(120),
-  password: z.string().min(1).max(4096),
+  password: z.string().min(1).max(ABSOLUTE_PASSWORD_LIMIT),
 })
 
 // The message quotes the rule that refused it, so a person is not left guessing which one moved.
