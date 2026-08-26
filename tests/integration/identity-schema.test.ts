@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { auditEntry } from '../../shared/audit'
 import { createTestDatabase, rows } from '../helpers/database'
 import type { TestDatabase } from '../helpers/database'
 
@@ -141,6 +142,34 @@ describe('auth tokens and access profiles', () => {
   // access_profiles waits for D-127, which owns the encryption at rest and the consent path.
   // Its nine flags are settled: the Nimbus Access Card categories (docs/data-model.md).
   test.todo('companions are capped at two (D-127)', () => {})
+})
+
+describe('the audit writer against the real table (0010, 0011)', () => {
+  test('an entry built by the writer inserts and reads back', async () => {
+    await withDatabase((database) => {
+      const entry = auditEntry({ actorId: 'u-1', action: 'role.granted', target: 'user:u-2', detail: { role: 'ADMINISTRATOR' } })
+      database.batch([[
+        'INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (?, ?, ?, ?, ?)',
+        entry.id, entry.actorId, entry.action, entry.target, JSON.stringify(entry.detail),
+      ]])
+      const [stored] = rows<{ action: string, detail: string }>(database, 'SELECT action, detail FROM audit_log')
+      expect(stored!.action).toBe('role.granted')
+      expect(JSON.parse(stored!.detail)).toEqual({ role: 'ADMINISTRATOR' })
+    })
+  })
+
+  // The entry rides the same batch as the change it records, so a rolled-back change cannot
+  // leave an audit entry claiming it happened (0001, 0003).
+  test('an audit entry does not survive a failed batch', async () => {
+    await withDatabase((database) => {
+      const entry = auditEntry({ actorId: 'u-1', action: 'user.disabled', target: 'user:u-2' })
+      expect(() => database.batch([
+        ['INSERT INTO audit_log (id, actor_id, action, target) VALUES (?, ?, ?, ?)', entry.id, entry.actorId, entry.action, entry.target],
+        ['INSERT INTO users (id, email, name) VALUES (?, ?, ?)', 'u-2', 'BROKEN@Example.Invalid', 'A Member'],
+      ])).toThrow()
+      expect(rows(database, 'SELECT * FROM audit_log')).toEqual([])
+    })
+  })
 })
 
 // Append-only is trigger-enforced, not a convention (0010).
