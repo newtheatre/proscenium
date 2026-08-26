@@ -7,7 +7,7 @@ without losing a row that matters. Phasing follows the roadmap: the platform sto
 Phase 1, the migration stories rehearse weekly through Phase 2 and complete at the 31 October
 cutover.
 
-Stories: 21. Phases: 18 MVP, 0 V2, 0 Later, 3 resolved.
+Stories: 22. Phases: 19 MVP, 0 V2, 0 Later, 3 resolved.
 
 ## Open questions
 
@@ -393,6 +393,28 @@ Stories: 21. Phases: 18 MVP, 0 V2, 0 Later, 3 resolved.
   3. Seeded people use reserved undeliverable domains and obviously synthetic names, so test
      data can never be mistaken for, or mailed to, a real person.
 - Source: Prompt Book P7; audit PR-14 (sandbox isolation precedent); Get-In part 5 (standards)
+
+## K-122: Bootstrap the first administrator in a new environment
+
+- Role: Administrator
+- Phase: MVP
+- Story: As the IT Manager, I want a documented way to create the first administrator in an
+  environment that has none, so that a fresh deployment is not locked out of itself.
+- Depends on: K-107
+- Acceptance criteria:
+  1. Granting the administrator role requires a permission only an administrator holds, so an
+     environment with no administrator cannot be administered; this story is the only way in and
+     says so.
+  2. Locally, one command grants the role to an existing account and refuses any target that is
+     not a local database, with a test proving the refusal.
+  3. In production, the runbook names the operator, the command and the approval needed; the
+     grant is audited with the actor recorded as the bootstrap rather than as a person.
+  4. The bootstrap is refused where a usable administrator already exists, so it cannot be used
+     to grant quietly around the ordinary path.
+  5. Operations documents the whole sequence for a new environment, and a successor can follow
+     it without asking anyone.
+- Source: Found while building A-120; the guard protects the last administrator and nothing
+  created the first.
 
 ## K-121: The named regression suite
 

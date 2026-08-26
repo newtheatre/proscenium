@@ -53,10 +53,14 @@ describe.skipIf(skip !== null)('registering and signing in (A-101, A-103, 0007)'
     expect(response.status).toBe(401)
   })
 
-  test('an address that was never registered is refused the same way', async () => {
+  // Indistinguishable, body included: different wording is as good an oracle as a different
+  // status. Timing is equalised structurally, by always running a verification (A-103).
+  test('an unknown address and a wrong password are indistinguishable', async () => {
     const stranger = syntheticPerson(999_999)
-    const response = await post('/api/auth/sign-in', { email: stranger.email, password })
-    expect(response.status).toBe(401)
+    const unknown = await post('/api/auth/sign-in', { email: stranger.email, password })
+    const wrong = await post('/api/auth/sign-in', { email: person.email, password: 'not the password' })
+    expect(unknown.status).toBe(wrong.status)
+    expect(await unknown.text()).toBe(await wrong.text())
   })
 
   test('the right password signs in and seals a session', async () => {

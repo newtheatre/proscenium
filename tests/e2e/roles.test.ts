@@ -102,6 +102,28 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
     expect((await response.json()).statusMessage ?? '').toMatch(/last administrator/i)
   })
 
+  // "Usable" excludes disabled accounts, so a disabled second administrator must not satisfy
+  // the guard (A-120 criterion 3).
+  test('a disabled second administrator does not satisfy the last-admin guard', async () => {
+    const spare = syntheticPerson(Math.floor(Math.random() * 1_000_000) + 2)
+    await register(spare)
+    const spareCookie = await signIn(spare.email)
+    const spareSession = await (await fetch(`${app.baseURL}/api/auth/session`, { headers: { cookie: spareCookie } })).json()
+
+    expect((await send('POST', '/api/admin/roles', { userId: spareSession.user.id, role: 'ADMIN' }, cookie)).status).toBe(200)
+
+    // With a second live administrator the guard lets go.
+    const session = await (await fetch(`${app.baseURL}/api/auth/session`, { headers: { cookie } })).json()
+    const { Database } = await import('bun:sqlite')
+    const database = new Database(app.databaseFile)
+    database.query('UPDATE users SET disabled = 1 WHERE id = ?').run(spareSession.user.id)
+    database.close()
+
+    // Disabled, so it no longer counts and the guard holds again.
+    const response = await send('DELETE', '/api/admin/roles', { userId: session.user.id, role: 'ADMIN' }, cookie)
+    expect(response.status).toBe(409)
+  })
+
   test('an ordinary role can be revoked', async () => {
     expect((await send('DELETE', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' }, cookie)).status).toBe(200)
     const read = await fetch(`${app.baseURL}/api/admin/roles?userId=${subjectId}`, { headers: { cookie } })
