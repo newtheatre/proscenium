@@ -1,0 +1,28 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --color-purple-50: oklch(0.959 0.02 330.76);
+  --color-purple-100: oklch(0.927 0.038 332.66);
+  --color-purple-200: oklch(0.855 0.079 331.79);
+  --color-purple-300: oklch(0.775 0.129 332.26);
+  --color-purple-400: oklch(0.704 0.181 332.6);
+  --color-purple-500: oklch(0.628 0.188 332.55);
+  --color-purple-600: oklch(0.546 0.164 332.65);
+  --color-purple-700: oklch(0.448 0.135 332.43);
+  --color-purple-800: oklch(0.341 0.102 332.15);
+  --color-purple-900: oklch(0.243 0.072 333.45);
+  --color-purple-950: oklch(0.197 0.058 333.69);
+
+  --color-orange-50: oklch(0.982 0.013 71.33);
+  --color-orange-100: oklch(0.967 0.027 74.76);
+  --color-orange-200: oklch(0.924 0.066 77.23);
+  --color-orange-300: oklch(0.891 0.106 80.96);
+  --color-orange-400: oklch(0.851 0.167 85.4);
+  --color-orange-500: oklch(0.735 0.151 86.16);
+  --color-orange-600: oklch(0.615 0.126 86.16);
+  --color-orange-700: oklch(0.493 0.101 85.63);
+  --color-orange-800: oklch(0.373 0.076 86.63);
+  --color-orange-900: oklch(0.26 0.053 87.37);
+  --color-orange-950: oklch(0.199 0.041 85.51);
+}

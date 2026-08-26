@@ -7,12 +7,15 @@ first, and the first product commit lands only after the Phase 0 gate.
 
 ## Where things stand
 
-- **Phase 0 (definition) is delivered and under committee review.** The full package is in
-  [`docs/`](docs/README.md): a 260-story backlog, 18 accepted decision records, the roadmap,
-  the configuration workshops register and the spike outcomes.
-- **The gate:** no product code before the committee signs the backlog scope and configuration
-  defaults. Target 6 September 2026. The rule is recorded in
-  [`docs/roadmap.md`](docs/roadmap.md).
+- **Phase 0 (definition) is delivered and the gate passed on 26 August 2026.** The full package
+  is in [`docs/`](docs/README.md): a 260-story backlog, 19 accepted decision records, the
+  roadmap, the configuration workshops register and the spike outcomes.
+- **The gate:** the committee signed the backlog scope and the decision records; the
+  configuration defaults are deferred to the workshops in the week of 31 August and ship
+  meanwhile as their proposed values. Recorded in
+  [`docs/decisions/0019-phase-0-gate-passed-with-provisional-configuration.md`](docs/decisions/0019-phase-0-gate-passed-with-provisional-configuration.md).
+- **Phase 1 (foundations) is in progress:** the application scaffold, the CI gates and the
+  configuration surface.
 - **The destination:** cutover from the old estate by 31 October 2026, hardening through
   December, V2 from January 2027.
 
@@ -28,6 +31,32 @@ quoted live on the public policy pages (0012). Everything the theatre could be h
 account for (incidents, age checks, prices, stock, audit) is append-only (0010). Erasure is
 one transaction (0011). Every date is Europe/London and the show night runs 04:00 to 04:00
 (0014).
+
+## Getting started
+
+Bun 1.4 or later and Node 20 or later. No Cloudflare account is needed: the database runs as a
+local SQLite file under `.data/`.
+
+```bash
+cp .env.example .env      # then set NUXT_SESSION_PASSWORD to any long random string
+bun install
+bun run dev               # http://localhost:3001
+```
+
+Before opening a pull request, run what CI gates on:
+
+```bash
+bun run lint
+bun run typecheck
+bun run check:comments
+bun run check:migrations
+bun run check:content-tokens
+bun test
+bun run build
+```
+
+The migration tooling is standalone and has its own instructions in
+[`migration/README.md`](migration/README.md); the application never imports from it.
 
 ## How to work here
 

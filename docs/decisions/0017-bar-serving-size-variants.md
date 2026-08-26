@@ -1,6 +1,6 @@
 # 0017: Bar products sell as serving-size variants
 
-- Status: Proposed
+- Status: Accepted (Phase 0 gate, 26 August 2026)
 - Date: 2026-08-26
 
 ## Context

@@ -1,6 +1,6 @@
 # 0015: Migration is a keyed merge with a module-phased cutover
 
-- Status: Proposed
+- Status: Accepted (Phase 0 gate, 26 August 2026)
 - Date: 2026-08-26
 
 ## Context
