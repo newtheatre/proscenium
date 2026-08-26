@@ -18,6 +18,30 @@ this is its memory. The migration tooling (`migration/`) loads into exactly this
 - FKs: `restrict` where history must survive (money, records), `cascade` for owned children,
   `set null` where the reference is optional colour.
 
+## The shape at a glance
+
+Everything hangs off `users`; the ledger and the programme are the other two centres of
+gravity.
+
+```mermaid
+erDiagram
+  users ||--o{ memberships : holds
+  users ||--o{ role_grants : holds
+  users ||--o| totp_secrets : enrols
+  users ||--o{ passkeys : enrols
+  users ||--o| access_profiles : declares
+  users ||--o{ reservations : books
+  users ||--o{ shifts : works
+  users ||--o{ training_records : earns
+  users ||--o{ room_bookings : requests
+  users ||--o{ ledger_entries : acts_in
+  shows ||--o{ performances : runs
+  performances ||--o{ reservations : sells
+  performances ||--o{ shifts : staffs
+  performances ||--o| night_reports : closes_with
+  ledger_entries ||--o{ ledger_lines : itemises
+```
+
 ## Identity and membership (module A)
 
 ### users
@@ -118,6 +142,36 @@ safe) · timestamps.
 Sold-out and completed are derived, never stored.
 
 ## Ticketing (module D)
+
+```mermaid
+erDiagram
+  shows ||--o{ performances : runs
+  venues ||--o{ performances : hosts
+  reservations ||--o{ tickets : contains
+  performances ||--o{ tickets : admits
+  ticket_types ||--o{ tickets : prices
+  performances ||--o{ waiting_list : queues
+  pass_types ||--o{ passes : issues
+  passes ||--o{ pass_admissions : redeems_at
+  pass_admissions ||--|| tickets : seats_via
+  users ||--o{ reservations : books
+  users ||--o{ passes : holds
+```
+
+The reservation lifecycle, including the hold release the old estate never had:
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING : reserved, online or desk
+  [*] --> DOOR : walk-up sale at the door
+  PENDING --> COLLECTED : paid at the desk, expected total matched
+  PENDING --> EXPIRED : hold released by the sweep, recorded for statistics
+  PENDING --> CANCELLED : customer before curtain, or staff
+  PENDING --> NO_SHOW : marked at the door
+  COLLECTED --> CANCELLED : refund first, then cancel
+  EXPIRED --> PENDING : desk reinstates, capacity re-checked
+  CANCELLED --> PENDING : desk reinstates, capacity re-checked
+```
 
 ### ticket_types
 `id` PK · `name` UNIQUE global · `description` · `price` pence (base) · `kind` CHECK
@@ -248,6 +302,22 @@ committee-editable. Free text purges at 30 days; milestones persist into the nig
 
 ## Bar (module F)
 
+One stocked thing sells at many sizes; price resolves variant first, category default second
+(0017). Stock only ever moves through the append-only ledger.
+
+```mermaid
+erDiagram
+  bar_categories ||--o{ bar_products : groups
+  bar_categories ||--o{ category_prices : defaults_per_serving_kind
+  bar_products ||--o{ product_variants : sells_as
+  product_variants ||--o{ variant_prices : dated
+  product_variants ||--o{ variant_components : made_of
+  variant_components }o--|| bar_items : depletes
+  variant_components }o--|| choice_groups : or_chooses_from
+  choice_groups ||--o{ choice_group_items : offers
+  bar_items ||--o{ stock_movements : sums_to_on_hand
+```
+
 ### bar_items  (stocked things)
 `id` PK · `name` · `unit` CHECK `ML|ITEM` · `container_ml` NULL for whole items, **immutable
 once movements exist** · `par_qty` · `age_restricted` bool default true · `allergen_notes` ·
@@ -319,6 +389,17 @@ of rows = closed that day.
 `id` PK · `room_id` NULL = all rooms · `starts_at` · `ends_at` · `reason` (shown to members)
 · `created_by`. Booking inside one is refused; existing bookings cancel with notification.
 
+```mermaid
+stateDiagram-v2
+  [*] --> CONFIRMED : in policy, standard room, instant
+  [*] --> PENDING_APPROVAL : out of policy or sensitive room
+  PENDING_APPROVAL --> CONFIRMED : approved
+  PENDING_APPROVAL --> REJECTED : reason shown to the requester
+  PENDING_APPROVAL --> CANCELLED : withdrawn
+  CONFIRMED --> CANCELLED : member or admin
+  CONFIRMED --> BUMPED : higher tier claims the slot, replacement offered
+```
+
 ### room_bookings
 `id` PK · `room_id` → rooms restrict · `user_id` → users restrict · `series_id` NULL →
 room_series cascade · `occurrence` int NULL · `title` · `attendees` int NULL · `starts_at` ·
@@ -365,6 +446,19 @@ As proven: sessions carry `held_on` civil date, status CHECK
 (session, user) with status CHECK `SIGNED_UP|CANCELLED|ATTENDED|ABSENT`, sign-up order is
 the derived waitlist; the register opens on the day, marks must cover it exactly, and
 delivery is a single-winner conditional write.
+
+Validity is derived at read time, never stored; the diagram is the derivation, not a status
+column:
+
+```mermaid
+stateDiagram-v2
+  [*] --> VALID : awarded, by register, sign off, external cert or self registration
+  VALID --> EXPIRING : inside the warning window, still counts as held
+  EXPIRING --> EXPIRED : on the expiry date
+  VALID --> REVOKED : admin only, reason mandatory
+  EXPIRING --> REVOKED : admin only, reason mandatory
+  EXPIRED --> [*] : renewal is a new record superseding this one
+```
 
 ### training_records  APPEND-ONLY (exception: revocation stamps `revoked_*` once)
 `id` PK · `user_id` restrict · `module_id` restrict · `awarded_on` civil date ·

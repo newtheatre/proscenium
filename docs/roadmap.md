@@ -5,6 +5,31 @@ because Phase 0's authoring is already done (this package), and because the firs
 autumn season double as shadow nights. The build itself was always a matter of weeks; what this
 timeline removes is slack between decisions, not testing or trust-building.
 
+```mermaid
+gantt
+  dateFormat YYYY-MM-DD
+  title Cutover by 31 October 2026
+  section Phase 0
+  Definition and workshops     :done, 2026-08-26, 2026-09-06
+  Gate                         :milestone, 2026-09-06, 0d
+  section Phase 1
+  Foundations                  :2026-09-07, 2026-09-19
+  First migration rehearsal    :milestone, 2026-09-13, 0d
+  section Phase 2
+  Rooms                        :2026-09-14, 2026-09-25
+  Rooms live                   :milestone, 2026-09-28, 0d
+  Training and rota            :2026-09-21, 2026-10-03
+  Box office and passes        :2026-09-28, 2026-10-10
+  Show night and bar           :2026-10-05, 2026-10-17
+  section Phase 3
+  Shadow nights                :2026-10-12, 2026-10-25
+  Cutover                      :crit, 2026-10-26, 2026-10-31
+  Old estate read only         :milestone, 2026-11-01, 0d
+  section Phase 4
+  Hardening                    :2026-11-01, 2026-12-23
+  Retention armed              :milestone, 2026-12-14, 0d
+```
+
 ## Phases
 
 ### Phase 0: definition (26 August to 6 September)

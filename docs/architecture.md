@@ -12,14 +12,18 @@ Service, decision 0002); files (posters, venue images) live in R2; secrets share
 worker live in the account Secrets Store, hydrated by the first-registered server plugin
 before anything reads a session (the `0.` prefix pattern carried from the estate).
 
-```
-Browser / phone ── Nuxt app (SSR + islands)
-                     │
-              Nitro server routes  ──  send_email (Email Service)
-                     │                 R2 (assets)
-                    D1                 Secrets Store
-                     │
-             Cron triggers (Nitro scheduled tasks)
+```mermaid
+flowchart LR
+  B[Browser or phone] --> N[Nuxt app, SSR and islands]
+  N --> API[Nitro server routes]
+  subgraph W[One Cloudflare Worker]
+    API --> CORE[server/core: db, session, authorise, ledger, notify, config, audit]
+    CRON[Cron triggers] --> TASKS[Scheduled tasks] --> CORE
+  end
+  CORE --> D1[(D1 database)]
+  CORE --> MAIL[send_email binding]
+  CORE --> R2[(R2 assets)]
+  SS[Secrets Store] -.hydrates first.-> CORE
 ```
 
 ## Code layout
@@ -54,6 +58,21 @@ tests/                  unit / integration / e2e, bun test
   3. **Ownership**: the row's own user id.
 - Guards are server-side and fail closed; route middleware is rendering convenience only.
 - MFA (TOTP + passkeys) is enforced at guard level for permission-bearing roles (0008).
+
+```mermaid
+flowchart TD
+  REQ[Request with sealed session] --> LIVE{User row exists, enabled, epoch current}
+  LIVE -- no --> C401[401, cookie cleared]
+  LIVE -- yes --> PERM{Permission from a held, unexpired role}
+  PERM -- yes --> MFA{MFA enrolled where the role demands it}
+  MFA -- yes --> OK[Handler runs]
+  MFA -- no --> C403[403, enrolment required]
+  PERM -- no --> DERIVED{Derived authority: confirmed shift tonight, valid training record, department leadership}
+  DERIVED -- yes --> OK
+  DERIVED -- no --> OWNER{Caller owns the row}
+  OWNER -- yes --> OK
+  OWNER -- no --> DENY[403]
+```
 
 ## Money and the ledger
 

@@ -11,6 +11,20 @@ The pipeline that turns four production databases into one, rehearsed weekly unt
 - The id map (`out/id-map.tsv`) is a working artefact (decision 0015): it never enters the
   application database and is archived with the read-only old estate at cutover.
 
+```mermaid
+flowchart LR
+  P[(Four production databases)] -- wrangler export, read only --> D[dumps/, gitignored]
+  D --> I[inventory.ts] --> M[out/manifest]
+  D --> T[transform-identity.ts]
+  T --> U[(out/unified.sqlite)]
+  T --> X[id map and exceptions, gitignored]
+  M --> R[reconcile.ts]
+  U --> R
+  R --> G{Green?}
+  G -- yes --> W[Weekly rehearsal recorded on epic 338]
+  G -- no --> F[Fix the transform, never the numbers]
+```
+
 ## Running a rehearsal
 
 ```bash
