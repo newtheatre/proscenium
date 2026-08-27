@@ -44,6 +44,14 @@ export const MESSAGE_TYPES = {
     template: 'magic-link',
     reachesUnverified: true,
   },
+  // An account made from the console has never been seen by its owner, so the first thing it
+  // sends must reach an unverified address (A-121 criterion 3).
+  'account.set-password': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'set-password',
+    reachesUnverified: true,
+  },
 } as const satisfies Record<string, MessageType>
 
 export type MessageTypeName = keyof typeof MESSAGE_TYPES

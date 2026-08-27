@@ -13,3 +13,15 @@ export async function readValidatedBodyOrThrow<T>(event: H3Event, schema: ZodTyp
   }
   return result.data
 }
+
+// The query string gets the same treatment as the body: nothing reaches a handler unvalidated.
+export async function getValidatedQueryOrThrow<T>(event: H3Event, schema: ZodType<T>): Promise<T> {
+  const result = schema.safeParse(getQuery(event))
+  if (!result.success) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `Invalid request: ${result.error.issues.map(issue => issue.path.join('.') || 'query').join(', ')}`,
+    })
+  }
+  return result.data
+}

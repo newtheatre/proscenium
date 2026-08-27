@@ -43,6 +43,13 @@
       "when": 1787838906912,
       "tag": "0005_magical_lester",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1787847871580,
+      "tag": "0006_outgoing_wildside",
+      "breakpoints": true
     }
   ]
 }

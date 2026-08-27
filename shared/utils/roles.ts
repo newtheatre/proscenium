@@ -19,6 +19,7 @@ export type Role = (typeof ROLES)[number]
 // register) derives from tonight's facts and is never granted in advance (0009).
 export const PERMISSIONS = [
   'accounts.read',
+  'accounts.create',
   'accounts.disable',
   'roles.grant',
   'roles.revoke',

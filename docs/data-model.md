@@ -52,6 +52,8 @@ NULL (admin-set claim marker) · `verified` bool · `disabled` bool · `session_
 `anonymised_at` NULL · `last_login_at` · `created_at` · `updated_at`.
 Anonymisation rewrites `email` to `deleted-<id>@anonymised.invalid`, `name` to `Deleted
 user`; every write path guards on `anonymised_at IS NULL`.
+Indexed on `disabled`, `verified`, `anonymised_at`, `last_login_at` and `name`, which are what
+the admin directory filters and sorts on (A-121); without them every filter is a scan.
 
 ### emergency_contacts
 `user_id` PK → users cascade · `name` (scrub) · `phone` (scrub) · `relation` (scrub) ·
