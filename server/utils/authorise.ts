@@ -49,7 +49,7 @@ export async function requirePermission(event: H3Event, permission: Permission):
     throw createError({
       statusCode: 403,
       statusMessage: 'This role needs an authenticator app before it can be used',
-      data: { enrol: '/api/account/mfa/enrol' },
+      data: { enrol: '/account/security' },
     })
   }
 

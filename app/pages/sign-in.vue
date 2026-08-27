@@ -77,9 +77,15 @@ async function ask(path: string, payload: FormSubmitEvent<z.output<typeof addres
   }
 }
 
+// Only a path on this site: an absolute URL here would make the sign-in screen an open redirect.
+const nextPath = computed(() => {
+  const next = route.query.next
+  return typeof next === 'string' && /^\/(?!\/)/.test(next) ? next : '/'
+})
+
 async function signedIn(): Promise<void> {
   await refresh()
-  await navigateTo('/')
+  await navigateTo(nextPath.value)
 }
 
 useSeoMeta({ title: 'Sign in' })
