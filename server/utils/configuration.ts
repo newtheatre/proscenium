@@ -27,6 +27,11 @@ function overrides(event?: H3Event): Promise<Map<string, unknown>> {
   return loading
 }
 
+// The override set as it stands, for a caller that needs more than one key at once.
+export function configOverrides(event?: H3Event): Promise<Map<string, unknown>> {
+  return overrides(event)
+}
+
 // The enforced value of a key: its override, or the default it ships with. A key the workshop
 // register proposed no value for has neither, and reading one is a defect (0019).
 export async function configValue<K extends ConfigKey>(event: H3Event | undefined, key: K): Promise<ConfigValue<K>> {

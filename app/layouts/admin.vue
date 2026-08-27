@@ -4,6 +4,7 @@
 const links = [[
   { label: 'Overview', icon: 'i-lucide-layout-dashboard', to: '/admin' },
   { label: 'People', icon: 'i-lucide-users', to: '/admin/people' },
+  { label: 'Settings', icon: 'i-lucide-settings', to: '/admin/config' },
 ]]
 const route = useRoute()
 </script>

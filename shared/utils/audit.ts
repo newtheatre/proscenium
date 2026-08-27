@@ -67,6 +67,18 @@ function guardDetail(value: unknown, path: string): void {
   throw new Error(`audit detail ${path} is a ${typeof value}, which cannot be recorded`)
 }
 
+// Whether a detail would be accepted, for a caller that must decide what to record rather than
+// discover mid-request that it cannot: guardDetail throws, and a throw inside a handler is a 500.
+export function isRecordable(detail: AuditDetail): boolean {
+  try {
+    guardDetail(detail, 'detail')
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
 // Returns the row to insert. It is deliberately not a write: atomicity is batch only, so the
 // caller puts this in the same batch as the change it records (0001, 0003).
 export function auditEntry(input: AuditInput): AuditRow {

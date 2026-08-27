@@ -17,6 +17,7 @@ application that replaces stage-door, proscenium, rooms and rehearsal. The gate 
 | `operations.md` | What an operator does: deploys, migrations and their restore point, the health check, the first administrator, secrets. |
 | `design-language.md` | The reasoning behind the tokens, the two intensities, and the rules for using them. |
 | `spikes.md` | Time-boxed investigations that must land before their dependent build work. |
+| `known-issues.md` | Defects and gaps found and not fixed, with where the fix belongs. A pull request that leaves a problem behind records it here. |
 |  `../CONTRIBUTING.md` | Engineering standards, at the repository root as CONTRIBUTING.md. |
 
 ## How to review

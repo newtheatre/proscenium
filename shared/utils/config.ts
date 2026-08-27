@@ -14,6 +14,9 @@ interface ConfigKeyDefinition {
   default?: unknown
   workshop: ConfigWorkshop
   describes: string
+  // A value that can hold personal data. Its changes are audited as a hash rather than as the
+  // value, because audit detail carries identifiers and never people (0011, 0024).
+  sensitive?: true
 }
 
 export const CONFIG_KEYS = {
@@ -46,15 +49,6 @@ export const CONFIG_KEYS = {
     default: 10,
     workshop: 'money-and-box-office',
     describes: 'Minutes a comp request stays open before it lapses.',
-  },
-  PASS_PRODUCTS: {
-    schema: z.array(z.object({
-      name: z.string(),
-      pricePence: z.number().int().nonnegative(),
-      cap: z.number().int().positive().nullable(),
-    })),
-    workshop: 'money-and-box-office',
-    describes: 'The season pass products: names, prices and caps. Listed in the workshop; unset until then.',
   },
   BAR_TAB_CAP_PENCE: {
     schema: z.number().int().nonnegative(),
@@ -146,15 +140,6 @@ export const CONFIG_KEYS = {
     default: ['PRODUCTION', 'COMMITTEE', 'REHEARSAL', 'GENERAL'],
     workshop: 'spaces-and-training',
     describes: 'Booking priority, highest first. A higher tier bumps a lower one with notification.',
-  },
-  ROOM_OPENING_HOURS: {
-    schema: z.record(z.string(), z.array(z.object({
-      day: z.number().int().min(0).max(6),
-      opens: z.string(),
-      closes: z.string(),
-    }))),
-    workshop: 'spaces-and-training',
-    describes: 'Opening hours per room, London. Set in the workshop; unset until then.',
   },
   TRAINING_EXPIRY_WARNING_DAYS: {
     schema: z.number().int().positive(),
@@ -299,12 +284,6 @@ export const CONFIG_KEYS = {
     describes: 'The window verification resends are counted over.',
   },
 
-  NOTIFICATION_TOPICS: {
-    schema: z.array(z.string()).nonempty(),
-    default: ['bookings', 'shifts', 'training', 'rooms', 'announcements'],
-    workshop: 'people-and-communications',
-    describes: 'Topics a member may set preferences on. Transactional messages always deliver (0013).',
-  },
   RETENTION_FULL_ACCOUNT_YEARS: {
     schema: z.number().int().positive(),
     default: 2,
@@ -326,6 +305,7 @@ export const CONFIG_KEYS = {
   NIGHT_REPORT_RECIPIENTS: {
     schema: z.array(z.string().email()),
     workshop: 'people-and-communications',
+    sensitive: true,
     describes: 'Standing recipients of the end-of-night report. The list is confirmed in the workshop.',
   },
 } as const satisfies Record<string, ConfigKeyDefinition>
@@ -336,6 +316,32 @@ export const CONFIG_KEY_NAMES = Object.keys(CONFIG_KEYS) as ConfigKey[]
 
 export function isConfigKey(name: string): name is ConfigKey {
   return Object.hasOwn(CONFIG_KEYS, name)
+}
+
+// The keys something actually reads today; a key absent here is recorded but not yet enforced,
+// which the surface says plainly (0012). A test greps the server for the reads, so it cannot drift.
+export const ENFORCED_KEYS = [
+  'MAGIC_LINK_MINUTES',
+  'MFA_ATTEMPT_MINUTES',
+  'PASSWORD_MAX_LENGTH',
+  'PASSWORD_MIN_LENGTH',
+  'PASSWORD_REQUIRE_MIXED_CASE',
+  'PASSWORD_REQUIRE_NUMBER',
+  'PASSWORD_REQUIRE_SYMBOL',
+  'PASSWORD_RESET_HOURS',
+  'PRIVILEGED_ROLES',
+  'SIGN_IN_ATTEMPTS_PER_ACCOUNT',
+  'SIGN_IN_ATTEMPTS_PER_ADDRESS_WINDOW_MINUTES',
+  'VERIFY_RESEND_ATTEMPTS',
+  'VERIFY_RESEND_WINDOW_MINUTES',
+] as const satisfies readonly ConfigKey[]
+
+export function isEnforced(key: ConfigKey): boolean {
+  return (ENFORCED_KEYS as readonly string[]).includes(key)
+}
+
+export function isSensitive(key: ConfigKey): boolean {
+  return 'sensitive' in CONFIG_KEYS[key]
 }
 
 // A key the register proposed no value for. Reading one is a defect, not a fallback: the
