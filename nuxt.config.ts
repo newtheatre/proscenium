@@ -67,7 +67,10 @@ export default defineNuxtConfig({
       maxAge: 60 * 60 * 24 * 30,
     },
     public: {
-      baseURL: 'https://newtheatre.org.uk',
+      // Every emailed link is built from this. NUXT_PUBLIC_BASE_URL overrides it, and development
+      // points at the local port so a verification link in .data/mail is one that works.
+      baseURL: process.env.NUXT_PUBLIC_BASE_URL
+        ?? (process.env.NODE_ENV === 'development' ? `http://localhost:${process.env.NUXT_PORT ?? 3000}` : 'https://newtheatre.org.uk'),
     },
   },
 

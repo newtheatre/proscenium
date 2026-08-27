@@ -1,3 +1,4 @@
+import { consola } from 'consola'
 import type { H3Event } from 'h3'
 import { eq } from 'drizzle-orm'
 import { undeliverableReason } from '#shared/utils/deliverability'
@@ -26,16 +27,46 @@ interface EmailBinding {
   send: (message: Outbound) => Promise<{ messageId?: string }>
 }
 
-// Local mail is logged, which is what architecture.md prescribes for development: the console
-// is the transport, so a message it printed is honestly sent.
+// Local mail is written to .data/mail as well as logged, because the dev server does not reliably
+// surface a handler's console output and a message nobody can read has not been delivered.
+const MAILBOX = '.data/mail'
+
+// The dev server runs on Node and does not surface a handler's console output, so a message with
+// nowhere to go was being recorded as sent while nobody could read it.
+async function writeToMailbox(message: Outbound): Promise<void> {
+  if (!import.meta.dev) return
+  try {
+    const { mkdir, writeFile } = await import('node:fs/promises')
+    await mkdir(MAILBOX, { recursive: true })
+    const stamp = new Date().toISOString().replaceAll(':', '-')
+    await writeFile(`${MAILBOX}/${stamp}-${message.to.replace(/[^a-z0-9]+/gi, '-')}.txt`, [
+      `To: ${message.to}`,
+      `From: ${message.from}`,
+      `Subject: ${message.subject}`,
+      '',
+      message.text,
+    ].join('\n'))
+  }
+  catch (error) {
+    consola.warn('[notify] could not write to the local mailbox', error)
+  }
+}
+
 const consoleTransport: Transport = {
   name: 'console',
   async send(message) {
-    console.info(`[notify] to ${message.to} from ${message.from}: ${message.subject}\n${message.text}`)
+    // consola, not console.info: the dev server keeps info-level console output below its
+    // threshold, so the transport was logging where nobody could see it.
+    consola.info(`[notify] to ${message.to}: ${message.subject}\n${message.text}`)
+    await writeToMailbox(message)
   },
 }
 
 function transportFor(event: H3Event): Transport {
+  // Development never hands a message to a provider, whatever the emulator supplies: a stub
+  // binding accepts a message and drops it, which reads as delivered (architecture.md).
+  if (import.meta.dev) return consoleTransport
+
   const binding = (event.context.cloudflare?.env as unknown as { EMAIL?: EmailBinding } | undefined)?.EMAIL
   if (!binding) return consoleTransport
   return {

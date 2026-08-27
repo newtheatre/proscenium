@@ -1,5 +1,6 @@
 import { and, eq, isNotNull, lt } from 'drizzle-orm'
 import { generateRecoveryCodes, normaliseRecoveryCode } from '#shared/utils/recovery-codes'
+import type { H3Event } from 'h3'
 
 // Enrolment, recovery and the challenge, kept together because minting codes is part of
 // confirming a factor and redeeming one is part of answering a challenge.
@@ -13,11 +14,16 @@ async function hashCode(value: string): Promise<string> {
 
 // Enrolling or regenerating needs a session fresher than ten minutes, so a borrowed screen
 // cannot quietly add a factor (A-109 criterion 4, A-110 criterion 3).
-export async function requireFreshSession(event: Parameters<typeof getUserSession>[0]): Promise<void> {
+export async function requireFreshSession(event: H3Event): Promise<void> {
   const session = await getUserSession(event)
   const signedInAt = session?.signedInAt ?? 0
   if (Math.floor(Date.now() / 1000) - signedInAt > FRESH_SESSION_SECONDS) {
-    throw createError({ statusCode: 401, statusMessage: 'Sign in again to change your security settings' })
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Sign in again to change your security settings',
+      // The screen turns this into one button rather than leaving the person to find the way.
+      data: { signInAgain: getRequestURL(event).pathname },
+    })
   }
 }
 

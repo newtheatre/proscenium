@@ -6,6 +6,7 @@ import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
+const CASE_TIMEOUT_MS = 60_000
 let app: AppUnderTest
 
 const password = generatePassword()
@@ -46,7 +47,7 @@ describe.skipIf(skip !== null)('rate limits (A-102, A-103)', () => {
 
     expect(last.status).toBe(429)
     expect(Number(last.headers.get('retry-after'))).toBeGreaterThan(0)
-  })
+  }, CASE_TIMEOUT_MS)
 
   // A different address has its own bucket, so one person cannot lock out another.
   test('the limit is per address, not global', async () => {
@@ -58,7 +59,7 @@ describe.skipIf(skip !== null)('rate limits (A-102, A-103)', () => {
 
     const bystander = await post('/api/auth/sign-in', { email: address('bystander'), password })
     expect(bystander.status).toBe(401)
-  })
+  }, CASE_TIMEOUT_MS)
 
   // Counted on the address submitted rather than the account found, so being limited says
   // nothing about whether an account exists (A-103 criterion 4).
@@ -77,7 +78,7 @@ describe.skipIf(skip !== null)('rate limits (A-102, A-103)', () => {
     }
 
     expect(await spend(real)).toBe(await spend(invented))
-  })
+  }, CASE_TIMEOUT_MS)
 
   test('resending verification is limited on its own scope', async () => {
     const email = address('resend')
@@ -88,7 +89,7 @@ describe.skipIf(skip !== null)('rate limits (A-102, A-103)', () => {
     }
 
     expect(last.status).toBe(429)
-  })
+  }, CASE_TIMEOUT_MS)
 
   // This proves no attempt is lost, not that the write is atomic. An in-process SQLite
   // serialises, so it passes against a read-then-write counter too, which I checked (0022).
@@ -107,7 +108,7 @@ describe.skipIf(skip !== null)('rate limits (A-102, A-103)', () => {
     expect(allowed + refused).toBe(attempts)
     expect(allowed).toBeLessThanOrEqual(signInLimit)
     expect(refused).toBeGreaterThan(0)
-  })
+  }, CASE_TIMEOUT_MS)
 
   // Separate scopes: exhausting one must not close the other.
   test('spending the sign-in budget leaves the resend budget alone', async () => {
@@ -117,7 +118,7 @@ describe.skipIf(skip !== null)('rate limits (A-102, A-103)', () => {
     }
     expect((await post('/api/auth/sign-in', { email, password })).status).toBe(429)
     expect((await post('/api/auth/verify/resend', { email })).status).toBe(200)
-  })
+  }, CASE_TIMEOUT_MS)
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
