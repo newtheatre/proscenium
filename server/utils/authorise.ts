@@ -29,9 +29,9 @@ export async function authority(event: H3Event): Promise<Authority> {
 
 // A privileged role needs a second factor (A-112). Google-only accounts are exempt: Workspace
 // 2-step covers them and they hold no password to steal.
-export async function requiresSecondFactor(account: AccountRow, grants: Grant[]): Promise<boolean> {
+export async function requiresSecondFactor(event: H3Event, account: AccountRow, grants: Grant[]): Promise<boolean> {
   if (account.password === null) return false
-  const privileged = new Set<string>(CONFIG_KEYS.PRIVILEGED_ROLES.default)
+  const privileged = new Set<string>(await configValue(event, 'PRIVILEGED_ROLES'))
   return grants.some(grant => privileged.has(grant.role))
 }
 
@@ -45,7 +45,7 @@ export async function requirePermission(event: H3Event, permission: Permission):
 
   // Blocked until done, with the way out named in the refusal rather than left to be guessed.
   const grants = await liveGrants(resolved.account.id)
-  if (await requiresSecondFactor(resolved.account, grants) && !await confirmedFactor(resolved.account.id)) {
+  if (await requiresSecondFactor(event, resolved.account, grants) && !await confirmedFactor(resolved.account.id)) {
     throw createError({
       statusCode: 403,
       statusMessage: 'This role needs an authenticator app before it can be used',

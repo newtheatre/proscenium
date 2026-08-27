@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import * as z from 'zod'
-import { defaultPasswordPolicy, passwordProblem } from '#shared/utils/auth'
+import { passwordProblem } from '#shared/utils/auth'
 import type { AuthFormField, FormError, FormSubmitEvent } from '@nuxt/ui'
 
 const route = useRoute()
-const policy = defaultPasswordPolicy()
+const policy = usePasswordPolicy()
 
 type Outcome = 'choosing' | 'done' | 'expired'
 
@@ -19,7 +19,7 @@ const fields: AuthFormField[] = [
     type: 'password',
     label: 'New password',
     autocomplete: 'new-password',
-    description: `At least ${policy.minLength} characters.`,
+    description: `At least ${policy.value.minLength} characters.`,
     required: true,
   },
 ]
@@ -27,7 +27,7 @@ const fields: AuthFormField[] = [
 // The address the token belongs to is not on this screen, so the Workspace rule cannot be
 // checked here; the route refuses it and the message is shown as written.
 function checkPassword(state: Partial<z.output<typeof schema>>): FormError[] {
-  const problem = state.password ? passwordProblem('', state.password, policy) : null
+  const problem = state.password ? passwordProblem('', state.password, policy.value) : null
   return problem ? [{ name: 'password', message: explainPasswordProblem(problem) }] : []
 }
 

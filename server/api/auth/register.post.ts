@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, body)
   const email = normaliseEmail(input.email)
 
-  const problem = passwordProblem(email, input.password, defaultPasswordPolicy())
+  const problem = passwordProblem(email, input.password, await passwordPolicy(event))
   if (problem) throw createError({ statusCode: 400, statusMessage: explainPasswordProblem(problem) })
 
   // An address no message could ever reach gets the ordinary answer and no account: a row that

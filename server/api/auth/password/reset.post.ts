@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 410, statusMessage: 'That link is no longer usable' })
   }
 
-  const problem = passwordProblem(account.email, input.password)
+  const problem = passwordProblem(account.email, input.password, await passwordPolicy(event))
   if (problem) throw createError({ statusCode: 400, statusMessage: explainPasswordProblem(problem) })
 
   await db.batch([

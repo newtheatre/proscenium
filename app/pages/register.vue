@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import * as z from 'zod'
-import { defaultPasswordPolicy, passwordProblem } from '#shared/utils/auth'
+import { passwordProblem } from '#shared/utils/auth'
 import type { AuthFormField, FormError, FormSubmitEvent } from '@nuxt/ui'
 
-const policy = defaultPasswordPolicy()
+const policy = usePasswordPolicy()
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Enter your name').max(200, 'That name is too long'),
@@ -19,7 +19,7 @@ const fields: AuthFormField[] = [
     type: 'password',
     label: 'Password',
     autocomplete: 'new-password',
-    description: `At least ${policy.minLength} characters. Length beats punctuation, so a few words you will remember is a good password.`,
+    description: `At least ${policy.value.minLength} characters. Length beats punctuation, so a few words you will remember is a good password.`,
     required: true,
   },
 ]
@@ -30,7 +30,7 @@ const notice = ref<string | null>(null)
 
 // One rule for the browser and the server: the same function decides both (0012).
 function checkPassword(state: Partial<z.output<typeof schema>>): FormError[] {
-  const problem = state.password ? passwordProblem(state.email ?? '', state.password, policy) : null
+  const problem = state.password ? passwordProblem(state.email ?? '', state.password, policy.value) : null
   return problem ? [{ name: 'password', message: explainPasswordProblem(problem) }] : []
 }
 
