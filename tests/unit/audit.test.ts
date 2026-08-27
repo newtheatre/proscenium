@@ -24,8 +24,12 @@ describe('audit entries (0010, 0011)', () => {
     for (const action of ['Role.Granted', 'rolegranted', 'role granted', 'role.', '.granted', '']) {
       expect(() => auditEntry({ ...ok, action })).toThrow(/action/i)
     }
-    for (const action of ['role.granted', 'booking.refunded', 'bar.stocktake.closed']) {
+    for (const action of ['role.granted', 'booking.refunded', 'bar.stocktake.closed', 'session.started.magic-link']) {
       expect(() => auditEntry({ ...ok, action })).not.toThrow()
+    }
+    // A hyphen belongs inside a segment, never at its edge.
+    for (const action of ['session.-started', 'session.started-', 'session.magic--link']) {
+      expect(() => auditEntry({ ...ok, action })).toThrow(/action/i)
     }
   })
 })

@@ -41,22 +41,23 @@ export async function issueToken(userId: string, kind: TokenKind, hours = VERIFY
 
 export interface ClaimedToken { userId: string, email: string | null }
 
-// Delete-as-claim: the row goes in the same batch that acts on it, so a token cannot be spent
-// twice even if two requests arrive together.
+// Delete-as-claim, in one statement: the row is removed and returned together, so two racing
+// redemptions cannot both succeed (A-108 criterion 3). Whoever gets the row has the claim.
 export async function claimToken(plaintext: string, kind: TokenKind): Promise<ClaimedToken | null> {
-  const [row] = await db.select().from(schema.authTokens).where(and(
+  const [row] = await db.delete(schema.authTokens).where(and(
     eq(schema.authTokens.tokenHash, await hashToken(plaintext)),
     eq(schema.authTokens.kind, kind),
-  )).limit(1)
+  )).returning({
+    userId: schema.authTokens.userId,
+    email: schema.authTokens.email,
+    expiresAt: schema.authTokens.expiresAt,
+  })
 
   if (!row) return null
 
-  // Expired tokens are removed on sight rather than left to a sweep, so a stale link cannot
-  // sit there looking usable.
-  if (row.expiresAt * 1000 <= Date.now()) {
-    await db.delete(schema.authTokens).where(eq(schema.authTokens.id, row.id))
-    return null
-  }
+  // An expired token is spent by claiming it, so a stale link is gone rather than left sitting
+  // there looking usable.
+  if (row.expiresAt * 1000 <= Date.now()) return null
 
   return { userId: row.userId, email: row.email }
 }

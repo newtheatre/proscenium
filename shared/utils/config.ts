@@ -242,6 +242,25 @@ export const CONFIG_KEYS = {
     describes: 'Require a symbol. Off, for the same reason as mixed case.',
   },
 
+  PASSWORD_RESET_HOURS: {
+    schema: z.number().positive(),
+    default: 1,
+    workshop: 'people-and-communications',
+    describes: 'How long a self-service password reset link lasts. The message states the real figure, whatever this is set to.',
+  },
+  ADMIN_TOKEN_HOURS: {
+    schema: z.number().positive(),
+    default: 24,
+    workshop: 'people-and-communications',
+    describes: 'How long an administrator-initiated or guest-claim link lasts, which is longer because the holder may not be expecting it.',
+  },
+  MAGIC_LINK_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 15,
+    workshop: 'people-and-communications',
+    describes: 'How long a sign-in link lasts. Short, because it is a credential sitting in a mailbox.',
+  },
+
   SIGN_IN_ATTEMPTS_PER_ACCOUNT: {
     schema: z.number().int().positive(),
     default: 10,

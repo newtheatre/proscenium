@@ -30,6 +30,20 @@ export const MESSAGE_TYPES = {
     template: 'account-exists',
     reachesUnverified: true,
   },
+  'password.reset': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'password-reset',
+    reachesUnverified: true,
+  },
+  // A magic link carries no personal information and proves the mailbox by consuming it, which
+  // is why it may reach an unverified address (A-107 criterion 3).
+  'account.magic-link': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'magic-link',
+    reachesUnverified: true,
+  },
 } as const satisfies Record<string, MessageType>
 
 export type MessageTypeName = keyof typeof MESSAGE_TYPES
