@@ -259,5 +259,22 @@ useSeoMeta({ title: 'Security' })
         </div>
       </div>
     </UPageCard>
+
+    <UPageCard
+      class="mt-6"
+      title="Your data"
+      description="Everything the theatre holds about you, in one file. A fuller account page arrives with A-114."
+    >
+      <UButton
+        data-test="export"
+        to="/api/account/export"
+        external
+        download
+        variant="subtle"
+        icon="i-lucide-download"
+      >
+        Download my data
+      </UButton>
+    </UPageCard>
   </UContainer>
 </template>
