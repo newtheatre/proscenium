@@ -34,7 +34,7 @@ Modules from the backlog map one-to-one onto directories. Nothing imports across
 boundaries except through `server/utils/` and `shared/`.
 
 ```
-app/                    pages, components, composables (grouped per module)
+app/                    pages, components, composables, plugins (grouped per module)
 server/
   api/<module>/         one route per file, Nitro conventions
   utils/                the shared spine: db, session, authorise, ledger, notify,
@@ -51,6 +51,25 @@ content/                Nuxt Content: editorial pages, policy pages with config 
 migration/              the SP-3 tooling (standalone, never imported by the app)
 tests/                  unit / integration / e2e, bun test
 ```
+
+## The identity screens
+
+`/sign-in` and `/register` are the two entry points, and each carries its own steps rather than
+sending the visitor to a URL that means nothing on reload: the MFA challenge, the forgotten-password
+and sign-in-link requests, and the check-your-email panel are all states of the page the person is
+already on. Only three routes exist because an email points at them, and each is reached with a
+token in the query string:
+
+| Route | Consumes |
+| --- | --- |
+| `/verify?token=` | `POST /api/auth/verify`, offering a fresh send on a 410 |
+| `/reset?token=` | `POST /api/auth/password/reset` |
+| `/magic?token=` | `POST /api/auth/magic-link/consume`, which may answer with an MFA attempt |
+
+Who is signed in is read once during rendering by `app/plugins/account.server.ts` into the
+`nnt-account` state, and re-read by `useAccount().refresh()` after anything that changes the
+session. A component awaiting that read instead would hold Suspense open and ship a page that never
+becomes interactive.
 
 ## Identity and authorisation
 
@@ -153,3 +172,8 @@ append-only migration check, and the content-token check against the configurati
 routes against a real local database and carry the racing tests; end-to-end tests drive the
 critical journeys (booking, door, till, register, room request) in a browser. The named
 regression suite (K-121) is seeded before feature work and grows monotonically.
+
+A browser test drives the real screen, so it must wait for the page to become interactive and not
+merely to render: until Nuxt's Suspense resolves, the markup is server-rendered and a click does
+nothing and reports nothing. `visit()` in `tests/helpers/webview.ts` waits for both, and `fill()`
+sets a value through the native setter so `v-model` sees the change.

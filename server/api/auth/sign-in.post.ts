@@ -13,6 +13,12 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, body)
   const email = normaliseEmail(input.email)
 
+  // The one deliberate enumeration exception (A-103 criterion 2). It names a rule about the
+  // domain, not about an account, so it tells an attacker nothing they could not read anywhere.
+  if (isWorkspaceEmail(email)) {
+    throw createError({ statusCode: 403, statusMessage: 'That address signs in with Google' })
+  }
+
   // Counted on what was submitted rather than on what was found: keying this on an account
   // that exists would make being rate limited proof that it does (A-103 criterion 4).
   await enforce(event, {

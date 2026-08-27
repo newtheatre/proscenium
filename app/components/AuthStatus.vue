@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { data, refresh } = await useFetch('/api/auth/session')
+const { account, refresh } = useAccount()
 
 async function signOut(): Promise<void> {
   await $fetch('/api/auth/sign-out', { method: 'POST' })
@@ -10,9 +10,10 @@ async function signOut(): Promise<void> {
 
 <template>
   <div class="flex items-center gap-2">
-    <template v-if="data?.signedIn">
-      <span class="hidden text-sm text-muted sm:inline">{{ data.user.name }}</span>
+    <template v-if="account.signedIn">
+      <span class="hidden text-sm text-muted sm:inline">{{ account.user?.name }}</span>
       <UButton
+        data-test="sign-out"
         size="sm"
         variant="ghost"
         @click="signOut"
