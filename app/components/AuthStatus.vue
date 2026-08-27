@@ -11,7 +11,13 @@ async function signOut(): Promise<void> {
 <template>
   <div class="flex items-center gap-2">
     <template v-if="account.signedIn">
-      <span class="hidden text-sm text-muted sm:inline">{{ account.user?.name }}</span>
+      <UButton
+        size="sm"
+        variant="ghost"
+        to="/account/security"
+      >
+        {{ account.user?.name }}
+      </UButton>
       <UButton
         data-test="sign-out"
         size="sm"
