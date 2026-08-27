@@ -6,7 +6,18 @@ const body = z.object({ email: z.string().email().max(320) })
 // Ask for a fresh verification message.
 export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, body)
-  const account = await findByEmail(normaliseEmail(input.email))
+  const email = normaliseEmail(input.email)
+
+  // Limited on the address submitted, so this cannot flood a mailbox and cannot tell a caller
+  // whether the address is known (A-102 criterion 3).
+  await enforce(event, {
+    scope: 'verify-resend',
+    value: email,
+    limit: CONFIG_KEYS.VERIFY_RESEND_ATTEMPTS.default,
+    windowMinutes: CONFIG_KEYS.VERIFY_RESEND_WINDOW_MINUTES.default,
+  })
+
+  const account = await findByEmail(email)
 
   // Enumeration-safe: the same answer whether or not the address has an account, and whether
   // or not it was already verified.

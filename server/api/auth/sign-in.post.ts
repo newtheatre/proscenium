@@ -11,7 +11,18 @@ const body = z.object({
 // Sign in with an address and a password.
 export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, body)
-  const account = await findByEmail(normaliseEmail(input.email))
+  const email = normaliseEmail(input.email)
+
+  // Counted on what was submitted rather than on what was found: keying this on an account
+  // that exists would make being rate limited proof that it does (A-103 criterion 4).
+  await enforce(event, {
+    scope: 'sign-in',
+    value: email,
+    limit: CONFIG_KEYS.SIGN_IN_ATTEMPTS_PER_ACCOUNT.default,
+    windowMinutes: CONFIG_KEYS.SIGN_IN_ATTEMPTS_PER_ADDRESS_WINDOW_MINUTES.default,
+  })
+
+  const account = await findByEmail(email)
 
   // One message and one shape for every failure: a wrong address, a wrong password, a disabled
   // account and a Google-only account must be indistinguishable from outside.
