@@ -30,7 +30,10 @@ export default defineOAuthGoogleEventHandler({
     })
 
     if (outcome.action === 'refuse') {
-      return sendRedirect(event, `/sign-in?refused=${outcome.reason}`)
+      // The code names no account state: an attacker holding the credentials must not learn
+      // that the account was disabled (A-122 criterion 2).
+      const code = outcome.reason === 'disabled' ? 'account' : outcome.reason
+      return sendRedirect(event, `/sign-in?refused=${code}`)
     }
 
     const userId = outcome.action === 'create' ? newId() : outcome.userId
@@ -60,7 +63,7 @@ export default defineOAuthGoogleEventHandler({
     }
 
     const account = await findById(userId)
-    if (!account) return sendRedirect(event, '/sign-in?refused=disabled')
+    if (!account) return sendRedirect(event, '/sign-in?refused=account')
 
     await db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'session.started.google', target: `user:${account.id}` }))
     await startSession(event, account)

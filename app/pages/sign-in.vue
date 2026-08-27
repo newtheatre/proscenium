@@ -10,7 +10,7 @@ const { refresh } = useAccount()
 const REFUSALS: Record<string, string> = {
   'not-workspace': 'Only @newtheatre.org.uk accounts sign in with Google. Members use an email address and password.',
   'unverified-email': 'That Google account has an unverified address.',
-  'disabled': 'That account cannot sign in. Ask the IT Manager.',
+  'account': 'That account cannot sign in. Ask the IT Manager.',
   'linked-elsewhere': 'That Google identity is already on another account. Those two need merging first.',
   'google': 'Google sign-in is unavailable at the moment.',
 }

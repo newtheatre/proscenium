@@ -15,6 +15,7 @@ fixed, in the pull request that fixes it.
 | **`/admin/people` is a dead link** in the admin sidebar. | The second of two navigation entries goes nowhere. | A-121, which builds that screen. |
 | **`VERIFY_TOKEN_HOURS = 24` is hardcoded** in `server/utils/tokens.ts`, and J-104 criterion 1 says no policy number is. | It is a policy number the committee may want to move, and moving it is a deploy. | It has no key on the workshop register, so it needs one proposing before it can be configuration. |
 | **`ADMIN_TOKEN_HOURS` has no consumer.** The key and its default exist; nothing issues a `SET_PASSWORD` token. | Nothing is broken, but the surface lists a setting that changes nothing. | A-116 and A-121, which introduce the paths that issue one. |
+| **A Google sign-in still names one account state.** `?refused=linked-elsewhere` says the Google identity is on another account. The disabled state no longer leaks (A-122 criterion 2), but this one does. | It is useful copy for the person and a fact about an account for anyone else. Lower stakes than disabled-ness, which is why it was left. | A-123, which builds the merge that refusal points at. |
 | **`content/` holds no pages**, so `check:content-tokens` passes over zero tokens. | The check is green by vacuum, and will not have been exercised on real content until J-110. | J-110. |
 
 ## Platform

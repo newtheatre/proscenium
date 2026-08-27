@@ -79,7 +79,7 @@ describe.skipIf(skip !== null)('the three shells (docs/design-language.md)', () 
   // The Google route refuses with a code; the wording lives on the page that shows it, so an
   // unhandled code would leave a member staring at nothing.
   test('every refusal code the Google route can send is explained', async () => {
-    for (const code of ['not-workspace', 'unverified-email', 'disabled', 'linked-elsewhere', 'google']) {
+    for (const code of ['not-workspace', 'unverified-email', 'account', 'linked-elsewhere', 'google']) {
       const text = await inspect<string>(`/sign-in?refused=${code}`, 'document.body.innerText')
       expect(`${code}: ${text.length > 40 && !text.includes('undefined')}`).toBe(`${code}: true`)
     }
