@@ -12,10 +12,10 @@ fixed, in the pull request that fixes it.
 | What | Why it matters | Where it belongs |
 | --- | --- | --- |
 | **No per-IP rate limiting anywhere.** A-101 criterion 5 (10 registrations an hour per IP) and A-103 criterion 4 (20 sign-in attempts per 15 minutes per IP) are both unmet. Only the per-address halves are enforced. | One address is limited; one attacker with a list of addresses is not limited at all. | A-101, A-103. Needs the client IP, which on Workers is `CF-Connecting-IP`. |
-| **`/admin/people` is a dead link** in the admin sidebar. | The second of two navigation entries goes nowhere. | A-121, which builds that screen. |
 | **`VERIFY_TOKEN_HOURS = 24` is hardcoded** in `server/utils/tokens.ts`, and J-104 criterion 1 says no policy number is. | It is a policy number the committee may want to move, and moving it is a deploy. | It has no key on the workshop register, so it needs one proposing before it can be configuration. |
 | **`ADMIN_TOKEN_HOURS` has no consumer.** The key and its default exist; nothing issues a `SET_PASSWORD` token. | Nothing is broken, but the surface lists a setting that changes nothing. | A-116 and A-121, which introduce the paths that issue one. |
 | **A Google sign-in still names one account state.** `?refused=linked-elsewhere` says the Google identity is on another account. The disabled state no longer leaks (A-122 criterion 2), but this one does. | It is useful copy for the person and a fact about an account for anyone else. Lower stakes than disabled-ness, which is why it was left. | A-123, which builds the merge that refusal points at. |
+| **Personal data is classified per table, not per column.** `shared/utils/personal-data.ts` says what each table holds and what erasure does to it; `docs/data-model.md` promises a per-column scrub classification. | A column added to an already-classified table joins the export and the erasure by default, which is the safe direction, but nothing forces a decision about it. | K-109, if per-column granularity turns out to be needed once a module has free-text columns. |
 | **`content/` holds no pages**, so `check:content-tokens` passes over zero tokens. | The check is green by vacuum, and will not have been exercised on real content until J-110. | J-110. |
 
 ## Platform
