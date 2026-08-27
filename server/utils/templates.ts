@@ -63,6 +63,52 @@ If it was not, nothing has changed and there is nothing to do.
 
 The Nottingham New Theatre`,
   }),
+  // The old estate's reset emails always said one hour, whatever the token actually lasted.
+  // This states the figure the token carries (A-108 criterion 2).
+  'password-reset': (context: TemplateContext): Rendered => {
+    const url = String(context.url)
+    const until = expiry(context.expiresAt as Date)
+    return {
+      subject: 'Reset your password',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Someone asked to reset the password on this account. If it was you, follow the link.</p>
+<p><a href="${url}">Set a new password</a></p>
+<p>The link works until ${until}. If it was not you, ignore this: nothing has changed and your
+password still works.</p>`),
+      text: `Hello ${context.name},
+
+Someone asked to reset the password on this account. If it was you, follow the link:
+
+${url}
+
+The link works until ${until}. If it was not you, ignore this: nothing has changed and your
+password still works.
+
+The Nottingham New Theatre`,
+    }
+  },
+
+  'magic-link': (context: TemplateContext): Rendered => {
+    const url = String(context.url)
+    const until = expiry(context.expiresAt as Date)
+    return {
+      subject: 'Your sign-in link',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Follow this link to sign in. It works once.</p>
+<p><a href="${url}">Sign in</a></p>
+<p>The link works until ${until}. If you did not ask for it, ignore it: it signs nobody in but
+whoever opens it from this mailbox.</p>`),
+      text: `Hello ${context.name},
+
+Follow this link to sign in. It works once:
+
+${url}
+
+The link works until ${until}. If you did not ask for it, ignore it.
+
+The Nottingham New Theatre`,
+    }
+  },
 } as const
 
 export type TemplateName = keyof typeof TEMPLATES

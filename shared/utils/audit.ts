@@ -4,9 +4,10 @@
 // Long enough for an identifier or a status, too short for prose.
 export const MAX_DETAIL_STRING = 120
 
-// Lowercase, dotted, at least noun.verb. Reports group by this, so a typo must not quietly
-// create a new category.
-const ACTION = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$/
+// Lowercase, dotted, at least noun.verb, with hyphens allowed inside a segment for terms like
+// magic-link. Reports group by this, so a typo must not quietly create a new category.
+const SEGMENT = '[a-z][a-z0-9]*(?:-[a-z0-9]+)*'
+const ACTION = new RegExp(`^${SEGMENT}(?:\\.${SEGMENT})+$`)
 
 // Anything shaped like an address, wherever it appears.
 const ADDRESS = /[^\s@]+@[^\s@]+\.[^\s@]+/
