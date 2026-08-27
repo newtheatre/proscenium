@@ -1,9 +1,8 @@
-# Unified system: Phase 0 definition
+# Unified system: documentation
 
 This directory is the definition package for the unified theatre management system: the single
-application that replaces stage-door, proscenium, rooms and rehearsal. Nothing in here is code.
-The gate at the bottom of `roadmap.md`'s Phase 0 passed on 26 August 2026 (decision 0019) and
-development has started.
+application that replaces stage-door, proscenium, rooms and rehearsal. The gate at the bottom of
+`roadmap.md`'s Phase 0 passed on 26 August 2026 (decision 0019) and development has started.
 
 ## Contents
 
@@ -13,6 +12,9 @@ development has started.
 | `backlog/` | The full story backlog, one file per module, tracker-ready. Each story has a role, a testable acceptance list, a phase and its sources. |
 | `decisions/` | Foundational architecture decision records, all accepted at the gate on 26 August 2026. |
 | `workshops.md` | The configuration defaults register: every number that is currently folklore, with a proposed value for the committee to confirm, plus the workshop agenda. The proposed values are what the system ships until a workshop amends them (0019). |
+| `architecture.md` | How the running system is put together: runtime, code layout, identity, concurrency, scheduled tasks, deployment and testing. |
+| `data-model.md` | Every table, its columns and the rules the schema enforces. |
+| `operations.md` | What an operator does: deploys, migrations and their restore point, the health check, the first administrator, secrets. |
 | `design-language.md` | The reasoning behind the tokens, the two intensities, and the rules for using them. |
 | `spikes.md` | Time-boxed investigations that must land before their dependent build work. |
 |  `../CONTRIBUTING.md` | Engineering standards, at the repository root as CONTRIBUTING.md. |

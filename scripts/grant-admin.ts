@@ -8,11 +8,13 @@ import { assertLocalTarget, assertNotProduction } from '../tests/helpers/seed'
 
 const DEFAULT_TARGET = '.data/db/sqlite.db'
 
-const email = process.argv[2]?.trim().toLowerCase()
-const target = process.argv[3] ?? DEFAULT_TARGET
+const args = process.argv.slice(2).filter(argument => argument !== '--additional')
+const additional = process.argv.includes('--additional')
+const email = args[0]?.trim().toLowerCase()
+const target = args[1] ?? DEFAULT_TARGET
 
 if (!email) {
-  console.error('usage: bun scripts/grant-admin.ts <email> [database]')
+  console.error('usage: bun scripts/grant-admin.ts <email> [database] [--additional]')
   console.error('Grants ADMIN, expiring at the committee year end, to an existing account.')
   process.exit(1)
 }
@@ -27,6 +29,21 @@ const account = db.query('SELECT id, name FROM users WHERE email = ?').get(email
 
 if (!account) {
   console.error(`No account for ${email}. Register or sign in once first.`)
+  process.exit(1)
+}
+
+// Bootstrapping is for an environment with no way in, so it refuses one that already has a way
+// in: an ordinary grant is audited to a person, and this one is not (K-122 criterion 4).
+const usable = db.query(`
+  SELECT count(*) n FROM role_grants g JOIN users u ON u.id = g.user_id
+  WHERE g.role = 'ADMIN' AND u.disabled = 0 AND u.anonymised_at IS NULL
+    AND (g.expires_at IS NULL OR g.expires_at > unixepoch())
+`).get() as { n: number }
+
+if (usable.n > 0 && !additional) {
+  console.error(`This database already has ${usable.n} usable administrator(s).`)
+  console.error('Grant the role through /api/admin/roles, which records who did it.')
+  console.error('Pass --additional only to build a local fixture that needs more than one.')
   process.exit(1)
 }
 

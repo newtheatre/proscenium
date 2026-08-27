@@ -110,6 +110,32 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
     expect(await read.json()).toMatchObject({ roles: [{ role: 'MANAGER' }] })
   })
 
+  // The third clause of the Phase 1 gate, asserted against a route rather than against the
+  // helper: the entry has to reach the table, in the same batch as the grant.
+  test('the gate: the grant itself lands in the audit trail', async () => {
+    const { Database } = await import('bun:sqlite')
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const entry = database.query(`
+        SELECT action, detail FROM audit_log WHERE target = ? AND action = 'role.granted'
+      `).get(`user:${subjectId}`) as { action: string, detail: string } | null
+
+      expect(entry).not.toBeNull()
+      expect(JSON.parse(entry!.detail)).toMatchObject({ role: 'MANAGER' })
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  // Bootstrapping exists for an environment with no way in, and this one now has one
+  // (K-122 criterion 4).
+  test('the bootstrap refuses to grant a second administrator', () => {
+    const again = Bun.spawnSync(['bun', 'scripts/grant-admin.ts', subject.email, app.databaseFile])
+    expect(again.exitCode).not.toBe(0)
+    expect(again.stderr.toString()).toMatch(/already has/i)
+  })
+
   test('an unknown role is refused by the schema once the caller is allowed in', async () => {
     const response = await send('POST', '/api/admin/roles', { userId: subjectId, role: 'SUPREME_LEADER' }, cookie)
     expect(response.status).toBe(400)

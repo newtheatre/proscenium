@@ -120,6 +120,10 @@ and exports are queries over the ledger; no module keeps its own money totals.
 All Nitro scheduled tasks mirrored in wrangler cron triggers. The system notices, humans
 decide (principle P6): no task ever awards a record, approves a request or takes money.
 
+Every name in the table has a handler under `server/tasks/`, because a cron pointing at one that
+does not exist errors on every firing. Seven of them are stubs that report the story they are
+waiting for and do nothing else; only `daily:sweeps` does work today.
+
 | Cron (UTC) | Task | Does |
 | --- | --- | --- |
 | `*/10 * * * *` | `holds:release` | Releases expired reservation holds, cascades waiting-list offers, sends pre-expiry reminders. The one task that changes booking state, and only ever in the direction the customer was warned about. |
@@ -159,12 +163,15 @@ databases. There is a `/dev-login` guarded by `import.meta.dev` using `replaceUs
 
 ## Deployment
 
-Merging to `main` (once this branch becomes it) deploys via Workers Builds. Migrations apply
-from a GitHub Actions job on push (restore point first, ledger re-read after, `nuxt-db
-migrate`), and `/api/health` returns 503 naming pending migrations whenever the deploy is
-ahead of its schema. CI gates: lint, typecheck, the three test layers, comment rules, the
-append-only migration check, and the content-token check against the configuration schema
-(0012).
+Merging to `main` (once this branch becomes it) deploys via Workers Builds. Migrations apply from
+`.github/workflows/migrate.yml` on push to `main` or `unified/main` when the run touches
+`server/db/migrations/**` (restore point first, `nuxt-db migrate`, ledger re-read after), and
+`/api/health` returns 503 naming pending migrations whenever the deploy is ahead of its schema.
+Applying and deploying cannot be sequenced from CI, so the ordering is a race; the health check is
+what makes losing it visible rather than silent.
+
+CI gates: lint, typecheck, the three test layers, comment rules, the append-only migration check,
+and the content-token check against the configuration schema (0012).
 
 ## Testing (0016)
 

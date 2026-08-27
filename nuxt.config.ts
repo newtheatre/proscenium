@@ -86,8 +86,8 @@ export default defineNuxtConfig({
       wasm: true,
     },
 
-    // Mirrored one-for-one by the cron triggers below; the two lists must not drift
-    // (docs/architecture.md, Scheduled tasks).
+    // Mirrored one-for-one by the cron triggers below; the two lists must not drift, and every
+    // name here has a handler under server/tasks (docs/architecture.md, Scheduled tasks).
     scheduledTasks: {
       '*/10 * * * *': ['holds:release'],
       '0 6 * * *': ['training:expiry-sweep'],
