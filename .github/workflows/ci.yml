@@ -50,3 +50,8 @@ jobs:
       # the write path does not enforce (0012).
       - name: Content tokens
         run: bun run check:content-tokens
+
+      # Anything but the notification centre reaching the mail binding skips every rule the
+      # centre enforces (0013).
+      - name: Notifications
+        run: bun run check:notifications

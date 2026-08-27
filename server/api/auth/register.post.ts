@@ -31,10 +31,18 @@ export default defineEventHandler(async (event) => {
   if (problem) throw createError({ statusCode: 400, statusMessage: explain(problem) })
 
   // Enumeration safety: an address already registered gets the same answer as a new one, and
-  // learns it is taken through the email it would already be able to read.
+  // learns it is taken through the email it would already be able to read (A-101 criterion 2).
   const existing = await findByEmail(email)
-  if (!existing) {
-    await createAccount({ email, name: input.name, passwordHash: await hashPassword(input.password) })
+  if (existing) {
+    await notify(event, {
+      type: 'account.exists',
+      userId: existing.id,
+      context: { name: '', signInUrl: `${useRuntimeConfig(event).public.baseURL}/sign-in` },
+    })
+  }
+  else {
+    const id = await createAccount({ email, name: input.name, passwordHash: await hashPassword(input.password) })
+    await sendVerification(event, id)
   }
 
   return { ok: true, message: 'Check your email to finish setting up your account' }
