@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, lt } from 'drizzle-orm'
 
 // Single-use tokens for the paths that prove a mailbox (A-102). The plaintext exists only in
 // the email; the database holds its hash, so a leaked backup grants nothing.
@@ -60,4 +60,12 @@ export async function claimToken(plaintext: string, kind: TokenKind): Promise<Cl
   if (row.expiresAt * 1000 <= Date.now()) return null
 
   return { userId: row.userId, email: row.email }
+}
+
+// A claimed token is already deleted, so what expires here was never used.
+export async function sweepExpiredTokens(before: Date): Promise<number> {
+  const gone = await db.delete(schema.authTokens)
+    .where(lt(schema.authTokens.expiresAt, Math.floor(before.getTime() / 1000)))
+    .returning({ id: schema.authTokens.id })
+  return gone.length
 }

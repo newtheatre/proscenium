@@ -108,7 +108,7 @@ decide (principle P6): no task ever awards a record, approves a request or takes
 | `0 9 * * *` | `sessions:sweep` | Session reminders, unmarked-register nags, lapsed practice windows. |
 | `0 10 * * *` | `shifts:remind` | Tomorrow's rota with calendar attachments. |
 | `12 0 * * *` | `nights:close` | Auto-closes unsigned night reports inside 24 hours, retries unsent report emails. |
-| `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, notification retries. |
+| `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, notification retries. |
 | `0 5 * * 1` | `backup` | Weekly export to R2 (plus provider Time Travel). |
 | `0 4 1 * *` | `retention:sweep` | Inactivity warnings and anonymisation (ships dry-run, armed by config with typed confirmation). |
 

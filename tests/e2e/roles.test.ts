@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { defaultRoleExpiry } from '#shared/utils/roles'
+import { codeForStep, stepFor } from '#shared/utils/totp'
 import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -74,11 +75,30 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
     expect((await send('POST', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' })).status).toBe(401)
   })
 
+  // A privileged role needs a second factor, so an administrator enrols one before the role is
+  // usable (A-112). This is what a real one has to do.
+  async function enrolAndReauthenticate(): Promise<string> {
+    const { secret } = await (await send('POST', '/api/account/mfa/enrol', {}, cookie)).json() as { secret: string }
+    const confirmed = await send('POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, cookie)
+    expect(confirmed.status).toBe(200)
+
+    const signedIn = await send('POST', '/api/auth/sign-in', { email: officer.email, password })
+    const { attemptId } = await signedIn.json() as { attemptId: string }
+    const answered = await send('POST', '/api/auth/mfa/challenge', {
+      attemptId,
+      code: await codeForStep(secret, stepFor(new Date()) + 1),
+    })
+    expect(answered.status).toBe(200)
+    return (answered.headers.get('set-cookie') ?? '').split(';')[0]!
+  }
+
   // The first administrator cannot be granted through the API, because granting needs the
   // permission that being one confers. The bootstrap script is the only way in (A-120).
   test('the gate: an administrator grants a role that expires at the committee year', async () => {
     const bootstrap = Bun.spawnSync(['bun', 'scripts/grant-admin.ts', officer.email, app.databaseFile])
     expect(bootstrap.exitCode).toBe(0)
+
+    cookie = await enrolAndReauthenticate()
 
     // The session was sealed before the grant existed, and permissions are read fresh.
     const granted = await send('POST', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' }, cookie)
