@@ -81,15 +81,23 @@ describe.skipIf(skip !== null)('the notification centre (H-101, H-103, H-107)', 
     expect(log[0]!.subject).toBeTruthy()
   })
 
-  // Every path that sends must refuse a placeholder, and the refusal is recorded rather than
-  // silent (H-107 criteria 1 and 3).
+  // Registration refuses an undeliverable address outright (A-101 criterion 3), so the account
+  // that carries one arrives by import: the imported shape is what H-107 exists to catch.
   test('an undeliverable address is never handed to a provider, and says so', async () => {
     const person = syntheticPerson(Math.floor(Math.random() * 1_000_000) + 1)
-    await register(person)
+    const deliverable = { ...person, email: `probe-${Math.random().toString(36).slice(2)}@${E2E_DOMAIN}` }
+    await register(deliverable)
 
-    const log = logFor(person.email)
-    expect(log).toHaveLength(1)
-    expect(log[0]).toMatchObject({ status: 'SKIPPED_UNDELIVERABLE', error: 'undeliverable-domain' })
+    const placeholder = `imported-${Math.random().toString(36).slice(2)}@example.com`
+    setEmail(deliverable.email, placeholder)
+
+    await fetch(`${app.baseURL}/api/auth/verify/resend`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: placeholder }),
+    })
+
+    expect(logFor(placeholder).at(-1)).toMatchObject({ status: 'SKIPPED_UNDELIVERABLE', error: 'undeliverable-domain' })
   })
 
   test('an anonymised account is refused before its address is even considered', async () => {

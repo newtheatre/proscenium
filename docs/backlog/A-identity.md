@@ -34,9 +34,9 @@ Open questions for the committee:
 - Story: As a visitor, I want to create an account with my email address and a password so that one login covers everything I do with the theatre.
 - Depends on: none
 - Acceptance criteria:
-  1. Registration accepts a name of 1 to 200 characters, an email address (lowercased and format-validated) and a password of at least 8 characters containing a lower-case letter, an upper-case letter and a digit; any other input is a 400 naming the failing field.
+  1. Registration accepts a name of 1 to 200 characters, an email address (lowercased and format-validated) and a password meeting the configured policy (length and optional complexity, `shared/utils/config.ts`); any other input is a 400 naming the failing field. Amended 27 August 2026: the policy is configuration rather than a fixed rule, because a length floor with no composition rule is what NIST SP 800-63B now advises.
   2. The response is identical whether or not the address already has an account (enumeration-safe). An existing full account receives a "you already have an account" email; a claimable guest account receives a 24-hour set-password link instead (A-116).
-  3. A @newtheatre.org.uk address is silently ignored: no account is created and no email is sent, because Workspace accounts are Google-only (A-104). Known undeliverable domains (.invalid, .test, example.com) are dropped the same way.
+  3. A @newtheatre.org.uk address is refused with a message naming Google as its credential: no account is created and no email is sent, because Workspace accounts are Google-only (A-104). Known undeliverable domains (.invalid, .test, example.com) are dropped silently, with the ordinary answer and no account. Amended 27 August 2026: the Workspace half was written as a silent drop, which leaves a committee member typing their work address into a form that appears to do nothing. The rule is about a domain and not about an account, so saying it plainly leaks nothing.
   4. Registration never creates a session; the user lands on a check-your-email page and must verify the address (A-102) before the account is usable.
   5. Rate limits of 10 registrations per hour per IP and 5 per hour per address are enforced.
   6. Passwords are hashed with a memory-hard algorithm and never appear in logs or responses.

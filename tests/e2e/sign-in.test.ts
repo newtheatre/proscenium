@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
+import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
@@ -10,8 +10,9 @@ const googleConfigured = Boolean(process.env.NUXT_OAUTH_GOOGLE_CLIENT_ID)
 const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 
-// A fresh synthetic person per run, so the suite never depends on what a previous run left.
-const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
+// A fresh synthetic person per run, so the suite never depends on what a previous run left. The
+// address is registrable, because this one has to reach an account it can sign in to.
+const person = { ...syntheticPerson(Math.floor(Math.random() * 1_000_000)), email: registrableAddress('signin') }
 // generatePassword returns a uuid-based string, comfortably over the shipped minimum.
 const password = generatePassword()
 

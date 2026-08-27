@@ -1,4 +1,4 @@
-import type { PasswordProblem } from '#shared/utils/auth'
+import type { PasswordProblem } from './auth'
 
 // The refusal quotes the rule that refused it, so a person is not left guessing which one
 // moved. Shared, so registration and reset never disagree about the wording.

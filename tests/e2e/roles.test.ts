@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { defaultRoleExpiry } from '#shared/utils/roles'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
+import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
@@ -9,8 +9,8 @@ const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 
-const officer = syntheticPerson(Math.floor(Math.random() * 1_000_000))
-const subject = syntheticPerson(Math.floor(Math.random() * 1_000_000) + 1)
+const officer = { ...syntheticPerson(Math.floor(Math.random() * 1_000_000)), email: registrableAddress('officer') }
+const subject = { ...syntheticPerson(Math.floor(Math.random() * 1_000_000) + 1), email: registrableAddress('subject') }
 const password = generatePassword()
 
 beforeAll(async () => {
@@ -125,7 +125,7 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
   // "Usable" excludes disabled accounts, so a disabled second administrator must not satisfy
   // the guard (A-120 criterion 3).
   test('a disabled second administrator does not satisfy the last-admin guard', async () => {
-    const spare = syntheticPerson(Math.floor(Math.random() * 1_000_000) + 2)
+    const spare = { ...syntheticPerson(Math.floor(Math.random() * 1_000_000) + 2), email: registrableAddress('spare') }
     await register(spare)
     const spareCookie = await signIn(spare.email)
     const spareSession = await (await fetch(`${app.baseURL}/api/auth/session`, { headers: { cookie: spareCookie } })).json()

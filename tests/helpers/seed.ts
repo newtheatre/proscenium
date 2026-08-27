@@ -54,6 +54,14 @@ export function syntheticPerson(index: number): SyntheticPerson {
   }
 }
 
+// A subdomain of ours with no MX record: undeliverable too, but registration refuses the
+// RFC-reserved domains outright, so an account a test signs in to needs one of these.
+const REGISTRABLE_DOMAIN = 'e2e.newtheatre.org.uk'
+
+export function registrableAddress(prefix: string): string {
+  return `${prefix}-${crypto.randomUUID().slice(0, 8)}@${REGISTRABLE_DOMAIN}`.toLowerCase()
+}
+
 // Generated at run time and returned once. Nothing here is committed, and a caller that does
 // not print it has no way to recover it.
 export function generatePassword(): string {
