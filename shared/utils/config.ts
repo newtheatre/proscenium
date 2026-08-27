@@ -242,6 +242,31 @@ export const CONFIG_KEYS = {
     describes: 'Require a symbol. Off, for the same reason as mixed case.',
   },
 
+  SIGN_IN_ATTEMPTS_PER_ACCOUNT: {
+    schema: z.number().int().positive(),
+    default: 10,
+    workshop: 'people-and-communications',
+    describes: 'Sign-in attempts allowed per address per window. Counted on the address submitted, not the account found, so being limited never proves one exists.',
+  },
+  SIGN_IN_ATTEMPTS_PER_ADDRESS_WINDOW_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 15,
+    workshop: 'people-and-communications',
+    describes: 'The window sign-in attempts are counted over.',
+  },
+  VERIFY_RESEND_ATTEMPTS: {
+    schema: z.number().int().positive(),
+    default: 5,
+    workshop: 'people-and-communications',
+    describes: 'Verification resends allowed per address per window, so nobody can flood a mailbox.',
+  },
+  VERIFY_RESEND_WINDOW_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 60,
+    workshop: 'people-and-communications',
+    describes: 'The window verification resends are counted over.',
+  },
+
   NOTIFICATION_TOPICS: {
     schema: z.array(z.string()).nonempty(),
     default: ['bookings', 'shifts', 'training', 'rooms', 'announcements'],
