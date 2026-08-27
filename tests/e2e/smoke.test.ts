@@ -48,6 +48,18 @@ describe.skipIf(skip !== null)('the application serves a page (0022)', () => {
     finally { view.close() }
   })
 
+  // The unit test proves the two lists agree; this proves Nitro can actually resolve every
+  // handler, which is the half a text comparison cannot see.
+  test('every registered scheduled task resolves', async () => {
+    const listed = await (await fetch(`${app.baseURL}/_nitro/tasks`)).json() as { tasks: Record<string, unknown> }
+    const names = Object.keys(listed.tasks ?? {})
+
+    expect(names).toContain('daily:sweeps')
+    for (const name of ['holds:release', 'training:expiry-sweep', 'sessions:sweep', 'shifts:remind', 'nights:close', 'backup', 'retention:sweep']) {
+      expect(`${name}: ${names.includes(name)}`).toBe(`${name}: true`)
+    }
+  })
+
   test('the health endpoint answers', async () => {
     const response = await fetch(`${app.baseURL}/api/health`)
     expect(response.status).toBe(200)

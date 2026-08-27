@@ -179,7 +179,7 @@ describe.skipIf(skip !== null)('privileged roles require a factor (A-112)', () =
     const signedIn = await send('POST', '/api/auth/sign-in', { email, password })
     const cookie = (signedIn.headers.get('set-cookie') ?? '').split(';')[0]!
 
-    expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', email, app.databaseFile]).exitCode).toBe(0)
+    expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', email, app.databaseFile, '--additional']).exitCode).toBe(0)
 
     const refused = await send('GET', `/api/admin/roles?userId=x`, null, cookie)
     expect(refused.status).toBe(403)
@@ -188,7 +188,7 @@ describe.skipIf(skip !== null)('privileged roles require a factor (A-112)', () =
 
   test('the same account works once a factor is confirmed', async () => {
     const member = await memberWithFactor()
-    expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', member.email, app.databaseFile]).exitCode).toBe(0)
+    expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', member.email, app.databaseFile, '--additional']).exitCode).toBe(0)
 
     const signedIn = await send('POST', '/api/auth/sign-in', { email: member.email, password })
     const { attemptId } = await signedIn.json() as { attemptId: string }
@@ -202,7 +202,7 @@ describe.skipIf(skip !== null)('privileged roles require a factor (A-112)', () =
   // Giving up the factor while the role needs it would lock the surface, so it is refused.
   test('the factor cannot be removed while a privileged role needs it', async () => {
     const member = await memberWithFactor()
-    expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', member.email, app.databaseFile]).exitCode).toBe(0)
+    expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', member.email, app.databaseFile, '--additional']).exitCode).toBe(0)
 
     const signedIn = await send('POST', '/api/auth/sign-in', { email: member.email, password })
     const { attemptId } = await signedIn.json() as { attemptId: string }
