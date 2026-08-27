@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { WORKSPACE_DOMAIN } from '#shared/utils/auth'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
@@ -87,7 +87,7 @@ function verifiedFlag(email: string): number {
 }
 
 async function open(path: string): Promise<Bun.WebView> {
-  const view = await openView()
+  const view = await openSignedOutView(app.baseURL)
   await visit(view, `${app.baseURL}${path}`)
   return view
 }

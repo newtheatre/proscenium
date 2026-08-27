@@ -126,6 +126,16 @@ export async function visit(view: Bun.WebView, url: string): Promise<void> {
   await waitForInteractive(view)
 }
 
+// One browser backs every view, so they share a cookie jar: a test that needs a signed-out visitor
+// has to end the session rather than assume a new view carries none.
+export async function openSignedOutView(baseURL: string): Promise<Bun.WebView> {
+  const view = await openView()
+  await view.navigate(`${baseURL}/`)
+  await waitFor(view, 'document.body')
+  await view.evaluate(`fetch('/api/auth/sign-out', { method: 'POST' }).then(response => response.status)`)
+  return view
+}
+
 // Polls a boolean expression until it holds. Every assertion about a rendered screen needs this,
 // because navigation and hydration both finish after the call that started them.
 export async function waitFor(view: Bun.WebView, expression: string, timeoutMs = SETTLE_TIMEOUT_MS): Promise<void> {

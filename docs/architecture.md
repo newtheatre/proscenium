@@ -176,4 +176,6 @@ regression suite (K-121) is seeded before feature work and grows monotonically.
 A browser test drives the real screen, so it must wait for the page to become interactive and not
 merely to render: until Nuxt's Suspense resolves, the markup is server-rendered and a click does
 nothing and reports nothing. `visit()` in `tests/helpers/webview.ts` waits for both, and `fill()`
-sets a value through the native setter so `v-model` sees the change.
+sets a value through the native setter so `v-model` sees the change. One browser backs every view,
+so views share a cookie jar: a case that needs a signed-out visitor opens one with
+`openSignedOutView()` rather than assuming a new view carries no session.
