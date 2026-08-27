@@ -13,8 +13,8 @@ export default defineEventHandler(async (event) => {
   await enforce(event, {
     scope: 'verify-resend',
     value: email,
-    limit: CONFIG_KEYS.VERIFY_RESEND_ATTEMPTS.default,
-    windowMinutes: CONFIG_KEYS.VERIFY_RESEND_WINDOW_MINUTES.default,
+    limit: await configValue(event, 'VERIFY_RESEND_ATTEMPTS'),
+    windowMinutes: await configValue(event, 'VERIFY_RESEND_WINDOW_MINUTES'),
   })
 
   const account = await findByEmail(email)

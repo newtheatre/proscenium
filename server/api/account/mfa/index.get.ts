@@ -20,6 +20,6 @@ export default defineEventHandler(async (event) => {
     confirmedAt: factor?.confirmedAt ?? null,
     recoveryCodesRemaining: codes.length,
     // Whether giving it up would be refused, so the screen can say so before the button is pressed.
-    required: await requiresSecondFactor(account, grants),
+    required: await requiresSecondFactor(event, account, grants),
   }
 })

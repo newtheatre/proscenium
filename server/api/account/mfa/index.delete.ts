@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   await requireFreshSession(event)
 
   const grants = await liveGrants(account.id)
-  if (await requiresSecondFactor(account, grants)) {
+  if (await requiresSecondFactor(event, account, grants)) {
     throw createError({
       statusCode: 409,
       statusMessage: 'This account holds a role that requires a second factor. Give up the role first.',

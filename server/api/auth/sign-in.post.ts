@@ -24,8 +24,8 @@ export default defineEventHandler(async (event) => {
   await enforce(event, {
     scope: 'sign-in',
     value: email,
-    limit: CONFIG_KEYS.SIGN_IN_ATTEMPTS_PER_ACCOUNT.default,
-    windowMinutes: CONFIG_KEYS.SIGN_IN_ATTEMPTS_PER_ADDRESS_WINDOW_MINUTES.default,
+    limit: await configValue(event, 'SIGN_IN_ATTEMPTS_PER_ACCOUNT'),
+    windowMinutes: await configValue(event, 'SIGN_IN_ATTEMPTS_PER_ADDRESS_WINDOW_MINUTES'),
   })
 
   const account = await findByEmail(email)
@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
 
   // A proven password is not a session while a second factor is waiting (A-111 criterion 1).
   if (await confirmedFactor(account.id)) {
-    const attemptId = await openAttempt(account.id, CONFIG_KEYS.MFA_ATTEMPT_MINUTES.default)
+    const attemptId = await openAttempt(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'))
     await db.insert(schema.auditLog).values(auditEntry({
       actorId: account.id,
       action: 'mfa.challenged',

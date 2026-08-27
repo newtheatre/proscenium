@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { CONFIG_KEYS } from '#shared/utils/config'
 import { verifyCode } from '#shared/utils/totp'
 
 const body = z.object({
@@ -36,7 +35,7 @@ export default defineEventHandler(async (event) => {
 
   if (!totp.accepted && !recovery.redeemed) {
     // A typo costs the code, not the password step: a fresh attempt is issued (criterion 2).
-    const attemptId = await openAttempt(account.id, CONFIG_KEYS.MFA_ATTEMPT_MINUTES.default)
+    const attemptId = await openAttempt(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'))
     throw createError({
       statusCode: 401,
       statusMessage: 'That code did not match',

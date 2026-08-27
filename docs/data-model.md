@@ -530,10 +530,14 @@ Idempotency claims (a promotion, a reminder) are partial unique indexes here.
 `created_at`. The in-app channel; never coalesced.
 
 ### config
-`key` PK · `value` · `updated_by` · `updated_at`. Defaults live in code; a missing row means
-the default. The settings surface shows default, current and last editor; wide-blast keys
-take a typed confirmation (J-104, J-105). Policy pages resolve `{{TOKENS}}` against this
-table (0012).
+`key` PK · `value` JSON · `updated_by` · `updated_at`. Defaults live in code; a missing row means
+the default, so the table holds overrides only and a default changed in code still propagates.
+Read through `configValue()` in `server/utils/configuration.ts`, which loads the override set once
+per request: an isolate-scoped cache would hold a stale value until the isolate recycled, and a
+settings change has to take effect on the next request (0012). A key the workshop register proposed
+no value for has neither row nor default, and reading one is refused rather than guessed (0019).
+The settings surface shows default, current and last editor; wide-blast keys take a typed
+confirmation (J-104, J-105). Policy pages resolve `{{TOKENS}}` against this table (0012).
 
 ### audit_log  APPEND-ONLY (exception: erasure redacts identifying values in `detail`)
 `id` PK · `actor_id` NULL = system · `action` · `target` · `detail` JSON (never personal
