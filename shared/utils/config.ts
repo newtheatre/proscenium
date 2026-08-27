@@ -14,6 +14,9 @@ interface ConfigKeyDefinition {
   default?: unknown
   workshop: ConfigWorkshop
   describes: string
+  // A value that can hold personal data. Its changes are audited as a hash rather than as the
+  // value, because audit detail carries identifiers and never people (0011, 0024).
+  sensitive?: true
 }
 
 export const CONFIG_KEYS = {
@@ -326,6 +329,7 @@ export const CONFIG_KEYS = {
   NIGHT_REPORT_RECIPIENTS: {
     schema: z.array(z.string().email()),
     workshop: 'people-and-communications',
+    sensitive: true,
     describes: 'Standing recipients of the end-of-night report. The list is confirmed in the workshop.',
   },
 } as const satisfies Record<string, ConfigKeyDefinition>
@@ -336,6 +340,32 @@ export const CONFIG_KEY_NAMES = Object.keys(CONFIG_KEYS) as ConfigKey[]
 
 export function isConfigKey(name: string): name is ConfigKey {
   return Object.hasOwn(CONFIG_KEYS, name)
+}
+
+// The keys something actually reads today; a key absent here is recorded but not yet enforced,
+// which the surface says plainly (0012). A test greps the server for the reads, so it cannot drift.
+export const ENFORCED_KEYS = [
+  'MAGIC_LINK_MINUTES',
+  'MFA_ATTEMPT_MINUTES',
+  'PASSWORD_MAX_LENGTH',
+  'PASSWORD_MIN_LENGTH',
+  'PASSWORD_REQUIRE_MIXED_CASE',
+  'PASSWORD_REQUIRE_NUMBER',
+  'PASSWORD_REQUIRE_SYMBOL',
+  'PASSWORD_RESET_HOURS',
+  'PRIVILEGED_ROLES',
+  'SIGN_IN_ATTEMPTS_PER_ACCOUNT',
+  'SIGN_IN_ATTEMPTS_PER_ADDRESS_WINDOW_MINUTES',
+  'VERIFY_RESEND_ATTEMPTS',
+  'VERIFY_RESEND_WINDOW_MINUTES',
+] as const satisfies readonly ConfigKey[]
+
+export function isEnforced(key: ConfigKey): boolean {
+  return (ENFORCED_KEYS as readonly string[]).includes(key)
+}
+
+export function isSensitive(key: ConfigKey): boolean {
+  return 'sensitive' in CONFIG_KEYS[key]
 }
 
 // A key the register proposed no value for. Reading one is a defect, not a fallback: the

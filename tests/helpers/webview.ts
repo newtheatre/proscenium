@@ -110,20 +110,21 @@ export async function openView(): Promise<Bun.WebView> {
 const SETTLE_TIMEOUT_MS = 15_000
 const INTERACTIVE_TIMEOUT_MS = 90_000
 
-// Mounted is not interactive: Nuxt wraps the page in Suspense, and until it resolves the screen
-// is server-rendered markup with no listeners, so a click does nothing and reports nothing.
-export async function waitForInteractive(view: Bun.WebView): Promise<void> {
+// Mounted is not interactive: until Suspense resolves the screen is server-rendered markup with
+// no listeners, and the marker must be inside the page, because chrome is patched before it.
+export async function waitForInteractive(view: Bun.WebView, marker = 'main'): Promise<void> {
   await waitFor(
     view,
-    `document.querySelector('#__nuxt')?.__vue_app__ && document.querySelector('main')?.__vueParentComponent`,
+    `document.querySelector('#__nuxt')?.__vue_app__ && document.querySelector(${JSON.stringify(marker)})?.__vueParentComponent`,
     INTERACTIVE_TIMEOUT_MS,
   )
 }
 
-// Navigate and wait until the screen will answer a click. Every browser test starts here.
-export async function visit(view: Bun.WebView, url: string): Promise<void> {
+// Navigate and wait until the screen will answer a click. Every browser test starts here. The
+// dashboard shell renders no <main>, so an admin screen names an element of its own.
+export async function visit(view: Bun.WebView, url: string, marker?: string): Promise<void> {
   await view.navigate(url)
-  await waitForInteractive(view)
+  await waitForInteractive(view, marker)
 }
 
 // One browser backs every view, so they share a cookie jar: a test that needs a signed-out visitor
