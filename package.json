@@ -18,7 +18,8 @@
     "migration:dry-run": "bun migration/inventory.ts && bun migration/transform-identity.ts && bun migration/reconcile.ts",
     "postinstall": "nuxt prepare",
     "typecheck:bun": "tsc -p tests --noEmit && tsc -p scripts --noEmit && tsc -p migration --noEmit",
-    "grant-admin": "bun scripts/grant-admin.ts"
+    "grant-admin": "bun scripts/grant-admin.ts",
+    "check:notifications": "bun scripts/check-notifications.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.2.5",
