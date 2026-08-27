@@ -13,7 +13,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Per-order seat cap (public) | 10 | 10 | Box office uncapped |
 | Refund policy | undocumented, ad hoc | free cancellation while unpaid; paid refunds in person, manager approval | Constraint: money moves in person only |
 | Comp authority | tonight's duty manager or staff | unchanged | Comp request expiry 10 minutes |
-| Pass products for 2026/27 | set yearly | to be listed in session | Names, prices, caps, covered shows |
+| Pass products for 2026/27 | set yearly | to be listed in session | Entered through the box office screens, not settings: prices are dated and append-only (0025, D-123) |
 | Bar tab cap | £20 soft nag | £20 hard cap, manager override | Old soft cap never blocked |
 | Discount codes | none | none at launch | Capability exists, unused until wanted |
 | Season boundary | 1 August to 31 July | unchanged | Drives reporting and role expiry |
@@ -30,7 +30,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Recurring series maximum | 12 occurrences (UI) / 52 (API) | 12 | |
 | No-show ladder | none | recorded at 2, pre-approval required at 3 per term | Constraint 2 of the old policy doc, now real |
 | Priority tiers | production > committee > rehearsal > general (unenforced) | as stated, with bumping and notification | |
-| Opening hours per room | none | per-room, set in session | |
+| Opening hours per room | none | per-room, set in session | Held on the room rather than in settings, so a room can be renamed or archived with them (0025, C-101) |
 | Training expiry warning window | 60 days | 60 days | Final warning at 14 days |
 | Academic year boundary | 31 August | 31 August | Carry-over window stays a 60-day constant |
 | Session edit window | 14 days | 14 days | |
@@ -42,7 +42,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Setting | Current folklore | Proposed default | Notes |
 | --- | --- | --- | --- |
 | Membership year and evidence | SU records, manual | Manual grant, plus a hand-uploaded SU export where available (SP-2: no automatic access) | |
-| Notification topics | per-app ad hoc | bookings, shifts, training, rooms, announcements | Transactional always delivers |
+| Notification topics | per-app ad hoc | bookings, shifts, training, rooms, announcements | Fixed in the schema rather than configured; changing the list is a migration (0025) |
 | Retention periods | 2 years full accounts, 3 years guests (dry-run) | unchanged, armed in December | |
 | Night report recipients | configured list | confirm the list | |
 | Role vocabulary mapping | four namespaces | one officer model, mapping table agreed in session | Needed by the Phase 1 import |
@@ -54,6 +54,10 @@ Any value not settled in a session gets the proposed default and a named owner; 
 decision does not block the gate, it ships the default.
 
 The proposed values are shipped in `shared/utils/config.ts`, one validated key each, and a workshop
-amending one is a settings change rather than a release (0012, 0019). The four rows above with
-no proposed value (the pass products, the per-room opening hours, the night report recipients
-and the role vocabulary mapping) ship unset, and the features needing them wait.
+amending one is a settings change rather than a release (0012, 0019). One row above has no proposed
+value, the night report recipients, and ships unset until a session confirms it.
+
+Three rows are decisions the committee still makes and settings the system does not hold: the pass
+products and the per-room opening hours are records rather than rules, entered through the screens
+that own them, and the notification topics are fixed in the schema (0025). The role vocabulary
+mapping is the migration's, in `migration/role-map.json`, and is not a runtime setting either.

@@ -40,8 +40,11 @@ function standing(setting: Setting): unknown {
   return setting.set ? setting.value : (setting.hasDefault ? setting.default : null)
 }
 
+// An unset key shows an empty box, not the JSON for an empty string: the first thing a workshop
+// does is fill these in, and a value that looks pre-filled invites saving it back.
 function asText(value: unknown): string {
-  return typeof value === 'string' ? value : JSON.stringify(value ?? '')
+  if (value === null || value === undefined) return ''
+  return typeof value === 'string' ? value : JSON.stringify(value)
 }
 
 function kind(setting: Setting): 'boolean' | 'number' | 'text' {
@@ -75,10 +78,12 @@ async function save(setting: Setting, value: unknown): Promise<void> {
   }
 }
 
-// Typed values go as themselves; anything else is read as JSON, which is how the API stores it.
+// A key that holds a string keeps the text as typed: parsing it first would turn 08-01 into a
+// number and true into a boolean, and the schema would refuse a value the officer typed correctly.
 function saveText(setting: Setting): Promise<void> {
   const raw = drafts[setting.key] ?? ''
   if (kind(setting) === 'number') return save(setting, Number(raw))
+  if (typeof standing(setting) === 'string') return save(setting, raw)
 
   try {
     return save(setting, JSON.parse(raw))

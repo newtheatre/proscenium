@@ -30,3 +30,4 @@ afterwards, only superseded.
 | 0022 | Integration tests run on SQLite, end-to-end tests drive Bun.WebView | |
 | 0023 | A fellowship is a permanent honour, and its entitlement is a pass | what it covers, guests, erasure |
 | 0024 | A settings change records a hash where its value could identify someone | which keys are sensitive |
+| 0025 | Configuration is a rule, not a record | where the pass products and opening hours live |

@@ -50,15 +50,6 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Minutes a comp request stays open before it lapses.',
   },
-  PASS_PRODUCTS: {
-    schema: z.array(z.object({
-      name: z.string(),
-      pricePence: z.number().int().nonnegative(),
-      cap: z.number().int().positive().nullable(),
-    })),
-    workshop: 'money-and-box-office',
-    describes: 'The season pass products: names, prices and caps. Listed in the workshop; unset until then.',
-  },
   BAR_TAB_CAP_PENCE: {
     schema: z.number().int().nonnegative(),
     default: 2000,
@@ -149,15 +140,6 @@ export const CONFIG_KEYS = {
     default: ['PRODUCTION', 'COMMITTEE', 'REHEARSAL', 'GENERAL'],
     workshop: 'spaces-and-training',
     describes: 'Booking priority, highest first. A higher tier bumps a lower one with notification.',
-  },
-  ROOM_OPENING_HOURS: {
-    schema: z.record(z.string(), z.array(z.object({
-      day: z.number().int().min(0).max(6),
-      opens: z.string(),
-      closes: z.string(),
-    }))),
-    workshop: 'spaces-and-training',
-    describes: 'Opening hours per room, London. Set in the workshop; unset until then.',
   },
   TRAINING_EXPIRY_WARNING_DAYS: {
     schema: z.number().int().positive(),
@@ -302,12 +284,6 @@ export const CONFIG_KEYS = {
     describes: 'The window verification resends are counted over.',
   },
 
-  NOTIFICATION_TOPICS: {
-    schema: z.array(z.string()).nonempty(),
-    default: ['bookings', 'shifts', 'training', 'rooms', 'announcements'],
-    workshop: 'people-and-communications',
-    describes: 'Topics a member may set preferences on. Transactional messages always deliver (0013).',
-  },
   RETENTION_FULL_ACCOUNT_YEARS: {
     schema: z.number().int().positive(),
     default: 2,
