@@ -547,6 +547,12 @@ was done, survives the redaction. A correction supersedes with a new entry.
 The four old estates' audit histories imported read-only for reference (J-108), same shape
 plus `source_app`. Never written by the application.
 
+### mfa_attempts
+`id` PK · `user_id` → users cascade · `expires_at` · `created_at`. A first credential that has
+been proven but not yet answered with a second factor (A-111). Five minutes, single use: a
+wrong code consumes the attempt and issues a fresh one, so a typo costs the code and not the
+password step. Swept on a schedule; an expired attempt returns the user to the first step.
+
 ### rate_limits
 `key` PK · `window_start` · `count`. Fixed-window, swept daily.
 

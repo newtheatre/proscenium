@@ -36,11 +36,22 @@ export default defineEventHandler(async (event) => {
   const matches = await verifyPassword(usable ? account.password! : await decoyHash(), input.password)
   if (!usable || !matches) return refuse()
 
+  // A proven password is not a session while a second factor is waiting (A-111 criterion 1).
+  if (await confirmedFactor(account.id)) {
+    const attemptId = await openAttempt(account.id, CONFIG_KEYS.MFA_ATTEMPT_MINUTES.default)
+    await db.insert(schema.auditLog).values(auditEntry({
+      actorId: account.id,
+      action: 'mfa.challenged',
+      target: `user:${account.id}`,
+    }))
+    return { ok: true, mfaRequired: true as const, attemptId }
+  }
+
   await db.batch([
     db.update(schema.users).set({ lastLoginAt: Math.floor(Date.now() / 1000) }).where(eq(schema.users.id, account.id)),
     db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'session.started', target: `user:${account.id}` })),
   ])
   await startSession(event, account)
 
-  return { ok: true, user: { id: account.id, name: account.name, email: account.email } }
+  return { ok: true, mfaRequired: false as const, user: { id: account.id, name: account.name, email: account.email } }
 })

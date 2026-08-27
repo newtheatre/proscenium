@@ -261,6 +261,19 @@ export const CONFIG_KEYS = {
     describes: 'How long a sign-in link lasts. Short, because it is a credential sitting in a mailbox.',
   },
 
+  MFA_ATTEMPT_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 5,
+    workshop: 'people-and-communications',
+    describes: 'How long a proven password step waits for its second factor before the person starts again.',
+  },
+  PRIVILEGED_ROLES: {
+    schema: z.array(z.string()),
+    default: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER'],
+    workshop: 'people-and-communications',
+    describes: 'Roles that require a second factor: any role touching money, personal data or safety records (A-112). Changing this is audited.',
+  },
+
   SIGN_IN_ATTEMPTS_PER_ACCOUNT: {
     schema: z.number().int().positive(),
     default: 10,

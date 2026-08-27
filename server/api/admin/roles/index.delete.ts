@@ -12,6 +12,8 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'roles.revoke')
   const input = await readValidatedBodyOrThrow(event, body)
 
+  // Removing a factor is refused while the account holds a role that requires one (A-112
+  // criterion 3); removing the role itself is the way out.
   if (await wouldStrandTheSystem(input.role, input.userId)) {
     throw createError({
       statusCode: 409,

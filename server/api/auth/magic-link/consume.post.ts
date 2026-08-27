@@ -17,6 +17,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 410, statusMessage: 'That link is no longer usable' })
   }
 
+  // A link replaces the password step, never the second factor (A-107 criterion 4).
+  if (await confirmedFactor(account.id)) {
+    const attemptId = await openAttempt(account.id, CONFIG_KEYS.MFA_ATTEMPT_MINUTES.default)
+    await db.batch([
+      db.update(schema.users).set({ verified: true }).where(eq(schema.users.id, account.id)),
+      db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'mfa.challenged', target: `user:${account.id}` })),
+    ])
+    return { ok: true, mfaRequired: true as const, attemptId }
+  }
+
   // Consuming the link proves the mailbox, so the address is verified by the act of using it
   // (A-107 criterion 3).
   await db.batch([
@@ -29,5 +39,5 @@ export default defineEventHandler(async (event) => {
   ])
 
   await startSession(event, { ...account, verified: true })
-  return { ok: true, user: { id: account.id, name: account.name, email: account.email } }
+  return { ok: true, mfaRequired: false as const, user: { id: account.id, name: account.name, email: account.email } }
 })

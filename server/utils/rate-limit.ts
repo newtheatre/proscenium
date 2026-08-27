@@ -44,8 +44,6 @@ export async function enforce(event: H3Event, limit: Limit, now = new Date()): P
   })
 }
 
-// Swept daily by the daily:sweeps task once it exists; until then the table grows slowly and
-// harmlessly, one row per bucket per window.
 export async function sweepExpiredLimits(before: Date): Promise<void> {
   await db.delete(schema.rateLimits).where(lt(schema.rateLimits.windowStart, Math.floor(before.getTime() / 1000)))
 }
