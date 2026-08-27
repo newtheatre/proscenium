@@ -8,6 +8,7 @@ import type { TableColumn } from '@nuxt/ui'
 definePageMeta({ layout: 'admin', title: 'People', middleware: 'signed-in' })
 
 const UBadge = resolveComponent('UBadge')
+const UButton = resolveComponent('UButton')
 
 interface Account {
   id: string
@@ -137,6 +138,18 @@ const columns: TableColumn<Account>[] = [
     ].filter(Boolean).join(', ') || 'nothing yet',
   },
   { id: 'lastLoginAt', header: 'Last seen', cell: ({ row }) => seen(row.original.lastLoginAt) },
+  {
+    id: 'open',
+    header: '',
+    meta: { class: { td: 'text-right' } },
+    cell: ({ row }) => h(UButton, {
+      'to': `/admin/people/${row.original.id}`,
+      'variant': 'ghost',
+      'size': 'sm',
+      'icon': 'i-lucide-chevron-right',
+      'aria-label': `Open ${row.original.name}`,
+    }),
+  },
 ]
 
 onMounted(load)
