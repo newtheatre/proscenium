@@ -94,7 +94,9 @@ Three rules follow:
    token moves, and then fails quietly in one component.
 2. **Lists are `UTable` with column definitions.** The admin table theme lives in `app.config.ts`
    for exactly this reason. A hand-written `<table>` in a page is a copy of a decision that has
-   already been made.
+   already been made. A list long enough to page uses `UPagination` bound to the server's page,
+   never a client-side slice of everything: the endpoint pages in SQL and answers with an
+   envelope (CONTRIBUTING), so the browser never holds the whole table.
 3. **The show-night screens are phone-first and work offline.** They cache their night on open
    and render from cache when the network drops (`architecture.md`, module K). Anything that only
    looks right on a desk monitor is wrong for the surface it is on.

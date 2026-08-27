@@ -6,6 +6,11 @@ import type { AuthFormField, FormError, FormSubmitEvent } from '@nuxt/ui'
 const route = useRoute()
 const policy = usePasswordPolicy()
 
+// A link from the console sets a first password rather than replacing one, and claims a token of
+// its own kind (A-121 criterion 3).
+const settingFirst = computed(() => route.query.kind === 'set')
+const tokenKind = computed(() => (settingFirst.value ? 'SET_PASSWORD' : 'PASSWORD_RESET'))
+
 type Outcome = 'choosing' | 'done' | 'expired'
 
 const outcome = ref<Outcome>('choosing')
@@ -41,7 +46,7 @@ async function reset(payload: FormSubmitEvent<z.output<typeof schema>>): Promise
   }
 
   try {
-    await $fetch('/api/auth/password/reset', { method: 'POST', body: { token, password: payload.data.password } })
+    await $fetch('/api/auth/password/reset', { method: 'POST', body: { token, password: payload.data.password, kind: tokenKind.value } })
     outcome.value = 'done'
   }
   catch (error) {
@@ -71,8 +76,8 @@ useSeoMeta({ title: 'Set a new password' })
 
       <UAuthForm
         v-if="outcome === 'choosing'"
-        title="Set a new password"
-        description="Setting a new password signs you out everywhere else."
+        :title="settingFirst ? 'Choose your password' : 'Set a new password'"
+        :description="settingFirst ? 'The theatre made you an account. Choose a password and it is ready to use.' : 'Setting a new password signs you out everywhere else.'"
         :schema="schema"
         :fields="fields"
         :validate="checkPassword"

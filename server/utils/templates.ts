@@ -48,6 +48,30 @@ The Nottingham New Theatre`,
     }
   },
 
+  // Nobody asked for this one, so it says who made it and why before it asks for anything.
+  'set-password': (context: TemplateContext): Rendered => {
+    const url = String(context.url)
+    const until = expiry(context.expiresAt as Date)
+    return {
+      subject: 'An account has been made for you at the New Theatre',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>The theatre has made you an account. Choose a password and it is ready to use.</p>
+<p><a href="${url}">Choose my password</a></p>
+<p>The link works until ${until}. If you were not expecting this, tell the IT Manager rather than
+ignoring it.</p>`),
+      text: `Hello ${context.name},
+
+The theatre has made you an account. Choose a password and it is ready to use:
+
+${url}
+
+The link works until ${until}. If you were not expecting this, tell the IT Manager rather than
+ignoring it.
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'account-exists': (context: TemplateContext): Rendered => ({
     subject: 'You already have an account',
     html: layout(`<p>Hello ${context.name},</p>

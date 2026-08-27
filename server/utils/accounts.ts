@@ -26,7 +26,8 @@ export async function findById(id: string): Promise<AccountRow | undefined> {
   return row as AccountRow | undefined
 }
 
-export interface NewAccount { email: string, name: string, passwordHash: string | null }
+// actorId is the administrator who made it from the console; a self-registration has none.
+export interface NewAccount { email: string, name: string, passwordHash: string | null, actorId?: string | null }
 
 // The account and its audit entry commit together or not at all (0001, 0003).
 export async function createAccount(input: NewAccount): Promise<string> {
@@ -35,7 +36,11 @@ export async function createAccount(input: NewAccount): Promise<string> {
     throw createError({ statusCode: 400, statusMessage: 'A Workspace address signs in with Google and cannot hold a password' })
   }
   const id = newId()
-  const entry = auditEntry({ actorId: null, action: 'account.registered', target: `user:${id}` })
+  const entry = auditEntry({
+    actorId: input.actorId ?? null,
+    action: input.actorId ? 'account.created.console' : 'account.registered',
+    target: `user:${id}`,
+  })
 
   await db.batch([
     db.insert(schema.users).values({ id, email, name: input.name.trim(), password: input.passwordHash }),

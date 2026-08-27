@@ -321,6 +321,7 @@ export function isConfigKey(name: string): name is ConfigKey {
 // The keys something actually reads today; a key absent here is recorded but not yet enforced,
 // which the surface says plainly (0012). A test greps the server for the reads, so it cannot drift.
 export const ENFORCED_KEYS = [
+  'ADMIN_TOKEN_HOURS',
   'MAGIC_LINK_MINUTES',
   'MFA_ATTEMPT_MINUTES',
   'PASSWORD_MAX_LENGTH',
@@ -330,6 +331,9 @@ export const ENFORCED_KEYS = [
   'PASSWORD_REQUIRE_SYMBOL',
   'PASSWORD_RESET_HOURS',
   'PRIVILEGED_ROLES',
+  // Read by the directory to count the accounts a sweep would warn, which is the whole of its
+  // effect until K-111 builds the sweep itself.
+  'RETENTION_FULL_ACCOUNT_YEARS',
   'SIGN_IN_ATTEMPTS_PER_ACCOUNT',
   'SIGN_IN_ATTEMPTS_PER_ADDRESS_WINDOW_MINUTES',
   'VERIFY_RESEND_ATTEMPTS',

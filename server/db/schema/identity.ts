@@ -23,6 +23,13 @@ export const users = sqliteTable('users', {
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 }, table => [
+  // The admin directory filters and sorts on these, and without them every filter is a scan
+  // (A-121).
+  index('users_disabled').on(table.disabled),
+  index('users_verified').on(table.verified),
+  index('users_anonymised_at').on(table.anonymisedAt),
+  index('users_last_login_at').on(table.lastLoginAt),
+  index('users_name').on(table.name),
   // Addresses are compared and deduplicated lowercased, so they are stored that way.
   check('users_email_lowercase', sql`${table.email} = lower(${table.email})`),
   // A Workspace address is Google-only and may never hold a password, including by import (0008).
