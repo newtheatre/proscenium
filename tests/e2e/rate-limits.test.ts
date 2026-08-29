@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { CONFIG_KEYS } from '#shared/utils/config'
+import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -67,6 +68,7 @@ describe.skipIf(skip !== null)('rate limits (A-102, A-103)', () => {
     const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
     const real = address('real')
     await post('/api/auth/register', { email: real, name: person.name, password })
+    markVerified(app, real)
 
     const invented = address('invented')
     const spend = async (email: string): Promise<number> => {

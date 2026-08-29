@@ -37,7 +37,7 @@ Open questions for the committee:
   1. Registration accepts a name of 1 to 200 characters, an email address (lowercased and format-validated) and a password meeting the configured policy (length and optional complexity, `shared/utils/config.ts`); any other input is a 400 naming the failing field. Amended 27 August 2026: the policy is configuration rather than a fixed rule, because a length floor with no composition rule is what NIST SP 800-63B now advises.
   2. The response is identical whether or not the address already has an account (enumeration-safe). An existing full account receives a "you already have an account" email; a claimable guest account receives a 24-hour set-password link instead (A-116).
   3. A @newtheatre.org.uk address is refused with a message naming Google as its credential: no account is created and no email is sent, because Workspace accounts are Google-only (A-104). Known undeliverable domains (.invalid, .test, example.com) are dropped silently, with the ordinary answer and no account. Amended 27 August 2026: the Workspace half was written as a silent drop, which leaves a committee member typing their work address into a form that appears to do nothing. The rule is about a domain and not about an account, so saying it plainly leaks nothing.
-  4. Registration never creates a session; the user lands on a check-your-email page and must verify the address (A-102) before the account is usable.
+  4. Registration never creates a session; the user lands on a check-your-email page and must verify the address (A-102) before the account is usable. Amended 29 August 2026: "usable" is now enforced at the sign-in path rather than implied, and an account that stays unverified expires (0026).
   5. Rate limits of 10 registrations per hour per IP and 5 per hour per address are enforced.
   6. Passwords are hashed with a memory-hard algorithm and never appear in logs or responses.
 - Source: Prompt Book A-1; audit SD-1 (limits, enumeration behaviour and silent-drop rules carry).
@@ -63,7 +63,7 @@ Open questions for the committee:
 - Story: As a returning member, I want to sign in with my email and password so that I can reach my account without ceremony.
 - Depends on: A-101
 - Acceptance criteria:
-  1. Every failure (unknown address, wrong password, password-less account, disabled account) returns an identical 401, and a dummy password verification always runs so response timing is not an oracle.
+  1. Every failure (unknown address, wrong password, password-less account, disabled account, unverified address) returns an identical 401, and a dummy password verification always runs so response timing is not an oracle. Amended 29 August 2026: an unverified address joined the list rather than gaining a message of its own, and the way back is a standing resend step on the sign-in screen (0026).
   2. A @newtheatre.org.uk address returns 403 directing the user to Google sign-in: the one deliberate enumeration exception.
   3. If the account has any confirmed second factor, no session is created; the response carries an MFA attempt with a 5-minute lifetime instead (A-111).
   4. Rate limits of 20 attempts per 15 minutes per IP and 10 per 15 minutes per account are enforced.
@@ -387,7 +387,7 @@ Open questions for the committee:
 - Story: As the theatre, I want dormant accounts warned and then anonymised automatically so that we do not hold personal data forever, and I want the automation to prove itself before it acts.
 - Depends on: A-125
 - Acceptance criteria:
-  1. A nightly sweep finds full accounts inactive for 2 years, sends a 60-day warning, then a 30-day warning, then anonymises; guest accounts anonymise after 3 years of no activity, without warning. All periods are configuration.
+  1. A nightly sweep finds full accounts inactive for 2 years, sends a 60-day warning, then a 30-day warning, then anonymises; guest accounts anonymise after 3 years of no activity, without warning. All periods are configuration. Amended 29 August 2026: the sweep never warns an unverified or unclaimed account. An unverified one expires on its own rule long before this reaches it, and a warning is a message A-102 criterion 2 forbids to an unverified address (0026).
   2. Exempt: current members, current role holders, administrators, and anyone with unsettled money.
   3. Any sign-in clears the account's warning trail and restarts the clock.
   4. Each run caps at 100 warnings and 200 anonymisations.

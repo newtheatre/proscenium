@@ -15,7 +15,7 @@ const REFUSALS: Record<string, string> = {
   'google': 'Google sign-in is unavailable at the moment.',
 }
 
-type Step = 'credentials' | 'forgot' | 'link' | 'challenge' | 'sent'
+type Step = 'credentials' | 'forgot' | 'link' | 'resend' | 'challenge' | 'sent'
 
 const step = ref<Step>('credentials')
 const notice = ref<string | null>(null)
@@ -137,6 +137,14 @@ useSeoMeta({ title: 'Sign in' })
             <UButton
               variant="link"
               class="px-0"
+              data-test="resend-verification"
+              @click="step = 'resend'"
+            >
+              I did not get my confirmation email
+            </UButton>
+            <UButton
+              variant="link"
+              class="px-0"
               to="/register"
             >
               I do not have an account yet
@@ -182,6 +190,26 @@ useSeoMeta({ title: 'Sign in' })
         :fields="addressField"
         :submit="{ label: 'Send a sign-in link' }"
         @submit="ask('/api/auth/magic-link/request', $event)"
+      >
+        <template #footer>
+          <UButton
+            variant="link"
+            class="px-0"
+            @click="step = 'credentials'"
+          >
+            Back to signing in
+          </UButton>
+        </template>
+      </UAuthForm>
+
+      <UAuthForm
+        v-else-if="step === 'resend'"
+        title="Confirm your address"
+        description="An account cannot be signed into until its address is confirmed. We will send the link again."
+        :schema="addressOnly"
+        :fields="addressField"
+        :submit="{ label: 'Send the link again' }"
+        @submit="ask('/api/auth/verify/resend', $event)"
       >
         <template #footer>
           <UButton

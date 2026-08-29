@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { WORKSPACE_DOMAIN } from '#shared/utils/auth'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -61,10 +62,13 @@ async function plantToken(email: string, kind: string, plaintext: string, expire
 const address = (prefix: string): string => `${prefix}-${Math.random().toString(36).slice(2)}@${E2E_DOMAIN}`
 const newToken = (): string => `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll('-', '')
 
-async function registerFresh(prefix: string): Promise<string> {
+// Verified by default because a signed-in member has to be (0026); the tests about verification
+// itself ask for one that is not.
+async function registerFresh(prefix: string, verified = true): Promise<string> {
   const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
   const email = address(prefix)
   await send('POST', '/api/auth/register', { email, name: person.name, password })
+  if (verified) markVerified(app, email)
   return email
 }
 
@@ -117,7 +121,7 @@ describe.skipIf(skip !== null)('registering and verifying in a browser (A-101, A
   }, CASE_TIMEOUT_MS)
 
   test('the verification link lands on a page that verifies the address', async () => {
-    const email = await registerFresh('verify')
+    const email = await registerFresh('verify', false)
     const token = newToken()
     await plantToken(email, 'EMAIL_VERIFY', token, 60)
 
@@ -133,7 +137,7 @@ describe.skipIf(skip !== null)('registering and verifying in a browser (A-101, A
 
   // A dead end is the failure this page exists to prevent (A-102 criterion 3).
   test('an expired verification link offers a fresh send rather than a dead end', async () => {
-    const email = await registerFresh('stale')
+    const email = await registerFresh('stale', false)
     const token = newToken()
     await plantToken(email, 'EMAIL_VERIFY', token, -1)
 
@@ -150,6 +154,29 @@ describe.skipIf(skip !== null)('registering and verifying in a browser (A-101, A
 })
 
 describe.skipIf(skip !== null)('signing in in a browser (A-103, A-111)', () => {
+  // The refusal an unverified account gets is deliberately generic, so the way back has to be
+  // standing on the screen rather than in the message (0026).
+  test('the sign-in screen offers the confirmation email again', async () => {
+    const email = await registerFresh('resend', false)
+    const view = await open('/sign-in')
+    try {
+      await fill(view, SIGN_IN_FORM, email)
+      await fill(view, PASSWORD_FIELD, password)
+      await click(view, SUBMIT)
+      await waitFor(view, 'document.querySelector(\'[data-test="resend-verification"]\')')
+
+      await click(view, '[data-test="resend-verification"]')
+      await fill(view, SIGN_IN_FORM, email)
+      await click(view, SUBMIT)
+
+      await waitFor(view, 'document.querySelector(\'[data-test="check-your-email"]\')')
+      expect(verifiedFlag(email)).toBe(0)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('an address and a password reach a signed-in page', async () => {
     const email = await registerFresh('signin')
     const view = await open('/sign-in')
@@ -266,7 +293,7 @@ describe.skipIf(skip !== null)('the links that arrive by email (A-107, A-108)', 
   }, CASE_TIMEOUT_MS)
 
   test('the sign-in link signs the visitor in', async () => {
-    const email = await registerFresh('magic')
+    const email = await registerFresh('magic', false)
     const token = newToken()
     await plantToken(email, 'MAGIC_LINK', token, 60)
 

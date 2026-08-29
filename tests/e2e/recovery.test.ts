@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { CONFIG_KEYS } from '#shared/utils/config'
+import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -75,6 +76,7 @@ async function registerFresh(prefix: string): Promise<string> {
   const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
   const email = address(prefix)
   await post('/api/auth/register', { email, name: person.name, password })
+  markVerified(app, email)
   return email
 }
 

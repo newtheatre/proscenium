@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -19,6 +20,7 @@ beforeAll(async () => {
   app = await startApp()
 
   await send('POST', '/api/auth/register', { email: officer.email, name: officer.name, password })
+  markVerified(app, officer.email)
   const signedIn = await send('POST', '/api/auth/sign-in', { email: officer.email, password })
   const first = (signedIn.headers.get('set-cookie') ?? '').split(';')[0]!
   secret = (await (await send('POST', '/api/account/mfa/enrol', {}, first)).json() as { secret: string }).secret
@@ -76,6 +78,7 @@ async function subject(prefix: string): Promise<Subject> {
   const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
   const email = registrableAddress(prefix)
   await send('POST', '/api/auth/register', { email, name: person.name, password })
+  markVerified(app, email)
   const signedIn = await send('POST', '/api/auth/sign-in', { email, password })
   const id = read<{ id: string }>('SELECT id FROM users WHERE email = ?', email)!.id
   return { id, email, cookie: (signedIn.headers.get('set-cookie') ?? '').split(';')[0]! }

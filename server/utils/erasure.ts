@@ -25,7 +25,8 @@ export async function eraseAccount(userId: string, actorId: string | null): Prom
   const writes = statements.map(statement => db.run(statement))
   const record = db.insert(schema.auditLog).values(auditEntry({
     actorId,
-    action: actorId === userId ? 'account.erased' : 'account.erased.admin',
+    // A null actor is the system, and an automatic erasure is not an administrator's act (0026).
+    action: actorId === null ? 'account.erased.system' : actorId === userId ? 'account.erased' : 'account.erased.admin',
     target: `user:${userId}`,
     detail: { tables: PERSONAL_TABLES.length },
   }))

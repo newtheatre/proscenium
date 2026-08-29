@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { RECOVERY_CODE_COUNT, normaliseRecoveryCode } from '#shared/utils/recovery-codes'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -54,6 +55,7 @@ async function signedInMember(): Promise<{ email: string, cookie: string }> {
   const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
   const email = `mfa-${Math.random().toString(36).slice(2)}@${E2E_DOMAIN}`
   await send('POST', '/api/auth/register', { email, name: person.name, password })
+  markVerified(app, email)
   const response = await send('POST', '/api/auth/sign-in', { email, password })
   return { email, cookie: (response.headers.get('set-cookie') ?? '').split(';')[0]! }
 }

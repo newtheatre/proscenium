@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { defaultRoleExpiry } from '#shared/utils/roles'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -28,6 +29,7 @@ async function register(person: { email: string, name: string }): Promise<void> 
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ ...person, password }),
   })
+  markVerified(app, person.email)
 }
 
 async function signIn(email: string): Promise<string> {

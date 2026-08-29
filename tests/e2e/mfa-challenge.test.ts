@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -46,6 +47,7 @@ async function memberWithFactor(): Promise<Member> {
   const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
   const email = `chal-${Math.random().toString(36).slice(2)}@${E2E_DOMAIN}`
   await send('POST', '/api/auth/register', { email, name: person.name, password })
+  markVerified(app, email)
 
   const signedIn = await send('POST', '/api/auth/sign-in', { email, password })
   const cookie = (signedIn.headers.get('set-cookie') ?? '').split(';')[0]!
@@ -83,6 +85,7 @@ describe.skipIf(skip !== null)('answering the challenge (A-111)', () => {
     const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
     const email = `plain-${Math.random().toString(36).slice(2)}@${E2E_DOMAIN}`
     await send('POST', '/api/auth/register', { email, name: person.name, password })
+    markVerified(app, email)
 
     const response = await send('POST', '/api/auth/sign-in', { email, password })
     expect((await response.json() as { mfaRequired: boolean }).mfaRequired).toBe(false)
@@ -175,6 +178,7 @@ describe.skipIf(skip !== null)('privileged roles require a factor (A-112)', () =
     const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
     const email = `priv-${Math.random().toString(36).slice(2)}@${E2E_DOMAIN}`
     await send('POST', '/api/auth/register', { email, name: person.name, password })
+    markVerified(app, email)
 
     const signedIn = await send('POST', '/api/auth/sign-in', { email, password })
     const cookie = (signedIn.headers.get('set-cookie') ?? '').split(';')[0]!

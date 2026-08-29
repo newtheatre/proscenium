@@ -44,6 +44,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Membership year and evidence | SU records, manual | Manual grant, plus a hand-uploaded SU export where available (SP-2: no automatic access) | |
 | Notification topics | per-app ad hoc | bookings, shifts, training, rooms, announcements | Fixed in the schema rather than configured; changing the list is a migration (0025) |
 | Retention periods | 2 years full accounts, 3 years guests (dry-run) | unchanged, armed in December | |
+| Unverified account expiry | none: an unproven address held an account forever | 30 days, then anonymised, capped at 200 a run | Owner: IT Manager. An account that never proved its address cannot sign in and expires on its own rule (0026) |
 | Night report recipients | configured list | confirm the list | |
 | Role vocabulary mapping | four namespaces | one officer model, mapping table agreed in session | Needed by the Phase 1 import |
 | Cutover communications | none | announcement plan for members and audiences | Who says what, when |
