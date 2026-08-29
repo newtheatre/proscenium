@@ -33,3 +33,4 @@ afterwards, only superseded.
 | 0025 | Configuration is a rule, not a record | where the pass products and opening hours live |
 | 0026 | An unverified address cannot sign in, and expires | why sign-in refuses, and what removes the account |
 | 0027 | An audit action is registered before it is written | the catalogue, the diff shape and the coverage checker |
+| 0028 | A manual audit entry names people by account, and is signed | what may be recorded by hand, and who may sign it |

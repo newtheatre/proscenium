@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { MAX_DETAIL_STRING, auditEntry, changes } from '#shared/utils/audit'
-import { AUDIT_ACTIONS, AUDIT_ACTION_NAMES, AUDIT_MODULES, auditAction } from '#shared/utils/audit-actions'
+import { AUDIT_ACTIONS, AUDIT_ACTION_NAMES, AUDIT_MODULES, MANUAL_ACTION_NAMES, auditAction, isManualAction } from '#shared/utils/audit-actions'
 import { AUDIT_COVERAGE } from '#shared/utils/audit-coverage'
 
 const ok = { actorId: 'u-1', action: 'role.granted', target: 'user:u-2' }
@@ -114,5 +114,29 @@ describe('field-by-field diffs (J-101 criterion 4)', () => {
 
   test('a diff is still subject to the guard that keeps people out of detail', () => {
     expect(() => auditEntry({ ...ok, detail: changes({ email: ['a@b.com', 'c@d.com'] }) })).toThrow(/address/i)
+  })
+})
+
+describe('the manual namespace (J-103 criterion 2)', () => {
+  test('a manual action is exactly one whose name says so', () => {
+    for (const name of AUDIT_ACTION_NAMES) {
+      expect(`${name}: ${isManualAction(name)}`).toBe(`${name}: ${name.startsWith('manual.')}`)
+    }
+  })
+
+  test('there is at least one to record, and none of them is a system action', () => {
+    expect(MANUAL_ACTION_NAMES.length).toBeGreaterThan(0)
+    for (const name of MANUAL_ACTION_NAMES) expect(AUDIT_ACTIONS[name].manual).toBe(true)
+  })
+})
+
+// The module filter resolves to an IN list of action names. That list is a compile-time constant
+// and never grows with the rows it covers, but D1 still caps a statement at 100 parameters (0003).
+describe('a module filter stays inside D1 parameter limits (0003)', () => {
+  test('no module holds more actions than one statement can bind', () => {
+    for (const module of AUDIT_MODULES) {
+      const held = AUDIT_ACTION_NAMES.filter(name => AUDIT_ACTIONS[name].module === module)
+      expect(`${module}: ${held.length <= 90}`).toBe(`${module}: true`)
+    }
   })
 })
