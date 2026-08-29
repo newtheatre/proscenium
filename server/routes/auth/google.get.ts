@@ -5,6 +5,13 @@ function candidate(row: { id: string, googleSub: string | null, disabled: boolea
   return row ?? null
 }
 
+const RETURN_COOKIE = 'nnt-after-google'
+
+// Only a path on this site, so the return trip cannot be pointed at somebody else's.
+function onwards(value: string | undefined): string {
+  return value && /^\/(?!\/)/.test(value) ? value : '/'
+}
+
 // Sign in with a Workspace Google account.
 export default defineOAuthGoogleEventHandler({
   config: { scope: ['email', 'profile'], authorizationParams: { hd: WORKSPACE_DOMAIN } },
@@ -67,7 +74,11 @@ export default defineOAuthGoogleEventHandler({
 
     await db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'session.started.google', target: `user:${account.id}` }))
     await startSession(event, account)
-    return sendRedirect(event, '/')
+
+    // Where they were when they were asked to sign in again, remembered across the round trip.
+    const after = onwards(getCookie(event, RETURN_COOKIE))
+    deleteCookie(event, RETURN_COOKIE)
+    return sendRedirect(event, after)
   },
 
   onError(event, error) {

@@ -2,7 +2,7 @@ import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 const body = z.object({
-  operation: z.enum(['disable', 'enable', 'sign-out', 'reset-mfa']),
+  operation: z.enum(['disable', 'enable', 'sign-out', 'reset-mfa', 'erase']),
 })
 
 // Immediate security operations on an account, in minutes rather than sessions (A-122).
@@ -14,10 +14,21 @@ export default defineEventHandler(async (event) => {
   const account = await findById(id)
   if (!account) throw createError({ statusCode: 404, statusMessage: 'No such account' })
 
+  // Nothing acts on a tombstone: erasure is final, and the rest would be acting on nobody.
+  if (account.anonymisedAt !== null) {
+    throw createError({ statusCode: 409, statusMessage: 'That account has been erased' })
+  }
+
   // Nobody locks themselves out by accident, and nobody disables the account investigating them
   // (criterion 4).
   if (owns(resolved, id)) {
     throw createError({ statusCode: 409, statusMessage: 'That is your own account' })
+  }
+
+  // Admin-initiated erasure mirrors the self-service path exactly, and is audited to whoever
+  // did it (criterion 6).
+  if (input.operation === 'erase') {
+    return { ok: true, operation: input.operation, ...await eraseAccount(id, resolved.account.id) }
   }
 
   if (input.operation === 'disable' && await wouldStrandTheSystem('ADMIN', id)) {

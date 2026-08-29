@@ -54,7 +54,11 @@ address**, import-enforced, 0008) · `google_sub` UNIQUE NULL · `pending_google
 NULL (admin-set claim marker) · `verified` bool · `disabled` bool · `session_epoch` int ·
 `anonymised_at` NULL · `last_login_at` · `created_at` · `updated_at`.
 Anonymisation rewrites `email` to `deleted-<id>@anonymised.invalid`, `name` to `Deleted
-user`; every write path guards on `anonymised_at IS NULL`.
+user`, clears `pronouns`, `password`, `google_sub` and `pending_google_email`, and bumps
+`session_epoch`. Every write path guards on `anonymised_at IS NULL`, and the
+`users_tombstone_guard` trigger refuses an identifying UPDATE on an anonymised row whether the
+path remembered to guard or not (0011, A-125 criterion 3): a guard in a handler is a guard one
+handler can forget.
 Indexed on `disabled`, `verified`, `anonymised_at`, `last_login_at` and `name`, which are what
 the admin directory filters and sorts on (A-121); without them every filter is a scan.
 

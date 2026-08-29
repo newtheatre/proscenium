@@ -43,9 +43,19 @@ const addressField: AuthFormField[] = [
   { name: 'email', type: 'email', label: 'Email address', autocomplete: 'email', required: true },
 ]
 
-const providers: ButtonProps[] = [
-  { label: 'Sign in with Google', icon: 'i-simple-icons-google', to: '/auth/google', external: true },
-]
+// Only a path on this site: an absolute URL here would make the sign-in screen an open redirect.
+const nextPath = computed(() => {
+  const next = route.query.next
+  return typeof next === 'string' && /^\/(?!\/)/.test(next) ? next : '/'
+})
+
+// Google keeps the return path across its round trip, so the way back is one click either way.
+const providers = computed<ButtonProps[]>(() => [{
+  label: 'Sign in with Google',
+  icon: 'i-simple-icons-google',
+  to: nextPath.value === '/' ? '/auth/google' : `/auth/google?next=${encodeURIComponent(nextPath.value)}`,
+  external: true,
+}])
 
 async function signIn(payload: FormSubmitEvent<z.output<typeof credentials>>): Promise<void> {
   notice.value = null
@@ -76,12 +86,6 @@ async function ask(path: string, payload: FormSubmitEvent<z.output<typeof addres
     notice.value = refusalText(error)
   }
 }
-
-// Only a path on this site: an absolute URL here would make the sign-in screen an open redirect.
-const nextPath = computed(() => {
-  const next = route.query.next
-  return typeof next === 'string' && /^\/(?!\/)/.test(next) ? next : '/'
-})
 
 async function signedIn(): Promise<void> {
   await refresh()

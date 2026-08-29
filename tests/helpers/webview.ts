@@ -39,6 +39,23 @@ async function waitForServer(url: string, signal: AbortSignal): Promise<void> {
   throw new Error(`server at ${url} did not become ready within ${READY_TIMEOUT_MS}ms`)
 }
 
+// Bun.spawn resolves `exited` when the process is reaped, which is not the same instant the
+// listener lets go of the socket.
+async function waitForPortFree(port: string, timeoutMs = 15_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    try {
+      const probe = Bun.listen({ hostname: '127.0.0.1', port: Number(port), socket: { data() {} } })
+      probe.stop(true)
+      return
+    }
+    catch {
+      await Bun.sleep(100)
+    }
+  }
+  throw new Error(`port ${port} is still held after the app was stopped`)
+}
+
 export interface AppUnderTest {
   baseURL: string
   databaseFile: string
@@ -55,7 +72,9 @@ export async function startApp(): Promise<AppUnderTest> {
   const hubDir = '.data/e2e'
   await Bun.$`rm -rf ${hubDir}`.quiet().nothrow()
 
-  const server: Subprocess = Bun.spawn(['bun', 'run', 'dev', '--port', port], {
+  // Nuxt directly, not through `bun run dev`: that spawns nuxt as a child, and killing the parent
+  // orphans it still holding the port, so the next suite talks to the last suite's database.
+  const server: Subprocess = Bun.spawn(['./node_modules/.bin/nuxt', 'dev', '--port', port], {
     env: { ...process.env, NUXT_PORT: port, NUXT_HUB_DIR: hubDir },
     stdout: 'pipe',
     stderr: 'pipe',
@@ -68,6 +87,9 @@ export async function startApp(): Promise<AppUnderTest> {
       controller.abort()
       server.kill()
       await server.exited
+      // Proved rather than assumed: a suite that leaves the port held makes the next one talk to
+      // a database it did not create.
+      await waitForPortFree(port)
       removeClaimedProfiles()
     },
   }

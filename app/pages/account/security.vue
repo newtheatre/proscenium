@@ -37,6 +37,7 @@ async function attempt(action: () => Promise<void>): Promise<void> {
     await action()
   }
   catch (error) {
+    signInAgain.value = refusalData<{ signInAgain?: string }>(error)?.signInAgain ?? null
     notice.value = refusalText(error)
   }
   finally {
@@ -84,6 +85,18 @@ const finish = (): Promise<void> => attempt(async () => {
   await load()
 })
 
+const signInAgain = ref<string | null>(null)
+const closing = ref(false)
+const confirmation = reactive({ email: '', password: '' })
+const { account, refresh: refreshAccount } = useAccount()
+
+// Erasure is final and the session goes with it, so the screen leaves rather than re-reading.
+const closeAccount = (): Promise<void> => attempt(async () => {
+  await $fetch('/api/account/close', { method: 'POST', body: { ...confirmation } })
+  await refreshAccount()
+  await navigateTo('/')
+})
+
 const confirmedOn = computed(() =>
   state.value?.confirmedAt ? formatLondon(new Date(state.value.confirmedAt * 1000), { dateStyle: 'long' }) : null)
 
@@ -106,6 +119,9 @@ useSeoMeta({ title: 'Security' })
         color="error"
         variant="subtle"
         :description="notice"
+        :actions="signInAgain
+          ? [{ label: 'Sign in again', color: 'neutral', variant: 'subtle', to: `/sign-in?next=${encodeURIComponent(signInAgain)}` }]
+          : []"
       />
 
       <div
@@ -265,16 +281,72 @@ useSeoMeta({ title: 'Security' })
       title="Your data"
       description="Everything the theatre holds about you, in one file. A fuller account page arrives with A-114."
     >
-      <UButton
-        data-test="export"
-        to="/api/account/export"
-        external
-        download
-        variant="subtle"
-        icon="i-lucide-download"
-      >
-        Download my data
-      </UButton>
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          data-test="export"
+          to="/api/account/export"
+          external
+          download
+          variant="subtle"
+          icon="i-lucide-download"
+        >
+          Download my data
+        </UButton>
+        <UButton
+          data-test="close-account"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-user-x"
+          @click="closing = true"
+        >
+          Close my account
+        </UButton>
+      </div>
     </UPageCard>
+
+    <UModal
+      v-model:open="closing"
+      title="Close your account"
+      description="Your name and address are removed and the account cannot be used again. Download your data first if you want it."
+    >
+      <template #body>
+        <form
+          class="space-y-4"
+          @submit.prevent="closeAccount"
+        >
+          <UAlert
+            color="warning"
+            variant="subtle"
+            description="This cannot be undone. Bookings and attendance stay as anonymous rows so the theatre's own records still add up."
+          />
+          <UFormField
+            label="Type your email address to confirm"
+            :description="account.user?.email"
+          >
+            <UInput
+              v-model="confirmation.email"
+              data-test="close-email"
+              type="email"
+              required
+            />
+          </UFormField>
+          <UFormField label="Your password">
+            <UInput
+              v-model="confirmation.password"
+              data-test="close-password"
+              type="password"
+            />
+          </UFormField>
+          <UButton
+            type="submit"
+            color="error"
+            data-test="close-submit"
+            :loading="working"
+          >
+            Close my account
+          </UButton>
+        </form>
+      </template>
+    </UModal>
   </UContainer>
 </template>

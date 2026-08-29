@@ -154,9 +154,13 @@ shift start. Mechanism (service worker or client cache layer) is an open questio
 
 | | Database | Email | Payments |
 | --- | --- | --- | --- |
-| Local | D1 local SQLite under `.data/` | logged to console | dev tender stub |
+| Local | D1 local SQLite under `.data/` | logged, and written to `.data/mail` so a link can be followed | dev tender stub |
 | Preview (branch builds) | isolated preview D1 | logged | stub |
 | Production | D1 `unified` | Email Service | the physical SumUp reader, always (0005) |
+
+Development never hands a message to a provider, whatever bindings the emulator supplies, and every
+emailed link is built from `NUXT_PUBLIC_BASE_URL`, which defaults to the local port in development
+so a verification link in `.data/mail` is one that works.
 
 Seed scripts generate credentials at runtime, print once, and refuse to run against remote
 databases. There is a `/dev-login` guarded by `import.meta.dev` using `replaceUserSession`.

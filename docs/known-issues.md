@@ -27,10 +27,12 @@ fixed, in the pull request that fixes it.
 | **Nothing alerts on an unhealthy deploy.** `/api/health` returns 503 naming pending migrations and nobody is watching it. | The signal exists and reaches no one. | K-107 criterion 4. |
 | **`db.batch` is not a transaction.** Two audit writes (`sign-in.post.ts`, `recovery-codes.post.ts`) insert outside the batch carrying their change, so the entry and the change are not atomic. | An audit entry can exist for a change that failed, or the reverse. | J-101 criterion 1, when the audit coverage fixture is built. |
 
+| **A build while `bun run dev` is running breaks the dev server.** The build recreates the local database file, and every write from the running server then fails with `SQLITE_READONLY_DBMOVED`. | The error names neither the cause nor the fix, which is to restart `bun run dev`. | Nothing yet: it would want the dev database and the build's to be different files. |
+
 ## Tooling and tests
 
 | What | Why it matters | Where it belongs |
 | --- | --- | --- |
 | **`Bun.WebView` exposes `click`, `type`, `press` and `cdp`**, and `tests/helpers/webview.ts` reimplements the first two through `evaluate`. | The bespoke versions work and are tested, but they are bespoke: the native ones dispatch trusted events, which ours cannot. | A tidy-up when a test needs something `evaluate` cannot do, such as a real keypress. |
 | **One Chrome profile leaks per test run**, about 130MB, from the probe in `skipReason()`. The rest are swept when the app stops. | It filled this machine's `/tmp` with 105 of them before the sweep existed. One a run is survivable; nothing cleans it. | The harness, when the probe can be made to report its directory. |
-| **Three integration files are `test.todo` stubs**: `races`, `money`, `erasure`. CI counts them as passing. | K-121 claims a named regression suite that gates from day one, and everything in it but the DST case is empty. | K-121, and the stories that make each case buildable. |
+| **Two integration files are `test.todo` stubs**: `races` and `money`. CI counts them as passing. | K-121 claims a named regression suite that gates from day one, and those two are still empty. `erasure` is filled in as of K-109. | K-121, and the stories that make each case buildable. |

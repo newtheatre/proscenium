@@ -1,6 +1,7 @@
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { Database } from 'bun:sqlite'
 import { sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { join } from 'node:path'
 
@@ -82,3 +83,13 @@ export function rows<T>(database: TestDatabase, statement: string, ...parameters
 }
 
 export { sql }
+
+// Drizzle builds a statement and its parameters; the harness runs the pair the way D1 does. The
+// cast is because `dialect` is internal, and one contained cast beats one in every test.
+export function boundStatement(database: TestDatabase, statement: SQL): BoundStatement {
+  const dialect = (database.db as unknown as {
+    dialect: { sqlToQuery: (query: SQL) => { sql: string, params: unknown[] } }
+  }).dialect
+  const query = dialect.sqlToQuery(statement)
+  return [query.sql, ...query.params]
+}
