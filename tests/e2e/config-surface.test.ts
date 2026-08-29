@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { CONFIG_KEYS, CONFIG_KEY_NAMES } from '#shared/utils/config'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { markVerified } from '#tests/helpers/accounts'
+import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -55,28 +55,11 @@ async function signInThroughTheChallenge(): Promise<string> {
   return (answered.headers.get('set-cookie') ?? '').split(';')[0]!
 }
 
-function spentStep(): number | null {
-  const database = new Database(app.databaseFile, { readonly: true })
-  try {
-    const row = database.query(`
-      SELECT t.last_used_step AS step FROM totp_secrets t JOIN users u ON u.id = t.user_id WHERE u.email = ?
-    `).get(officer.email) as { step: number | null } | null
-    return row?.step ?? null
-  }
-  finally {
-    database.close()
-  }
-}
-
-// A spent step cannot answer a second challenge, and a code two steps out is outside tolerance:
-// so the only safe code is the current step, once the clock has left the one already used.
-async function unusedCode(): Promise<string> {
-  for (let attempt = 0; attempt < 40; attempt++) {
-    const step = stepFor(new Date())
-    if (step !== spentStep()) return codeForStep(secret, step)
-    await Bun.sleep(1000)
-  }
-  throw new Error('the authenticator step did not move on')
+// A code two steps out is outside tolerance, so the only usable one is the current step. Rather
+// than wait out the window it was spent in, the step is forgotten: replay has its own tests.
+function unusedCode(): Promise<string> {
+  forgetSpentStep(app, officer.email)
+  return codeForStep(secret, stepFor(new Date()))
 }
 
 interface Setting { key: string, value: unknown, set: boolean, enforced: boolean, default: unknown, updatedBy: { name: string } | null }

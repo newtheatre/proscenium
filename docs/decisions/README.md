@@ -34,3 +34,4 @@ afterwards, only superseded.
 | 0026 | An unverified address cannot sign in, and expires | why sign-in refuses, and what removes the account |
 | 0027 | An audit action is registered before it is written | the catalogue, the diff shape and the coverage checker |
 | 0028 | A manual audit entry names people by account, and is signed | what may be recorded by hand, and who may sign it |
+| 0029 | The end-to-end suites are a separate command | what `bun run test` covers, and what runs nightly |

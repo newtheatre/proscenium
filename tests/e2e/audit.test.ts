@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { DEFAULT_PAGE_SIZE } from '#shared/utils/pagination'
-import { markVerified, registerMember } from '#tests/helpers/accounts'
+import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -57,15 +57,8 @@ function read<T>(sql: string, ...parameters: unknown[]): T | undefined {
   }
 }
 
-const spentStep = (): number | null => read<{ step: number | null }>(`
-  SELECT t.last_used_step AS step FROM totp_secrets t JOIN users u ON u.id = t.user_id WHERE u.email = ?
-`, officer.email)?.step ?? null
-
 async function signInThroughTheChallenge(): Promise<string> {
-  for (let attempt = 0; attempt < 40; attempt++) {
-    if (stepFor(new Date()) !== spentStep()) break
-    await Bun.sleep(1000)
-  }
+  forgetSpentStep(app, officer.email)
   const { attemptId } = await (await send('POST', '/api/auth/sign-in', { email: officer.email, password })).json() as { attemptId: string }
   const answered = await send('POST', '/api/auth/mfa/challenge', {
     attemptId,
@@ -290,10 +283,7 @@ describe.skipIf(skip !== null)('exporting the trail (J-103 criterion 5)', () => 
 // One browser sign-in, shared. The challenge is answered with the next step rather than the
 // current one, so this waits until that step is the one not already spent.
 async function signedInView(): Promise<Bun.WebView> {
-  for (let attempt = 0; attempt < 60; attempt++) {
-    if (stepFor(new Date()) + 1 !== spentStep()) break
-    await Bun.sleep(1000)
-  }
+  forgetSpentStep(app, officer.email)
   const view = await openSignedOutView(app.baseURL)
   await visit(view, `${app.baseURL}/sign-in`)
   await fill(view, 'form input[type="email"]', officer.email)

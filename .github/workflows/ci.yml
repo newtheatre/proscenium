@@ -35,8 +35,10 @@ jobs:
       - name: Typecheck (Bun projects)
         run: bun run typecheck:bun
 
+      # Unit and integration only, in under a second. The end-to-end suites need a dev server and
+      # a browser, and run in their own workflow (0029).
       - name: Tests
-        run: bun test
+        run: bun run test
 
       - name: Comments
         run: bun run check:comments

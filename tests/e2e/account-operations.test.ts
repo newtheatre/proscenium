@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { markVerified } from '#tests/helpers/accounts'
+import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -53,16 +53,9 @@ function read<T>(sql: string, ...parameters: unknown[]): T | undefined {
   }
 }
 
-const spentStep = (): number | null => read<{ step: number | null }>(`
-  SELECT t.last_used_step AS step FROM totp_secrets t JOIN users u ON u.id = t.user_id WHERE u.email = ?
-`, officer.email)?.step ?? null
-
 // A spent step cannot answer a second challenge, and two steps out is outside tolerance.
 async function unusedCode(): Promise<string> {
-  for (let attempt = 0; attempt < 40; attempt++) {
-    if (stepFor(new Date()) !== spentStep()) break
-    await Bun.sleep(1000)
-  }
+  forgetSpentStep(app, officer.email)
   return codeForStep(secret, stepFor(new Date()))
 }
 

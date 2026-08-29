@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { DEFAULT_PAGE_SIZE } from '#shared/utils/pagination'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { markVerified } from '#tests/helpers/accounts'
+import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -48,18 +48,9 @@ function send(method: string, path: string, body?: unknown, withCookie?: string)
   })
 }
 
-function spentStep(): number | null {
-  return read<{ step: number | null }>(`
-    SELECT t.last_used_step AS step FROM totp_secrets t JOIN users u ON u.id = t.user_id WHERE u.email = ?
-  `, officer.email)?.step ?? null
-}
-
 // A spent step cannot answer a second challenge, and a code two steps out is outside tolerance.
 async function signInThroughTheChallenge(): Promise<string> {
-  for (let attempt = 0; attempt < 40; attempt++) {
-    if (stepFor(new Date()) !== spentStep()) break
-    await Bun.sleep(1000)
-  }
+  forgetSpentStep(app, officer.email)
   const { attemptId } = await (await send('POST', '/api/auth/sign-in', { email: officer.email, password })).json() as { attemptId: string }
   const answered = await send('POST', '/api/auth/mfa/challenge', {
     attemptId,
@@ -301,10 +292,7 @@ describe.skipIf(skip !== null)('the directory screen', () => {
       await click(view, 'form button[type="submit"]')
       await waitFor(view, 'document.querySelectorAll(\'[data-test="mfa-challenge"] input\').length >= 6')
 
-      for (let attempt = 0; attempt < 40; attempt++) {
-        if (stepFor(new Date()) !== spentStep()) break
-        await Bun.sleep(1000)
-      }
+      forgetSpentStep(app, officer.email)
       await fillPin(view, '[data-test="mfa-challenge"] input', await codeForStep(secret, stepFor(new Date())))
       await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
 

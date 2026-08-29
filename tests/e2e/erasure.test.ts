@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { TOMBSTONE_NAME, tombstoneEmail } from '#shared/utils/erasure'
 import { PERSONAL_TABLES } from '#shared/utils/personal-data'
-import { markVerified } from '#tests/helpers/accounts'
+import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -65,15 +65,8 @@ function readAll(sql: string): string {
   }
 }
 
-const spentStep = (): number | null => read<{ step: number | null }>(`
-  SELECT t.last_used_step AS step FROM totp_secrets t JOIN users u ON u.id = t.user_id WHERE u.email = ?
-`, officer.email)?.step ?? null
-
 async function signInThroughTheChallenge(): Promise<string> {
-  for (let attempt = 0; attempt < 40; attempt++) {
-    if (stepFor(new Date()) !== spentStep()) break
-    await Bun.sleep(1000)
-  }
+  forgetSpentStep(app, officer.email)
   const { attemptId } = await (await send('POST', '/api/auth/sign-in', { email: officer.email, password })).json() as { attemptId: string }
   const answered = await send('POST', '/api/auth/mfa/challenge', {
     attemptId,
