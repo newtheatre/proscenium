@@ -35,7 +35,11 @@ export default defineEventHandler(async (event) => {
 
   if (!totp.accepted && !recovery.redeemed) {
     // A typo costs the code, not the password step: a fresh attempt is issued (criterion 2).
-    const attemptId = await openAttempt(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'))
+    const attemptId = await openAttempt(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'), auditEntry({
+      actorId: account.id,
+      action: 'mfa.challenged',
+      target: `user:${account.id}`,
+    }))
     throw createError({
       statusCode: 401,
       statusMessage: 'That code did not match',

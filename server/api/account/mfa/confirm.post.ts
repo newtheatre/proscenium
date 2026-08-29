@@ -1,5 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { RECOVERY_CODE_COUNT } from '#shared/utils/recovery-codes'
 import { verifyCode } from '#shared/utils/totp'
 
 const body = z.object({ code: z.string().min(6).max(20) })
@@ -31,11 +32,17 @@ export default defineEventHandler(async (event) => {
       actorId: account.id,
       action: 'mfa.confirmed',
       target: `user:${account.id}`,
+      detail: changes({ factor: [null, 'totp'] }),
     })),
   ])
 
   // Minted after confirmation, and shown exactly once: nothing stores them in the clear.
-  const codes = await mintRecoveryCodes(account.id)
+  const codes = await mintRecoveryCodes(account.id, auditEntry({
+    actorId: account.id,
+    action: 'mfa.recovery-codes.minted',
+    target: `user:${account.id}`,
+    detail: { count: RECOVERY_CODE_COUNT },
+  }))
 
   // The epoch moved, so this session is reissued rather than left stale by its own success.
   const refreshed = await findById(account.id)

@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "bun test",
+    "check:audit": "bun scripts/check-audit.ts",
     "check:comments": "bun scripts/check-comments.ts",
     "check:migrations": "bun scripts/check-migrations.ts",
     "check:content-tokens": "bun scripts/check-content-tokens.ts",

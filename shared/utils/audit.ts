@@ -1,3 +1,5 @@
+import { auditAction } from './audit-actions'
+
 // The shape of an audit entry, and the guard that keeps personal data out of it. The table is
 // append-only (0010) and erasure must never need to reach its content (0011).
 
@@ -19,6 +21,18 @@ const FREE_TEXT_KEYS = new Set([
 ])
 
 export type AuditDetail = Record<string, unknown>
+
+export interface FieldChange { from: unknown, to: unknown }
+
+// One shape for every state change, so a reader and a report never have to know which endpoint
+// wrote the entry (J-101 criterion 4).
+export function changes(fields: Record<string, [unknown, unknown]>): AuditDetail {
+  const recorded: Record<string, FieldChange> = {}
+  for (const [name, [from, to]] of Object.entries(fields)) {
+    recorded[name] = { from: from ?? null, to: to ?? null }
+  }
+  return { changes: recorded }
+}
 
 export interface AuditInput {
   // NULL is the system acting on its own, such as a sweep.
@@ -85,6 +99,7 @@ export function auditEntry(input: AuditInput): AuditRow {
   if (!ACTION.test(input.action)) {
     throw new Error(`audit action \`${input.action}\` must be lowercase and dotted, as in role.granted`)
   }
+  auditAction(input.action)
   guardDetail(input.detail ?? {}, 'detail')
 
   return {

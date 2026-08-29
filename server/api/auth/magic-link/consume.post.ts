@@ -19,11 +19,12 @@ export default defineEventHandler(async (event) => {
 
   // A link replaces the password step, never the second factor (A-107 criterion 4).
   if (await confirmedFactor(account.id)) {
-    const attemptId = await openAttempt(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'))
-    await db.batch([
-      db.update(schema.users).set({ verified: true }).where(eq(schema.users.id, account.id)),
-      db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'mfa.challenged', target: `user:${account.id}` })),
-    ])
+    await db.update(schema.users).set({ verified: true }).where(eq(schema.users.id, account.id))
+    const attemptId = await openAttempt(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'), auditEntry({
+      actorId: account.id,
+      action: 'mfa.challenged',
+      target: `user:${account.id}`,
+    }))
     return { ok: true, mfaRequired: true as const, attemptId }
   }
 

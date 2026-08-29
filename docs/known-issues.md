@@ -26,7 +26,6 @@ fixed, in the pull request that fixes it.
 | **Seven scheduled tasks are stubs.** `holds:release`, `training:expiry-sweep`, `sessions:sweep`, `shifts:remind`, `nights:close`, `backup` and `retention:sweep` are registered, run on their cron and do nothing but name the story they wait for. | A cron that fires and does nothing looks identical to one that fires and works. | Each named story. `backup` (K-108) is the one with no other cover. |
 | **`requirePermission` reads `liveGrants` twice** for the same account in one request. | Two D1 round trips where one would do, on every guarded request. | Whenever the authorisation path is next touched. |
 | **Nothing alerts on an unhealthy deploy.** `/api/health` returns 503 naming pending migrations and nobody is watching it. | The signal exists and reaches no one. | K-107 criterion 4. |
-| **`db.batch` is not a transaction.** Two audit writes (`sign-in.post.ts`, `recovery-codes.post.ts`) insert outside the batch carrying their change, so the entry and the change are not atomic. | An audit entry can exist for a change that failed, or the reverse. | J-101 criterion 1, when the audit coverage fixture is built. |
 
 | **A build while `bun run dev` is running breaks the dev server.** The build recreates the local database file, and every write from the running server then fails with `SQLITE_READONLY_DBMOVED`. | The error names neither the cause nor the fix, which is to restart `bun run dev`. | Nothing yet: it would want the dev database and the build's to be different files. |
 

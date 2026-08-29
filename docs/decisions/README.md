@@ -32,3 +32,4 @@ afterwards, only superseded.
 | 0024 | A settings change records a hash where its value could identify someone | which keys are sensitive |
 | 0025 | Configuration is a rule, not a record | where the pass products and opening hours live |
 | 0026 | An unverified address cannot sign in, and expires | why sign-in refuses, and what removes the account |
+| 0027 | An audit action is registered before it is written | the catalogue, the diff shape and the coverage checker |

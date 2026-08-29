@@ -21,6 +21,7 @@ export default defineEventHandler(async (event) => {
       actorId: account.id,
       action: 'mfa.removed',
       target: `user:${account.id}`,
+      detail: changes({ factor: ['totp', null] }),
     })),
   ])
 

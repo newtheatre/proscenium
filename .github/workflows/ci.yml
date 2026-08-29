@@ -55,3 +55,8 @@ jobs:
       # centre enforces (0013).
       - name: Notifications
         run: bun run check:notifications
+
+      # A privileged mutation that records nothing is a gap nobody sees until it matters
+      # (J-101 criterion 5).
+      - name: Audit coverage
+        run: bun run check:audit

@@ -20,6 +20,7 @@ export default defineEventHandler(async (event) => {
       actorId: claimed.userId,
       action: 'account.verified',
       target: `user:${claimed.userId}`,
+      detail: changes({ verified: [false, true] }),
     })),
   ])
 
