@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { RECOVERY_CODE_COUNT } from '#shared/utils/recovery-codes'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -52,6 +53,7 @@ async function registerAndSignIn(prefix: string): Promise<{ email: string, view:
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, name: person.name, password }),
   })
+  markVerified(app, email)
 
   const view = await openSignedOutView(app.baseURL)
   await visit(view, `${app.baseURL}/sign-in`)

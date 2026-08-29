@@ -284,6 +284,19 @@ export const CONFIG_KEYS = {
     describes: 'The window verification resends are counted over.',
   },
 
+  UNVERIFIED_ACCOUNT_DAYS: {
+    schema: z.number().int().positive(),
+    default: 30,
+    workshop: 'people-and-communications',
+    describes: 'Days an account may hold an unproven address before it is anonymised. A password-less account is exempt: it was never a registration to complete (0026).',
+  },
+  UNVERIFIED_EXPIRY_CAP: {
+    schema: z.number().int().positive(),
+    default: 200,
+    workshop: 'people-and-communications',
+    describes: 'The most accounts one unverified-expiry run may anonymise, so the first sweep after an import drains over days (0026).',
+  },
+
   RETENTION_FULL_ACCOUNT_YEARS: {
     schema: z.number().int().positive(),
     default: 2,
@@ -336,6 +349,8 @@ export const ENFORCED_KEYS = [
   'RETENTION_FULL_ACCOUNT_YEARS',
   'SIGN_IN_ATTEMPTS_PER_ACCOUNT',
   'SIGN_IN_ATTEMPTS_PER_ADDRESS_WINDOW_MINUTES',
+  'UNVERIFIED_ACCOUNT_DAYS',
+  'UNVERIFIED_EXPIRY_CAP',
   'VERIFY_RESEND_ATTEMPTS',
   'VERIFY_RESEND_WINDOW_MINUTES',
 ] as const satisfies readonly ConfigKey[]

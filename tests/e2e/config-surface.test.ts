@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { CONFIG_KEYS, CONFIG_KEY_NAMES } from '#shared/utils/config'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -23,6 +24,7 @@ beforeAll(async () => {
 
   for (const person of [officer, bystander]) {
     await send('POST', '/api/auth/register', { email: person.email, name: person.name, password })
+    markVerified(app, person.email)
   }
 
   const signedIn = await send('POST', '/api/auth/sign-in', { email: officer.email, password })

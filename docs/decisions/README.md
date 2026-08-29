@@ -31,3 +31,4 @@ afterwards, only superseded.
 | 0023 | A fellowship is a permanent honour, and its entitlement is a pass | what it covers, guests, erasure |
 | 0024 | A settings change records a hash where its value could identify someone | which keys are sensitive |
 | 0025 | Configuration is a rule, not a record | where the pass products and opening hours live |
+| 0026 | An unverified address cannot sign in, and expires | why sign-in refuses, and what removes the account |

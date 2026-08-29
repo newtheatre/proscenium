@@ -30,15 +30,15 @@ export default defineEventHandler(async (event) => {
 
   const account = await findByEmail(email)
 
-  // One message and one shape for every failure: a wrong address, a wrong password, a disabled
-  // account and a Google-only account must be indistinguishable from outside.
+  // One message and one shape for every failure, an unproven address included: nothing here
+  // may tell an attacker which branch ran (A-103 criterion 1, 0026).
   const refuse = (): never => {
     throw createError({ statusCode: 401, statusMessage: 'Those details do not match an account' })
   }
 
   // A verification always runs, even with nothing to verify against, so how long the answer
   // takes cannot tell an attacker whether the address exists (A-103).
-  const usable = account && account.password && !account.disabled && account.anonymisedAt === null
+  const usable = account && account.password && account.verified && !account.disabled && account.anonymisedAt === null
   const matches = await verifyPassword(usable ? account.password! : await decoyHash(), input.password)
   if (!usable || !matches) return refuse()
 

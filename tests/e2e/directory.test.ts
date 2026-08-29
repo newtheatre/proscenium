@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { DEFAULT_PAGE_SIZE } from '#shared/utils/pagination'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -22,6 +23,7 @@ beforeAll(async () => {
 
   for (const person of [officer, bystander]) {
     await send('POST', '/api/auth/register', { email: person.email, name: person.name, password })
+    markVerified(app, person.email)
   }
 
   const signedIn = await send('POST', '/api/auth/sign-in', { email: officer.email, password })
@@ -104,10 +106,13 @@ async function directory(query = ''): Promise<Listing> {
 
 const emails = (listing: Listing): string[] => listing.items.map(item => item.email)
 
-async function member(prefix: string): Promise<string> {
+// Verified by default because a signed-in member has to be (0026); the filter tests want one
+// that is not.
+async function member(prefix: string, verified = true): Promise<string> {
   const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
   const email = registrableAddress(prefix)
   await send('POST', '/api/auth/register', { email, name: person.name, password })
+  if (verified) markVerified(app, email)
   return email
 }
 
@@ -144,7 +149,7 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
   })
 
   test('an unverified account is found by the filter and a verified one is not', async () => {
-    const email = await member('unverified')
+    const email = await member('unverified', false)
     expect(emails(await directory('?filter=unverified'))).toContain(email)
 
     write('UPDATE users SET verified = 1 WHERE email = ?', email)
@@ -152,7 +157,7 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
   })
 
   test('a disabled account is found only by its own filter', async () => {
-    const email = await member('disabled')
+    const email = await member('disabled', false)
     write('UPDATE users SET disabled = 1 WHERE email = ?', email)
 
     expect(emails(await directory('?filter=disabled'))).toContain(email)

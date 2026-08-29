@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { Database } from 'bun:sqlite'
+import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -38,6 +40,7 @@ describe.skipIf(skip !== null)('registering and signing in (A-101, A-103, 0007)'
 
   test('an address registers', async () => {
     const response = await post('/api/auth/register', { email: person.email, name: person.name, password })
+    markVerified(app, person.email)
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ ok: true })
   })
@@ -115,6 +118,93 @@ describe.skipIf(skip !== null)('registering and signing in (A-101, A-103, 0007)'
     })
     expect(response.status).toBe(400)
     expect((await response.json()).statusMessage ?? '').toMatch(/Google/i)
+  })
+})
+
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+// The plaintext exists only in the message, so a test plants one whose hash it knows.
+async function plantToken(email: string, kind: string, plaintext: string): Promise<void> {
+  const hash = await sha256(plaintext)
+  const database = new Database(app.databaseFile)
+  try {
+    const user = database.query('SELECT id FROM users WHERE email = ?').get(email) as { id: string }
+    // One live token per user per kind, and registration already issued the verification one.
+    database.query('DELETE FROM auth_tokens WHERE user_id = ? AND kind = ?').run(user.id, kind)
+    database.query('INSERT INTO auth_tokens (id, user_id, kind, token_hash, expires_at) VALUES (?, ?, ?, ?, ?)')
+      .run(crypto.randomUUID().replaceAll('-', ''), user.id, kind, hash, Math.floor(Date.now() / 1000) + 3600)
+  }
+  finally {
+    database.close()
+  }
+}
+
+const newToken = (): string => `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll('-', '')
+
+// Registered and left as registration leaves it: unproven.
+async function unproven(prefix: string): Promise<string> {
+  const stranger = syntheticPerson(Math.floor(Math.random() * 1_000_000))
+  const email = registrableAddress(prefix)
+  expect((await post('/api/auth/register', { email, name: stranger.name, password })).status).toBe(200)
+  return email
+}
+
+const signIn = (email: string, secret = password): Promise<Response> =>
+  post('/api/auth/sign-in', { email, password: secret })
+
+describe.skipIf(skip !== null)('an unverified address cannot sign in (0026)', () => {
+  test('it is refused, and indistinguishable from a wrong password and an unknown address', async () => {
+    const email = await unproven('unproven')
+
+    const refused = await signIn(email)
+    const wrong = await signIn(person.email, 'not the password')
+    const unknown = await signIn(registrableAddress('nobody'))
+
+    expect(refused.status).toBe(401)
+    const body = await refused.text()
+    expect(await wrong.text()).toBe(body)
+    expect(await unknown.text()).toBe(body)
+  })
+
+  // Each of the four routes to a verified address is a way back for somebody who never got the
+  // first email, which is what keeps the refusal from being a dead end.
+  test('the verification link opens the door', async () => {
+    const email = await unproven('by-link')
+    const token = newToken()
+    await plantToken(email, 'EMAIL_VERIFY', token)
+
+    expect((await post('/api/auth/verify', { token })).status).toBe(200)
+    expect((await signIn(email)).status).toBe(200)
+  })
+
+  test('a password reset opens the door', async () => {
+    const email = await unproven('by-reset')
+    const token = newToken()
+    await plantToken(email, 'PASSWORD_RESET', token)
+    const replacement = generatePassword()
+
+    expect((await post('/api/auth/password/reset', { token, password: replacement })).status).toBe(200)
+    expect((await signIn(email, replacement)).status).toBe(200)
+  })
+
+  test('a sign-in link opens the door', async () => {
+    const email = await unproven('by-magic')
+    const token = newToken()
+    await plantToken(email, 'MAGIC_LINK', token)
+
+    expect((await post('/api/auth/magic-link/consume', { token })).status).toBe(200)
+    expect((await signIn(email)).status).toBe(200)
+  })
+
+  test('asking for the link again tells the caller nothing about the address', async () => {
+    const known = await post('/api/auth/verify/resend', { email: await unproven('resending') })
+    const stranger = await post('/api/auth/verify/resend', { email: registrableAddress('nobody') })
+
+    expect(known.status).toBe(stranger.status)
+    expect(await known.text()).toBe(await stranger.text())
   })
 })
 

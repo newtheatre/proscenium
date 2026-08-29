@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { TOMBSTONE_NAME, tombstoneEmail } from '#shared/utils/erasure'
 import { PERSONAL_TABLES } from '#shared/utils/personal-data'
+import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -21,6 +22,7 @@ beforeAll(async () => {
   app = await startApp()
 
   await send('POST', '/api/auth/register', { email: officer.email, name: officer.name, password })
+  markVerified(app, officer.email)
   const signedIn = await send('POST', '/api/auth/sign-in', { email: officer.email, password })
   const first = (signedIn.headers.get('set-cookie') ?? '').split(';')[0]!
   secret = (await (await send('POST', '/api/account/mfa/enrol', {}, first)).json() as { secret: string }).secret
@@ -82,13 +84,17 @@ async function signInThroughTheChallenge(): Promise<string> {
 
 interface Member { id: string, email: string, name: string, cookie: string }
 
+// The name carries the address because the erasure assertions scan whole tables: syntheticPerson
+// draws from thirty-five names, so two members sharing one would make an erased name look present.
 async function member(prefix: string): Promise<Member> {
   const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
   const email = registrableAddress(prefix)
-  await send('POST', '/api/auth/register', { email, name: person.name, password })
+  const name = `${person.name} ${email.split('@')[0]}`
+  await send('POST', '/api/auth/register', { email, name, password })
+  markVerified(app, email)
   const signedIn = await send('POST', '/api/auth/sign-in', { email, password })
   const id = read<{ id: string }>('SELECT id FROM users WHERE email = ?', email)!.id
-  return { id, email, name: person.name, cookie: (signedIn.headers.get('set-cookie') ?? '').split(';')[0]! }
+  return { id, email, name, cookie: (signedIn.headers.get('set-cookie') ?? '').split(';')[0]! }
 }
 
 const close = (person: Member, body: unknown): Promise<Response> =>
@@ -215,6 +221,87 @@ describe.skipIf(skip !== null)('erasing somebody else (A-125 criterion 6)', () =
       const contents = readAll(`SELECT * FROM ${entry.name}`)
       expect(`${entry.name} address: ${contents.includes(person.email)}`).toBe(`${entry.name} address: false`)
       expect(`${entry.name} name: ${contents.includes(person.name)}`).toBe(`${entry.name} name: false`)
+    }
+  })
+})
+
+function write(sql: string, ...parameters: unknown[]): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(sql).run(...parameters as never[])
+  }
+  finally {
+    database.close()
+  }
+}
+
+const DAY = 24 * 60 * 60
+
+// Registered and then aged, because created_at is what the rule reads and no test can wait a month.
+async function unproven(prefix: string, ageInDays: number): Promise<string> {
+  const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
+  const email = registrableAddress(prefix)
+  await send('POST', '/api/auth/register', { email, name: `${person.name} ${email.split('@')[0]}`, password })
+  write('UPDATE users SET created_at = ? WHERE email = ?', Math.floor(Date.now() / 1000) - ageInDays * DAY, email)
+  return read<{ id: string }>('SELECT id FROM users WHERE email = ?', email)!.id
+}
+
+const anonymised = (id: string): number | null =>
+  read<{ at: number | null }>('SELECT anonymised_at AS at FROM users WHERE id = ?', id)!.at
+
+async function sweep(): Promise<void> {
+  const response = await fetch(`${app.baseURL}/_nitro/tasks/daily:sweeps`, { method: 'POST' })
+  expect(response.status).toBe(200)
+}
+
+describe.skipIf(skip !== null)('an unverified account expires (0026)', () => {
+  test('the sweep takes the overdue one and leaves the rest', async () => {
+    const overdue = await unproven('overdue', 40)
+    const fresh = await unproven('fresh', 1)
+    const proved = await unproven('proved', 40)
+    write('UPDATE users SET verified = 1 WHERE id = ?', proved)
+    // A password-less account is a guest or a console creation, which A-116 owns.
+    const guest = await unproven('guest', 40)
+    write('UPDATE users SET password = NULL WHERE id = ?', guest)
+
+    await sweep()
+
+    expect(anonymised(overdue)).not.toBeNull()
+    expect(anonymised(fresh)).toBeNull()
+    expect(anonymised(proved)).toBeNull()
+    expect(anonymised(guest)).toBeNull()
+  })
+
+  test('it goes through the erasure path and is attributed to the system', async () => {
+    const id = await unproven('automatic', 40)
+    await sweep()
+
+    expect(anonymised(id)).not.toBeNull()
+    expect(read<{ email: string, name: string, password: string | null }>(
+      'SELECT email, name, password FROM users WHERE id = ?', id))
+      .toMatchObject({ email: tombstoneEmail(id), name: TOMBSTONE_NAME, password: null })
+
+    const entry = read<{ actor: string | null }>(
+      'SELECT actor_id AS actor FROM audit_log WHERE target = ? AND action = ?', `user:${id}`, 'account.erased.system')
+    expect(entry).toBeDefined()
+    expect(entry!.actor).toBeNull()
+  })
+
+  test('the cap holds when more are eligible than one run allows', async () => {
+    const capped = await send('PUT', '/api/admin/config/UNVERIFIED_EXPIRY_CAP', { value: 1 }, cookie)
+    expect(capped.status).toBe(200)
+    try {
+      const first = await unproven('capped-a', 60)
+      const second = await unproven('capped-b', 50)
+
+      await sweep()
+      expect([anonymised(first), anonymised(second)].filter(at => at !== null)).toHaveLength(1)
+
+      await sweep()
+      expect([anonymised(first), anonymised(second)].filter(at => at !== null)).toHaveLength(2)
+    }
+    finally {
+      await send('PUT', '/api/admin/config/UNVERIFIED_EXPIRY_CAP', { value: 200 }, cookie)
     }
   })
 })
