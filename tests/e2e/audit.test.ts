@@ -287,27 +287,70 @@ describe.skipIf(skip !== null)('exporting the trail (J-103 criterion 5)', () => 
   })
 })
 
+// One browser sign-in, shared. The challenge is answered with the next step rather than the
+// current one, so this waits until that step is the one not already spent.
+async function signedInView(): Promise<Bun.WebView> {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (stepFor(new Date()) + 1 !== spentStep()) break
+    await Bun.sleep(1000)
+  }
+  const view = await openSignedOutView(app.baseURL)
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', officer.email)
+  await fill(view, 'form input[type="password"]', password)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, `document.querySelectorAll('[data-test="mfa-challenge"] input').length >= 6`)
+
+  const code = await codeForStep(secret, stepFor(new Date()) + 1)
+  for (const [index, digit] of [...code].entries()) {
+    await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
+  }
+  await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+  return view
+}
+
+function write(sql: string, ...parameters: unknown[]): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(sql).run(...parameters as never[])
+  }
+  finally {
+    database.close()
+  }
+}
+
 describe.skipIf(skip !== null)('the audit screen (J-101 criterion 2, J-103)', () => {
+  // A fresh database only holds actions this build registers, so nothing here had ever rendered
+  // one it had not heard of, and the trail is history rather than a snapshot of this build.
+  test('an entry whose action this build does not know still renders', async () => {
+    const member = await registerMember(app, 'retired', password, { signIn: false })
+    write(
+      'INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (?, ?, ?, ?, ?)',
+      crypto.randomUUID().replaceAll('-', ''), officerId, 'booking.refunded', `user:${member.id}`, '{"pence":1200}',
+    )
+
+    const view = await signedInView()
+    try {
+      await visit(view, `${app.baseURL}/admin/audit`, '[data-test="audit-table"]')
+      await fill(view, 'input[data-test="audit-target"]', `user:${member.id}`)
+      await waitFor(view, `document.querySelector('[data-test="audit-table"]').innerText.includes('booking.refunded')`)
+
+      // Rendered under its own name rather than crashing the table it is one row of.
+      expect(await textOf(view, '[data-test="audit-table"]')).toContain('booking.refunded')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('an officer finds a grant they made, and the system entries look different', async () => {
     const member = await registerMember(app, 'onscreen', password, { signIn: false })
     expect((await send('POST', '/api/admin/roles', { userId: member.id, role: 'FRONT_OF_HOUSE' }, cookie)).status).toBe(200)
 
-    const view = await openSignedOutView(app.baseURL)
+    const view = await signedInView()
     try {
-      await visit(view, `${app.baseURL}/sign-in`)
-      await fill(view, 'form input[type="email"]', officer.email)
-      await fill(view, 'form input[type="password"]', password)
-      await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelectorAll('[data-test="mfa-challenge"] input').length >= 6`)
-
-      const code = await codeForStep(secret, stepFor(new Date()) + 1)
-      for (const [index, digit] of [...code].entries()) {
-        await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
-      }
-      await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
-
       await visit(view, `${app.baseURL}/admin/audit`, '[data-test="audit-table"]')
-      await fill(view, '[data-test="audit-target"] input, input[data-test="audit-target"]', `user:${member.id}`)
+      await fill(view, 'input[data-test="audit-target"]', `user:${member.id}`)
       await waitFor(view, `document.querySelector('[data-test="audit-table"]').innerText.includes('Role granted')`)
 
       expect(await textOf(view, '[data-test="audit-table"]')).toContain(officer.name)

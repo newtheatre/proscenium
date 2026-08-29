@@ -1,11 +1,19 @@
 // Every action the trail may carry. Writing one that is not here is refused, so a typo cannot
 // quietly create a category and the screen always has a label to show (J-101 criterion 5).
 
-// The backlog module an action belongs to. Reports and the audit screen group by this, which is
-// why it is declared rather than parsed out of the action's first segment.
+// The backlog module an action belongs to, declared rather than parsed out of the action's first
+// segment. `unknown` is what an unregistered action reads as, and nothing ever writes it.
 export const AUDIT_MODULES = ['identity', 'governance'] as const
+export const UNKNOWN_MODULE = 'unknown'
 
 export type AuditModule = (typeof AUDIT_MODULES)[number]
+
+// What a reader gets: the module widens, because an unregistered action belongs to none.
+export interface DescribedAction {
+  label: string
+  module: AuditModule | typeof UNKNOWN_MODULE
+  manual?: true
+}
 
 export interface AuditActionType {
   label: string
@@ -46,6 +54,8 @@ const CATALOGUE = {
 
   'role.granted': { label: 'Role granted', module: 'identity' },
   'role.revoked': { label: 'Role revoked', module: 'identity' },
+  // Written by scripts/grant-admin.ts, which is the one writer outside a request (K-122).
+  'role.granted.bootstrap': { label: 'Administrator bootstrapped', module: 'identity' },
 
   'config.changed': { label: 'Setting changed', module: 'governance' },
   'audit.exported': { label: 'Audit trail exported', module: 'governance' },
@@ -76,6 +86,12 @@ export const MANUAL_ACTION_NAMES = AUDIT_ACTION_NAMES.filter(name => AUDIT_ACTIO
 
 export function isManualAction(name: string): boolean {
   return isAuditAction(name) && AUDIT_ACTIONS[name].manual === true
+}
+
+// For reading rather than writing: the trail is history, and an entry written before a name was
+// retired, or imported from the old estate (J-108), still has to render.
+export function describeAction(name: string): DescribedAction {
+  return isAuditAction(name) ? AUDIT_ACTIONS[name] : { label: name, module: UNKNOWN_MODULE }
 }
 
 // Registering an action is the decision; writing one is not. An unregistered name is a defect,

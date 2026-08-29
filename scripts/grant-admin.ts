@@ -3,6 +3,7 @@
 // roles.grant, and roles.grant comes from being an administrator (A-120).
 
 import { Database } from 'bun:sqlite'
+import { auditEntry } from '../shared/utils/audit'
 import { defaultRoleExpiry } from '../shared/utils/roles'
 import { assertLocalTarget, assertNotProduction } from '../tests/helpers/seed'
 
@@ -50,11 +51,20 @@ if (usable.n > 0 && !additional) {
 const expiresAt = defaultRoleExpiry(new Date())
 const id = crypto.randomUUID().replaceAll('-', '')
 
+// Through auditEntry even here, so the action catalogue governs every writer and not only the
+// ones inside a request (0027).
+const entry = auditEntry({
+  actorId: null,
+  action: 'role.granted.bootstrap',
+  target: `user:${account.id}`,
+  detail: { role: 'ADMIN', expiresAt },
+})
+
 db.transaction(() => {
   db.query('INSERT OR IGNORE INTO role_grants (id, user_id, role, expires_at, granted_by) VALUES (?, ?, ?, ?, ?)')
     .run(id, account.id, 'ADMIN', expiresAt, null)
   db.query('INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (?, ?, ?, ?, ?)')
-    .run(crypto.randomUUID().replaceAll('-', ''), null, 'role.granted.bootstrap', `user:${account.id}`, JSON.stringify({ role: 'ADMIN', expiresAt }))
+    .run(entry.id, entry.actorId, entry.action, entry.target, JSON.stringify(entry.detail))
 })()
 
 console.log(`ADMIN granted to ${account.name} <${email}>, expiring ${new Date(expiresAt * 1000).toISOString()}`)

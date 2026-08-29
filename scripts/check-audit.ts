@@ -16,14 +16,24 @@ function scan(directory: string): string[] {
     .sort()
 }
 
+const problems: string[] = []
 const candidates: string[] = []
 for (const file of [...scan('server/api'), ...scan('server/routes')]) {
   const writes = (await Bun.file(file).text()).includes('auditEntry(')
   if (MUTATES.test(file) || file.startsWith('server/routes/') || writes) candidates.push(file)
 }
 
+// A script is not a route and has no coverage row, but it writes to the same table. Its row is
+// built by auditEntry and inserted from that, so the catalogue governs it too.
+for (const file of scan('scripts')) {
+  const source = await Bun.file(file).text()
+  if (!source.includes('INSERT INTO audit_log')) continue
+  if (!source.includes('auditEntry(') || !source.includes('entry.action')) {
+    problems.push(`${file}  writes audit_log without inserting an auditEntry row: build one and insert its fields`)
+  }
+}
+
 const registry = new Map(AUDIT_COVERAGE.map(entry => [entry.route, entry]))
-const problems: string[] = []
 
 for (const route of candidates) {
   if (!registry.has(route)) {

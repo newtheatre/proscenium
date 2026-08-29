@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { MAX_DETAIL_STRING, auditEntry, changes } from '#shared/utils/audit'
-import { AUDIT_ACTIONS, AUDIT_ACTION_NAMES, AUDIT_MODULES, MANUAL_ACTION_NAMES, auditAction, isManualAction } from '#shared/utils/audit-actions'
+import { AUDIT_ACTIONS, AUDIT_ACTION_NAMES, AUDIT_MODULES, MANUAL_ACTION_NAMES, auditAction, describeAction, isManualAction } from '#shared/utils/audit-actions'
 import { AUDIT_COVERAGE } from '#shared/utils/audit-coverage'
 
 const ok = { actorId: 'u-1', action: 'role.granted', target: 'user:u-2' }
@@ -138,5 +138,20 @@ describe('a module filter stays inside D1 parameter limits (0003)', () => {
       const held = AUDIT_ACTION_NAMES.filter(name => AUDIT_ACTIONS[name].module === module)
       expect(`${module}: ${held.length <= 90}`).toBe(`${module}: true`)
     }
+  })
+})
+
+// Writing is closed and reading is not: the trail is history, and an entry survives the name it was
+// written under being retired or arriving from the old estate (J-108).
+describe('reading an action the catalogue does not hold', () => {
+  test('it describes itself rather than coming back undefined', () => {
+    const described = describeAction('booking.refunded')
+    expect(described.label).toBe('booking.refunded')
+    expect(described.module).toBe('unknown')
+    expect(described.manual).toBeUndefined()
+  })
+
+  test('a registered action still describes itself from the catalogue', () => {
+    for (const name of AUDIT_ACTION_NAMES) expect(describeAction(name)).toEqual(AUDIT_ACTIONS[name])
   })
 })

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { AUDIT_ACTIONS, AUDIT_ACTION_NAMES, AUDIT_MODULES, MANUAL_ACTION_NAMES } from '#shared/utils/audit-actions'
+import { AUDIT_ACTIONS, AUDIT_ACTION_NAMES, AUDIT_MODULES, MANUAL_ACTION_NAMES, describeAction } from '#shared/utils/audit-actions'
 import { formatLondon } from '#shared/utils/london'
 import type { AuditActionName, AuditModule } from '#shared/utils/audit-actions'
 import type { TableColumn } from '@nuxt/ui'
@@ -27,9 +27,11 @@ interface Listing {
   pages: number
 }
 
+const ANY = 'any'
+
 const listing = ref<Listing | null>(null)
-const module = ref<AuditModule | undefined>(undefined)
-const action = ref<AuditActionName | undefined>(undefined)
+const module = ref<AuditModule | typeof ANY>(ANY)
+const action = ref<AuditActionName | typeof ANY>(ANY)
 const target = ref('')
 const since = ref('')
 const until = ref('')
@@ -48,8 +50,8 @@ const endOf = (day: string): number | undefined =>
   day ? Math.floor(new Date(`${day}T23:59:59`).getTime() / 1000) : undefined
 
 const filters = computed(() => ({
-  module: module.value,
-  action: action.value,
+  module: module.value === ANY ? undefined : module.value,
+  action: action.value === ANY ? undefined : action.value,
   target: target.value || undefined,
   from: startOf(since.value),
   to: endOf(until.value),
@@ -81,7 +83,7 @@ async function record(): Promise<void> {
         occurredAt: startOf(entry.occurredOn),
       },
     })
-    recorded.value = AUDIT_ACTIONS[entry.action].label
+    recorded.value = describeAction(entry.action).label
     recording.value = false
     entry.target = ''
     entry.onBehalfOf = ''
@@ -103,21 +105,28 @@ const exportUrl = computed(() => {
 })
 
 const MODULE_OPTIONS = [
-  { label: 'Every module', value: undefined },
+  { label: 'Every module', value: ANY },
   ...AUDIT_MODULES.map(name => ({ label: name, value: name })),
 ]
 
 // Narrowed to the chosen module, because an action filter offering every action in the estate is
 // a list nobody reads.
 const actionOptions = computed(() => [
-  { label: 'Every action', value: undefined },
+  { label: 'Every action', value: ANY },
   ...AUDIT_ACTION_NAMES
-    .filter(name => !module.value || AUDIT_ACTIONS[name].module === module.value)
+    .filter(name => module.value === ANY || AUDIT_ACTIONS[name].module === module.value)
     .map(name => ({ label: AUDIT_ACTIONS[name].label, value: name })),
 ])
 
+// Reset here rather than in a watcher: narrowing the list a select is rendering while that same
+// select is open is what tears its content down mid-update.
+function chooseModule(): void {
+  if (module.value !== ANY && action.value !== ANY && AUDIT_ACTIONS[action.value].module !== module.value) {
+    action.value = ANY
+  }
+}
+
 watch([module, action, target, since, until], () => {
-  if (module.value && action.value && AUDIT_ACTIONS[action.value].module !== module.value) action.value = undefined
   page.value = 1
   void load()
 })
@@ -142,7 +151,7 @@ const columns: TableColumn<Entry>[] = [
     id: 'action',
     header: 'What',
     cell: ({ row }) => {
-      const type = AUDIT_ACTIONS[row.original.action]
+      const type = describeAction(row.original.action)
       return h('div', { class: 'flex items-center gap-2' }, [
         type.label,
         type.manual ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Recorded by hand') : null,
@@ -189,6 +198,7 @@ onMounted(load)
           data-test="audit-module"
           :items="MODULE_OPTIONS"
           value-key="value"
+          @update:model-value="chooseModule"
         />
       </UFormField>
 
