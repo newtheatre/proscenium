@@ -59,6 +59,25 @@ export const memberships = sqliteTable('memberships', {
   check('memberships_source', sql`${table.source} IN ('MANUAL', 'ROSTER')`),
 ])
 
+// An honour, not a grant: permanent, singular, and the theatre's own record. `restrict` is the
+// difference, so deleting somebody cannot quietly unmake an award (0023, A-127).
+export const fellowships = sqliteTable('fellowships', {
+  id: id(),
+  userId: text('user_id').notNull().unique().references(() => users.id, { onDelete: 'restrict' }),
+  // A London date, not an instant: what is recorded is the day the committee resolved it.
+  awardedOn: text('awarded_on').notNull(),
+  // The meeting that resolved it, never an individual: the theatre awards this, not a person.
+  awardedBy: text('awarded_by').notNull(),
+  // Public wording, displayed as written. Kept through an erasure by decision (A-127).
+  citation: text('citation').notNull(),
+  revokedAt: integer('revoked_at'),
+  revokedBy: text('revoked_by'),
+  revocationReason: text('revocation_reason'),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  index('fellowships_revoked_at').on(table.revokedAt),
+])
+
 export const roleGrants = sqliteTable('role_grants', {
   id: id(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

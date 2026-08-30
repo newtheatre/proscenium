@@ -57,6 +57,10 @@ const CATALOGUE = {
   // Written by scripts/grant-admin.ts, which is the one writer outside a request (K-122).
   'role.granted.bootstrap': { label: 'Administrator bootstrapped', module: 'identity' },
 
+  // An honour rather than authority, so it sits with governance and not with identity (0023).
+  'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },
+  'fellowship.revoked': { label: 'Fellowship revoked', module: 'governance' },
+
   'config.changed': { label: 'Setting changed', module: 'governance' },
   'audit.exported': { label: 'Audit trail exported', module: 'governance' },
 

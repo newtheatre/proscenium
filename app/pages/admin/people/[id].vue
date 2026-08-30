@@ -10,6 +10,7 @@ interface View {
   methods: { password: boolean, google: boolean, passkeys: number, factor: boolean, recoveryCodesRemaining: number }
   grants: Grant[]
   memberships: { year: number, source: string }[]
+  fellowship: { id: string, awardedOn: string, awardedBy: string, citation: string, revokedAt: number | null } | null
   history: { action: string, target: string | null, createdAt: number, byThem: boolean }[]
 }
 
@@ -171,6 +172,29 @@ onMounted(load)
             {{ membership.year }} ({{ membership.source.toLowerCase() }})
           </li>
         </ul>
+      </UPageCard>
+
+      <UPageCard
+        v-if="view.fellowship"
+        data-test="fellowship"
+        title="Fellowship"
+        description="A permanent honour, and the theatre's own record (0023)."
+      >
+        <p class="text-sm">
+          Awarded {{ view.fellowship.awardedOn }} by {{ view.fellowship.awardedBy }}.
+          <UBadge
+            v-if="view.fellowship.revokedAt"
+            class="ml-1"
+            color="error"
+            variant="subtle"
+            size="sm"
+          >
+            Revoked
+          </UBadge>
+        </p>
+        <p class="mt-2 text-sm text-muted">
+          {{ view.fellowship.citation }}
+        </p>
       </UPageCard>
 
       <UPageCard

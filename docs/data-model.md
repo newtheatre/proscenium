@@ -76,8 +76,10 @@ UNIQUE (`user_id`, `year`). Current membership = row for the current committee y
 ### fellowships
 `id` PK · `user_id` → users restrict · `awarded_on` (date, London) · `awarded_by` (the
 committee or meeting that resolved it, not an individual) · `citation` (the public wording of
-what it was awarded for) · `pass_id` NULL → passes (the lifetime entitlement, 0023) ·
-`revoked_at` NULL · `revoked_by` NULL · `revocation_reason` scrub · `created_at`.
+what it was awarded for) · `revoked_at` NULL · `revoked_by` NULL · `revocation_reason` scrub ·
+`created_at`. `pass_id` → passes (the lifetime entitlement, 0023) arrives with module D as a
+nullable column: the roll is recorded first, because the committee assembles it before the box
+office exists.
 UNIQUE (`user_id`): a person is a Fellow once. `restrict` rather than `cascade` on purpose, so
 deleting a user cannot silently remove an award from the theatre's own record; erasure
 anonymises the person and the award stands.
