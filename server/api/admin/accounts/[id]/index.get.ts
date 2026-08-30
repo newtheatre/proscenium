@@ -34,6 +34,14 @@ export default defineEventHandler(async (event) => {
   const memberships = await db.select({ year: schema.memberships.year, source: schema.memberships.source })
     .from(schema.memberships).where(eq(schema.memberships.userId, id))
 
+  const [fellowship] = await db.select({
+    id: schema.fellowships.id,
+    awardedOn: schema.fellowships.awardedOn,
+    awardedBy: schema.fellowships.awardedBy,
+    citation: schema.fellowships.citation,
+    revokedAt: schema.fellowships.revokedAt,
+  }).from(schema.fellowships).where(eq(schema.fellowships.userId, id)).limit(1)
+
   // The trail for one person, which is what triage needs. Searching the whole of it is J-103.
   const history = resolved.permissions.has('audit.read')
     ? await db.select({
@@ -71,6 +79,7 @@ export default defineEventHandler(async (event) => {
       live: grant.expiresAt === null || grant.expiresAt > now,
     })),
     memberships,
+    fellowship: fellowship ?? null,
     history: history.map(entry => ({
       action: entry.action,
       target: entry.target,

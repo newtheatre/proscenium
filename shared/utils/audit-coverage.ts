@@ -47,6 +47,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['manual.role.granted', 'manual.role.revoked', 'manual.account.disabled', 'manual.account.enabled'],
     via: ['shared/utils/audit-actions.ts'],
   },
+  { route: 'server/api/admin/fellowships/[id]/revoke.post.ts', actions: ['fellowship.revoked'] },
+  { route: 'server/api/admin/fellowships/index.post.ts', actions: ['fellowship.awarded'] },
   { route: 'server/api/admin/config/[key].put.ts', actions: ['config.changed'] },
   { route: 'server/api/admin/roles/index.delete.ts', actions: ['role.revoked'] },
   { route: 'server/api/admin/roles/index.post.ts', actions: ['role.granted'] },

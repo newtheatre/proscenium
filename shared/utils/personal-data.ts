@@ -51,6 +51,17 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'How many members there were in a year must survive; the evidence for one need not.',
   },
   {
+    name: 'fellowships',
+    column: 'user_id',
+    section: 'fellowship',
+    columns: ['awarded_on', 'awarded_by', 'citation', 'revoked_at'],
+    erasure: 'scrub',
+    scrub: ['revocation_reason'],
+    // The citation names the person it honours and survives an erasure by decision: the roll is
+    // the theatre's record, published at the time (A-127, awaiting committee confirmation).
+    why: 'The theatre\'s own record of who it honoured. The award stands; why it was revoked need not.',
+  },
+  {
     name: 'role_grants',
     column: 'user_id',
     section: 'roles',

@@ -409,7 +409,11 @@ Open questions for the committee:
   2. A person can hold at most one fellowship, enforced by a unique constraint rather than by the
      form.
   3. Awarding issues the lifetime entitlement in the same batch as the record, so a Fellow can
-     never exist without one or an entitlement without an award (0023).
+     never exist without one or an entitlement without an award (0023). Amended 30 August 2026: the
+     roll is recorded first and the entitlement issues when the pass model exists, because passes
+     need pass types, prices and the ledger behind them and the committee assembles the roll for
+     30 September. The batch invariant applies from the moment there is a pass to issue, which is
+     before the door opens on 12 October.
   4. A fellowship can be revoked with a reason; revocation stops future admissions and rewrites
      nothing, so the award, the revocation and every admission already taken all stand.
   5. Awarding and revoking are audited, and the audit detail carries the fellowship id and never
@@ -420,7 +424,8 @@ Open questions for the committee:
      it.
 - Open questions: whether an erasure should also redact the citation, which names the person it
   honours. It ships unredacted, because the roll is a public record the theatre published at the
-  time, and the committee is asked to confirm.
+  time, and the committee is asked to confirm. Shipped that way on 30 August 2026 and recorded in
+  known issues, so the question has somewhere to be answered rather than being lost in a story.
 - Source: Committee direction, 26 August 2026; decision 0023.
 
 ## A-201: Import an SU membership list by hand
