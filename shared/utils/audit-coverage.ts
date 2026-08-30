@@ -76,6 +76,14 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/auth/register.post.ts', actions: ['account.registered'], via: ['server/utils/accounts.ts'] },
   { route: 'server/api/auth/sign-in.post.ts', actions: ['session.started', 'mfa.challenged'] },
   { route: 'server/api/auth/sign-out.post.ts', exempt: 'ending your own session changes no record' },
+
+  // Development only, and absent from a build: nuxt.config excludes both files (K-124).
+  {
+    route: 'server/api/dev/seed.post.ts',
+    actions: ['account.registered', 'account.erased.system'],
+    via: ['server/utils/dev.ts', 'server/utils/accounts.ts', 'server/utils/erasure.ts'],
+  },
+  { route: 'server/api/dev/sign-in-as.post.ts', exempt: 'a development sign-in with no password, in no build' },
   { route: 'server/api/auth/verify/index.post.ts', actions: ['account.verified'] },
   {
     route: 'server/api/auth/verify/resend.post.ts',

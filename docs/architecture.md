@@ -163,7 +163,10 @@ emailed link is built from `NUXT_PUBLIC_BASE_URL`, which defaults to the local p
 so a verification link in `.data/mail` is one that works.
 
 Seed scripts generate credentials at runtime, print once, and refuse to run against remote
-databases. There is a `/dev-login` guarded by `import.meta.dev` using `replaceUserSession`.
+databases. `/dev` is the local developer surface: it seeds personas and signs in as any of them
+without a password. It is kept out of a production build by `nuxt.config`'s `ignore` rather than by
+a runtime guard, because a guard still ships the file, and a test greps the built output to prove
+it (K-124).
 
 ## Deployment
 

@@ -284,6 +284,12 @@ export async function fill(view: Bun.WebView, selector: string, value: string): 
   })()`)
 }
 
+// A number input formats and commits on blur, so a value assigned without one is never read.
+export async function fillNumber(view: Bun.WebView, selector: string, value: string): Promise<void> {
+  await fill(view, selector, value)
+  await view.evaluate(`document.querySelector(${JSON.stringify(selector)}).blur()`)
+}
+
 // PinInput is one input per digit, so a six-digit code is six fills and not one.
 export async function fillPin(view: Bun.WebView, selector: string, code: string): Promise<void> {
   await waitFor(view, `document.querySelectorAll(${JSON.stringify(selector)}).length >= ${code.length}`)

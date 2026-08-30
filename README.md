@@ -64,6 +64,18 @@ emptying the database between suites, and names each suite as it starts so a slo
 suite is slow (0029). CI gates on the first; the second runs nightly and on demand.
 `bun test <file>` still runs one suite on its own.
 
+### Developer tools
+
+Running locally, `/dev` seeds a persona per role plus a plain member, a guest and a tombstone,
+signs in as any of them without a password, and shows the local mailbox alongside the permissions
+the current session resolves to. It is an authentication bypass, so it does not exist in a build:
+`nuxt.config` leaves the page and its routes out of the bundle, and `tests/unit/dev-tools.test.ts`
+greps a built `.output` to prove it (K-124).
+
+`bun run shots` writes a picture of every admin screen at two widths into `.shots/`, which is
+gitignored. It gates nothing and CI never runs it; it is there so a visual change can be reviewed
+from the images rather than from the diff.
+
 The migration tooling is standalone and has its own instructions in
 [`migration/README.md`](migration/README.md); the application never imports from it.
 
