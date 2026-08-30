@@ -51,12 +51,3 @@ CREATE TABLE recovery_codes (
   code_hash TEXT NOT NULL,
   used_at INTEGER
 );
-CREATE TABLE audit_archive (
-  id TEXT PRIMARY KEY,
-  source_app TEXT NOT NULL,
-  actor_user_id TEXT,
-  action TEXT NOT NULL,
-  target TEXT,
-  detail TEXT,
-  created_at INTEGER NOT NULL
-);

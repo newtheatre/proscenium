@@ -21,6 +21,7 @@
       "#shared/*": ["./shared/*"],
       "#server": ["./server"],
       "#server/*": ["./server/*"],
+      "#migration/*": ["./migration/*"],
       "#tests/*": ["./tests/*"]
     }
   }

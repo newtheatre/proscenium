@@ -16,7 +16,7 @@
     "check:migrations": "bun scripts/check-migrations.ts",
     "check:content-tokens": "bun scripts/check-content-tokens.ts",
     "migration:export": "./migration/export.sh",
-    "migration:dry-run": "bun migration/inventory.ts && bun migration/transform-identity.ts && bun migration/reconcile.ts",
+    "migration:dry-run": "bun migration/inventory.ts && bun migration/transform-identity.ts && bun migration/reconcile.ts && bun migration/load.ts",
     "postinstall": "nuxt prepare",
     "typecheck:bun": "tsc -p tests --noEmit && tsc -p scripts --noEmit && tsc -p migration --noEmit",
     "grant-admin": "bun scripts/grant-admin.ts",

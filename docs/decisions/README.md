@@ -35,3 +35,4 @@ afterwards, only superseded.
 | 0027 | An audit action is registered before it is written | the catalogue, the diff shape and the coverage checker |
 | 0028 | A manual audit entry names people by account, and is signed | what may be recorded by hand, and who may sign it |
 | 0029 | The end-to-end suites are a separate command | what `bun run test` covers, and what runs nightly |
+| 0030 | The old estate's audit history is not imported | why the archive was refused, and what answers a historical question |

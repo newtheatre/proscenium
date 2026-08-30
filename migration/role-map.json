@@ -2,11 +2,14 @@
   "_status": "PROVISIONAL until the role-vocabulary workshop signs the mapping (docs/workshops.md, session 3)",
   "auth:ADMIN": "ADMIN",
   "proscenium:ADMIN": "ADMIN",
-  "proscenium:MANAGER": "MANAGER",
   "proscenium:BOX_OFFICE": "BOX_OFFICE",
+  "proscenium:COMMITTEE": "COMMITTEE",
   "proscenium:FOH_MANAGER": "FOH_MANAGER",
   "proscenium:FRONT_OF_HOUSE": "FRONT_OF_HOUSE",
-  "proscenium:COMMITTEE": "COMMITTEE",
+  "proscenium:MANAGER": "MANAGER",
   "rooms:ADMIN": "THEATRE_MANAGER",
+  "ticketing:ADMIN": "ADMIN",
+  "ticketing:BOX_OFFICE": "BOX_OFFICE",
+  "ticketing:MANAGER": "MANAGER",
   "training:ADMIN": "TRAINING_MANAGER"
 }

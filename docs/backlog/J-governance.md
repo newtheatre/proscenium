@@ -121,7 +121,7 @@ Stories: 13 (10 MVP, 3 V2).
   5. The drill procedure lives in the in-app operator documentation (J-109), current enough that a successor can run it cold.
 - Source: Prompt Book K-1 (tested restore each term), P7; audit EW-3 (Time Travel restore points, weekly exports); Get-In part 6 (one blast radius)
 
-## J-108: The audit archive import
+## J-108: The audit archive import (superseded)
 
 - Role: Administrator
 - Phase: MVP
@@ -133,6 +133,10 @@ Stories: 13 (10 MVP, 3 V2).
   3. The import is checksummed and reconciled by row counts per source; a mismatch aborts.
   4. Archived entries are searchable through the same surface as native ones (J-103), filterable by source app.
   5. Erasure redaction (J-102) reaches archived entries exactly as it reaches native ones, and actors already anonymised in the source import as anonymised.
+- Superseded 30 August 2026 by decision 0030: the old estate's audit history is not imported in any
+  shape. Criterion 2 already named the free text this story would have had to clean, and criterion 5
+  would have made every later erasure reach into another system's records. The history stays in the
+  old estate, which remains readable until it is archived.
 - Source: Prompt Book J-1; audit SD-11, TR-10 (free-text cleanup SQL); Get-In part 2 (audit history imports as a read-only archive)
 
 ## J-109: Operator documentation in-app
