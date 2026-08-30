@@ -44,8 +44,7 @@ export default defineEventHandler(async (event) => {
 
   // A proven password is not a session while a second factor is waiting (A-111 criterion 1).
   if (await confirmedFactor(account.id)) {
-    const attemptId = await openAttempt(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'))
-    await db.insert(schema.auditLog).values(auditEntry({
+    const attemptId = await openAttempt(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'), auditEntry({
       actorId: account.id,
       action: 'mfa.challenged',
       target: `user:${account.id}`,

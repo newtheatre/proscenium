@@ -556,6 +556,15 @@ aim is that `detail` never carries identifying values (0011), but aim is not gua
 erasure can redact one that has. Everything that says what happened, and when, and to whom it
 was done, survives the redaction. A correction supersedes with a new entry.
 
+Two registries govern what may be written. `shared/utils/audit-actions.ts` is the closed catalogue
+of actions: each carries a label and the module it belongs to, and `auditEntry` refuses a name that
+is not in it, so a typo cannot create a category and the screen always has something to display.
+`shared/utils/audit-coverage.ts` says which route answers for which entry, and `check:audit` fails
+the build when a mutating route is missing from it, claims an action it does not write, or is
+exempt without a reason (J-101 criterion 5). A state change records `changes: { field: { from, to } }`,
+one shape whatever endpoint wrote it (J-101 criterion 4); a settings change whose value is
+sensitive records a hash pair instead, which is a redaction rather than a diff (0024).
+
 ### audit_archive
 The four old estates' audit histories imported read-only for reference (J-108), same shape
 plus `source_app`. Never written by the application.

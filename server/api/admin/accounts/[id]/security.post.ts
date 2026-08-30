@@ -42,14 +42,14 @@ export default defineEventHandler(async (event) => {
   // cannot resurrect a cookie sealed before the disable (criterion 1).
   const revoke = { sessionEpoch: sql`${schema.users.sessionEpoch} + 1` }
 
-  const changes = {
-    'disable': { set: { disabled: true, ...revoke }, action: 'account.disabled', detail: { from: false, to: true } },
-    'enable': { set: { disabled: false }, action: 'account.enabled', detail: { from: true, to: false } },
+  const operations = {
+    'disable': { set: { disabled: true, ...revoke }, action: 'account.disabled', detail: changes({ disabled: [false, true] }) },
+    'enable': { set: { disabled: false }, action: 'account.enabled', detail: changes({ disabled: [true, false] }) },
     'sign-out': { set: revoke, action: 'session.revoked', detail: { sessions: 'all' } },
     'reset-mfa': { set: revoke, action: 'mfa.reset', detail: { factor: 'cleared', sessions: 'all' } },
   } as const
 
-  const change = changes[input.operation]
+  const change = operations[input.operation]
   const touch = db.update(schema.users).set(change.set).where(eq(schema.users.id, id))
   const record = db.insert(schema.auditLog).values(auditEntry({
     actorId: resolved.account.id,

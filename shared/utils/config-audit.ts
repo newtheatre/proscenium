@@ -1,4 +1,4 @@
-import { isRecordable } from './audit'
+import { changes, isRecordable } from './audit'
 import { isSensitive } from './config'
 import type { AuditDetail } from './audit'
 import type { ConfigKey } from './config'
@@ -13,9 +13,10 @@ async function digest(value: unknown): Promise<string> {
 }
 
 export async function configChangeDetail(key: ConfigKey, from: unknown, to: unknown): Promise<AuditDetail> {
-  const plain: AuditDetail = { key, from: from ?? null, to }
+  const plain: AuditDetail = { key, ...changes({ value: [from, to] }) }
 
   if (!isSensitive(key) && isRecordable(plain)) return plain
 
+  // A hash pair is a redaction and not a diff, so it keeps a shape of its own (0024).
   return { key, redacted: true, fromHash: await digest(from), toHash: await digest(to) }
 }

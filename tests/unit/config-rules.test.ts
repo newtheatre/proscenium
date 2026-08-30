@@ -49,7 +49,7 @@ describe('what a setting will accept (J-104 criterion 3)', () => {
 describe('what a settings change records (0011, 0024)', () => {
   test('an ordinary key records the values it moved between', async () => {
     const detail = await configChangeDetail('PASSWORD_MIN_LENGTH', 15, 20)
-    expect(detail).toMatchObject({ key: 'PASSWORD_MIN_LENGTH', from: 15, to: 20 })
+    expect(detail).toMatchObject({ key: 'PASSWORD_MIN_LENGTH', changes: { value: { from: 15, to: 20 } } })
     expect(isRecordable(detail)).toBe(true)
   })
 

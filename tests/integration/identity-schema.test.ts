@@ -162,7 +162,7 @@ describe('the audit writer against the real table (0010, 0011)', () => {
   // leave an audit entry claiming it happened (0001, 0003).
   test('an audit entry does not survive a failed batch', async () => {
     await withDatabase((database) => {
-      const entry = auditEntry({ actorId: 'u-1', action: 'user.disabled', target: 'user:u-2' })
+      const entry = auditEntry({ actorId: 'u-1', action: 'account.disabled', target: 'user:u-2' })
       expect(() => database.batch([
         ['INSERT INTO audit_log (id, actor_id, action, target) VALUES (?, ?, ?, ?)', entry.id, entry.actorId, entry.action, entry.target],
         ['INSERT INTO users (id, email, name) VALUES (?, ?, ?)', 'u-2', 'BROKEN@Example.Invalid', 'A Member'],

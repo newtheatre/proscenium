@@ -136,6 +136,33 @@ describe.skipIf(skip !== null)('answering the challenge (A-111)', () => {
     expect((await send('POST', '/api/auth/mfa/challenge', { attemptId, code: await nextCode(member.secret) })).status).toBe(410)
   })
 
+  // An entry written outside the batch carrying its change can exist for a change that failed,
+  // or the reverse (J-101 criterion 1). Attempt and entry now arrive together or not at all.
+  test('an attempt and its audit entry arrive together', async () => {
+    const member = await memberWithFactor()
+    const id = withDatabase(database =>
+      (database.query('SELECT id FROM users WHERE email = ?').get(member.email) as { id: string }).id)
+
+    const entries = (): number => withDatabase(database =>
+      (database.query('SELECT count(*) AS n FROM audit_log WHERE action = ? AND target = ?')
+        .get('mfa.challenged', `user:${id}`) as { n: number }).n)
+
+    const attempts = (): number => withDatabase(database =>
+      (database.query('SELECT count(*) AS n FROM mfa_attempts WHERE user_id = ?').get(id) as { n: number }).n)
+
+    const before = entries()
+    const { attemptId } = await (await send('POST', '/api/auth/sign-in', { email: member.email, password })).json() as { attemptId: string }
+
+    expect(attemptId).toBeTruthy()
+    expect(entries()).toBe(before + 1)
+    expect(attempts()).toBe(1)
+
+    // A wrong code spends the attempt and opens a fresh one, so the pairing has to hold twice.
+    await send('POST', '/api/auth/mfa/challenge', { attemptId, code: '000000' })
+    expect(entries()).toBe(before + 2)
+    expect(attempts()).toBe(1)
+  })
+
   // Criterion 4: an attempt that nobody answered is a row, and the nightly task removes it.
   test('the daily sweep removes lapsed attempts', async () => {
     const member = await memberWithFactor()

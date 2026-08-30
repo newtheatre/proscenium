@@ -1,5 +1,6 @@
 import { and, eq, isNotNull, lt } from 'drizzle-orm'
 import { generateRecoveryCodes, normaliseRecoveryCode } from '#shared/utils/recovery-codes'
+import type { AuditRow } from '#shared/utils/audit'
 import type { H3Event } from 'h3'
 
 // Enrolment, recovery and the challenge, kept together because minting codes is part of
@@ -37,9 +38,9 @@ export async function confirmedFactor(userId: string): Promise<boolean> {
   return Boolean(row)
 }
 
-// Minted whole: a new set retires the old one in the same batch, so no window exists in which
-// both work (A-110 criterion 3).
-export async function mintRecoveryCodes(userId: string): Promise<string[]> {
+// Minted whole, and the entry with them: a new set retires the old one in the same batch, which
+// is the only atomicity D1 gives us (A-110 criterion 3, 0027).
+export async function mintRecoveryCodes(userId: string, entry: AuditRow): Promise<string[]> {
   const codes = generateRecoveryCodes()
   const rows = await Promise.all(codes.map(async code => ({
     id: crypto.randomUUID().replaceAll('-', ''),
@@ -50,13 +51,14 @@ export async function mintRecoveryCodes(userId: string): Promise<string[]> {
   await db.batch([
     db.delete(schema.recoveryCodes).where(eq(schema.recoveryCodes.userId, userId)),
     db.insert(schema.recoveryCodes).values(rows),
+    db.insert(schema.auditLog).values(entry),
   ])
 
   return codes
 }
 
 // A proven first credential waiting on its second factor (A-111).
-export async function openAttempt(userId: string, minutes: number): Promise<string> {
+export async function openAttempt(userId: string, minutes: number, entry: AuditRow): Promise<string> {
   const id = crypto.randomUUID().replaceAll('-', '')
   await db.batch([
     // One outstanding attempt per account: starting again abandons the last.
@@ -66,6 +68,7 @@ export async function openAttempt(userId: string, minutes: number): Promise<stri
       userId,
       expiresAt: Math.floor(Date.now() / 1000) + minutes * 60,
     }),
+    db.insert(schema.auditLog).values(entry),
   ])
   return id
 }

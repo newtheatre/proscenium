@@ -142,7 +142,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
     try {
       await send('PUT', '/api/admin/config/BAR_TAB_CAP_PENCE', { value: 2500 }, cookie)
       const entry = auditFor('BAR_TAB_CAP_PENCE')
-      expect(JSON.parse(entry!.detail)).toMatchObject({ key: 'BAR_TAB_CAP_PENCE', from: 2000, to: 2500 })
+      expect(JSON.parse(entry!.detail)).toMatchObject({ key: 'BAR_TAB_CAP_PENCE', changes: { value: { from: 2000, to: 2500 } } })
     }
     finally {
       clearOverride('BAR_TAB_CAP_PENCE')

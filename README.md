@@ -51,6 +51,8 @@ bun run typecheck
 bun run check:comments
 bun run check:migrations
 bun run check:content-tokens
+bun run check:notifications
+bun run check:audit
 bun test
 bun run build
 ```
