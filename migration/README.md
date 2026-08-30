@@ -33,6 +33,8 @@ bun install
 bun migration/inventory.ts     # loads dumps locally, writes out/manifest.json + .md
 bun migration/transform-identity.ts   # builds the unified identity core in out/unified.sqlite
 bun migration/reconcile.ts     # verifies counts and invariants; non-zero exit on failure
+bun migration/load.ts          # writes out/load.sql
+bun migration/load.ts /tmp/rehearsal.db   # and applies it to a local target
 ```
 
 `export.sh` requires a wrangler login with access to the New Theatre account. Every later
@@ -49,7 +51,22 @@ step is offline against the dumps.
   signs the vocabulary; unmapped grants land in the exceptions report), and imports the old
   audit histories into `audit_archive`.
 - **Reconciliation**: source-versus-target counts, the register count guard (K-115), and the
-  invariant checks (no Workspace passwords, tombstones preserved, email uniqueness).
+  invariant checks (no Workspace passwords, tombstones preserved, email uniqueness, every old role
+  mapped, no old estate id left in `granted_by`, every address lowercase).
+- **Load** (K-112 criterion 4): turns the core into `out/load.sql`, upserts keyed on identity, and
+  applies it to a local target when given one. It never deletes, so a person or a grant that
+  vanished upstream stays until somebody decides; and it never touches production, which is applied
+  by hand from the runbook in `docs/operations.md`.
+
+## Why the same person keeps the same id
+
+`out/id-map.tsv` is an input as well as an output. The transform reads it before minting anything,
+so a rehearsal updates the estate rather than importing a second copy of it. The file is gitignored
+because this repository is public and the map is what links the archived old estate to live
+identities. Losing it costs a reload of a scratch target, not ten thousand duplicate people: wipe
+the rehearsal database and start again.
+
+The old estate's audit history is deliberately not imported (decision 0030).
 
 Remaining transforms (programme, reservations and tickets, rooms, bar) follow the same
 shape, one file per module, as the weekly rehearsals proceed.

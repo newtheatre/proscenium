@@ -253,10 +253,15 @@ Stories: 22. Phases: 19 MVP, 0 V2, 0 Later, 3 resolved.
   1. All users import from stage-door with scrypt password hashes and TOTP secrets intact;
      nobody is forced to reset a password by the migration.
   2. Role grants map through a written vocabulary table agreed with the committee; provenance
-     and expiry dates carry; the old audit log imports as a read-only archive.
+     and expiry dates carry. Amended 30 August 2026: the old audit log is not imported at all, in
+     any shape. Its actions belong to features this system does not have and its details carry the
+     free text the live trail refuses, so importing it would put a standing obligation on every
+     later erasure (0030).
   3. Anonymised tombstones import as tombstones and remain guarded against rewrite.
   4. The import is re-runnable weekly against a fresh export: keyed upsert by canonical id, zero
-     duplicates, and a reconciliation report of row counts per table after every run.
+     duplicates, and a reconciliation report of row counts per table after every run. Amended 30
+     August 2026: the key is `out/id-map.tsv`, read back before anything is minted, so the same
+     person keeps the same id week to week and the load updates rather than doubling the estate.
   5. Two consecutive green rehearsal runs are part of the Phase 2 gate.
 - Source: Prompt Book P1 (one person, one record); audit SD-1 to SD-13 (as-built identity);
   Get-In part 3 (inventory), part 4 (Phase 1 first import)

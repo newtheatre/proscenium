@@ -571,10 +571,6 @@ the system. Its `actor_id` is the officer who signed it, and its detail carries 
 `created_at`). Everybody a manual entry names is an account on this system: the trail never holds a
 name it could not later anonymise (0028).
 
-### audit_archive
-The four old estates' audit histories imported read-only for reference (J-108), same shape
-plus `source_app`. Never written by the application.
-
 ### mfa_attempts
 `id` PK · `user_id` → users cascade · `expires_at` · `created_at`. A first credential that has
 been proven but not yet answered with a second factor (A-111). Five minutes, single use: a

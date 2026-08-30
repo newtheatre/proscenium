@@ -1,164 +1,48 @@
-// The cutover's first import (K-112): the four user stores become one identity core.
-// Fresh ids throughout; the old-to-new map goes to out/id-map.tsv, never the database.
-import { Database } from 'bun:sqlite'
+#!/usr/bin/env bun
+// The rehearsal's transform step: load the dumps, run the identity transform, write the artefacts.
+// The transform itself is in identity.ts, so the pipeline is testable without a production export.
 import { join } from 'node:path'
-import { OUT, ROOT, ensureOut, latestStamp, loadDump, nanoid } from './lib'
+import { OUT, ROOT, ensureOut, latestStamp, loadDump } from './lib'
+import { createCore, transformIdentity } from './identity'
 
 const stamp = await latestStamp()
 ensureOut()
 
 const targetPath = join(OUT, 'unified.sqlite')
 if (await Bun.file(targetPath).exists()) await Bun.file(targetPath).delete()
-const target = new Database(targetPath)
-target.exec(await Bun.file(join(ROOT, 'migration/schema-core.sql')).text())
+const target = await createCore(targetPath)
+
+// Read back before anything is minted: the same person keeps the same id week to week, which is
+// what makes the load an update rather than a second estate (K-112 criterion 4).
+const mapPath = join(OUT, 'id-map.tsv')
+const idMap = new Map<string, string>()
+if (await Bun.file(mapPath).exists()) {
+  for (const line of (await Bun.file(mapPath).text()).split('\n')) {
+    const [old, fresh] = line.split('\t')
+    if (old && fresh) idMap.set(old, fresh)
+  }
+}
+const reused = idMap.size
 
 const auth = await loadDump('auth', stamp)
-const roleMap: Record<string, string> = await Bun.file(join(ROOT, 'migration/role-map.json')).json()
-const exceptions: string[] = []
-const idMap = new Map<string, string>()
-const now = Date.now()
-
-type AuthUser = {
-  id: string
-  email: string
-  name: string
-  password: string | null
-  google_sub: string | null
-  pending_google_email: string | null
-  email_verified: number
-  disabled: number
-  session_epoch: number
-  last_login: number | null
-  created_at: number
-  updated_at: number
-}
-const users = auth.query<AuthUser, []>('SELECT * FROM users').all()
-
-const insertUser = target.prepare(
-  `INSERT INTO users (id, email, name, password, google_sub, pending_google_email, verified,
-   disabled, session_epoch, anonymised_at, last_login_at, created_at, updated_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-)
-
-let workspaceWiped = 0
-let tombstones = 0
-target.exec('BEGIN')
-for (const u of users) {
-  const newId = nanoid()
-  idMap.set(u.id, newId)
-  // The tombstone marker in the old estate is the address suffix; it becomes a real column.
-  const anonymisedAt = u.email.endsWith('@anonymised.invalid') ? (u.updated_at ?? now) : null
-  if (anonymisedAt) tombstones++
-  let password = u.password
-  if (u.email.endsWith('@newtheatre.org.uk') && password !== null) {
-    password = null
-    workspaceWiped++
-  }
-  insertUser.run(
-    newId, u.email, u.name, password, u.google_sub, u.pending_google_email,
-    u.email_verified ?? 0, u.disabled ?? 0, u.session_epoch ?? 0, anonymisedAt,
-    u.last_login, u.created_at ?? now, u.updated_at ?? now,
-  )
-}
-target.exec('COMMIT')
-
-// Mirror consistency: a mirror id absent from auth is an exception, never a guess (K-113).
+const mirrors = []
 for (const source of ['rooms', 'training', 'proscenium'] as const) {
-  const db = await loadDump(source, stamp)
-  const mirrorIds = db.query<{ id: string }, []>('SELECT id FROM users').all()
-  for (const { id } of mirrorIds) {
-    if (!idMap.has(id)) exceptions.push(`${source}: mirror user ${id} has no auth row`)
-  }
-  db.close()
+  mirrors.push({ source, db: await loadDump(source, stamp) })
 }
 
-type Grant = { user_id: string, role: string, expires_at: number | null, granted_by: string | null, granted_at: number | null, note: string | null, expiry_warned_at: number | null }
-const grants = auth.query<Grant, []>('SELECT * FROM user_roles').all()
-const insertGrant = target.prepare(
-  'INSERT INTO role_grants (id, user_id, role, expires_at, granted_by, granted_at, note, expiry_warned_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-)
-// Distinct old roles can collapse onto one unified role for one person; merge them,
-// permanent expiry winning over dated, latest date otherwise.
-const merged = new Map<string, { userId: string, role: string, g: Grant, collapsed: number }>()
-let grantsSkipped = 0
-for (const g of grants) {
-  const mapped = roleMap[g.role]
-  const userId = idMap.get(g.user_id)
-  if (!userId) {
-    exceptions.push(`grant ${g.role}: unknown user ${g.user_id}`)
-    grantsSkipped++
-    continue
-  }
-  if (!mapped) {
-    exceptions.push(`grant ${g.role} (user ${g.user_id}): no mapping, not imported`)
-    grantsSkipped++
-    continue
-  }
-  // Expired grants stay behind: enforcement was read-time, so dropping them loses nothing.
-  if (g.expires_at !== null && g.expires_at < now) {
-    grantsSkipped++
-    continue
-  }
-  const key = `${userId}\u0000${mapped}`
-  const existing = merged.get(key)
-  if (!existing) {
-    merged.set(key, { userId, role: mapped, g, collapsed: 0 })
-  }
-  else {
-    existing.collapsed++
-    const a = existing.g.expires_at
-    const b = g.expires_at
-    if (b === null || (a !== null && b > a)) existing.g = { ...g, expires_at: b === null ? null : b }
-  }
-}
-let grantsImported = 0
-let grantsCollapsed = 0
-target.exec('BEGIN')
-for (const { userId, role, g, collapsed } of merged.values()) {
-  insertGrant.run(nanoid(), userId, role, g.expires_at, g.granted_by, g.granted_at ?? now, g.note, g.expiry_warned_at)
-  grantsImported++
-  grantsCollapsed += collapsed
-  if (collapsed) exceptions.push(`note: ${collapsed + 1} old grants collapsed onto ${role} for one user; widest expiry kept`)
-}
-target.exec('COMMIT')
+const roleMap: Record<string, string> = await Bun.file(join(ROOT, 'migration/role-map.json')).json()
+const { summary, exceptions, unmappedRoles } = transformIdentity({ auth, mirrors, roleMap, idMap, target })
 
-const totp = auth.query<{ user_id: string, secret: string, confirmed_at: number | null, last_used_step: number | null, created_at: number }, []>('SELECT * FROM totp_secrets').all()
-const insertTotp = target.prepare('INSERT INTO totp_secrets (user_id, secret, confirmed_at, last_used_step, created_at) VALUES (?, ?, ?, ?, ?)')
-for (const t of totp) {
-  const userId = idMap.get(t.user_id)
-  if (userId) insertTotp.run(userId, t.secret, t.confirmed_at, t.last_used_step, t.created_at ?? now)
-}
-
-const codes = auth.query<{ user_id: string, code_hash: string, used_at: number | null }, []>('SELECT user_id, code_hash, used_at FROM mfa_recovery_codes').all()
-const insertCode = target.prepare('INSERT INTO recovery_codes (id, user_id, code_hash, used_at) VALUES (?, ?, ?, ?)')
-for (const c of codes) {
-  const userId = idMap.get(c.user_id)
-  if (userId) insertCode.run(nanoid(), userId, c.code_hash, c.used_at)
-}
-
-// Old-domain passkeys are deliberately not imported (SP-4, decision 0008).
-
-const insertAudit = target.prepare('INSERT INTO audit_archive (id, source_app, actor_user_id, action, target, detail, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-let auditRows = 0
-for (const source of ['auth', 'training'] as const) {
-  const db = source === 'auth' ? auth : await loadDump(source, stamp)
-  const app = source === 'auth' ? 'stage-door' : 'rehearsal'
-  const rows = db.query<{ actor_user_id: string | null, action: string, target: string | null, detail: string | null, created_at: number }, []>('SELECT actor_user_id, action, target, detail, created_at FROM audit_log').all()
-  target.exec('BEGIN')
-  for (const r of rows) {
-    insertAudit.run(nanoid(), app, r.actor_user_id ? (idMap.get(r.actor_user_id) ?? null) : null, r.action, r.target, r.detail, r.created_at ?? now)
-    auditRows++
-  }
-  target.exec('COMMIT')
-  if (source !== 'auth') db.close()
-}
-
-await Bun.write(join(OUT, 'id-map.tsv'), [...idMap.entries()].map(([o, n]) => `${o}\t${n}`).join('\n') + '\n')
+await Bun.write(mapPath, `${[...idMap.entries()].map(([old, fresh]) => `${old}\t${fresh}`).join('\n')}\n`)
 await Bun.write(join(OUT, 'exceptions.txt'), exceptions.join('\n') + (exceptions.length ? '\n' : ''))
-await Bun.write(
-  join(OUT, 'transform-summary.json'),
-  JSON.stringify({ stamp, users: users.length, tombstones, workspaceWiped, grantsImported, grantsCollapsed, grantsSkipped, totp: totp.length, recoveryCodes: codes.length, auditRows, exceptions: exceptions.length }, null, 2),
+await Bun.write(join(OUT, 'transform-summary.json'), `${JSON.stringify({ stamp, reusedIds: reused, ...summary, unmappedRoles, exceptions: exceptions.length }, null, 2)}\n`)
+
+console.log(
+  `Identity transform complete: ${summary.users} users (${summary.tombstones} tombstones, `
+  + `${summary.workspaceWiped} Workspace passwords wiped, ${summary.emailsLowercased} addresses lowercased), `
+  + `${summary.grantsImported} grants, ${reused} ids reused, ${exceptions.length} exceptions.`,
 )
-console.log(`Identity transform complete: ${users.length} users (${tombstones} tombstones, ${workspaceWiped} Workspace passwords wiped), ${grantsImported} grants, ${auditRows} audit rows, ${exceptions.length} exceptions.`)
+
+for (const { db } of mirrors) db.close()
 auth.close()
 target.close()

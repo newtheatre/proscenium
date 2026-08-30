@@ -52,6 +52,40 @@ Applying and deploying cannot be sequenced from CI: the migration job and Worker
 from the same push and race. The health check below is what makes losing that race visible rather
 than silent. **Anything destructive is applied by hand, before merging.**
 
+## Importing the old estate
+
+The identity import is rehearsed weekly and applied once, at cutover. Everything but the export
+runs offline against dumps, and nothing in `migration/` can write to a remote database
+(`migration/README.md`).
+
+A rehearsal, which is what `bun run migration:dry-run` does after `bun run migration:export`:
+
+1. `inventory.ts` records per-table counts and domain checksums from the dumps.
+2. `transform-identity.ts` builds `out/unified.sqlite`, reusing `out/id-map.tsv` so the same person
+   keeps the id they were given last week.
+3. `reconcile.ts` verifies the counts and the invariants, and **exits non-zero** on any failure.
+4. `load.ts` writes `out/load.sql` and, given a local path, applies it there and reports the row
+   count per table.
+
+The load upserts on identity and **never deletes**: a person or a grant that disappeared upstream
+stays until somebody decides what should happen to them.
+
+### At cutover
+
+Applied by hand, like everything else destructive, and only after a green reconciliation:
+
+```bash
+bunx wrangler d1 time-travel info unified          # take the bookmark first
+bunx wrangler d1 execute unified --remote --file=migration/out/load.sql
+```
+
+`load.sql` is plain statements with no bound parameters, so D1's parameter limits do not apply. It
+is **not** one transaction: D1 executes the file statement by statement, which is why the Time
+Travel bookmark is taken first and why the load is safe to run again after a partial failure.
+
+Keep `out/id-map.tsv` until cutover is complete. After that it is the key to an estate that no
+longer exists, and it goes with the archive rather than staying on anybody's laptop.
+
 ## The health check
 
 `GET /api/health` is public and returns:
@@ -126,6 +160,5 @@ worker secret without it is silently ignored.
 ## Not built yet
 
 Named here so nobody looks for them: backups and the restore drill (K-108, J-107), the retention
-sweep (K-111), the audit search surface (J-103), the configuration surface (J-104), and the
-operator documentation published in-app (J-109). The stubs above are the placeholders for the
-first two.
+sweep (K-111), and the operator documentation published in-app (J-109). The stubs above are the
+placeholders for the first two.
