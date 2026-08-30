@@ -36,3 +36,4 @@ afterwards, only superseded.
 | 0028 | A manual audit entry names people by account, and is signed | what may be recorded by hand, and who may sign it |
 | 0029 | The end-to-end suites are a separate command | what `bun run test` covers, and what runs nightly |
 | 0030 | The old estate's audit history is not imported | why the archive was refused, and what answers a historical question |
+| 0031 | A membership is a term, and confirming it never gates money | what membership is, and what a check does and does not block |

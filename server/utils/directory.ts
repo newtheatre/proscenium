@@ -1,5 +1,5 @@
+import { londonDay } from '#shared/utils/membership'
 import { and, count, eq, gt, inArray, isNotNull, isNull, like, ne, or, sql } from 'drizzle-orm'
-import { committeeYearOf } from '#shared/utils/london'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
@@ -75,6 +75,17 @@ export interface DirectoryQuery {
   includeAnonymised: boolean
 }
 
+const graceDays = (event: H3Event): Promise<number> => configValue(event, 'MEMBERSHIP_GRACE_DAYS')
+
+// Current means today is inside the term or its grace window, read at query time so a membership
+// that ran out overnight stops counting without a sweep having to run (0009, 0031).
+function currentMembership(grace: number): SQL {
+  return sql`exists (select 1 from ${schema.memberships}
+    where ${schema.memberships.userId} = ${schema.users.id}
+      and ${schema.memberships.startsOn} <= ${londonDay(new Date())}
+      and date(${schema.memberships.expiresOn}, ${`+${grace} days`}) >= ${londonDay(new Date())})`
+}
+
 export async function directoryPredicate(event: H3Event, query: DirectoryQuery): Promise<SQL> {
   const now = Math.floor(Date.now() / 1000)
   const parts: SQL[] = []
@@ -86,15 +97,11 @@ export async function directoryPredicate(event: H3Event, query: DirectoryQuery):
 
   switch (query.filter) {
     case 'members-current':
-      parts.push(sql`exists (select 1 from ${schema.memberships}
-        where ${schema.memberships.userId} = ${schema.users.id}
-          and ${schema.memberships.year} = ${committeeYearOf(new Date())})`)
+      parts.push(currentMembership(await graceDays(event)))
       break
     case 'members-lapsed':
       parts.push(sql`exists (select 1 from ${schema.memberships} where ${schema.memberships.userId} = ${schema.users.id})`)
-      parts.push(sql`not exists (select 1 from ${schema.memberships}
-        where ${schema.memberships.userId} = ${schema.users.id}
-          and ${schema.memberships.year} = ${committeeYearOf(new Date())})`)
+      parts.push(sql`not ${currentMembership(await graceDays(event))}`)
       break
     case 'guests-unclaimed':
       parts.push(isNull(schema.users.password), isNull(schema.users.googleSub), isNull(schema.users.lastLoginAt))

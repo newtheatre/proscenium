@@ -75,16 +75,16 @@ describe('users (0008, docs/data-model.md)', () => {
 })
 
 describe('memberships and roles', () => {
-  test('one membership row per user per year', async () => {
+  // A renewal overlaps the tail of the term it renews, so nothing stops a person holding two
+  // (0031). What the schema does refuse is a term that ends before it starts.
+  test('a term cannot end before it starts', async () => {
     await withDatabase((database) => {
       insertUser(database, 'member@example.invalid')
       const [{ id }] = rows<{ id: string }>(database, 'SELECT id FROM users')
-      const insert = (): void => database.batch([[
-        'INSERT INTO memberships (id, user_id, year, source) VALUES (?, ?, ?, ?)',
-        `m-${Math.random()}`, id, 2026, 'MANUAL',
-      ]])
-      insert()
-      expect(insert).toThrow()
+      expect(() => database.batch([[
+        'INSERT INTO memberships (id, user_id, starts_on, expires_on, source) VALUES (?, ?, ?, ?, ?)',
+        'm-1', id, '2027-09-14', '2026-09-13', 'MANUAL',
+      ]])).toThrow()
     })
   })
 
@@ -93,8 +93,8 @@ describe('memberships and roles', () => {
       insertUser(database, 'member@example.invalid')
       const [{ id }] = rows<{ id: string }>(database, 'SELECT id FROM users')
       expect(() => database.batch([[
-        'INSERT INTO memberships (id, user_id, year, source) VALUES (?, ?, ?, ?)',
-        'm-1', id, 2026, 'PURCHASE',
+        'INSERT INTO memberships (id, user_id, starts_on, expires_on, source) VALUES (?, ?, ?, ?, ?)',
+        'm-1', id, '2026-09-14', '2027-09-13', 'PURCHASE',
       ]])).toThrow()
     })
   })
@@ -118,7 +118,7 @@ describe('memberships and roles', () => {
       const [{ id }] = rows<{ id: string }>(database, 'SELECT id FROM users')
       database.batch([
         ['INSERT INTO role_grants (id, user_id, role) VALUES (?, ?, ?)', 'g-1', id, 'ADMINISTRATOR'],
-        ['INSERT INTO memberships (id, user_id, year, source) VALUES (?, ?, ?, ?)', 'm-1', id, 2026, 'MANUAL'],
+        ['INSERT INTO memberships (id, user_id, starts_on, expires_on, source) VALUES (?, ?, ?, ?, ?)', 'm-1', id, '2026-09-14', '2027-09-13', 'MANUAL'],
       ])
       database.batch([['DELETE FROM users WHERE id = ?', id]])
       expect(rows(database, 'SELECT * FROM role_grants')).toEqual([])

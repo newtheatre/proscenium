@@ -57,6 +57,11 @@ const CATALOGUE = {
   // Written by scripts/grant-admin.ts, which is the one writer outside a request (K-122).
   'role.granted.bootstrap': { label: 'Administrator bootstrapped', module: 'identity' },
 
+  'membership.granted': { label: 'Membership recorded', module: 'identity' },
+  'membership.confirmed': { label: 'Membership confirmed', module: 'identity' },
+  'membership.exported': { label: 'Membership register exported', module: 'governance' },
+  'account.student-id.recorded': { label: 'Student number recorded', module: 'identity' },
+
   // An honour rather than authority, so it sits with governance and not with identity (0023).
   'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },
   'fellowship.revoked': { label: 'Fellowship revoked', module: 'governance' },

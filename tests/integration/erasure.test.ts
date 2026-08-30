@@ -28,7 +28,7 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
       id, EMAIL, NAME, 'she/her', 'scrypt$fake'],
     ['INSERT INTO emergency_contacts (user_id, name, phone, relation, updated_at) VALUES (?, ?, ?, ?, ?)',
       id, 'Her Mother', '07700 900000', 'mother', now],
-    ['INSERT INTO memberships (id, user_id, year, source, evidence, granted_by) VALUES (?, ?, 2026, ?, ?, ?)',
+    ['INSERT INTO memberships (id, user_id, starts_on, expires_on, source, evidence, granted_by) VALUES (?, ?, \'2026-09-14\', \'2027-09-13\', ?, ?, ?)',
       `m-${id}`, id, 'MANUAL', `paid in person, ${NAME}`, id],
     ['INSERT INTO role_grants (id, user_id, role, granted_at, note) VALUES (?, ?, ?, ?, ?)',
       `g-${id}`, id, 'BOX_OFFICE', now, `${NAME} asked for this`],
@@ -116,10 +116,10 @@ describe('erasure (K-109, 0011)', () => {
 
       // Bookings and sales have no tables yet. What exists of the same kind is the membership
       // year and the message log, and both survive without the person in them.
-      const memberships = rows<{ year: number, evidence: string | null }>(database,
-        'SELECT year, evidence FROM memberships WHERE user_id = ?', id)
+      const memberships = rows<{ startsOn: string, evidence: string | null }>(database,
+        'SELECT starts_on AS startsOn, evidence FROM memberships WHERE user_id = ?', id)
       expect(memberships).toHaveLength(1)
-      expect(memberships[0]).toMatchObject({ year: 2026, evidence: null })
+      expect(memberships[0]).toMatchObject({ startsOn: '2026-09-14', evidence: null })
 
       const messages = rows<{ status: string, subject: string | null }>(database,
         'SELECT status, subject FROM notification_log WHERE user_id = ?', id)

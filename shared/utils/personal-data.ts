@@ -28,7 +28,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     name: 'users',
     column: 'id',
     section: 'account',
-    columns: ['name', 'email', 'pronouns', 'verified', 'created_at', 'last_login_at'],
+    columns: ['name', 'email', 'pronouns', 'student_id', 'verified', 'created_at', 'last_login_at'],
     erasure: 'scrub',
     // The rewrite is not a null-out, so anonymiseAccount writes it rather than the generic scrub.
     why: 'The person. The row survives so everything referring to it still resolves (0011).',
@@ -45,7 +45,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     name: 'memberships',
     column: 'user_id',
     section: 'memberships',
-    columns: ['year', 'source', 'created_at'],
+    columns: ['starts_on', 'expires_on', 'source', 'confirmed_at', 'created_at'],
     erasure: 'scrub',
     scrub: ['evidence'],
     why: 'How many members there were in a year must survive; the evidence for one need not.',

@@ -257,9 +257,9 @@ Open questions for the committee:
 - Story: As a student, I want my membership recognised as a state on my account so that member pricing, room booking and participation unlock without paperwork.
 - Depends on: A-101
 - Acceptance criteria:
-  1. Membership is a dated state on the account carrying year, source (roster sync, manual grant, purchase) and an evidence reference; it is never a separate login or account type.
-  2. Member-only writes (room booking, proposals, rota, tabs) check current membership at the write path, not at page load.
-  3. Membership lapses automatically at the year boundary with a configurable grace window; renewal prompts go out before and during the grace window.
+  1. Membership is a dated state on the account carrying year, source (roster sync, manual grant, purchase) and an evidence reference; it is never a separate login or account type. Amended 30 August 2026: not a year but a term of one or three years running from the purchase, so two people who joined a month apart lapse a month apart. There is no purchase source, because the SU sells it and we only record it (0005, 0031).
+  2. Member-only writes (room booking, proposals, rota, tabs) check current membership at the write path, not at page load. Not yet applicable, 30 August 2026: every module named here is later work, so there is nothing to gate. `currentMembership` is the predicate they will call, and 0031 fixes the rule they must follow: money never checks confirmation, participation may.
+  3. Membership lapses automatically at the year boundary with a configurable grace window; renewal prompts go out before and during the grace window. Amended 30 August 2026: it lapses on its own expiry rather than at a year boundary, and lapsing needs no sweep because current is read at query time (0009). The grace window is `MEMBERSHIP_GRACE_DAYS`; the reminder goes out `MEMBERSHIP_RENEWAL_NOTICE_DAYS` before each person's own date, once, recorded on the row.
   4. The committee can grant membership manually, recording who granted it, when, and the evidence; every grant is audited.
   5. The committee can view and export the membership register for SU returns; the export is column allow-listed and paginated.
   6. Past years' membership states remain queryable; lapse never deletes history.

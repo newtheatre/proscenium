@@ -4,6 +4,7 @@
 const links = [[
   { label: 'Overview', icon: 'i-lucide-layout-dashboard', to: '/admin' },
   { label: 'People', icon: 'i-lucide-users', to: '/admin/people' },
+  { label: 'Members', icon: 'i-lucide-badge-check', to: '/admin/members' },
   { label: 'Fellows', icon: 'i-lucide-award', to: '/admin/fellows' },
   { label: 'Audit trail', icon: 'i-lucide-scroll-text', to: '/admin/audit' },
   { label: 'Settings', icon: 'i-lucide-settings', to: '/admin/config' },

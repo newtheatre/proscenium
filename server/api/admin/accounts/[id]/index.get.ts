@@ -31,8 +31,13 @@ export default defineEventHandler(async (event) => {
   const codes = await db.select({ id: schema.recoveryCodes.id })
     .from(schema.recoveryCodes).where(eq(schema.recoveryCodes.userId, id))
 
-  const memberships = await db.select({ year: schema.memberships.year, source: schema.memberships.source })
-    .from(schema.memberships).where(eq(schema.memberships.userId, id))
+  const memberships = await db.select({
+    id: schema.memberships.id,
+    startsOn: schema.memberships.startsOn,
+    expiresOn: schema.memberships.expiresOn,
+    source: schema.memberships.source,
+    confirmedAt: schema.memberships.confirmedAt,
+  }).from(schema.memberships).where(eq(schema.memberships.userId, id)).orderBy(desc(schema.memberships.expiresOn))
 
   const [fellowship] = await db.select({
     id: schema.fellowships.id,

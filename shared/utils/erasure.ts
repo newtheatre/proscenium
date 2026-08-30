@@ -52,6 +52,7 @@ export function erasureStatements(userId: string, now: number): SQL[] {
       password = null,
       google_sub = null,
       pending_google_email = null,
+      student_id = null,
       anonymised_at = ${now},
       session_epoch = session_epoch + 1,
       updated_at = ${now}
