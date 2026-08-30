@@ -14,6 +14,6 @@ migration/dumps/
 migration/out/
 
 
-# The end-to-end suite's throwaway database. Declared here so the hub module
-# does not append a line of its own on every run.
-.data/e2e
+# The end-to-end run's database lives in /tmp, outside the tree the dev server watches (0029).
+
+../../../../../tmp/nnt-e2e-3101

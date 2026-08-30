@@ -1,3 +1,5 @@
+import { Database } from 'bun:sqlite'
+import { hubDirFor } from './hub-dir'
 import type { Subprocess } from 'bun'
 
 // Bun.WebView's default backend is WKWebView, which is macOS only. Everything else drives
@@ -39,21 +41,27 @@ async function waitForServer(url: string, signal: AbortSignal): Promise<void> {
   throw new Error(`server at ${url} did not become ready within ${READY_TIMEOUT_MS}ms`)
 }
 
-// Bun.spawn resolves `exited` when the process is reaped, which is not the same instant the
-// listener lets go of the socket.
-async function waitForPortFree(port: string, timeoutMs = 15_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    try {
-      const probe = Bun.listen({ hostname: '127.0.0.1', port: Number(port), socket: { data() {} } })
-      probe.stop(true)
-      return
-    }
-    catch {
-      await Bun.sleep(100)
-    }
+function portIsFree(port: string): boolean {
+  try {
+    const probe = Bun.listen({ hostname: '127.0.0.1', port: Number(port), socket: { data() {} } })
+    probe.stop(true)
+    return true
   }
-  throw new Error(`port ${port} is still held after the app was stopped`)
+  catch {
+    return false
+  }
+}
+
+// A held port is this app's if it answers this app's health route. Anything else is somebody
+// else's server, and talking to it would be worse than refusing.
+async function alreadyServing(): Promise<boolean> {
+  try {
+    const response = await fetch(`${BASE_URL}/api/health`, { signal: AbortSignal.timeout(3000) })
+    return 'sessionKey' in (await response.json() as Record<string, unknown>)
+  }
+  catch {
+    return false
+  }
 }
 
 export interface AppUnderTest {
@@ -62,37 +70,131 @@ export interface AppUnderTest {
   stop: () => Promise<void>
 }
 
-// Its own database per run, inside the gitignored .data: sharing one lets a run depend on what
-// the last one left, which is how "the last administrator" stops being true mid-suite.
+// Bun buffers a file's console output until the file ends, so a run has no live progress at all.
+// Written straight to the descriptor, this is the one line that escapes that.
+function announce(suite: string, started: number, since: number): void {
+  const minutes = Math.floor((Date.now() - since) / 60_000)
+  const seconds = Math.floor(((Date.now() - since) % 60_000) / 1000)
+  const total = [...new Bun.Glob('*.test.ts').scanSync({ cwd: 'tests/e2e' })].length
+  Bun.write(Bun.stderr, `[e2e] ${started}/${total} ${suite} (${minutes}m${String(seconds).padStart(2, '0')}s in)\n`)
+}
+
+// The suite is not something bun hands us, and naming it is worth one stack read: a run that says
+// only "still going" tells nobody which suite is the slow one.
+function callingSuite(): string {
+  const frame = new Error('locate the suite').stack?.split('\n').find(line => line.includes('tests/e2e/'))
+  return frame?.match(/tests\/e2e\/([\w.-]+)\.test\.ts/)?.[1] ?? 'a suite'
+}
+
+let suitesStarted = 0
+const runBegan = Date.now()
+
+// Every suite in a shard shares one server, because booting one costs fifteen seconds and bun
+// runs a shard's files in a single process. Isolation is the database, not the server (0022).
+let shared: { app: AppUnderTest, server: Subprocess | null, controller: AbortController } | null = null
+
+// Emptied and never replaced: the server holds the file open (0029). The schema is not touched
+// either, so audit_log stays, being append-only by a trigger this must not drop.
+const KEPT = new Set(['_hub_migrations', 'audit_log'])
+
+export function resetDatabase(file: string): void {
+  const database = new Database(file)
+  try {
+    const tables = (database.query(`
+      SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+    `).all() as { name: string }[]).filter(table => !KEPT.has(table.name))
+
+    // One transaction, so the lock is taken and released once rather than per table.
+    database.transaction(() => {
+      for (const table of tables) database.run(`DELETE FROM ${table.name}`)
+    })()
+  }
+  finally {
+    database.close()
+  }
+}
+
+// Its own database per suite, inside the gitignored .data: sharing one lets a suite depend on what
+// the last one left, which is how "the last administrator" stops being true mid-run.
 export async function startApp(): Promise<AppUnderTest> {
+  announce(callingSuite(), ++suitesStarted, runBegan)
+
+  if (shared) {
+    resetDatabase(shared.app.databaseFile)
+    return shared.app
+  }
+
   const controller = new AbortController()
   const port = new URL(BASE_URL).port
-  // A stable path, wiped on the way in rather than out: a crashed run leaves nothing behind,
-  // and the hub module appends its own .gitignore line for every distinct directory it sees.
-  const hubDir = '.data/e2e'
+  // A stable path, wiped on the way in rather than out: a crashed run leaves nothing behind.
+  const hubDir = hubDirFor(port)
+
+  // Adopted rather than replaced: `bun run test` boots the server before the suites and kills it
+  // after, so what a suite usually finds here is one that is already up.
+  if (!portIsFree(port)) {
+    if (!await alreadyServing()) {
+      throw new Error(`port ${port} is held by something that is not this app: stop it, or set E2E_BASE_URL`)
+    }
+    const adopted: AppUnderTest = {
+      baseURL: BASE_URL,
+      databaseFile: `${hubDirFor(port)}/db/sqlite.db`,
+      stop: async () => {
+        removeClaimedProfiles()
+        await Promise.resolve()
+      },
+    }
+    shared = { app: adopted, server: null, controller }
+    resetDatabase(adopted.databaseFile)
+    return adopted
+  }
+
   await Bun.$`rm -rf ${hubDir}`.quiet().nothrow()
 
-  // Nuxt directly, not through `bun run dev`: that spawns nuxt as a child, and killing the parent
-  // orphans it still holding the port, so the next suite talks to the last suite's database.
+  // Nuxt directly, not through `bun run dev`: that spawns a child, and killing the parent orphans
+  // it still holding the port. Output is discarded, because a pipe nobody reads blocks the writer.
   const server: Subprocess = Bun.spawn(['./node_modules/.bin/nuxt', 'dev', '--port', port], {
     env: { ...process.env, NUXT_PORT: port, NUXT_HUB_DIR: hubDir },
-    stdout: 'pipe',
-    stderr: 'pipe',
+    stdout: 'ignore',
+    stderr: 'ignore',
   })
+  const began = Date.now()
   await waitForServer(BASE_URL, controller.signal)
-  return {
+  // The one boot a run pays for, said out loud: fifteen seconds of silence at the start otherwise
+  // looks like a hung suite.
+  Bun.write(Bun.stderr, `[e2e] dev server on ${port} ready in ${((Date.now() - began) / 1000).toFixed(1)}s\n`)
+
+  const app: AppUnderTest = {
     baseURL: BASE_URL,
     databaseFile: `${hubDir}/db/sqlite.db`,
+    // The server outlives the suite; what a suite owns is its data and its browser profiles.
     stop: async () => {
-      controller.abort()
-      server.kill()
-      await server.exited
-      // Proved rather than assumed: a suite that leaves the port held makes the next one talk to
-      // a database it did not create.
-      await waitForPortFree(port)
       removeClaimedProfiles()
+      await Promise.resolve()
     },
   }
+
+  shared = { app, server, controller }
+  return app
+}
+
+// The shard's server dies with the shard. Without this it outlives the run holding the port, and
+// the next run talks to a database it did not create.
+function shutdown(): void {
+  Bun.write(Bun.stderr, `[e2e] shutdown hook fired, shared=${Boolean(shared)}\n`)
+  if (!shared) return
+  shared.controller.abort()
+  // SIGKILL, not SIGTERM: an exit handler cannot wait for a graceful stop, and a dev server that
+  // takes its time going down holds the port the next run refuses to start on.
+  shared.server?.kill('SIGKILL')
+  shared = null
+}
+
+process.on('exit', shutdown)
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    shutdown()
+    process.exit(1)
+  })
 }
 
 // Every Chrome-backed view leaves a browser profile of roughly 130MB behind, and closing it does
@@ -130,7 +232,7 @@ export async function openView(): Promise<Bun.WebView> {
 }
 
 const SETTLE_TIMEOUT_MS = 15_000
-const INTERACTIVE_TIMEOUT_MS = 90_000
+const INTERACTIVE_TIMEOUT_MS = 120_000
 
 // Mounted is not interactive: until Suspense resolves the screen is server-rendered markup with
 // no listeners, and the marker must be inside the page, because chrome is patched before it.

@@ -3,16 +3,16 @@
 export default defineNuxtConfig({
 
   modules: [
-    '@nuxt/a11y',
     '@nuxt/ui',
     '@nuxt/content',
-    '@nuxt/eslint',
-    '@nuxt/hints',
     '@nuxt/image',
     '@nuxtjs/seo',
     '@nuxthub/core',
     'nuxt-authorization',
     'nuxt-auth-utils',
+    // Advisory in the dev server and absent from a build, so the end-to-end harness drops them:
+    // nineteen suites each pay their setup, and none of them reads the advice (0022).
+    ...process.env.E2E_BASE_URL ? [] : ['@nuxt/a11y', '@nuxt/eslint', '@nuxt/hints'],
   ],
 
   $production: {
@@ -48,7 +48,9 @@ export default defineNuxtConfig({
     },
   },
 
-  devtools: { enabled: true },
+  // Off under the end-to-end harness: nineteen suites each boot a dev server, and DevTools is
+  // build time nobody in that run will ever open.
+  devtools: { enabled: !process.env.E2E_BASE_URL },
 
   css: ['~/assets/css/theme.css'],
 

@@ -53,9 +53,16 @@ bun run check:migrations
 bun run check:content-tokens
 bun run check:notifications
 bun run check:audit
-bun test
+bun run test
+bun run test:e2e
 bun run build
 ```
+
+`bun run test` is the unit and integration suites, and finishes in under a second. `bun run
+test:e2e` is the slow half: it drives a real browser against a single dev server it boots and owns,
+emptying the database between suites, and names each suite as it starts so a slow run says which
+suite is slow (0029). CI gates on the first; the second runs nightly and on demand.
+`bun test <file>` still runs one suite on its own.
 
 The migration tooling is standalone and has its own instructions in
 [`migration/README.md`](migration/README.md); the application never imports from it.

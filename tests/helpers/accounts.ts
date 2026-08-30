@@ -43,6 +43,21 @@ export function markVerified(app: AppUnderTest, email: string): void {
   }
 }
 
+// A spent step cannot answer a second challenge, so a suite signing in again either waits out the
+// thirty second window or forgets the step. Replay protection has its own tests (A-111).
+export function forgetSpentStep(app: AppUnderTest, email: string): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(`
+      UPDATE totp_secrets SET last_used_step = NULL
+      WHERE user_id = (SELECT id FROM users WHERE email = ?)
+    `).run(email)
+  }
+  finally {
+    database.close()
+  }
+}
+
 export interface RegisterOptions {
   /** Leave the address unproven, for a suite that is testing what that refuses. */
   verify?: boolean

@@ -10,7 +10,7 @@
     "typecheck": "nuxt typecheck",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "bun test",
+    "test": "bun test tests/unit tests/integration",
     "check:audit": "bun scripts/check-audit.ts",
     "check:comments": "bun scripts/check-comments.ts",
     "check:migrations": "bun scripts/check-migrations.ts",
@@ -20,7 +20,8 @@
     "postinstall": "nuxt prepare",
     "typecheck:bun": "tsc -p tests --noEmit && tsc -p scripts --noEmit && tsc -p migration --noEmit",
     "grant-admin": "bun scripts/grant-admin.ts",
-    "check:notifications": "bun scripts/check-notifications.ts"
+    "check:notifications": "bun scripts/check-notifications.ts",
+    "test:e2e": "bun scripts/run-tests.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.2.5",
