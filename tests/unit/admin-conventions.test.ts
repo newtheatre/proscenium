@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
+import { plural } from '#shared/utils/text'
 
 // The admin conventions are a test rather than a review habit (0032), the same way the design
 // language is (0021). What review still judges is whether a screen says the right thing.
@@ -21,6 +22,10 @@ const offenders = async (test: (source: string) => boolean): Promise<string[]> =
 describe('an input is the component for its value (0032)', () => {
   test('a date is UInputDate, never a native date input', async () => {
     expect(await offenders(source => /type="date"/.test(source))).toEqual([])
+  })
+
+  test('a number is UInputNumber, never a native number input', async () => {
+    expect(await offenders(source => /type="number"|'number' \? 'number'/.test(source))).toEqual([])
   })
 })
 
@@ -57,10 +62,51 @@ describe('feedback goes where it belongs (0032)', () => {
     expect(tables.filter(screen => !screen.source.includes('#empty')).map(screen => screen.path)).toEqual([])
   })
 
+  test('nothing counts things as "account(s)"', async () => {
+    const lazy = (await screens()).filter(screen => screen.source.includes('(s)'))
+    expect(lazy.map(screen => screen.path)).toEqual([])
+  })
+
   test('a screen that confirms an action uses a toast', async () => {
     const confirming = (await screens()).filter(screen =>
       /Recorded|Revoked\.|is on the (roll|trail)/.test(screen.source))
     expect(confirming.length).toBeGreaterThan(0)
     expect(confirming.filter(screen => !screen.source.includes('useToast')).map(screen => screen.path)).toEqual([])
+  })
+})
+
+// Money is entered in pounds and stored in pence, and the settings screen is the only place that
+// converts (0004, 0032).
+describe('money reads in pounds and is stored in pence', () => {
+  const pounds = (pence: number | undefined): number => (pence ?? 0) / 100
+  const pence = (amount: number | undefined): number => Math.round((amount ?? 0) * 100)
+
+  test('a cap in pence reads as pounds', () => {
+    expect(pounds(2000)).toBe(20)
+    expect(pounds(2550)).toBe(25.5)
+    expect(pounds(undefined)).toBe(0)
+  })
+
+  test('pounds typed in come back as whole pence', () => {
+    expect(pence(30)).toBe(3000)
+    expect(pence(25.5)).toBe(2550)
+    // A third of a pound is not a number of pence, so it rounds rather than storing a fraction.
+    expect(pence(0.005)).toBe(1)
+    expect(Number.isInteger(pence(19.999))).toBe(true)
+  })
+})
+
+
+// Every screen that counts something says the count in words a reader would use.
+describe('a count reads as English', () => {
+  test('one is singular and everything else is not', () => {
+    expect(plural(1, 'account')).toBe('1 account')
+    expect(plural(0, 'account')).toBe('0 accounts')
+    expect(plural(4, 'membership')).toBe('4 memberships')
+  })
+
+  test('an irregular plural is given rather than guessed', () => {
+    expect(plural(2, 'person', 'people')).toBe('2 people')
+    expect(plural(1, 'person', 'people')).toBe('1 person')
   })
 })

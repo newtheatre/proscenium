@@ -185,13 +185,22 @@ function describeDetail(detail: Record<string, unknown> | null): string[] {
   const parts: string[] = []
   const changes = detail.changes as Record<string, { from: unknown, to: unknown }> | undefined
   for (const [field, change] of Object.entries(changes ?? {})) {
-    parts.push(`${field}: ${JSON.stringify(change.from)} → ${JSON.stringify(change.to)}`)
+    parts.push(`${field}: ${readable(field, change.from)} \u2192 ${readable(field, change.to)}`)
   }
   for (const [key, value] of Object.entries(detail)) {
     if (key === 'changes') continue
-    parts.push(`${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`)
+    parts.push(`${key}: ${readable(key, value)}`)
   }
   return parts
+}
+
+// A key ending in At holds epoch seconds, which reads as a nine digit number unless it is turned
+// back into the date it is (0014).
+function readable(key: string, value: unknown): string {
+  if (key.endsWith('At') && typeof value === 'number' && Number.isInteger(value)) {
+    return formatLondon(new Date(value * 1000), { dateStyle: 'medium' })
+  }
+  return typeof value === 'string' ? value : JSON.stringify(value)
 }
 
 const columns: TableColumn<Entry>[] = [

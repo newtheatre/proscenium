@@ -216,7 +216,7 @@ onMounted(load)
         color="warning"
         variant="subtle"
         icon="i-lucide-shield-alert"
-        :title="`${listing.banners.privilegedWithoutFactor} privileged account(s) without an authenticator`"
+        :title="`${plural(listing.banners.privilegedWithoutFactor, 'privileged account')} without an authenticator`"
         description="Their roles do not work until they enrol one."
         :actions="[{ label: 'Show them', color: 'neutral', variant: 'subtle', onClick: () => show('privileged-without-mfa') }]"
       />
@@ -226,7 +226,7 @@ onMounted(load)
         color="neutral"
         variant="subtle"
         icon="i-lucide-clock"
-        :title="`${listing.banners.insideRetentionWindow} account(s) approaching retention`"
+        :title="`${plural(listing.banners.insideRetentionWindow, 'account')} approaching retention`"
         description="Dormant for longer than the retention window allows."
         :actions="[{ label: 'Show them', color: 'neutral', variant: 'subtle', onClick: () => show('retention-window') }]"
       />
@@ -312,7 +312,7 @@ onMounted(load)
         data-test="directory-total"
         class="text-sm text-muted"
       >
-        {{ listing?.total ?? 0 }} account(s)
+        {{ plural(listing?.total ?? 0, 'account') }}
       </p>
       <UPagination
         v-if="listing && listing.pages > 1"

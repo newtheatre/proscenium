@@ -256,7 +256,7 @@ onMounted(load)
         data-test="fellows-total"
         class="text-sm text-muted"
       >
-        {{ listing?.total ?? 0 }} Fellow(s)
+        {{ plural(listing?.total ?? 0, 'Fellow') }}
       </p>
       <UPagination
         v-if="listing && listing.pages > 1"
