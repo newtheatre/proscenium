@@ -284,6 +284,19 @@ export const CONFIG_KEYS = {
     describes: 'The window verification resends are counted over.',
   },
 
+  MEMBERSHIP_GRACE_DAYS: {
+    schema: z.number().int().nonnegative(),
+    default: 14,
+    workshop: 'people-and-communications',
+    describes: 'Days after a membership expires that it still counts, so a renewal in hand is not a refusal at the desk (0031).',
+  },
+  MEMBERSHIP_RENEWAL_NOTICE_DAYS: {
+    schema: z.number().int().positive(),
+    default: 21,
+    workshop: 'people-and-communications',
+    describes: 'How far ahead of its own expiry a membership is reminded. Each person has their own date, so this is not a year-end chase.',
+  },
+
   UNVERIFIED_ACCOUNT_DAYS: {
     schema: z.number().int().positive(),
     default: 30,
@@ -343,6 +356,8 @@ export const ENFORCED_KEYS = [
   'PASSWORD_REQUIRE_NUMBER',
   'PASSWORD_REQUIRE_SYMBOL',
   'PASSWORD_RESET_HOURS',
+  'MEMBERSHIP_GRACE_DAYS',
+  'MEMBERSHIP_RENEWAL_NOTICE_DAYS',
   'PRIVILEGED_ROLES',
   // Read by the directory to count the accounts a sweep would warn, which is the whole of its
   // effect until K-111 builds the sweep itself.

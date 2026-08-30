@@ -51,10 +51,12 @@ erDiagram
 `id` PK · `email` UNIQUE lowercased · `name` · `pronouns` (optional, scrub) · `password`
 (scrypt PHC, NULL for guest or Google-only; **never non-NULL on an @newtheatre.org.uk
 address**, import-enforced, 0008) · `google_sub` UNIQUE NULL · `pending_google_email` UNIQUE
-NULL (admin-set claim marker) · `verified` bool · `disabled` bool · `session_epoch` int ·
+NULL (admin-set claim marker) · `student_id` UNIQUE NULL (how the committee finds somebody on the
+SU's list: names do not always match and the address is often personal, 0031) · `verified` bool ·
+`disabled` bool · `session_epoch` int ·
 `anonymised_at` NULL · `last_login_at` · `created_at` · `updated_at`.
 Anonymisation rewrites `email` to `deleted-<id>@anonymised.invalid`, `name` to `Deleted
-user`, clears `pronouns`, `password`, `google_sub` and `pending_google_email`, and bumps
+user`, clears `pronouns`, `password`, `student_id`, `google_sub` and `pending_google_email`, and bumps
 `session_epoch`. Every write path guards on `anonymised_at IS NULL`, and the
 `users_tombstone_guard` trigger refuses an identifying UPDATE on an anonymised row whether the
 path remembered to guard or not (0011, A-125 criterion 3): a guard in a handler is a guard one
@@ -68,10 +70,14 @@ the admin directory filters and sorts on (A-121); without them every filter is a
 holds a shift or production role (A-3).
 
 ### memberships
-`id` PK · `user_id` → users cascade · `year` (e.g. `2026`, the year containing 1 August) ·
-`source` CHECK `MANUAL|ROSTER` (no purchase source: membership is bought at the SU only) ·
-`evidence` (grant note or import run id) · `granted_by` · `created_at`.
-UNIQUE (`user_id`, `year`). Current membership = row for the current committee year.
+`id` PK · `user_id` → users cascade · `starts_on` / `expires_on` (London dates: a term of one or
+three years running from the purchase, not a committee year) · `source` CHECK `MANUAL|ROSTER` (no
+purchase source: membership is bought at the SU only) · `evidence` (grant note or import run id) ·
+`granted_by` · `confirmed_at` / `confirmed_by` (checked against the SU's list afterwards; a check
+never gates money) · `renewal_notice_at` · `created_at`.
+CHECK `expires_on > starts_on`. Current membership = today inside the term or inside
+`MEMBERSHIP_GRACE_DAYS` after it, read at query time (0031). A renewal is another row: history is
+never rewritten.
 
 ### fellowships
 `id` PK · `user_id` → users restrict · `awarded_on` (date, London) · `awarded_by` (the

@@ -52,6 +52,13 @@ export const MESSAGE_TYPES = {
     template: 'set-password',
     reachesUnverified: true,
   },
+  // Transactional, so no topic. It does not reach an unverified address, which is what keeps a
+  // sweep over ten thousand imported accounts from becoming a bulk send (A-102 criterion 2).
+  'membership.expiring': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'membership-expiring',
+  },
 } as const satisfies Record<string, MessageType>
 
 export type MessageTypeName = keyof typeof MESSAGE_TYPES

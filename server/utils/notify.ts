@@ -62,12 +62,14 @@ const consoleTransport: Transport = {
   },
 }
 
-function transportFor(event: H3Event): Transport {
+// The event is optional because a scheduled task has none, and a task that cannot send is a task
+// that silently does half its job (A-117 criterion 3).
+function transportFor(event: H3Event | undefined): Transport {
   // Development never hands a message to a provider, whatever the emulator supplies: a stub
   // binding accepts a message and drops it, which reads as delivered (architecture.md).
   if (import.meta.dev) return consoleTransport
 
-  const binding = (event.context.cloudflare?.env as unknown as { EMAIL?: EmailBinding } | undefined)?.EMAIL
+  const binding = (event?.context.cloudflare?.env as unknown as { EMAIL?: EmailBinding } | undefined)?.EMAIL
   if (!binding) return consoleTransport
   return {
     name: 'email-service',
@@ -98,7 +100,7 @@ async function record(userId: string | null, type: string, channel: Channel, sta
 
 // Sends one message. Every outcome is logged, including the ones that never reach a provider,
 // so a silence is always explained somewhere.
-export async function notify(event: H3Event, notification: Notification): Promise<Status> {
+export async function notify(event: H3Event | undefined, notification: Notification): Promise<Status> {
   const type = messageType(notification.type)
 
   // Read at send time, not at enqueue: an address changed in between reaches the new one

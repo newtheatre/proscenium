@@ -133,6 +133,27 @@ The link works until ${until}. If you did not ask for it, ignore it.
 The Nottingham New Theatre`,
     }
   },
+  'membership-expiring': (context: TemplateContext): Rendered => {
+    const on = String(context.expiresOn)
+    return {
+      subject: 'Your membership is running out',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Your Nottingham New Theatre membership runs out on ${on}.</p>
+<p>Membership is bought at the Students' Union, not from us, so renew it there and we will pick
+the change up from their record.</p>
+<p>Nothing is lost if you let it lapse: your account, your bookings and your history all stay.</p>`),
+      text: `Hello ${context.name},
+
+Your Nottingham New Theatre membership runs out on ${on}.
+
+Membership is bought at the Students' Union, not from us, so renew it there and we will pick the
+change up from their record.
+
+Nothing is lost if you let it lapse: your account, your bookings and your history all stay.
+
+The Nottingham New Theatre`,
+    }
+  },
 } as const
 
 export type TemplateName = keyof typeof TEMPLATES

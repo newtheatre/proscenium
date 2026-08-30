@@ -43,6 +43,8 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | --- | --- | --- | --- |
 | Membership year and evidence | SU records, manual | Manual grant, plus a hand-uploaded SU export where available (SP-2: no automatic access) | |
 | Notification topics | per-app ad hoc | bookings, shifts, training, rooms, announcements | Fixed in the schema rather than configured; changing the list is a migration (0025) |
+| Membership grace window | none: nobody tracked an expiry | 14 days past expiry still counts | Owner: IT Manager. A renewal in hand should not be a refusal at the desk (0031) |
+| Membership renewal notice | none | remind 21 days before a person's own expiry | Owner: IT Manager. Each membership has its own date, so this is not a year-end chase |
 | Retention periods | 2 years full accounts, 3 years guests (dry-run) | unchanged, armed in December | |
 | Unverified account expiry | none: an unproven address held an account forever | 30 days, then anonymised, capped at 200 a run | Owner: IT Manager. An account that never proved its address cannot sign in and expires on its own rule (0026) |
 | Night report recipients | configured list | confirm the list | |

@@ -19,6 +19,9 @@ export const users = sqliteTable('users', {
   // Bumped to revoke every existing session for this user (0007).
   sessionEpoch: integer('session_epoch').notNull().default(0),
   anonymisedAt: integer('anonymised_at'),
+  // How the committee finds somebody against the SU's record. Names do not always match a person
+  // and the address is often personal rather than university (0031).
+  studentId: text('student_id'),
   lastLoginAt: integer('last_login_at'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
@@ -30,6 +33,7 @@ export const users = sqliteTable('users', {
   index('users_anonymised_at').on(table.anonymisedAt),
   index('users_last_login_at').on(table.lastLoginAt),
   index('users_name').on(table.name),
+  unique('users_student_id').on(table.studentId),
   // Addresses are compared and deduplicated lowercased, so they are stored that way.
   check('users_email_lowercase', sql`${table.email} = lower(${table.email})`),
   // A Workspace address is Google-only and may never hold a password, including by import (0008).
@@ -44,19 +48,30 @@ export const emergencyContacts = sqliteTable('emergency_contacts', {
   updatedAt: integer('updated_at').notNull().default(now),
 })
 
+// A term, not a year: bought at the SU for one or three years running from the purchase, so it
+// lapses on its own date and not on 31 July (0031).
 export const memberships = sqliteTable('memberships', {
   id: id(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  // The year containing 1 August, so 2026 runs to 31 July 2027 (0014).
-  year: integer('year').notNull(),
+  // London calendar dates, because what was bought is a term of days, not an instant (0014).
+  startsOn: text('starts_on').notNull(),
+  expiresOn: text('expires_on').notNull(),
   source: text('source').notNull(),
   evidence: text('evidence'),
   grantedBy: text('granted_by'),
+  // Checked against the SU's own record afterwards. Money never waits for it (0031).
+  confirmedAt: integer('confirmed_at'),
+  confirmedBy: text('confirmed_by'),
+  // When the renewal notice went out, so a sweep that missed a night catches up rather than
+  // sending twice. The same shape role_grants uses for its expiry warning.
+  renewalNoticeAt: integer('renewal_notice_at'),
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
-  unique('memberships_user_year').on(table.userId, table.year),
+  index('memberships_user').on(table.userId),
+  index('memberships_expires_on').on(table.expiresOn),
   // Membership is bought at the SU, never here, so there is no purchase source (0005).
   check('memberships_source', sql`${table.source} IN ('MANUAL', 'ROSTER')`),
+  check('memberships_term', sql`${table.expiresOn} > ${table.startsOn}`),
 ])
 
 // An honour, not a grant: permanent, singular, and the theatre's own record. `restrict` is the

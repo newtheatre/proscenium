@@ -9,7 +9,7 @@ interface View {
   account: { id: string, name: string, email: string, verified: boolean, disabled: boolean, anonymisedAt: number | null }
   methods: { password: boolean, google: boolean, passkeys: number, factor: boolean, recoveryCodesRemaining: number }
   grants: Grant[]
-  memberships: { year: number, source: string }[]
+  memberships: { id: string, startsOn: string, expiresOn: string, source: string, confirmedAt: number | null }[]
   fellowship: { id: string, awardedOn: string, awardedBy: string, citation: string, revokedAt: number | null } | null
   history: { action: string, target: string | null, createdAt: number, byThem: boolean }[]
 }
@@ -153,7 +153,7 @@ onMounted(load)
 
       <UPageCard
         title="Membership"
-        description="Recorded per committee year (A-117)."
+        description="A term bought at the SU, not a committee year (0031)."
       >
         <p
           v-if="!view.memberships.length"
@@ -167,9 +167,10 @@ onMounted(load)
         >
           <li
             v-for="membership in view.memberships"
-            :key="membership.year"
+            :key="membership.id"
           >
-            {{ membership.year }} ({{ membership.source.toLowerCase() }})
+            {{ membership.startsOn }} to {{ membership.expiresOn }}
+            ({{ membership.source.toLowerCase() }}{{ membership.confirmedAt ? ', checked' : ', not yet checked' }})
           </li>
         </ul>
       </UPageCard>

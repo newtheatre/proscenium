@@ -3,7 +3,7 @@
 export default defineTask({
   meta: {
     name: 'daily:sweeps',
-    description: 'Delete lapsed rate-limit windows, MFA attempts and sign-in tokens, and expire unverified accounts',
+    description: 'Tidy lapsed rows, expire unverified accounts, and remind memberships that are running out',
   },
   async run() {
     const before = new Date()
@@ -11,6 +11,7 @@ export default defineTask({
     const attempts = await sweepExpiredAttempts(before)
     const tokens = await sweepExpiredTokens(before)
     const unverified = await expireUnverifiedAccounts(before)
-    return { result: { attempts, tokens, unverified } }
+    const renewals = await remindExpiringMemberships(undefined, before)
+    return { result: { attempts, tokens, unverified, renewals } }
   },
 })
