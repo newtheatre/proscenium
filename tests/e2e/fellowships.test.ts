@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillDate, openSignedOutView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
@@ -170,14 +170,18 @@ describe.skipIf(skip !== null)('the roll in a browser (A-127)', () => {
 
       await visit(view, `${app.baseURL}/admin/fellows`, '[data-test="fellows-table"]')
       await click(view, '[data-test="award"]')
-      await fill(view, 'input[data-test="award-user"]', alumna.id)
-      await fill(view, 'input[data-test="award-date"]', '2021-03-04')
+      // Searched by address, because syntheticPerson draws first names from a short list and two
+      // people sharing one would let the picker choose the wrong person.
+      await pickPerson(view, '[data-test="person-picker"]', alumna.email.split('@')[0]!, alumna.name)
+      await fillDate(view, '[data-test="award-date"]', '2021-03-04')
       await fill(view, 'input[data-test="award-by"]', 'Committee, 4 March 2021')
       await fill(view, '[data-test="award-citation"]', 'For twenty years of front of house.')
       await click(view, '[data-test="award-submit"]')
 
-      await waitFor(view, 'document.querySelector(\'[data-test="fellows-notice"]\')')
-      await waitFor(view, `document.querySelector('[data-test="fellows-table"]').innerText.includes('front of house')`)
+      // The outcome rather than the notification: a toast dismisses itself, and racing one proves
+      // nothing. Searched for by name, because the roll pages and this suite fills it.
+      await fill(view, 'input[data-test="fellows-search"]', alumna.email.split('@')[0]!)
+      await waitFor(view, `document.querySelector('[data-test="fellows-table"]').innerText.includes('front of house')`, 20_000)
       expect(await textOf(view, '[data-test="fellows-table"]')).toContain(alumna.name)
     }
     finally {

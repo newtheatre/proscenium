@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { recordMembership } from '#shared/utils/admin-forms'
 import { MEMBERSHIP_TERMS, isInGrace, londonDay } from '#shared/utils/membership'
-import type { MembershipTerm } from '#shared/utils/membership'
-import type { TableColumn } from '@nuxt/ui'
+import type { RecordMembership } from '#shared/utils/admin-forms'
+import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'admin', title: 'Members', middleware: 'signed-in' })
 
@@ -43,10 +44,11 @@ const search = ref('')
 const page = ref(1)
 const loading = ref(false)
 const failure = ref<string | null>(null)
-const notice = ref<string | null>(null)
+const toast = useToast()
+const grantForm = useTemplateRef('grantForm')
 
 const granting = ref(false)
-const grant = reactive({ userId: '', startsOn: '', years: 1 as MembershipTerm, evidence: '', studentId: '' })
+const grant = reactive<Partial<RecordMembership>>({ years: 1 })
 
 async function load(): Promise<void> {
   loading.value = true
@@ -64,28 +66,28 @@ async function load(): Promise<void> {
   }
 }
 
-async function record(): Promise<void> {
+async function record(event: FormSubmitEvent<RecordMembership>): Promise<void> {
   failure.value = null
   try {
-    await $fetch('/api/admin/memberships', {
-      method: 'POST',
-      body: {
-        userId: grant.userId,
-        startsOn: grant.startsOn,
-        years: grant.years,
-        evidence: grant.evidence || undefined,
-        studentId: grant.studentId || undefined,
-      },
+    await $fetch('/api/admin/memberships', { method: 'POST', body: event.data })
+    toast.add({
+      title: 'Membership recorded',
+      description: 'It counts from now, whether or not anybody has checked it yet.',
+      icon: 'i-lucide-badge-check',
+      color: 'success',
     })
-    notice.value = 'Recorded. It counts from today, whether or not anybody has checked it yet.'
     granting.value = false
-    grant.userId = ''
-    grant.evidence = ''
-    grant.studentId = ''
+    grant.userId = undefined
+    grant.evidence = undefined
+    grant.studentId = undefined
     await load()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    // A clashing student number is about that field; anything else is about the person.
+    const message = refusalText(error)
+    if (/student number/i.test(message)) grantForm.value?.setErrors([{ name: 'studentId', message }])
+    else if (/account/i.test(message)) grantForm.value?.setErrors([{ name: 'userId', message }])
+    else failure.value = message
   }
 }
 
@@ -93,6 +95,7 @@ async function confirm(member: Member): Promise<void> {
   failure.value = null
   try {
     await $fetch(`/api/admin/memberships/${member.id}/confirm`, { method: 'POST' })
+    toast.add({ title: `${member.name} checked against the SU's list`, icon: 'i-lucide-check', color: 'success' })
     await load()
   }
   catch (error) {
@@ -170,16 +173,6 @@ onMounted(load)
       color="error"
       variant="subtle"
       :description="failure"
-    />
-
-    <UAlert
-      v-if="notice"
-      data-test="members-notice"
-      color="success"
-      variant="subtle"
-      :description="notice"
-      close
-      @update:open="notice = null"
     />
 
     <UAlert
@@ -262,52 +255,72 @@ onMounted(load)
       description="What they bought at the SU, and when."
     >
       <template #body>
-        <form
+        <UForm
+          ref="grantForm"
+          :schema="recordMembership"
+          :state="grant"
           class="space-y-4"
-          @submit.prevent="record"
+          @submit="record"
         >
-          <UFormField label="Account">
-            <UInput
-              v-model="grant.userId"
-              data-test="grant-user"
-              required
-            />
-          </UFormField>
           <UFormField
-            label="Bought on"
-            description="The term runs from this day, not from the start of the year."
+            name="userId"
+            label="Who bought it"
+            required
           >
-            <UInput
-              v-model="grant.startsOn"
-              data-test="grant-starts"
-              type="date"
+            <PersonPicker
+              v-model="grant.userId"
+              class="w-full"
+            />
+          </UFormField>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <UFormField
+              name="startsOn"
+              label="Bought on"
+              description="The term runs from this day."
               required
-            />
-          </UFormField>
-          <UFormField label="Term">
-            <USelect
-              v-model="grant.years"
-              data-test="grant-years"
-              :items="MEMBERSHIP_TERMS.map(years => ({ label: `${years} year${years === 1 ? '' : 's'}`, value: years }))"
-              value-key="value"
-            />
-          </UFormField>
+            >
+              <DateField
+                v-model="grant.startsOn"
+                data-test="grant-starts"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField
+              name="years"
+              label="Term"
+              required
+            >
+              <USelect
+                v-model="grant.years"
+                data-test="grant-years"
+                :items="MEMBERSHIP_TERMS.map(years => ({ label: `${years} year${years === 1 ? '' : 's'}`, value: years }))"
+                value-key="value"
+                class="w-full"
+              />
+            </UFormField>
+          </div>
           <UFormField
+            name="studentId"
             label="Student number"
-            description="How the committee finds them on the SU's list. Optional, and stored on the account."
+            description="How the committee finds them on the SU's list. Stored on the account."
+            hint="Optional"
           >
             <UInput
               v-model="grant.studentId"
               data-test="grant-student-id"
+              class="w-full"
             />
           </UFormField>
           <UFormField
+            name="evidence"
             label="Evidence"
-            description="The SU's own reference for the purchase, if there is one."
+            description="The SU's own reference for the purchase."
+            hint="Optional"
           >
             <UInput
               v-model="grant.evidence"
               data-test="grant-evidence"
+              class="w-full"
             />
           </UFormField>
           <UButton
@@ -316,7 +329,7 @@ onMounted(load)
           >
             Record it
           </UButton>
-        </form>
+        </UForm>
       </template>
     </UModal>
   </div>

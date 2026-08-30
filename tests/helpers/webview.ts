@@ -293,6 +293,35 @@ export async function fillPin(view: Bun.WebView, selector: string, code: string)
   }
 }
 
+// A date field is contenteditable segments rather than an input, so it is typed into rather than
+// assigned to. British order, which is what the field is set to (0032).
+export async function fillDate(view: Bun.WebView, selector: string, day: string): Promise<void> {
+  const [year, month, date] = day.split('-')
+  await waitFor(view, `document.querySelectorAll(${JSON.stringify(`${selector} [data-reka-date-field-segment]`)}).length >= 3`)
+  await view.evaluate(`(() => {
+    const segments = [...document.querySelectorAll(${JSON.stringify(`${selector} [data-reka-date-field-segment]`)})]
+      .filter(segment => segment.getAttribute('data-reka-date-field-segment') !== 'literal')
+    const digits = ${JSON.stringify([date, month, year].join(''))}
+    let index = 0
+    for (const segment of segments) {
+      segment.focus()
+      const wanted = segment.getAttribute('data-reka-date-field-segment') === 'year' ? 4 : 2
+      for (let typed = 0; typed < wanted; typed++) {
+        const key = digits[index++]
+        segment.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+      }
+    }
+  })()`)
+}
+
+// The picker searches the server, so this types, waits for the person to appear, and clicks them.
+export async function pickPerson(view: Bun.WebView, selector: string, term: string, name: string): Promise<void> {
+  await click(view, `${selector} input`)
+  await fill(view, `${selector} input`, term)
+  await waitFor(view, `[...document.querySelectorAll('[role="option"]')].some(option => option.innerText.includes(${JSON.stringify(name)}))`, 20_000)
+  await view.evaluate(`[...document.querySelectorAll('[role="option"]')].find(option => option.innerText.includes(${JSON.stringify(name)})).click()`)
+}
+
 export async function click(view: Bun.WebView, selector: string): Promise<void> {
   await waitFor(view, `document.querySelector(${JSON.stringify(selector)})`)
   await view.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`)
