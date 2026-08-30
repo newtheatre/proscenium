@@ -4,7 +4,10 @@ import { PERSONAS, PERSONA_PASSWORD } from '#shared/utils/personas'
 // Development-only helpers (K-124). Every caller is guarded, and nuxt.config keeps the routes out
 // of a production build entirely rather than trusting a guard to be remembered.
 
-const MAILBOX = '.data/mail'
+// Beside the database they describe, so a run against a throwaway hub directory does not read a
+// map written for the developer's own one.
+const DEV_DIR = process.env.NUXT_HUB_DIR ?? '.data'
+const MAILBOX = `${DEV_DIR}/mail`
 
 export interface Letter { name: string, to: string, subject: string, body: string }
 
@@ -26,11 +29,12 @@ export async function mailbox(): Promise<Letter[]> {
 
 // Which account each persona became. Anonymisation rewrites the email, so a tombstone cannot be
 // found by the address it was seeded under; this map is how it stays findable (0011).
-const MAP = '.data/personas.json'
+const MAP = `${DEV_DIR}/personas.json`
 
 async function remembered(): Promise<Record<string, string>> {
+  const { readFile } = await import('node:fs/promises')
   try {
-    return await Bun.file(MAP).json() as Record<string, string>
+    return JSON.parse(await readFile(MAP, 'utf8')) as Record<string, string>
   }
   catch {
     return {}
@@ -89,6 +93,8 @@ export async function seedPersonas(): Promise<{ made: number, held: number }> {
     if (persona.shape === 'tombstone') await eraseAccount(id, null)
   }
 
-  await Bun.write(MAP, JSON.stringify(map, null, 2))
+  const { mkdir, writeFile } = await import('node:fs/promises')
+  await mkdir(DEV_DIR, { recursive: true })
+  await writeFile(MAP, JSON.stringify(map, null, 2))
   return { made, held }
 }

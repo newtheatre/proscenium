@@ -96,7 +96,6 @@ describe('money reads in pounds and is stored in pence', () => {
   })
 })
 
-
 // Every screen that counts something says the count in words a reader would use.
 describe('a count reads as English', () => {
   test('one is singular and everything else is not', () => {
