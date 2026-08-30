@@ -565,6 +565,12 @@ exempt without a reason (J-101 criterion 5). A state change records `changes: { 
 one shape whatever endpoint wrote it (J-101 criterion 4); a settings change whose value is
 sensitive records a hash pair instead, which is a redaction rather than a diff (0024).
 
+A `manual.*` action is recorded after the fact by an officer, for something that happened outside
+the system. Its `actor_id` is the officer who signed it, and its detail carries `onBehalfOf` (a
+`user:<id>` reference to whoever decided it) and `occurredAt` (the real-world date, which is not
+`created_at`). Everybody a manual entry names is an account on this system: the trail never holds a
+name it could not later anonymise (0028).
+
 ### audit_archive
 The four old estates' audit histories imported read-only for reference (J-108), same shape
 plus `source_app`. Never written by the application.

@@ -41,6 +41,12 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['account.created.console', 'role.granted'],
     via: ['server/utils/accounts.ts'],
   },
+  { route: 'server/api/admin/audit/export.get.ts', actions: ['audit.exported'] },
+  {
+    route: 'server/api/admin/audit/index.post.ts',
+    actions: ['manual.role.granted', 'manual.role.revoked', 'manual.account.disabled', 'manual.account.enabled'],
+    via: ['shared/utils/audit-actions.ts'],
+  },
   { route: 'server/api/admin/config/[key].put.ts', actions: ['config.changed'] },
   { route: 'server/api/admin/roles/index.delete.ts', actions: ['role.revoked'] },
   { route: 'server/api/admin/roles/index.post.ts', actions: ['role.granted'] },

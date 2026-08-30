@@ -1,11 +1,19 @@
 // Every action the trail may carry. Writing one that is not here is refused, so a typo cannot
 // quietly create a category and the screen always has a label to show (J-101 criterion 5).
 
-// The backlog module an action belongs to. Reports and the audit screen group by this, which is
-// why it is declared rather than parsed out of the action's first segment.
+// The backlog module an action belongs to, declared rather than parsed out of the action's first
+// segment. `unknown` is what an unregistered action reads as, and nothing ever writes it.
 export const AUDIT_MODULES = ['identity', 'governance'] as const
+export const UNKNOWN_MODULE = 'unknown'
 
 export type AuditModule = (typeof AUDIT_MODULES)[number]
+
+// What a reader gets: the module widens, because an unregistered action belongs to none.
+export interface DescribedAction {
+  label: string
+  module: AuditModule | typeof UNKNOWN_MODULE
+  manual?: true
+}
 
 export interface AuditActionType {
   label: string
@@ -16,7 +24,7 @@ export interface AuditActionType {
   manual?: true
 }
 
-export const AUDIT_ACTIONS = {
+const CATALOGUE = {
   'account.registered': { label: 'Account registered', module: 'identity', self: true },
   'account.created.console': { label: 'Account created from the console', module: 'identity' },
   'account.created.google': { label: 'Account created by Google sign-in', module: 'identity', self: true },
@@ -46,16 +54,44 @@ export const AUDIT_ACTIONS = {
 
   'role.granted': { label: 'Role granted', module: 'identity' },
   'role.revoked': { label: 'Role revoked', module: 'identity' },
+  // Written by scripts/grant-admin.ts, which is the one writer outside a request (K-122).
+  'role.granted.bootstrap': { label: 'Administrator bootstrapped', module: 'identity' },
 
   'config.changed': { label: 'Setting changed', module: 'governance' },
+  'audit.exported': { label: 'Audit trail exported', module: 'governance' },
+
+  // Recorded after the fact, for a decision taken outside the system. The vocabulary grows with
+  // the modules: there is no general-purpose manual action, because that is a note (J-103).
+  'manual.role.granted': { label: 'Role granted outside the system', module: 'governance', manual: true },
+  'manual.role.revoked': { label: 'Role revoked outside the system', module: 'governance', manual: true },
+  'manual.account.disabled': { label: 'Account disabled outside the system', module: 'governance', manual: true },
+  'manual.account.enabled': { label: 'Account enabled outside the system', module: 'governance', manual: true },
 } as const satisfies Record<string, AuditActionType>
 
-export type AuditActionName = keyof typeof AUDIT_ACTIONS
+export type AuditActionName = keyof typeof CATALOGUE
+
+// Widened on the way out: `as const` is what infers the names, and it also narrows every value to
+// its own literal shape, so an optional flag looks absent on the entries that lack it.
+export const AUDIT_ACTIONS: Record<AuditActionName, AuditActionType> = CATALOGUE
 
 export const AUDIT_ACTION_NAMES = Object.keys(AUDIT_ACTIONS) as AuditActionName[]
 
 export function isAuditAction(name: string): name is AuditActionName {
   return Object.hasOwn(AUDIT_ACTIONS, name)
+}
+
+// Only these may be written by hand, and the namespace is enforced at the write path so a manual
+// entry can never claim an action the system performs (J-103 criterion 2).
+export const MANUAL_ACTION_NAMES = AUDIT_ACTION_NAMES.filter(name => AUDIT_ACTIONS[name].manual === true)
+
+export function isManualAction(name: string): boolean {
+  return isAuditAction(name) && AUDIT_ACTIONS[name].manual === true
+}
+
+// For reading rather than writing: the trail is history, and an entry written before a name was
+// retired, or imported from the old estate (J-108), still has to render.
+export function describeAction(name: string): DescribedAction {
+  return isAuditAction(name) ? AUDIT_ACTIONS[name] : { label: name, module: UNKNOWN_MODULE }
 }
 
 // Registering an action is the decision; writing one is not. An unregistered name is a defect,

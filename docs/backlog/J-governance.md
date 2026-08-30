@@ -60,7 +60,7 @@ Stories: 13 (10 MVP, 3 V2).
 - Acceptance criteria:
   1. The trail is filterable by actor, action, target, source module and date range; results page in SQL and return a pagination envelope, never a bare array.
   2. Manual entries record actions taken outside the system and are namespaced (manual.*) at the write path, so a manual entry claiming a system or application action type is refused.
-  3. A manual entry is signed: written against the authenticated officer entering it, from an MFA-verified session, with the stated real-world actor and date carried as structured fields distinct from the signer.
+  3. A manual entry is signed: written against the authenticated officer entering it, from an MFA-verified session, with the stated real-world actor and date carried as structured fields distinct from the signer. Amended 29 August 2026: the real-world actor is an account reference and never a name, because a name is personal free text and the trail's only sanctioned edit is redaction. A person with no account cannot be named (0028).
   4. Manual entries are append-only under the same trigger as the rest of the trail.
   5. Search results export as CSV, and the export is itself audited.
 - Source: Prompt Book J-1 (signed manual entries, namespaced); audit SD-11 (manual.* namespace)
