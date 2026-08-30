@@ -5,6 +5,7 @@ import { formatLondon } from '#shared/utils/london'
 import { manualEntryForm } from '#shared/utils/admin-forms'
 import type { ManualEntryForm } from '#shared/utils/admin-forms'
 import type { AuditActionName, AuditModule } from '#shared/utils/audit-actions'
+import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'admin', title: 'Audit trail', middleware: 'signed-in' })
@@ -17,6 +18,7 @@ interface Entry {
   actorName: string | null
   action: AuditActionName
   target: string | null
+  targetName: string | null
   detail: Record<string, unknown> | null
   createdAt: number
 }
@@ -136,11 +138,61 @@ function chooseModule(): void {
   }
 }
 
+const activeFilters = computed<ActiveFilter[]>(() => {
+  const active: ActiveFilter[] = []
+  if (module.value !== ANY) {
+    active.push({ key: 'module', label: module.value, icon: 'i-lucide-layers', clear: () => {
+      module.value = ANY
+    } })
+  }
+  if (action.value !== ANY) {
+    active.push({ key: 'action', label: describeAction(action.value).label, icon: 'i-lucide-activity', clear: () => {
+      action.value = ANY
+    } })
+  }
+  if (target.value) {
+    active.push({ key: 'target', label: `About ${target.value}`, icon: 'i-lucide-crosshair', clear: () => {
+      target.value = ''
+    } })
+  }
+  if (since.value) active.push({ key: 'from', label: `From ${since.value}`, icon: 'i-lucide-calendar', clear: () => {
+    since.value = ''
+  } })
+  if (until.value) active.push({ key: 'to', label: `To ${until.value}`, icon: 'i-lucide-calendar', clear: () => {
+    until.value = ''
+  } })
+  return active
+})
+
+function clearFilters(): void {
+  module.value = ANY
+  action.value = ANY
+  target.value = ''
+  since.value = ''
+  until.value = ''
+}
+
 watch([module, action, target, since, until], () => {
   page.value = 1
   void load()
 })
 watch(page, load)
+
+// Raw JSON ran off the edge of the table and told nobody anything. A diff has a shape (0027), so
+// it reads as one; everything else reads as its own keys and values.
+function describeDetail(detail: Record<string, unknown> | null): string[] {
+  if (!detail) return []
+  const parts: string[] = []
+  const changes = detail.changes as Record<string, { from: unknown, to: unknown }> | undefined
+  for (const [field, change] of Object.entries(changes ?? {})) {
+    parts.push(`${field}: ${JSON.stringify(change.from)} → ${JSON.stringify(change.to)}`)
+  }
+  for (const [key, value] of Object.entries(detail)) {
+    if (key === 'changes') continue
+    parts.push(`${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`)
+  }
+  return parts
+}
 
 const columns: TableColumn<Entry>[] = [
   {
@@ -168,11 +220,19 @@ const columns: TableColumn<Entry>[] = [
       ])
     },
   },
-  { accessorKey: 'target', header: 'To what', meta: { class: { td: 'font-mono text-xs' } } },
+  {
+    id: 'target',
+    header: 'To whom',
+    // A name where there is one, and the raw target where the entry is not about a person.
+    cell: ({ row }) => row.original.targetName
+      ?? h('span', { class: 'font-mono text-xs text-muted' }, row.original.target ?? ''),
+  },
   {
     id: 'detail',
-    header: 'Detail',
-    cell: ({ row }) => h('code', { class: 'text-xs' }, row.original.detail ? JSON.stringify(row.original.detail) : ''),
+    header: 'What changed',
+    meta: { class: { td: 'max-w-xs' } },
+    cell: ({ row }) => h('div', { class: 'flex flex-wrap gap-1' }, describeDetail(row.original.detail).map(part =>
+      h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm', class: 'font-mono' }, () => part))),
   },
 ]
 
@@ -188,83 +248,91 @@ onMounted(load)
       :description="failure"
     />
 
-    <div class="flex flex-wrap items-end gap-3">
-      <UFormField
-        label="Module"
-        class="min-w-40"
-      >
-        <USelect
-          v-model="module"
-          data-test="audit-module"
-          :items="MODULE_OPTIONS"
-          value-key="value"
-          @update:model-value="chooseModule"
-        />
-      </UFormField>
+    <AdminToolbar
+      v-model:search="target"
+      placeholder="Who or what an entry is about"
+      :active="activeFilters"
+      :loading="loading"
+      @clear="clearFilters"
+    >
+      <template #filters>
+        <UFormField label="Module">
+          <USelect
+            v-model="module"
+            data-test="audit-module"
+            :items="MODULE_OPTIONS"
+            value-key="value"
+            class="w-full"
+            @update:model-value="chooseModule"
+          />
+        </UFormField>
 
-      <UFormField
-        label="Action"
-        class="min-w-56"
-      >
-        <USelect
-          v-model="action"
-          data-test="audit-action"
-          :items="actionOptions"
-          value-key="value"
-        />
-      </UFormField>
+        <UFormField label="Action">
+          <USelectMenu
+            v-model="action"
+            data-test="audit-action"
+            :items="actionOptions"
+            value-key="value"
+            class="w-full"
+          />
+        </UFormField>
 
-      <UFormField
-        label="Target"
-        class="min-w-56 flex-1"
-      >
-        <UInput
-          v-model="target"
-          data-test="audit-target"
-          placeholder="user:0123456789abcdef"
-          icon="i-lucide-search"
-        />
-      </UFormField>
+        <UFormField
+          label="From"
+          help="The day an entry was written, not the day it describes."
+        >
+          <DateField
+            v-model="since"
+            data-test="audit-from"
+            class="w-full"
+          />
+        </UFormField>
 
-      <UFormField label="From">
-        <DateField
-          v-model="since"
-          data-test="audit-from"
-        />
-      </UFormField>
+        <UFormField label="To">
+          <DateField
+            v-model="until"
+            data-test="audit-to"
+            class="w-full"
+          />
+        </UFormField>
+      </template>
 
-      <UFormField label="To">
-        <DateField
-          v-model="until"
-          data-test="audit-to"
-        />
-      </UFormField>
+      <template #actions>
+        <UButton
+          data-test="audit-record"
+          icon="i-lucide-pen-line"
+          @click="recording = true"
+        >
+          Record something
+        </UButton>
 
-      <UButton
-        data-test="audit-record"
-        icon="i-lucide-pen-line"
-        @click="recording = true"
-      >
-        Record something
-      </UButton>
-
-      <UButton
-        data-test="audit-export"
-        icon="i-lucide-download"
-        variant="subtle"
-        :to="exportUrl"
-        external
-      >
-        Export
-      </UButton>
-    </div>
+        <UButton
+          data-test="audit-export"
+          icon="i-lucide-download"
+          color="neutral"
+          variant="outline"
+          :to="exportUrl"
+          external
+        >
+          Export
+        </UButton>
+      </template>
+    </AdminToolbar>
 
     <UTable
       :data="listing?.items ?? []"
       :columns="columns"
       :loading="loading"
       data-test="audit-table"
-    />
+    >
+      <template #empty>
+        <p class="py-6 text-center text-sm text-muted">
+          {{ activeFilters.length
+            ? 'No entry matches that.'
+            : 'Nothing on the trail yet. Every privileged action lands here.' }}
+        </p>
+      </template>
+    </UTable>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p

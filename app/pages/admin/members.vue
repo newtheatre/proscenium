@@ -3,6 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { recordMembership } from '#shared/utils/admin-forms'
 import { MEMBERSHIP_TERMS, isInGrace, londonDay } from '#shared/utils/membership'
 import type { RecordMembership } from '#shared/utils/admin-forms'
+import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'admin', title: 'Members', middleware: 'signed-in' })
@@ -32,10 +33,10 @@ interface Listing {
 }
 
 const FILTERS = [
-  { label: 'Current', value: 'current' },
-  { label: 'Awaiting a check', value: 'awaiting-check' },
-  { label: 'Lapsed', value: 'lapsed' },
-  { label: 'Everyone ever', value: 'everyone' },
+  { label: 'Current', value: 'current', icon: 'i-lucide-badge-check' },
+  { label: 'Awaiting a check', value: 'awaiting-check', icon: 'i-lucide-clock' },
+  { label: 'Lapsed', value: 'lapsed', icon: 'i-lucide-history' },
+  { label: 'Everyone ever', value: 'everyone', icon: 'i-lucide-users' },
 ]
 
 const listing = ref<Listing | null>(null)
@@ -101,6 +102,32 @@ async function confirm(member: Member): Promise<void> {
   catch (error) {
     failure.value = refusalText(error)
   }
+}
+
+// What is filtered, said out loud and removable one at a time (0032).
+const activeFilters = computed<ActiveFilter[]>(() => {
+  const active: ActiveFilter[] = []
+  if (search.value) {
+    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
+      search.value = ''
+    } })
+  }
+  if (filter.value !== 'current') {
+    active.push({
+      key: 'filter',
+      label: FILTERS.find(option => option.value === filter.value)!.label,
+      icon: FILTERS.find(option => option.value === filter.value)!.icon,
+      clear: () => {
+        filter.value = 'current'
+      },
+    })
+  }
+  return active
+})
+
+function clearFilters(): void {
+  search.value = ''
+  filter.value = 'current'
 }
 
 const exportUrl = computed(() => {
@@ -183,56 +210,64 @@ onMounted(load)
       description="This records what somebody bought and when it runs out. A membership counts from the moment it is recorded: checking it against the SU's own list happens afterwards and never holds up a member price."
     />
 
-    <div class="flex flex-wrap items-end gap-3">
-      <UFormField
-        label="Search"
-        class="min-w-64 flex-1"
-      >
-        <UInput
-          v-model="search"
-          data-test="members-search"
-          placeholder="A name, an address or a student number"
-          icon="i-lucide-search"
-        />
-      </UFormField>
+    <AdminToolbar
+      v-model:search="search"
+      placeholder="A name, an address or a student number"
+      :active="activeFilters"
+      :loading="loading"
+      @clear="clearFilters"
+    >
+      <template #filters>
+        <UFormField
+          label="Show"
+          help="Current counts the grace window after a term ends."
+        >
+          <USelect
+            v-model="filter"
+            data-test="members-filter"
+            :items="FILTERS"
+            value-key="value"
+            class="w-full"
+          />
+        </UFormField>
+      </template>
 
-      <UFormField
-        label="Show"
-        class="min-w-48"
-      >
-        <USelect
-          v-model="filter"
-          data-test="members-filter"
-          :items="FILTERS"
-          value-key="value"
-        />
-      </UFormField>
+      <template #actions>
+        <UButton
+          data-test="record-membership"
+          icon="i-lucide-user-plus"
+          @click="granting = true"
+        >
+          Record one
+        </UButton>
 
-      <UButton
-        data-test="record-membership"
-        icon="i-lucide-user-plus"
-        @click="granting = true"
-      >
-        Record one
-      </UButton>
-
-      <UButton
-        data-test="members-export"
-        icon="i-lucide-download"
-        variant="subtle"
-        :to="exportUrl"
-        external
-      >
-        Export
-      </UButton>
-    </div>
+        <UButton
+          data-test="members-export"
+          icon="i-lucide-download"
+          color="neutral"
+          variant="outline"
+          :to="exportUrl"
+          external
+        >
+          Export
+        </UButton>
+      </template>
+    </AdminToolbar>
 
     <UTable
       :data="listing?.items ?? []"
       :columns="columns"
       :loading="loading"
       data-test="members-table"
-    />
+    >
+      <template #empty>
+        <p class="py-6 text-center text-sm text-muted">
+          {{ search || filter !== 'current'
+            ? 'No membership matches that.'
+            : 'No current memberships. One appears here as soon as it is recorded.' }}
+        </p>
+      </template>
+    </UTable>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p

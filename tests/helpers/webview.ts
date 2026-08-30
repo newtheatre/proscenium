@@ -180,7 +180,6 @@ export async function startApp(): Promise<AppUnderTest> {
 // The shard's server dies with the shard. Without this it outlives the run holding the port, and
 // the next run talks to a database it did not create.
 function shutdown(): void {
-  Bun.write(Bun.stderr, `[e2e] shutdown hook fired, shared=${Boolean(shared)}\n`)
   if (!shared) return
   shared.controller.abort()
   // SIGKILL, not SIGTERM: an exit handler cannot wait for a graceful stop, and a dev server that

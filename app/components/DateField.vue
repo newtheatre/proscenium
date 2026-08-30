@@ -8,6 +8,8 @@ const model = defineModel<string | undefined>()
 
 defineProps<{ disabled?: boolean }>()
 
+const field = useTemplateRef('field')
+
 const value = computed({
   get(): CalendarDate | null {
     if (!model.value) return null
@@ -26,9 +28,30 @@ const value = computed({
 
 <template>
   <UInputDate
+    ref="field"
     v-model="value"
     locale="en-GB"
     :disabled="disabled"
-    icon="i-lucide-calendar"
-  />
+  >
+    <template #trailing>
+      <UPopover :reference="field?.inputsRef?.at(-1)?.$el">
+        <UButton
+          color="neutral"
+          variant="link"
+          size="sm"
+          icon="i-lucide-calendar"
+          aria-label="Pick a date from a calendar"
+          :disabled="disabled"
+          class="px-0"
+        />
+
+        <template #content>
+          <UCalendar
+            v-model="value"
+            class="p-2"
+          />
+        </template>
+      </UPopover>
+    </template>
+  </UInputDate>
 </template>

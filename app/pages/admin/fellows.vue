@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { awardFellowship, revokeFellowship } from '#shared/utils/admin-forms'
+import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { AwardFellowship } from '#shared/utils/admin-forms'
 
@@ -29,9 +30,9 @@ interface Listing {
 }
 
 const SHOW = [
-  { label: 'Current Fellows', value: 'current' },
-  { label: 'Revoked', value: 'revoked' },
-  { label: 'Everyone ever', value: 'everyone' },
+  { label: 'Current Fellows', value: 'current', icon: 'i-lucide-award' },
+  { label: 'Revoked', value: 'revoked', icon: 'i-lucide-ban' },
+  { label: 'Everyone ever', value: 'everyone', icon: 'i-lucide-users' },
 ]
 
 const listing = ref<Listing | null>(null)
@@ -119,6 +120,31 @@ watch([show, search], () => {
 })
 watch(page, load)
 
+const activeFilters = computed<ActiveFilter[]>(() => {
+  const active: ActiveFilter[] = []
+  if (search.value) {
+    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
+      search.value = ''
+    } })
+  }
+  if (show.value !== 'current') {
+    active.push({
+      key: 'show',
+      label: SHOW.find(option => option.value === show.value)!.label,
+      icon: SHOW.find(option => option.value === show.value)!.icon,
+      clear: () => {
+        show.value = 'current'
+      },
+    })
+  }
+  return active
+})
+
+function clearFilters(): void {
+  search.value = ''
+  show.value = 'current'
+}
+
 const columns: TableColumn<Fellow>[] = [
   { accessorKey: 'awardedOn', header: 'Awarded', meta: { class: { td: 'font-mono text-sm whitespace-nowrap' } } },
   {
@@ -180,46 +206,50 @@ onMounted(load)
       description="No database held it before this one, so the existing Fellows are entered here by hand. A revocation stops future admissions and rewrites nothing."
     />
 
-    <div class="flex flex-wrap items-end gap-3">
-      <UFormField
-        label="Search"
-        class="min-w-64 flex-1"
-      >
-        <UInput
-          v-model="search"
-          data-test="fellows-search"
-          placeholder="A name, an address or a citation"
-          icon="i-lucide-search"
-        />
-      </UFormField>
+    <AdminToolbar
+      v-model:search="search"
+      placeholder="A name, an address or a citation"
+      :active="activeFilters"
+      :loading="loading"
+      @clear="clearFilters"
+    >
+      <template #filters>
+        <UFormField label="Show">
+          <USelect
+            v-model="show"
+            data-test="fellows-show"
+            :items="SHOW"
+            value-key="value"
+            class="w-full"
+          />
+        </UFormField>
+      </template>
 
-      <UFormField
-        label="Show"
-        class="min-w-48"
-      >
-        <USelect
-          v-model="show"
-          data-test="fellows-show"
-          :items="SHOW"
-          value-key="value"
-        />
-      </UFormField>
-
-      <UButton
-        data-test="award"
-        icon="i-lucide-award"
-        @click="awarding = true"
-      >
-        Record an award
-      </UButton>
-    </div>
+      <template #actions>
+        <UButton
+          data-test="award"
+          icon="i-lucide-award"
+          @click="awarding = true"
+        >
+          Record an award
+        </UButton>
+      </template>
+    </AdminToolbar>
 
     <UTable
       :data="listing?.items ?? []"
       :columns="columns"
       :loading="loading"
       data-test="fellows-table"
-    />
+    >
+      <template #empty>
+        <p class="py-6 text-center text-sm text-muted">
+          {{ search || show !== 'current'
+            ? 'Nobody on the roll matches that.'
+            : 'The roll is empty. The committee assembles it, and it is entered here by hand.' }}
+        </p>
+      </template>
+    </UTable>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p

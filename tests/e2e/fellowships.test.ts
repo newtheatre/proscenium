@@ -180,7 +180,7 @@ describe.skipIf(skip !== null)('the roll in a browser (A-127)', () => {
 
       // The outcome rather than the notification: a toast dismisses itself, and racing one proves
       // nothing. Searched for by name, because the roll pages and this suite fills it.
-      await fill(view, 'input[data-test="fellows-search"]', alumna.email.split('@')[0]!)
+      await fill(view, 'input[data-test="toolbar-search"]', alumna.email.split('@')[0]!)
       await waitFor(view, `document.querySelector('[data-test="fellows-table"]').innerText.includes('front of house')`, 20_000)
       expect(await textOf(view, '[data-test="fellows-table"]')).toContain(alumna.name)
     }

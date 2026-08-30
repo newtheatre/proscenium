@@ -34,9 +34,29 @@ describe('a person is chosen, never typed (0032)', () => {
   })
 })
 
+describe('filters sit in a toolbar at a fixed width (0032)', () => {
+  test('no screen lays its filters out in a bare flex row', async () => {
+    expect(await offenders(source => /class="flex flex-wrap items-end gap-3"/.test(source))).toEqual([])
+  })
+
+  // One search of a fixed width and one button, with the filters behind it, is what stops a row
+  // resizing as its values change.
+  test('every list uses the shared toolbar', async () => {
+    const lists = (await screens()).filter(screen => screen.source.includes('<UTable'))
+    expect(lists.length).toBeGreaterThan(0)
+    expect(lists.filter(screen => !screen.source.includes('<AdminToolbar')).map(screen => screen.path)).toEqual([])
+  })
+})
+
 describe('feedback goes where it belongs (0032)', () => {
   // A confirmation the reader does not have to act on is a toast, not something that sits on the
   // page until it is dismissed.
+  test('every table says what would be there when it is empty', async () => {
+    const tables = (await screens()).filter(screen => screen.source.includes('<UTable'))
+    expect(tables.length).toBeGreaterThan(0)
+    expect(tables.filter(screen => !screen.source.includes('#empty')).map(screen => screen.path)).toEqual([])
+  })
+
   test('a screen that confirms an action uses a toast', async () => {
     const confirming = (await screens()).filter(screen =>
       /Recorded|Revoked\.|is on the (roll|trail)/.test(screen.source))
