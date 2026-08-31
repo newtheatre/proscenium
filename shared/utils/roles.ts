@@ -31,6 +31,8 @@ export const PERMISSIONS = [
   'members.write',
   'config.read',
   'config.write',
+  'rooms.read',
+  'rooms.write',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
@@ -39,11 +41,11 @@ export type Permission = (typeof PERMISSIONS)[number]
 // now would grant authority over features nobody has reviewed.
 export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   ADMIN: PERMISSIONS,
-  MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'fellowships.write', 'members.read', 'members.write'],
+  MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'fellowships.write', 'members.read', 'members.write', 'rooms.read', 'rooms.write'],
   // J-103's story is the Theatre Manager's: they are who searches the trail and records what
   // happened outside the system.
-  THEATRE_MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'members.read'],
-  TRAINING_MANAGER: ['accounts.read', 'members.read'],
+  THEATRE_MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'members.read', 'rooms.read', 'rooms.write'],
+  TRAINING_MANAGER: ['accounts.read', 'members.read', 'rooms.read'],
   BOX_OFFICE: [],
   FOH_MANAGER: [],
   FRONT_OF_HOUSE: [],
