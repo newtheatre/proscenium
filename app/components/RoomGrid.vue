@@ -3,7 +3,7 @@ import { fromLondonWallClock, londonWeekday } from '#shared/utils/london'
 import type { RoomHours } from '#shared/utils/rooms'
 
 // One grid, two shapes. A column is a room on a day, so a week of one room and a day of every
-// room are the same component with different columns (C-102 criterion 1).
+// room are the same component with different columns (C-102 criterion 1). Dragging picks a span.
 
 export interface GridTaken {
   startsAt: number
@@ -38,7 +38,60 @@ const props = withDefaults(defineProps<{
   slotMinutes: 15,
 })
 
-const emit = defineEmits<{ pick: [column: GridColumn, clock: string] }>()
+// From and until, so a drag across four slots books an hour rather than the default.
+const emit = defineEmits<{ pick: [column: GridColumn, from: string, until: string] }>()
+
+// A drag selects a span. It stays inside one column and stops at the first slot that is not free,
+// so a selection can never straddle somebody else's booking.
+const dragging = ref<{ key: string, from: number, to: number } | null>(null)
+
+function startAt(column: GridColumn, minutes: number): void {
+  if (stateOf(column, minutes) !== 'free') return
+  dragging.value = { key: column.key, from: minutes, to: minutes }
+}
+
+function extendTo(column: GridColumn, minutes: number): void {
+  const drag = dragging.value
+  if (!drag || drag.key !== column.key) return
+
+  // Every slot between the two ends has to be free, or the drag would book across a booking.
+  const [low, high] = minutes < drag.from ? [minutes, drag.from] : [drag.from, minutes]
+  for (let at = low; at <= high; at += props.slotMinutes) {
+    if (stateOf(column, at) !== 'free') return
+  }
+  dragging.value = { ...drag, to: minutes }
+}
+
+function inDrag(column: GridColumn, minutes: number): boolean {
+  const drag = dragging.value
+  if (!drag || drag.key !== column.key) return false
+  return minutes >= Math.min(drag.from, drag.to) && minutes <= Math.max(drag.from, drag.to)
+}
+
+// A pointer sequence ends in a click as well, and assistive technology and any programmatic
+// caller send only the click. So click is the fallback, suppressed when a drag just answered.
+const dragged = ref(false)
+
+function pick(column: GridColumn, minutes: number): void {
+  if (dragged.value) return
+  emit('pick', column, clockAt(minutes), clockAt(minutes + props.slotMinutes * 4))
+}
+
+function finish(column: GridColumn): void {
+  const drag = dragging.value
+  dragging.value = null
+  if (!drag || drag.key !== column.key) return
+
+  dragged.value = true
+  void nextTick(() => {
+    dragged.value = false
+  })
+
+  const first = Math.min(drag.from, drag.to)
+  // The end is the far edge of the last slot, so one slot is a whole slot rather than nothing.
+  const last = Math.max(drag.from, drag.to) + props.slotMinutes
+  emit('pick', column, clockAt(first), clockAt(Math.min(last, 24 * 60 - 1)))
+}
 
 const slots = computed(() =>
   Array.from({ length: ((props.endsAt - props.startsAt) * 60) / props.slotMinutes }, (_, index) => {
@@ -107,7 +160,11 @@ function labelOf(column: GridColumn, minutes: number): string {
 </script>
 
 <template>
-  <div class="overflow-x-auto">
+  <div
+    class="overflow-x-auto"
+    @pointerup="dragging = null"
+    @pointerleave="dragging = null"
+  >
     <div
       class="grid gap-px rounded-md bg-accented"
       :style="{
@@ -138,11 +195,14 @@ function labelOf(column: GridColumn, minutes: number): string {
           :key="`${column.key}-${slot.minutes}`"
           type="button"
           class="h-4 w-full"
-          :class="FILLS[stateOf(column, slot.minutes)]"
+          :class="[FILLS[stateOf(column, slot.minutes)], inDrag(column, slot.minutes) ? 'ring-2 ring-inset ring-primary' : '']"
           :disabled="stateOf(column, slot.minutes) !== 'free'"
           :aria-label="labelOf(column, slot.minutes)"
           :data-test="`slot-${column.room.id}-${column.day}-${slot.label}`"
-          @click="emit('pick', column, slot.label)"
+          @pointerdown.prevent="startAt(column, slot.minutes)"
+          @pointerenter="extendTo(column, slot.minutes)"
+          @pointerup="finish(column)"
+          @click="pick(column, slot.minutes)"
         />
       </template>
     </div>

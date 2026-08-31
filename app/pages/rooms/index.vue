@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatLondon, fromLondonWallClock, londonWeekday } from '#shared/utils/london'
+import { closedOn } from '#shared/utils/rooms'
 import type { GridColumn, GridRoom } from '~/components/RoomGrid.vue'
 
 definePageMeta({ middleware: 'signed-in' })
@@ -105,6 +106,9 @@ const summary = computed(() => data.value.rooms.map(room => ({
   room,
   days: days.value.map(day => ({
     day,
+    // A room shut that day is neither free nor busy, and saying "Free" invites a click that the
+    // day view would then refuse.
+    closed: closedOn(room.hours, londonWeekday(noonOn(day))),
     held: room.taken.filter(taken => taken.startsAt >= dayStart(day) && taken.startsAt < dayStart(addDays(day, 1))).length,
   })),
 })))
@@ -120,8 +124,8 @@ function move(by: number): void {
   anchor.value = addDays(anchor.value, shown.value === 'day' ? by : by * 7)
 }
 
-function book(column: GridColumn, clock: string): void {
-  navigateTo({ path: '/rooms/book', query: { room: column.room.id, day: column.day, at: clock } })
+function book(column: GridColumn, from: string, until: string): void {
+  navigateTo({ path: '/rooms/book', query: { room: column.room.id, day: column.day, at: from, until } })
 }
 
 function openDay(roomIdentity: string, day: string): void {
@@ -137,7 +141,7 @@ useSeoMeta({ title: 'Rooms' })
   <UContainer class="py-8">
     <UPageHeader
       title="Rooms"
-      description="What is free, and when. A slot somebody else holds reads as booked and nothing more."
+      description="What is free, and when. Click a free slot to book an hour, or drag across several. A slot somebody else holds reads as booked and nothing more."
     />
 
     <div class="mt-6 flex flex-wrap items-center gap-2">
@@ -258,7 +262,13 @@ useSeoMeta({ title: 'Rooms' })
               :key="cell.day"
               class="p-1 text-center"
             >
+              <span
+                v-if="cell.closed"
+                class="block py-1 text-xs text-muted"
+                :data-test="`summary-${row.room.id}-${cell.day}`"
+              >Closed</span>
               <UButton
+                v-else
                 size="xs"
                 :color="cell.held ? 'primary' : 'neutral'"
                 :variant="cell.held ? 'subtle' : 'ghost'"
@@ -267,7 +277,7 @@ useSeoMeta({ title: 'Rooms' })
                 :data-test="`summary-${row.room.id}-${cell.day}`"
                 @click="openDay(row.room.id, cell.day)"
               >
-                {{ cell.held || 'Free' }}
+                {{ cell.held ? plural(cell.held, 'booking') : 'Free' }}
               </UButton>
             </td>
           </tr>
