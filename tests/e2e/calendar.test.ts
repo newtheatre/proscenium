@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -209,6 +209,65 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
     // the browser has yet to make (criterion 3).
     expect(await rendered.text()).toContain(name)
   })
+
+  // The server render passing is not the same as the page working: a Select item carrying an
+  // empty string renders happily and then throws on hydration, which is how this got out.
+  test('the page is alive in a browser, with slots to click', async () => {
+    const password = generatePassword()
+    const planner = await registerMember(app, 'clicker', password)
+    giveMembership(planner.id)
+    await makeRoom()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', planner.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+
+      await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
+      await waitFor(view, `document.querySelectorAll('[data-test^="slot-"]').length > 0`, 30_000)
+
+      expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
+      const free = await view.evaluate<number>(`[...document.querySelectorAll('[data-test^="slot-"]')].filter(button => !button.disabled).length`)
+      expect(free).toBeGreaterThan(0)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  // The route a free slot navigates to now exists, so the click leads somewhere.
+  test('clicking a free slot lands on the form, already filled in', async () => {
+    const password = generatePassword()
+    const planner = await registerMember(app, 'booker-ui', password)
+    giveMembership(planner.id)
+    await makeRoom()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', planner.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+
+      await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
+      await waitFor(view, `document.querySelectorAll('[data-test^="slot-"]').length > 0`, 30_000)
+
+      await view.evaluate(`[...document.querySelectorAll('[data-test^="slot-"]')].find(button => !button.disabled).click()`)
+      await waitFor(view, `document.querySelector('[data-test="booking-form"]')`, 30_000)
+
+      expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
+      // The room, the day and the time came with the click (criterion 2).
+      const day = await view.evaluate<string>(`[...document.querySelectorAll('[data-test="booking-day"] input')].map(input => input.value).join('')`)
+      expect(day.replace(/\D/g, '')).toHaveLength(8)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
 
   test('signing in is required to see what is booked', async () => {
     const shut = await fetch(`${app.baseURL}/api/rooms/availability?from=2026-09-14&to=2026-09-14`)

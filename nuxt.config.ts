@@ -10,6 +10,7 @@ export default defineNuxtConfig({
     '@nuxthub/core',
     'nuxt-authorization',
     'nuxt-auth-utils',
+    '@vueuse/nuxt',
     // Advisory in the dev server and absent from a build, so the end-to-end harness drops them:
     // nineteen suites each pay their setup, and none of them reads the advice (0022).
     ...process.env.E2E_BASE_URL ? [] : ['@nuxt/a11y', '@nuxt/eslint', '@nuxt/hints'],

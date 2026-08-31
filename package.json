@@ -39,6 +39,8 @@
     "@nuxtjs/seo": "5.3.14",
     "@simplewebauthn/browser": "^13",
     "@simplewebauthn/server": "^13",
+    "@vueuse/core": "^14.4.0",
+    "@vueuse/nuxt": "^14.4.0",
     "drizzle-orm": "^0.45.2",
     "nuxt": "^4.5.2",
     "nuxt-auth-utils": "0.5.30",

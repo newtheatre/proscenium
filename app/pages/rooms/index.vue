@@ -32,13 +32,18 @@ const SLOT_MINUTES = 15
 
 const request = useRequestFetch()
 
-// Day below tablet width, week above: a foyer is not a desk (C-102 criterion 5).
-const narrow = useNarrow()
+// Day below tablet width, week above: a foyer is not a desk (C-102 criterion 5). False while
+// rendering, a server having no viewport, and corrected on the first client tick.
+const narrow = useMediaQuery('(max-width: 767px)')
 const view = ref<'day' | 'week'>('week')
 const shown = computed<'day' | 'week'>(() => (narrow.value ? 'day' : view.value))
 
 const anchor = ref(todayInLondon())
-const roomId = ref('')
+
+// A Select item may not carry an empty string: Reka reserves it for clearing the selection, and
+// an item that uses one throws on hydration. The audit trail carries the same sentinel.
+const EVERY_ROOM = 'all'
+const roomId = ref(EVERY_ROOM)
 
 function todayInLondon(): string {
   return formatLondon(new Date(), { year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -69,7 +74,11 @@ const span = computed(() => {
 const { data, status, refresh } = await useAsyncData(
   () => `availability-${span.value.from}-${span.value.to}-${roomId.value}`,
   () => request<Availability>('/api/rooms/availability', {
-    query: { from: span.value.from, to: span.value.to, ...(roomId.value ? { roomId: roomId.value } : {}) },
+    query: {
+      from: span.value.from,
+      to: span.value.to,
+      ...(roomId.value === EVERY_ROOM ? {} : { roomId: roomId.value }),
+    },
   }),
   { watch: [span, roomId], default: (): Availability => ({ from: '', to: '', rooms: [] }) },
 )
@@ -78,7 +87,7 @@ const days = computed(() =>
   Array.from({ length: shown.value === 'day' ? 1 : 7 }, (_, index) => addDays(span.value.from, index)))
 
 const roomOptions = computed(() => [
-  { label: 'Every room', value: '' },
+  { label: 'Every room', value: EVERY_ROOM },
   ...data.value.rooms.map(room => ({ label: room.name, value: room.id })),
 ])
 
