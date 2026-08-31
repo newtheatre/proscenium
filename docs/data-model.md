@@ -309,14 +309,20 @@ pass money).
 `DESK|TILL|SELF_SERVE|IMPORT|SYSTEM` · `tender` CHECK `CARD|COMP|TAB|NONE` · `actor_id` →
 users restrict NULL (system) · `total_pence` (0 on a COMP; negative on a reversal) ·
 `reverses_entry_id` NULL self-FK (a correction points at what it corrects) · `comp_reason`
-CHECK enum NULL · `comp_approved_by` NULL · `discount_id` NULL · `discount_percent` /
+NULL, **no CHECK** until module D decides its values (0033) · `comp_approved_by` NULL · `discount_id` NULL · `discount_percent` /
 `discount_pence` snapshots · `tab_debtor_id` NULL → users restrict · `tab_settled_at` ·
 `tab_settlement_entry_id` NULL self-FK · `void_of_entry_id` NULL (tab charges only; a
 reversing entry, 0031's rule carried) · `created_at`.
-Exception to append-only: none. Even voids and refunds are new reversing rows.
+Exception to append-only: none. Even voids and refunds are new reversing rows, and
+`ledger_entries_no_self_reversal` refuses an entry that claims to reverse itself.
+`server/utils/ledger.ts` is the only writer; `check:ledger` fails the build on any other file
+that inserts into either table. `postEntry` returns statements rather than writing them, so
+money and the thing it paid for commit in one batch (0001, I-102 criterion 6).
 
 ### ledger_lines  APPEND-ONLY
-`id` PK · `entry_id` → ledger_entries cascade · `kind` CHECK
+`id` PK · `entry_id` → ledger_entries cascade · `kind`, **no CHECK**, held as an enum in
+`shared/utils/ledger.ts` and enforced at the one write path, because a CHECK on an append-only
+table can never be widened (0033):
 `TICKET_COLLECTION|WALK_UP|BAR_ITEM|PASS_SALE|TAB_SETTLEMENT|REFUND|IMPORT` ·
 `amount_pence` gross · `reservation_id` NULL · `performance_id` NULL · `ticket_id` NULL ·
 `product_variant_id` NULL · `qty` · `unit_price_pence` · `price_ref` (which price row and
