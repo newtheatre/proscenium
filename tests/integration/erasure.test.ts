@@ -167,3 +167,24 @@ describe('erasure (K-109, 0011)', () => {
     })
   })
 })
+
+// A tombstone that still says when somebody last signed in is still saying something about them.
+describe('erasure takes the credential timestamps with it (A-113)', () => {
+  test('nothing is left saying when a way in was added or used', async () => {
+    await withDatabase(async (database) => {
+      const id = seedPerson(database, 'u-credentials')
+      const now = Math.floor(Date.now() / 1000)
+      database.batch([[
+        'UPDATE users SET password_set_at = ?, password_last_used_at = ?, google_linked_at = ?, google_last_used_at = ? WHERE id = ?',
+        now, now, now, now, id,
+      ]])
+
+      await erase(database, id)
+
+      const [row] = rows<Record<string, number | null>>(database, `
+        SELECT password_set_at, password_last_used_at, google_linked_at, google_last_used_at
+        FROM users WHERE id = ?`, id)
+      expect(Object.values(row!).every(value => value === null)).toBe(true)
+    })
+  })
+})

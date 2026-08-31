@@ -60,6 +60,8 @@ const CATALOGUE = {
   'membership.granted': { label: 'Membership recorded', module: 'identity' },
   'membership.confirmed': { label: 'Membership confirmed', module: 'identity' },
   'membership.exported': { label: 'Membership register exported', module: 'governance' },
+  'account.method.added': { label: 'Sign-in method added', module: 'identity', self: true },
+  'account.method.removed': { label: 'Sign-in method removed', module: 'identity', self: true },
   'account.student-id.recorded': { label: 'Student number recorded', module: 'identity' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).

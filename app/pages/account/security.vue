@@ -112,6 +112,8 @@ useSeoMeta({ title: 'Security' })
       description="An authenticator app is a second step at sign-in, so a stolen password is not enough on its own."
     />
 
+    <SignInMethods class="mt-8" />
+
     <UPageCard class="mt-8">
       <UAlert
         v-if="notice"

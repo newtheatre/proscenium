@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
   await db.batch([
     // Bumping the epoch ends every other session on the account (0007, A-108 criterion 4).
     db.update(schema.users)
-      .set({ password: await hashPassword(input.password), verified: true, sessionEpoch: sql`${schema.users.sessionEpoch} + 1` })
+      .set({ password: await hashPassword(input.password), passwordSetAt: Math.floor(Date.now() / 1000), verified: true, sessionEpoch: sql`${schema.users.sessionEpoch} + 1` })
       .where(eq(schema.users.id, account.id)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: account.id,

@@ -53,7 +53,7 @@ export default defineEventHandler(async (event) => {
   }
 
   await db.batch([
-    db.update(schema.users).set({ lastLoginAt: Math.floor(Date.now() / 1000) }).where(eq(schema.users.id, account.id)),
+    db.update(schema.users).set({ lastLoginAt: Math.floor(Date.now() / 1000), passwordLastUsedAt: Math.floor(Date.now() / 1000) }).where(eq(schema.users.id, account.id)),
     db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'session.started', target: `user:${account.id}` })),
   ])
   await startSession(event, account)

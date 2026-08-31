@@ -50,17 +50,22 @@ erDiagram
 ### users
 `id` PK · `email` UNIQUE lowercased · `name` · `pronouns` (optional, scrub) · `password`
 (scrypt PHC, NULL for guest or Google-only; **never non-NULL on an @newtheatre.org.uk
-address**, import-enforced, 0008) · `google_sub` UNIQUE NULL · `pending_google_email` UNIQUE
-NULL (admin-set claim marker) · `student_id` UNIQUE NULL (how the committee finds somebody on the
+address**, import-enforced, 0008) · `password_set_at` NULL · `password_last_used_at` NULL ·
+`google_sub` UNIQUE NULL · `google_linked_at` NULL · `google_last_used_at` NULL ·
+`pending_google_email` UNIQUE NULL (admin-set claim marker) · `student_id` UNIQUE NULL (how the committee finds somebody on the
 SU's list: names do not always match and the address is often personal, 0031) · `verified` bool ·
 `disabled` bool · `session_epoch` int ·
 `anonymised_at` NULL · `last_login_at` · `created_at` · `updated_at`.
 Anonymisation rewrites `email` to `deleted-<id>@anonymised.invalid`, `name` to `Deleted
-user`, clears `pronouns`, `password`, `student_id`, `google_sub` and `pending_google_email`, and bumps
+user`, clears `pronouns`, `password`, `student_id`, `google_sub`, `pending_google_email` and the four
+credential timestamps, and bumps
 `session_epoch`. Every write path guards on `anonymised_at IS NULL`, and the
 `users_tombstone_guard` trigger refuses an identifying UPDATE on an anonymised row whether the
 path remembered to guard or not (0011, A-125 criterion 3): a guard in a handler is a guard one
 handler can forget.
+The four `*_at` credential columns are what the account's own screen lists as when each way in
+was added and last used (A-113). They are NULL on a row that predates them, and on an imported
+one where the old estate never recorded it: the screen says so rather than inventing a date.
 Indexed on `disabled`, `verified`, `anonymised_at`, `last_login_at` and `name`, which are what
 the admin directory filters and sorts on (A-121); without them every filter is a scan.
 
