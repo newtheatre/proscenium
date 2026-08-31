@@ -1,0 +1,108 @@
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { Database } from 'bun:sqlite'
+import { skipReason, startApp } from '#tests/helpers/webview'
+import type { AppUnderTest } from '#tests/helpers/webview'
+
+// K-120. The script hashes outside Nuxt, so signing in as a seeded person is the only thing that
+// proves its scrypt and the application's agree.
+
+const skip = skipReason()
+const BOOT_TIMEOUT_MS = 180_000
+let app: AppUnderTest
+const seeded: { email: string, password: string }[] = []
+
+beforeAll(async () => {
+  if (skip) return
+  app = await startApp()
+
+  const ran = Bun.spawnSync(['bun', 'scripts/seed.ts', app.databaseFile], { stdout: 'pipe', stderr: 'pipe' })
+  const said = `${ran.stdout.toString()}${ran.stderr.toString()}`
+  expect(ran.exitCode).toBe(0)
+
+  // The credentials are printed once and nowhere else, so reading them back means reading them
+  // out of what the command said.
+  const lines = said.split('\n').map(line => line.trim())
+  for (const [index, line] of lines.entries()) {
+    if (line.includes('@') && lines[index + 1]?.startsWith('test-')) {
+      seeded.push({ email: line, password: lines[index + 1]! })
+    }
+  }
+}, BOOT_TIMEOUT_MS)
+
+afterAll(async () => {
+  await app?.stop()
+}, 30_000)
+
+function rows<T>(statement: string, ...parameters: unknown[]): T[] {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return database.query(statement).all(...parameters as never[]) as T[]
+  }
+  finally {
+    database.close()
+  }
+}
+
+function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return (database.query(statement).get(...parameters as never[]) as T | null) ?? undefined
+  }
+  finally {
+    database.close()
+  }
+}
+
+describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
+  test('it printed credentials for everybody it made', () => {
+    expect(seeded.length).toBeGreaterThan(0)
+    expect(read<{ n: number }>('SELECT count(*) n FROM users WHERE name LIKE ?', '%(test)%')?.n)
+      .toBe(seeded.length)
+  })
+
+  // The whole point: the script hashes outside Nuxt, and this is what proves the two agree.
+  test('a seeded password signs in', async () => {
+    const person = seeded[0]!
+    const answered = await fetch(`${app.baseURL}/api/auth/sign-in`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: person.email, password: person.password }),
+    })
+
+    expect(answered.status).toBe(200)
+    expect(answered.headers.get('set-cookie')).toContain('nnt-session')
+  })
+
+  test('a seeded member holds a membership, so they can book', async () => {
+    const person = seeded[0]!
+    const held = read<{ n: number }>(`
+      SELECT count(*) n FROM memberships m JOIN users u ON u.id = m.user_id WHERE u.email = ?`, person.email)
+    expect(held?.n).toBe(1)
+  })
+
+  test('the rooms and a week of bookings are there', () => {
+    expect(read<{ n: number }>('SELECT count(*) n FROM rooms')?.n).toBeGreaterThanOrEqual(4)
+    expect(read<{ n: number }>('SELECT count(*) n FROM room_bookings')?.n).toBeGreaterThan(0)
+    // One waiting on a decision, so the pending state has something to show.
+    expect(read<{ n: number }>(`SELECT count(*) n FROM room_bookings WHERE status = 'PENDING_APPROVAL'`)?.n)
+      .toBeGreaterThan(0)
+  })
+
+  // Criterion 3: seeded people can never be mistaken for, or mailed to, a real person.
+  test('every seeded person is obviously not a real one', () => {
+    const names = rows<{ name: string, email: string }>(
+      `SELECT name, email FROM users WHERE email LIKE '%@e2e.newtheatre.org.uk'`)
+
+    expect(names.length).toBeGreaterThan(0)
+    expect(names.filter(person => !person.name.includes('(test)'))).toEqual([])
+    expect(seeded.every(person => person.email.endsWith('@e2e.newtheatre.org.uk'))).toBe(true)
+  })
+
+  test('running it again adds people rather than duplicating rooms', () => {
+    const before = read<{ n: number }>('SELECT count(*) n FROM rooms')!.n
+    const ran = Bun.spawnSync(['bun', 'scripts/seed.ts', app.databaseFile], { stdout: 'pipe', stderr: 'pipe' })
+
+    expect(ran.exitCode).toBe(0)
+    expect(read<{ n: number }>('SELECT count(*) n FROM rooms')?.n).toBe(before)
+  })
+})

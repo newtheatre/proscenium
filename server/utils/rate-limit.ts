@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import { lt, sql } from 'drizzle-orm'
 import { bucketKey, verdict, windowFor } from '#shared/utils/rate-limit'
-import type { Verdict } from '#shared/utils/rate-limit'
+import type { RateVerdict } from '#shared/utils/rate-limit'
 
 // A conditional write, never a read then a write: two requests arriving together must not both
 // see the same count (0006). No local test can prove that, which is 0022's stated limit.
@@ -26,7 +26,7 @@ export interface Limit { scope: string, value: string, limit: number, windowMinu
 
 // Records an attempt and says whether it is allowed. The attempt counts either way, so
 // hammering a limited bucket keeps it limited.
-export async function consume(limit: Limit, now = new Date()): Promise<Verdict> {
+export async function consume(limit: Limit, now = new Date()): Promise<RateVerdict> {
   const window = windowFor(now, limit.windowMinutes * 60)
   const count = await increment(bucketKey(limit.scope, limit.value), window.start)
   return verdict(count, limit.limit, window, now)

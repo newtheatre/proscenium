@@ -519,7 +519,12 @@ and rides the write as a predicate. `server/utils/bookings.ts` is the only write
 guarded `INSERT ... SELECT ... WHERE NOT EXISTS ... RETURNING id`: a row returned is the win, and
 no rows is disambiguated by a single read into gone (410) or beaten (409), the pattern 0003 names.
 There is no override, deliberate or otherwise: blackouts (C-114) and priority tiers (C-115) are how
-a legitimate double-booking happens, and each leaves a record of what happened and why. Conflict responses mask titles and identities from
+a legitimate double-booking happens, and each leaves a record of what happened and why.
+Read back through `GET /api/rooms/availability`, which takes a span of London days, counts the
+sweep before fetching it and refuses past `ROOM_AVAILABILITY_ROW_BOUND` rather than truncating: half
+a sweep would show a taken slot as free (C-103 criterion 1). Every conflict it returns is masked by
+the same helper the booking refusal uses, so a member reads "Booked" and nothing else unless the
+booking is their own (criteria 4 and 5). Conflict responses mask titles and identities from
 non-admins ("Booked"). In-policy bookings for standard rooms confirm instantly (C-1).
 
 ### room_series

@@ -72,7 +72,7 @@ export interface Context {
   activeBookings: number
 }
 
-export interface Verdict {
+export interface PolicyVerdict {
   failures: Failure[]
   // A sensitive room queues even with nothing wrong, which is why this is not a boolean pass.
   needsApproval: boolean
@@ -110,7 +110,7 @@ function weeksAhead(startsAt: Date, now: Date): number {
   return (startsAt.getTime() - now.getTime()) / (7 * 24 * 3_600_000)
 }
 
-export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderPolicy, context: Context): Verdict {
+export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderPolicy, context: Context): PolicyVerdict {
   const failures: Failure[] = []
   const fail = (reason: Refusal, says: string): number => failures.push({ reason, says })
 

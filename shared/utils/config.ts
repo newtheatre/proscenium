@@ -135,6 +135,12 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'No-shows in a term before every further booking needs pre-approval.',
   },
+  ROOM_AVAILABILITY_ROW_BOUND: {
+    schema: z.number().int().positive(),
+    default: 1000,
+    workshop: 'spaces-and-training',
+    describes: 'Bookings an availability sweep may cover before it refuses. It refuses, never truncates.',
+  },
   ROOM_PRIORITY_TIERS: {
     schema: z.array(z.string()).nonempty(),
     default: ['PRODUCTION', 'COMMITTEE', 'REHEARSAL', 'GENERAL'],
@@ -358,6 +364,7 @@ export const ENFORCED_KEYS = [
   'PASSWORD_RESET_HOURS',
   'MEMBERSHIP_GRACE_DAYS',
   'ROOM_ACTIVE_BOOKINGS_PER_MEMBER',
+  'ROOM_AVAILABILITY_ROW_BOUND',
   'ROOM_AUTO_APPROVE_NOTICE_HOURS',
   'ROOM_BOOKING_HORIZON_WEEKS',
   'ROOM_MAX_BOOKING_ADMINS_EXEMPT',

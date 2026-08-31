@@ -1,25 +1,25 @@
 // Fixed-window counting, kept pure so the arithmetic is testable without a database.
 
-export interface Window {
+export interface RateWindow {
   start: number
   resetsAt: number
 }
 
 // The window an instant falls in. Fixed rather than sliding: a sliding window needs a row per
 // attempt, and this table is swept daily (docs/data-model.md).
-export function windowFor(at: Date, seconds: number): Window {
+export function windowFor(at: Date, seconds: number): RateWindow {
   const now = Math.floor(at.getTime() / 1000)
   const start = now - (now % seconds)
   return { start, resetsAt: start + seconds }
 }
 
-export interface Verdict {
+export interface RateVerdict {
   allowed: boolean
   remaining: number
   retryAfterSeconds: number
 }
 
-export function verdict(count: number, limit: number, window: Window, at: Date): Verdict {
+export function verdict(count: number, limit: number, window: RateWindow, at: Date): RateVerdict {
   const allowed = count <= limit
   return {
     allowed,
