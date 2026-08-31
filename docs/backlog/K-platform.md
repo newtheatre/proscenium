@@ -445,3 +445,50 @@ Stories: 22. Phases: 19 MVP, 0 V2, 0 Later, 3 resolved.
      request.
 - Source: Prompt Book K-1 (testing); audit TR-10 (the estate's best-tested module), PR-2, PR-5,
   PR-8, SD-14; Get-In part 5 (the defect list doubles as the regression checklist)
+
+## K-123: One set of admin component conventions
+
+- Role: Administrator
+- Phase: MVP
+- Story: As an officer using the admin screens, I want every screen to behave the same way so
+  that learning one teaches me the rest, and as the next developer I want the choice already
+  made so I copy something right rather than something nearby.
+- Depends on: none
+- Acceptance criteria:
+  1. A person is always chosen, never typed: every field naming somebody searches by name,
+     address and student number, debounced, and shows who was picked. No screen asks for an
+     account id.
+  2. Every input is the component for its job: a date is a date input, a number is a number
+     input, money is entered in pounds and stored in pence, a list of scalars is a tags input,
+     a closed short list is a select, a long or searchable one is a select menu.
+  3. Every form validates against the same schema the endpoint validates against, and a
+     refusal from the server lands on the field it concerns rather than as a page-level alert.
+  4. Filters sit in a dashboard toolbar with fixed widths, so a control does not resize when
+     its value changes and a row does not wrap at a normal window size.
+  5. A confirmation is a toast; an alert is only for something the reader must act on. Every
+     table has an empty state that says what would be there.
+  6. The conventions are a decision record and a test that fails when a screen departs from
+     them, not a review habit.
+- Source: Review of the admin surface against the Nuxt UI component matrix, 30 August 2026;
+  decision 0021 (the design language is enforced by test, not by review).
+
+## K-124: Developer tools that do not ship
+
+- Role: Administrator
+- Phase: MVP
+- Story: As a developer, I want to reach any state of this system in one click locally so that
+  working on a screen does not begin with registering an account, fetching a token out of a
+  mailbox and enrolling an authenticator.
+- Depends on: K-122
+- Acceptance criteria:
+  1. A development-only surface signs in as any account without its password, and seeds a set
+     of personas covering each role, a plain member, a guest and a tombstone.
+  2. It shows the local mailbox, the current session, and the permissions that session resolves
+     to, because every authorisation question starts with those.
+  3. The whole surface is guarded so that it does not exist in a production build, and a test
+     proves the built output contains neither the route nor its handler.
+  4. A command captures the admin screens as images at two widths, so a visual change can be
+     reviewed without running anything. It gates nothing.
+- Source: Review of the admin surface, 30 August 2026; estate convention that a consumer app's
+  dev login is guarded by `import.meta.dev` (workspace CLAUDE.md), applied here to the app that
+  writes the session.

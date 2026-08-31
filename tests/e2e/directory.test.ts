@@ -296,22 +296,24 @@ describe.skipIf(skip !== null)('the directory screen', () => {
       await fillPin(view, '[data-test="mfa-challenge"] input', await codeForStep(secret, stepFor(new Date())))
       await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
 
-      await visit(view, `${app.baseURL}/admin/people`, '[data-test="directory-search"]')
+      await visit(view, `${app.baseURL}/admin/people`, '[data-test="toolbar-search"]')
       await waitFor(view, `document.body.innerText.includes(${JSON.stringify(known)})`)
 
       // Searching narrows to one, and the total below the table says so.
-      await fill(view, '[data-test="directory-search"]', known)
+      await fill(view, 'input[data-test="toolbar-search"]', known)
       await waitFor(view, 'document.querySelector(\'[data-test="directory-total"]\')?.innerText.startsWith("1 ")')
       expect(await textOf(view)).not.toContain(officer.email)
 
-      // A filter whose story is not built says which one rather than looking broken.
-      await fill(view, '[data-test="directory-search"]', '')
-      await view.evaluate(`(() => {
-        const select = document.querySelector('[data-test="directory-filter"]')
-        const setter = Object.getOwnPropertyDescriptor(select.constructor.prototype, 'value')?.set
-        if (setter) { setter.call(select, 'members-current'); select.dispatchEvent(new Event('change', { bubbles: true })) }
-      })()`)
-      await Bun.sleep(1500)
+      // Searching is shown back as a chip that can be taken off again (0032).
+      await waitFor(view, `document.querySelector('[data-test="toolbar-active"]')?.innerText.includes(${JSON.stringify(known)})`)
+      await click(view, '[data-test="toolbar-clear"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="toolbar-active"]\') === null')
+
+      // The filters live behind one button, which is what keeps the row from resizing.
+      await click(view, '[data-test="toolbar-filters"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="directory-filter"]\')')
+      await view.evaluate(`document.querySelector('[data-test="toolbar-filters"]').click()`)
+      await Bun.sleep(500)
 
       const invitee = registrableAddress('by-hand')
       await click(view, '[data-test="invite"]')

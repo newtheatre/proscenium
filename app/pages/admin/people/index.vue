@@ -3,6 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { formatLondon } from '#shared/utils/london'
 import { ROLES } from '#shared/utils/roles'
 import type { Role } from '#shared/utils/roles'
+import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'admin', title: 'People', middleware: 'signed-in' })
@@ -110,6 +111,47 @@ async function invite(): Promise<void> {
   }
 }
 
+const activeFilters = computed<ActiveFilter[]>(() => {
+  const active: ActiveFilter[] = []
+  if (search.value) {
+    active.push({
+      key: 'search',
+      label: `Matching ${search.value}`,
+      icon: 'i-lucide-search',
+      clear: () => {
+        search.value = ''
+      },
+    })
+  }
+  if (filter.value !== 'everyone') {
+    active.push({
+      key: 'filter',
+      label: FILTERS.find(option => option.value === filter.value)!.label,
+      icon: 'i-lucide-filter',
+      clear: () => {
+        show('everyone')
+      },
+    })
+  }
+  if (role.value) {
+    active.push({
+      key: 'role',
+      label: role.value,
+      icon: 'i-lucide-shield',
+      clear: () => {
+        role.value = undefined
+      },
+    })
+  }
+  return active
+})
+
+function clearFilters(): void {
+  search.value = ''
+  role.value = undefined
+  show('everyone')
+}
+
 const seen = (at: number | null): string =>
   at ? formatLondon(new Date(at * 1000), { dateStyle: 'medium' }) : 'Never'
 
@@ -174,7 +216,7 @@ onMounted(load)
         color="warning"
         variant="subtle"
         icon="i-lucide-shield-alert"
-        :title="`${listing.banners.privilegedWithoutFactor} privileged account(s) without an authenticator`"
+        :title="`${plural(listing.banners.privilegedWithoutFactor, 'privileged account')} without an authenticator`"
         description="Their roles do not work until they enrol one."
         :actions="[{ label: 'Show them', color: 'neutral', variant: 'subtle', onClick: () => show('privileged-without-mfa') }]"
       />
@@ -184,59 +226,55 @@ onMounted(load)
         color="neutral"
         variant="subtle"
         icon="i-lucide-clock"
-        :title="`${listing.banners.insideRetentionWindow} account(s) approaching retention`"
+        :title="`${plural(listing.banners.insideRetentionWindow, 'account')} approaching retention`"
         description="Dormant for longer than the retention window allows."
         :actions="[{ label: 'Show them', color: 'neutral', variant: 'subtle', onClick: () => show('retention-window') }]"
       />
     </div>
 
-    <div class="flex flex-wrap items-end gap-3">
-      <UFormField
-        label="Search"
-        class="min-w-64 flex-1"
-      >
-        <UInput
-          v-model="search"
-          data-test="directory-search"
-          placeholder="A name or an address"
-          icon="i-lucide-search"
-        />
-      </UFormField>
+    <AdminToolbar
+      v-model:search="search"
+      placeholder="A name, an address or a student number"
+      :active="activeFilters"
+      :loading="loading"
+      @clear="clearFilters"
+    >
+      <template #filters>
+        <UFormField label="Show">
+          <USelect
+            v-model="filter"
+            data-test="directory-filter"
+            :items="FILTERS"
+            value-key="value"
+            class="w-full"
+            @update:model-value="show(filter)"
+          />
+        </UFormField>
 
-      <UFormField
-        label="Show"
-        class="min-w-56"
-      >
-        <USelect
-          v-model="filter"
-          data-test="directory-filter"
-          :items="FILTERS"
-          value-key="value"
-          @update:model-value="show(filter)"
-        />
-      </UFormField>
+        <UFormField
+          v-if="filter === 'role-holders'"
+          label="Role"
+        >
+          <USelect
+            v-model="role"
+            data-test="directory-role"
+            :items="[{ label: 'Any role', value: undefined }, ...ROLES.map(name => ({ label: name, value: name }))]"
+            value-key="value"
+            class="w-full"
+          />
+        </UFormField>
+      </template>
 
-      <UFormField
-        v-if="filter === 'role-holders'"
-        label="Role"
-        class="min-w-48"
-      >
-        <USelect
-          v-model="role"
-          data-test="directory-role"
-          :items="[{ label: 'Any role', value: undefined }, ...ROLES.map(name => ({ label: name, value: name }))]"
-          value-key="value"
-        />
-      </UFormField>
-
-      <UButton
-        data-test="invite"
-        icon="i-lucide-user-plus"
-        @click="inviting = true"
-      >
-        Add someone
-      </UButton>
-    </div>
+      <template #actions>
+        <UButton
+          data-test="invite"
+          icon="i-lucide-user-plus"
+          @click="inviting = true"
+        >
+          Add someone
+        </UButton>
+      </template>
+    </AdminToolbar>
 
     <UAlert
       v-if="listing?.awaiting"
@@ -261,14 +299,20 @@ onMounted(load)
       :columns="columns"
       :loading="loading"
       data-test="directory-table"
-    />
+    >
+      <template #empty>
+        <p class="py-6 text-center text-sm text-muted">
+          {{ activeFilters.length ? 'Nobody matches that.' : 'No accounts yet.' }}
+        </p>
+      </template>
+    </UTable>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p
         data-test="directory-total"
         class="text-sm text-muted"
       >
-        {{ listing?.total ?? 0 }} account(s)
+        {{ plural(listing?.total ?? 0, 'account') }}
       </p>
       <UPagination
         v-if="listing && listing.pages > 1"

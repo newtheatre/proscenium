@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import type { TableColumn } from '@nuxt/ui'
+import { awardFellowship, revokeFellowship } from '#shared/utils/admin-forms'
+import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
+import type { AwardFellowship } from '#shared/utils/admin-forms'
 
 definePageMeta({ layout: 'admin', title: 'Fellows', middleware: 'signed-in' })
 
@@ -27,9 +30,9 @@ interface Listing {
 }
 
 const SHOW = [
-  { label: 'Current Fellows', value: 'current' },
-  { label: 'Revoked', value: 'revoked' },
-  { label: 'Everyone ever', value: 'everyone' },
+  { label: 'Current Fellows', value: 'current', icon: 'i-lucide-award' },
+  { label: 'Revoked', value: 'revoked', icon: 'i-lucide-ban' },
+  { label: 'Everyone ever', value: 'everyone', icon: 'i-lucide-users' },
 ]
 
 const listing = ref<Listing | null>(null)
@@ -39,11 +42,14 @@ const page = ref(1)
 const loading = ref(false)
 const failure = ref<string | null>(null)
 
+const toast = useToast()
+const awardForm = useTemplateRef('awardForm')
+const revokeForm = useTemplateRef('revokeForm')
+
 const awarding = ref(false)
-const award = reactive({ userId: '', awardedOn: '', awardedBy: '', citation: '' })
+const award = reactive<Partial<AwardFellowship>>({})
 const revoking = ref<Fellow | null>(null)
-const reason = ref('')
-const notice = ref<string | null>(null)
+const revocation = reactive<{ reason?: string }>({})
 
 async function load(): Promise<void> {
   loading.value = true
@@ -61,35 +67,50 @@ async function load(): Promise<void> {
   }
 }
 
-async function record(): Promise<void> {
+// A refusal lands on the field it concerns rather than as an alert behind the modal (0032). The
+// server knows which field only for the person, so anything else stays a page-level failure.
+function blame(error: unknown, form: { setErrors: (errors: { name: string, message: string }[]) => void } | null, name: string): void {
+  const message = refusalText(error)
+  if (form && /already holds|not an account|has been erased|no such account/i.test(message)) {
+    form.setErrors([{ name, message }])
+    return
+  }
+  failure.value = message
+}
+
+async function record(event: FormSubmitEvent<AwardFellowship>): Promise<void> {
   failure.value = null
   try {
-    await $fetch('/api/admin/fellowships', { method: 'POST', body: { ...award } })
-    notice.value = 'The award is on the roll.'
+    await $fetch('/api/admin/fellowships', { method: 'POST', body: event.data })
+    toast.add({ title: 'Recorded on the roll', icon: 'i-lucide-award', color: 'success' })
     awarding.value = false
-    award.userId = ''
-    award.awardedOn = ''
-    award.awardedBy = ''
-    award.citation = ''
+    award.userId = undefined
+    award.awardedOn = undefined
+    award.awardedBy = undefined
+    award.citation = undefined
     await load()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    blame(error, awardForm.value ?? null, 'userId')
   }
 }
 
-async function revoke(): Promise<void> {
+async function revoke(event: FormSubmitEvent<{ reason: string }>): Promise<void> {
   if (!revoking.value) return
   failure.value = null
   try {
-    await $fetch(`/api/admin/fellowships/${revoking.value.id}/revoke`, { method: 'POST', body: { reason: reason.value } })
-    notice.value = 'Revoked. The award and everything taken under it still stand.'
+    await $fetch(`/api/admin/fellowships/${revoking.value.id}/revoke`, { method: 'POST', body: event.data })
+    toast.add({
+      title: 'Revoked',
+      description: 'The award and everything taken under it still stand.',
+      icon: 'i-lucide-ban',
+    })
     revoking.value = null
-    reason.value = ''
+    revocation.reason = undefined
     await load()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    blame(error, revokeForm.value ?? null, 'reason')
   }
 }
 
@@ -98,6 +119,31 @@ watch([show, search], () => {
   void load()
 })
 watch(page, load)
+
+const activeFilters = computed<ActiveFilter[]>(() => {
+  const active: ActiveFilter[] = []
+  if (search.value) {
+    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
+      search.value = ''
+    } })
+  }
+  if (show.value !== 'current') {
+    active.push({
+      key: 'show',
+      label: SHOW.find(option => option.value === show.value)!.label,
+      icon: SHOW.find(option => option.value === show.value)!.icon,
+      clear: () => {
+        show.value = 'current'
+      },
+    })
+  }
+  return active
+})
+
+function clearFilters(): void {
+  search.value = ''
+  show.value = 'current'
+}
 
 const columns: TableColumn<Fellow>[] = [
   { accessorKey: 'awardedOn', header: 'Awarded', meta: { class: { td: 'font-mono text-sm whitespace-nowrap' } } },
@@ -153,16 +199,6 @@ onMounted(load)
     />
 
     <UAlert
-      v-if="notice"
-      data-test="fellows-notice"
-      color="success"
-      variant="subtle"
-      :description="notice"
-      close
-      @update:open="notice = null"
-    />
-
-    <UAlert
       color="neutral"
       variant="subtle"
       icon="i-lucide-scroll"
@@ -170,53 +206,57 @@ onMounted(load)
       description="No database held it before this one, so the existing Fellows are entered here by hand. A revocation stops future admissions and rewrites nothing."
     />
 
-    <div class="flex flex-wrap items-end gap-3">
-      <UFormField
-        label="Search"
-        class="min-w-64 flex-1"
-      >
-        <UInput
-          v-model="search"
-          data-test="fellows-search"
-          placeholder="A name, an address or a citation"
-          icon="i-lucide-search"
-        />
-      </UFormField>
+    <AdminToolbar
+      v-model:search="search"
+      placeholder="A name, an address or a citation"
+      :active="activeFilters"
+      :loading="loading"
+      @clear="clearFilters"
+    >
+      <template #filters>
+        <UFormField label="Show">
+          <USelect
+            v-model="show"
+            data-test="fellows-show"
+            :items="SHOW"
+            value-key="value"
+            class="w-full"
+          />
+        </UFormField>
+      </template>
 
-      <UFormField
-        label="Show"
-        class="min-w-48"
-      >
-        <USelect
-          v-model="show"
-          data-test="fellows-show"
-          :items="SHOW"
-          value-key="value"
-        />
-      </UFormField>
-
-      <UButton
-        data-test="award"
-        icon="i-lucide-award"
-        @click="awarding = true"
-      >
-        Record an award
-      </UButton>
-    </div>
+      <template #actions>
+        <UButton
+          data-test="award"
+          icon="i-lucide-award"
+          @click="awarding = true"
+        >
+          Record an award
+        </UButton>
+      </template>
+    </AdminToolbar>
 
     <UTable
       :data="listing?.items ?? []"
       :columns="columns"
       :loading="loading"
       data-test="fellows-table"
-    />
+    >
+      <template #empty>
+        <p class="py-6 text-center text-sm text-muted">
+          {{ search || show !== 'current'
+            ? 'Nobody on the roll matches that.'
+            : 'The roll is empty. The committee assembles it, and it is entered here by hand.' }}
+        </p>
+      </template>
+    </UTable>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p
         data-test="fellows-total"
         class="text-sm text-muted"
       >
-        {{ listing?.total ?? 0 }} Fellow(s)
+        {{ plural(listing?.total ?? 0, 'Fellow') }}
       </p>
       <UPagination
         v-if="listing && listing.pages > 1"
@@ -232,48 +272,61 @@ onMounted(load)
       description="One per person, for life. The citation is public wording and is shown as written."
     >
       <template #body>
-        <form
+        <UForm
+          ref="awardForm"
+          :schema="awardFellowship"
+          :state="award"
           class="space-y-4"
-          @submit.prevent="record"
+          @submit="record"
         >
           <UFormField
-            label="Account"
-            description="The account id of the person being honoured. They need one to hold the entitlement."
+            name="userId"
+            label="Who is being honoured"
+            description="They need an account to hold the entitlement."
+            required
           >
-            <UInput
+            <PersonPicker
               v-model="award.userId"
-              data-test="award-user"
-              required
-            />
-          </UFormField>
-          <UFormField label="Date awarded">
-            <UInput
-              v-model="award.awardedOn"
-              data-test="award-date"
-              type="date"
-              required
+              class="w-full"
             />
           </UFormField>
           <UFormField
+            name="awardedOn"
+            label="Date awarded"
+            required
+          >
+            <DateField
+              v-model="award.awardedOn"
+              data-test="award-date"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            name="awardedBy"
             label="Resolved by"
             description="The meeting that resolved it, not a person."
+            required
           >
             <UInput
               v-model="award.awardedBy"
               data-test="award-by"
               placeholder="Committee, 12 June 2019"
-              required
+              class="w-full"
             />
           </UFormField>
           <UFormField
+            name="citation"
             label="Citation"
             description="What it was awarded for, in the wording the theatre published."
+            required
           >
             <UTextarea
               v-model="award.citation"
               data-test="award-citation"
               :rows="3"
-              required
+              autoresize
+              :maxrows="6"
+              class="w-full"
             />
           </UFormField>
           <UButton
@@ -282,7 +335,7 @@ onMounted(load)
           >
             Record it
           </UButton>
-        </form>
+        </UForm>
       </template>
     </UModal>
 
@@ -293,19 +346,26 @@ onMounted(load)
       @update:open="revoking = null"
     >
       <template #body>
-        <form
+        <UForm
+          ref="revokeForm"
+          :schema="revokeFellowship"
+          :state="revocation"
           class="space-y-4"
-          @submit.prevent="revoke"
+          @submit="revoke"
         >
           <UFormField
+            name="reason"
             label="Reason"
             description="Kept on the record, and scrubbed if the person is later erased."
+            required
           >
             <UTextarea
-              v-model="reason"
+              v-model="revocation.reason"
               data-test="revoke-reason"
               :rows="3"
-              required
+              autoresize
+              :maxrows="6"
+              class="w-full"
             />
           </UFormField>
           <UButton
@@ -315,7 +375,7 @@ onMounted(load)
           >
             Revoke
           </UButton>
-        </form>
+        </UForm>
       </template>
     </UModal>
   </div>

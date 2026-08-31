@@ -52,8 +52,8 @@ const signsInWith = computed(() => {
   return [
     methods.password ? 'A password' : null,
     methods.google ? 'Google' : null,
-    methods.passkeys ? `${methods.passkeys} passkey(s)` : null,
-    methods.factor ? `An authenticator, with ${methods.recoveryCodesRemaining} recovery code(s) left` : null,
+    methods.passkeys ? plural(methods.passkeys, 'passkey') : null,
+    methods.factor ? `An authenticator, with ${plural(methods.recoveryCodesRemaining, 'recovery code')} left` : null,
   ].filter(Boolean) as string[]
 })
 

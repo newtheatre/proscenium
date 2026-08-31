@@ -1,7 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { z } from 'zod'
-
-const body = z.object({ reason: z.string().trim().min(1).max(500) })
+import { revokeFellowship as body } from '#shared/utils/admin-forms'
 
 // Revoke a fellowship, rewriting nothing (A-127 criterion 4, 0023).
 export default defineEventHandler(async (event) => {

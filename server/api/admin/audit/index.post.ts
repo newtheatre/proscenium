@@ -1,16 +1,5 @@
-import { z } from 'zod'
-import { MANUAL_ACTION_NAMES, isManualAction } from '#shared/utils/audit-actions'
-import type { AuditActionName } from '#shared/utils/audit-actions'
-
-const body = z.object({
-  action: z.enum(MANUAL_ACTION_NAMES as [AuditActionName, ...AuditActionName[]]),
-  // The person the entry is about, and the person it is recorded on behalf of. Both are account
-  // references: the trail never names somebody it cannot later anonymise (0011, 0027).
-  target: z.string().max(64),
-  onBehalfOf: z.string().max(64),
-  occurredAt: z.number().int().positive(),
-  detail: z.record(z.string().max(60), z.union([z.string().max(120), z.number(), z.boolean(), z.null()])).default({}),
-})
+import { recordManualEntry as body } from '#shared/utils/admin-forms'
+import { isManualAction } from '#shared/utils/audit-actions'
 
 // Record an action taken outside the system (J-103 criteria 2 and 3).
 export default defineEventHandler(async (event) => {

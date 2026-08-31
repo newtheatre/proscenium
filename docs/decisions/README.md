@@ -37,3 +37,4 @@ afterwards, only superseded.
 | 0029 | The end-to-end suites are a separate command | what `bun run test` covers, and what runs nightly |
 | 0030 | The old estate's audit history is not imported | why the archive was refused, and what answers a historical question |
 | 0031 | A membership is a term, and confirming it never gates money | what membership is, and what a check does and does not block |
+| 0032 | The admin surface has one set of component conventions | which component for which job, and what the test holds |

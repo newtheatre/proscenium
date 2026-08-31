@@ -128,7 +128,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect(JSON.parse(entry!.detail)).toMatchObject({ key: 'BAR_TAB_CAP_PENCE', changes: { value: { from: 2000, to: 2500 } } })
     }
     finally {
-      clearOverride('BAR_TAB_CAP_PENCE')
+      clearOverride('REFUND_UNPAID_CANCELLATION_FREE')
     }
   })
 
@@ -193,17 +193,29 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       await fillPin(view, '[data-test="mfa-challenge"] input', await unusedCode())
       await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
 
-      await visit(view, `${app.baseURL}/admin/config`, '[data-test="setting-BAR_TAB_CAP_PENCE"]')
+      await visit(view, `${app.baseURL}/admin/config`, '[data-test="config-search"]')
+
+      // Fifty keys, found by searching for what the key decides rather than its name (0032).
+      await fill(view, 'input[data-test="config-search"]', 'bar tab')
+      await waitFor(view, 'document.querySelector(\'[data-test="setting-BAR_TAB_CAP_PENCE"]\')')
       expect(await textOf(view)).toContain('Not enforced yet')
 
-      await fill(view, '[data-test="input-BAR_TAB_CAP_PENCE"]', '3000')
-      await click(view, '[data-test="save-BAR_TAB_CAP_PENCE"]')
+      // Money reads in pounds, which is what the officer types (0004). An input's value is not
+      // text on the page, so it is read rather than searched for.
+      const shown = await view.evaluate<string>(
+        `document.querySelector('input[data-test="input-BAR_TAB_CAP_PENCE"]')?.value ?? ''`)
+      // 2500 pence is what this suite set it to, and £25.00 is what that should read as.
+      expect(shown).toBe('£25.00')
+
+      await fill(view, 'input[data-test="config-search"]', 'cancel an unpaid booking')
+      await waitFor(view, 'document.querySelector(\'[data-test="toggle-REFUND_UNPAID_CANCELLATION_FREE"]\')')
+      await click(view, '[data-test="toggle-REFUND_UNPAID_CANCELLATION_FREE"]')
       await waitFor(view, 'document.body.innerText.includes("Changed by")')
 
-      expect((await settingFor('BAR_TAB_CAP_PENCE')).value).toBe(3000)
+      expect((await settingFor('REFUND_UNPAID_CANCELLATION_FREE')).value).toBe(false)
     }
     finally {
-      clearOverride('BAR_TAB_CAP_PENCE')
+      clearOverride('REFUND_UNPAID_CANCELLATION_FREE')
       view.close()
     }
   }, CASE_TIMEOUT_MS)

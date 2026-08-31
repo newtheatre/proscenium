@@ -1,14 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { z } from 'zod'
-
-const body = z.object({
-  userId: z.string().min(1).max(64),
-  // A London calendar date: what is recorded is the day the committee resolved it (0014).
-  awardedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Give the date as YYYY-MM-DD'),
-  // The meeting, never an individual: the theatre awards this (0023).
-  awardedBy: z.string().trim().min(1).max(200),
-  citation: z.string().trim().min(1).max(1000),
-})
+import { awardFellowship as body } from '#shared/utils/admin-forms'
 
 // Record a fellowship (A-127).
 export default defineEventHandler(async (event) => {

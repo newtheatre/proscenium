@@ -76,6 +76,12 @@ export default defineNuxtConfig({
     },
   },
 
+  // The developer tools do not exist in a build (K-124). A guard inside a file would still ship
+  // the file; this keeps them out of the bundle entirely.
+  ignore: process.env.NODE_ENV === 'production'
+    ? ['app/pages/dev.vue', 'server/api/dev/**', 'server/utils/dev.ts']
+    : [],
+
   experimental: {
     // A deploy rotates every asset hash, so an open tab asks for chunks that no longer exist.
     emitRouteChunkError: 'automatic-immediate',
@@ -85,6 +91,10 @@ export default defineNuxtConfig({
 
   nitro: {
     preset: 'cloudflare_module',
+
+    // Nuxt's own `ignore` covers the app; Nitro scans server/ separately, so the developer
+    // routes have to be excluded here too (K-124). A test on the built output proves it.
+    ignore: process.env.NODE_ENV === 'production' ? ['api/dev/**'] : [],
 
     experimental: {
       tasks: true,

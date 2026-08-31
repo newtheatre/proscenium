@@ -322,7 +322,7 @@ describe.skipIf(skip !== null)('the audit screen (J-101 criterion 2, J-103)', ()
     const view = await signedInView()
     try {
       await visit(view, `${app.baseURL}/admin/audit`, '[data-test="audit-table"]')
-      await fill(view, 'input[data-test="audit-target"]', `user:${member.id}`)
+      await fill(view, 'input[data-test="toolbar-search"]', `user:${member.id}`)
       await waitFor(view, `document.querySelector('[data-test="audit-table"]').innerText.includes('booking.refunded')`)
 
       // Rendered under its own name rather than crashing the table it is one row of.
@@ -340,7 +340,7 @@ describe.skipIf(skip !== null)('the audit screen (J-101 criterion 2, J-103)', ()
     const view = await signedInView()
     try {
       await visit(view, `${app.baseURL}/admin/audit`, '[data-test="audit-table"]')
-      await fill(view, 'input[data-test="audit-target"]', `user:${member.id}`)
+      await fill(view, 'input[data-test="toolbar-search"]', `user:${member.id}`)
       await waitFor(view, `document.querySelector('[data-test="audit-table"]').innerText.includes('Role granted')`)
 
       expect(await textOf(view, '[data-test="audit-table"]')).toContain(officer.name)

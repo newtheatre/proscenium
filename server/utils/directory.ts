@@ -130,7 +130,11 @@ export async function directoryPredicate(event: H3Event, query: DirectoryQuery):
 
   if (query.search) {
     const term = `%${query.search.toLowerCase()}%`
-    parts.push(or(like(sql`lower(${schema.users.name})`, term), like(schema.users.email, term))!)
+    parts.push(or(
+      like(sql`lower(${schema.users.name})`, term),
+      like(schema.users.email, term),
+      like(sql`lower(coalesce(${schema.users.studentId}, ''))`, term),
+    )!)
   }
 
   return parts.length > 0 ? and(...parts)! : ne(schema.users.id, '')

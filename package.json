@@ -21,7 +21,8 @@
     "typecheck:bun": "tsc -p tests --noEmit && tsc -p scripts --noEmit && tsc -p migration --noEmit",
     "grant-admin": "bun scripts/grant-admin.ts",
     "check:notifications": "bun scripts/check-notifications.ts",
-    "test:e2e": "bun scripts/run-tests.ts"
+    "test:e2e": "bun scripts/run-tests.ts",
+    "shots": "bun scripts/shots.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.2.5",

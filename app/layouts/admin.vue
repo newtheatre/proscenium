@@ -8,7 +8,10 @@ const links = [[
   { label: 'Fellows', icon: 'i-lucide-award', to: '/admin/fellows' },
   { label: 'Audit trail', icon: 'i-lucide-scroll-text', to: '/admin/audit' },
   { label: 'Settings', icon: 'i-lucide-settings', to: '/admin/config' },
-]]
+], // Development only, and absent from a build because the page it points at is (K-124).
+...import.meta.dev
+  ? [[{ label: 'Developer tools', icon: 'i-lucide-flask-conical', to: '/dev' }]]
+  : []]
 const route = useRoute()
 </script>
 
@@ -26,7 +29,7 @@ const route = useRoute()
         :items="links"
       />
       <template #footer>
-        <AuthStatus />
+        <AuthStatus stacked />
       </template>
     </UDashboardSidebar>
 
