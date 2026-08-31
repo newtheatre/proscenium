@@ -36,15 +36,35 @@ stay recognisably different while staying recognisably ours.
 | `gold` | The limelight. Highlights, celebration, hero moments on dark. |
 | `ash` | Stage-black neutrals, hue-matched to purple so dark surfaces read as the house rather than as dead black. |
 
-Two contrast floors are set in `:root` and must not be undone:
+Three contrast floors are set in `:root` and must not be undone:
 
 - Interactive purple resolves to `purple-600`. `purple-500` sits at roughly 3.9:1 on white, under
   the 4.5:1 floor for body-size text.
 - Interactive gold resolves to `gold-700`. `gold-400` is a fill colour only, and always carries
   `ash-950` text on top of it. On stage black, `gold-400` is the signature and needs no help.
+- Error red resolves to `red-700`. Nuxt UI ships `red-500`, and even `red-600` measures 4.0:1
+  against the tinted background of a subtle error alert, which is exactly where error text sits.
+  Measured by the axe run, not by eye (K-101).
 
-Under `.dark` both brighten to their 400s and the surfaces drop to the ash 950/900/800 ladder,
+Under `.dark` all three brighten to their 400s and the surfaces drop to the ash 950/900/800 ladder,
 which is what "stage black" means in practice.
+
+## Focus
+
+Keyboard focus is never removed, only restyled. `--nnt-focus-ring` is a two-pixel outline with a
+two-pixel offset, applied by `:focus-visible` to every focusable element, so a new screen inherits
+a visible focus indicator rather than opting into one (K-101 criterion 4). It brightens to gold
+under `.dark`, purple-600 being invisible against stage black.
+
+Two tests hold the floor: `design-language.test.ts` fails on any rule that removes an outline, and
+`tests/e2e/accessibility.test.ts` focuses a real control in a real browser and reads back the
+computed outline.
+
+## State is never only a colour
+
+Availability, validity and connection pair colour with words or shape (K-101 criterion 3). A badge
+with no text in it and an icon-only button with no accessible name both fail
+`design-language.test.ts`, which is how the rule survives the next screen.
 
 ## Type
 

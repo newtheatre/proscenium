@@ -155,7 +155,7 @@ export async function startApp(): Promise<AppUnderTest> {
   // Nuxt directly, not through `bun run dev`: that spawns a child, and killing the parent orphans
   // it still holding the port. Output is discarded, because a pipe nobody reads blocks the writer.
   const server: Subprocess = Bun.spawn(['./node_modules/.bin/nuxt', 'dev', '--port', port], {
-    env: { ...process.env, NUXT_PORT: port, NUXT_HUB_DIR: hubDir },
+    env: { ...process.env, NUXT_PORT: port, NUXT_HUB_DIR: hubDir, E2E_BASE_URL: BASE_URL },
     stdout: 'ignore',
     stderr: 'ignore',
   })

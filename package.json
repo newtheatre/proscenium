@@ -53,6 +53,7 @@
     "@iconify-json/simple-icons": "^1.2.54",
     "@libsql/client": "^0.17.4",
     "@types/bun": "1.4.0",
+    "axe-core": "^4.13.0",
     "better-sqlite3": "^12.11.1",
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.8.1",

@@ -59,7 +59,23 @@
   /* Gold carrying text in light mode needs 700; gold-400 is a fill colour
      only, and always under ash-950 text. */
   --ui-secondary: var(--ui-color-secondary-700);
+  /* Nuxt UI's error red is 500, and 600 still measures 4.0:1 against the tinted background of a
+     subtle error alert, which is exactly where error text sits. 700 clears it. */
+  --ui-error: var(--ui-color-error-700);
   --ui-radius: 0.375rem;
+
+  /* A focus ring a screen inherits rather than opts into (K-101 criterion 4). Two pixels and an
+     offset so it stays visible over a filled control as well as a bare one. */
+  --nnt-focus-width: 2px;
+  --nnt-focus-offset: 2px;
+  --nnt-focus-ring: var(--ui-color-primary-600);
+}
+
+/* Keyboard focus is never removed, only restyled. A control that takes focus must show it, and
+   :focus-visible means a mouse click does not paint a ring nobody asked for. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: var(--nnt-focus-width) solid var(--nnt-focus-ring);
+  outline-offset: var(--nnt-focus-offset);
 }
 
 .dark {
@@ -74,6 +90,9 @@
   /* Limelight: brand colours brighten under the lights. */
   --ui-primary: var(--ui-color-primary-400);
   --ui-secondary: var(--ui-color-secondary-400);
+  --ui-error: var(--ui-color-error-400);
+  /* Purple-600 disappears against stage black, so the ring brightens with everything else. */
+  --nnt-focus-ring: var(--ui-color-secondary-400);
 }
 
 /* The expressive kit. Public surfaces reach for these, internal tools do not. */
