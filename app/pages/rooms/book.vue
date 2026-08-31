@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { TIERS } from '#shared/utils/bookings'
 import { overCapacity } from '#shared/utils/rooms'
+import { REQUEST_REASON_LIMIT } from '#shared/utils/requests'
 import { formatLondon, fromLondonWallClock } from '#shared/utils/london'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { RoomHours } from '#shared/utils/rooms'
@@ -52,6 +53,7 @@ const state = reactive({
 const saving = ref(false)
 const failures = ref<Failure[]>([])
 const askInstead = ref(false)
+const reason = ref('')
 
 const { data: rooms } = await useAsyncData(
   'bookable-rooms',
@@ -126,7 +128,41 @@ async function book(event: FormSubmitEvent<z.output<typeof form>>): Promise<void
     const data = refusalData<{ failures?: Failure[], canRequest?: boolean, conflicts?: unknown[] }>(error)
     failures.value = data?.failures ?? []
     askInstead.value = data?.canRequest ?? false
-    if (failures.value.length === 0) toast.add({ title: refusalText(error), color: 'error' })
+    if (failures.value.length === 0 && !askInstead.value) toast.add({ title: refusalText(error), color: 'error' })
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+// The same span, asked for rather than taken. It holds the slot while somebody decides, so the
+// member is not racing anybody for it while they wait (C-108 criterion 2).
+async function ask(): Promise<void> {
+  saving.value = true
+  try {
+    await $fetch('/api/rooms/requests', {
+      method: 'POST',
+      body: {
+        roomId: state.roomId,
+        title: state.title,
+        startsAt: instantOf(state.day, state.from),
+        endsAt: instantOf(state.day, state.to),
+        attendees: state.attendees ?? null,
+        tier: state.tier,
+        reason: reason.value,
+      },
+    })
+
+    toast.add({
+      title: 'Asked for',
+      description: 'The slot is held while somebody decides.',
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    await navigateTo('/rooms/mine')
+  }
+  catch (error) {
+    toast.add({ title: refusalText(error), color: 'error' })
   }
   finally {
     saving.value = false
@@ -274,13 +310,39 @@ useSeoMeta({ title: 'Book a room' })
               v-if="askInstead"
               class="mt-2"
             >
-              Asking is not built yet, so for now speak to the Theatre Manager.
+              Ask for it anyway, and somebody will decide. The slot is held while they do.
             </p>
           </template>
         </UAlert>
 
+        <UFormField
+          v-if="askInstead"
+          label="Why this one is worth an exception"
+          name="reason"
+          required
+          :description="`Shown to whoever decides. Up to ${REQUEST_REASON_LIMIT} characters.`"
+        >
+          <UTextarea
+            v-model="reason"
+            :rows="3"
+            :maxlength="REQUEST_REASON_LIMIT"
+            class="w-full"
+            data-test="request-reason"
+          />
+        </UFormField>
+
         <div class="flex flex-wrap gap-2">
           <UButton
+            v-if="askInstead"
+            :loading="saving"
+            :disabled="!reason.trim()"
+            data-test="request-submit"
+            @click="ask"
+          >
+            Ask for it
+          </UButton>
+          <UButton
+            v-else
             type="submit"
             :loading="saving"
             data-test="booking-submit"

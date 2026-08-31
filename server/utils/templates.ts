@@ -144,6 +144,58 @@ The Nottingham New Theatre`,
     }
   },
 
+  'room-requested': (context: TemplateContext): Rendered => ({
+    subject: `Asked for: ${String(context.room)}, ${String(context.when)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Your request for ${context.room}, ${context.when}, is with the Theatre Manager. The slot is held
+while somebody decides, so nobody else can take it in the meantime.</p>
+<p>${context.title}</p>
+<p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
+    text: `Hello ${context.name},
+
+Your request for ${String(context.room)}, ${String(context.when)}, is with the Theatre Manager. The
+slot is held while somebody decides, so nobody else can take it in the meantime.
+
+${String(context.title)}
+
+${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
+  'room-request-waiting': (context: TemplateContext): Rendered => ({
+    subject: `A room request is waiting: ${String(context.room)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>A request for ${context.room}, ${context.when}, has been waiting for a decision.</p>
+<p>${context.title}</p>
+<p>The slot is held until somebody answers, so nobody else can book it while it waits.</p>`),
+    text: `Hello ${context.name},
+
+A request for ${String(context.room)}, ${String(context.when)}, has been waiting for a decision.
+
+${String(context.title)}
+
+The slot is held until somebody answers, so nobody else can book it while it waits.
+
+The Nottingham New Theatre`,
+  }),
+
+  'room-request-expired': (context: TemplateContext): Rendered => ({
+    subject: `Lapsed: ${String(context.room)}, ${String(context.when)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Your request for ${context.room}, ${context.when}, lapsed because nobody answered it in time.
+The slot is free again, so it can be asked for or booked afresh.</p>
+<p>${context.title}</p>`),
+    text: `Hello ${context.name},
+
+Your request for ${String(context.room)}, ${String(context.when)}, lapsed because nobody answered
+it in time. The slot is free again, so it can be asked for or booked afresh.
+
+${String(context.title)}
+
+The Nottingham New Theatre`,
+  }),
+
   'account-exists': (context: TemplateContext): Rendered => ({
     subject: 'You already have an account',
     html: layout(`<p>Hello ${context.name},</p>

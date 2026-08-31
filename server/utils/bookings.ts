@@ -1,6 +1,8 @@
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
+import { isCurrent } from '#shared/utils/membership'
 import type { BookingStatus, Conflict } from '#shared/utils/bookings'
+import type { H3Event } from 'h3'
 
 // The slot claim. One guarded statement, never a read then a check then a write: two requests
 // arriving together must not both see the slot free (0003, 0006, C-107 criterion 2).
@@ -15,6 +17,8 @@ export interface ClaimInput {
   tier: string
   status: BookingStatus
   notes: string | null
+  // Why an exception is being asked for. Null on an ordinary booking, required on a request.
+  reason?: string | null
 }
 
 export type ClaimOutcome
@@ -33,9 +37,10 @@ export async function claimSlot(input: ClaimInput): Promise<ClaimOutcome> {
   // RETURNING rather than a changes count: the driver's meta is not a shape to rely on, and a row
   // coming back is the same signal claimToken uses to know it won (0003).
   const claimed = await db.all<{ id: string }>(sql`
-    INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, status, notes)
+    INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, status, notes, reason)
     SELECT ${id}, ${input.roomId}, ${input.userId}, ${input.title}, ${input.attendees},
-           ${input.startsAt}, ${input.endsAt}, ${input.tier}, ${input.status}, ${input.notes}
+           ${input.startsAt}, ${input.endsAt}, ${input.tier}, ${input.status}, ${input.notes},
+           ${input.reason ?? null}
     WHERE EXISTS (SELECT 1 FROM rooms WHERE id = ${input.roomId} AND is_active = 1)
       AND NOT EXISTS (
         SELECT 1 FROM room_bookings
@@ -133,4 +138,20 @@ export async function bookingFor(id: string): Promise<BookingRow | undefined> {
     .limit(1)
 
   return row
+}
+
+export async function hasCurrentMembership(event: H3Event, userId: string, now: Date): Promise<boolean> {
+  // The longest-running term the person holds: a three-year membership outlives a one-year one
+  // bought later, and either counts (0031).
+  const [term] = await db.select({
+    startsOn: schema.memberships.startsOn,
+    expiresOn: schema.memberships.expiresOn,
+  })
+    .from(schema.memberships)
+    .where(eq(schema.memberships.userId, userId))
+    .orderBy(desc(schema.memberships.expiresOn))
+    .limit(1)
+
+  if (!term) return false
+  return isCurrent(term, londonDay(now), await configValue(event, 'MEMBERSHIP_GRACE_DAYS'))
 }

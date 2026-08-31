@@ -58,6 +58,21 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'room-booked',
   },
+  'room.request.received': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-requested',
+  },
+  'room.request.waiting': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-request-waiting',
+  },
+  'room.request.expired': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-request-expired',
+  },
   'room.booking.cancelled': {
     topic: 'ROOMS',
     channels: ['EMAIL'],

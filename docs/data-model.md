@@ -506,7 +506,9 @@ stateDiagram-v2
 · `starts_at` · `ends_at` (half-open interval; CHECK `ends_at > starts_at`) · `tier`, **no CHECK**,
 enum in `shared/utils/bookings.ts` · `status` CHECK
 `CONFIRMED|PENDING_APPROVAL|REJECTED|CANCELLED|BUMPED` · `rejection_reason` scrub · `notes`
-scrub · `no_show_recorded_at` NULL · timestamps. Indexed on `(room_id, starts_at, ends_at)`, which
+scrub · `reason` scrub (why an exception is asked for, the member's own words, C-108) ·
+`escalated_at` NULL (when the approvers were told it was waiting, so a sweep tells them once) ·
+`no_show_recorded_at` NULL · timestamps. Indexed on `status`, which the request sweep reads. Indexed on `(room_id, starts_at, ends_at)`, which
 is exactly what the clash predicate reads, and on `user_id` for the active-bookings cap.
 `tier` carries no CHECK because `ROOM_PRIORITY_TIERS` is committee-editable, and a constraint
 behind an editable list breaks writes the moment the list is used (0033's reasoning, C-115).
@@ -523,6 +525,12 @@ Occupancy: `CONFIRMED` and `PENDING_APPROVAL` hold their slot; the clash rule is
 and rides the write as a predicate. `server/utils/bookings.ts` is the only writer, and it is one
 guarded `INSERT ... SELECT ... WHERE NOT EXISTS ... RETURNING id`: a row returned is the win, and
 no rows is disambiguated by a single read into gone (410) or beaten (409), the pattern 0003 names.
+A request lands `PENDING_APPROVAL`, which already holds its slot in both the clash predicate and the
+availability sweep, so a decision in progress cannot be booked out from under (C-108 criterion 2).
+`rooms:sweep` tells the approvers once when a request has waited past `ROOM_REQUEST_ESCALATE_HOURS`
+and lapses it past `ROOM_REQUEST_EXPIRE_HOURS`, both guarded on the status they read so an approver
+deciding at the same moment wins. Approvers are whoever holds `rooms.write`; there is no approver
+role, and C-109's queue reads it the same way.
 There is no override, deliberate or otherwise: blackouts (C-114) and priority tiers (C-115) are how
 a legitimate double-booking happens, and each leaves a record of what happened and why.
 Read back through `GET /api/rooms/availability`, which takes a span of London days, counts the

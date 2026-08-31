@@ -135,6 +135,18 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'No-shows in a term before every further booking needs pre-approval.',
   },
+  ROOM_REQUEST_ESCALATE_HOURS: {
+    schema: z.number().int().positive(),
+    default: 48,
+    workshop: 'spaces-and-training',
+    describes: 'How long a request may wait before the approvers are told it is waiting.',
+  },
+  ROOM_REQUEST_EXPIRE_HOURS: {
+    schema: z.number().int().positive(),
+    default: 168,
+    workshop: 'spaces-and-training',
+    describes: 'How long a request may wait before it lapses and the member is told.',
+  },
   ROOM_AVAILABILITY_ROW_BOUND: {
     schema: z.number().int().positive(),
     default: 1000,
@@ -365,6 +377,8 @@ export const ENFORCED_KEYS = [
   'MEMBERSHIP_GRACE_DAYS',
   'ROOM_ACTIVE_BOOKINGS_PER_MEMBER',
   'ROOM_AVAILABILITY_ROW_BOUND',
+  'ROOM_REQUEST_ESCALATE_HOURS',
+  'ROOM_REQUEST_EXPIRE_HOURS',
   'ROOM_AUTO_APPROVE_NOTICE_HOURS',
   'ROOM_BOOKING_HORIZON_WEEKS',
   'ROOM_MAX_BOOKING_ADMINS_EXEMPT',
