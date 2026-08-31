@@ -105,11 +105,11 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Notice below which a request goes to the approval queue instead of auto-approving.',
   },
-  ROOM_BOOKING_HORIZON: {
-    schema: z.enum(['END_OF_TERM', 'END_OF_SEASON']),
-    default: 'END_OF_TERM',
+  ROOM_BOOKING_HORIZON_WEEKS: {
+    schema: z.number().int().positive(),
+    default: 12,
     workshop: 'spaces-and-training',
-    describes: 'How far ahead a member may book.',
+    describes: 'How many weeks ahead a member may book. Weeks, not end of term: no term dates exist (0034).',
   },
   ROOM_ACTIVE_BOOKINGS_PER_MEMBER: {
     schema: z.number().int().positive(),
