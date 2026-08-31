@@ -12,6 +12,10 @@ export interface RoomRow {
   capacity: number | null
   isActive: boolean
   sensitive: boolean
+  isExternal: boolean
+  campus: string | null
+  building: string | null
+  contact: string | null
   hours: RoomHours[]
 }
 
@@ -22,6 +26,10 @@ const COLUMNS = {
   capacity: schema.rooms.capacity,
   isActive: schema.rooms.isActive,
   sensitive: schema.rooms.sensitive,
+  isExternal: schema.rooms.isExternal,
+  campus: schema.rooms.campus,
+  building: schema.rooms.building,
+  contact: schema.rooms.contact,
 }
 
 const HOUR_COLUMNS = {
@@ -73,7 +81,7 @@ export async function findRoom(id: string): Promise<RoomRow | undefined> {
 // The diff criterion 1 asks for: what changed, from what, to what. Nothing here is personal.
 export function roomChanges(before: RoomRow, after: RoomInput): Record<string, [unknown, unknown]> {
   const changes: Record<string, [unknown, unknown]> = {}
-  for (const field of ['name', 'description', 'capacity', 'isActive', 'sensitive'] as const) {
+  for (const field of ['name', 'description', 'capacity', 'isActive', 'sensitive', 'isExternal', 'campus', 'building', 'contact'] as const) {
     if (before[field] !== after[field]) changes[field] = [before[field], after[field]]
   }
   return changes

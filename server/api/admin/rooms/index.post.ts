@@ -19,13 +19,17 @@ export default defineEventHandler(async (event) => {
       capacity: input.capacity,
       isActive: input.isActive,
       sensitive: input.sensitive,
+      isExternal: input.isExternal,
+      campus: input.campus,
+      building: input.building,
+      contact: input.contact,
     }),
     ...input.hours.map(day => db.insert(schema.roomHours).values({ id: newId(), roomId: id, ...day })),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'room.created',
       target: `room:${id}`,
-      detail: { name: input.name, sensitive: input.sensitive },
+      detail: { name: input.name, sensitive: input.sensitive, external: input.isExternal },
     })),
   ])
 
