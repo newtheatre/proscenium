@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { TIERS } from '#shared/utils/bookings'
+import { overCapacity } from '#shared/utils/rooms'
 import { formatLondon, fromLondonWallClock } from '#shared/utils/london'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { RoomHours } from '#shared/utils/rooms'
@@ -79,6 +80,11 @@ function instantOf(day: string, clock: string): string {
   return fromLondonWallClock(year!, month!, date!, hour!, minute!).toISOString()
 }
 
+// The room cannot hold more than it holds, so the field will not go above it. The write path
+// still only warns, which is what C-101 criterion 5 asks for: this guides rather than refuses.
+const capacity = computed(() => room.value?.capacity ?? undefined)
+const tooMany = computed(() => overCapacity(room.value?.capacity ?? null, state.attendees ?? null))
+
 // Said before submitting, not after: a room somebody else books, or one that always asks, is
 // worth knowing about while the form is still being filled in (C-105 criterion 5).
 const warnsUpFront = computed(() => {
@@ -107,8 +113,12 @@ async function book(event: FormSubmitEvent<z.output<typeof form>>): Promise<void
       },
     })
 
-    toast.add({ title: 'Booked', icon: 'i-lucide-check', color: 'success' })
-    if (answer.warning) toast.add({ title: answer.warning, color: 'warning' })
+    toast.add({
+      title: 'Booked',
+      description: answer.warning ?? undefined,
+      icon: 'i-lucide-check',
+      color: answer.warning ? 'warning' : 'success',
+    })
     await navigateTo('/rooms')
   }
   catch (error) {
@@ -219,11 +229,13 @@ useSeoMeta({ title: 'Book a room' })
           label="How many people"
           name="attendees"
           hint="Optional"
-          :description="room?.capacity ? `The room holds ${room.capacity}. More is allowed, and worth checking.` : undefined"
+          :description="room?.capacity ? `The room holds ${room.capacity}.` : undefined"
+          :help="tooMany ?? undefined"
         >
           <UInputNumber
             v-model="state.attendees"
             :min="1"
+            :max="capacity"
             class="w-full"
             data-test="booking-attendees"
           />
