@@ -148,6 +148,13 @@
       "when": 1788217233320,
       "tag": "0020_hot_professor_monster",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1788219112124,
+      "tag": "0021_rare_luminals",
+      "breakpoints": true
     }
   ]
 }

@@ -508,6 +508,7 @@ enum in `shared/utils/bookings.ts` · `status` CHECK
 `CONFIRMED|PENDING_APPROVAL|REJECTED|CANCELLED|BUMPED` · `rejection_reason` scrub · `notes`
 scrub · `reason` scrub (why an exception is asked for, the member's own words, C-108) ·
 `escalated_at` NULL (when the approvers were told it was waiting, so a sweep tells them once) ·
+`decided_by` → users NULL, `decided_at` NULL (who answered the request, and when) ·
 `no_show_recorded_at` NULL · timestamps. Indexed on `status`, which the request sweep reads. Indexed on `(room_id, starts_at, ends_at)`, which
 is exactly what the clash predicate reads, and on `user_id` for the active-bookings cap.
 `tier` carries no CHECK because `ROOM_PRIORITY_TIERS` is committee-editable, and a constraint
@@ -531,6 +532,28 @@ availability sweep, so a decision in progress cannot be booked out from under (C
 and lapses it past `ROOM_REQUEST_EXPIRE_HOURS`, both guarded on the status they read so an approver
 deciding at the same moment wins. Approvers are whoever holds `rooms.write`; there is no approver
 role, and C-109's queue reads it the same way.
+
+The queue is `GET /api/admin/rooms/requests`, gated on `rooms.write`, and it **re-judges every
+waiting request as it reads it** rather than recalling the verdict from when it was written: a
+request made on Monday may have run out of notice by Thursday, and the officer deciding needs what
+is true now (C-109 criterion 1). The requester's standing is what it judges against, never the
+reader's.
+
+`POST /api/admin/rooms/requests/decide` answers one or up to a hundred at once. Each decision is
+**its own guarded statement**, never one `UPDATE` over an id list: the clash rule rides the
+approving write, so an approval beaten to the slot returns a conflict listing what took it rather
+than confirming a double booking (criterion 3, audit RM-4). No statement's parameter count grows
+with the batch; the read that fetches the rows first chunks at 90 (0003). A zero-row write is
+disambiguated by one read into missing, already settled, room gone, or beaten, so a partly refused
+batch says which ones and why rather than reading as a success.
+`REJECTED`, `CANCELLED` and `BUMPED` are terminal for everyone, officers included: reopening is
+refused because the slot may already be somebody else's (criterion 5). An approval may move the
+booking into a different room, one at a time, and the clash rule is asserted against the room it is
+going into.
+Decisions notify **once per member per action**: five approvals for one person in one batch are
+five lines of one email, not five emails (criterion 4). A rejection reason is shown to the
+requester word for word, in the message and in their own booking list (criterion 2), and stays out
+of the audit trail, which records the room and the decision only (0011).
 There is no override, deliberate or otherwise: blackouts (C-114) and priority tiers (C-115) are how
 a legitimate double-booking happens, and each leaves a record of what happened and why.
 Read back through `GET /api/rooms/availability`, which takes a span of London days, counts the

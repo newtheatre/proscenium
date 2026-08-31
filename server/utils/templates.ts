@@ -196,6 +196,57 @@ ${String(context.title)}
 The Nottingham New Theatre`,
   }),
 
+  // One decision or five, the same shape: a list, so a batch never becomes a run of emails.
+  'room-approved': (context: TemplateContext): Rendered => {
+    const bookings = context.bookings as { room: string, title: string, when: string }[]
+    const moved = context.moved ? `They are in ${String(context.moved)}, which is not the room asked for.` : ''
+    return {
+      subject: bookings.length === 1
+        ? `Approved: ${bookings[0]!.room}, ${bookings[0]!.when}`
+        : `Approved: ${bookings.length} room requests`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${bookings.length === 1 ? 'Your request has been approved.' : 'Your requests have been approved.'} ${moved}</p>
+<ul>${bookings.map(booking => `<li>${booking.room}, ${booking.when}: ${booking.title}</li>`).join('')}</ul>
+<p><a href="${String(context.roomsUrl)}">See what you hold</a></p>`),
+      text: `Hello ${context.name},
+
+${bookings.length === 1 ? 'Your request has been approved.' : 'Your requests have been approved.'} ${moved}
+
+${bookings.map(booking => `- ${booking.room}, ${booking.when}: ${booking.title}`).join('\n')}
+
+See what you hold: ${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
+  // The reason is shown word for word, because it is what the requester was told (criterion 2).
+  'room-rejected': (context: TemplateContext): Rendered => {
+    const bookings = context.bookings as { room: string, title: string, when: string }[]
+    const reason = String(context.reason ?? '')
+    return {
+      subject: bookings.length === 1
+        ? `Not approved: ${bookings[0]!.room}, ${bookings[0]!.when}`
+        : `Not approved: ${bookings.length} room requests`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${bookings.length === 1 ? 'Your request was not approved.' : 'Your requests were not approved.'}</p>
+<ul>${bookings.map(booking => `<li>${booking.room}, ${booking.when}: ${booking.title}</li>`).join('')}</ul>
+<p>Why: ${reason}</p>
+<p>The slot is free again. <a href="${String(context.roomsUrl)}">See what you hold</a></p>`),
+      text: `Hello ${context.name},
+
+${bookings.length === 1 ? 'Your request was not approved.' : 'Your requests were not approved.'}
+
+${bookings.map(booking => `- ${booking.room}, ${booking.when}: ${booking.title}`).join('\n')}
+
+Why: ${reason}
+
+The slot is free again. See what you hold: ${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'account-exists': (context: TemplateContext): Rendered => ({
     subject: 'You already have an account',
     html: layout(`<p>Hello ${context.name},</p>

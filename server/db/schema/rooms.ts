@@ -73,6 +73,10 @@ export const roomBookings = sqliteTable('room_bookings', {
   // When the approvers were told this had been waiting, so a nightly sweep tells them once.
   escalatedAt: integer('escalated_at'),
   rejectionReason: text('rejection_reason'),
+  // Who answered the request, and when. No delete action: SQLite cannot add one to an existing
+  // table, and erasure anonymises rather than deletes, so no row loses its officer (0011).
+  decidedBy: text('decided_by').references(() => users.id),
+  decidedAt: integer('decided_at'),
   noShowRecordedAt: integer('no_show_recorded_at'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),

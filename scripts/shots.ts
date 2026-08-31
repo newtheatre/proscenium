@@ -131,6 +131,21 @@ if (studio) {
   }, cookie)
 }
 
+// Inside the notice window, so the policy refuses it and it becomes a request: the queue with
+// nothing waiting in it is not a picture of the queue.
+if (studio) {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  tomorrow.setHours(19, 0, 0, 0)
+  await send('POST', '/api/rooms/requests', {
+    roomId: studio.id,
+    title: 'Tech run, The Seagull',
+    startsAt: tomorrow.toISOString(),
+    endsAt: new Date(tomorrow.getTime() + 3 * 3_600_000).toISOString(),
+    reason: 'The get-in moved to Friday, so the tech has to be tomorrow.',
+  }, cookie)
+}
+
 const view = await openSignedOutView(app.baseURL)
 await visit(view, `${app.baseURL}/sign-in`)
 await fill(view, 'form input[type="email"]', email)
@@ -182,6 +197,7 @@ const SHOTS: Shot[] = [
     }
   })()` },
   { name: '10c-rooms-filters', path: '/admin/rooms', marker: '[data-test="rooms-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '10d-requests', path: '/admin/requests', marker: '[data-test="requests-table"]' },
   { name: '11-config', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
   { name: '12-dev-tools', path: '/dev', marker: '[data-test="dev-seed"]' },
   { name: '13-people-narrow', path: '/admin/people', marker: '[data-test="directory-table"]', width: NARROW },

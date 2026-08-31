@@ -70,7 +70,7 @@ async function whyItFailed(input: ClaimInput): Promise<ClaimOutcome> {
 
 // What is in the way, for the refusal to quote. Masked by the caller, never here: this returns the
 // truth and the route decides who may see it (C-103 criterion 4).
-export async function conflictsWith(span: { roomId: string, startsAt: number, endsAt: number }): Promise<Conflict[]> {
+export async function conflictsWith(span: { roomId: string, startsAt: number, endsAt: number, exceptId?: string }): Promise<Conflict[]> {
   const rows = await db.select({
     startsAt: schema.roomBookings.startsAt,
     endsAt: schema.roomBookings.endsAt,
@@ -84,6 +84,8 @@ export async function conflictsWith(span: { roomId: string, startsAt: number, en
       inArray(schema.roomBookings.status, [...HOLDS_A_SLOT]),
       sql`${schema.roomBookings.startsAt} < ${span.endsAt}`,
       sql`${schema.roomBookings.endsAt} > ${span.startsAt}`,
+      // The row being decided on is not in its own way (C-109).
+      span.exceptId ? sql`${schema.roomBookings.id} <> ${span.exceptId}` : undefined,
     ))
 
   return rows.map(row => ({
