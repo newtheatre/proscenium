@@ -102,3 +102,35 @@ export async function activeBookingsFor(userId: string, now: number): Promise<nu
 
   return row?.held ?? 0
 }
+
+export interface BookingRow {
+  id: string
+  roomId: string
+  room: string
+  isExternal: boolean
+  userId: string
+  title: string
+  startsAt: number
+  endsAt: number
+  status: string
+}
+
+export async function bookingFor(id: string): Promise<BookingRow | undefined> {
+  const [row] = await db.select({
+    id: schema.roomBookings.id,
+    roomId: schema.roomBookings.roomId,
+    room: schema.rooms.name,
+    isExternal: schema.rooms.isExternal,
+    userId: schema.roomBookings.userId,
+    title: schema.roomBookings.title,
+    startsAt: schema.roomBookings.startsAt,
+    endsAt: schema.roomBookings.endsAt,
+    status: schema.roomBookings.status,
+  })
+    .from(schema.roomBookings)
+    .innerJoin(schema.rooms, eq(schema.rooms.id, schema.roomBookings.roomId))
+    .where(eq(schema.roomBookings.id, id))
+    .limit(1)
+
+  return row
+}

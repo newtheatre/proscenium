@@ -84,6 +84,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/auth/passkey/register.post.ts', actions: ['account.method.added'] },
   { route: 'server/api/auth/passkey/authenticate.post.ts', actions: ['session.started.passkey'] },
   { route: 'server/api/rooms/availability.get.ts', exempt: 'reads what is already taken' },
+  { route: 'server/api/rooms/bookings/index.get.ts', exempt: 'reads the bookings you hold' },
+  { route: 'server/api/rooms/bookings/[id]/cancel.post.ts', actions: ['room.booking.cancelled'] },
   { route: 'server/api/rooms/bookings.post.ts', actions: ['room.booked'] },
   { route: 'server/api/admin/rooms/index.get.ts', exempt: 'reads the bookable estate' },
   { route: 'server/api/admin/rooms/index.post.ts', actions: ['room.created'] },

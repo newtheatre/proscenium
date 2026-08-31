@@ -514,6 +514,11 @@ behind an editable list breaks writes the moment the list is used (0033's reason
 is not a rebuild, and this table is not append-only in any case.
 Erasure scrubs `title` and `notes` and keeps the row: the room was used, which is a fact about the
 room rather than about the person (0011).
+A member cancels through `POST /api/rooms/bookings/[id]/cancel`, which is **a status change and
+never a deletion**: no member-facing delete path exists at all, rather than one that refuses
+(C-112 criterion 2, audit RM-3). The write is guarded on the status it read, so two cancels racing
+leave one success. `CANCELLED`, `REJECTED` and `BUMPED` are terminal, and the row stays in the
+member's own list with its status (criterion 5).
 Occupancy: `CONFIRMED` and `PENDING_APPROVAL` hold their slot; the clash rule is half-open
 and rides the write as a predicate. `server/utils/bookings.ts` is the only writer, and it is one
 guarded `INSERT ... SELECT ... WHERE NOT EXISTS ... RETURNING id`: a row returned is the win, and
