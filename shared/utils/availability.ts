@@ -8,11 +8,11 @@ export const MAX_AVAILABILITY_DAYS = 31
 
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/
 
-export type Window
+export type AvailabilityWindow
   = | { ok: true, fromAt: Date, toAt: Date, days: number }
     | { ok: false, why: string }
 
-export function planWindow(from: string, to: string): Window {
+export function planWindow(from: string, to: string): AvailabilityWindow {
   const start = DAY.exec(from)
   const end = DAY.exec(to)
   if (!start || !end) return { ok: false, why: 'A date reads as YYYY-MM-DD' }
