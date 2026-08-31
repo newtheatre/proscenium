@@ -141,7 +141,7 @@ useSeoMeta({ title: 'Rooms' })
     />
 
     <div class="mt-6 flex flex-wrap items-center gap-2">
-      <UButtonGroup>
+      <UFieldGroup>
         <UButton
           icon="i-lucide-chevron-left"
           color="neutral"
@@ -166,7 +166,7 @@ useSeoMeta({ title: 'Rooms' })
           data-test="calendar-forward"
           @click="move(1)"
         />
-      </UButtonGroup>
+      </UFieldGroup>
 
       <USelect
         v-model="roomId"
@@ -175,7 +175,7 @@ useSeoMeta({ title: 'Rooms' })
         data-test="calendar-room"
       />
 
-      <UButtonGroup v-if="!narrow">
+      <UFieldGroup v-if="!narrow">
         <UButton
           :color="view === 'day' ? 'primary' : 'neutral'"
           variant="outline"
@@ -192,7 +192,7 @@ useSeoMeta({ title: 'Rooms' })
         >
           Week
         </UButton>
-      </UButtonGroup>
+      </UFieldGroup>
 
       <UIcon
         v-if="status === 'pending'"
