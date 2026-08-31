@@ -53,6 +53,10 @@ jobs:
       - name: Content tokens
         run: bun run check:content-tokens
 
+      # A money path that writes the ledger itself is a path that can forget to (0004).
+      - name: Ledger
+        run: bun run check:ledger
+
       # Anything but the notification centre reaching the mail binding skips every rule the
       # centre enforces (0013).
       - name: Notifications

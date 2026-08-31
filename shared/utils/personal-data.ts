@@ -153,6 +153,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'A password step waiting for its second factor, which expires anyway.',
   },
   {
+    name: 'ledger_entries',
+    column: 'actor_id',
+    section: 'money',
+    columns: ['happened_at', 'london_day', 'source', 'tender', 'total_pence'],
+    erasure: 'keep',
+    // Append-only and trigger-enforced, so a scrub could not run here even if it were wanted: the
+    // reference resolves to the tombstone the user row became (0004, 0010, 0011).
+    why: 'Money the theatre took. Sales statistics survive an erasure; the person in them does not.',
+  },
+  {
     name: 'config',
     column: 'updated_by',
     section: null,

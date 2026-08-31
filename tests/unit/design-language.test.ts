@@ -40,3 +40,61 @@ describe('design language (0021)', () => {
     expect(theme).not.toContain('fonts.googleapis.com')
   })
 })
+
+// K-101 criterion 4: a new screen inherits focus and contrast from the tokens rather than
+// remembering to ask for them.
+describe('the accessibility floor is in the tokens (K-101)', () => {
+  test('the token source defines a focus ring, and both themes have one', async () => {
+    const theme = await Bun.file(TOKEN_SOURCE).text()
+    expect(theme).toContain('--nnt-focus-ring')
+    expect(theme).toContain(':focus-visible')
+    // The light value and the dark override: purple-600 vanishes against stage black.
+    expect(theme.match(/--nnt-focus-ring:/g)?.length).toBeGreaterThanOrEqual(2)
+  })
+
+  test('nothing removes a focus outline without putting one back', async () => {
+    const offenders: string[] = []
+    for (const file of await appFiles()) {
+      const source = await Bun.file(file).text()
+      source.split('\n').forEach((line, index) => {
+        if (/outline\s*:\s*(none|0)\b/.test(line) || /\boutline-none\b/.test(line)) {
+          offenders.push(`${file}:${index + 1}`)
+        }
+      })
+    }
+    expect(offenders).toEqual([])
+  })
+})
+
+// K-101 criterion 3: availability, validity and connection are never carried by colour alone.
+describe('colour is never the only thing saying it (K-101)', () => {
+  test('every badge carries words, not just a colour', async () => {
+    const offenders: string[] = []
+    for (const file of (await appFiles()).filter(path => path.endsWith('.vue'))) {
+      const source = await Bun.file(file).text()
+      for (const badge of source.matchAll(/<UBadge\b([^>]*?)(\/>|>([\s\S]*?)<\/UBadge>)/g)) {
+        const attributes = badge[1] ?? ''
+        const between = (badge[3] ?? '').trim()
+        const labelled = /\blabel\s*=/.test(attributes) || /:label\s*=/.test(attributes)
+          || /aria-label\s*=/.test(attributes) || between.length > 0
+        if (!labelled) offenders.push(`${file}  a badge with no words in it`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  test('an icon standing on its own says what it is', async () => {
+    const offenders: string[] = []
+    for (const file of (await appFiles()).filter(path => path.endsWith('.vue'))) {
+      const source = await Bun.file(file).text()
+      for (const button of source.matchAll(/<UButton\b([^>]*?)\/>/g)) {
+        const attributes = button[1] ?? ''
+        const hasIcon = /\bicon\s*=/.test(attributes) || /:icon\s*=/.test(attributes)
+        const hasWords = /\blabel\s*=/.test(attributes) || /:label\s*=/.test(attributes)
+          || /aria-label\s*=/.test(attributes) || /:aria-label\s*=/.test(attributes)
+        if (hasIcon && !hasWords) offenders.push(`${file}  an icon-only button with no name`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})
