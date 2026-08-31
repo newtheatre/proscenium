@@ -227,6 +227,8 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
 
       await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
+      // A week of every room is the summary; the slots live behind the day view.
+      await click(view, '[data-test="calendar-day"]')
       await waitFor(view, `document.querySelectorAll('[data-test^="slot-"]').length > 0`, 30_000)
 
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
@@ -254,6 +256,7 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
 
       await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
+      await click(view, '[data-test="calendar-day"]')
       await waitFor(view, `document.querySelectorAll('[data-test^="slot-"]').length > 0`, 30_000)
 
       await view.evaluate(`[...document.querySelectorAll('[data-test^="slot-"]')].find(button => !button.disabled).click()`)
@@ -261,8 +264,65 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
 
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
       // The room, the day and the time came with the click (criterion 2).
-      const day = await view.evaluate<string>(`[...document.querySelectorAll('[data-test="booking-day"] input')].map(input => input.value).join('')`)
+      const day = await view.evaluate<string>(`[...document.querySelectorAll('[data-test="booking-day"] input')].map(field => field.value).join('')`)
       expect(day.replace(/\D/g, '')).toHaveLength(8)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  // How most members will arrive: a QR code or a link somebody sent them, followed while signed
+  // out. The query has to survive the round trip or the form opens empty.
+  test('a booking link followed signed out lands on the form it named', async () => {
+    const password = generatePassword()
+    const invited = await registerMember(app, 'invited', password)
+    giveMembership(invited.id)
+    const room = await makeRoom()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      const wanted = `/rooms/book?room=${room}&day=2026-09-14&at=14%3A30`
+      await visit(view, `${app.baseURL}${wanted}`)
+      await waitFor(view, `location.pathname === '/sign-in'`, 30_000)
+
+      await fill(view, 'form input[type="email"]', invited.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+
+      await waitFor(view, `document.querySelector('[data-test="booking-form"]')`, 30_000)
+      const at = await view.evaluate<string>(`document.querySelector('[data-test="booking-from"]').value`)
+      expect(at).toBe('14:30')
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  // Rooms across for a day, days across for one room: the same grid asked two questions.
+  test('every room shows as columns for one day, and one room as a week', async () => {
+    const password = generatePassword()
+    const planner = await registerMember(app, 'shapes', password)
+    giveMembership(planner.id)
+    await makeRoom()
+    await makeRoom()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', planner.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+
+      // Every room, a week: a count per room per day rather than an unreadable grid.
+      await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
+      await waitFor(view, `document.querySelector('[data-test="calendar-summary"]')`, 30_000)
+
+      // Every room, a day: the columns are rooms.
+      await click(view, '[data-test="calendar-day"]')
+      await waitFor(view, `document.querySelectorAll('[data-test^="slot-"]').length > 0`, 30_000)
+      expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
     }
     finally {
       view.close()

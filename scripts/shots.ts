@@ -111,6 +111,26 @@ await send('POST', '/api/admin/fellowships', {
   citation: 'For founding the studio season.',
 }, cookie)
 
+// Booking a room needs a current membership (C-105 criterion 2), and an officer is not exempt.
+sql(`INSERT INTO memberships (id, user_id, starts_on, expires_on, source)
+     VALUES (?, (SELECT id FROM users WHERE email = ?), date('now', '-30 days'), date('now', '+300 days'), 'MANUAL')`,
+crypto.randomUUID().replaceAll('-', ''), email)
+
+const roomsForShots = await (await send('GET', '/api/admin/rooms', undefined, cookie)).json() as { items: { id: string, name: string }[] }
+const studio = roomsForShots.items.find(room => room.name === 'The Studio') ?? roomsForShots.items[0]
+if (studio) {
+  // Beyond the notice window, or the policy refuses it as short notice and the picture is empty.
+  const soon = new Date()
+  soon.setDate(soon.getDate() + 4)
+  soon.setHours(18, 0, 0, 0)
+  await send('POST', '/api/rooms/bookings', {
+    roomId: studio.id,
+    title: 'Read-through, The Seagull',
+    startsAt: soon.toISOString(),
+    endsAt: new Date(soon.getTime() + 2 * 3_600_000).toISOString(),
+  }, cookie)
+}
+
 const view = await openSignedOutView(app.baseURL)
 await visit(view, `${app.baseURL}/sign-in`)
 await fill(view, 'form input[type="email"]', email)
@@ -150,6 +170,9 @@ const SHOTS: Shot[] = [
   { name: '08-fellows-modal', path: '/admin/fellows', marker: '[data-test="fellows-table"]', after: `document.querySelector('[data-test="award"]').click()` },
   { name: '09-audit', path: '/admin/audit', marker: '[data-test="audit-table"]' },
   { name: '10-audit-modal', path: '/admin/audit', marker: '[data-test="audit-table"]', after: `document.querySelector('[data-test="audit-record"]').click()` },
+  { name: '09a-calendar-week', path: '/rooms', marker: '[data-test="calendar-span"]' },
+  { name: '09b-calendar-day', path: '/rooms', marker: '[data-test="calendar-span"]', after: `document.querySelector('[data-test="calendar-day"]').click()` },
+  { name: '09c-home', path: '/', marker: 'main' },
   { name: '10a-rooms', path: '/admin/rooms', marker: '[data-test="rooms-table"]' },
   { name: '10b-rooms-modal', path: '/admin/rooms', marker: '[data-test="rooms-table"]', after: `(async () => {
     document.querySelector('[data-test="add-room"]').click()
