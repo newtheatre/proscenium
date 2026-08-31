@@ -18,6 +18,11 @@ interface Room {
   campus: string | null
   building: string | null
   contact: string | null
+  minBookingMinutes: number | null
+  maxBookingHours: number | null
+  noticeHours: number | null
+  horizonWeeks: number | null
+  activeBookingsCap: number | null
   hours: RoomHours[]
 }
 
@@ -54,6 +59,11 @@ const state = reactive({
   campus: '',
   building: '',
   contact: '',
+  minBookingMinutes: undefined as number | undefined,
+  maxBookingHours: undefined as number | undefined,
+  noticeHours: undefined as number | undefined,
+  horizonWeeks: undefined as number | undefined,
+  activeBookingsCap: undefined as number | undefined,
 })
 const hours = ref<Record<number, { opens: string, closes: string, open: boolean }>>({})
 
@@ -73,6 +83,11 @@ function edit(room: Room | null): void {
     campus: room?.campus ?? '',
     building: room?.building ?? '',
     contact: room?.contact ?? '',
+    minBookingMinutes: room?.minBookingMinutes ?? undefined,
+    maxBookingHours: room?.maxBookingHours ?? undefined,
+    noticeHours: room?.noticeHours ?? undefined,
+    horizonWeeks: room?.horizonWeeks ?? undefined,
+    activeBookingsCap: room?.activeBookingsCap ?? undefined,
   })
   hours.value = blankHours()
   for (const day of room?.hours ?? []) {
@@ -435,6 +450,81 @@ const columns: TableColumn<Room>[] = [
               data-test="room-sensitive"
             />
           </UFormField>
+
+          <USeparator label="This room's own rules" />
+
+          <p class="text-sm text-muted">
+            Left blank, a room follows the estate settings. A number here applies to this room
+            only, and nought is a real answer meaning none needed.
+          </p>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <UFormField
+              label="Shortest booking"
+              name="minBookingMinutes"
+              hint="Minutes"
+            >
+              <UInputNumber
+                v-model="state.minBookingMinutes"
+                :min="1"
+                class="w-full"
+                data-test="room-min-minutes"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Longest booking"
+              name="maxBookingHours"
+              hint="Hours"
+            >
+              <UInputNumber
+                v-model="state.maxBookingHours"
+                :min="1"
+                class="w-full"
+                data-test="room-max-hours"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Notice needed"
+              name="noticeHours"
+              hint="Hours"
+            >
+              <UInputNumber
+                v-model="state.noticeHours"
+                :min="0"
+                class="w-full"
+                data-test="room-notice-hours"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Booking opens"
+              name="horizonWeeks"
+              hint="Weeks ahead"
+            >
+              <UInputNumber
+                v-model="state.horizonWeeks"
+                :min="1"
+                class="w-full"
+                data-test="room-horizon-weeks"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Bookings one member may hold"
+              name="activeBookingsCap"
+            >
+              <UInputNumber
+                v-model="state.activeBookingsCap"
+                :min="1"
+                class="w-full"
+                data-test="room-cap"
+              />
+            </UFormField>
+          </div>
+
+          <USeparator />
 
           <UFormField
             v-if="editing"

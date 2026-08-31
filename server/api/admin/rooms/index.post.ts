@@ -23,6 +23,11 @@ export default defineEventHandler(async (event) => {
       campus: input.campus,
       building: input.building,
       contact: input.contact,
+      minBookingMinutes: input.minBookingMinutes,
+      maxBookingHours: input.maxBookingHours,
+      noticeHours: input.noticeHours,
+      horizonWeeks: input.horizonWeeks,
+      activeBookingsCap: input.activeBookingsCap,
     }),
     ...input.hours.map(day => db.insert(schema.roomHours).values({ id: newId(), roomId: id, ...day })),
     db.insert(schema.auditLog).values(auditEntry({

@@ -106,6 +106,19 @@ export function showNightBounds(at: Date): { from: Date, to: Date } {
   return { from, to: fromLondonWallClock(after.year, after.month, after.day, SHOW_NIGHT_START_HOUR) }
 }
 
+// londonParts carries no weekday, and the opening-hours rule needs one. Derived from the London
+// wall clock rather than the instant, so an evening in BST is the evening it looks like (0014).
+export function londonWeekday(at: Date): number {
+  const { year, month, day } = londonParts(at)
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+}
+
+// The wall clock a room's opening hours are written in, zero-padded so it compares as a string.
+export function londonClock(at: Date): string {
+  const { hour, minute } = londonParts(at)
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
 export function formatLondon(at: Date, options: Intl.DateTimeFormatOptions = {}): string {
   assertInstant(at)
   return new Intl.DateTimeFormat('en-GB', { timeZone: LONDON, ...options }).format(at)

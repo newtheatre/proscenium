@@ -32,6 +32,11 @@ export default defineEventHandler(async (event) => {
         campus: input.campus,
         building: input.building,
         contact: input.contact,
+        minBookingMinutes: input.minBookingMinutes,
+        maxBookingHours: input.maxBookingHours,
+        noticeHours: input.noticeHours,
+        horizonWeeks: input.horizonWeeks,
+        activeBookingsCap: input.activeBookingsCap,
         updatedAt: now,
       })
       .where(eq(schema.rooms.id, id)),

@@ -20,6 +20,8 @@ const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 const text = (max: number) => z.string().trim().max(max).nullish()
   .transform(value => (value ?? '').trim() || null)
 
+const override = <T extends z.ZodTypeAny>(schema: T) => schema.nullish().transform(value => value ?? null)
+
 export const roomForm = z.object({
   name: z.string().trim().min(1).max(120),
   description: text(2000),
@@ -34,6 +36,13 @@ export const roomForm = z.object({
   campus: text(80),
   building: text(120),
   contact: text(500),
+  // Blank falls back to the estate setting; nought is an override meaning none needed, so these
+  // are nullish rather than optional-with-default (C-106 criterion 1).
+  minBookingMinutes: override(z.number().int().positive()),
+  maxBookingHours: override(z.number().positive()),
+  noticeHours: override(z.number().int().nonnegative()),
+  horizonWeeks: override(z.number().int().positive()),
+  activeBookingsCap: override(z.number().int().positive()),
 })
 
 export type RoomInput = z.output<typeof roomForm>
