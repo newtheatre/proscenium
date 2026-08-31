@@ -50,14 +50,14 @@ erDiagram
 ### users
 `id` PK · `email` UNIQUE lowercased · `name` · `pronouns` (optional, scrub) · `password`
 (scrypt PHC, NULL for guest or Google-only; **never non-NULL on an @newtheatre.org.uk
-address**, import-enforced, 0008) · `password_set_at` NULL · `password_last_used_at` NULL ·
+address**, import-enforced, 0008) · `phone` NULL (scrub) · `password_set_at` NULL · `password_last_used_at` NULL ·
 `google_sub` UNIQUE NULL · `google_linked_at` NULL · `google_last_used_at` NULL ·
 `pending_google_email` UNIQUE NULL (admin-set claim marker) · `student_id` UNIQUE NULL (how the committee finds somebody on the
 SU's list: names do not always match and the address is often personal, 0031) · `verified` bool ·
 `disabled` bool · `session_epoch` int ·
 `anonymised_at` NULL · `last_login_at` · `created_at` · `updated_at`.
 Anonymisation rewrites `email` to `deleted-<id>@anonymised.invalid`, `name` to `Deleted
-user`, clears `pronouns`, `password`, `student_id`, `google_sub`, `pending_google_email` and the four
+user`, clears `pronouns`, `phone`, `password`, `student_id`, `google_sub`, `pending_google_email` and the four
 credential timestamps, and bumps
 `session_epoch`. Every write path guards on `anonymised_at IS NULL`, and the
 `users_tombstone_guard` trigger refuses an identifying UPDATE on an anonymised row whether the
@@ -72,7 +72,11 @@ the admin directory filters and sorts on (A-121); without them every filter is a
 ### emergency_contacts
 `user_id` PK → users cascade · `name` (scrub) · `phone` (scrub) · `relation` (scrub) ·
 `updated_at`. Readable only by tonight's duty manager and safety officers while the person
-holds a shift or production role (A-3).
+holds a shift or production role (A-3). Neither a shift nor a production role exists yet, so
+until they do it is readable by its owner and nobody else: the audience opens when there is
+something to evaluate it against, never wider than the story allows (A-114).
+Written through `PUT /api/account/profile`, which removes the row when the contact's name is
+cleared: a contact with no name is nobody, and an emptied row reads like an answer.
 
 ### memberships
 `id` PK · `user_id` → users cascade · `starts_on` / `expires_on` (London dates: a term of one or
@@ -111,6 +115,18 @@ check, not a constraint.
 `id` PK · `user_id` → users cascade · `credential_id` UNIQUE · `public_key` · `counter` ·
 `transports` JSON · `backed_up` bool · `label` · `created_at` · `last_used_at`.
 Relying-party id is the unified domain; nothing imports from the old estate (0008, SP-4).
+Enrolment asks for a discoverable credential with user verification required, so sign-in is
+usernameless and one passkey stands for both the credential and the second factor (A-105).
+`counter` is written on every use and a value that fails to advance is refused as a copied
+authenticator, which is the only reason keeping the count is worth anything.
+
+### passkey_challenges
+`id` PK (the attempt id the browser echoes back) · `challenge` · `user_id` → users cascade,
+NULL while signing in because a usernameless attempt does not know whose it is · `expires_at` ·
+`created_at`. Indexed on `expires_at`, and swept on each write rather than on a schedule.
+A challenge is taken, not read: verifying anything against it removes it, so a response cannot
+be replayed. Its own table rather than a kind on `auth_tokens`, because that column carries a
+CHECK and widening one in SQLite is a full rebuild of a table holding live tokens (A-105).
 
 ### recovery_codes
 `id` PK · `user_id` → users cascade · `code_hash` · `used_at` NULL. Eight per set; a new set

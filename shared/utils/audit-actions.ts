@@ -39,6 +39,7 @@ const CATALOGUE = {
   'session.started': { label: 'Signed in with a password', module: 'identity', self: true },
   'session.started.google': { label: 'Signed in with Google', module: 'identity', self: true },
   'session.started.magic-link': { label: 'Signed in with a link', module: 'identity', self: true },
+  'session.started.passkey': { label: 'Signed in with a passkey', module: 'identity', self: true },
   'session.started.totp': { label: 'Signed in with an authenticator', module: 'identity', self: true },
   'session.started.recovery-code': { label: 'Signed in with a recovery code', module: 'identity', self: true },
   'session.revoked': { label: 'Sessions ended by an officer', module: 'identity' },
@@ -62,6 +63,9 @@ const CATALOGUE = {
   'membership.exported': { label: 'Membership register exported', module: 'governance' },
   'account.method.added': { label: 'Sign-in method added', module: 'identity', self: true },
   'account.method.removed': { label: 'Sign-in method removed', module: 'identity', self: true },
+  'account.email.changed': { label: 'Email address changed', module: 'identity', self: true },
+  'account.email.changed.admin': { label: 'Email address changed by an officer', module: 'identity' },
+  'account.profile.updated': { label: 'Profile updated', module: 'identity', self: true },
   'account.student-id.recorded': { label: 'Student number recorded', module: 'identity' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).

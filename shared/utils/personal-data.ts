@@ -28,7 +28,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     name: 'users',
     column: 'id',
     section: 'account',
-    columns: ['name', 'email', 'pronouns', 'student_id', 'verified', 'created_at', 'last_login_at'],
+    columns: ['name', 'email', 'pronouns', 'phone', 'student_id', 'verified', 'created_at', 'last_login_at'],
     erasure: 'scrub',
     // The rewrite is not a null-out, so anonymiseAccount writes it rather than the generic scrub.
     why: 'The person. The row survives so everything referring to it still resolves (0011).',
@@ -135,6 +135,14 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     columns: null,
     erasure: 'delete',
     why: 'A credential in flight, and one of them carries an address.',
+  },
+  {
+    name: 'passkey_challenges',
+    column: 'user_id',
+    section: null,
+    columns: null,
+    erasure: 'delete',
+    why: 'A ceremony in flight, five minutes long, holding nothing but a random string.',
   },
   {
     name: 'mfa_attempts',

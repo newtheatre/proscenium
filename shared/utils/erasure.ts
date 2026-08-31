@@ -49,6 +49,7 @@ export function erasureStatements(userId: string, now: number): SQL[] {
       email = ${tombstoneEmail(userId)},
       name = ${TOMBSTONE_NAME},
       pronouns = null,
+      phone = null,
       password = null,
       password_set_at = null,
       password_last_used_at = null,
