@@ -93,3 +93,34 @@ export async function registerMember(
   const signedIn = await request(app, 'POST', '/api/auth/sign-in', { email, password })
   return { id, email, name: person.name, cookie: (signedIn.headers.get('set-cookie') ?? '').split(';')[0]! }
 }
+
+export interface AdminOptions {
+  // Empty grants nothing, for checking that a guard refuses somebody ordinary.
+  roles?: 'ADMIN'[]
+}
+
+// A privileged session is four steps, not one: a role carrying a permission needs a second factor
+// before a guard honours it (A-112), and four suites were each doing that by hand.
+export async function adminSession(app: AppUnderTest, options: AdminOptions = {}): Promise<TestMember> {
+  const { codeForStep, stepFor } = await import('#shared/utils/totp')
+  const { generatePassword } = await import('./seed')
+  const { roles = ['ADMIN'] } = options
+
+  const password = generatePassword()
+  const member = await registerMember(app, roles.length ? 'officer' : 'stranger', password)
+  if (roles.length === 0) return member
+
+  const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, member.cookie)).json() as { secret: string }
+  await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, member.cookie)
+
+  Bun.spawnSync(['bun', 'scripts/grant-admin.ts', member.email, app.databaseFile])
+  forgetSpentStep(app, member.email)
+
+  const { attemptId } = await (await request(app, 'POST', '/api/auth/sign-in', { email: member.email, password })).json() as { attemptId: string }
+  const answered = await request(app, 'POST', '/api/auth/mfa/challenge', {
+    attemptId,
+    code: await codeForStep(secret, stepFor(new Date())),
+  })
+
+  return { ...member, cookie: (answered.headers.get('set-cookie') ?? '').split(';')[0]! }
+}

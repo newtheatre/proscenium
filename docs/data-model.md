@@ -457,12 +457,20 @@ counted NULL distinct from counted zero; finishing posts movements atomically.
 ## Rooms (module C)
 
 ### rooms
-`id` PK · `name` · `description` · `capacity` · `is_active` bool · `sensitive` bool (books
-via the approval queue regardless of policy) · `created_at`.
+`id` PK · `name` UNIQUE · `description` · `capacity` NULL = uncapped, CHECK `> 0` · `is_active`
+bool · `sensitive` bool (books via the approval queue regardless of policy) · `created_at` ·
+`updated_at`. Indexed on `is_active`, which is what a member-facing calendar filters on.
+Retired, never deleted: a booking made last term still names something (C-101 criterion 2), and
+there is no delete endpoint at all rather than one that refuses. Capacity is compared against a
+booking's attendee count as a **warning, never a refusal**: the old estate recorded both and
+compared neither.
 
 ### room_hours
-`id` PK · `room_id` cascade · `weekday` 0..6 · `opens` `HH:MM` · `closes` `HH:MM`. Absence
-of rows = closed that day.
+`id` PK · `room_id` cascade · `weekday` 0..6 CHECK · `opens` `HH:MM` · `closes` `HH:MM`, CHECK
+`closes > opens`. Absence of rows = closed that day. Zero-padded so the two compare and sort as
+strings, which is why no part of the opening-hours rules involves a date or a timezone.
+Replaced wholesale on an edit rather than patched: seven days is small enough that a diff would
+be more code than value.
 
 ### room_blackouts
 `id` PK · `room_id` NULL = all rooms · `starts_at` · `ends_at` · `reason` (shown to members)

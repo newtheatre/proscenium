@@ -83,6 +83,10 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/account/methods/index.get.ts', exempt: 'reads what the account signs in with' },
   { route: 'server/api/auth/passkey/register.post.ts', actions: ['account.method.added'] },
   { route: 'server/api/auth/passkey/authenticate.post.ts', actions: ['session.started.passkey'] },
+  { route: 'server/api/admin/rooms/index.get.ts', exempt: 'reads the bookable estate' },
+  { route: 'server/api/admin/rooms/index.post.ts', actions: ['room.created'] },
+  { route: 'server/api/admin/rooms/[id]/index.put.ts', actions: ['room.updated', 'room.hours.set'] },
+  { route: 'server/api/admin/rooms/[id]/index.delete.ts', actions: ['room.updated'] },
   { route: 'server/api/auth/sign-out.post.ts', exempt: 'ending your own session changes no record' },
 
   // Development only, and absent from a build: nuxt.config excludes both files (K-124).

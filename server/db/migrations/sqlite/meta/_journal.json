@@ -120,6 +120,13 @@
       "when": 1788173907917,
       "tag": "0016_ledger_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1788184926706,
+      "tag": "0017_black_tyrannus",
+      "breakpoints": true
     }
   ]
 }
