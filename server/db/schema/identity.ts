@@ -9,6 +9,7 @@ export const users = sqliteTable('users', {
   email: text('email').notNull().unique(),
   name: text('name').notNull(),
   pronouns: text('pronouns'),
+  phone: text('phone'),
   // scrypt PHC. NULL for a guest or a Google-only account.
   password: text('password'),
   // When each way in was added and last used, because the account screen lists both (A-113).

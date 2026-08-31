@@ -34,12 +34,21 @@ function query<T>(app: AppUnderTest, sql: string, ...parameters: unknown[]): T |
 // Marked verified in the database rather than through the link: a suite that is not testing
 // verification should not have to perform it, and the flow has its own tests.
 export function markVerified(app: AppUnderTest, email: string): void {
-  const database = new Database(app.databaseFile)
-  try {
-    database.query('UPDATE users SET verified = 1 WHERE email = ?').run(email)
-  }
-  finally {
-    database.close()
+  // The server writes to the same file, so a write from here can land mid-transaction and get
+  // SQLITE_BUSY. Retried rather than failing a suite for something a moment fixes.
+  for (let attempt = 0; ; attempt++) {
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('UPDATE users SET verified = 1 WHERE email = ?').run(email)
+      return
+    }
+    catch (error) {
+      if (attempt >= 40) throw error
+      Bun.sleepSync(50)
+    }
+    finally {
+      database.close()
+    }
   }
 }
 

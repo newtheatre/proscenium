@@ -5,6 +5,8 @@ export interface AccountRow {
   id: string
   email: string
   name: string
+  pronouns: string | null
+  phone: string | null
   password: string | null
   // When each way in was added and last used, for the account's own security screen (A-113).
   passwordSetAt: number | null

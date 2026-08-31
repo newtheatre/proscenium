@@ -50,14 +50,14 @@ erDiagram
 ### users
 `id` PK · `email` UNIQUE lowercased · `name` · `pronouns` (optional, scrub) · `password`
 (scrypt PHC, NULL for guest or Google-only; **never non-NULL on an @newtheatre.org.uk
-address**, import-enforced, 0008) · `password_set_at` NULL · `password_last_used_at` NULL ·
+address**, import-enforced, 0008) · `phone` NULL (scrub) · `password_set_at` NULL · `password_last_used_at` NULL ·
 `google_sub` UNIQUE NULL · `google_linked_at` NULL · `google_last_used_at` NULL ·
 `pending_google_email` UNIQUE NULL (admin-set claim marker) · `student_id` UNIQUE NULL (how the committee finds somebody on the
 SU's list: names do not always match and the address is often personal, 0031) · `verified` bool ·
 `disabled` bool · `session_epoch` int ·
 `anonymised_at` NULL · `last_login_at` · `created_at` · `updated_at`.
 Anonymisation rewrites `email` to `deleted-<id>@anonymised.invalid`, `name` to `Deleted
-user`, clears `pronouns`, `password`, `student_id`, `google_sub`, `pending_google_email` and the four
+user`, clears `pronouns`, `phone`, `password`, `student_id`, `google_sub`, `pending_google_email` and the four
 credential timestamps, and bumps
 `session_epoch`. Every write path guards on `anonymised_at IS NULL`, and the
 `users_tombstone_guard` trigger refuses an identifying UPDATE on an anonymised row whether the
@@ -72,7 +72,11 @@ the admin directory filters and sorts on (A-121); without them every filter is a
 ### emergency_contacts
 `user_id` PK → users cascade · `name` (scrub) · `phone` (scrub) · `relation` (scrub) ·
 `updated_at`. Readable only by tonight's duty manager and safety officers while the person
-holds a shift or production role (A-3).
+holds a shift or production role (A-3). Neither a shift nor a production role exists yet, so
+until they do it is readable by its owner and nobody else: the audience opens when there is
+something to evaluate it against, never wider than the story allows (A-114).
+Written through `PUT /api/account/profile`, which removes the row when the contact's name is
+cleared: a contact with no name is nobody, and an emptied row reads like an answer.
 
 ### memberships
 `id` PK · `user_id` → users cascade · `starts_on` / `expires_on` (London dates: a term of one or
