@@ -65,6 +65,20 @@ emptying the database between suites, and names each suite as it starts so a slo
 suite is slow (0029). CI gates on the first; the second runs nightly and on demand.
 `bun test <file>` still runs one suite on its own.
 
+### Example data
+
+```bash
+bun run seed
+```
+
+Rooms, members with memberships, and a week of bookings, into `.data/db/sqlite.db`. It prints the
+credentials it generated **once**, and there is no way to read a password back afterwards. It
+refuses to run against production or any database that is not local, exiting non-zero and saying
+why; there is no flag to override that, because the only reason to add one is the mistake it exists
+to prevent (K-120).
+
+Run it again and it adds people without duplicating rooms.
+
 ### Developer tools
 
 Running locally, `/dev` seeds a persona per role plus a plain member, a guest and a tombstone,
