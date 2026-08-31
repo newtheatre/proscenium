@@ -13,6 +13,15 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 410, statusMessage: 'That link has expired or has already been used. Ask for a new one.' })
   }
 
+  // A link bound to an address confirms that address and no other: changing again between the
+  // send and the click leaves the older link inert (A-115 criterion 1).
+  if (claimed.email !== null) {
+    const account = await findById(claimed.userId)
+    if (!account || normaliseEmail(account.email) !== normaliseEmail(claimed.email)) {
+      throw createError({ statusCode: 410, statusMessage: 'That link was for a different address. Ask for a new one.' })
+    }
+  }
+
   await db.batch([
     db.delete(schema.authTokens).where(eq(schema.authTokens.userId, claimed.userId)),
     db.update(schema.users).set({ verified: true }).where(eq(schema.users.id, claimed.userId)),

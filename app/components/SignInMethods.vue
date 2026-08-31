@@ -6,7 +6,7 @@ import type { SignInMethod } from '#shared/utils/sign-in-methods'
 // listing carries `removable`, so the screen and the endpoint agree (A-113).
 
 const toast = useToast()
-const { account } = useAccount()
+const { account, refresh: refreshAccount } = useAccount()
 const methods = ref<SignInMethod[]>([])
 const loading = ref(true)
 const working = ref('')
@@ -25,6 +25,28 @@ async function load(): Promise<void> {
 
 function when(at: number | null): string {
   return at === null ? 'not recorded' : formatLondon(new Date(at * 1000), { dateStyle: 'medium' })
+}
+
+const changing = ref(false)
+const wantedEmail = ref('')
+
+async function changeEmail(): Promise<void> {
+  changing.value = true
+  try {
+    const answer = await $fetch<{ message: string }>('/api/account/email', {
+      method: 'PUT',
+      body: { email: wantedEmail.value },
+    })
+    wantedEmail.value = ''
+    toast.add({ title: answer.message, icon: 'i-lucide-mail', color: 'success' })
+    await refreshAccount()
+  }
+  catch (error) {
+    toast.add({ title: refusalText(error), color: 'error' })
+  }
+  finally {
+    changing.value = false
+  }
 }
 
 const { register, isSupported } = useWebAuthn({ registerEndpoint: '/api/auth/passkey/register' })
@@ -127,23 +149,51 @@ onMounted(load)
     </ul>
 
     <template #footer>
-      <UButton
-        v-if="isSupported"
-        icon="i-lucide-fingerprint"
-        color="neutral"
-        variant="subtle"
-        :loading="enrolling"
-        data-test="add-passkey"
-        @click="addPasskey"
-      >
-        Add a passkey
-      </UButton>
-      <p
-        v-else
-        class="text-sm text-muted"
-      >
-        This browser cannot hold a passkey.
-      </p>
+      <div class="space-y-4">
+        <UFormField
+          label="Email address"
+          name="email"
+          description="Changing it signs out your other devices and asks the new address to confirm itself."
+        >
+          <div class="flex flex-wrap items-center gap-2">
+            <UInput
+              v-model="wantedEmail"
+              type="email"
+              :placeholder="account.user?.email"
+              class="w-full sm:w-80"
+              data-test="new-email"
+            />
+            <UButton
+              color="neutral"
+              variant="subtle"
+              :disabled="!wantedEmail"
+              :loading="changing"
+              data-test="change-email"
+              @click="changeEmail"
+            >
+              Change it
+            </UButton>
+          </div>
+        </UFormField>
+
+        <UButton
+          v-if="isSupported"
+          icon="i-lucide-fingerprint"
+          color="neutral"
+          variant="subtle"
+          :loading="enrolling"
+          data-test="add-passkey"
+          @click="addPasskey"
+        >
+          Add a passkey
+        </UButton>
+        <p
+          v-else
+          class="text-sm text-muted"
+        >
+          This browser cannot hold a passkey.
+        </p>
+      </div>
     </template>
   </UPageCard>
 </template>

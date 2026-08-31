@@ -62,7 +62,7 @@ token in the query string:
 
 | Route | Consumes |
 | --- | --- |
-| `/verify?token=` | `POST /api/auth/verify`, offering a fresh send on a 410 |
+| `/verify?token=` | `POST /api/auth/verify`, offering a fresh send on a 410. A token issued by an address change is bound to that address and confirms no other (A-115) |
 | `/reset?token=` | `POST /api/auth/password/reset` |
 | `/magic?token=` | `POST /api/auth/magic-link/consume`, which may answer with an MFA attempt |
 

@@ -63,6 +63,8 @@ const CATALOGUE = {
   'membership.exported': { label: 'Membership register exported', module: 'governance' },
   'account.method.added': { label: 'Sign-in method added', module: 'identity', self: true },
   'account.method.removed': { label: 'Sign-in method removed', module: 'identity', self: true },
+  'account.email.changed': { label: 'Email address changed', module: 'identity', self: true },
+  'account.email.changed.admin': { label: 'Email address changed by an officer', module: 'identity' },
   'account.profile.updated': { label: 'Profile updated', module: 'identity', self: true },
   'account.student-id.recorded': { label: 'Student number recorded', module: 'identity' },
 
