@@ -153,6 +153,17 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'A password step waiting for its second factor, which expires anyway.',
   },
   {
+    name: 'room_bookings',
+    column: 'user_id',
+    section: 'bookings',
+    columns: ['title', 'starts_at', 'ends_at', 'status', 'created_at'],
+    erasure: 'scrub',
+    // The row survives because the room was used and that is a fact about the room, not the
+    // person. What they wrote about it does not (0011).
+    scrub: ['title', 'notes'],
+    why: 'Rooms this person booked. Utilisation survives an erasure; their words in it do not.',
+  },
+  {
     name: 'ledger_entries',
     column: 'actor_id',
     section: 'money',
