@@ -1,5 +1,5 @@
 import { londonClock, londonParts, londonWeekday } from './london'
-import { isOpenAt } from './rooms'
+import { closedOn, isOpenAt } from './rooms'
 import type { RoomHours } from './rooms'
 
 // Booking policy, enforced where it is published (C-106). Pure: the API is the authority and the
@@ -54,6 +54,8 @@ export interface PolicyOverrides {
 export interface RoomUnderPolicy extends PolicyOverrides {
   isActive: boolean
   sensitive: boolean
+  // Somebody else's room: this system records the request, the Theatre Manager books it.
+  isExternal: boolean
   hours: RoomHours[]
 }
 
@@ -125,7 +127,8 @@ export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderP
     fail('ROOM_RETIRED', 'That room is no longer in use.')
   }
 
-  if (room.hours.every(day => day.weekday !== weekday)) {
+  // A room with no hours recorded is open; one that has said when it opens is shut outside them.
+  if (closedOn(room.hours, weekday)) {
     fail('ROOM_CLOSED', 'The room is closed that day.')
   }
   else if (!isOpenAt(room.hours, weekday, londonClock(proposal.startsAt), londonClock(proposal.endsAt))) {
@@ -154,9 +157,12 @@ export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderP
   }
 
   const refusedOutright = failures.some(failure => NOT_DIVERTIBLE.includes(failure.reason))
+  // An external room is booked by the Theatre Manager filling in the SU's form, so a member's
+  // booking is always a request for somebody to do that (C-101, C-108).
+  const alwaysAsks = room.sensitive || room.isExternal
   return {
     failures,
-    needsApproval: !refusedOutright && (room.sensitive || failures.length > 0),
+    needsApproval: !refusedOutright && (alwaysAsks || failures.length > 0),
     refusedOutright,
   }
 }

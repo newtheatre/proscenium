@@ -17,6 +17,7 @@ const ESTATE = {
 const ROOM = {
   isActive: true,
   sensitive: false,
+  isExternal: false,
   hours: [{ weekday: 1, opens: '09:00', closes: '22:00' }],
   minBookingMinutes: null,
   maxBookingHours: null,
@@ -135,6 +136,14 @@ describe('a sensitive room always goes to a person', () => {
     expect(verdict.needsApproval).toBe(true)
   })
 
+  // An external room is booked by the Theatre Manager filling in the SU's form, so a member's
+  // booking is a request for somebody to do that, never an instant confirmation.
+  test('an external room always goes to a person, whatever the policy says', () => {
+    const verdict = judge(GOOD, policy(), { ...ROOM, isExternal: true }, CONTEXT)
+    expect(verdict.failures).toEqual([])
+    expect(verdict.needsApproval).toBe(true)
+  })
+
   test('anything that fails a rule needs approval too, rather than being refused outright', () => {
     const soon = { startsAt: new Date('2026-09-01T14:00:00Z'), endsAt: new Date('2026-09-01T16:00:00Z') }
     expect(judge(soon, policy(), ROOM, CONTEXT).needsApproval).toBe(true)
@@ -170,6 +179,24 @@ describe('a room may override the estate', () => {
   // Zero is a real override meaning no notice needed, and must not read as absent.
   test('an override of nought is an override', () => {
     expect(resolvePolicy({ ...ROOM, noticeHours: 0 }, ESTATE).noticeHours).toBe(0)
+  })
+})
+
+// Most rooms have no restriction worth recording, and making an officer fill in seven days to say
+// so is the wrong default.
+describe('a room with no hours is open', () => {
+  const anytime = { ...ROOM, hours: [] }
+
+  test('a booking at any hour of any day passes', () => {
+    const sunday = { startsAt: new Date('2026-09-13T03:00:00Z'), endsAt: new Date('2026-09-13T05:00:00Z') }
+    const named = judge(sunday, policy(), anytime, CONTEXT).failures.map(failure => failure.reason)
+    expect(named).not.toContain('ROOM_CLOSED')
+    expect(named).not.toContain('OUT_OF_HOURS')
+  })
+
+  test('but a room that has said when it opens is shut outside those hours', () => {
+    const sunday = { startsAt: new Date('2026-09-13T03:00:00Z'), endsAt: new Date('2026-09-13T05:00:00Z') }
+    expect(judge(sunday, policy(), ROOM, CONTEXT).failures.map(failure => failure.reason)).toContain('ROOM_CLOSED')
   })
 })
 

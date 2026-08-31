@@ -41,9 +41,20 @@ describe('opening hours belong to the room', () => {
     expect(WEEKDAYS.map(day => day.index)).toEqual([0, 1, 2, 3, 4, 5, 6])
   })
 
-  test('a day with no row is closed, not open all hours', () => {
+  test('a room with hours is closed on a day it has no row for', () => {
     expect(closedOn(HOURS, 2)).toBe(true)
     expect(closedOn(HOURS, 1)).toBe(false)
+  })
+
+  // A room nobody has given hours to is open, not shut. Most rooms have no restriction worth
+  // recording, and making the officer fill in seven days to say so is the wrong default.
+  test('a room with no hours at all is always open', () => {
+    expect(closedOn([], 2)).toBe(false)
+    expect(isOpenAt([], 3, '03:00', '05:00')).toBe(true)
+  })
+
+  test('but a room that has said when it opens is shut outside those hours', () => {
+    expect(isOpenAt(HOURS, 1, '03:00', '05:00')).toBe(false)
   })
 
   test('a span inside the day is open and one crossing the close is not', () => {

@@ -89,6 +89,15 @@ for (const [index, id] of ids.slice(0, 4).entries()) {
     studentId: `2099000${index}`,
   }, cookie)
 }
+// A room of each kind, so the screen is not judged on an empty table.
+for (const [name, over] of [
+  ['The Studio', { capacity: 40 }],
+  ['The Auditorium', { capacity: 120, sensitive: true, hours: [{ weekday: 1, opens: '09:00', closes: '22:00' }] }],
+  ['Portland B12', { isExternal: true, campus: 'University Park', building: 'Portland Building', contact: 'SU reception' }],
+] as [string, Record<string, unknown>][]) {
+  await send('POST', '/api/admin/rooms', { name, ...over }, cookie)
+}
+
 await send('POST', '/api/admin/fellowships', {
   userId: ids[4],
   awardedOn: '2019-06-12',
@@ -141,6 +150,15 @@ const SHOTS: Shot[] = [
   { name: '08-fellows-modal', path: '/admin/fellows', marker: '[data-test="fellows-table"]', after: `document.querySelector('[data-test="award"]').click()` },
   { name: '09-audit', path: '/admin/audit', marker: '[data-test="audit-table"]' },
   { name: '10-audit-modal', path: '/admin/audit', marker: '[data-test="audit-table"]', after: `document.querySelector('[data-test="audit-record"]').click()` },
+  { name: '10a-rooms', path: '/admin/rooms', marker: '[data-test="rooms-table"]' },
+  { name: '10b-rooms-modal', path: '/admin/rooms', marker: '[data-test="rooms-table"]', after: `(async () => {
+    document.querySelector('[data-test="add-room"]').click()
+    await new Promise(resolve => setTimeout(resolve, 500))
+    for (const section of ['hours-section', 'policy-section']) {
+      document.querySelector('[data-test="' + section + '"] button')?.click()
+    }
+  })()` },
+  { name: '10c-rooms-filters', path: '/admin/rooms', marker: '[data-test="rooms-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '11-config', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
   { name: '12-dev-tools', path: '/dev', marker: '[data-test="dev-seed"]' },
   { name: '13-people-narrow', path: '/admin/people', marker: '[data-test="directory-table"]', width: NARROW },

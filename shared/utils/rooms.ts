@@ -58,12 +58,20 @@ export const roomHoursForm = z.object({
 
 export type RoomHours = z.output<typeof roomHoursForm>
 
+// No hours at all is a room with no restriction worth recording, which is most of them. Hours
+// once given are exhaustive: a weekday with no row is then a day the room is shut.
+export function unrestricted(hours: RoomHours[]): boolean {
+  return hours.length === 0
+}
+
 export function closedOn(hours: RoomHours[], weekday: number): boolean {
+  if (unrestricted(hours)) return false
   return !hours.some(day => day.weekday === weekday)
 }
 
 // Half-open at neither end: a booking must sit wholly inside the opening span.
 export function isOpenAt(hours: RoomHours[], weekday: number, from: string, to: string): boolean {
+  if (unrestricted(hours)) return true
   return hours.some(day => day.weekday === weekday && from >= day.opens && to <= day.closes)
 }
 

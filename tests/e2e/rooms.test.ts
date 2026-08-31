@@ -165,6 +165,17 @@ describe.skipIf(skip !== null)('describing the bookable estate (C-101)', () => {
     expect(detail.campus?.[1]).toBe('Jubilee')
   })
 
+  // The bug as reported. On the server $fetch carries no cookies, so the render came back
+  // unauthenticated and hydration, holding data already, never asked again.
+  test('the rendered page has the rooms in it, before any script runs', async () => {
+    const name = `Onload ${crypto.randomUUID().slice(0, 6)}`
+    await addRoom(name)
+
+    const rendered = await fetch(`${app.baseURL}/admin/rooms`, { headers: { cookie } })
+    expect(rendered.status).toBe(200)
+    expect(await rendered.text()).toContain(name)
+  })
+
   test('describing the estate needs the permission', async () => {
     const stranger = await adminSession(app, { roles: [] })
     expect((await send('GET', '/api/admin/rooms', undefined, stranger.cookie)).status).toBe(403)

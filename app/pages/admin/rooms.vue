@@ -26,27 +26,57 @@ interface Room {
   hours: RoomHours[]
 }
 
+interface Estate {
+  minBookingMinutes: number
+  maxBookingHours: number
+  noticeHours: number
+  horizonWeeks: number
+  activeBookingsCap: number
+}
+
+interface Listing { items: Room[], total: number, estate: Estate }
+
+// Only ever shown while the real numbers are in flight, and replaced by them on arrival.
+const BLANK_ESTATE: Estate = {
+  minBookingMinutes: 0,
+  maxBookingHours: 0,
+  noticeHours: 0,
+  horizonWeeks: 0,
+  activeBookingsCap: 0,
+}
+
 const toast = useToast()
 const search = ref('')
 const showRetired = ref(false)
+const kind = ref<'all' | 'internal' | 'external'>('all')
 const open = ref(false)
 const editing = ref<Room | null>(null)
 const saving = ref(false)
 
+// useRequestFetch, not $fetch: on the server $fetch sends no cookies, so the render was
+// unauthenticated, came back empty, and hydration had no reason to ask again.
+const request = useRequestFetch()
+
 const { data: listing, status, refresh } = await useAsyncData(
   () => `rooms-${showRetired.value}`,
-  () => $fetch<{ items: Room[], total: number }>('/api/admin/rooms', {
-    query: { includeInactive: showRetired.value },
-  }),
-  { watch: [showRetired], default: () => ({ items: [] as Room[], total: 0 }) },
+  () => request<Listing>('/api/admin/rooms', { query: { includeInactive: showRetired.value } }),
+  { watch: [showRetired], default: (): Listing => ({ items: [], total: 0, estate: BLANK_ESTATE }) },
 )
+
+const estate = computed(() => listing.value.estate)
+
+// What a blank override means, said where the blank is.
+const fallsBackTo = (value: number | boolean): string => `Estate default: ${value}`
 
 // Searched in the browser on purpose: the estate is a handful of rooms, and a round trip to
 // filter five names would be slower than the typing.
 const rooms = computed(() => {
   const term = search.value.trim().toLowerCase()
-  if (!term) return listing.value.items
-  return listing.value.items.filter(room => room.name.toLowerCase().includes(term))
+  return listing.value.items.filter((room) => {
+    if (kind.value === 'internal' && room.isExternal) return false
+    if (kind.value === 'external' && !room.isExternal) return false
+    return !term || room.name.toLowerCase().includes(term)
+  })
 })
 
 const state = reactive({
@@ -141,6 +171,14 @@ const active = computed<ActiveFilter[]>(() => {
       clear: () => { showRetired.value = false },
     })
   }
+  if (kind.value !== 'all') {
+    filters.push({
+      key: 'kind',
+      label: kind.value === 'external' ? 'Booked through the SU' : 'Ours to book',
+      icon: 'i-lucide-building',
+      clear: () => { kind.value = 'all' },
+    })
+  }
   if (search.value) {
     filters.push({
       key: 'search',
@@ -155,11 +193,17 @@ const active = computed<ActiveFilter[]>(() => {
 function clearFilters(): void {
   search.value = ''
   showRetired.value = false
+  kind.value = 'all'
 }
 
+const openDaysCount = computed(() => WEEKDAYS.filter(day => hours.value[day.index]?.open).length)
+
+const OVERRIDES = ['minBookingMinutes', 'maxBookingHours', 'noticeHours', 'horizonWeeks', 'activeBookingsCap'] as const
+const overrideCount = computed(() => OVERRIDES.filter(field => state[field] !== undefined).length)
+
 function openDays(room: Room): string {
+  if (room.hours.length === 0) return 'Always open'
   const days = WEEKDAYS.filter(day => minutesOpen(room.hours, day.index) > 0)
-  if (days.length === 0) return 'Closed all week'
   if (days.length === 7) return 'Open every day'
   return days.map(day => day.short).join(', ')
 }
@@ -180,7 +224,7 @@ const columns: TableColumn<Room>[] = [
       variant="subtle"
       icon="i-lucide-door-open"
       title="The bookable estate"
-      description="A room is retired, never deleted, so a booking made last term still names something. Opening hours belong to the room: a weekday left closed cannot be booked at all."
+      description="A room is retired, never deleted, so a booking made last term still names something. A room with no opening hours is open whenever; give it hours and it is shut outside them. An external one is booked by the Theatre Manager on a form with the SU."
     />
 
     <AdminToolbar
@@ -191,6 +235,21 @@ const columns: TableColumn<Room>[] = [
       @clear="clearFilters"
     >
       <template #filters>
+        <UFormField
+          label="Who books it"
+          description="An external room is booked by the Theatre Manager on a form with the SU."
+        >
+          <URadioGroup
+            v-model="kind"
+            :items="[
+              { label: 'Every room', value: 'all' },
+              { label: 'Ours to book', value: 'internal' },
+              { label: 'Booked through the SU', value: 'external' },
+            ]"
+            data-test="filter-kind"
+          />
+        </UFormField>
+
         <UFormField label="Retired rooms">
           <USwitch
             v-model="showRetired"
@@ -309,7 +368,7 @@ const columns: TableColumn<Room>[] = [
     <UModal
       v-model:open="open"
       :title="editing ? `Edit ${editing.name}` : 'Add a room'"
-      description="Opening hours are per weekday. A day left closed cannot be booked."
+      description="Left alone, a room is open whenever and follows the estate settings."
     >
       <template #body>
         <UForm
@@ -408,39 +467,56 @@ const columns: TableColumn<Room>[] = [
             </UFormField>
           </template>
 
-          <USeparator label="Opening hours" />
+          <UCollapsible data-test="hours-section">
+            <UButton
+              color="neutral"
+              variant="subtle"
+              trailing-icon="i-lucide-chevron-down"
+              block
+              class="justify-between"
+            >
+              Opening hours ({{ openDaysCount === 0 ? 'always open' : plural(openDaysCount, 'day') }})
+            </UButton>
 
-          <div
-            v-for="day in WEEKDAYS"
-            :key="day.index"
-            class="flex flex-wrap items-center gap-3"
-          >
-            <USwitch
-              v-model="hours[day.index]!.open"
-              :label="day.name"
-              class="w-40"
-              :data-test="`room-open-${day.index}`"
-            />
-            <template v-if="hours[day.index]!.open">
-              <UInput
-                v-model="hours[day.index]!.opens"
-                type="time"
-                :data-test="`room-opens-${day.index}`"
-              />
-              <span class="text-sm text-muted">to</span>
-              <UInput
-                v-model="hours[day.index]!.closes"
-                type="time"
-                :data-test="`room-closes-${day.index}`"
-              />
+            <template #content>
+              <div class="space-y-3 pt-4">
+                <p class="text-sm text-muted">
+                  Leave every day closed and the room is open whenever, which is true of most
+                  rooms. Open one day and the rest become closed.
+                </p>
+
+                <div
+                  v-for="day in WEEKDAYS"
+                  :key="day.index"
+                  class="flex flex-wrap items-center gap-3"
+                >
+                  <USwitch
+                    v-model="hours[day.index]!.open"
+                    :label="day.name"
+                    class="w-40"
+                    :data-test="`room-open-${day.index}`"
+                  />
+                  <template v-if="hours[day.index]!.open">
+                    <UInput
+                      v-model="hours[day.index]!.opens"
+                      type="time"
+                      :data-test="`room-opens-${day.index}`"
+                    />
+                    <span class="text-sm text-muted">to</span>
+                    <UInput
+                      v-model="hours[day.index]!.closes"
+                      type="time"
+                      :data-test="`room-closes-${day.index}`"
+                    />
+                  </template>
+                  <span
+                    v-else
+                    class="text-sm text-muted"
+                  >Closed</span>
+                </div>
+              </div>
             </template>
-            <span
-              v-else
-              class="text-sm text-muted"
-            >Closed</span>
-          </div>
-
-          <USeparator />
+          </UCollapsible>
 
           <UFormField name="sensitive">
             <USwitch
@@ -451,78 +527,97 @@ const columns: TableColumn<Room>[] = [
             />
           </UFormField>
 
-          <USeparator label="This room's own rules" />
-
-          <p class="text-sm text-muted">
-            Left blank, a room follows the estate settings. A number here applies to this room
-            only, and nought is a real answer meaning none needed.
-          </p>
-
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField
-              label="Shortest booking"
-              name="minBookingMinutes"
-              hint="Minutes"
+          <UCollapsible data-test="policy-section">
+            <UButton
+              color="neutral"
+              variant="subtle"
+              trailing-icon="i-lucide-chevron-down"
+              block
+              class="justify-between"
             >
-              <UInputNumber
-                v-model="state.minBookingMinutes"
-                :min="1"
-                class="w-full"
-                data-test="room-min-minutes"
-              />
-            </UFormField>
+              This room's own rules ({{ overrideCount === 0 ? 'follows the estate' : plural(overrideCount, 'override') }})
+            </UButton>
 
-            <UFormField
-              label="Longest booking"
-              name="maxBookingHours"
-              hint="Hours"
-            >
-              <UInputNumber
-                v-model="state.maxBookingHours"
-                :min="1"
-                class="w-full"
-                data-test="room-max-hours"
-              />
-            </UFormField>
+            <template #content>
+              <div class="space-y-4 pt-4">
+                <p class="text-sm text-muted">
+                  Left blank, a room follows the estate settings shown under each box. A number
+                  here applies to this room only, and nought is a real answer meaning none needed.
+                </p>
 
-            <UFormField
-              label="Notice needed"
-              name="noticeHours"
-              hint="Hours"
-            >
-              <UInputNumber
-                v-model="state.noticeHours"
-                :min="0"
-                class="w-full"
-                data-test="room-notice-hours"
-              />
-            </UFormField>
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <UFormField
+                    label="Shortest booking"
+                    name="minBookingMinutes"
+                    :description="fallsBackTo(estate.minBookingMinutes)"
+                    hint="Minutes"
+                  >
+                    <UInputNumber
+                      v-model="state.minBookingMinutes"
+                      :min="1"
+                      class="w-full"
+                      data-test="room-min-minutes"
+                    />
+                  </UFormField>
 
-            <UFormField
-              label="Booking opens"
-              name="horizonWeeks"
-              hint="Weeks ahead"
-            >
-              <UInputNumber
-                v-model="state.horizonWeeks"
-                :min="1"
-                class="w-full"
-                data-test="room-horizon-weeks"
-              />
-            </UFormField>
+                  <UFormField
+                    label="Longest booking"
+                    name="maxBookingHours"
+                    :description="fallsBackTo(estate.maxBookingHours)"
+                    hint="Hours"
+                  >
+                    <UInputNumber
+                      v-model="state.maxBookingHours"
+                      :min="1"
+                      class="w-full"
+                      data-test="room-max-hours"
+                    />
+                  </UFormField>
 
-            <UFormField
-              label="Bookings one member may hold"
-              name="activeBookingsCap"
-            >
-              <UInputNumber
-                v-model="state.activeBookingsCap"
-                :min="1"
-                class="w-full"
-                data-test="room-cap"
-              />
-            </UFormField>
-          </div>
+                  <UFormField
+                    label="Notice needed"
+                    name="noticeHours"
+                    :description="fallsBackTo(estate.noticeHours)"
+                    hint="Hours"
+                  >
+                    <UInputNumber
+                      v-model="state.noticeHours"
+                      :min="0"
+                      class="w-full"
+                      data-test="room-notice-hours"
+                    />
+                  </UFormField>
+
+                  <UFormField
+                    label="Booking opens"
+                    name="horizonWeeks"
+                    :description="fallsBackTo(estate.horizonWeeks)"
+                    hint="Weeks ahead"
+                  >
+                    <UInputNumber
+                      v-model="state.horizonWeeks"
+                      :min="1"
+                      class="w-full"
+                      data-test="room-horizon-weeks"
+                    />
+                  </UFormField>
+
+                  <UFormField
+                    label="Bookings one member may hold"
+                    name="activeBookingsCap"
+                    :description="fallsBackTo(estate.activeBookingsCap)"
+                  >
+                    <UInputNumber
+                      v-model="state.activeBookingsCap"
+                      :min="1"
+                      class="w-full"
+                      data-test="room-cap"
+                    />
+                  </UFormField>
+                </div>
+              </div>
+            </template>
+          </UCollapsible>
 
           <USeparator />
 

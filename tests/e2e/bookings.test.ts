@@ -65,6 +65,14 @@ const send = (method: string, path: string, body: unknown, as: string): Promise<
     ...(method === 'GET' ? {} : { body: JSON.stringify(body ?? {}) }),
   })
 
+// A member of their own, so a case about contention is not also a case about the ten-booking cap:
+// bookings made earlier in the suite would otherwise refuse the racers before they ever raced.
+async function freshBooker(): Promise<string> {
+  const person = await registerMember(app, 'racer', generatePassword())
+  giveMembership(person.id)
+  return person.cookie
+}
+
 // Every weekday open, so the hours rule never gets in the way of a case about something else.
 const ALL_WEEK = [0, 1, 2, 3, 4, 5, 6].map(weekday => ({ weekday, opens: '00:00', closes: '23:59' }))
 
@@ -122,6 +130,34 @@ describe.skipIf(skip !== null)('booking within policy (C-106)', () => {
   test('a room may set its own notice window, overriding the estate', async () => {
     const room = await makeRoom({ noticeHours: 0 })
     expect((await book(room, soon(1, 10))).status).toBe(200)
+  })
+
+  // Somebody else's room: this system records the request and the Theatre Manager fills in the
+  // SU's form. So a member's booking is always a request, never an instant confirmation.
+  test('an external room always goes to a person', async () => {
+    const room = await makeRoom({ isExternal: true })
+    const refused = await book(room, soon())
+
+    expect(refused.status).toBe(422)
+    const { data } = await refused.json() as { data: { canRequest: boolean, failures: unknown[] } }
+    expect(data.canRequest).toBe(true)
+    expect(data.failures).toEqual([])
+  })
+
+  // Most rooms have no restriction worth recording, and making an officer fill in seven days to
+  // say so is the wrong default.
+  test('a room with no hours takes a booking at any hour', async () => {
+    const room = await makeRoom({ hours: [] })
+    expect((await book(room, soon(8, 3))).status).toBe(200)
+  })
+
+  test('a room that has said when it opens refuses one outside them', async () => {
+    const room = await makeRoom({ hours: [{ weekday: 0, opens: '09:00', closes: '17:00' }] })
+    const refused = await book(room, soon(8, 3))
+
+    expect(refused.status).toBe(422)
+    const { data } = await refused.json() as { data: { failures: { reason: string }[] } }
+    expect(data.failures.map(failure => failure.reason).some(reason => reason.startsWith('ROOM_') || reason === 'OUT_OF_HOURS')).toBe(true)
   })
 
   test('a slot in the past is refused outright, not offered as a request', async () => {
@@ -197,7 +233,8 @@ describe.skipIf(skip !== null)('one slot, one winner (C-107)', () => {
     const room = await makeRoom()
     const span = soon(13, 10, 2)
 
-    const answers = await Promise.all([book(room, span), book(room, span)])
+    const racer = await freshBooker()
+    const answers = await Promise.all([book(room, span, racer), book(room, span, racer)])
     const codes = answers.map(answer => answer.status).sort()
 
     expect(codes).toEqual([200, 409])
@@ -210,7 +247,8 @@ describe.skipIf(skip !== null)('one slot, one winner (C-107)', () => {
     const room = await makeRoom()
     const span = soon(14, 10, 2)
 
-    const answers = await Promise.all(Array.from({ length: 10 }, () => book(room, span)))
+    const racer = await freshBooker()
+    const answers = await Promise.all(Array.from({ length: 10 }, () => book(room, span, racer)))
     expect(answers.filter(answer => answer.status === 200)).toHaveLength(1)
     expect(answers.filter(answer => answer.status === 409)).toHaveLength(9)
   })

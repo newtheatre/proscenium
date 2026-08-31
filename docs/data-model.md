@@ -467,7 +467,11 @@ address, whatever gets the room booked). Indexed on `is_active`, which is what a
 calendar filters on, and on `is_external`.
 **External, not "venue".** A `venue` here is where a performance happens, and an internally managed
 room may be one: the auditorium is booked for rehearsals and hosts performances. So the noun is
-always *room*, and `is_external` says only who arranges it (C-101).
+always *room*, and `is_external` says only who arranges it (C-101). An external room is an SU room:
+a member's booking for one is always a request, because the Theatre Manager books it by filling in
+the SU's form. Venues outside the SU are hired for performances and are module B's, not these.
+`sensitive` and `is_external` therefore both send a booking to the approval queue whatever the
+policy says, and for the same reason: a person has to do something before the room is really held.
 Retired, never deleted: a booking made last term still names something (C-101 criterion 2), and
 there is no delete endpoint at all rather than one that refuses. Capacity is compared against a
 booking's attendee count as a **warning, never a refusal**: the old estate recorded both and
@@ -475,7 +479,9 @@ compared neither.
 
 ### room_hours
 `id` PK · `room_id` cascade · `weekday` 0..6 CHECK · `opens` `HH:MM` · `closes` `HH:MM`, CHECK
-`closes > opens`. Absence of rows = closed that day. Zero-padded so the two compare and sort as
+`closes > opens`. **No rows at all = open whenever**: most rooms have no restriction worth
+recording, and making an officer fill in seven days to say so is the wrong default. Once a room
+has any hours, they are exhaustive, so a weekday with no row is then a day it is shut. Zero-padded so the two compare and sort as
 strings, which is why no part of the opening-hours rules involves a date or a timezone.
 Replaced wholesale on an edit rather than patched: seven days is small enough that a diff would
 be more code than value.
