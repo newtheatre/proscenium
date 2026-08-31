@@ -136,6 +136,20 @@ export const passkeys = sqliteTable('passkeys', {
   lastUsedAt: integer('last_used_at'),
 })
 
+// Its own table rather than a kind on auth_tokens: that column carries a CHECK, and widening one
+// in SQLite is a full rebuild of a table holding live tokens (A-105).
+export const passkeyChallenges = sqliteTable('passkey_challenges', {
+  // The attempt id the browser echoes back, which is what binds a response to its challenge.
+  id: text('id').primaryKey(),
+  challenge: text('challenge').notNull(),
+  // Null while signing in: a usernameless attempt does not know who it is until it verifies.
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  expiresAt: integer('expires_at').notNull(),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  index('passkey_challenges_expires_at').on(table.expiresAt),
+])
+
 export const recoveryCodes = sqliteTable('recovery_codes', {
   id: id(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

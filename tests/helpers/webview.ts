@@ -1,3 +1,4 @@
+import { statSync } from 'node:fs'
 import { Database } from 'bun:sqlite'
 import { hubDirFor } from './hub-dir'
 import type { Subprocess } from 'bun'
@@ -118,6 +119,7 @@ export function resetDatabase(file: string): void {
 // the last one left, which is how "the last administrator" stops being true mid-run.
 export async function startApp(): Promise<AppUnderTest> {
   announce(callingSuite(), ++suitesStarted, runBegan)
+  removeStaleProfiles()
 
   if (shared) {
     resetDatabase(shared.app.databaseFile)
@@ -207,6 +209,23 @@ function profileDirectories(): Set<string> {
 }
 
 const claimedProfiles = new Set<string>()
+
+// A run killed part way never reaches its sweep, so profiles pile up until a full tmpfs makes the
+// browser suites slow and then flaky. An hour old cannot belong to a live run; minutes is a run.
+const STALE_PROFILE_MS = 60 * 60 * 1000
+
+function removeStaleProfiles(): void {
+  const cutoff = Date.now() - STALE_PROFILE_MS
+  for (const entry of profileDirectories()) {
+    const path = `/tmp/${entry}`
+    try {
+      if (statSync(path).mtimeMs < cutoff) Bun.spawnSync(['rm', '-rf', path])
+    }
+    catch {
+      // Gone between listing and stat, which is the outcome wanted anyway.
+    }
+  }
+}
 
 function claimProfilesSince(before: Set<string>): void {
   for (const entry of profileDirectories()) {
@@ -302,21 +321,42 @@ export async function fillPin(view: Bun.WebView, selector: string, code: string)
 // assigned to. British order, which is what the field is set to (0032).
 export async function fillDate(view: Bun.WebView, selector: string, day: string): Promise<void> {
   const [year, month, date] = day.split('-')
-  await waitFor(view, `document.querySelectorAll(${JSON.stringify(`${selector} [data-reka-date-field-segment]`)}).length >= 3`)
-  await view.evaluate(`(() => {
-    const segments = [...document.querySelectorAll(${JSON.stringify(`${selector} [data-reka-date-field-segment]`)})]
+  const segments = JSON.stringify(`${selector} [data-reka-date-field-segment]`)
+  const digits = JSON.stringify([date, month, year].join(''))
+
+  const type = `(() => {
+    const parts = [...document.querySelectorAll(${segments})]
       .filter(segment => segment.getAttribute('data-reka-date-field-segment') !== 'literal')
-    const digits = ${JSON.stringify([date, month, year].join(''))}
+    const digits = ${digits}
     let index = 0
-    for (const segment of segments) {
+    for (const segment of parts) {
       segment.focus()
       const wanted = segment.getAttribute('data-reka-date-field-segment') === 'year' ? 4 : 2
       for (let typed = 0; typed < wanted; typed++) {
-        const key = digits[index++]
-        segment.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+        segment.dispatchEvent(new KeyboardEvent('keydown', { key: digits[index++], bubbles: true }))
       }
     }
-  })()`)
+  })()`
+  const readBack = `[...document.querySelectorAll(${segments})].map(segment => segment.innerText).join('')`
+
+  await waitFor(view, `document.querySelectorAll(${segments}).length >= 3`)
+
+  // The segments are server-rendered before Vue attaches to them, so a keydown can land on
+  // nothing. Typed, then read back, and only typed again if nothing took (0029).
+  for (let attempt = 0; attempt < 8; attempt++) {
+    await view.evaluate(type)
+    for (let settle = 0; settle < 12; settle++) {
+      await Bun.sleep(250)
+      if (!String(await view.evaluate(readBack)).includes(year!)) continue
+
+      // Left the way a person leaves it. The model commits on the tick after the last segment, so
+      // a submit fired in the same breath sends nothing for the date.
+      await view.evaluate(`document.activeElement instanceof HTMLElement && document.activeElement.blur()`)
+      await Bun.sleep(250)
+      return
+    }
+  }
+  throw new Error(`${selector} would not take the date ${day}`)
 }
 
 // The picker searches the server, so this types, waits for the person to appear, and clicks them.

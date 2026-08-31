@@ -6,6 +6,7 @@ import type { SignInMethod } from '#shared/utils/sign-in-methods'
 // listing carries `removable`, so the screen and the endpoint agree (A-113).
 
 const toast = useToast()
+const { account } = useAccount()
 const methods = ref<SignInMethod[]>([])
 const loading = ref(true)
 const working = ref('')
@@ -24,6 +25,26 @@ async function load(): Promise<void> {
 
 function when(at: number | null): string {
   return at === null ? 'not recorded' : formatLondon(new Date(at * 1000), { dateStyle: 'medium' })
+}
+
+const { register, isSupported } = useWebAuthn({ registerEndpoint: '/api/auth/passkey/register' })
+const enrolling = ref(false)
+
+async function addPasskey(): Promise<void> {
+  enrolling.value = true
+  try {
+    // The address is sent for the authenticator's own display only; the endpoint ignores it and
+    // enrols for whoever holds the session (A-105 criterion 3).
+    await register({ userName: account.value.user?.email ?? '', displayName: account.value.user?.name })
+    toast.add({ title: 'Passkey added', icon: 'i-lucide-fingerprint', color: 'success' })
+    await load()
+  }
+  catch (error) {
+    toast.add({ title: refusalText(error), color: 'error' })
+  }
+  finally {
+    enrolling.value = false
+  }
 }
 
 async function remove(method: SignInMethod): Promise<void> {
@@ -104,5 +125,25 @@ onMounted(load)
         </UBadge>
       </li>
     </ul>
+
+    <template #footer>
+      <UButton
+        v-if="isSupported"
+        icon="i-lucide-fingerprint"
+        color="neutral"
+        variant="subtle"
+        :loading="enrolling"
+        data-test="add-passkey"
+        @click="addPasskey"
+      >
+        Add a passkey
+      </UButton>
+      <p
+        v-else
+        class="text-sm text-muted"
+      >
+        This browser cannot hold a passkey.
+      </p>
+    </template>
   </UPageCard>
 </template>

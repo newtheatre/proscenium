@@ -39,6 +39,7 @@ const CATALOGUE = {
   'session.started': { label: 'Signed in with a password', module: 'identity', self: true },
   'session.started.google': { label: 'Signed in with Google', module: 'identity', self: true },
   'session.started.magic-link': { label: 'Signed in with a link', module: 'identity', self: true },
+  'session.started.passkey': { label: 'Signed in with a passkey', module: 'identity', self: true },
   'session.started.totp': { label: 'Signed in with an authenticator', module: 'identity', self: true },
   'session.started.recovery-code': { label: 'Signed in with a recovery code', module: 'identity', self: true },
   'session.revoked': { label: 'Sessions ended by an officer', module: 'identity' },
