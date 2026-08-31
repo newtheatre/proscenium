@@ -16,14 +16,24 @@ export const WEEKDAYS = [
 // Zero-padded so they compare and sort as strings, which is why the whole file can avoid dates.
 const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 
+// Blank is no answer rather than an empty answer, the way a profile field is.
+const text = (max: number) => z.string().trim().max(max).nullish()
+  .transform(value => (value ?? '').trim() || null)
+
 export const roomForm = z.object({
   name: z.string().trim().min(1).max(120),
-  description: z.string().trim().max(2000).nullish().transform(value => (value ?? '').trim() || null),
+  description: text(2000),
   // Null is uncapped. Nought would be a room nobody may enter.
   capacity: z.number().int().positive().nullish().transform(value => value ?? null),
   isActive: z.boolean().default(true),
   // Books through the approval queue whatever the policy says (C-105 criterion 5).
   sensitive: z.boolean().default(false),
+  // A room somebody else manages, tracked here so it is not a spreadsheet. Where it is and who to
+  // ask are the whole of what this system knows about one.
+  isExternal: z.boolean().default(false),
+  campus: text(80),
+  building: text(120),
+  contact: text(500),
 })
 
 export type RoomInput = z.output<typeof roomForm>

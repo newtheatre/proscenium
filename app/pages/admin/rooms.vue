@@ -14,6 +14,10 @@ interface Room {
   capacity: number | null
   isActive: boolean
   sensitive: boolean
+  isExternal: boolean
+  campus: string | null
+  building: string | null
+  contact: string | null
   hours: RoomHours[]
 }
 
@@ -46,6 +50,10 @@ const state = reactive({
   capacity: undefined as number | undefined,
   isActive: true,
   sensitive: false,
+  isExternal: false,
+  campus: '',
+  building: '',
+  contact: '',
 })
 const hours = ref<Record<number, { opens: string, closes: string, open: boolean }>>({})
 
@@ -61,6 +69,10 @@ function edit(room: Room | null): void {
     capacity: room?.capacity ?? undefined,
     isActive: room?.isActive ?? true,
     sensitive: room?.sensitive ?? false,
+    isExternal: room?.isExternal ?? false,
+    campus: room?.campus ?? '',
+    building: room?.building ?? '',
+    contact: room?.contact ?? '',
   })
   hours.value = blankHours()
   for (const day of room?.hours ?? []) {
@@ -200,7 +212,13 @@ const columns: TableColumn<Room>[] = [
             {{ row.original.name }}
           </p>
           <p
-            v-if="row.original.description"
+            v-if="row.original.isExternal"
+            class="text-sm text-muted"
+          >
+            {{ [row.original.building, row.original.campus].filter(Boolean).join(', ') || 'Somewhere else' }}
+          </p>
+          <p
+            v-else-if="row.original.description"
             class="text-sm text-muted"
           >
             {{ row.original.description }}
@@ -218,6 +236,14 @@ const columns: TableColumn<Room>[] = [
 
       <template #state-cell="{ row }">
         <div class="flex flex-wrap gap-1">
+          <UBadge
+            v-if="row.original.isExternal"
+            color="info"
+            variant="subtle"
+            size="sm"
+          >
+            External
+          </UBadge>
           <UBadge
             v-if="row.original.sensitive"
             color="warning"
@@ -315,6 +341,57 @@ const columns: TableColumn<Room>[] = [
               data-test="room-capacity"
             />
           </UFormField>
+
+          <USeparator />
+
+          <UFormField name="isExternal">
+            <USwitch
+              v-model="state.isExternal"
+              label="Somebody else manages this room"
+              description="A room arranged by conversation rather than by this system. Recording where it is and who to ask beats a spreadsheet."
+              data-test="room-external"
+            />
+          </UFormField>
+
+          <template v-if="state.isExternal">
+            <UFormField
+              label="Campus"
+              name="campus"
+              hint="Optional"
+            >
+              <UInput
+                v-model="state.campus"
+                class="w-full"
+                data-test="room-campus"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Building"
+              name="building"
+              hint="Optional"
+            >
+              <UInput
+                v-model="state.building"
+                class="w-full"
+                data-test="room-building"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Who to ask"
+              name="contact"
+              hint="Optional"
+              description="A name, an address, a phone number: whatever gets the room booked."
+            >
+              <UTextarea
+                v-model="state.contact"
+                class="w-full"
+                :rows="2"
+                data-test="room-contact"
+              />
+            </UFormField>
+          </template>
 
           <USeparator label="Opening hours" />
 

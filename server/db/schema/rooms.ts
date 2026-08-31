@@ -16,11 +16,18 @@ export const rooms = sqliteTable('rooms', {
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   // Books through the approval queue whatever the policy says (C-105 criterion 5).
   sensitive: integer('sensitive', { mode: 'boolean' }).notNull().default(false),
+  // Somebody else's room, arranged by conversation. "External" rather than "venue": a venue is
+  // where a performance happens, and the auditorium is both (C-101).
+  isExternal: integer('is_external', { mode: 'boolean' }).notNull().default(false),
+  campus: text('campus'),
+  building: text('building'),
+  contact: text('contact'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 }, table => [
   // Member-facing calendars list the active rooms and nothing else (criterion 4).
   index('rooms_is_active').on(table.isActive),
+  index('rooms_is_external').on(table.isExternal),
   unique('rooms_name').on(table.name),
   check('rooms_capacity_positive', sql`${table.capacity} IS NULL OR ${table.capacity} > 0`),
 ])

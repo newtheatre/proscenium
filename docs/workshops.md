@@ -25,7 +25,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Room minimum booking | 30 minutes (policy doc, unenforced) | 30 minutes | |
 | Room maximum booking | 4 hours (unenforced) | 4 hours, admins exempt | |
 | Advance notice | 4 working days (unenforced) | 48 hours for auto-approval; shorter goes to the queue | The old rule was widely ignored; pick one that will be kept |
-| Booking horizon | none | end of current term | |
+| Booking horizon | none | 12 weeks ahead | Weeks rather than end of term: no term dates exist anywhere in the system, so that rule could not be enforced (0034) |
 | Active bookings per member | 10 (unenforced) | 10, series counts each occurrence | |
 | Recurring series maximum | 12 occurrences (UI) / 52 (API) | 12 | |
 | No-show ladder | none | recorded at 2, pre-approval required at 3 per term | Constraint 2 of the old policy doc, now real |

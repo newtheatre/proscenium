@@ -459,7 +459,12 @@ counted NULL distinct from counted zero; finishing posts movements atomically.
 ### rooms
 `id` PK · `name` UNIQUE · `description` · `capacity` NULL = uncapped, CHECK `> 0` · `is_active`
 bool · `sensitive` bool (books via the approval queue regardless of policy) · `created_at` ·
-`updated_at`. Indexed on `is_active`, which is what a member-facing calendar filters on.
+`updated_at` · `is_external` bool · `campus` · `building` · `contact` (free text: a name, an
+address, whatever gets the room booked). Indexed on `is_active`, which is what a member-facing
+calendar filters on, and on `is_external`.
+**External, not "venue".** A `venue` here is where a performance happens, and an internally managed
+room may be one: the auditorium is booked for rehearsals and hosts performances. So the noun is
+always *room*, and `is_external` says only who arranges it (C-101).
 Retired, never deleted: a booking made last term still names something (C-101 criterion 2), and
 there is no delete endpoint at all rather than one that refuses. Capacity is compared against a
 booking's attendee count as a **warning, never a refusal**: the old estate recorded both and
