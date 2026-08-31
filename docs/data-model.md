@@ -459,12 +459,19 @@ counted NULL distinct from counted zero; finishing posts movements atomically.
 ### rooms
 `id` PK · `name` UNIQUE · `description` · `capacity` NULL = uncapped, CHECK `> 0` · `is_active`
 bool · `sensitive` bool (books via the approval queue regardless of policy) · `created_at` ·
-`updated_at` · `is_external` bool · `campus` · `building` · `contact` (free text: a name, an
+`updated_at` · `min_booking_minutes` / `max_booking_hours` / `notice_hours` / `horizon_weeks` /
+`active_bookings_cap`, each NULL falling back to the estate setting of the same name; nought is an
+override meaning none needed, so resolution tests absence rather than falsiness (C-106 criterion 1)
+· `is_external` bool · `campus` · `building` · `contact` (free text: a name, an
 address, whatever gets the room booked). Indexed on `is_active`, which is what a member-facing
 calendar filters on, and on `is_external`.
 **External, not "venue".** A `venue` here is where a performance happens, and an internally managed
 room may be one: the auditorium is booked for rehearsals and hosts performances. So the noun is
-always *room*, and `is_external` says only who arranges it (C-101).
+always *room*, and `is_external` says only who arranges it (C-101). An external room is an SU room:
+a member's booking for one is always a request, because the Theatre Manager books it by filling in
+the SU's form. Venues outside the SU are hired for performances and are module B's, not these.
+`sensitive` and `is_external` therefore both send a booking to the approval queue whatever the
+policy says, and for the same reason: a person has to do something before the room is really held.
 Retired, never deleted: a booking made last term still names something (C-101 criterion 2), and
 there is no delete endpoint at all rather than one that refuses. Capacity is compared against a
 booking's attendee count as a **warning, never a refusal**: the old estate recorded both and
@@ -472,7 +479,9 @@ compared neither.
 
 ### room_hours
 `id` PK · `room_id` cascade · `weekday` 0..6 CHECK · `opens` `HH:MM` · `closes` `HH:MM`, CHECK
-`closes > opens`. Absence of rows = closed that day. Zero-padded so the two compare and sort as
+`closes > opens`. **No rows at all = open whenever**: most rooms have no restriction worth
+recording, and making an officer fill in seven days to say so is the wrong default. Once a room
+has any hours, they are exhaustive, so a weekday with no row is then a day it is shut. Zero-padded so the two compare and sort as
 strings, which is why no part of the opening-hours rules involves a date or a timezone.
 Replaced wholesale on an edit rather than patched: seven days is small enough that a diff would
 be more code than value.
@@ -493,15 +502,24 @@ stateDiagram-v2
 ```
 
 ### room_bookings
-`id` PK · `room_id` → rooms restrict · `user_id` → users restrict · `series_id` NULL →
-room_series cascade · `occurrence` int NULL · `title` · `attendees` int NULL · `starts_at` ·
-`ends_at` (half-open interval; CHECK `ends_at > starts_at`) · `tier` CHECK
-`PRODUCTION|TRAINING|REHEARSAL|GENERAL` · `status` CHECK
+`id` PK · `room_id` → rooms restrict · `user_id` → users restrict · `title` · `attendees` int NULL
+· `starts_at` · `ends_at` (half-open interval; CHECK `ends_at > starts_at`) · `tier`, **no CHECK**,
+enum in `shared/utils/bookings.ts` · `status` CHECK
 `CONFIRMED|PENDING_APPROVAL|REJECTED|CANCELLED|BUMPED` · `rejection_reason` scrub · `notes`
-scrub · `bumped_to_booking_id` NULL (the replacement offer) · `no_show_recorded_at` NULL ·
-timestamps.
+scrub · `no_show_recorded_at` NULL · timestamps. Indexed on `(room_id, starts_at, ends_at)`, which
+is exactly what the clash predicate reads, and on `user_id` for the active-bookings cap.
+`tier` carries no CHECK because `ROOM_PRIORITY_TIERS` is committee-editable, and a constraint
+behind an editable list breaks writes the moment the list is used (0033's reasoning, C-115).
+`series_id`, `occurrence` and `bumped_to_booking_id` arrive with C-110 and C-115; adding a column
+is not a rebuild, and this table is not append-only in any case.
+Erasure scrubs `title` and `notes` and keeps the row: the room was used, which is a fact about the
+room rather than about the person (0011).
 Occupancy: `CONFIRMED` and `PENDING_APPROVAL` hold their slot; the clash rule is half-open
-and rides the write as a predicate. Conflict responses mask titles and identities from
+and rides the write as a predicate. `server/utils/bookings.ts` is the only writer, and it is one
+guarded `INSERT ... SELECT ... WHERE NOT EXISTS ... RETURNING id`: a row returned is the win, and
+no rows is disambiguated by a single read into gone (410) or beaten (409), the pattern 0003 names.
+There is no override, deliberate or otherwise: blackouts (C-114) and priority tiers (C-115) are how
+a legitimate double-booking happens, and each leaves a record of what happened and why. Conflict responses mask titles and identities from
 non-admins ("Booked"). In-policy bookings for standard rooms confirm instantly (C-1).
 
 ### room_series

@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { check, index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import { users } from './identity'
 
 const now = sql`(unixepoch())`
 const id = () => text('id').primaryKey()
@@ -22,6 +23,13 @@ export const rooms = sqliteTable('rooms', {
   campus: text('campus'),
   building: text('building'),
   contact: text('contact'),
+  // Null falls back to the estate setting. Nought is an override meaning none needed, which is why
+  // the resolution tests absence rather than falsiness (C-106 criterion 1).
+  minBookingMinutes: integer('min_booking_minutes'),
+  maxBookingHours: integer('max_booking_hours'),
+  noticeHours: integer('notice_hours'),
+  horizonWeeks: integer('horizon_weeks'),
+  activeBookingsCap: integer('active_bookings_cap'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 }, table => [
@@ -43,4 +51,34 @@ export const roomHours = sqliteTable('room_hours', {
   index('room_hours_room').on(table.roomId),
   check('room_hours_weekday', sql`${table.weekday} BETWEEN 0 AND 6`),
   check('room_hours_order', sql`${table.closes} > ${table.opens}`),
+])
+
+export const roomBookings = sqliteTable('room_bookings', {
+  id: id(),
+  // Restrict, not cascade: a room is retired rather than deleted, so a booking losing its room
+  // would be a bug rather than a case to handle.
+  roomId: text('room_id').notNull().references(() => rooms.id, { onDelete: 'restrict' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  title: text('title').notNull(),
+  attendees: integer('attendees'),
+  startsAt: integer('starts_at').notNull(),
+  endsAt: integer('ends_at').notNull(),
+  // No CHECK: ROOM_PRIORITY_TIERS is committee-editable and a constraint behind an editable list
+  // breaks writes the moment the list is used (0033's reasoning, C-115).
+  tier: text('tier').notNull().default('GENERAL'),
+  status: text('status').notNull().default('CONFIRMED'),
+  notes: text('notes'),
+  rejectionReason: text('rejection_reason'),
+  noShowRecordedAt: integer('no_show_recorded_at'),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  // The clash predicate reads exactly this, on every booking attempt.
+  index('room_bookings_clash').on(table.roomId, table.startsAt, table.endsAt),
+  index('room_bookings_user').on(table.userId),
+  check('room_bookings_span', sql`${table.endsAt} > ${table.startsAt}`),
+  check(
+    'room_bookings_status',
+    sql`${table.status} IN ('CONFIRMED', 'PENDING_APPROVAL', 'REJECTED', 'CANCELLED', 'BUMPED')`,
+  ),
 ])

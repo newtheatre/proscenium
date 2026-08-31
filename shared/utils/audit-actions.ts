@@ -70,6 +70,7 @@ const CATALOGUE = {
 
   'room.created': { label: 'Room added', module: 'spaces' },
   'room.updated': { label: 'Room changed', module: 'spaces' },
+  'room.booked': { label: 'Room booked', module: 'spaces', self: true },
   'room.hours.set': { label: 'Room opening hours set', module: 'spaces' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).

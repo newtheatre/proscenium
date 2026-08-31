@@ -1,6 +1,8 @@
 import { asc, eq, inArray } from 'drizzle-orm'
 import { roomHoursForm } from '#shared/utils/rooms'
 import type { RoomHours, RoomInput } from '#shared/utils/rooms'
+import type { EstatePolicy } from '#shared/utils/booking-policy'
+import type { H3Event } from 'h3'
 
 // Reading and writing the bookable estate. A room's opening hours are replaced wholesale rather
 // than patched: seven days is a small enough set that a diff would be more code than value.
@@ -16,6 +18,12 @@ export interface RoomRow {
   campus: string | null
   building: string | null
   contact: string | null
+  // Null falls back to the estate setting (C-106 criterion 1).
+  minBookingMinutes: number | null
+  maxBookingHours: number | null
+  noticeHours: number | null
+  horizonWeeks: number | null
+  activeBookingsCap: number | null
   hours: RoomHours[]
 }
 
@@ -30,6 +38,11 @@ const COLUMNS = {
   campus: schema.rooms.campus,
   building: schema.rooms.building,
   contact: schema.rooms.contact,
+  minBookingMinutes: schema.rooms.minBookingMinutes,
+  maxBookingHours: schema.rooms.maxBookingHours,
+  noticeHours: schema.rooms.noticeHours,
+  horizonWeeks: schema.rooms.horizonWeeks,
+  activeBookingsCap: schema.rooms.activeBookingsCap,
 }
 
 const HOUR_COLUMNS = {
@@ -81,7 +94,7 @@ export async function findRoom(id: string): Promise<RoomRow | undefined> {
 // The diff criterion 1 asks for: what changed, from what, to what. Nothing here is personal.
 export function roomChanges(before: RoomRow, after: RoomInput): Record<string, [unknown, unknown]> {
   const changes: Record<string, [unknown, unknown]> = {}
-  for (const field of ['name', 'description', 'capacity', 'isActive', 'sensitive', 'isExternal', 'campus', 'building', 'contact'] as const) {
+  for (const field of ['name', 'description', 'capacity', 'isActive', 'sensitive', 'isExternal', 'campus', 'building', 'contact', 'minBookingMinutes', 'maxBookingHours', 'noticeHours', 'horizonWeeks', 'activeBookingsCap'] as const) {
     if (before[field] !== after[field]) changes[field] = [before[field], after[field]]
   }
   return changes
@@ -89,4 +102,17 @@ export function roomChanges(before: RoomRow, after: RoomInput): Record<string, [
 
 export function parseHours(input: unknown[]): RoomHours[] {
   return input.map(day => roomHoursForm.parse(day))
+}
+
+// The estate's own numbers, before any room overrides them. One read of the config set, because
+// overrides are memoised per request (0012).
+export async function estatePolicy(event: H3Event): Promise<EstatePolicy> {
+  return {
+    minBookingMinutes: await configValue(event, 'ROOM_MIN_BOOKING_MINUTES'),
+    maxBookingHours: await configValue(event, 'ROOM_MAX_BOOKING_HOURS'),
+    noticeHours: await configValue(event, 'ROOM_AUTO_APPROVE_NOTICE_HOURS'),
+    horizonWeeks: await configValue(event, 'ROOM_BOOKING_HORIZON_WEEKS'),
+    activeBookingsCap: await configValue(event, 'ROOM_ACTIVE_BOOKINGS_PER_MEMBER'),
+    maxBookingAdminsExempt: await configValue(event, 'ROOM_MAX_BOOKING_ADMINS_EXEMPT'),
+  }
 }

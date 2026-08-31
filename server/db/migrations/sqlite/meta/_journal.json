@@ -134,6 +134,13 @@
       "when": 1788188175344,
       "tag": "0018_salty_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1788189443747,
+      "tag": "0019_steep_human_torch",
+      "breakpoints": true
     }
   ]
 }
