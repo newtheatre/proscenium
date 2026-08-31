@@ -72,6 +72,31 @@ The Nottingham New Theatre`,
     }
   },
 
+  // Names what went, never what remains: a message read by the wrong person must not inventory
+  // the ways into the account.
+  'method-removed': (context: TemplateContext): Rendered => {
+    const method = String(context.method)
+    const url = String(context.securityUrl)
+    return {
+      subject: 'A sign-in method was removed from your account',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>The ${method} sign-in was just removed from your New Theatre account.</p>
+<p>If that was you, there is nothing to do. If it was not, sign in and check your security
+settings now.</p>
+<p><a href="${url}">My security settings</a></p>`),
+      text: `Hello ${context.name},
+
+The ${method} sign-in was just removed from your New Theatre account.
+
+If that was you, there is nothing to do. If it was not, sign in and check your security settings
+now:
+
+${url}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'account-exists': (context: TemplateContext): Rendered => ({
     subject: 'You already have an account',
     html: layout(`<p>Hello ${context.name},</p>

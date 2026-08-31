@@ -30,3 +30,13 @@ export async function startSession(event: H3Event, account: AccountRow): Promise
     signedInAt: Math.floor(Date.now() / 1000),
   })
 }
+
+// The freshness gate reads signedInAt as when credentials were last proven, so re-sealing after a
+// name or address change carries it forward rather than restarting it (A-113 criterion 2).
+export async function resealSession(event: H3Event, account: AccountRow): Promise<void> {
+  const session = await getUserSession(event)
+  await replaceUserSession(event, {
+    user: { id: account.id, name: account.name, email: account.email, epoch: account.sessionEpoch },
+    signedInAt: session?.signedInAt ?? Math.floor(Date.now() / 1000),
+  })
+}

@@ -6,6 +6,12 @@ export interface AccountRow {
   email: string
   name: string
   password: string | null
+  // When each way in was added and last used, for the account's own security screen (A-113).
+  passwordSetAt: number | null
+  passwordLastUsedAt: number | null
+  googleSub: string | null
+  googleLinkedAt: number | null
+  googleLastUsedAt: number | null
   verified: boolean
   disabled: boolean
   sessionEpoch: number
@@ -43,7 +49,13 @@ export async function createAccount(input: NewAccount): Promise<string> {
   })
 
   await db.batch([
-    db.insert(schema.users).values({ id, email, name: input.name.trim(), password: input.passwordHash }),
+    db.insert(schema.users).values({
+      id,
+      email,
+      name: input.name.trim(),
+      password: input.passwordHash,
+      passwordSetAt: input.passwordHash === null ? null : Math.floor(Date.now() / 1000),
+    }),
     db.insert(schema.auditLog).values(entry),
   ])
   return id

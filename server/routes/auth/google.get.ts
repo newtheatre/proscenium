@@ -45,12 +45,13 @@ export default defineOAuthGoogleEventHandler({
 
     const userId = outcome.action === 'create' ? newId() : outcome.userId
     const name = String(user.name ?? identity.email)
+    const now = Math.floor(Date.now() / 1000)
 
     if (outcome.action === 'create') {
       // Verified by Google and password-less by construction; the CHECK refuses one anyway (0008).
       await db.batch([
         db.insert(schema.users).values({
-          id: userId, email: identity.email, name, googleSub: identity.sub, verified: true,
+          id: userId, email: identity.email, name, googleSub: identity.sub, verified: true, googleLinkedAt: now,
         }),
         db.insert(schema.auditLog).values(auditEntry({ actorId: null, action: 'account.created.google', target: `user:${userId}` })),
       ])
@@ -59,7 +60,7 @@ export default defineOAuthGoogleEventHandler({
       // Claiming marks the account verified: Google has proven the address (A-104).
       await db.batch([
         db.update(schema.users)
-          .set({ googleSub: identity.sub, verified: true, pendingGoogleEmail: null })
+          .set({ googleSub: identity.sub, verified: true, pendingGoogleEmail: null, googleLinkedAt: now })
           .where(and(eq(schema.users.id, userId), isNull(schema.users.googleSub))),
         db.insert(schema.auditLog).values(auditEntry({
           actorId: userId,
@@ -72,7 +73,10 @@ export default defineOAuthGoogleEventHandler({
     const account = await findById(userId)
     if (!account) return sendRedirect(event, '/sign-in?refused=account')
 
-    await db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'session.started.google', target: `user:${account.id}` }))
+    await db.batch([
+      db.update(schema.users).set({ lastLoginAt: now, googleLastUsedAt: now }).where(eq(schema.users.id, account.id)),
+      db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'session.started.google', target: `user:${account.id}` })),
+    ])
     await startSession(event, account)
 
     // Where they were when they were asked to sign in again, remembered across the round trip.

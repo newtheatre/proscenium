@@ -11,7 +11,12 @@ export const users = sqliteTable('users', {
   pronouns: text('pronouns'),
   // scrypt PHC. NULL for a guest or a Google-only account.
   password: text('password'),
+  // When each way in was added and last used, because the account screen lists both (A-113).
+  passwordSetAt: integer('password_set_at'),
+  passwordLastUsedAt: integer('password_last_used_at'),
   googleSub: text('google_sub').unique(),
+  googleLinkedAt: integer('google_linked_at'),
+  googleLastUsedAt: integer('google_last_used_at'),
   // Admin-set marker claiming a Workspace account before its first Google sign-in.
   pendingGoogleEmail: text('pending_google_email').unique(),
   verified: integer('verified', { mode: 'boolean' }).notNull().default(false),

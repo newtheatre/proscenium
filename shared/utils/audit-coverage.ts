@@ -75,6 +75,9 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/auth/password/reset.post.ts', actions: ['password.set', 'password.reset'] },
   { route: 'server/api/auth/register.post.ts', actions: ['account.registered'], via: ['server/utils/accounts.ts'] },
   { route: 'server/api/auth/sign-in.post.ts', actions: ['session.started', 'mfa.challenged'] },
+  { route: 'server/api/account/methods/[id].delete.ts', actions: ['account.method.removed'] },
+  { route: 'server/api/account/password.put.ts', actions: ['account.method.added', 'password.set'] },
+  { route: 'server/api/account/methods/index.get.ts', exempt: 'reads what the account signs in with' },
   { route: 'server/api/auth/sign-out.post.ts', exempt: 'ending your own session changes no record' },
 
   // Development only, and absent from a build: nuxt.config excludes both files (K-124).
