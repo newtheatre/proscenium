@@ -65,7 +65,8 @@ async function stream(shard: Shard, from: ReadableStream<Uint8Array>): Promise<v
 // pays for that inside its own timeout. Paid here instead, once, outside every test.
 const WARM = [
   '/', '/sign-in', '/register', '/verify', '/magic', '/reset',
-  '/account/security', '/admin', '/admin/people', '/admin/config', '/admin/audit', '/foh',
+  '/account/security', '/admin', '/admin/people', '/admin/config', '/admin/audit',
+  '/admin/fellows', '/admin/members', '/dev', '/foh',
 ]
 
 // Keeps the last few lines so a server that never becomes healthy can say why.

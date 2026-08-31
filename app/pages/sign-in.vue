@@ -87,6 +87,26 @@ async function ask(path: string, payload: FormSubmitEvent<z.output<typeof addres
   }
 }
 
+// A passkey proves the person on the device, so it stands for both steps and no challenge
+// follows it (A-105 criterion 2).
+const { authenticate, isSupported } = useWebAuthn({ authenticateEndpoint: '/api/auth/passkey/authenticate' })
+const passkeyWorking = ref(false)
+
+async function signInWithPasskey(): Promise<void> {
+  passkeyWorking.value = true
+  notice.value = null
+  try {
+    await authenticate()
+    await signedIn()
+  }
+  catch (error) {
+    notice.value = refusalText(error)
+  }
+  finally {
+    passkeyWorking.value = false
+  }
+}
+
 async function signedIn(): Promise<void> {
   await refresh()
   await navigateTo(nextPath.value)
@@ -127,6 +147,18 @@ useSeoMeta({ title: 'Sign in' })
       >
         <template #footer>
           <div class="flex flex-col items-start gap-1">
+            <UButton
+              v-if="isSupported"
+              icon="i-lucide-fingerprint"
+              color="neutral"
+              variant="subtle"
+              class="mb-3 self-stretch justify-center"
+              :loading="passkeyWorking"
+              data-test="passkey-sign-in"
+              @click="signInWithPasskey"
+            >
+              Use a passkey
+            </UButton>
             <UButton
               variant="link"
               class="px-0"

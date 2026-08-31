@@ -137,6 +137,14 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'A credential in flight, and one of them carries an address.',
   },
   {
+    name: 'passkey_challenges',
+    column: 'user_id',
+    section: null,
+    columns: null,
+    erasure: 'delete',
+    why: 'A ceremony in flight, five minutes long, holding nothing but a random string.',
+  },
+  {
     name: 'mfa_attempts',
     column: 'user_id',
     section: null,

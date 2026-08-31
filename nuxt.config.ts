@@ -182,6 +182,12 @@ export default defineNuxtConfig({
     blob: true,
   },
 
+  // Adds the WebAuthn ceremony handlers and useWebAuthn, which do not exist without it (A-105).
+  // It also refuses to build if @simplewebauthn/* are missing, so the pair are dependencies.
+  auth: {
+    webAuthn: true,
+  },
+
   eslint: {
     config: {
       stylistic: true,

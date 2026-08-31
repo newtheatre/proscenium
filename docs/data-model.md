@@ -111,6 +111,18 @@ check, not a constraint.
 `id` PK · `user_id` → users cascade · `credential_id` UNIQUE · `public_key` · `counter` ·
 `transports` JSON · `backed_up` bool · `label` · `created_at` · `last_used_at`.
 Relying-party id is the unified domain; nothing imports from the old estate (0008, SP-4).
+Enrolment asks for a discoverable credential with user verification required, so sign-in is
+usernameless and one passkey stands for both the credential and the second factor (A-105).
+`counter` is written on every use and a value that fails to advance is refused as a copied
+authenticator, which is the only reason keeping the count is worth anything.
+
+### passkey_challenges
+`id` PK (the attempt id the browser echoes back) · `challenge` · `user_id` → users cascade,
+NULL while signing in because a usernameless attempt does not know whose it is · `expires_at` ·
+`created_at`. Indexed on `expires_at`, and swept on each write rather than on a schedule.
+A challenge is taken, not read: verifying anything against it removes it, so a response cannot
+be replayed. Its own table rather than a kind on `auth_tokens`, because that column carries a
+CHECK and widening one in SQLite is a full rebuild of a table holding live tokens (A-105).
 
 ### recovery_codes
 `id` PK · `user_id` → users cascade · `code_hash` · `used_at` NULL. Eight per set; a new set

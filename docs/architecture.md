@@ -83,6 +83,10 @@ becomes interactive.
   3. **Ownership**: the row's own user id.
 - Guards are server-side and fail closed; route middleware is rendering convenience only.
 - MFA (TOTP + passkeys) is enforced at guard level for permission-bearing roles (0008).
+- A passkey is a complete sign-in and no challenge follows it: the authenticator verified the
+  person before it would sign, so the credential step and the second step happened at once
+  (A-105). `nuxt-auth-utils` verifies both ceremonies with `requireUserVerification: false`, so
+  that rule is enforced in `shared/utils/passkeys.ts` and checked in both handlers.
 
 ```mermaid
 flowchart TD
