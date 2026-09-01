@@ -114,6 +114,7 @@ export default defineEventHandler(async (event) => {
       title: input.title,
       attendees: input.attendees,
       tier: input.tier,
+      purpose: await requirePurpose(event, input.purpose),
       notes: input.notes,
       status,
       recurrence,

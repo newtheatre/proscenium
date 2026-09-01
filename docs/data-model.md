@@ -513,6 +513,16 @@ scrub · `reason` scrub (why an exception is asked for, the member's own words, 
 is exactly what the clash predicate reads, and on `user_id` for the active-bookings cap.
 `tier` carries no CHECK because `ROOM_PRIORITY_TIERS` is committee-editable, and a constraint
 behind an editable list breaks writes the moment the list is used (0033's reasoning, C-115).
+
+**`purpose` is not `tier`.** A tier answers who keeps a contested slot; a purpose answers what the
+room is needed for, which is what makes a room suitable or not. One `USelect` was doing both jobs
+under the label "What kind of booking". `purpose` is nullable with no default and no CHECK: the
+list (`ROOM_PURPOSES`) is committee-editable and validated at the write path, and the history
+C-118 imports was never asked, so "not recorded" is a real answer rather than an invented one. It
+is required on every new booking and deliberately not preselected on the form, because a defaulted
+purpose means a member who never looked at the field gets no suitability warning (C-119). A link
+may carry it (`/rooms/book?purpose=REHEARSAL`), which is a stated intent rather than a silent
+default.
 `series_id` → room_series NULL and `occurrence` NULL carry an occurrence's place in its term
 (C-110). `bumped_to_booking_id` and `bumped_reason` carry a bump (C-115). Indexed on `series_id`,
 which every series-scoped action reads. Adding a column is not a rebuild, and this table is not

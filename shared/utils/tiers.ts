@@ -37,6 +37,7 @@ export const bumpForm = z.object({
   userId: z.string().min(1).max(64),
   title: z.string().trim().min(1).max(200),
   tier: z.string().min(1).max(32),
+  purpose: z.string().trim().min(1, 'Say what the room is for').max(32),
   reason: z.string().trim().min(1, 'Say why the room is being taken').max(BUMP_REASON_LIMIT),
 })
 

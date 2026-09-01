@@ -6,5 +6,6 @@ export default defineEventHandler(async (event) => {
   return {
     ...estate,
     seriesCap: await configValue(event, 'ROOM_SERIES_MAX_OCCURRENCES'),
+    purposes: await configValue(event, 'ROOM_PURPOSES'),
   }
 })

@@ -85,6 +85,7 @@ export const seriesForm = z.object({
   title: z.string().trim().min(1).max(200),
   attendees: z.number().int().positive().nullish().transform(value => value ?? null),
   tier: z.enum(['PRODUCTION', 'COMMITTEE', 'REHEARSAL', 'GENERAL']).default('GENERAL'),
+  purpose: z.string().trim().min(1, 'Say what the room is for').max(32),
   notes: z.string().trim().max(1000).nullish().transform(value => (value ?? '').trim() || null),
   frequency: z.enum(FREQUENCIES),
   weekdays: z.array(z.number().int().min(0).max(6)).default([]),

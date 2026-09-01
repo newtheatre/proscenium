@@ -165,6 +165,12 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Bookings an availability sweep may cover before it refuses. It refuses, never truncates.',
   },
+  ROOM_PURPOSES: {
+    schema: z.array(z.string()).nonempty(),
+    default: ['REHEARSAL', 'MEETING', 'WORKSHOP', 'AUDITION', 'READ_THROUGH', 'GET_IN', 'SOCIAL', 'STORAGE'],
+    workshop: 'spaces-and-training',
+    describes: 'What a room may be booked for. A space unsuitable for one of these is noted against it.',
+  },
   ROOM_PRIORITY_TIERS: {
     schema: z.array(z.string()).nonempty(),
     default: ['PRODUCTION', 'COMMITTEE', 'REHEARSAL', 'GENERAL'],
@@ -399,6 +405,7 @@ export const ENFORCED_KEYS = [
   'ROOM_MIN_BOOKING_MINUTES',
   'ROOM_SERIES_MAX_OCCURRENCES',
   'ROOM_PRIORITY_TIERS',
+  'ROOM_PURPOSES',
   'ROOM_NO_SHOW_WINDOW_DAYS',
   'ROOM_NO_SHOW_RECORD_AT',
   'ROOM_NO_SHOW_PREAPPROVAL_AT',

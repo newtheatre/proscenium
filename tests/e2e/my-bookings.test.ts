@@ -192,6 +192,7 @@ describe.skipIf(skip !== null)('being told (C-113, the member half)', () => {
     await send('POST', '/api/rooms/bookings', {
       roomId: room,
       title: 'Rehearsal',
+      purpose: 'REHEARSAL',
       startsAt: soon.toISOString(),
       endsAt: new Date(soon.getTime() + 2 * 3_600_000).toISOString(),
     }, member.cookie)

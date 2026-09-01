@@ -93,10 +93,11 @@ describe('a member learns a slot is taken, never whose it is', () => {
 })
 
 describe('what a booking request must say', () => {
-  test('a room, a span and a title', () => {
+  test('a room, a span, a title and what it is for', () => {
     expect(bookingForm.safeParse({
       roomId: 'r-1',
       title: 'Rehearsal',
+      purpose: 'REHEARSAL',
       startsAt: '2026-09-14T09:00:00.000Z',
       endsAt: '2026-09-14T11:00:00.000Z',
     }).success).toBe(true)

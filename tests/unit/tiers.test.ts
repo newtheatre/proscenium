@@ -58,7 +58,7 @@ describe('what may be bumped (criterion 2)', () => {
 })
 
 describe('a bump carries its reason (criterion 2)', () => {
-  const valid = { userId: 'u1', title: 'Dress run', tier: 'PRODUCTION', reason: 'Show week' }
+  const valid = { userId: 'u1', title: 'Dress run', tier: 'PRODUCTION', purpose: 'REHEARSAL', reason: 'Show week' }
 
   test('a reason is required', () => {
     expect(bumpForm.safeParse(valid).success).toBe(true)

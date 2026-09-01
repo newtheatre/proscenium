@@ -10,6 +10,7 @@ describe('what a request must say', () => {
   const span = {
     roomId: 'r-1',
     title: 'Dress run',
+    purpose: 'REHEARSAL',
     startsAt: '2026-09-14T09:00:00.000Z',
     endsAt: '2026-09-14T11:00:00.000Z',
   }

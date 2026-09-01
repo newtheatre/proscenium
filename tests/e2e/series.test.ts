@@ -106,6 +106,7 @@ function bookSeries(roomId: string, over: Record<string, unknown> = {}, as = mem
   return send('POST', '/api/rooms/series', {
     roomId,
     title: 'Weekly rehearsal',
+    purpose: 'REHEARSAL',
     frequency: 'WEEKLY',
     weekdays: [1],
     startsOn: mondayIn(1),
@@ -145,6 +146,7 @@ describe.skipIf(skip !== null)('booking a term at once (C-110)', () => {
     const clash = await send('POST', '/api/rooms/bookings', {
       roomId: room,
       title: 'On top of it',
+      purpose: 'REHEARSAL',
       startsAt: new Date(first.starts_at * 1000).toISOString(),
       endsAt: new Date((first.starts_at + 3600) * 1000).toISOString(),
     }, other.cookie)
@@ -335,6 +337,7 @@ describe.skipIf(skip !== null)('cancelling asks which (C-111 criterion 1)', () =
     const booked = await send('POST', '/api/rooms/bookings', {
       roomId: room,
       title: 'On its own',
+      purpose: 'REHEARSAL',
       startsAt: at.toISOString(),
       endsAt: new Date(at.getTime() + 3_600_000).toISOString(),
     }, who.cookie)
@@ -521,7 +524,7 @@ describe.skipIf(skip !== null)('the screens (C-110, C-111)', () => {
     const view = await openSignedOutView(app.baseURL)
     try {
       await signIn(view)
-      await visit(view, `${app.baseURL}/rooms/book?room=${room}&day=${startsOn}&at=19:00`, '[data-test="booking-form"]')
+      await visit(view, `${app.baseURL}/rooms/book?room=${room}&day=${startsOn}&at=19:00&purpose=REHEARSAL`, '[data-test="booking-form"]')
       // A server render cannot see a hydration failure, so the page is read after it is live.
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
 

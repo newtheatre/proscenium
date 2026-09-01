@@ -91,7 +91,7 @@ function span(daysAhead: number, hour = 14, hours = 2): { startsAt: string, ends
 }
 
 const book = (roomId: string, when: { startsAt: string, endsAt: string }, as = member.cookie): Promise<Response> =>
-  send('POST', '/api/rooms/bookings', { roomId, title: 'Rehearsal', ...when }, as)
+  send('POST', '/api/rooms/bookings', { roomId, title: 'Rehearsal', purpose: 'REHEARSAL', ...when }, as)
 
 const closeRoom = (roomId: string | null, when: { startsAt: string, endsAt: string }, reason = 'Get-in for the autumn show'): Promise<Response> =>
   send('POST', '/api/admin/rooms/blackouts', { roomId, reason, ...when }, officer)
@@ -177,6 +177,7 @@ describe.skipIf(skip !== null)('a closed room refuses, with the reason (criterio
     const asked = await send('POST', '/api/rooms/requests', {
       roomId: room,
       title: 'Please',
+      purpose: 'REHEARSAL',
       reason: 'I really need it',
       ...span(39),
     }, member.cookie)
@@ -223,6 +224,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
     const asked = await send('POST', '/api/rooms/requests', {
       roomId: room,
       title: 'Waiting on a decision',
+      purpose: 'REHEARSAL',
       reason: 'A sensitive room always asks',
       ...span(42),
     }, member.cookie)
@@ -276,6 +278,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
     const answered = await send('POST', '/api/rooms/series', {
       roomId: room,
       title: 'Weekly rehearsal',
+      purpose: 'REHEARSAL',
       frequency: 'WEEKLY',
       weekdays: [1],
       startsOn: day,
@@ -311,6 +314,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
     const answered = await send('POST', '/api/rooms/series', {
       roomId: room,
       title: 'Weekly rehearsal',
+      purpose: 'REHEARSAL',
       frequency: 'WEEKLY',
       weekdays: [2],
       startsOn: startsOn.toISOString().slice(0, 10),
@@ -353,6 +357,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
     const ask = (skipDays: string[]): Promise<Response> => send('POST', '/api/rooms/series', {
       roomId: room,
       title: 'Weekly rehearsal',
+      purpose: 'REHEARSAL',
       frequency: 'WEEKLY',
       weekdays: [3],
       startsOn: day,

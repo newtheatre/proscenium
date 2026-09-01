@@ -19,6 +19,31 @@ export function isTier(value: string): value is Tier {
   return (TIERS as readonly string[]).includes(value)
 }
 
+// What the room is for, which is a different question from who wins a contested slot. The tier
+// answers that; this answers what somebody would need the room to be like (C-119).
+export const PURPOSES = [
+  'REHEARSAL',
+  'MEETING',
+  'WORKSHOP',
+  'AUDITION',
+  'READ_THROUGH',
+  'GET_IN',
+  'SOCIAL',
+  'STORAGE',
+] as const
+export type Purpose = (typeof PURPOSES)[number]
+
+export function isPurpose(value: string): value is Purpose {
+  return (PURPOSES as readonly string[]).includes(value)
+}
+
+// For reading rather than writing: ROOM_PURPOSES is committee-editable and history carries
+// purposes nobody was asked for, so an unregistered one reads as itself (0027's habit).
+export function describePurpose(value: string | null): string {
+  if (!value) return 'Not recorded'
+  return value.charAt(0) + value.slice(1).toLowerCase().replaceAll('_', ' ')
+}
+
 // A member cancels what still holds a slot; everything else has already been decided, and the
 // slot may be somebody else's by now (C-112 criterion 5).
 export const CANCELLABLE: readonly BookingStatus[] = ['CONFIRMED', 'PENDING_APPROVAL']
@@ -72,6 +97,9 @@ export const bookingForm = z.object({
   endsAt: instant,
   attendees: z.number().int().positive().nullish().transform(value => value ?? null),
   tier: z.enum(TIERS).default('GENERAL'),
+  // Validated against ROOM_PURPOSES at the write path, never a zod enum: the list is
+  // committee-editable, and a frozen one breaks the moment they add to it (0033's reasoning).
+  purpose: z.string().trim().min(1, 'Say what the room is for').max(32),
   notes: z.string().trim().max(1000).nullish().transform(value => (value ?? '').trim() || null),
 }).refine(booking => new Date(booking.endsAt) > new Date(booking.startsAt), {
   path: ['endsAt'],

@@ -217,6 +217,7 @@ describe.skipIf(skip !== null)('a request tells the approvers when it arrives (c
     const asked = await send('POST', '/api/rooms/requests', {
       roomId: quiet,
       title: 'Understudy call',
+      purpose: 'REHEARSAL',
       reason: 'The principal is ill and we have two days',
       ...soon(),
     }, member.cookie)
@@ -240,6 +241,7 @@ describe.skipIf(skip !== null)('a request tells the approvers when it arrives (c
     const asked = await send('POST', '/api/rooms/requests', {
       roomId: quiet,
       title: 'Muted call',
+      purpose: 'REHEARSAL',
       reason: 'Nobody will be emailed about this one',
       ...soon(),
     }, member.cookie)

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { BULK_LIMIT, REJECTION_REASON_LIMIT } from '#shared/utils/approvals'
+import { describePurpose } from '#shared/utils/bookings'
 import { formatLondon } from '#shared/utils/london'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
@@ -24,6 +25,7 @@ interface Request {
   startsAt: number
   endsAt: number
   status: string
+  purpose: string | null
   reason: string | null
   rejectionReason: string | null
   createdAt: number
@@ -216,7 +218,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
     header: 'Who and what',
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.requester),
-      h('div', { class: 'text-xs text-muted' }, row.original.title),
+      h('div', { class: 'text-xs text-muted' }, `${row.original.title} (${describePurpose(row.original.purpose)})`),
     ]),
   },
   {

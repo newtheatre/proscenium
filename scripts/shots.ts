@@ -126,6 +126,7 @@ if (studio) {
   await send('POST', '/api/rooms/bookings', {
     roomId: studio.id,
     title: 'Read-through, The Seagull',
+    purpose: 'REHEARSAL',
     startsAt: soon.toISOString(),
     endsAt: new Date(soon.getTime() + 2 * 3_600_000).toISOString(),
   }, cookie)
@@ -140,6 +141,7 @@ if (studio) {
   await send('POST', '/api/rooms/requests', {
     roomId: studio.id,
     title: 'Tech run, The Seagull',
+    purpose: 'REHEARSAL',
     startsAt: tomorrow.toISOString(),
     endsAt: new Date(tomorrow.getTime() + 3 * 3_600_000).toISOString(),
     reason: 'The get-in moved to Friday, so the tech has to be tomorrow.',

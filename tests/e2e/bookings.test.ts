@@ -95,7 +95,7 @@ function soon(daysAhead = 7, hour = 10, hours = 2): { startsAt: string, endsAt: 
 }
 
 const book = (roomId: string, span: { startsAt: string, endsAt: string }, as = member.cookie, over = {}): Promise<Response> =>
-  send('POST', '/api/rooms/bookings', { roomId, title: 'Rehearsal', ...span, ...over }, as)
+  send('POST', '/api/rooms/bookings', { roomId, title: 'Rehearsal', purpose: 'REHEARSAL', ...span, ...over }, as)
 
 describe.skipIf(skip !== null)('booking within policy (C-106)', () => {
   test('a booking inside every rule confirms instantly', async () => {
@@ -222,7 +222,7 @@ describe.skipIf(skip !== null)('one slot, one winner (C-107)', () => {
     await book(room, soon(12, 10, 2), member.cookie, { title: 'Dress run, The Seagull' })
 
     const refused = await send('POST', '/api/rooms/bookings', {
-      roomId: room, title: 'Clash', ...soon(12, 11, 2),
+      roomId: room, title: 'Clash', purpose: 'REHEARSAL', ...soon(12, 11, 2),
     }, officer)
     expect(await refused.text()).toContain('Seagull')
   })

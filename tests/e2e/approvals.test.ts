@@ -239,6 +239,7 @@ describe.skipIf(skip !== null)('rejecting (criterion 2)', () => {
     const taken = await send('POST', '/api/rooms/requests', {
       roomId: room,
       title: 'Mine now',
+      purpose: 'REHEARSAL',
       reason: 'Asking after the refusal',
       ...span,
     }, member.cookie)

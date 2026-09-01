@@ -15,6 +15,7 @@ export interface ClaimInput {
   startsAt: number
   endsAt: number
   tier: string
+  purpose: string
   status: BookingStatus
   notes: string | null
   // Why an exception is being asked for. Null on an ordinary booking, required on a request.
@@ -37,9 +38,9 @@ export async function claimSlot(input: ClaimInput): Promise<ClaimOutcome> {
   // RETURNING rather than a changes count: the driver's meta is not a shape to rely on, and a row
   // coming back is the same signal claimToken uses to know it won (0003).
   const claimed = await db.all<{ id: string }>(sql`
-    INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, status, notes, reason)
+    INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes, reason)
     SELECT ${id}, ${input.roomId}, ${input.userId}, ${input.title}, ${input.attendees},
-           ${input.startsAt}, ${input.endsAt}, ${input.tier}, ${input.status}, ${input.notes},
+           ${input.startsAt}, ${input.endsAt}, ${input.tier}, ${input.purpose}, ${input.status}, ${input.notes},
            ${input.reason ?? null}
     WHERE EXISTS (SELECT 1 FROM rooms WHERE id = ${input.roomId} AND is_active = 1)
       AND NOT EXISTS (

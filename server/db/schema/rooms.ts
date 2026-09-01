@@ -93,6 +93,9 @@ export const roomBookings = sqliteTable('room_bookings', {
   // No CHECK: ROOM_PRIORITY_TIERS is committee-editable and a constraint behind an editable list
   // breaks writes the moment the list is used (0033's reasoning, C-115).
   tier: text('tier').notNull().default('GENERAL'),
+  // What the room is for, which is not the same question as who wins a contested slot. No CHECK
+  // and no default: ROOM_PURPOSES is committee-editable, and history was never asked (C-119).
+  purpose: text('purpose'),
   status: text('status').notNull().default('CONFIRMED'),
   notes: text('notes'),
   // Why the member is asking for something outside policy. Required on a request (C-108).
