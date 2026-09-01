@@ -98,9 +98,15 @@ let shared: { app: AppUnderTest, server: Subprocess | null, controller: AbortCon
 // either, so audit_log stays, being append-only by a trigger this must not drop.
 const KEPT = new Set(['_hub_migrations', 'audit_log'])
 
+// The dev server is serving from this file while we wipe it, and the journal is `delete` rather
+// than WAL, so its readers and our writer lock each other out. Waiting beats throwing at once.
+const RESET_LOCK_WAIT_MS = 10_000
+const RESET_ATTEMPTS = 5
+
 export function resetDatabase(file: string): void {
   const database = new Database(file)
   try {
+    database.run(`PRAGMA busy_timeout = ${RESET_LOCK_WAIT_MS}`)
     const tables = (database.query(`
       SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
     `).all() as { name: string }[]).filter(table => !KEPT.has(table.name))
@@ -113,11 +119,25 @@ export function resetDatabase(file: string): void {
 
     // One transaction, so the lock is taken and released once, and so the guards are never off
     // outside it. Recreated from the schema rather than restated, so they cannot drift.
-    database.transaction(() => {
+    const wipe = database.transaction(() => {
       for (const trigger of triggers) database.run(`DROP TRIGGER IF EXISTS ${trigger.name}`)
       for (const table of tables) database.run(`DELETE FROM ${table.name}`)
       for (const trigger of triggers) database.run(trigger.sql)
-    })()
+    })
+
+    // A rolled-back attempt leaves the guards up, so retrying is safe. One suite losing the race
+    // aborts every suite after it, because none of them gets a reset either.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        wipe()
+        break
+      }
+      catch (thrown) {
+        const busy = String(thrown).includes('SQLITE_BUSY') || String(thrown).includes('database is locked')
+        if (!busy || attempt === RESET_ATTEMPTS) throw thrown
+        Bun.sleepSync(200 * attempt)
+      }
+    }
   }
   finally {
     database.close()
