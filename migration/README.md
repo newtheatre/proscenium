@@ -32,6 +32,7 @@ bun install
 ./migration/export.sh          # pulls fresh dumps from production via wrangler
 bun migration/inventory.ts     # loads dumps locally, writes out/manifest.json + .md
 bun migration/transform-identity.ts   # builds the unified identity core in out/unified.sqlite
+bun migration/transform-bookings.ts   # imports the old rooms history onto those accounts
 bun migration/reconcile.ts     # verifies counts and invariants; non-zero exit on failure
 bun migration/load.ts          # writes out/load.sql
 bun migration/load.ts /tmp/rehearsal.db   # and applies it to a local target
@@ -53,6 +54,18 @@ step is offline against the dumps.
 - **Reconciliation**: source-versus-target counts, the register count guard (K-115), and the
   invariant checks (no Workspace passwords, tombstones preserved, email uniqueness, every old role
   mapped, no old estate id left in `granted_by`, every address lowercase).
+- **Booking history** (C-118): the old rooms app's bookings and recurring series, keyed to the
+  accounts the identity transform minted. Statuses map to the unified vocabulary, with
+  `AWAITING_EXTERNAL` becoming `PENDING_APPROVAL` on an external room, which is how the unified
+  system models a booking the Theatre Manager arranges with the SU. Times are milliseconds there
+  and seconds here, so the reconciliation checksums total booked seconds as well as counting rows:
+  a unit error puts the whole history in 1970 and no row count would catch it. Nothing is invented:
+  a booking whose account or room did not come across is skipped and named in
+  `out/booking-exceptions.txt` rather than given one, and tombstones stay tombstones. Web push
+  subscriptions are deliberately not read; push consent is re-collected when push works.
+  `out/room-map.tsv` maps each old `room:<id>` and `venue:<id>` to a unified room and is written by
+  hand, because a wrong room silently rewrites years of utilisation.
+
 - **Load** (K-112 criterion 4): turns the core into `out/load.sql`, upserts keyed on identity, and
   applies it to a local target when given one. It never deletes, so a person or a grant that
   vanished upstream stays until somebody decides; and it never touches production, which is applied

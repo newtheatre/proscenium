@@ -108,6 +108,10 @@ export const roomBookings = sqliteTable('room_bookings', {
   // rule in the module treats an occurrence as one (C-110 criterion 5).
   seriesId: text('series_id').references(() => roomSeries.id),
   occurrence: integer('occurrence'),
+  // The booking offered in place of one that was bumped. A bumped row is never deleted, so the
+  // displaced member can see what happened and what they were given instead (C-115 criterion 4).
+  bumpedToBookingId: text('bumped_to_booking_id'),
+  bumpedReason: text('bumped_reason'),
   noShowRecordedAt: integer('no_show_recorded_at'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
@@ -137,3 +141,41 @@ export const roomFeedTokens = sqliteTable('room_feed_tokens', {
   lastFetchedAt: integer('last_fetched_at'),
   createdAt: integer('created_at').notNull().default(now),
 })
+
+// A room shut for maintenance, a get-in or an external hire (C-114). The old app had no way to
+// say a room was closed, so people booked into a get-in and found out on the night.
+export const roomBlackouts = sqliteTable('room_blackouts', {
+  id: id(),
+  // Null is every room, which is what a fire alarm test or a building closure means.
+  roomId: text('room_id').references(() => rooms.id, { onDelete: 'cascade' }),
+  // Shown to everybody on the calendar, never masked: a closed room explains itself (criterion 4).
+  reason: text('reason').notNull(),
+  startsAt: integer('starts_at').notNull(),
+  endsAt: integer('ends_at').notNull(),
+  createdBy: text('created_by').references(() => users.id),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  index('room_blackouts_span').on(table.startsAt, table.endsAt),
+  index('room_blackouts_room').on(table.roomId),
+  check('room_blackouts_span', sql`${table.endsAt} > ${table.startsAt}`),
+])
+
+// Bookings nobody turned up for (C-116). Append-only: a correction is a superseding entry with a
+// reason, never an edit, so the count can always be reconstructed (0010).
+export const roomNoShows = sqliteTable('room_no_shows', {
+  id: id(),
+  bookingId: text('booking_id').notNull().references(() => roomBookings.id, { onDelete: 'restrict' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  // RECORDED asserts one; WITHDRAWN supersedes an earlier assertion about the same booking.
+  kind: text('kind').notNull().default('RECORDED'),
+  // Why it was withdrawn. Never personal free text, the same rule audit detail follows (0011).
+  reason: text('reason'),
+  supersedesId: text('supersedes_id'),
+  recordedBy: text('recorded_by').references(() => users.id),
+  recordedAt: integer('recorded_at').notNull().default(now),
+}, table => [
+  index('room_no_shows_user').on(table.userId),
+  index('room_no_shows_booking').on(table.bookingId),
+  check('room_no_shows_kind', sql`${table.kind} IN ('RECORDED', 'WITHDRAWN')`),
+])

@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { coversRoom } from '#shared/utils/blackouts'
 import { z } from 'zod'
 import { HOLDS_A_SLOT, maskConflicts } from '#shared/utils/bookings'
 import { planWindow } from '#shared/utils/availability'
@@ -60,6 +61,10 @@ export default defineEventHandler(async (event) => {
   // Detail for an officer, and for a person's own booking: a member may see what they booked.
   const canSeeDetail = permissions.has('rooms.read')
 
+  // Never masked, unlike a booking. A closed room explains itself to everybody, which is the one
+  // deliberate exception to C-103's masking (C-114 criterion 4).
+  const shut = await blackoutsAcross(fromAt, toAt)
+
   return {
     from: input.from,
     to: input.to,
@@ -71,6 +76,9 @@ export default defineEventHandler(async (event) => {
       isExternal: room.isExternal,
       hours: room.hours,
       taken: takenIn(rows, room.id, account.id, canSeeDetail),
+      closed: shut
+        .filter(blackout => coversRoom(blackout, room.id))
+        .map(blackout => ({ startsAt: blackout.startsAt, endsAt: blackout.endsAt, reason: blackout.reason })),
     })),
   }
 })

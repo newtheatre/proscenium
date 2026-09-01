@@ -1,4 +1,5 @@
 import { bookingForm, maskConflicts } from '#shared/utils/bookings'
+import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { formatLondon } from '#shared/utils/london'
 
@@ -17,6 +18,21 @@ export default defineEventHandler(async (event) => {
   const endsAt = new Date(input.endsAt)
   const now = new Date()
 
+  // A closed room refuses before the policy is consulted, and says why rather than masking it:
+  // the one deliberate exception to conflict masking (C-114 criterion 4).
+  const shut = blackoutOver(
+    await blackoutsAcross(Math.floor(startsAt.getTime() / 1000), Math.floor(endsAt.getTime() / 1000), room.id),
+    room.id,
+    { startsAt: Math.floor(startsAt.getTime() / 1000), endsAt: Math.floor(endsAt.getTime() / 1000) },
+  )
+  if (shut) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: saysClosed(shut),
+      data: { failures: [{ reason: 'ROOM_CLOSED', says: saysClosed(shut) }], canRequest: false, blackout: shut },
+    })
+  }
+
   const estate = await estatePolicy(event)
   const policy = resolvePolicy(room, estate)
 
@@ -25,6 +41,7 @@ export default defineEventHandler(async (event) => {
     isAdmin: permissions.has('rooms.write'),
     hasMembership: await hasCurrentMembership(event, account.id, now),
     activeBookings: await activeBookingsFor(account.id, Math.floor(now.getTime() / 1000)),
+    underPreApproval: await underPreApproval(event, account.id, now),
   })
 
   // Nothing an approver could agree to (a lapsed membership, a slot already past), so it is a

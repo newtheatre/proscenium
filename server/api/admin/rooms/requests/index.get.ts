@@ -53,6 +53,7 @@ export default defineEventHandler(async (event) => {
   const now = new Date()
   const held = await heldByRequesters()
   const current = await membersAmongRequesters(event, now)
+  const stopped = await requestersUnderPreApproval(event, rows, now)
 
   const items = rows.map((row) => {
     const room = rooms.find(one => one.id === row.roomId)
@@ -66,6 +67,7 @@ export default defineEventHandler(async (event) => {
         isAdmin: false,
         hasMembership: current.has(row.userId),
         activeBookings: held.get(row.userId) ?? 0,
+        underPreApproval: stopped.has(row.userId),
       },
     )
 
@@ -79,6 +81,16 @@ export default defineEventHandler(async (event) => {
 
   return { when: input.when, items, total: items.length }
 })
+
+// Which requesters are on the no-show ladder. Counted per person rather than in one statement,
+// because the count is a window function over the latest entry per booking (C-116).
+async function requestersUnderPreApproval(event: H3Event, rows: { userId: string }[], now: Date): Promise<Set<string>> {
+  const stopped = new Set<string>()
+  for (const userId of new Set(rows.map(row => row.userId))) {
+    if (await underPreApproval(event, userId, now)) stopped.add(userId)
+  }
+  return stopped
+}
 
 // The requesters, scoped by subquery rather than by an id list built from the rows above, so no
 // statement's parameter count grows with the queue (0003, 0006).

@@ -1,6 +1,7 @@
 import { expand, seriesForm } from '#shared/utils/series'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { maskConflicts } from '#shared/utils/bookings'
+import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { formatLondon } from '#shared/utils/london'
 import type { OccurrenceRefusal } from '#server/utils/series'
 
@@ -38,7 +39,15 @@ export default defineEventHandler(async (event) => {
   const isAdmin = permissions.has('rooms.write')
   const hasMembership = await hasCurrentMembership(event, account.id, now)
   const alreadyHeld = await activeBookingsFor(account.id, Math.floor(now.getTime() / 1000))
+  const preApproval = await underPreApproval(event, account.id, now)
   const clashes = await conflictsAcross(room.id, occurrences)
+  // Read once for the whole term. A blacked-out occurrence is a refusal like any other, so the
+  // member skips it explicitly rather than having it dropped for them (criterion 2).
+  const shut = await blackoutsAcross(
+    Math.floor(occurrences[0]!.startsAt.getTime() / 1000),
+    Math.floor(occurrences.at(-1)!.endsAt.getTime() / 1000),
+    room.id,
+  )
 
   // Judged before any row is written, each counting against the cap as it goes: a series counts
   // each occurrence, which is what the setting says (criterion 2).
@@ -51,16 +60,23 @@ export default defineEventHandler(async (event) => {
       isAdmin,
       hasMembership,
       activeBookings: alreadyHeld + at,
+      underPreApproval: preApproval,
     })
 
     const conflicts = clashes.get(one.occurrence) ?? []
+    const closed = blackoutOver(shut, room.id, {
+      startsAt: Math.floor(one.startsAt.getTime() / 1000),
+      endsAt: Math.floor(one.endsAt.getTime() / 1000),
+    })
     needsApproval ||= verdict.needsApproval
 
-    if (verdict.refusedOutright || conflicts.length > 0) {
+    if (verdict.refusedOutright || conflicts.length > 0 || closed) {
       refusals.push({
         occurrence: one.occurrence,
         day: one.day,
-        failures: verdict.failures,
+        failures: closed
+          ? [...verdict.failures, { reason: 'ROOM_CLOSED' as const, says: saysClosed(closed) }]
+          : verdict.failures,
         conflicts: maskConflicts(conflicts, permissions.has('rooms.read')),
       })
     }

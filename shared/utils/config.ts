@@ -123,6 +123,12 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Occurrences in one recurring series. The old UI and API disagreed at 12 and 52.',
   },
+  ROOM_NO_SHOW_WINDOW_DAYS: {
+    schema: z.number().int().positive(),
+    default: 365,
+    workshop: 'spaces-and-training',
+    describes: 'How far back the no-show ladder looks. It also clears at the committee year end, whichever is shorter.',
+  },
   ROOM_NO_SHOW_RECORD_AT: {
     schema: z.number().int().positive(),
     default: 2,
@@ -392,6 +398,10 @@ export const ENFORCED_KEYS = [
   'ROOM_MAX_BOOKING_HOURS',
   'ROOM_MIN_BOOKING_MINUTES',
   'ROOM_SERIES_MAX_OCCURRENCES',
+  'ROOM_PRIORITY_TIERS',
+  'ROOM_NO_SHOW_WINDOW_DAYS',
+  'ROOM_NO_SHOW_RECORD_AT',
+  'ROOM_NO_SHOW_PREAPPROVAL_AT',
   'MEMBERSHIP_RENEWAL_NOTICE_DAYS',
   'PRIVILEGED_ROLES',
   // Read by the directory to count the accounts a sweep would warn, which is the whole of its

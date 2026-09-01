@@ -106,6 +106,16 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/rooms/index.post.ts', actions: ['room.created'] },
   { route: 'server/api/admin/rooms/[id]/index.put.ts', actions: ['room.updated', 'room.hours.set'] },
   { route: 'server/api/admin/rooms/[id]/index.delete.ts', actions: ['room.updated'] },
+  { route: 'server/api/admin/rooms/blackouts/index.get.ts', exempt: 'reads which rooms are shut' },
+  { route: 'server/api/admin/rooms/blackouts/index.post.ts', actions: ['room.blackout.created'] },
+  { route: 'server/api/admin/rooms/blackouts/[id].delete.ts', actions: ['room.blackout.removed'] },
+  { route: 'server/api/admin/rooms/bookings/[id]/bump.post.ts', actions: ['room.booking.bumped'] },
+  { route: 'server/api/admin/rooms/bookings/[id]/alternatives.get.ts', exempt: 'reads where a booking could go instead' },
+  { route: 'server/api/admin/rooms/bookings/[id]/no-show.post.ts', actions: ['room.no-show.recorded'] },
+  { route: 'server/api/admin/rooms/no-shows/[id]/withdraw.post.ts', actions: ['room.no-show.withdrawn'] },
+  { route: 'server/api/rooms/standing.get.ts', exempt: 'reads your own record' },
+  { route: 'server/api/admin/rooms/reports/utilisation.get.ts', exempt: 'reads booked hours against open hours' },
+  { route: 'server/api/admin/rooms/reports/export.get.ts', exempt: 'the same figures as a file; no personal column is in it' },
   { route: 'server/api/auth/sign-out.post.ts', exempt: 'ending your own session changes no record' },
 
   // Development only, and absent from a build: nuxt.config excludes both files (K-124).

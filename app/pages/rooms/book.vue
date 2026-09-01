@@ -74,6 +74,14 @@ const { data: rules } = await useAsyncData(
 )
 const seriesCap = computed(() => rules.value.seriesCap)
 
+// Said before submitting, not after: a member on the ladder should know every booking is going to
+// be checked by a person before they fill the form in (C-116 criterion 4).
+const { data: standing } = await useAsyncData(
+  'my-standing',
+  () => request<{ standing: string, says: string }>('/api/rooms/standing'),
+  { default: () => ({ standing: 'CLEAR', says: '' }) },
+)
+
 const WEEKDAYS = [
   { label: 'Mon', value: 1 },
   { label: 'Tue', value: 2 },
@@ -214,6 +222,7 @@ const tooMany = computed(() => overCapacity(room.value?.capacity ?? null, state.
 // Said before submitting, not after: a room somebody else books, or one that always asks, is
 // worth knowing about while the form is still being filled in (C-105 criterion 5).
 const warnsUpFront = computed(() => {
+  if (standing.value.standing === 'PRE_APPROVAL') return standing.value.says
   if (room.value?.isExternal) {
     return 'This room is booked through the SU. Your request goes to the Theatre Manager, who fills in their form.'
   }

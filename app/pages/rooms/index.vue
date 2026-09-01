@@ -19,6 +19,7 @@ interface Room extends GridRoom {
   sensitive: boolean
   isExternal: boolean
   taken: Taken[]
+  closed: { startsAt: number, endsAt: number, reason: string }[]
 }
 
 interface Availability { from: string, to: string, rooms: Room[] }
@@ -307,6 +308,7 @@ useSeoMeta({ title: 'Rooms' })
       <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-primary/30" /> Booked</span>
       <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-warning/30" /> Awaiting a decision</span>
       <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-muted" /> Closed</span>
+      <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-error/20" /> Shut</span>
     </div>
   </UContainer>
 </template>

@@ -38,6 +38,8 @@ erDiagram
   users ||--o{ training_records : earns
   users ||--o{ room_bookings : requests
   users ||--o| room_feed_tokens : subscribes_with
+  rooms ||--o{ room_blackouts : closed_by
+  room_bookings ||--o{ room_no_shows : missed_as
   room_series ||--o{ room_bookings : expands_to
   users ||--o{ ledger_entries : acts_in
   shows ||--o{ performances : runs
@@ -488,10 +490,6 @@ strings, which is why no part of the opening-hours rules involves a date or a ti
 Replaced wholesale on an edit rather than patched: seven days is small enough that a diff would
 be more code than value.
 
-### room_blackouts
-`id` PK · `room_id` NULL = all rooms · `starts_at` · `ends_at` · `reason` (shown to members)
-· `created_by`. Booking inside one is refused; existing bookings cancel with notification.
-
 ```mermaid
 stateDiagram-v2
   [*] --> CONFIRMED : in policy, standard room, instant
@@ -516,8 +514,24 @@ is exactly what the clash predicate reads, and on `user_id` for the active-booki
 `tier` carries no CHECK because `ROOM_PRIORITY_TIERS` is committee-editable, and a constraint
 behind an editable list breaks writes the moment the list is used (0033's reasoning, C-115).
 `series_id` → room_series NULL and `occurrence` NULL carry an occurrence's place in its term
-(C-110); `bumped_to_booking_id` arrives with C-115. Indexed on `series_id`, which every
-series-scoped action reads. Adding a column is not a rebuild, and this table is not append-only.
+(C-110). `bumped_to_booking_id` and `bumped_reason` carry a bump (C-115). Indexed on `series_id`,
+which every series-scoped action reads. Adding a column is not a rebuild, and this table is not
+append-only.
+
+**Bumping** (C-115) is never automatic: a booking over a confirmed one is still a 409, and only an
+officer with `rooms.write` may take a slot, with a mandatory reason. The order comes from
+`ROOM_PRIORITY_TIERS`, so a committee that reorders the tiers reorders the rule; a tier the setting
+no longer lists ranks below everything, and an equal or lower tier can never bump. The displaced
+booking becomes `BUMPED`, which is distinct from `CANCELLED` and is never deleted, and links to
+what was offered in its place.
+
+The displaced member is offered **the nearest equivalent slot, held for them rather than
+suggested**: the same room first, then a room whose recorded capacity is at least equal, closest in
+time either side, skipping anything booked or closed. A room whose capacity nobody recorded is not
+offered against a room that has one, because it cannot be shown to be big enough. If nothing
+equivalent is free the bump still goes ahead and the message says so. The whole thing is one batch:
+the displaced row flips guarded on `CONFIRMED`, and both the claimant's booking and the offer are
+written only if that flip landed, so a lost race leaves nothing behind.
 Erasure scrubs `notes`, `reason` and `rejection_reason` to null and `title` to `Erased booking`,
 and keeps the row: the room was used, which is a fact about the room rather than about the person
 (0011). `title` is NOT NULL, and nulling it would fail the whole erasure batch, so the register
@@ -593,6 +607,87 @@ pure, so both transitions are unit cases rather than a hope.
 
 `GET /api/rooms/bookings/[id]/ics` is the same builder for one booking, and the confirmation email
 carries that file as an attachment (criterion 1).
+
+### Utilisation reporting
+No table: the figures are counted from `room_bookings`, `room_hours` and `room_no_shows` on demand
+(C-117). Every total is summed in SQL rather than by fetching rows and adding them up, so a year is
+one statement and not a download. `GET /api/admin/rooms/reports/utilisation` breaks down by room or
+by tier, pages, and returns an envelope; `.../reports/export` is the same figures as CSV, every cell
+quoted so a room name with a comma cannot split a row (criterion 3).
+
+Confirmed, cancelled and no-show hours are told apart, and a no-show is **its own figure rather
+than a deduction**: the room was held and not used, which is the number the review wants
+(criterion 1). Whether a booking counts as a no-show uses `CURRENTLY_MARKED`, the same
+latest-entry-wins rule the ladder uses, so a withdrawn no-show returns to being used hours and the
+report and the ladder can never disagree.
+
+The denominator is what the policy engine says a room is open for, walked day by day from
+`room_hours`, so the figure a booking is judged against and the figure it is divided by are the
+same. A room with no hours recorded is always open and therefore has **no** denominator: that reads
+as "no opening hours recorded", never as nought per cent.
+
+The span is London days, so a report of one month neither gains nor loses an hour when the clocks
+move inside it (0014). Figures survive an erasure, because the bookings do (0011, criterion 4).
+
+Breakdown by production, and the pre-migration flag on imported bookings, arrive with the stories
+that create those things (C-118, module B).
+
+### room_no_shows
+`id` PK · `booking_id` → room_bookings restrict · `user_id` → users restrict · `kind` CHECK
+`RECORDED|WITHDRAWN` · `reason` NULL · `supersedes_id` NULL · `recorded_by` → users NULL ·
+`recorded_at`. Indexed on `user_id` and on `booking_id`. **Append-only, trigger-enforced**, joining
+the 0010 set: a correction is a superseding `WITHDRAWN` entry naming what it replaces, never an
+edit, so the count a member is judged on can always be reconstructed (C-116 criterion 2). The old
+app promised no-show tracking and never built it, so an empty booked room cost nothing (RM-1).
+
+Anyone holding `rooms.write` may mark a booking, and only a **past confirmed** one: a booking still
+to come cannot have been missed, and one nobody held cannot either (criterion 1).
+
+**One booking is one no-show** however many entries exist about it: the count is the latest entry
+per booking, not a row count. Ties break on `rowid` rather than on `id`, because `recorded_at` is
+whole seconds and a mark and its withdrawal can share one; the table never deletes, so a later
+insert always has the higher rowid. `latestFor` orders identically, so what a withdrawal supersedes
+and what the ladder counts can never disagree.
+
+The ladder is `ROOM_NO_SHOW_RECORD_AT` (2) and `ROOM_NO_SHOW_PREAPPROVAL_AT` (3), counted over a
+window that is **rolling and bounded by the committee year, whichever is shorter**
+(`ROOM_NO_SHOW_WINDOW_DAYS`, 365): a June no-show survives the July handover, and one from two
+committees ago does not follow somebody about (0009, criterion 3).
+
+At the pre-approval step, `judge()` sets `needsApproval` for **every** booking whatever the policy
+says about it, so it diverts to the approval queue, and the booking form says so before the member
+fills it in (criterion 4). `GET /api/rooms/standing` gives a member their own count, standing and
+records, withdrawals included, so a correction is visible rather than a gap (criterion 5).
+
+Erasure keeps the rows: append-only means a scrub could not run here even if it were wanted, and
+the reference resolves to the tombstone the user row became, so the statistics survive and the
+ladder dies with the account (criterion 6, 0010, 0011).
+
+### room_blackouts
+`id` PK · `room_id` → rooms cascade NULL · `reason` NOT NULL · `starts_at`, `ends_at` CHECK
+`ends_at > starts_at` · `created_by` → users NULL · timestamps. Indexed on `(starts_at, ends_at)`
+and on `room_id`. **A null `room_id` is every room**, which is what a building closure or a fire
+alarm test means (C-114 criterion 1). The old app had no blackout mechanism at all, so members
+booked into a get-in and found out on the night (RM-6).
+
+A booking, a request or a series occurrence overlapping a closure is refused **with the reason
+attached** (criterion 2). That is the one deliberate exception to C-103's conflict masking: a
+closure renders on the calendar for everybody with its stated reason and is never shown as
+"Booked" (criterion 4), because a member turned away deserves to know it is rewiring rather than
+go looking for whoever booked it. A series lists a blacked-out occurrence among its refusals like
+any other, so the member skips it explicitly rather than having it dropped for them.
+
+Creating a closure **cancels what is already booked under it, in the same batch that writes it**,
+and writes the reason into each `rejection_reason`. Only the occurrences a closure actually covers
+are cancelled, never a whole series: a get-in on one Monday does not take a term with it
+(criterion 3). Any series whose head went has the next occurrence promoted. Everybody affected is
+told once, however many of their bookings went, naming each (C-113 criterion 2).
+
+Removal **restores nothing** (criterion 5). A cancelled booking stays cancelled and has to be made
+again, because its slot may be somebody else's by then. Creation and removal are both audited.
+
+Erasure scrubs `created_by` to null and keeps the closure: the room was shut, which is a fact
+about the room; who typed it in lives in the audit trail (0010, 0011).
 
 ### room_series
 `id` PK · `user_id` → users restrict · `room_id` → rooms restrict · `title` · `frequency` CHECK

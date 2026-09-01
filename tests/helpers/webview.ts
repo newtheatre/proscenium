@@ -105,9 +105,18 @@ export function resetDatabase(file: string): void {
       SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
     `).all() as { name: string }[]).filter(table => !KEPT.has(table.name))
 
-    // One transaction, so the lock is taken and released once rather than per table.
+    // An append-only table refuses a delete, and its rows hold a foreign key onto users, so a
+    // reset cannot get past either without lifting the guards (0010).
+    const triggers = database.query(`
+      SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND sql IS NOT NULL
+    `).all() as { name: string, sql: string }[]
+
+    // One transaction, so the lock is taken and released once, and so the guards are never off
+    // outside it. Recreated from the schema rather than restated, so they cannot drift.
     database.transaction(() => {
+      for (const trigger of triggers) database.run(`DROP TRIGGER IF EXISTS ${trigger.name}`)
       for (const table of tables) database.run(`DELETE FROM ${table.name}`)
+      for (const trigger of triggers) database.run(trigger.sql)
     })()
   }
   finally {

@@ -180,6 +180,27 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'A term of rooms this person booked. Utilisation survives an erasure; their words do not.',
   },
   {
+    name: 'room_no_shows',
+    column: 'user_id',
+    section: 'no-shows',
+    columns: ['kind', 'recorded_at'],
+    erasure: 'keep',
+    // Append-only and trigger-enforced, so a scrub could not run here even if it were wanted: the
+    // reference resolves to the tombstone the user row became, and the ladder dies with it (0010).
+    why: 'Rooms booked and not used. The statistics survive an erasure; the person in them does not.',
+  },
+  {
+    name: 'room_blackouts',
+    column: 'created_by',
+    section: null,
+    columns: null,
+    erasure: 'scrub',
+    // The closure is a fact about the room and stays; who typed it in is in the audit trail,
+    // which is where an officer's acts belong (0010, 0011).
+    scrub: ['created_by'],
+    why: 'An officer closed a room. The closure survives an erasure; the officer in it does not.',
+  },
+  {
     name: 'room_feed_tokens',
     column: 'user_id',
     section: null,

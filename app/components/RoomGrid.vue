@@ -13,11 +13,18 @@ export interface GridTaken {
   mine: boolean
 }
 
+export interface GridClosure {
+  startsAt: number
+  endsAt: number
+  reason: string
+}
+
 export interface GridRoom {
   id: string
   name: string
   hours: RoomHours[]
   taken: GridTaken[]
+  closed?: GridClosure[]
 }
 
 export interface GridColumn {
@@ -123,9 +130,17 @@ function openAt(column: GridColumn, minutes: number): boolean {
   return column.room.hours.some(hours => hours.weekday === weekday && clock >= hours.opens && clock < hours.closes)
 }
 
-type SlotState = 'closed' | 'mine' | 'booked' | 'pending' | 'free'
+type SlotState = 'closed' | 'blacked-out' | 'mine' | 'booked' | 'pending' | 'free'
 
+function closureAt(column: GridColumn, minutes: number): GridClosure | undefined {
+  const at = instantOf(column.day, minutes)
+  return column.room.closed?.find(closure => closure.startsAt <= at && closure.endsAt > at)
+}
+
+// A blackout outranks a booking: the room being shut is the reason it is unavailable, and saying
+// "booked" instead would send somebody looking for whoever booked it (C-114 criterion 4).
 function stateOf(column: GridColumn, minutes: number): SlotState {
+  if (closureAt(column, minutes)) return 'blacked-out'
   if (!openAt(column, minutes)) return 'closed'
   const taken = bookingAt(column, minutes)
   if (!taken) return 'free'
@@ -135,26 +150,34 @@ function stateOf(column: GridColumn, minutes: number): SlotState {
 
 // Colour is never the only carrier: every slot names its state to a screen reader (K-101).
 const SAYS: Record<SlotState, string> = {
-  closed: 'closed',
-  mine: 'yours',
-  booked: 'booked',
-  pending: 'awaiting a decision',
-  free: 'free',
+  'blacked-out': 'shut',
+  'closed': 'closed',
+  'mine': 'yours',
+  'booked': 'booked',
+  'pending': 'awaiting a decision',
+  'free': 'free',
 }
 
 const FILLS: Record<SlotState, string> = {
-  closed: 'bg-muted cursor-not-allowed',
-  mine: 'bg-secondary/40 cursor-not-allowed',
-  booked: 'bg-primary/30 cursor-not-allowed',
-  pending: 'bg-warning/30 cursor-not-allowed',
-  free: 'bg-default hover:bg-elevated',
+  'blacked-out': 'bg-error/20 cursor-not-allowed',
+  'closed': 'bg-muted cursor-not-allowed',
+  'mine': 'bg-secondary/40 cursor-not-allowed',
+  'booked': 'bg-primary/30 cursor-not-allowed',
+  'pending': 'bg-warning/30 cursor-not-allowed',
+  'free': 'bg-default hover:bg-elevated',
 }
 
 // A member's own booking is the one they may read, so it says what it is rather than "booked".
+// A blackout says its reason to everybody, which no booking does.
 function labelOf(column: GridColumn, minutes: number): string {
   const state = stateOf(column, minutes)
   const taken = bookingAt(column, minutes)
-  const what = state === 'mine' && taken ? `yours, ${taken.title}` : SAYS[state]
+  const closure = closureAt(column, minutes)
+
+  const what = closure
+    ? `shut, ${closure.reason}`
+    : state === 'mine' && taken ? `yours, ${taken.title}` : SAYS[state]
+
   return `${column.room.name}, ${column.label} at ${clockAt(minutes)}: ${what}`
 }
 </script>
@@ -198,6 +221,7 @@ function labelOf(column: GridColumn, minutes: number): string {
           :class="[FILLS[stateOf(column, slot.minutes)], inDrag(column, slot.minutes) ? 'ring-2 ring-inset ring-primary' : '']"
           :disabled="stateOf(column, slot.minutes) !== 'free'"
           :aria-label="labelOf(column, slot.minutes)"
+          :title="closureAt(column, slot.minutes)?.reason"
           :data-test="`slot-${column.room.id}-${column.day}-${slot.label}`"
           @pointerdown.prevent="startAt(column, slot.minutes)"
           @pointerenter="extendTo(column, slot.minutes)"

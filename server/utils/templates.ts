@@ -349,6 +349,92 @@ The Nottingham New Theatre`,
     }
   },
 
+  'room-blackout-cancelled': (context: TemplateContext): Rendered => {
+    const bookings = context.bookings as { room: string, title: string, when: string }[]
+    const one = bookings.length === 1
+    return {
+      subject: one
+        ? `Cancelled: ${bookings[0]!.room}, ${bookings[0]!.when}`
+        : `Cancelled: ${bookings.length} bookings`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${one ? 'A room you booked has' : 'Rooms you booked have'} been closed: ${context.reason}.</p>
+<p>${one ? 'This booking is' : 'These bookings are'} cancelled. Nothing is rebooked automatically,
+so please book again if you still need the space.</p>
+<ul>${bookings.map(booking => `<li>${booking.room}, ${booking.when}: ${booking.title}</li>`).join('')}</ul>
+<p><a href="${String(context.roomsUrl)}">Find another slot</a></p>`),
+      text: `Hello ${context.name},
+
+${one ? 'A room you booked has' : 'Rooms you booked have'} been closed: ${String(context.reason)}.
+
+${one ? 'This booking is' : 'These bookings are'} cancelled. Nothing is rebooked automatically, so
+please book again if you still need the space.
+
+${bookings.map(booking => `- ${booking.room}, ${booking.when}: ${booking.title}`).join('\n')}
+
+Find another slot: ${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
+  'room-bumped': (context: TemplateContext): Rendered => {
+    const offered = context.offered ? String(context.offered) : null
+    return {
+      subject: `Moved: ${String(context.room)}, ${String(context.when)}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Your booking of ${context.room}, ${context.when}, has been given to something with a higher
+claim on the room: ${context.reason}.</p>
+<p>${context.title}</p>
+${offered
+  ? `<p>You have been booked into <strong>${offered}</strong> instead, and that slot is held for
+you. If it does not suit, cancel it and book something else.</p>`
+  : `<p>Nothing equivalent was free nearby, so nothing has been booked in its place. Please find
+another slot.</p>`}
+<p><a href="${String(context.roomsUrl)}">See what you hold</a></p>`),
+      text: `Hello ${context.name},
+
+Your booking of ${String(context.room)}, ${String(context.when)}, has been given to something with
+a higher claim on the room: ${String(context.reason)}.
+
+${String(context.title)}
+
+${offered
+  ? `You have been booked into ${offered} instead, and that slot is held for you. If it does not suit, cancel it and book something else.`
+  : 'Nothing equivalent was free nearby, so nothing has been booked in its place. Please find another slot.'}
+
+See what you hold: ${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
+  'room-no-show': (context: TemplateContext): Rendered => {
+    const stopped = context.underPreApproval === true
+    return {
+      subject: stopped ? 'Your bookings now need approving first' : 'A booking you did not use',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${context.room}, ${context.title}, was booked and not used. That is ${context.count} now.</p>
+${stopped
+  ? `<p>From now on every room you book is checked by a person before it is held. That lifts once
+your record is back below ${context.preApprovalAt}.</p>`
+  : `<p>At ${context.preApprovalAt}, every booking you make is checked by a person first. If you
+cannot use a room, cancelling frees it for somebody else and costs you nothing.</p>`}
+<p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
+      text: `Hello ${context.name},
+
+${String(context.room)}, ${String(context.title)}, was booked and not used. That is
+${String(context.count)} now.
+
+${stopped
+  ? `From now on every room you book is checked by a person before it is held. That lifts once your record is back below ${String(context.preApprovalAt)}.`
+  : `At ${String(context.preApprovalAt)}, every booking you make is checked by a person first. If you cannot use a room, cancelling frees it for somebody else and costs you nothing.`}
+
+See your bookings: ${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'account-exists': (context: TemplateContext): Rendered => ({
     subject: 'You already have an account',
     html: layout(`<p>Hello ${context.name},</p>

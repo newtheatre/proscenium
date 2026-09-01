@@ -1,5 +1,6 @@
 import { requestForm } from '#shared/utils/requests'
 import { maskConflicts } from '#shared/utils/bookings'
+import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { formatLondon } from '#shared/utils/london'
 
@@ -15,11 +16,26 @@ export default defineEventHandler(async (event) => {
   const endsAt = new Date(input.endsAt)
   const now = new Date()
 
+  // Nothing an approver could agree to either: the room is shut, and closing it was their doing.
+  const shut = blackoutOver(
+    await blackoutsAcross(Math.floor(startsAt.getTime() / 1000), Math.floor(endsAt.getTime() / 1000), room.id),
+    room.id,
+    { startsAt: Math.floor(startsAt.getTime() / 1000), endsAt: Math.floor(endsAt.getTime() / 1000) },
+  )
+  if (shut) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: saysClosed(shut),
+      data: { failures: [{ reason: 'ROOM_CLOSED', says: saysClosed(shut) }], canRequest: false, blackout: shut },
+    })
+  }
+
   const verdict = judge({ startsAt, endsAt }, resolvePolicy(room, await estatePolicy(event)), room, {
     now,
     isAdmin: permissions.has('rooms.write'),
     hasMembership: await hasCurrentMembership(event, account.id, now),
     activeBookings: await activeBookingsFor(account.id, Math.floor(now.getTime() / 1000)),
+    underPreApproval: await underPreApproval(event, account.id, now),
   })
 
   // Nothing an approver could agree to, so it is not a request either (C-105 criterion 4).
