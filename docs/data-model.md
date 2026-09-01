@@ -690,6 +690,11 @@ union answers, which is why it cannot live in `room_bookings`: `room_id` is NOT 
 member-facing read of it is an `innerJoin`, so a nullable room would make an in-flight request
 silently vanish from the member's page, their feed and the queue.
 
+**The screens never say "the union", and never "ask the union".** A member books *a room not
+listed here*; the estate calls these *rooms we do not manage*. The Students' Union is named only
+where a person needs to know whose form it is and who decides. The identifiers keep `external`,
+which is the domain word and is not read by anybody outside this repository.
+
 The lifecycle is `REQUESTED → AWAITING_EXTERNAL → CONFIRMED`, with `refuse-assignment` looping back
 to the union and `reject`/`cancel` ending it. Every write is guarded on the status it read (0006).
 **Confirm is folded into assign**: an accepted assignment is the confirmation. `assign` and

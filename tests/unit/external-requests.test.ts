@@ -68,7 +68,7 @@ describe('the lifecycle', () => {
 
   test('a room is recorded only once the form is in', () => {
     expect(refusalToAct({ status: 'AWAITING_EXTERNAL' }, 'assign')).toBeNull()
-    expect(refusalToAct({ status: 'AWAITING_EXTERNAL' }, 'submit')).toContain('cannot be sent to the union')
+    expect(refusalToAct({ status: 'AWAITING_EXTERNAL' }, 'submit')).toContain('cannot be requested')
   })
 
   // The union moving us room to room after confirming is ordinary, so a confirmed request can
@@ -103,8 +103,8 @@ describe('the lifecycle', () => {
   })
 
   test('a refusal says the state in words a member would use', () => {
-    expect(saysExternalStatus('AWAITING_EXTERNAL')).toBe('With the union')
-    expect(refusalToAct({ status: 'AWAITING_EXTERNAL' }, 'submit')).toContain('with the union')
+    expect(saysExternalStatus('AWAITING_EXTERNAL')).toBe('Requested, awaiting a room')
+    expect(refusalToAct({ status: 'AWAITING_EXTERNAL' }, 'submit')).toContain('requested, awaiting a room')
   })
 })
 

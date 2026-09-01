@@ -219,7 +219,7 @@ useSeoMeta({ title: 'Rooms' })
         to="/rooms/external"
         data-test="ask-the-union"
       >
-        Ask the union
+        Book a room not listed here
       </UButton>
     </div>
 

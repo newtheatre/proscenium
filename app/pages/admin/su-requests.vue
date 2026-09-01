@@ -7,7 +7,7 @@ import { formatLondon } from '#shared/utils/london'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'admin', title: 'Union requests', middleware: 'signed-in' })
+definePageMeta({ layout: 'admin', title: 'Other room requests', middleware: 'signed-in' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
@@ -115,7 +115,7 @@ async function act(path: string, body: Record<string, unknown>, said: string): P
 async function submit(): Promise<void> {
   const one = submitting.value
   if (!one) return
-  if (await act(`/api/admin/rooms/external-requests/${one.id}/submit`, { suReference: reference.value }, 'With the union')) {
+  if (await act(`/api/admin/rooms/external-requests/${one.id}/submit`, { suReference: reference.value }, 'Requested')) {
     submitting.value = null
   }
 }
@@ -138,7 +138,7 @@ async function refuse(): Promise<void> {
     spaceId: chosenSpace.value,
     reason: refusalReason.value,
     note: noteToo.value ? { verdict: noteVerdict.value, reason: refusalReason.value } : null,
-  }, 'Recorded, and the union asked again')
+  }, 'Recorded, and asked again')
   if (done) refusing.value = null
 }
 
@@ -203,7 +203,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
       row.original.attendees
         ? h('div', { class: 'text-xs text-muted' }, plural(row.original.attendees, 'person', 'people'))
         : null,
-      // Written by the member for the union's form, so the person filling it in has to see it.
+      // Written by the member for the form, so the person filling it in has to see it.
       row.original.notes ? h('p', { class: 'mt-1 text-sm' }, row.original.notes) : null,
     ]),
   },
@@ -299,8 +299,8 @@ onMounted(load)
       color="neutral"
       variant="subtle"
       icon="i-lucide-map-pin"
-      title="A conversation with the union, tracked"
-      description="A member asks, you fill in the union's form, they answer, and you record what they gave us. If it is no good, say so and ask again: what they offered is kept either way, so next time we know."
+      title="Rooms we do not manage, tracked"
+      description="A member asks, you fill in the form, they answer, and you record what we were given. If it is no good, say so and ask again: what was offered is kept either way, so next time we know."
     />
 
     <AdminToolbar
@@ -331,7 +331,7 @@ onMounted(load)
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          Nothing is waiting on the union.
+          Nothing is waiting on anybody else.
         </p>
       </template>
     </UTable>
@@ -345,7 +345,7 @@ onMounted(load)
 
     <UModal
       :open="submitting !== null"
-      title="The union's form is in"
+      title="The form is in"
       description="The member is told it is with them. Their reference, if they gave you one, makes reconciling the two sides possible later."
       @update:open="submitting = null"
     >
@@ -467,7 +467,7 @@ onMounted(load)
     <UModal
       :open="refusing !== null"
       title="That room is no good"
-      description="Recorded against the room, so the next person asking for it is warned. The request stays with the union."
+      description="Recorded against the room, so the next person asking for it is warned. The request stays open."
       @update:open="refusing = null"
     >
       <template #body>
@@ -528,7 +528,7 @@ onMounted(load)
           <UCheckbox
             v-model="noteToo"
             :label="`Remember this about the room for ${describePurpose(refusing?.purpose ?? null).toLowerCase()}`"
-            description="So the next person asking for it is warned before the union is troubled."
+            description="So the next person asking for it is warned before anybody is troubled."
             data-test="refuse-note"
           />
         </div>
@@ -569,7 +569,7 @@ onMounted(load)
           data-test="modal-failure"
         />
         <UFormField
-          label="Why it is not going to the union"
+          label="Why it is not being requested"
           required
         >
           <UTextarea

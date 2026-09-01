@@ -73,7 +73,7 @@ async function ask(): Promise<void> {
 
     toast.add({
       title: 'Asked for',
-      description: answer.warning ?? 'The Theatre Manager fills in the union\'s form next.',
+      description: answer.warning ?? 'The Theatre Manager fills in the form for it next.',
       icon: 'i-lucide-check',
       color: answer.warning ? 'warning' : 'success',
     })
@@ -89,14 +89,14 @@ async function ask(): Promise<void> {
   }
 }
 
-useSeoMeta({ title: 'Ask the union for a room' })
+useSeoMeta({ title: 'Book a room not listed here' })
 </script>
 
 <template>
   <UContainer class="max-w-xl py-16">
     <UPageHeader
-      title="Ask the union for a room"
-      description="For when nothing of ours suits. The Students' Union decides which room we get, so this is a request rather than a booking."
+      title="Book a room not listed here"
+      description="For when nothing of ours suits. Somebody else decides which room we get, so this is a request rather than a booking."
     />
 
     <UAlert
@@ -105,7 +105,7 @@ useSeoMeta({ title: 'Ask the union for a room' })
       variant="subtle"
       icon="i-lucide-info"
       title="Nothing here is held for you"
-      description="The Theatre Manager fills in the union's form, and the union answers in their own time. You may say which room you would like, but they may give us a different one."
+      description="The Theatre Manager fills in the Students' Union's form, and they answer in their own time. You may say which room you would like, but they may give us a different one."
       data-test="external-warning"
     />
 
@@ -114,7 +114,7 @@ useSeoMeta({ title: 'Ask the union for a room' })
         <UFormField
           label="What it is for"
           required
-          description="Shown to the Theatre Manager and written on the union's form."
+          description="Shown to the Theatre Manager and written on the form."
         >
           <UInput
             v-model="state.title"
@@ -196,7 +196,7 @@ useSeoMeta({ title: 'Ask the union for a room' })
         </UFormField>
 
         <UFormField
-          label="Anything else the union should know"
+          label="Anything else whoever manages it should know"
           hint="Optional"
         >
           <UTextarea

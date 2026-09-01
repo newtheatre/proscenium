@@ -176,7 +176,7 @@ describe.skipIf(skip !== null)('asking, with an optional preference (criterion 1
       { title: 'Tomorrow', purpose: 'REHEARSAL', ...span(1) }, member.cookie)
 
     expect(answered.status).toBe(422)
-    expect((await answered.json() as { statusMessage: string }).statusMessage).toContain('union needs')
+    expect((await answered.json() as { statusMessage: string }).statusMessage).toContain('needs')
   })
 
   test('a lapsed membership cannot ask', async () => {
@@ -458,7 +458,7 @@ describe.skipIf(skip !== null)('the screens (C-120)', () => {
       await click(view, '[data-test="external-submit"]')
 
       await waitFor(view, `document.querySelector('[data-test="union-list"]')`, 30_000)
-      expect(await textOf(view, 'body')).toContain('Waiting to go to the union')
+      expect(await textOf(view, 'body')).toContain('Not yet requested')
 
       expect(read<{ status: string }>(
         `SELECT status FROM external_requests WHERE title = 'Asked from a browser'`)?.status).toBe('REQUESTED')

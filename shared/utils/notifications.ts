@@ -142,7 +142,7 @@ export const MESSAGE_TYPES = {
     template: 'room-no-show',
   },
 
-  // The union is a third party, so the member hears at every step (C-120).
+  // A third party decides, so the member hears at every step (C-120).
   'external.request.received': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-received' },
   'external.request.raised': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-raised' },
   'external.request.submitted': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-submitted' },

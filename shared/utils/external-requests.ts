@@ -1,8 +1,8 @@
 import { londonParts } from './london'
 import { z } from 'zod'
 
-// Asking the union for a room (C-120). The lifecycle has three decision points where booking one
-// of our own rooms has one, which is why it is its own thing and not a booking with a new status.
+// Asking for a room we do not manage (C-120). The lifecycle has three decision points where
+// booking one of ours has one, so it is its own thing rather than a booking with a new status.
 
 export const EXTERNAL_STATUSES = ['REQUESTED', 'AWAITING_EXTERNAL', 'CONFIRMED', 'REJECTED', 'CANCELLED'] as const
 export type ExternalStatus = (typeof EXTERNAL_STATUSES)[number]
@@ -16,18 +16,18 @@ export type Verb = 'submit' | 'assign' | 'refuse-assignment' | 'reject' | 'cance
 
 const ALLOWED: Record<Verb, readonly ExternalStatus[]> = {
   'submit': ['REQUESTED'],
-  // Also from CONFIRMED: the union moving us room to room after confirming is ordinary, and
-  // without this the room they gave us can never be corrected (C-120).
+  // Also from CONFIRMED: being moved room to room after an answer is ordinary, and without this
+  // the room we were given can never be corrected (C-120).
   'assign': ['AWAITING_EXTERNAL', 'CONFIRMED'],
   'refuse-assignment': ['AWAITING_EXTERNAL', 'CONFIRMED'],
   'reject': ['REQUESTED', 'AWAITING_EXTERNAL'],
-  // A confirmed request is still a member's to withdraw, and the union is told by a person.
+  // A confirmed request is still a member's to withdraw, and their side is told by a person.
   'cancel': ['REQUESTED', 'AWAITING_EXTERNAL', 'CONFIRMED'],
 }
 
 export function saysExternalStatus(status: string): string {
-  if (status === 'REQUESTED') return 'Waiting to go to the union'
-  if (status === 'AWAITING_EXTERNAL') return 'With the union'
+  if (status === 'REQUESTED') return 'Not yet requested'
+  if (status === 'AWAITING_EXTERNAL') return 'Requested, awaiting a room'
   if (status === 'CONFIRMED') return 'Confirmed'
   if (status === 'REJECTED') return 'Turned down'
   if (status === 'CANCELLED') return 'Cancelled'
@@ -41,9 +41,9 @@ export function refusalToAct(request: { status: string }, verb: Verb): string | 
 }
 
 function past(verb: Verb): string {
-  if (verb === 'submit') return 'sent to the union'
+  if (verb === 'submit') return 'requested'
   if (verb === 'assign') return 'given a room'
-  if (verb === 'refuse-assignment') return 'sent back to the union'
+  if (verb === 'refuse-assignment') return 'sent back'
   if (verb === 'reject') return 'turned down'
   return 'cancelled'
 }
@@ -60,8 +60,8 @@ export interface ExternalContext {
   horizonWeeks: number
 }
 
-// Judged separately from a room of ours: opening hours, capacity and an active flag are things the
-// union never tells us, so asking about them would be inventing an answer.
+// Judged separately from a room of ours: opening hours, capacity and an active flag are things
+// nobody tells us about a room we do not manage, so asking would be inventing an answer.
 export function judgeExternal(span: { startsAt: Date, endsAt: Date }, context: ExternalContext): ExternalFailure[] {
   const failures: ExternalFailure[] = []
 
@@ -78,7 +78,7 @@ export function judgeExternal(span: { startsAt: Date, endsAt: Date }, context: E
   if (days < context.noticeDays) {
     failures.push({
       reason: 'SHORT_NOTICE',
-      says: `The union needs ${context.noticeDays} days, because a person fills in their form and waits for an answer.`,
+      says: `This needs ${context.noticeDays} days, because a person fills in a form and waits for an answer.`,
     })
   }
   if (days / 7 > context.horizonWeeks) {
@@ -106,7 +106,7 @@ export const externalRequestForm = z.object({
   attendees: z.number().int().positive().nullish().transform(value => value ?? null),
   startsAt: instant,
   endsAt: instant,
-  // A preference, never a promise: the union may give us anything (C-120).
+  // A preference, never a promise: we may be given anything (C-120).
   preferredSpaceId: z.string().min(1).max(64).nullish().transform(value => value ?? null),
   notes: z.string().trim().max(1000).nullish().transform(value => (value ?? '').trim() || null),
 }).refine(request => new Date(request.endsAt) > new Date(request.startsAt), {

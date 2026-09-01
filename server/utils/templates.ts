@@ -436,35 +436,35 @@ The Nottingham New Theatre`,
   },
 
   'external-received': (context: TemplateContext): Rendered => ({
-    subject: `Asked for: a union room, ${String(context.when)}`,
+    subject: `Asked for: a room not listed on the site, ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>Your request for a room through the Students' Union, ${context.when}, is with the Theatre
-Manager, who fills in the union's form.</p>
+<p>Your request for a room we do not manage, ${context.when}, is with the Theatre Manager, who
+fills in the Students' Union's form.</p>
 <p>${context.title}</p>
-<p>The union decides which room we get, so nothing is held yet. You will hear when the form is in,
-and again when they answer.</p>`),
+<p>The Students' Union decides which room we get, so nothing is held yet. You will hear when the
+form is in, and again when they answer.</p>`),
     text: `Hello ${context.name},
 
-Your request for a room through the Students' Union, ${String(context.when)}, is with the Theatre
-Manager, who fills in the union's form.
+Your request for a room we do not manage, ${String(context.when)}, is with the Theatre Manager,
+who fills in the Students' Union's form.
 
 ${String(context.title)}
 
-The union decides which room we get, so nothing is held yet. You will hear when the form is in, and
-again when they answer.
+The Students' Union decides which room we get, so nothing is held yet. You will hear when the form
+is in, and again when they answer.
 
 The Nottingham New Theatre`,
   }),
 
   'external-raised': (context: TemplateContext): Rendered => ({
-    subject: `A union room has been asked for: ${String(context.when)}`,
+    subject: `A room not listed on the site has been asked for: ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>${context.who} has asked for a union room, ${context.when}.</p>
+<p>${context.who} has asked for a room we do not manage, ${context.when}.</p>
 <p>${context.title}</p>
 <p><a href="${String(context.queueUrl)}">Fill in the form</a></p>`),
     text: `Hello ${context.name},
 
-${String(context.who)} has asked for a union room, ${String(context.when)}.
+${String(context.who)} has asked for a room we do not manage, ${String(context.when)}.
 
 ${String(context.title)}
 
@@ -474,15 +474,15 @@ The Nottingham New Theatre`,
   }),
 
   'external-submitted': (context: TemplateContext): Rendered => ({
-    subject: `With the union: ${String(context.when)}`,
+    subject: `Requested: ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>The form for ${context.title}, ${context.when}, is in with the union. They decide which room we
-get, so this may not be the room you asked for.</p>
+<p>The form for ${context.title}, ${context.when}, is in with the Students' Union. They decide
+which room we get, so this may not be the room you asked for.</p>
 <p><a href="${String(context.roomsUrl)}">See what you have asked for</a></p>`),
     text: `Hello ${context.name},
 
-The form for ${String(context.title)}, ${String(context.when)}, is in with the union. They decide
-which room we get, so this may not be the room you asked for.
+The form for ${String(context.title)}, ${String(context.when)}, is in with the Students' Union.
+They decide which room we get, so this may not be the room you asked for.
 
 See what you have asked for: ${String(context.roomsUrl)}
 
@@ -492,12 +492,12 @@ The Nottingham New Theatre`,
   'external-assigned': (context: TemplateContext): Rendered => ({
     subject: `You have ${String(context.room)}, ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>The union has given us <strong>${context.room}</strong> (${context.where}) for ${context.title},
+<p>You have <strong>${context.room}</strong> (${context.where}) for ${context.title},
 ${context.when}.</p>
 <p><a href="${String(context.roomsUrl)}">See what you hold</a></p>`),
     text: `Hello ${context.name},
 
-The union has given us ${String(context.room)} (${String(context.where)}) for
+You have ${String(context.room)} (${String(context.where)}) for
 ${String(context.title)}, ${String(context.when)}.
 
 See what you hold: ${String(context.roomsUrl)}
@@ -506,16 +506,16 @@ The Nottingham New Theatre`,
   }),
 
   'external-reassigning': (context: TemplateContext): Rendered => ({
-    subject: `Asking the union again: ${String(context.when)}`,
+    subject: `Asking again: ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>The union offered us ${context.room} for ${context.title}, ${context.when}, and it is not
-suitable for what you need it for. We have gone back to them, which adds a few days.</p>
+<p>We were offered ${context.room} for ${context.title}, ${context.when}, and it is not suitable
+for what you need it for. We have asked again, which adds a few days.</p>
 <p><a href="${String(context.roomsUrl)}">See what you have asked for</a></p>`),
     text: `Hello ${context.name},
 
-The union offered us ${String(context.room)} for ${String(context.title)},
-${String(context.when)}, and it is not suitable for what you need it for. We have gone back to
-them, which adds a few days.
+We were offered ${String(context.room)} for ${String(context.title)},
+${String(context.when)}, and it is not suitable for what you need it for. We have asked again,
+which adds a few days.
 
 See what you have asked for: ${String(context.roomsUrl)}
 
@@ -523,15 +523,16 @@ The Nottingham New Theatre`,
   }),
 
   'external-rejected': (context: TemplateContext): Rendered => ({
-    subject: `Not going to the union: ${String(context.when)}`,
+    subject: `Not being requested: ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>Your request for a union room for ${context.title}, ${context.when}, is not being sent.</p>
+<p>Your request for a room we do not manage, for ${context.title}, ${context.when}, is not being
+sent.</p>
 <p>Why: ${context.reason}</p>
 <p><a href="${String(context.roomsUrl)}">Find another slot</a></p>`),
     text: `Hello ${context.name},
 
-Your request for a union room for ${String(context.title)}, ${String(context.when)}, is not being
-sent.
+Your request for a room we do not manage, for ${String(context.title)}, ${String(context.when)},
+is not being sent.
 
 Why: ${String(context.reason)}
 
@@ -540,19 +541,19 @@ Find another slot: ${String(context.roomsUrl)}
 The Nottingham New Theatre`,
   }),
 
-  // The union's side is a person and a form, so withdrawing ours does not withdraw theirs.
+  // Their side is a person and a form, so withdrawing ours does not withdraw theirs.
   'external-withdrawn': (context: TemplateContext): Rendered => ({
     subject: `Withdrawn: ${String(context.who)}, ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>${context.who} has withdrawn their request for ${context.title}, ${context.when}.</p>
-<p>The union still has our booking for ${context.room} (reference: ${context.reference}), so it
-needs cancelling with them by hand.</p>`),
+<p>The Students' Union still has our booking for ${context.room} (reference:
+${context.reference}), so it needs cancelling with them by hand.</p>`),
     text: `Hello ${context.name},
 
 ${String(context.who)} has withdrawn their request for ${String(context.title)},
 ${String(context.when)}.
 
-The union still has our booking for ${String(context.room)} (reference:
+The Students' Union still has our booking for ${String(context.room)} (reference:
 ${String(context.reference)}), so it needs cancelling with them by hand.
 
 The Nottingham New Theatre`,
@@ -561,22 +562,23 @@ The Nottingham New Theatre`,
   'external-waiting': (context: TemplateContext): Rendered => {
     const withUnion = context.withUnion === true
     return {
-      subject: `Still waiting: a union room, ${String(context.when)}`,
+      subject: `Still waiting: a room not listed on the site, ${String(context.when)}`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>${context.who} asked for a union room, ${context.when}, and it has been waiting.</p>
+<p>${context.who} asked for a room we do not manage, ${context.when}, and it has been waiting.</p>
 <p>${context.title}</p>
 <p>${withUnion
-  ? 'The form is in with the union, so this may need chasing with them.'
+  ? 'The form is in with the Students\' Union, so this may need chasing with them.'
   : 'The form has not gone in yet.'}</p>
 <p><a href="${String(context.queueUrl)}">Open the queue</a></p>`),
       text: `Hello ${context.name},
 
-${String(context.who)} asked for a union room, ${String(context.when)}, and it has been waiting.
+${String(context.who)} asked for a room we do not manage, ${String(context.when)}, and it has been
+waiting.
 
 ${String(context.title)}
 
 ${withUnion
-  ? 'The form is in with the union, so this may need chasing with them.'
+  ? 'The form is in with the Students\' Union, so this may need chasing with them.'
   : 'The form has not gone in yet.'}
 
 Open the queue: ${String(context.queueUrl)}

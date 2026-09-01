@@ -209,7 +209,7 @@ const columns: TableColumn<Room>[] = [
       variant="subtle"
       icon="i-lucide-door-open"
       title="The bookable estate"
-      description="A room is retired, never deleted, so a booking made last term still names something. A room with no opening hours is open whenever; give it hours and it is shut outside them. Every room here is one we control; union rooms live under SU rooms."
+      description="A room is retired, never deleted, so a booking made last term still names something. A room with no opening hours is open whenever; give it hours and it is shut outside them. Every room here is one we control; the rest live under Other rooms."
     />
 
     <AdminToolbar
@@ -236,7 +236,7 @@ const columns: TableColumn<Room>[] = [
           icon="i-lucide-map-pin"
           data-test="to-su-rooms"
         >
-          Union rooms
+          Other rooms
         </UButton>
 
         <UButton

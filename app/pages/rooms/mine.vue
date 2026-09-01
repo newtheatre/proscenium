@@ -95,7 +95,7 @@ const { data: union, refresh: refreshUnion } = await useAsyncData(
 
 const cancellingUnion = ref<UnionRequest | null>(null)
 
-// A union room is a different kind of thing, so it says so rather than pretending to be a booking.
+// A room we do not manage is a different thing, so it says so rather than posing as a booking.
 async function cancelUnion(): Promise<void> {
   const one = cancellingUnion.value
   if (!one) return
@@ -106,8 +106,8 @@ async function cancelUnion(): Promise<void> {
     toast.add({
       title: 'Withdrawn',
       description: answer.unionTold
-        ? 'The Theatre Manager has been told, because the union still has our booking.'
-        : 'It had not gone to the union yet.',
+        ? 'The Theatre Manager has been told, because our booking for it still stands.'
+        : 'It had not been requested yet.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -330,10 +330,10 @@ useSeoMeta({ title: 'My bookings' })
       data-test="union-list"
     >
       <h2 class="nnt-headline text-lg">
-        Rooms asked for through the union
+        Rooms we do not manage
       </h2>
       <p class="mt-1 text-sm text-muted">
-        The union decides which room we get, so none of these is held until they answer.
+        Somebody else decides which room we get, so none of these is held until they answer.
       </p>
 
       <ul class="mt-4 divide-y divide-default">
@@ -345,7 +345,7 @@ useSeoMeta({ title: 'My bookings' })
         >
           <div class="min-w-0 flex-1">
             <p class="flex flex-wrap items-center gap-2 font-medium">
-              {{ one.assigned ?? one.preferred ?? 'A union room' }}
+              {{ one.assigned ?? one.preferred ?? 'A room not listed on the site' }}
               <UBadge
                 :color="one.status === 'CONFIRMED' ? 'success' : one.status === 'AWAITING_EXTERNAL' ? 'info' : 'neutral'"
                 variant="subtle"
@@ -454,12 +454,12 @@ useSeoMeta({ title: 'My bookings' })
     <UModal
       :open="cancellingUnion !== null"
       title="Withdraw this request?"
-      description="The union arranged this by hand, so withdrawing here tells the Theatre Manager to withdraw it with them."
+      description="This was arranged by hand, so withdrawing here tells the Theatre Manager to withdraw it with them."
       @update:open="cancellingUnion = null"
     >
       <template #body>
         <p class="text-sm">
-          Nothing is freed automatically: our booking with the union stands until a person cancels
+          Nothing is freed automatically: our booking for it stands until a person cancels
           it with them.
         </p>
       </template>
