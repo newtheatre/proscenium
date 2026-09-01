@@ -173,7 +173,46 @@ function seedBookings(rooms: { id: string, name: string }[], people: Seeded[]): 
   return planned.length
 }
 
+// The rooms the union manages, and the lesson that cost somebody an evening (C-119).
+function seedExternalSpaces(): number {
+  const spaces = [
+    { id: id(), name: 'Portland B12', building: 'Portland Building', campus: 'University Park', capacity: 20 },
+    { id: id(), name: 'Portland A9', building: 'Portland Building', campus: 'University Park', capacity: 60 },
+    { id: id(), name: 'Hallward Seminar 3', building: 'Hallward Library', campus: 'University Park', capacity: 15 },
+    { id: id(), name: 'Coates C15', building: 'Coates Building', campus: 'University Park', capacity: 45 },
+  ]
+
+  // Re-runnable, like the rooms above: seeding twice adds people, never a second catalogue.
+  for (const space of spaces) {
+    const held = db.query('SELECT id FROM external_spaces WHERE name = ?').get(space.name) as { id: string } | null
+    if (held) {
+      space.id = held.id
+      continue
+    }
+
+    db.query(`INSERT INTO external_spaces (id, name, building, campus, capacity, contact)
+              VALUES (?, ?, ?, ?, ?, 'SU reception, room bookings desk')`)
+      .run(space.id, space.name, space.building, space.campus, space.capacity)
+  }
+
+  const notes = [
+    { space: spaces[0]!.id, purpose: 'REHEARSAL', verdict: 'UNSUITABLE', reason: 'A fixed table fills the room; there is no floor to work on.' },
+    { space: spaces[0]!.id, purpose: 'MEETING', verdict: 'SUITABLE', reason: 'The table everybody complains about is the point here.' },
+    { space: spaces[2]!.id, purpose: 'REHEARSAL', verdict: 'CAUTION', reason: 'Next to a silent study area, so nothing loud.' },
+  ]
+
+  for (const note of notes) {
+    db.query(`INSERT INTO external_space_notes (id, space_id, purpose, verdict, reason)
+              VALUES (?, ?, ?, ?, ?)
+              ON CONFLICT (space_id, purpose) DO UPDATE SET verdict = excluded.verdict, reason = excluded.reason`)
+      .run(id(), note.space, note.purpose, note.verdict, note.reason)
+  }
+
+  return spaces.length
+}
+
 const rooms = seedRooms()
+const spaces = seedExternalSpaces()
 const people = await seedPeople()
 const bookings = seedBookings(rooms, people)
 db.close()
@@ -181,7 +220,7 @@ db.close()
 // Printed once, and nowhere else. Nothing here is committed and there is no way to read a
 // password back (K-120 criterion 1).
 console.info(`\nSeeded ${target}\n`)
-console.info(`  ${rooms.length} rooms, ${people.length} people, ${bookings} bookings\n`)
+console.info(`  ${rooms.length} rooms, ${spaces} SU rooms, ${people.length} people, ${bookings} bookings\n`)
 console.info('  Sign in as any of these. The passwords are shown here and nowhere else:\n')
 for (const person of people) console.info(`    ${person.email}\n      ${person.password}`)
 console.info('\n  Give one of them the run of the place with:')

@@ -182,3 +182,42 @@ export const roomNoShows = sqliteTable('room_no_shows', {
   index('room_no_shows_booking').on(table.bookingId),
   check('room_no_shows_kind', sql`${table.kind} IN ('RECORDED', 'WITHDRAWN')`),
 ])
+
+// Rooms the Students' Union manages (C-119). A reference catalogue, never a bookable estate: we
+// cannot promise a room we do not control, so nothing here holds a slot or appears on a calendar.
+export const externalSpaces = sqliteTable('external_spaces', {
+  id: id(),
+  name: text('name').notNull(),
+  campus: text('campus'),
+  building: text('building'),
+  // Whoever gets the room booked, which for an SU room is a desk rather than a person.
+  contact: text('contact'),
+  capacity: integer('capacity'),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  unique('external_spaces_name').on(table.name),
+  index('external_spaces_active').on(table.isActive),
+  check('external_spaces_capacity', sql`${table.capacity} IS NULL OR ${table.capacity} > 0`),
+])
+
+// What we learned about a space, the hard way. A meeting room with a fixed table is no good for a
+// rehearsal, and nobody knew until they turned up to it (C-119).
+export const externalSpaceNotes = sqliteTable('external_space_notes', {
+  id: id(),
+  spaceId: text('space_id').notNull().references(() => externalSpaces.id, { onDelete: 'cascade' }),
+  // No CHECK: ROOM_PURPOSES is committee-editable, and a constraint behind an editable list breaks
+  // writes the moment the list is used (0033's reasoning).
+  purpose: text('purpose').notNull(),
+  verdict: text('verdict').notNull(),
+  reason: text('reason').notNull(),
+  writtenBy: text('written_by').references(() => users.id),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  // One verdict per space per purpose: two would leave nobody knowing which applied.
+  unique('external_space_notes_space_purpose').on(table.spaceId, table.purpose),
+  index('external_space_notes_space').on(table.spaceId),
+  check('external_space_notes_verdict', sql`${table.verdict} IN ('SUITABLE', 'CAUTION', 'UNSUITABLE')`),
+])

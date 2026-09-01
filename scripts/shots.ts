@@ -200,6 +200,7 @@ const SHOTS: Shot[] = [
   })()` },
   { name: '10c-rooms-filters', path: '/admin/rooms', marker: '[data-test="rooms-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '10d-requests', path: '/admin/requests', marker: '[data-test="requests-table"]' },
+  { name: '10e-su-rooms', path: '/admin/su-rooms', marker: '[data-test="spaces-table"]' },
   { name: '11-config', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
   { name: '12-dev-tools', path: '/dev', marker: '[data-test="dev-seed"]' },
   { name: '13-people-narrow', path: '/admin/people', marker: '[data-test="directory-table"]', width: NARROW },
