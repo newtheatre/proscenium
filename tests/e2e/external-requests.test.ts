@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
@@ -512,4 +513,98 @@ describe.skipIf(skip !== null)('the screens (C-120)', () => {
       view.close()
     }
   }, 180_000)
+})
+
+describe.skipIf(skip !== null)('a union room reaches the rest of the system', () => {
+  async function confirmed(daysAhead: number): Promise<{ id: string, space: string, name: string }> {
+    const id = await ask(span(daysAhead))
+    const space = await listSpace('Reaches')
+    const name = read<{ name: string }>('SELECT name FROM external_spaces WHERE id = ?', space)!.name
+    await send('POST', `/api/admin/rooms/external-requests/${id}/submit`, {}, officer)
+    await send('POST', `/api/admin/rooms/external-requests/${id}/assign`, { spaceId: space }, officer)
+    return { id, space, name }
+  }
+
+  // A room the union gave us is a commitment like any other, so it belongs in the same calendar.
+  test('a confirmed one is in the member s calendar feed', async () => {
+    const { name } = await confirmed(35)
+    const { url } = await (await send('POST', '/api/account/room-feed', {}, member.cookie)).json() as { url: string }
+
+    const calendar = await (await fetch(url)).text()
+    expect(calendar).toContain(name)
+    expect(calendar).toContain('STATUS:CONFIRMED')
+  })
+
+  test('one still with the union is tentative, because they may yet say no', async () => {
+    const id = await ask(span(36))
+    await send('POST', `/api/admin/rooms/external-requests/${id}/submit`, {}, officer)
+
+    const { url } = await (await send('POST', '/api/account/room-feed', {}, member.cookie)).json() as { url: string }
+    const calendar = await (await fetch(url)).text()
+
+    const event = calendar.split('BEGIN:VEVENT').find(part => part.includes(id))
+    expect(event).toBeDefined()
+    expect(event).toContain('STATUS:TENTATIVE')
+  })
+
+  test('and somebody else s is in nobody else s feed', async () => {
+    await confirmed(37)
+    const { url } = await (await send('POST', '/api/account/room-feed', {}, other.cookie)).json() as { url: string }
+    expect(await (await fetch(url)).text()).not.toContain('Reaches')
+  })
+
+  // Nobody is reminded about our own rooms and left to forget a union one.
+  test('a confirmed one tomorrow is reminded about', async () => {
+    const id = await ask(span(30))
+    const space = await listSpace('Reminded')
+    await send('POST', `/api/admin/rooms/external-requests/${id}/submit`, {}, officer)
+    await send('POST', `/api/admin/rooms/external-requests/${id}/assign`, { spaceId: space }, officer)
+
+    // Moved to tomorrow directly, because the union needs ten days' notice to be asked at all.
+    const { year, month, day } = londonParts(new Date())
+    const at = Math.floor(fromLondonWallClock(year, month, day + 1, 19).getTime() / 1000)
+    write('UPDATE external_requests SET starts_at = ?, ends_at = ? WHERE id = ?', at, at + 7200, id)
+    write(`DELETE FROM notification_log WHERE type = 'room.booking.reminder'`)
+
+    const answered = await send('POST', '/api/dev/remind-rooms', {}, officer)
+    expect(answered.status).toBe(200)
+
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.booking.reminder'`,
+      member.id)?.n).toBe(1)
+  })
+
+  // Escalated, never expired: expiry frees a held slot and this holds none (0036).
+  test('one left waiting chases the approvers, and never lapses', async () => {
+    const id = await ask(span(38))
+    write('UPDATE external_requests SET created_at = ? WHERE id = ?',
+      Math.floor(Date.now() / 1000) - 30 * 86_400, id)
+
+    const before = read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'external.request.waiting'`,
+      officerId)?.n ?? 0
+
+    const answered = await send('POST', '/api/dev/sweep-requests', {}, officer)
+    expect((await answered.json() as { unionEscalated: number }).unionEscalated).toBeGreaterThan(0)
+
+    expect((read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'external.request.waiting'`,
+      officerId)?.n ?? 0) - before).toBeGreaterThan(0)
+
+    // Still open: the union may yet answer.
+    expect(statusOf(id)).toBe('REQUESTED')
+  })
+
+  test('and is chased once, not every night', async () => {
+    const id = await ask(span(39))
+    write('UPDATE external_requests SET created_at = ? WHERE id = ?',
+      Math.floor(Date.now() / 1000) - 30 * 86_400, id)
+
+    await send('POST', '/api/dev/sweep-requests', {}, officer)
+    const after = await (await send('POST', '/api/dev/sweep-requests', {}, officer)).json() as { unionEscalated: number }
+
+    expect(read<{ escalated_at: number | null }>(
+      'SELECT escalated_at FROM external_requests WHERE id = ?', id)?.escalated_at).not.toBeNull()
+    expect(after.unionEscalated).toBe(0)
+  })
 })

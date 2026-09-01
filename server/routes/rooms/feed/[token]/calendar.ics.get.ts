@@ -33,12 +33,37 @@ export default defineEventHandler(async (event) => {
     ))
     .orderBy(schema.roomBookings.startsAt)
 
+  // A room the union gave us is a commitment like any other, so it belongs in the same calendar.
+  // One that is still with them is tentative, because they may yet say no (C-120).
+  const union = await db.select({
+    id: schema.externalRequests.id,
+    title: schema.externalRequests.title,
+    room: schema.externalSpaces.name,
+    startsAt: schema.externalRequests.startsAt,
+    endsAt: schema.externalRequests.endsAt,
+    status: schema.externalRequests.status,
+    updatedAt: schema.externalRequests.updatedAt,
+  })
+    .from(schema.externalRequests)
+    .leftJoin(schema.externalSpaces, eq(schema.externalSpaces.id, schema.externalRequests.assignedSpaceId))
+    .where(and(
+      eq(schema.externalRequests.userId, holder.userId),
+      gte(schema.externalRequests.endsAt, now),
+      sql`${schema.externalRequests.startsAt} < ${now + horizon * 7 * 24 * 3600}`,
+    ))
+    .orderBy(schema.externalRequests.startsAt)
+
   setHeader(event, 'content-type', 'text/calendar; charset=utf-8')
   setHeader(event, 'content-disposition', 'inline; filename="nnt-rooms.ics"')
   // A subscription is polled, so a stale copy is worse than a fetch.
   setHeader(event, 'cache-control', 'no-store, private')
 
-  return calendarFor(rows, {
+  return calendarFor([...rows, ...union.map(one => ({
+    ...one,
+    room: one.room ?? 'A union room, not yet assigned',
+    // The union's own vocabulary against a calendar's: only a room they gave us is confirmed.
+    status: one.status === 'CONFIRMED' ? 'CONFIRMED' : one.status === 'AWAITING_EXTERNAL' || one.status === 'REQUESTED' ? 'PENDING_APPROVAL' : 'CANCELLED',
+  }))], {
     name: 'New Theatre rooms',
     host: new URL(useRuntimeConfig(event).public.baseURL).hostname,
   })

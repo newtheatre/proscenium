@@ -56,9 +56,32 @@ export async function remindTomorrow(event: H3Event | undefined, at = new Date()
     ))
     .orderBy(asc(schema.roomBookings.startsAt))
 
-  // One message per member however many rooms they hold tomorrow (criterion 2).
-  const byMember = new Map<string, typeof rows>()
-  for (const row of rows) byMember.set(row.userId, [...(byMember.get(row.userId) ?? []), row])
+  // A room the union gave us is a room somebody has to turn up to, so it is reminded about like
+  // any other. Only a confirmed one: the rest may still not happen (C-120).
+  const union = await db.select({
+    id: schema.externalRequests.id,
+    userId: schema.externalRequests.userId,
+    room: schema.externalSpaces.name,
+    title: schema.externalRequests.title,
+    startsAt: schema.externalRequests.startsAt,
+    endsAt: schema.externalRequests.endsAt,
+    status: schema.externalRequests.status,
+    updatedAt: schema.externalRequests.updatedAt,
+  })
+    .from(schema.externalRequests)
+    .innerJoin(schema.externalSpaces, eq(schema.externalSpaces.id, schema.externalRequests.assignedSpaceId))
+    .where(and(
+      eq(schema.externalRequests.status, 'CONFIRMED'),
+      gte(schema.externalRequests.startsAt, from),
+      lt(schema.externalRequests.startsAt, to),
+    ))
+    .orderBy(asc(schema.externalRequests.startsAt))
+
+  // One message per member however many rooms they hold tomorrow, ours and the union's alike
+  // (criterion 2).
+  const held = [...rows, ...union].sort((a, b) => a.startsAt - b.startsAt)
+  const byMember = new Map<string, typeof held>()
+  for (const row of held) byMember.set(row.userId, [...(byMember.get(row.userId) ?? []), row])
 
   const base = useRuntimeConfig(event).public.baseURL
   let members = 0
@@ -92,7 +115,7 @@ export async function remindTomorrow(event: H3Event | undefined, at = new Date()
     members++
   }
 
-  return { members, bookings: rows.length, skipped }
+  return { members, bookings: held.length, skipped }
 }
 
 // What the operations dashboard reads: a send that failed or was suppressed, newest first.

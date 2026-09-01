@@ -712,7 +712,13 @@ Cancelling one the union already has **tells the approvers**, because our arrang
 stands until a person withdraws it. That closes the C-112 criterion 3 gap `docs/known-issues.md`
 recorded, which could not be closed before because there was no arrangement object to withdraw.
 
-An external request **escalates but never expires**: expiry frees a held slot and this holds none.
+An external request **escalates but never expires**: expiry frees a held slot and this holds none,
+so lapsing one would tell the member nothing while the union may still answer. `rooms:sweep` chases
+the approvers once past `ROOM_REQUEST_ESCALATE_HOURS`, saying which half of the wait it is stuck in.
+
+A confirmed union room reaches everywhere a booking does: the member's calendar feed (tentative
+while it is still with the union, since they may yet say no) and the day-before reminder, which
+sends one message covering our rooms and theirs together.
 
 Erasure scrubs the member's words from a request and keeps what was asked; an assignment scrubs
 `recorded_by` and keeps what the union offered.

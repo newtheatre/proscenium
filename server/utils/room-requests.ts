@@ -25,6 +25,55 @@ export async function approvers(): Promise<{ id: string, name: string }[]> {
     ))
 }
 
+// A union request escalates but never expires: expiry frees a held slot, and this holds none, so
+// lapsing one would tell the member nothing while the union may still answer (C-120, 0036).
+export async function sweepExternalRequests(event: H3Event | undefined, at = new Date()): Promise<number> {
+  const now = Math.floor(at.getTime() / 1000)
+  const escalateAfter = await configValue(event, 'ROOM_REQUEST_ESCALATE_HOURS')
+
+  const waiting = await db.select({
+    id: schema.externalRequests.id,
+    who: schema.users.name,
+    title: schema.externalRequests.title,
+    startsAt: schema.externalRequests.startsAt,
+    status: schema.externalRequests.status,
+    createdAt: schema.externalRequests.createdAt,
+    escalatedAt: schema.externalRequests.escalatedAt,
+  })
+    .from(schema.externalRequests)
+    .innerJoin(schema.users, eq(schema.users.id, schema.externalRequests.userId))
+    .where(inArray(schema.externalRequests.status, ['REQUESTED', 'AWAITING_EXTERNAL']))
+    .orderBy(asc(schema.externalRequests.createdAt))
+
+  let escalated = 0
+  for (const request of waiting) {
+    if (!dueToEscalate(request, now, escalateAfter)) continue
+
+    await db.update(schema.externalRequests)
+      .set({ escalatedAt: now })
+      .where(eq(schema.externalRequests.id, request.id))
+
+    for (const approver of await approvers()) {
+      await notify(event, {
+        type: 'external.request.waiting',
+        userId: approver.id,
+        context: {
+          name: approver.name,
+          who: request.who,
+          title: request.title,
+          when: whenOf(request),
+          // Which half of the wait it is stuck in, because the two need different action.
+          withUnion: request.status === 'AWAITING_EXTERNAL',
+          queueUrl: `${useRuntimeConfig(event).public.baseURL}/admin/su-requests`,
+        },
+      })
+    }
+    escalated++
+  }
+
+  return escalated
+}
+
 export async function sweepRequests(event: H3Event | undefined, at = new Date()): Promise<RequestSweep> {
   const now = Math.floor(at.getTime() / 1000)
   const escalateAfter = await configValue(event, 'ROOM_REQUEST_ESCALATE_HOURS')

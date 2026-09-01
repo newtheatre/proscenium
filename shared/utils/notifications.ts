@@ -150,6 +150,7 @@ export const MESSAGE_TYPES = {
   'external.request.reassigning': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-reassigning' },
   'external.request.rejected': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-rejected' },
   'external.request.withdrawn': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-withdrawn' },
+  'external.request.waiting': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-waiting' },
   // Security, so no topic can suppress it, and no reachesUnverified (A-102 criterion 2).
   'account.method-removed': {
     topic: null,

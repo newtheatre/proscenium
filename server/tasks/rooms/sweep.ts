@@ -6,6 +6,12 @@ export default defineTask({
     description: 'Escalate room requests that are waiting, and lapse the ones that waited too long',
   },
   async run() {
-    return { result: await sweepRequests(undefined, new Date()) }
+    const at = new Date()
+    return {
+      result: {
+        ...await sweepRequests(undefined, at),
+        unionEscalated: await sweepExternalRequests(undefined, at),
+      },
+    }
   },
 })

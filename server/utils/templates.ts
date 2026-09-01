@@ -558,6 +558,33 @@ ${String(context.reference)}), so it needs cancelling with them by hand.
 The Nottingham New Theatre`,
   }),
 
+  'external-waiting': (context: TemplateContext): Rendered => {
+    const withUnion = context.withUnion === true
+    return {
+      subject: `Still waiting: a union room, ${String(context.when)}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${context.who} asked for a union room, ${context.when}, and it has been waiting.</p>
+<p>${context.title}</p>
+<p>${withUnion
+  ? 'The form is in with the union, so this may need chasing with them.'
+  : 'The form has not gone in yet.'}</p>
+<p><a href="${String(context.queueUrl)}">Open the queue</a></p>`),
+      text: `Hello ${context.name},
+
+${String(context.who)} asked for a union room, ${String(context.when)}, and it has been waiting.
+
+${String(context.title)}
+
+${withUnion
+  ? 'The form is in with the union, so this may need chasing with them.'
+  : 'The form has not gone in yet.'}
+
+Open the queue: ${String(context.queueUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'account-exists': (context: TemplateContext): Rendered => ({
     subject: 'You already have an account',
     html: layout(`<p>Hello ${context.name},</p>
