@@ -88,6 +88,14 @@ async function warm(port: number): Promise<void> {
 
 // The runner owns the dev server, not the suites: a `finally` here always runs, and an exit hook
 // inside a bun test process does not, so a leaked server would hold the port.
+
+// Freeing the socket is not enough: a surviving runner takes the port straight back.
+function held(port: number): void {
+  if (!portIsFree(port)) {
+    throw new Error(`port ${port} is already held: stop the process on it, then run this again`)
+  }
+}
+
 function portIsFree(port: number): boolean {
   try {
     const probe = Bun.listen({ hostname: '127.0.0.1', port, socket: { data() {} } })
@@ -145,6 +153,10 @@ async function e2e(files: string[]): Promise<boolean> {
   const began = Date.now()
   const shards = deal(files)
   const plural = shards.length === 1 ? 'one server, booted once and reused' : `${shards.length} shards, one server each`
+
+  // Ports checked before the banner, not after: a refusal that has already announced the run
+  // reads as a finished one to anything watching the output for that line.
+  for (const shard of shards) held(BASE_PORT + shard.index)
   console.log(`end-to-end: ${files.length} suites, ${plural}\n`)
 
   const servers = await Promise.all(shards.map(shard => serve(BASE_PORT + shard.index)))
