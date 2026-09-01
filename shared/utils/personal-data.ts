@@ -168,6 +168,15 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Rooms this person booked. Utilisation survives an erasure; their words in it do not.',
   },
   {
+    name: 'room_feed_tokens',
+    column: 'user_id',
+    section: null,
+    columns: null,
+    erasure: 'delete',
+    // The link is a credential. Left behind, an erased person's calendar would keep resolving.
+    why: 'A calendar subscription the account holds. It ends with the account (C-104).',
+  },
+  {
     name: 'ledger_entries',
     column: 'actor_id',
     section: 'money',

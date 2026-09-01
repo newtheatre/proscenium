@@ -49,6 +49,7 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
     ['INSERT INTO audit_log (id, actor_id, action, target, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)',
       `al-${id}`, id, 'account.registered', `user:${id}`, JSON.stringify({ who: NAME, address: EMAIL }), now],
     ['INSERT INTO rooms (id, name) VALUES (?, ?)', `room-${id}`, 'The Studio'],
+    ['INSERT INTO room_feed_tokens (id, user_id, token_hash) VALUES (?, ?, ?)', `f-${id}`, id, `feed-${id}`],
     // Everything a member types about a booking: the title, the note, why they asked for an
     // exception, and what was written back when it was refused (C-108, C-109).
     [`INSERT INTO room_bookings (id, room_id, user_id, title, starts_at, ends_at, status, notes, reason, rejection_reason)
@@ -142,6 +143,10 @@ describe('erasure (K-109, 0011)', () => {
         'SELECT status, subject FROM notification_log WHERE user_id = ?', id)
       expect(messages).toHaveLength(1)
       expect(messages[0]).toMatchObject({ status: 'SENT', subject: null })
+
+      // The calendar link is a credential, so it goes rather than being scrubbed: left behind, an
+      // erased person's phone would keep resolving their bookings (C-104).
+      expect(rows(database, 'SELECT id FROM room_feed_tokens WHERE user_id = ?', id)).toHaveLength(0)
 
       // The row itself is still there for everything referring to it.
       expect(rows(database, 'SELECT id FROM users WHERE id = ?', id)).toHaveLength(1)

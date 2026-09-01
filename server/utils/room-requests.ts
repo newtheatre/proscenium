@@ -10,7 +10,7 @@ export interface RequestSweep { escalated: number, expired: number }
 
 // Whoever may act on a request. There is no approver role: it is whoever holds the permission,
 // which C-109's queue reads the same way.
-async function approvers(): Promise<{ id: string, name: string }[]> {
+export async function approvers(): Promise<{ id: string, name: string }[]> {
   const roles = ROLES.filter(role => PERMISSION_MAP[role].includes('rooms.write'))
   if (roles.length === 0) return []
 

@@ -86,6 +86,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/rooms/availability.get.ts', exempt: 'reads what is already taken' },
   { route: 'server/api/rooms/bookings/index.get.ts', exempt: 'reads the bookings you hold' },
   { route: 'server/api/rooms/bookings/[id]/cancel.post.ts', actions: ['room.booking.cancelled'] },
+  { route: 'server/api/rooms/bookings/[id]/ics.get.ts', exempt: 'downloads a booking you already hold' },
+  { route: 'server/api/account/room-feed.get.ts', exempt: 'says whether your own feed exists' },
+  { route: 'server/api/account/room-feed.post.ts', actions: ['account.calendar-feed.issued'] },
+  {
+    route: 'server/routes/rooms/feed/[token]/calendar.ics.get.ts',
+    exempt: 'reads your own bookings; a fetch is recorded on the token, not in the trail',
+  },
   { route: 'server/api/rooms/requests.post.ts', actions: ['room.requested'] },
   { route: 'server/api/rooms/bookings.post.ts', actions: ['room.booked'] },
   { route: 'server/api/admin/rooms/index.get.ts', exempt: 'reads the bookable estate' },
@@ -106,6 +113,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/dev.ts', 'server/utils/accounts.ts', 'server/utils/erasure.ts'],
   },
   { route: 'server/api/dev/sweep-requests.post.ts', actions: ['room.request.expired'], via: ['server/utils/room-requests.ts'] },
+  { route: 'server/api/dev/remind-rooms.post.ts', exempt: 'sends a reminder; the send is recorded in notification_log' },
+  { route: 'server/api/admin/notifications/trouble.get.ts', exempt: 'reads the message log' },
   { route: 'server/api/dev/sign-in-as.post.ts', exempt: 'a development sign-in with no password, in no build' },
   { route: 'server/api/auth/verify/index.post.ts', actions: ['account.verified'] },
   {

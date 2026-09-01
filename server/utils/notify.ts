@@ -10,12 +10,19 @@ import type { TemplateContext } from '#server/utils/templates'
 // The only thing in this application that hands a message to a provider (0013, H-101). A CI
 // check refuses the binding anywhere else, so there is one place these rules can be skipped.
 
+export interface Attachment {
+  filename: string
+  contentType: string
+  content: string
+}
+
 interface Outbound {
   to: string
   from: string
   subject: string
   html: string
   text: string
+  attachments?: Attachment[]
 }
 
 interface Transport {
@@ -43,8 +50,10 @@ async function writeToMailbox(message: Outbound): Promise<void> {
       `To: ${message.to}`,
       `From: ${message.from}`,
       `Subject: ${message.subject}`,
+      ...(message.attachments ?? []).map(file => `Attachment: ${file.filename} (${file.contentType})`),
       '',
       message.text,
+      ...(message.attachments ?? []).flatMap(file => ['', `--- ${file.filename} ---`, file.content]),
     ].join('\n'))
   }
   catch (error) {
@@ -81,6 +90,9 @@ export interface Notification {
   type: string
   userId: string
   context: TemplateContext
+  // Built by the caller, because what a message carries is the caller's business rather than the
+  // template's. A transport that cannot attach still sends the message (C-104 criterion 1).
+  attachments?: Attachment[]
 }
 
 type Status = 'SENT' | 'FAILED' | 'SKIPPED_UNDELIVERABLE'
@@ -144,6 +156,7 @@ export async function notify(event: H3Event | undefined, notification: Notificat
       subject: rendered.subject,
       html: rendered.html,
       text: rendered.text,
+      ...(notification.attachments?.length ? { attachments: notification.attachments } : {}),
     })
     await record(account.id, notification.type, 'EMAIL', 'SENT', rendered.subject, null)
     return 'SENT'

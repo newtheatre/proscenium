@@ -163,6 +163,24 @@ ${String(context.roomsUrl)}
 The Nottingham New Theatre`,
   }),
 
+  'room-request-raised': (context: TemplateContext): Rendered => ({
+    subject: `A room has been asked for: ${String(context.room)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>${context.who} has asked for ${context.room}, ${context.when}.</p>
+<p>${context.title}</p>
+<p>The slot is held until somebody answers. <a href="${String(context.queueUrl)}">Open the queue</a></p>`),
+    text: `Hello ${context.name},
+
+${String(context.who)} has asked for ${String(context.room)}, ${String(context.when)}.
+
+${String(context.title)}
+
+The slot is held until somebody answers. Open the queue:
+${String(context.queueUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
   'room-request-waiting': (context: TemplateContext): Rendered => ({
     subject: `A room request is waiting: ${String(context.room)}`,
     html: layout(`<p>Hello ${context.name},</p>
@@ -242,6 +260,31 @@ ${bookings.map(booking => `- ${booking.room}, ${booking.when}: ${booking.title}`
 Why: ${reason}
 
 The slot is free again. See what you hold: ${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
+  'room-reminder': (context: TemplateContext): Rendered => {
+    const bookings = context.bookings as { room: string, title: string, when: string }[]
+    const one = bookings.length === 1
+    return {
+      subject: one
+        ? `Tomorrow: ${bookings[0]!.room}, ${bookings[0]!.when}`
+        : `Tomorrow: ${bookings.length} rooms booked`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${one ? 'You have a room booked tomorrow.' : 'You have rooms booked tomorrow.'}</p>
+<ul>${bookings.map(booking => `<li>${booking.room}, ${booking.when}: ${booking.title}</li>`).join('')}</ul>
+<p>If you no longer need ${one ? 'it' : 'them'}, <a href="${String(context.roomsUrl)}">cancel</a> so
+somebody else can have the slot.</p>`),
+      text: `Hello ${context.name},
+
+${one ? 'You have a room booked tomorrow.' : 'You have rooms booked tomorrow.'}
+
+${bookings.map(booking => `- ${booking.room}, ${booking.when}: ${booking.title}`).join('\n')}
+
+If you no longer need ${one ? 'it' : 'them'}, cancel so somebody else can have the slot:
+${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
     }

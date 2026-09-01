@@ -92,3 +92,15 @@ export const roomBookings = sqliteTable('room_bookings', {
     sql`${table.status} IN ('CONFIRMED', 'PENDING_APPROVAL', 'REJECTED', 'CANCELLED', 'BUMPED')`,
   ),
 ])
+
+// A member's calendar subscription (C-104). Its own table rather than a column on users, so
+// regenerating is a replace and the old URL dies by lookup rather than by comparison.
+export const roomFeedTokens = sqliteTable('room_feed_tokens', {
+  id: id(),
+  // One live feed per person: regenerating replaces this row, which is what revokes the old URL.
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+  // The URL carries the plaintext; the database holds its hash, so a leaked backup grants nothing.
+  tokenHash: text('token_hash').notNull().unique(),
+  lastFetchedAt: integer('last_fetched_at'),
+  createdAt: integer('created_at').notNull().default(now),
+})

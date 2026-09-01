@@ -88,6 +88,17 @@ export default defineEventHandler(async (event) => {
       title: input.title,
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },
+    // The calendar file travels with the confirmation, so the booking reaches a phone without
+    // anybody going looking for it (C-104 criterion 1).
+    attachments: [bookingAttachment(event, {
+      id: claimed.id,
+      title: input.title,
+      room: room.name,
+      startsAt: Math.floor(startsAt.getTime() / 1000),
+      endsAt: Math.floor(endsAt.getTime() / 1000),
+      status: 'CONFIRMED',
+      updatedAt: Math.floor(Date.now() / 1000),
+    })],
   })
 
   return {

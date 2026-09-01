@@ -29,6 +29,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Active bookings per member | 10 (unenforced) | 10, series counts each occurrence | |
 | Request escalation | none: requests sat forever | approvers told after 48 hours | The old app had no escalation and no expiry, so a request nobody saw stayed open indefinitely |
 | Request expiry | none | lapses after 7 days, requester told | Long enough that a holiday does not lose a request, short enough that the queue is not archaeology |
+| Calendar feed horizon | none: no calendar was ever built | 26 weeks ahead | How far a subscribed phone carries bookings. A feed is polled forever, so the bound is what stops it growing without end (RM-7) |
 | Availability sweep bound | 1,000 rows (old app) | 1,000 rows, refusing rather than truncating | A technical guard rather than a policy number: a sweep that silently returned half the bookings would show a taken slot as free |
 | Recurring series maximum | 12 occurrences (UI) / 52 (API) | 12 | |
 | No-show ladder | none | recorded at 2, pre-approval required at 3 per term | Constraint 2 of the old policy doc, now real |

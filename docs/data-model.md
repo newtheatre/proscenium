@@ -37,6 +37,7 @@ erDiagram
   users ||--o{ shifts : works
   users ||--o{ training_records : earns
   users ||--o{ room_bookings : requests
+  users ||--o| room_feed_tokens : subscribes_with
   users ||--o{ ledger_entries : acts_in
   shows ||--o{ performances : runs
   performances ||--o{ reservations : sells
@@ -530,6 +531,9 @@ guarded `INSERT ... SELECT ... WHERE NOT EXISTS ... RETURNING id`: a row returne
 no rows is disambiguated by a single read into gone (410) or beaten (409), the pattern 0003 names.
 A request lands `PENDING_APPROVAL`, which already holds its slot in both the clash predicate and the
 availability sweep, so a decision in progress cannot be booked out from under (C-108 criterion 2).
+The approvers are told when a request arrives (`room.request.raised`), not only once it has gone
+stale. If an approver has the rooms topic muted the send is skipped and logged as suppressed, and
+the request still stands on the queue: a muted inbox cannot orphan one (C-113 criterion 4).
 `rooms:sweep` tells the approvers once when a request has waited past `ROOM_REQUEST_ESCALATE_HOURS`
 and lapses it past `ROOM_REQUEST_EXPIRE_HOURS`, both guarded on the status they read so an approver
 deciding at the same moment wins. Approvers are whoever holds `rooms.write`; there is no approver
@@ -564,6 +568,29 @@ a sweep would show a taken slot as free (C-103 criterion 1). Every conflict it r
 the same helper the booking refusal uses, so a member reads "Booked" and nothing else unless the
 booking is their own (criteria 4 and 5). Conflict responses mask titles and identities from
 non-admins ("Booked"). In-policy bookings for standard rooms confirm instantly (C-1).
+
+### room_feed_tokens
+`id` PK · `user_id` → users cascade, UNIQUE · `token_hash` UNIQUE · `last_fetched_at` NULL ·
+`created_at`. One live feed per person, and minting replaces the row, which is what revokes the
+old URL: the hash it would be looked up by is gone, so nothing compares or expires anything
+(C-104 criterion 3). The URL carries the plaintext and the database holds only its hash, so a
+leaked backup grants no calendar. The plaintext is returned once, in the response that mints it,
+and is readable nowhere afterwards; `GET /api/account/room-feed` answers only whether one exists.
+
+`GET /rooms/feed/<token>/calendar.ics` is a Nitro route rather than an API one, because a calendar
+client fetches it with no session and no cookie: the token is the whole authorisation, and it
+reaches that one member's bookings and nothing else. A token that names no account gets the same
+404 as one that was never issued. It carries `ROOM_FEED_WEEKS` ahead, because a subscription is
+polled forever and the horizon is what stops the file growing without end. A cancelled, rejected
+or bumped booking is still sent, marked `CANCELLED` with `SEQUENCE:1`, so a client that already
+holds the event strikes it out rather than leaving a rehearsal on somebody's phone (criterion 5).
+
+Every time is a London wall clock carrying a `VTIMEZONE`, never a UTC instant, so a 19:00 booking
+reads 19:00 in both halves of the year (criterion 4). `shared/utils/ics.ts` builds the file and is
+pure, so both transitions are unit cases rather than a hope.
+
+`GET /api/rooms/bookings/[id]/ics` is the same builder for one booking, and the confirmation email
+carries that file as an attachment (criterion 1).
 
 ### room_series
 `id` PK · recurrence descriptor (frequency, interval, days, count, until) · `created_at`.

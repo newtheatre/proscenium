@@ -129,7 +129,9 @@ function statusOf(id: string): string | undefined {
 describe.skipIf(skip !== null)('the queue (C-109)', () => {
   test('lists a waiting request with who asked, the span, the room and the reason', async () => {
     const room = await makeRoom()
-    const id = placeRequest(room, member.id, soon(2), 'The get-in is that morning')
+    // A day out, not two: two is exactly the notice window, so whether it breached the rule
+    // would depend on the hour the suite happened to run.
+    const id = placeRequest(room, member.id, soon(1), 'The get-in is that morning')
 
     const answered = await send('GET', '/api/admin/rooms/requests', null, officer)
     const body = await answered.json() as { items: { id: string, requester: string, reason: string, room: string, failures: { reason: string }[] }[] }
