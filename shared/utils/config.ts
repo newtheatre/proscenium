@@ -133,13 +133,13 @@ export const CONFIG_KEYS = {
     schema: z.number().int().positive(),
     default: 2,
     workshop: 'spaces-and-training',
-    describes: 'No-shows in a term before the member is formally recorded.',
+    describes: 'No-shows within the window above before the member is formally recorded.',
   },
   ROOM_NO_SHOW_PREAPPROVAL_AT: {
     schema: z.number().int().positive(),
     default: 3,
     workshop: 'spaces-and-training',
-    describes: 'No-shows in a term before every further booking needs pre-approval.',
+    describes: 'No-shows within the window above before every further booking needs pre-approval.',
   },
   ROOM_REQUEST_ESCALATE_HOURS: {
     schema: z.number().int().positive(),
@@ -169,7 +169,7 @@ export const CONFIG_KEYS = {
     schema: z.number().int().positive(),
     default: 10,
     workshop: 'spaces-and-training',
-    describes: 'Notice the SU needs before a room is wanted. Longer than our own, because a person fills in their form.',
+    describes: 'Notice needed before a room we do not manage is wanted. Longer than our own, because a person fills in a form and waits.',
   },
   ROOM_PURPOSES: {
     schema: z.array(z.string()).nonempty(),

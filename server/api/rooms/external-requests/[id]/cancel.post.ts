@@ -1,7 +1,7 @@
 import { refusalToAct } from '#shared/utils/external-requests'
 import { formatLondon } from '#shared/utils/london'
 
-// Withdraw a union room you asked for.
+// Withdraw a request for a room not listed here.
 export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
   const id = getRouterParam(event, 'id') ?? ''
@@ -18,10 +18,10 @@ export default defineEventHandler(async (event) => {
   const now = Math.floor(Date.now() / 1000)
   const cancelling = { status: 'CANCELLED', updated_at: now }
 
-  // Two guarded attempts rather than one, because whether the union already holds this decides
-  // who gets told, and a submit landing between the read and the write would make a read lie.
-  const withUnion = await moveRequest(id, ['AWAITING_EXTERNAL', 'CONFIRMED'], cancelling)
-  const moved = withUnion || await moveRequest(id, ['REQUESTED'], cancelling)
+  // Two guarded attempts rather than one, because whether the form is already in decides who
+  // gets told, and a submit landing between the read and the write would make a read lie.
+  const alreadyOut = await moveRequest(id, ['AWAITING_EXTERNAL', 'CONFIRMED'], cancelling)
+  const moved = alreadyOut || await moveRequest(id, ['REQUESTED'], cancelling)
 
   if (!moved) throw createError({ statusCode: 409, statusMessage: 'That request has already been decided' })
 
@@ -32,9 +32,9 @@ export default defineEventHandler(async (event) => {
     detail: { was: request.status },
   }))
 
-  // The approvers are told whenever the union already has it, because our arrangement with them
-  // stands until a person withdraws it (C-112 criterion 3).
-  if (withUnion) {
+  // The approvers are told whenever the form is already in, because our arrangement stands
+  // until a person withdraws it (C-112 criterion 3).
+  if (alreadyOut) {
     for (const approver of await approvers()) {
       await notify(event, {
         type: 'external.request.withdrawn',
@@ -51,5 +51,5 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  return { ok: true, id, status: 'CANCELLED' as const, unionTold: withUnion }
+  return { ok: true, id, status: 'CANCELLED' as const, alreadyRequested: alreadyOut }
 })

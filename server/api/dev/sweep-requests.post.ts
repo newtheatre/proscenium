@@ -2,5 +2,5 @@
 // waiting a day for the cron (K-124).
 export default defineEventHandler(async (event) => {
   const at = new Date()
-  return { ...await sweepRequests(event, at), unionEscalated: await sweepExternalRequests(event, at) }
+  return { ...await sweepRequests(event, at), externalEscalated: await sweepExternalRequests(event, at) }
 })

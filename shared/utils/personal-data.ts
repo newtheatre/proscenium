@@ -192,13 +192,13 @@ export const PERSONAL_TABLES: PersonalTable[] = [
   {
     name: 'external_requests',
     column: 'user_id',
-    section: 'union-room-requests',
+    section: 'other-room-requests',
     columns: ['title', 'purpose', 'starts_at', 'ends_at', 'status', 'rejection_reason', 'created_at'],
     erasure: 'scrub',
     // The ask is a fact about the estate; the member's words about it are theirs (0011).
     scrub: ['title', 'notes', 'rejection_reason'],
     scrubTo: { title: 'Erased request' },
-    why: 'Union rooms this person asked for. What was asked survives; their words do not.',
+    why: 'Rooms we do not manage that this person asked for. What was asked survives; their words do not.',
   },
   {
     name: 'external_requests',
@@ -209,7 +209,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // The officer who handled somebody else's ask is cleared like every other officer column;
     // who did it stays in the audit trail, which erasure redacts on its own terms (0011).
     scrub: ['submitted_by', 'decided_by'],
-    why: 'Union room requests this person handled for somebody else. The request survives; the officer does not.',
+    why: 'Requests for rooms we do not manage that this person handled for somebody else. The request survives; the officer does not.',
   },
   {
     name: 'room_bookings',
@@ -227,9 +227,9 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     section: null,
     columns: null,
     erasure: 'scrub',
-    // What the union gave us is a fact about the union; who typed it in is in the audit trail.
+    // What we were offered is a fact about the room, not about us; who typed it in is in the audit trail.
     scrub: ['recorded_by'],
-    why: 'What the union offered, and whether it suited. The record survives; the officer does not.',
+    why: 'What was offered, and whether it suited. The record survives; the officer does not.',
   },
   {
     name: 'external_space_notes',
@@ -239,7 +239,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'scrub',
     // What we learned about a room outlives whoever wrote it down; the audit trail keeps who.
     scrub: ['written_by'],
-    why: 'An officer noted what an SU room is no good for. The knowledge survives; the officer does not.',
+    why: 'An officer noted what a room we do not manage is no good for. The knowledge survives; the officer does not.',
   },
   {
     name: 'room_blackouts',

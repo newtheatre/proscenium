@@ -17,16 +17,27 @@ Counts: 20 MVP stories (C-101 to C-120), 6 V2 stories (C-201 to C-206), 2 Later 
    Phase 0 workshop.
 2. The policy defaults inherited from the published `rooms` policy document (30-minute minimum,
    4-hour maximum, 4 working days' notice, 10-active-bookings cap, 12-week series limit) were never
-   enforced in code. Are they still the numbers the committee wants, and is the notice window
-   calendar days or working days?
+   enforced in code. Are they still the numbers the committee wants? ~~And is the notice window
+   calendar days or working days?~~ **The notice half is answered.** Our own notice is a number of
+   hours, not days, so the question does not arise for it (`ROOM_AUTO_APPROVE_NOTICE_HOURS`, 48).
+   For a room we do not manage it is **three working days**, excluding Saturdays, Sundays and bank
+   holidays, counted from the member's ask; a booking may still be *for* a weekend or a bank
+   holiday, because only the gap before it is judged (C-121, decision 0038).
 3. ~~Do externally arranged SU venues stay in scope, and if so does the AWAITING_EXTERNAL status
    carry?~~ **Answered.** They stay in scope, and the status carries with exactly its old meaning,
    but not on a booking: an externally arranged room is a request of its own kind, because we can
    never guarantee availability we do not control (decision 0036, C-119, C-120).
-4. Does the old `allowConflicts` double-booking override carry into the unified system, or do
-   blackouts plus priority tiers cover every legitimate use it had?
-5. Who may record a no-show (any admin, or only the Theatre Manager), and does the consequence
-   ladder reset at the committee-year boundary?
+4. ~~Does the old `allowConflicts` double-booking override carry into the unified system, or do
+   blackouts plus priority tiers cover every legitimate use it had?~~ **Answered.** It does not
+   carry: nothing named `allowConflicts` exists anywhere in the schema, the source or the importer.
+   Blackouts (C-114) and priority tiers with bumping (C-115) shipped instead, and between them
+   cover every use it had, with a notified displacement where the old override was silent.
+5. ~~Who may record a no-show (any admin, or only the Theatre Manager), and does the consequence
+   ladder reset at the committee-year boundary?~~ **Answered on both halves, and built.** Anyone
+   holding `rooms.write` may record one and withdraw one; it is not narrowed to the Theatre
+   Manager. The ladder looks back over a rolling window **and** clears at the committee year end,
+   whichever is the shorter reach, so a member does not carry a first-term no-show into the
+   summer (`ROOM_NO_SHOW_WINDOW_DAYS`, `windowStart` in `shared/utils/no-shows.ts`).
 6. Which equipment categories are safety-critical and which training module gates each (rigging is
    confirmed; what else)? Needs the department leads in the room.
 
@@ -39,7 +50,7 @@ Counts: 20 MVP stories (C-101 to C-120), 6 V2 stories (C-201 to C-206), 2 Later 
 - Acceptance criteria:
   1. An internal room carries a name, capacity, per-weekday opening hours, a sensitive-space flag and an active flag; all fields are editable by an administrator and every change is audited with a from/to diff.
   2. Internal rooms deactivate (soft delete) so booking history stays readable; permanent deletion is refused with a clear error once any booking references the room.
-  3. ~~External venues carry campus, building, room and free-text contact details.~~ **Moved to C-119**: a union room is a reference catalogue rather than part of the bookable estate (decision 0036).
+  3. ~~External venues carry campus, building, room and free-text contact details.~~ **Moved to C-119**: a room we do not manage is a reference catalogue rather than part of the bookable estate (decision 0036).
   4. Deactivated rooms disappear from member-facing calendars and booking forms immediately but remain visible in historical bookings and reports.
   5. Room capacity is recorded and compared against a booking's attendee count at the write path, producing a warning (not a refusal) when exceeded; the old estate recorded both and compared neither.
 - Source: Prompt Book C-1, C-2; audit RM-5.
@@ -251,9 +262,9 @@ Counts: 20 MVP stories (C-101 to C-120), 6 V2 stories (C-201 to C-206), 2 Later 
 - Story: As the Theatre Manager, I want no-shows recorded with a configurable consequence ladder so that empty booked rooms have a cost the member can see coming.
 - Depends on: C-105, C-106
 - Acceptance criteria:
-  1. An authorised person can mark a past confirmed booking as a no-show; the mark records who, when and the booking, and cannot be marked on a future or cancelled booking.
-  2. A no-show record is corrected by a superseding entry with a reason, never edited or deleted (facts are append-only).
-  3. Repeated no-shows within a rolling window trigger a configurable ladder, defaulting to a warning at the second and a pre-approval requirement at the third; the numbers are workshop-confirmed configuration, not code.
+  1. Anyone holding `rooms.write` can mark a booking as a no-show; the mark records the member, the officer, the time, the booking and an optional reason. Only a **confirmed** booking qualifies, and only once it has **ended**: a booking still running, and one in any other status, are both refused, as is a second mark on a booking already marked.
+  2. A no-show record is corrected by a superseding entry with a **mandatory** reason, never edited or deleted (facts are append-only). Only the entry that currently stands may be superseded, so a withdrawal cannot be applied twice or to a record already withdrawn.
+  3. Repeated no-shows trigger a configurable ladder, defaulting to a recorded standing at the second and a pre-approval requirement at the third; a first no-show notifies nobody. The window is a rolling number of days **bounded by the committee year**, whichever reaches less far back, so nothing carries across the handover. All three numbers are workshop-confirmed configuration, not code.
   4. A member under pre-approval has every booking divert to the approval queue (C-109) regardless of policy compliance, and the booking form tells them so before submission.
   5. Members see their own no-show count and current standing; the ladder state is visible to them, not a surprise.
   6. Erasure keeps no-show statistics as anonymous rows; the ladder state itself dies with the account.
@@ -287,33 +298,33 @@ Counts: 20 MVP stories (C-101 to C-120), 6 V2 stories (C-201 to C-206), 2 Later 
   5. The import is re-runnable against fresh exports during migration rehearsals without duplicating rows.
 - Source: Prompt Book C-1; audit RM-1, EW-2; Get-In part 3 (rooms inventory row, cutover order 2).
 
-## C-119: The union's rooms, and what they are good for
+## C-119: Rooms we do not manage, and what they are good for
 
 - Role: Theatre Manager
 - Phase: MVP
-- Story: As the Theatre Manager, I want the rooms the SU manages listed with what each is good and bad for, so that nobody is sent to rehearse in a room with a fixed table in it again.
+- Story: As the Theatre Manager, I want the rooms other people manage listed with what each is good and bad for, so that nobody is sent to rehearse in a room with a fixed table in it again.
 - Depends on: C-101
 - Acceptance criteria:
-  1. An SU room carries a name, campus, building, contact and capacity, and is retired rather than deleted so an old request still names something. It is a reference catalogue and never part of the bookable estate: nothing in it holds a slot or appears on a calendar.
+  1. Such a room carries a name, campus, building, contact and capacity, and is retired rather than deleted so an old request still names something. It is a reference catalogue and never part of the bookable estate: nothing in it holds a slot or appears on a calendar.
   2. A suitability note records one verdict (suitable, caution, unsuitable) against one room and one purpose, with a mandatory reason. The same room may be unsuitable for a rehearsal and suitable for a meeting, which is the case the pairing exists for. Noting the same pair again replaces the verdict; notes are ordinary editable rows, not an append-only register.
   3. A member searching for a room sees, per result, whether it suits the purpose they are asking for, and the reason.
-  4. The catalogue is searched on the server and never shipped whole: the union has hundreds of rooms.
+  4. The catalogue is searched on the server and never shipped whole: the Students' Union alone manages hundreds of rooms.
   5. Every listing, change and note is audited; the wording of a note stays out of the trail, because it may describe a person's experience.
-- Source: the Theatre Manager's spreadsheet, checked by hand before answering the SU; audit RM-6.
+- Source: the Theatre Manager's spreadsheet, checked by hand before answering the Students' Union; audit RM-6.
 
-## C-120: Asking the union for a room
+## C-120: Booking a room not listed here
 
 - Role: Member
 - Phase: MVP
-- Story: As a member, I want to ask for a room through the Students' Union with an optional preference, so that a room we do not control is tracked properly rather than by email and a spreadsheet.
+- Story: As a member, I want to ask for a room we do not manage with an optional preference, so that a room we do not control is tracked properly rather than by email and a spreadsheet.
 - Depends on: C-119, C-113
 - Acceptance criteria:
-  1. A member asks for a span with a purpose and an optional preferred room; the ask holds no slot anywhere, and two members may ask for the same evening because the union has hundreds of rooms. It is refused only for things the union itself would refuse: no membership, the past, too little notice, beyond the horizon.
-  2. The Theatre Manager records that the union's form is in, which moves the request to AWAITING_EXTERNAL and tells the member it is with them.
-  3. Recording the room the union gave us confirms the request and tells the member which room they have. Every room offered is kept, so asking again never overwrites what we were given first.
+  1. A member asks for a span with a purpose and an optional preferred room; the ask holds no slot anywhere, and two members may ask for the same evening because there are hundreds of such rooms. It is refused only for things whoever manages the room would refuse: no membership, the past, too little notice, beyond the horizon.
+  2. The Theatre Manager records that the form is in, which moves the request to AWAITING_EXTERNAL and tells the member it is with whoever manages the room.
+  3. Recording the room we were given confirms the request and tells the member which room they have. Every room offered is kept, so asking again never overwrites what we were given first. A confirmed request may still be corrected: being moved room to room after an answer is ordinary, so recording a different room, and refusing one, are both legal from CONFIRMED.
   4. Recording a room noted unsuitable for the request's purpose is refused, and goes ahead only when the officer asserts past it; the audit records that a note existed and was overridden, never its wording.
-  5. Where the union offers something unsuitable, the officer records it and asks again: the request stays with the union, the offer is kept, and the suitability note may be written in the same action.
-  6. A member may withdraw at any open step and after confirmation; where the union already has it, the approvers are told, because our arrangement with them stands until a person cancels it.
+  5. Where something unsuitable is offered, the officer records it and asks again: the request returns to AWAITING_EXTERNAL with the room it was given cleared, so it never stands as a booking we cannot use. The offer is kept, and the suitability note may be written in the same action.
+  6. A member may withdraw at any open step and after confirmation; where the form is already in, the approvers are told, because our arrangement stands until a person cancels it.
 - Source: the Theatre Manager's own account of the process; decision 0036; audit RM-6.
 
 ## C-201: Asset register

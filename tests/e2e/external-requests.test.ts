@@ -398,7 +398,7 @@ describe.skipIf(skip !== null)('turning one down, and withdrawing one', () => {
       officerId)?.n ?? 0
 
     const answered = await send('POST', `/api/rooms/external-requests/${id}/cancel`, {}, member.cookie)
-    expect((await answered.json() as { unionTold: boolean }).unionTold).toBe(true)
+    expect((await answered.json() as { alreadyRequested: boolean }).alreadyRequested).toBe(true)
 
     expect((read<{ n: number }>(
       `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'external.request.withdrawn'`,
@@ -408,7 +408,7 @@ describe.skipIf(skip !== null)('turning one down, and withdrawing one', () => {
   test('withdrawing one that never went does not trouble anybody', async () => {
     const id = await ask()
     const answered = await send('POST', `/api/rooms/external-requests/${id}/cancel`, {}, member.cookie)
-    expect((await answered.json() as { unionTold: boolean }).unionTold).toBe(false)
+    expect((await answered.json() as { alreadyRequested: boolean }).alreadyRequested).toBe(false)
   })
 
   test('a settled request is the end of it', async () => {
@@ -457,7 +457,7 @@ describe.skipIf(skip !== null)('the screens (C-120)', () => {
       await waitFor(view, `!document.querySelector('[data-test="external-submit"]').disabled`, 30_000)
       await click(view, '[data-test="external-submit"]')
 
-      await waitFor(view, `document.querySelector('[data-test="union-list"]')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="unlisted-list"]')`, 30_000)
       expect(await textOf(view, 'body')).toContain('Not yet requested')
 
       expect(read<{ status: string }>(
@@ -585,7 +585,7 @@ describe.skipIf(skip !== null)('a union room reaches the rest of the system', ()
       officerId)?.n ?? 0
 
     const answered = await send('POST', '/api/dev/sweep-requests', {}, officer)
-    expect((await answered.json() as { unionEscalated: number }).unionEscalated).toBeGreaterThan(0)
+    expect((await answered.json() as { externalEscalated: number }).externalEscalated).toBeGreaterThan(0)
 
     expect((read<{ n: number }>(
       `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'external.request.waiting'`,
@@ -601,11 +601,11 @@ describe.skipIf(skip !== null)('a union room reaches the rest of the system', ()
       Math.floor(Date.now() / 1000) - 30 * 86_400, id)
 
     await send('POST', '/api/dev/sweep-requests', {}, officer)
-    const after = await (await send('POST', '/api/dev/sweep-requests', {}, officer)).json() as { unionEscalated: number }
+    const after = await (await send('POST', '/api/dev/sweep-requests', {}, officer)).json() as { externalEscalated: number }
 
     expect(read<{ escalated_at: number | null }>(
       'SELECT escalated_at FROM external_requests WHERE id = ?', id)?.escalated_at).not.toBeNull()
-    expect(after.unionEscalated).toBe(0)
+    expect(after.externalEscalated).toBe(0)
   })
 })
 

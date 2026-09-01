@@ -2,7 +2,7 @@ import { externalRequestForm, judgeExternal } from '#shared/utils/external-reque
 import { noteFor, warningFor } from '#shared/utils/external-spaces'
 import { formatLondon } from '#shared/utils/london'
 
-// Ask the union for a room, with an optional preference.
+// Ask for a room not listed here, with an optional preference.
 export default defineEventHandler(async (event) => {
   const { account } = await authority(event)
   const input = await readValidatedBodyOrThrow(event, externalRequestForm)
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
     horizonWeeks: await configValue(event, 'ROOM_BOOKING_HORIZON_WEEKS'),
   })
 
-  // Nothing an officer could wave through, because the union is the one being asked.
+  // Nothing an officer could wave through, because somebody else is the one being asked.
   if (failures.length > 0) {
     throw createError({ statusCode: 422, statusMessage: failures[0]!.says, data: { failures } })
   }
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
   if (input.preferredSpaceId) {
     const space = await findSpace(input.preferredSpaceId)
     if (!space || !space.isActive) {
-      throw createError({ statusCode: 422, statusMessage: 'That room is not one the union lists' })
+      throw createError({ statusCode: 422, statusMessage: 'That room is not one we have listed' })
     }
   }
 

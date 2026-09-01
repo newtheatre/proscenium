@@ -5,7 +5,7 @@ import { chunked } from '#shared/utils/approvals'
 import { OPEN_STATUSES } from '#shared/utils/external-requests'
 import type { ExternalStatus } from '#shared/utils/external-requests'
 
-// Reading and answering a member's ask for a union room (C-120). Every write is guarded on the
+// Reading and answering an ask for a room we do not manage (C-120). Every write is guarded on the
 // status it read, so two officers acting at once cannot both count (0006).
 
 export interface RequestRow {
@@ -108,7 +108,7 @@ export interface AssignmentRow {
   recordedAt: number
 }
 
-// Every room the union offered, and whether it suited, for a page of requests at once. Without
+// Every room offered, and whether it suited, for a page of requests at once. Without
 // this the second answer overwrites the first and nobody can see that we asked again.
 export async function assignmentsFor(requestIds: string[]): Promise<Map<string, AssignmentRow[]>> {
   const rows: (AssignmentRow & { requestId: string })[] = []

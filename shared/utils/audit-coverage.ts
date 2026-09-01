@@ -115,10 +115,10 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/rooms/no-shows/[id]/withdraw.post.ts', actions: ['room.no-show.withdrawn'] },
   { route: 'server/api/rooms/standing.get.ts', exempt: 'reads your own record' },
   { route: 'server/api/rooms/external-spaces.get.ts', exempt: 'searches the rooms the SU manages' },
-  { route: 'server/api/rooms/external-requests.get.ts', exempt: 'reads the union rooms you asked for' },
+  { route: 'server/api/rooms/external-requests.get.ts', exempt: 'reads the unlisted rooms you asked for' },
   { route: 'server/api/rooms/external-requests.post.ts', actions: ['external.requested'] },
   { route: 'server/api/rooms/external-requests/[id]/cancel.post.ts', actions: ['external.request.cancelled'] },
-  { route: 'server/api/admin/rooms/external-requests/index.get.ts', exempt: 'reads what is waiting on the union' },
+  { route: 'server/api/admin/rooms/external-requests/index.get.ts', exempt: 'reads what is waiting on somebody else' },
   { route: 'server/api/admin/rooms/external-requests/[id]/submit.post.ts', actions: ['external.request.submitted'] },
   { route: 'server/api/admin/rooms/external-requests/[id]/assign.post.ts', actions: ['external.request.assigned'] },
   {

@@ -74,7 +74,7 @@ async function copyFeed(): Promise<void> {
   }
 }
 
-interface UnionRequest {
+interface UnlistedRequest {
   id: string
   title: string
   purpose: string
@@ -87,32 +87,32 @@ interface UnionRequest {
   cancellable: boolean
 }
 
-const { data: union, refresh: refreshUnion } = await useAsyncData(
-  () => `my-union-requests-${when.value}`,
-  () => request<{ items: UnionRequest[] }>('/api/rooms/external-requests', { query: { when: when.value } }),
-  { watch: [when], default: (): { items: UnionRequest[] } => ({ items: [] }) },
+const { data: unlisted, refresh: refreshUnlisted } = await useAsyncData(
+  () => `my-unlisted-requests-${when.value}`,
+  () => request<{ items: UnlistedRequest[] }>('/api/rooms/external-requests', { query: { when: when.value } }),
+  { watch: [when], default: (): { items: UnlistedRequest[] } => ({ items: [] }) },
 )
 
-const cancellingUnion = ref<UnionRequest | null>(null)
+const cancellingUnlisted = ref<UnlistedRequest | null>(null)
 
 // A room we do not manage is a different thing, so it says so rather than posing as a booking.
-async function cancelUnion(): Promise<void> {
-  const one = cancellingUnion.value
+async function cancelUnlisted(): Promise<void> {
+  const one = cancellingUnlisted.value
   if (!one) return
 
   working.value = true
   try {
-    const answer = await $fetch<{ unionTold: boolean }>(`/api/rooms/external-requests/${one.id}/cancel`, { method: 'POST' })
+    const answer = await $fetch<{ alreadyRequested: boolean }>(`/api/rooms/external-requests/${one.id}/cancel`, { method: 'POST' })
     toast.add({
       title: 'Withdrawn',
-      description: answer.unionTold
+      description: answer.alreadyRequested
         ? 'The Theatre Manager has been told, because our booking for it still stands.'
         : 'It had not been requested yet.',
       icon: 'i-lucide-check',
       color: 'success',
     })
-    cancellingUnion.value = null
-    await refreshUnion()
+    cancellingUnlisted.value = null
+    await refreshUnlisted()
   }
   catch (error) {
     toast.add({ title: refusalText(error), color: 'error' })
@@ -325,9 +325,9 @@ useSeoMeta({ title: 'My bookings' })
     </p>
 
     <section
-      v-if="union.items.length"
+      v-if="unlisted.items.length"
       class="mt-10"
-      data-test="union-list"
+      data-test="unlisted-list"
     >
       <h2 class="nnt-headline text-lg">
         Rooms we do not manage
@@ -338,14 +338,14 @@ useSeoMeta({ title: 'My bookings' })
 
       <ul class="mt-4 divide-y divide-default">
         <li
-          v-for="one in union.items"
+          v-for="one in unlisted.items"
           :key="one.id"
           class="flex flex-wrap items-start gap-3 py-4"
-          :data-test="`union-${one.id}`"
+          :data-test="`unlisted-${one.id}`"
         >
           <div class="min-w-0 flex-1">
             <p class="flex flex-wrap items-center gap-2 font-medium">
-              {{ one.assigned ?? one.preferred ?? 'A room not listed on the site' }}
+              {{ one.assigned ?? one.preferred ?? 'A room not listed here' }}
               <UBadge
                 :color="one.status === 'CONFIRMED' ? 'success' : one.status === 'AWAITING_EXTERNAL' ? 'info' : 'neutral'"
                 variant="subtle"
@@ -374,8 +374,8 @@ useSeoMeta({ title: 'My bookings' })
             size="sm"
             color="error"
             variant="subtle"
-            :data-test="`cancel-union-${one.id}`"
-            @click="cancellingUnion = one"
+            :data-test="`cancel-unlisted-${one.id}`"
+            @click="cancellingUnlisted = one"
           >
             Withdraw
           </UButton>
@@ -452,10 +452,10 @@ useSeoMeta({ title: 'My bookings' })
     </UPageCard>
 
     <UModal
-      :open="cancellingUnion !== null"
+      :open="cancellingUnlisted !== null"
       title="Withdraw this request?"
       description="This was arranged by hand, so withdrawing here tells the Theatre Manager to withdraw it with them."
-      @update:open="cancellingUnion = null"
+      @update:open="cancellingUnlisted = null"
     >
       <template #body>
         <p class="text-sm">
@@ -467,15 +467,15 @@ useSeoMeta({ title: 'My bookings' })
         <UButton
           color="error"
           :loading="working"
-          data-test="cancel-union-confirm"
-          @click="cancelUnion"
+          data-test="cancel-unlisted-confirm"
+          @click="cancelUnlisted"
         >
           Withdraw it
         </UButton>
         <UButton
           color="neutral"
           variant="ghost"
-          @click="cancellingUnion = null"
+          @click="cancellingUnlisted = null"
         >
           Keep it
         </UButton>

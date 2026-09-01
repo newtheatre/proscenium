@@ -2,7 +2,7 @@ import { and, asc, eq, like, or, sql } from 'drizzle-orm'
 import { BOUND_PARAMETER_CHUNK, chunked } from '#shared/utils/approvals'
 import type { SpaceNote, Verdict } from '#shared/utils/external-spaces'
 
-// Reading the SU catalogue (C-119). Searched rather than listed: the union has hundreds of rooms
+// Reading the catalogue (C-119). Searched rather than listed: there are hundreds of rooms
 // and shipping them all to a dropdown would be a page nobody could use.
 
 export interface SpaceRow {

@@ -179,7 +179,7 @@ export const roomNoShows = sqliteTable('room_no_shows', {
   check('room_no_shows_kind', sql`${table.kind} IN ('RECORDED', 'WITHDRAWN')`),
 ])
 
-// Rooms the Students' Union manages (C-119). A reference catalogue, never a bookable estate: we
+// Rooms somebody else manages (C-119). A reference catalogue, never a bookable estate: we
 // cannot promise a room we do not control, so nothing here holds a slot or appears on a calendar.
 export const externalSpaces = sqliteTable('external_spaces', {
   id: id(),
@@ -218,7 +218,7 @@ export const externalSpaceNotes = sqliteTable('external_space_notes', {
   check('external_space_notes_verdict', sql`${table.verdict} IN ('SUITABLE', 'CAUTION', 'UNSUITABLE')`),
 ])
 
-// A member's ask for a room the union manages (C-120). Not a booking: it holds no slot, because
+// A member's ask for a room we do not manage (C-120). Not a booking: it holds no slot, because
 // the SU may assign anything and two members asking for the same evening must both be possible.
 export const externalRequests = sqliteTable('external_requests', {
   id: id(),
@@ -228,7 +228,7 @@ export const externalRequests = sqliteTable('external_requests', {
   attendees: integer('attendees'),
   startsAt: integer('starts_at').notNull(),
   endsAt: integer('ends_at').notNull(),
-  // What the member would like, and what the union actually gave us. Rarely the same thing.
+  // What the member would like, and what we were actually given. Rarely the same thing.
   preferredSpaceId: text('preferred_space_id').references(() => externalSpaces.id),
   assignedSpaceId: text('assigned_space_id').references(() => externalSpaces.id),
   notes: text('notes'),
@@ -254,7 +254,7 @@ export const externalRequests = sqliteTable('external_requests', {
   ),
 ])
 
-// What we asked for against what we were given, every time. Without this, asking the union again
+// What we asked for against what we were given, every time. Without this, asking again
 // overwrites the answer and nobody can see that the first room was no good (C-120).
 export const externalAssignments = sqliteTable('external_assignments', {
   id: id(),

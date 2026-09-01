@@ -5,7 +5,7 @@ const query = z.object({
   when: z.enum(['upcoming', 'past']).default('upcoming'),
 })
 
-// The union rooms this member has asked for.
+// The rooms not listed here that this member has asked for.
 export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
   const input = await getValidatedQueryOrThrow(event, query)
