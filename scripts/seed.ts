@@ -30,7 +30,20 @@ const now = Math.floor(Date.now() / 1000)
 
 // Named the way the society names them, so a screen looks like the real thing rather than like a
 // fixture. Hours are left empty on most: a room with none is open whenever (C-101).
-const ROOMS = [
+
+// Where a room is and who to ask are optional: ours are in one building and need no telling.
+interface SeedRoom {
+  name: string
+  capacity: number
+  description: string
+  sensitive: boolean
+  campus?: string
+  building?: string
+  contact?: string
+  hours?: { weekday: number, opens: string, closes: string }[]
+}
+
+const ROOMS: SeedRoom[] = [
   { name: 'The Studio', capacity: 40, description: 'The rehearsal room upstairs.', sensitive: false },
   { name: 'The Workshop', capacity: 25, description: 'Bench space, and the only room with a sink.', sensitive: false },
   {
