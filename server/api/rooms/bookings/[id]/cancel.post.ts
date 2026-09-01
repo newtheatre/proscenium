@@ -52,7 +52,6 @@ export default defineEventHandler(async (event) => {
     status: 'CANCELLED' as const,
     scope: input.scope ?? 'occurrence',
     cancelled: cancelled.length,
-    external: booking.isExternal,
   }
 })
 

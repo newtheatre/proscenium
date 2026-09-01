@@ -190,6 +190,27 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Rooms booked and not used. The statistics survive an erasure; the person in them does not.',
   },
   {
+    name: 'external_requests',
+    column: 'user_id',
+    section: 'union-room-requests',
+    columns: ['title', 'purpose', 'starts_at', 'ends_at', 'status', 'rejection_reason', 'created_at'],
+    erasure: 'scrub',
+    // The ask is a fact about the estate; the member's words about it are theirs (0011).
+    scrub: ['title', 'notes', 'rejection_reason'],
+    scrubTo: { title: 'Erased request' },
+    why: 'Union rooms this person asked for. What was asked survives; their words do not.',
+  },
+  {
+    name: 'external_assignments',
+    column: 'recorded_by',
+    section: null,
+    columns: null,
+    erasure: 'scrub',
+    // What the union gave us is a fact about the union; who typed it in is in the audit trail.
+    scrub: ['recorded_by'],
+    why: 'What the union offered, and whether it suited. The record survives; the officer does not.',
+  },
+  {
     name: 'external_space_notes',
     column: 'written_by',
     section: null,

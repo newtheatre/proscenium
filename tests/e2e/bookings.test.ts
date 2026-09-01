@@ -132,16 +132,11 @@ describe.skipIf(skip !== null)('booking within policy (C-106)', () => {
     expect((await book(room, soon(1, 10))).status).toBe(200)
   })
 
-  // Somebody else's room: this system records the request and the Theatre Manager fills in the
-  // SU's form. So a member's booking is always a request, never an instant confirmation.
-  test('an external room always goes to a person', async () => {
-    const room = await makeRoom({ isExternal: true })
-    const refused = await book(room, soon())
-
-    expect(refused.status).toBe(422)
-    const { data } = await refused.json() as { data: { canRequest: boolean, failures: unknown[] } }
-    expect(data.canRequest).toBe(true)
-    expect(data.failures).toEqual([])
+  // A union room is not a room at all now: asking for one is its own path (0036).
+  test('a room the estate does not have cannot be booked', async () => {
+    const refused = await send('POST', '/api/rooms/bookings',
+      { roomId: 'not-a-room', title: 'Nowhere', purpose: 'REHEARSAL', ...soon() }, member.cookie)
+    expect(refused.status).toBe(410)
   })
 
   // Most rooms have no restriction worth recording, and making an officer fill in seven days to

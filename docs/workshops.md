@@ -33,6 +33,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Availability sweep bound | 1,000 rows (old app) | 1,000 rows, refusing rather than truncating | A technical guard rather than a policy number: a sweep that silently returned half the bookings would show a taken slot as free |
 | Recurring series maximum | 12 occurrences (UI) / 52 (API) | 12 | |
 | No-show ladder | none | recorded at 2, pre-approval required at 3 per term | Constraint 2 of the old policy doc, now real |
+| SU request notice | 4 working days, by convention | 10 days | The union needs longer than we do, because a person fills in their form and waits for an answer (C-120) |
 | Booking purposes | none: the old app asked what a booking was called, never what it was for | rehearsal, meeting, workshop, audition, read-through, get-in, social, storage | What a room is needed for, which is what makes an SU room suitable or not (C-119). Distinct from priority |
 | Priority tiers | production > committee > rehearsal > general (unenforced) | as stated, with bumping and notification | |
 | Opening hours per room | none | per-room, set in session | Held on the room rather than in settings, so a room can be renamed or archived with them (0025, C-101) |

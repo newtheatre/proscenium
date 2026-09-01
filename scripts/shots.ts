@@ -93,7 +93,6 @@ for (const [index, id] of ids.slice(0, 4).entries()) {
 for (const [name, over] of [
   ['The Studio', { capacity: 40 }],
   ['The Auditorium', { capacity: 120, sensitive: true, hours: [{ weekday: 1, opens: '09:00', closes: '22:00' }] }],
-  ['Portland B12', { isExternal: true, campus: 'University Park', building: 'Portland Building', contact: 'SU reception' }],
 ] as [string, Record<string, unknown>][]) {
   await send('POST', '/api/admin/rooms', { name, ...over }, cookie)
 }

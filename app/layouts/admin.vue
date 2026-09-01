@@ -9,6 +9,7 @@ const links = [[
   { label: 'Rooms', icon: 'i-lucide-door-open', to: '/admin/rooms' },
   { label: 'Room requests', icon: 'i-lucide-inbox', to: '/admin/requests' },
   { label: 'SU rooms', icon: 'i-lucide-map-pin', to: '/admin/su-rooms' },
+  { label: 'Union requests', icon: 'i-lucide-send', to: '/admin/su-requests' },
   { label: 'Closures', icon: 'i-lucide-construction', to: '/admin/blackouts' },
   { label: 'Utilisation', icon: 'i-lucide-chart-column', to: '/admin/utilisation' },
   { label: 'Audit trail', icon: 'i-lucide-scroll-text', to: '/admin/audit' },

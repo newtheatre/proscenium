@@ -15,6 +15,7 @@ const links = computed(() => (account.value.signedIn
 const footer = computed(() => (account.value.signedIn
   ? [
       { label: 'Book a room', to: '/rooms' },
+      { label: 'Ask the union', to: '/rooms/external' },
       { label: 'My bookings', to: '/rooms/mine' },
       { label: 'My profile', to: '/account/profile' },
       { label: 'Sign-in and security', to: '/account/security' },

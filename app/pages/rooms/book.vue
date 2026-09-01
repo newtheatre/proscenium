@@ -16,7 +16,6 @@ interface Room {
   name: string
   capacity: number | null
   sensitive: boolean
-  isExternal: boolean
   hours: RoomHours[]
 }
 
@@ -231,9 +230,6 @@ const tooMany = computed(() => overCapacity(room.value?.capacity ?? null, state.
 // worth knowing about while the form is still being filled in (C-105 criterion 5).
 const warnsUpFront = computed(() => {
   if (standing.value.standing === 'PRE_APPROVAL') return standing.value.says
-  if (room.value?.isExternal) {
-    return 'This room is booked through the SU. Your request goes to the Theatre Manager, who fills in their form.'
-  }
   if (room.value?.sensitive) return 'Every booking for this room is agreed by a person before it is held.'
   return null
 })

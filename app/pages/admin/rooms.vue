@@ -14,7 +14,6 @@ interface Room {
   capacity: number | null
   isActive: boolean
   sensitive: boolean
-  isExternal: boolean
   campus: string | null
   building: string | null
   contact: string | null
@@ -48,7 +47,6 @@ const BLANK_ESTATE: Estate = {
 const toast = useToast()
 const search = ref('')
 const showRetired = ref(false)
-const kind = ref<'all' | 'internal' | 'external'>('all')
 const open = ref(false)
 const editing = ref<Room | null>(null)
 const saving = ref(false)
@@ -73,8 +71,6 @@ const fallsBackTo = (value: number | boolean): string => `Estate default: ${valu
 const rooms = computed(() => {
   const term = search.value.trim().toLowerCase()
   return listing.value.items.filter((room) => {
-    if (kind.value === 'internal' && room.isExternal) return false
-    if (kind.value === 'external' && !room.isExternal) return false
     return !term || room.name.toLowerCase().includes(term)
   })
 })
@@ -85,7 +81,6 @@ const state = reactive({
   capacity: undefined as number | undefined,
   isActive: true,
   sensitive: false,
-  isExternal: false,
   campus: '',
   building: '',
   contact: '',
@@ -109,7 +104,6 @@ function edit(room: Room | null): void {
     capacity: room?.capacity ?? undefined,
     isActive: room?.isActive ?? true,
     sensitive: room?.sensitive ?? false,
-    isExternal: room?.isExternal ?? false,
     campus: room?.campus ?? '',
     building: room?.building ?? '',
     contact: room?.contact ?? '',
@@ -171,14 +165,6 @@ const active = computed<ActiveFilter[]>(() => {
       clear: () => { showRetired.value = false },
     })
   }
-  if (kind.value !== 'all') {
-    filters.push({
-      key: 'kind',
-      label: kind.value === 'external' ? 'Booked through the SU' : 'Ours to book',
-      icon: 'i-lucide-building',
-      clear: () => { kind.value = 'all' },
-    })
-  }
   if (search.value) {
     filters.push({
       key: 'search',
@@ -193,7 +179,6 @@ const active = computed<ActiveFilter[]>(() => {
 function clearFilters(): void {
   search.value = ''
   showRetired.value = false
-  kind.value = 'all'
 }
 
 const openDaysCount = computed(() => WEEKDAYS.filter(day => hours.value[day.index]?.open).length)
@@ -235,21 +220,6 @@ const columns: TableColumn<Room>[] = [
       @clear="clearFilters"
     >
       <template #filters>
-        <UFormField
-          label="Who books it"
-          description="An external room is booked by the Theatre Manager on a form with the SU."
-        >
-          <URadioGroup
-            v-model="kind"
-            :items="[
-              { label: 'Every room', value: 'all' },
-              { label: 'Ours to book', value: 'internal' },
-              { label: 'Booked through the SU', value: 'external' },
-            ]"
-            data-test="filter-kind"
-          />
-        </UFormField>
-
         <UFormField label="Retired rooms">
           <USwitch
             v-model="showRetired"
@@ -259,6 +229,16 @@ const columns: TableColumn<Room>[] = [
       </template>
 
       <template #actions>
+        <UButton
+          to="/admin/su-rooms"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-map-pin"
+          data-test="to-su-rooms"
+        >
+          Union rooms
+        </UButton>
+
         <UButton
           icon="i-lucide-plus"
           data-test="add-room"
@@ -286,13 +266,7 @@ const columns: TableColumn<Room>[] = [
             {{ row.original.name }}
           </p>
           <p
-            v-if="row.original.isExternal"
-            class="text-sm text-muted"
-          >
-            {{ [row.original.building, row.original.campus].filter(Boolean).join(', ') || 'Somewhere else' }}
-          </p>
-          <p
-            v-else-if="row.original.description"
+            v-if="row.original.description"
             class="text-sm text-muted"
           >
             {{ row.original.description }}
@@ -310,14 +284,6 @@ const columns: TableColumn<Room>[] = [
 
       <template #state-cell="{ row }">
         <div class="flex flex-wrap gap-1">
-          <UBadge
-            v-if="row.original.isExternal"
-            color="info"
-            variant="subtle"
-            size="sm"
-          >
-            External
-          </UBadge>
           <UBadge
             v-if="row.original.sensitive"
             color="warning"
@@ -417,55 +383,6 @@ const columns: TableColumn<Room>[] = [
           </UFormField>
 
           <USeparator />
-
-          <UFormField name="isExternal">
-            <USwitch
-              v-model="state.isExternal"
-              label="Somebody else manages this room"
-              description="A room arranged by conversation rather than by this system. Recording where it is and who to ask beats a spreadsheet."
-              data-test="room-external"
-            />
-          </UFormField>
-
-          <template v-if="state.isExternal">
-            <UFormField
-              label="Campus"
-              name="campus"
-              hint="Optional"
-            >
-              <UInput
-                v-model="state.campus"
-                class="w-full"
-                data-test="room-campus"
-              />
-            </UFormField>
-
-            <UFormField
-              label="Building"
-              name="building"
-              hint="Optional"
-            >
-              <UInput
-                v-model="state.building"
-                class="w-full"
-                data-test="room-building"
-              />
-            </UFormField>
-
-            <UFormField
-              label="Who to ask"
-              name="contact"
-              hint="Optional"
-              description="A name, an address, a phone number: whatever gets the room booked."
-            >
-              <UTextarea
-                v-model="state.contact"
-                class="w-full"
-                :rows="2"
-                data-test="room-contact"
-              />
-            </UFormField>
-          </template>
 
           <UCollapsible data-test="hours-section">
             <UButton

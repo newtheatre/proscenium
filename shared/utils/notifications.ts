@@ -141,6 +141,15 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'room-no-show',
   },
+
+  // The union is a third party, so the member hears at every step (C-120).
+  'external.request.received': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-received' },
+  'external.request.raised': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-raised' },
+  'external.request.submitted': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-submitted' },
+  'external.request.assigned': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-assigned' },
+  'external.request.reassigning': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-reassigning' },
+  'external.request.rejected': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-rejected' },
+  'external.request.withdrawn': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-withdrawn' },
   // Security, so no topic can suppress it, and no reachesUnverified (A-102 criterion 2).
   'account.method-removed': {
     topic: null,

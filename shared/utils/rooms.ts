@@ -30,9 +30,6 @@ export const roomForm = z.object({
   isActive: z.boolean().default(true),
   // Books through the approval queue whatever the policy says (C-105 criterion 5).
   sensitive: z.boolean().default(false),
-  // A room somebody else manages, tracked here so it is not a spreadsheet. Where it is and who to
-  // ask are the whole of what this system knows about one.
-  isExternal: z.boolean().default(false),
   campus: text(80),
   building: text(120),
   contact: text(500),

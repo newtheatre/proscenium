@@ -7,8 +7,8 @@ conflict masking), while the calendar, the policy engine, blackouts, tiers and n
 new build. Equipment loans arrive in V2 as the sibling the room store always implied, gated by live
 training records because the gate and the record now share one database.
 
-Counts: 19 MVP stories (C-101 to C-119), 6 V2 stories (C-201 to C-206), 2 Later epic stubs
-(C-301, C-302). 27 total.
+Counts: 20 MVP stories (C-101 to C-120), 6 V2 stories (C-201 to C-206), 2 Later epic stubs
+(C-301, C-302). 28 total.
 
 ## Open questions
 
@@ -19,8 +19,10 @@ Counts: 19 MVP stories (C-101 to C-119), 6 V2 stories (C-201 to C-206), 2 Later 
    4-hour maximum, 4 working days' notice, 10-active-bookings cap, 12-week series limit) were never
    enforced in code. Are they still the numbers the committee wants, and is the notice window
    calendar days or working days?
-3. Do externally arranged SU venues stay in scope, and if so does the AWAITING_EXTERNAL status
-   carry, given assignment there is a manual conversation the system cannot confirm?
+3. ~~Do externally arranged SU venues stay in scope, and if so does the AWAITING_EXTERNAL status
+   carry?~~ **Answered.** They stay in scope, and the status carries with exactly its old meaning,
+   but not on a booking: an externally arranged room is a request of its own kind, because we can
+   never guarantee availability we do not control (decision 0036, C-119, C-120).
 4. Does the old `allowConflicts` double-booking override carry into the unified system, or do
    blackouts plus priority tiers cover every legitimate use it had?
 5. Who may record a no-show (any admin, or only the Theatre Manager), and does the consequence
@@ -37,7 +39,7 @@ Counts: 19 MVP stories (C-101 to C-119), 6 V2 stories (C-201 to C-206), 2 Later 
 - Acceptance criteria:
   1. An internal room carries a name, capacity, per-weekday opening hours, a sensitive-space flag and an active flag; all fields are editable by an administrator and every change is audited with a from/to diff.
   2. Internal rooms deactivate (soft delete) so booking history stays readable; permanent deletion is refused with a clear error once any booking references the room.
-  3. External venues carry campus, building, room and free-text contact details; deletion is refused while any booking references the venue.
+  3. ~~External venues carry campus, building, room and free-text contact details.~~ **Moved to C-119**: a union room is a reference catalogue rather than part of the bookable estate (decision 0036).
   4. Deactivated rooms disappear from member-facing calendars and booking forms immediately but remain visible in historical bookings and reports.
   5. Room capacity is recorded and compared against a booking's attendee count at the write path, producing a warning (not a refusal) when exceeded; the old estate recorded both and compared neither.
 - Source: Prompt Book C-1, C-2; audit RM-5.
@@ -64,7 +66,7 @@ Counts: 19 MVP stories (C-101 to C-119), 6 V2 stories (C-201 to C-206), 2 Later 
 - Depends on: C-101
 - Acceptance criteria:
   1. Availability search accepts any span up to 31 days and refuses (never truncates) a query whose conflict sweep would exceed the configured row bound, carried from the old app's 1,000-row refusal.
-  2. Occupancy rules: CONFIRMED bookings, PENDING requests with a room assigned, and AWAITING_EXTERNAL bookings all hold their slot; a pending request with no room assigned holds nothing.
+  2. Occupancy rules: CONFIRMED bookings and PENDING requests with a room assigned hold their slot; a pending request with no room assigned holds nothing. **Amended by decision 0036**: an externally arranged room is a request of its own kind and holds no slot anywhere, so AWAITING_EXTERNAL no longer appears in this table at all.
   3. Intervals are half-open, so a booking ending at 19:00 and one starting at 19:00 in the same room never conflict; this is an automated test case.
   4. Without admin standing, every conflicting slot reads "Booked" with no identity, title or production name; admins see full details. A member learns when a slot is taken, never whose it is.
   5. The same masking applies identically to the calendar (C-102), the search API and any error payload listing conflicts.
@@ -298,6 +300,21 @@ Counts: 19 MVP stories (C-101 to C-119), 6 V2 stories (C-201 to C-206), 2 Later 
   4. The catalogue is searched on the server and never shipped whole: the union has hundreds of rooms.
   5. Every listing, change and note is audited; the wording of a note stays out of the trail, because it may describe a person's experience.
 - Source: the Theatre Manager's spreadsheet, checked by hand before answering the SU; audit RM-6.
+
+## C-120: Asking the union for a room
+
+- Role: Member
+- Phase: MVP
+- Story: As a member, I want to ask for a room through the Students' Union with an optional preference, so that a room we do not control is tracked properly rather than by email and a spreadsheet.
+- Depends on: C-119, C-113
+- Acceptance criteria:
+  1. A member asks for a span with a purpose and an optional preferred room; the ask holds no slot anywhere, and two members may ask for the same evening because the union has hundreds of rooms. It is refused only for things the union itself would refuse: no membership, the past, too little notice, beyond the horizon.
+  2. The Theatre Manager records that the union's form is in, which moves the request to AWAITING_EXTERNAL and tells the member it is with them.
+  3. Recording the room the union gave us confirms the request and tells the member which room they have. Every room offered is kept, so asking again never overwrites what we were given first.
+  4. Recording a room noted unsuitable for the request's purpose is refused, and goes ahead only when the officer asserts past it; the audit records that a note existed and was overridden, never its wording.
+  5. Where the union offers something unsuitable, the officer records it and asks again: the request stays with the union, the offer is kept, and the suitability note may be written in the same action.
+  6. A member may withdraw at any open step and after confirmation; where the union already has it, the approvers are told, because our arrangement with them stands until a person cancels it.
+- Source: the Theatre Manager's own account of the process; decision 0036; audit RM-6.
 
 ## C-201: Asset register
 

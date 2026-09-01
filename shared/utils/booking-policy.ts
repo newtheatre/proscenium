@@ -54,8 +54,6 @@ export interface PolicyOverrides {
 export interface RoomUnderPolicy extends PolicyOverrides {
   isActive: boolean
   sensitive: boolean
-  // Somebody else's room: this system records the request, the Theatre Manager books it.
-  isExternal: boolean
   hours: RoomHours[]
 }
 
@@ -159,9 +157,9 @@ export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderP
   }
 
   const refusedOutright = failures.some(failure => NOT_DIVERTIBLE.includes(failure.reason))
-  // An external room is a request for the Theatre Manager to fill in the SU's form (C-101), and a
-  // member on the no-show ladder asks for every room whatever the policy says (C-116).
-  const alwaysAsks = room.sensitive || room.isExternal || context.underPreApproval === true
+  // A member on the no-show ladder asks for every room whatever the policy says (C-116). A union
+  // room is not here at all any more: it is a request of its own kind (C-120, 0036).
+  const alwaysAsks = room.sensitive || context.underPreApproval === true
   return {
     failures,
     needsApproval: !refusedOutright && (alwaysAsks || failures.length > 0),

@@ -17,9 +17,6 @@ export const rooms = sqliteTable('rooms', {
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   // Books through the approval queue whatever the policy says (C-105 criterion 5).
   sensitive: integer('sensitive', { mode: 'boolean' }).notNull().default(false),
-  // Somebody else's room, arranged by conversation. "External" rather than "venue": a venue is
-  // where a performance happens, and the auditorium is both (C-101).
-  isExternal: integer('is_external', { mode: 'boolean' }).notNull().default(false),
   campus: text('campus'),
   building: text('building'),
   contact: text('contact'),
@@ -35,7 +32,6 @@ export const rooms = sqliteTable('rooms', {
 }, table => [
   // Member-facing calendars list the active rooms and nothing else (criterion 4).
   index('rooms_is_active').on(table.isActive),
-  index('rooms_is_external').on(table.isExternal),
   unique('rooms_name').on(table.name),
   check('rooms_capacity_positive', sql`${table.capacity} IS NULL OR ${table.capacity} > 0`),
 ])
@@ -220,4 +216,55 @@ export const externalSpaceNotes = sqliteTable('external_space_notes', {
   unique('external_space_notes_space_purpose').on(table.spaceId, table.purpose),
   index('external_space_notes_space').on(table.spaceId),
   check('external_space_notes_verdict', sql`${table.verdict} IN ('SUITABLE', 'CAUTION', 'UNSUITABLE')`),
+])
+
+// A member's ask for a room the union manages (C-120). Not a booking: it holds no slot, because
+// the SU may assign anything and two members asking for the same evening must both be possible.
+export const externalRequests = sqliteTable('external_requests', {
+  id: id(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  title: text('title').notNull(),
+  purpose: text('purpose').notNull(),
+  attendees: integer('attendees'),
+  startsAt: integer('starts_at').notNull(),
+  endsAt: integer('ends_at').notNull(),
+  // What the member would like, and what the union actually gave us. Rarely the same thing.
+  preferredSpaceId: text('preferred_space_id').references(() => externalSpaces.id),
+  assignedSpaceId: text('assigned_space_id').references(() => externalSpaces.id),
+  notes: text('notes'),
+  // Whatever the SU calls the booking on their side, so the two can be reconciled by hand.
+  suReference: text('su_reference'),
+  status: text('status').notNull().default('REQUESTED'),
+  submittedAt: integer('submitted_at'),
+  submittedBy: text('submitted_by').references(() => users.id),
+  decidedAt: integer('decided_at'),
+  decidedBy: text('decided_by').references(() => users.id),
+  rejectionReason: text('rejection_reason'),
+  escalatedAt: integer('escalated_at'),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  index('external_requests_status').on(table.status),
+  index('external_requests_user').on(table.userId),
+  check('external_requests_span', sql`${table.endsAt} > ${table.startsAt}`),
+  // A closed set about process, unlike a purpose, so a CHECK is right here (0033's distinction).
+  check(
+    'external_requests_status',
+    sql`${table.status} IN ('REQUESTED', 'AWAITING_EXTERNAL', 'CONFIRMED', 'REJECTED', 'CANCELLED')`,
+  ),
+])
+
+// What we asked for against what we were given, every time. Without this, asking the union again
+// overwrites the answer and nobody can see that the first room was no good (C-120).
+export const externalAssignments = sqliteTable('external_assignments', {
+  id: id(),
+  requestId: text('request_id').notNull().references(() => externalRequests.id, { onDelete: 'cascade' }),
+  spaceId: text('space_id').notNull().references(() => externalSpaces.id, { onDelete: 'restrict' }),
+  outcome: text('outcome').notNull(),
+  reason: text('reason'),
+  recordedBy: text('recorded_by').references(() => users.id),
+  recordedAt: integer('recorded_at').notNull().default(now),
+}, table => [
+  index('external_assignments_request').on(table.requestId),
+  check('external_assignments_outcome', sql`${table.outcome} IN ('ACCEPTED', 'REFUSED')`),
 ])

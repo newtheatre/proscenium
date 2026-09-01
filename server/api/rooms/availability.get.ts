@@ -73,7 +73,6 @@ export default defineEventHandler(async (event) => {
       name: room.name,
       capacity: room.capacity,
       sensitive: room.sensitive,
-      isExternal: room.isExternal,
       hours: room.hours,
       taken: takenIn(rows, room.id, account.id, canSeeDetail),
       closed: shut
