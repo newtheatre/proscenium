@@ -6,6 +6,16 @@ import type { H3Event } from 'h3'
 // Counting no-shows and reading a member's standing (C-116). The table is append-only, so a count
 // is the latest entry per booking rather than a row count (0010, criterion 2).
 
+// The bookings currently marked, latest entry per booking winning. Shared, so the report and the
+// ladder can never disagree about whether a withdrawn no-show still counts (C-116, C-117).
+export const CURRENTLY_MARKED = sql`
+  SELECT booking_id FROM (
+    SELECT booking_id, kind,
+           row_number() OVER (PARTITION BY booking_id ORDER BY recorded_at DESC, rowid DESC) AS latest
+    FROM room_no_shows
+  ) WHERE latest = 1 AND kind = 'RECORDED'
+`
+
 export async function ladderFor(event: H3Event | undefined): Promise<Ladder> {
   return {
     recordAt: await configValue(event, 'ROOM_NO_SHOW_RECORD_AT'),

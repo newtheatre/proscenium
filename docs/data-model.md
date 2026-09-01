@@ -608,6 +608,30 @@ pure, so both transitions are unit cases rather than a hope.
 `GET /api/rooms/bookings/[id]/ics` is the same builder for one booking, and the confirmation email
 carries that file as an attachment (criterion 1).
 
+### Utilisation reporting
+No table: the figures are counted from `room_bookings`, `room_hours` and `room_no_shows` on demand
+(C-117). Every total is summed in SQL rather than by fetching rows and adding them up, so a year is
+one statement and not a download. `GET /api/admin/rooms/reports/utilisation` breaks down by room or
+by tier, pages, and returns an envelope; `.../reports/export` is the same figures as CSV, every cell
+quoted so a room name with a comma cannot split a row (criterion 3).
+
+Confirmed, cancelled and no-show hours are told apart, and a no-show is **its own figure rather
+than a deduction**: the room was held and not used, which is the number the review wants
+(criterion 1). Whether a booking counts as a no-show uses `CURRENTLY_MARKED`, the same
+latest-entry-wins rule the ladder uses, so a withdrawn no-show returns to being used hours and the
+report and the ladder can never disagree.
+
+The denominator is what the policy engine says a room is open for, walked day by day from
+`room_hours`, so the figure a booking is judged against and the figure it is divided by are the
+same. A room with no hours recorded is always open and therefore has **no** denominator: that reads
+as "no opening hours recorded", never as nought per cent.
+
+The span is London days, so a report of one month neither gains nor loses an hour when the clocks
+move inside it (0014). Figures survive an erasure, because the bookings do (0011, criterion 4).
+
+Breakdown by production, and the pre-migration flag on imported bookings, arrive with the stories
+that create those things (C-118, module B).
+
 ### room_no_shows
 `id` PK · `booking_id` → room_bookings restrict · `user_id` → users restrict · `kind` CHECK
 `RECORDED|WITHDRAWN` · `reason` NULL · `supersedes_id` NULL · `recorded_by` → users NULL ·

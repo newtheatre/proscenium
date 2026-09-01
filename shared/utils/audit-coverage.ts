@@ -114,6 +114,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/rooms/bookings/[id]/no-show.post.ts', actions: ['room.no-show.recorded'] },
   { route: 'server/api/admin/rooms/no-shows/[id]/withdraw.post.ts', actions: ['room.no-show.withdrawn'] },
   { route: 'server/api/rooms/standing.get.ts', exempt: 'reads your own record' },
+  { route: 'server/api/admin/rooms/reports/utilisation.get.ts', exempt: 'reads booked hours against open hours' },
+  { route: 'server/api/admin/rooms/reports/export.get.ts', exempt: 'the same figures as a file; no personal column is in it' },
   { route: 'server/api/auth/sign-out.post.ts', exempt: 'ending your own session changes no record' },
 
   // Development only, and absent from a build: nuxt.config excludes both files (K-124).
