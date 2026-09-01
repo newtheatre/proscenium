@@ -3,6 +3,8 @@
 // the snapshot does not carry. Refusing one is invariant 0010; there are no exemptions.
 
 import { join } from 'node:path'
+import { journalProblems } from '../shared/utils/migrations'
+import type { JournalEntry } from '../shared/utils/migrations'
 
 const DIR = 'server/db/migrations/sqlite'
 const META = join(DIR, 'meta')
@@ -118,6 +120,20 @@ if (problems.length) {
   process.exit(1)
 }
 
+const journal: { entries?: JournalEntry[] } = await Bun.file(join(META, '_journal.json')).json()
+const disagreements = journalProblems(journal.entries ?? [], scan(DIR, '*.sql'))
+
+if (disagreements.length) {
+  console.error('check-migrations: the journal and the migration files disagree.\n')
+  for (const problem of disagreements) console.error(`  ${problem}`)
+  console.error('\nTwo branches numbering a migration after the same parent is the usual cause.')
+  console.error('The branch that merges second renumbers: regenerate it onto the merged main so')
+  console.error('the file, its journal entry and its number are one sequence again. Never resolve')
+  console.error('a journal conflict by keeping both entries at the same idx.')
+  process.exit(1)
+}
+
 const guarded = [...cascadesOnto.keys()].length
 console.log(`check-migrations: ${guarded} tables have rows cascading onto them and `
-  + `${liveTriggers.size} triggers are live, none dropped by a rebuild.`)
+  + `${liveTriggers.size} triggers are live, none dropped by a rebuild. `
+  + `${(journal.entries ?? []).length} journal entries match their files.`)
