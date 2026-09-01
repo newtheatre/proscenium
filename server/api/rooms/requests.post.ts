@@ -77,6 +77,23 @@ export default defineEventHandler(async (event) => {
     },
   })
 
+  // Told on arrival, not only once it is stale. A muted approver's send is skipped and logged,
+  // and the request still stands on the queue, so no inbox can orphan one (C-113 criterion 4).
+  for (const approver of await approvers()) {
+    await notify(event, {
+      type: 'room.request.raised',
+      userId: approver.id,
+      context: {
+        name: approver.name,
+        who: account.name,
+        room: room.name,
+        title: input.title,
+        when: formatLondon(startsAt, { dateStyle: 'full', timeStyle: 'short' }),
+        queueUrl: `${useRuntimeConfig(event).public.baseURL}/admin/requests`,
+      },
+    })
+  }
+
   return {
     ok: true,
     id: claimed.id,

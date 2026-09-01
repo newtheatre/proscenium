@@ -113,6 +113,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/dev.ts', 'server/utils/accounts.ts', 'server/utils/erasure.ts'],
   },
   { route: 'server/api/dev/sweep-requests.post.ts', actions: ['room.request.expired'], via: ['server/utils/room-requests.ts'] },
+  { route: 'server/api/dev/remind-rooms.post.ts', exempt: 'sends a reminder; the send is recorded in notification_log' },
+  { route: 'server/api/admin/notifications/trouble.get.ts', exempt: 'reads the message log' },
   { route: 'server/api/dev/sign-in-as.post.ts', exempt: 'a development sign-in with no password, in no build' },
   { route: 'server/api/auth/verify/index.post.ts', actions: ['account.verified'] },
   {

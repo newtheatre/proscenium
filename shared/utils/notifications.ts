@@ -63,6 +63,13 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'room-requested',
   },
+  // Sent when a request arrives; `waiting` is the later nudge, so an approver can tell a new one
+  // from one that has sat unanswered (C-113 criterion 4).
+  'room.request.raised': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-request-raised',
+  },
   'room.request.waiting': {
     topic: 'ROOMS',
     channels: ['EMAIL'],
@@ -89,6 +96,13 @@ export const MESSAGE_TYPES = {
     topic: 'ROOMS',
     channels: ['EMAIL'],
     template: 'room-cancelled',
+  },
+  // The day before, once, carrying every booking that member holds tomorrow (C-113 criteria 2
+  // and 3). The old app had no clockwork at all, so nothing was ever reminded (RM-1).
+  'room.booking.reminder': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-reminder',
   },
   // Security, so no topic can suppress it, and no reachesUnverified (A-102 criterion 2).
   'account.method-removed': {

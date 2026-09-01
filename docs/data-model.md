@@ -531,6 +531,9 @@ guarded `INSERT ... SELECT ... WHERE NOT EXISTS ... RETURNING id`: a row returne
 no rows is disambiguated by a single read into gone (410) or beaten (409), the pattern 0003 names.
 A request lands `PENDING_APPROVAL`, which already holds its slot in both the clash predicate and the
 availability sweep, so a decision in progress cannot be booked out from under (C-108 criterion 2).
+The approvers are told when a request arrives (`room.request.raised`), not only once it has gone
+stale. If an approver has the rooms topic muted the send is skipped and logged as suppressed, and
+the request still stands on the queue: a muted inbox cannot orphan one (C-113 criterion 4).
 `rooms:sweep` tells the approvers once when a request has waited past `ROOM_REQUEST_ESCALATE_HOURS`
 and lapses it past `ROOM_REQUEST_EXPIRE_HOURS`, both guarded on the status they read so an approver
 deciding at the same moment wins. Approvers are whoever holds `rooms.write`; there is no approver
