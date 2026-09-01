@@ -30,7 +30,9 @@ export default defineEventHandler(async (event) => {
   }
 
   const now = Math.floor(Date.now() / 1000)
-  const moved = await moveRequest(id, ['AWAITING_EXTERNAL'], {
+  // From CONFIRMED too, and guarded on both: the union moving us room to room after answering is
+  // ordinary, and the room they gave us has to be correctable (0006, C-120).
+  const moved = await moveRequest(id, ['AWAITING_EXTERNAL', 'CONFIRMED'], {
     status: 'CONFIRMED',
     assigned_space_id: space.id,
     su_reference: input.suReference ?? request.suReference,

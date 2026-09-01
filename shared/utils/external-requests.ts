@@ -1,3 +1,4 @@
+import { londonParts } from './london'
 import { z } from 'zod'
 
 // Asking the union for a room (C-120). The lifecycle has three decision points where booking one
@@ -10,14 +11,15 @@ export const EXTERNAL_REASON_LIMIT = 500
 
 // Nothing here holds a slot, so nothing here is settled by time alone; only a person settles it.
 export const OPEN_STATUSES: readonly ExternalStatus[] = ['REQUESTED', 'AWAITING_EXTERNAL']
-export const SETTLED_STATUSES: readonly ExternalStatus[] = ['CONFIRMED', 'REJECTED', 'CANCELLED']
 
 export type Verb = 'submit' | 'assign' | 'refuse-assignment' | 'reject' | 'cancel'
 
 const ALLOWED: Record<Verb, readonly ExternalStatus[]> = {
   'submit': ['REQUESTED'],
-  'assign': ['AWAITING_EXTERNAL'],
-  'refuse-assignment': ['AWAITING_EXTERNAL'],
+  // Also from CONFIRMED: the union moving us room to room after confirming is ordinary, and
+  // without this the room they gave us can never be corrected (C-120).
+  'assign': ['AWAITING_EXTERNAL', 'CONFIRMED'],
+  'refuse-assignment': ['AWAITING_EXTERNAL', 'CONFIRMED'],
   'reject': ['REQUESTED', 'AWAITING_EXTERNAL'],
   // A confirmed request is still a member's to withdraw, and the union is told by a person.
   'cancel': ['REQUESTED', 'AWAITING_EXTERNAL', 'CONFIRMED'],
@@ -70,7 +72,9 @@ export function judgeExternal(span: { startsAt: Date, endsAt: Date }, context: E
     failures.push({ reason: 'IN_THE_PAST', says: 'That slot has already happened.' })
   }
 
-  const days = (span.startsAt.getTime() - context.now.getTime()) / 86_400_000
+  // London days, not blocks of 24 hours: a window spanning a clock change is an hour out and
+  // refuses an ask that had the notice the setting names (0014).
+  const days = londonDaysBetween(context.now, span.startsAt)
   if (days < context.noticeDays) {
     failures.push({
       reason: 'SHORT_NOTICE',
@@ -82,6 +86,16 @@ export function judgeExternal(span: { startsAt: Date, endsAt: Date }, context: E
   }
 
   return failures
+}
+
+// Whole London days apart, counted from midnight to midnight, so a clock change between them
+// does not move the answer by an hour (0014).
+function londonDaysBetween(from: Date, to: Date): number {
+  const midnight = (at: Date): number => {
+    const parts = londonParts(at)
+    return Date.UTC(parts.year, parts.month - 1, parts.day)
+  }
+  return (midnight(to) - midnight(from)) / 86_400_000
 }
 
 const instant = z.string().datetime()

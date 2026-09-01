@@ -20,3 +20,6 @@ migration/out/
 
 # `bun run shots` writes here. The pictures are for looking at once, not for keeping.
 .shots/
+
+# Worktrees created for parallel work on the same clone
+.claude/worktrees/

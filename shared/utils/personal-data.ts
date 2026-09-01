@@ -201,6 +201,27 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Union rooms this person asked for. What was asked survives; their words do not.',
   },
   {
+    name: 'external_requests',
+    column: 'decided_by',
+    section: null,
+    columns: null,
+    erasure: 'scrub',
+    // The officer who handled somebody else's ask is cleared like every other officer column;
+    // who did it stays in the audit trail, which erasure redacts on its own terms (0011).
+    scrub: ['submitted_by', 'decided_by'],
+    why: 'Union room requests this person handled for somebody else. The request survives; the officer does not.',
+  },
+  {
+    name: 'room_bookings',
+    column: 'decided_by',
+    section: null,
+    columns: null,
+    erasure: 'scrub',
+    // Matches every other officer column in the module: the decision is a fact, the decider is not.
+    scrub: ['decided_by'],
+    why: 'Room requests this person approved or turned down. The decision survives; the officer does not.',
+  },
+  {
     name: 'external_assignments',
     column: 'recorded_by',
     section: null,

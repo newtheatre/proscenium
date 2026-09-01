@@ -608,3 +608,111 @@ describe.skipIf(skip !== null)('a union room reaches the rest of the system', ()
     expect(after.unionEscalated).toBe(0)
   })
 })
+
+// The union moving us room to room after confirming is ordinary, and until C-120 the room they
+// gave us could never be corrected once the request was confirmed.
+describe('the union changing its mind after it answered', () => {
+  async function confirmedOn(daysAhead: number): Promise<{ id: string, space: string }> {
+    const id = await ask(span(daysAhead))
+    const space = await listSpace('Changed')
+    await send('POST', `/api/admin/rooms/external-requests/${id}/submit`, {}, officer)
+    await send('POST', `/api/admin/rooms/external-requests/${id}/assign`, { spaceId: space }, officer)
+    expect(statusOf(id)).toBe('CONFIRMED')
+    return { id, space }
+  }
+
+  test('a confirmed request can be moved to the room they actually gave us', async () => {
+    const { id } = await confirmedOn(41)
+    const instead = await listSpace('Instead')
+
+    const answered = await send('POST', `/api/admin/rooms/external-requests/${id}/assign`, { spaceId: instead }, officer)
+    expect(answered.status).toBe(200)
+    expect(statusOf(id)).toBe('CONFIRMED')
+    expect(read<{ assigned_space_id: string }>(
+      'SELECT assigned_space_id FROM external_requests WHERE id = ?', id)?.assigned_space_id).toBe(instead)
+  })
+
+  // A room refused after confirming is still a room we no longer have, so the request goes back
+  // to waiting on the union rather than standing as a booking we cannot use.
+  test('refusing a confirmed room sends it back and forgets the room', async () => {
+    const { id, space } = await confirmedOn(42)
+
+    const answered = await send('POST', `/api/admin/rooms/external-requests/${id}/refuse-assignment`, {
+      spaceId: space,
+      reason: 'A meeting room with a fixed table',
+      note: { verdict: 'UNSUITABLE', reason: 'Fixed table, no floor space' },
+    }, officer)
+    expect(answered.status).toBe(200)
+
+    expect(statusOf(id)).toBe('AWAITING_EXTERNAL')
+    expect(read<{ assigned_space_id: string | null }>(
+      'SELECT assigned_space_id FROM external_requests WHERE id = ?', id)?.assigned_space_id).toBeNull()
+
+    // The refusal is a privileged mutation, so it leaves a trail like its peers.
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM audit_log WHERE target = ? AND action = 'external.space.note.set'`,
+      `space:${space}`)?.n).toBe(1)
+  })
+
+  test('and a settled request is refused rather than reopened', async () => {
+    const id = await ask(span(43))
+    await send('POST', `/api/rooms/external-requests/${id}/cancel`, {}, member.cookie)
+
+    const answered = await send('POST', `/api/admin/rooms/external-requests/${id}/refuse-assignment`, {
+      spaceId: await listSpace('Never'), reason: 'Too late',
+    }, officer)
+    expect(answered.status).toBe(409)
+    expect(statusOf(id)).toBe('CANCELLED')
+  })
+
+  // Escalation is per waiting spell, so one sent back to the union is chased again rather than
+  // being counted as already chased months ago.
+  test('sending it to the union again resets the chase', async () => {
+    const id = await ask(span(44))
+    write('UPDATE external_requests SET created_at = ? WHERE id = ?',
+      Math.floor(Date.now() / 1000) - 30 * 86_400, id)
+    await send('POST', '/api/dev/sweep-requests', {}, officer)
+    expect(read<{ escalated_at: number | null }>(
+      'SELECT escalated_at FROM external_requests WHERE id = ?', id)?.escalated_at).not.toBeNull()
+
+    await send('POST', `/api/admin/rooms/external-requests/${id}/submit`, {}, officer)
+    expect(read<{ escalated_at: number | null }>(
+      'SELECT escalated_at FROM external_requests WHERE id = ?', id)?.escalated_at).toBeNull()
+  })
+})
+
+// The queue is a list of work: an answered request from last term is a lookup, not the top of it.
+describe('what the officer sees first', () => {
+  test('open requests come before settled ones', async () => {
+    const settled = await ask(span(45))
+    await send('POST', `/api/rooms/external-requests/${settled}/cancel`, {}, member.cookie)
+    const open = await ask(span(46))
+
+    const answered = await send('GET', '/api/admin/rooms/external-requests?when=all', undefined, officer)
+    const { items } = await answered.json() as { items: { id: string, status: string }[] }
+
+    const firstSettled = items.findIndex(one => one.status === 'CANCELLED')
+    expect(items.findIndex(one => one.id === open)).toBeLessThan(firstSettled)
+    expect(items.some(one => one.id === settled)).toBe(true)
+  })
+
+  test('and every offer arrives with the request, however many there are', async () => {
+    const id = await ask(span(47))
+    const space = await listSpace('Offered')
+    await send('POST', `/api/admin/rooms/external-requests/${id}/submit`, {}, officer)
+    await send('POST', `/api/admin/rooms/external-requests/${id}/assign`, { spaceId: space }, officer)
+    await send('POST', `/api/admin/rooms/external-requests/${id}/refuse-assignment`, {
+      spaceId: space, reason: 'No floor space',
+    }, officer)
+
+    const answered = await send('GET', '/api/admin/rooms/external-requests?when=all', undefined, officer)
+    const { items, more } = await answered.json() as {
+      items: { id: string, offers: { outcome: string }[] }[]
+      more: boolean
+    }
+
+    const one = items.find(row => row.id === id)!
+    expect(one.offers.map(offer => offer.outcome)).toEqual(['ACCEPTED', 'REFUSED'])
+    expect(more).toBe(false)
+  })
+})

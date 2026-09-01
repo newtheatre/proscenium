@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { UNRECORDED_PURPOSE } from '#shared/utils/bookings'
 import { STATUS_MAP, reconcile, transformBookings } from '#migration/bookings'
 import { createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -188,7 +189,7 @@ describe('the old history imports keyed to the canonical account (criterion 1)',
     try {
       run(source, target)
       expect(rows<{ purpose: string }>(target, 'SELECT purpose FROM external_requests')[0]?.purpose)
-        .toBe('UNRECORDED')
+        .toBe(UNRECORDED_PURPOSE)
     }
     finally {
       target.close()

@@ -1,3 +1,4 @@
+import { UNRECORDED_PURPOSE } from '../shared/utils/bookings'
 import { nanoid } from './lib'
 import type { Database } from 'bun:sqlite'
 
@@ -182,17 +183,18 @@ export function transformBookings(input: TransformInput): { summary: BookingSumm
         continue
       }
 
-      // What the venue meant depends on where the request had got to: before the union answered
-      // it was what we asked for, and after it was what they gave us.
-      const answered = status === 'CONFIRMED' || status === 'REJECTED' || status === 'CANCELLED'
+      // Only a confirmed row names a room the union granted. A refused or withdrawn one names
+      // what we asked for, exactly as an unanswered one does.
+      const answered = status === 'CONFIRMED'
 
       target.query(`
         INSERT OR REPLACE INTO external_requests
           (id, user_id, title, purpose, attendees, starts_at, ends_at, preferred_space_id,
            assigned_space_id, notes, status, rejection_reason, created_at, updated_at)
-        VALUES (?, ?, ?, 'UNRECORDED', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        idFor(externalIds, String(row.id)), userIdEarly, row.event_title, row.number_of_attendees,
+        idFor(externalIds, String(row.id)), userIdEarly, row.event_title, UNRECORDED_PURPOSE,
+        row.number_of_attendees,
         seconds(row.start_time), seconds(row.end_time),
         answered ? null : spaceId, answered ? spaceId : null,
         row.notes, status, row.rejection_reason, seconds(row.created_at), seconds(row.created_at),

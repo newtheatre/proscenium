@@ -12,17 +12,20 @@ export default defineEventHandler(async (event) => {
   await requirePermission(event, 'rooms.write')
   const input = await getValidatedQueryOrThrow(event, query)
 
-  const items = await externalQueue(input.when === 'open' ? OPEN_STATUSES : EXTERNAL_STATUSES)
+  const found = await externalQueue(input.when === 'open' ? OPEN_STATUSES : EXTERNAL_STATUSES)
+  const items = found.slice(0, LIST_CAP)
   const notes = await notesFor({ spaceIds: items.flatMap(one => (one.preferredSpaceId ? [one.preferredSpaceId] : [])) })
+  const offers = await assignmentsFor(items.map(one => one.id))
 
   return {
     when: input.when,
-    items: await Promise.all(items.map(async one => ({
+    items: items.map(one => ({
       ...one,
       // What we know about the room they asked for, so the officer sees it before the union does.
       preferredWarning: warningFor(noteFor(notes, one.preferredSpaceId ?? '', one.purpose)),
-      offers: await assignmentsFor(one.id),
-    }))),
+      offers: offers.get(one.id) ?? [],
+    })),
     total: items.length,
+    more: found.length > LIST_CAP,
   }
 })

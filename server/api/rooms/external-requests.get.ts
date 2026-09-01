@@ -10,11 +10,13 @@ export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
   const input = await getValidatedQueryOrThrow(event, query)
 
-  const items = await externalRequestsFor(account.id, input.when, Math.floor(Date.now() / 1000))
+  const found = await externalRequestsFor(account.id, input.when, Math.floor(Date.now() / 1000))
+  const items = found.slice(0, LIST_CAP)
 
   return {
     when: input.when,
     items: items.map(one => ({ ...one, cancellable: refusalToAct(one, 'cancel') === null })),
     total: items.length,
+    more: found.length > LIST_CAP,
   }
 })

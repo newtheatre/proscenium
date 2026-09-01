@@ -3,7 +3,7 @@
 export default defineTask({
   meta: {
     name: 'rooms:sweep',
-    description: 'Escalate room requests that are waiting, and lapse the ones that waited too long',
+    description: 'Escalate room and union requests that are waiting, and lapse the room ones that waited too long',
   },
   async run() {
     const at = new Date()

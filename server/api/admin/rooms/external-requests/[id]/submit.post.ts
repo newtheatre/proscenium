@@ -19,6 +19,9 @@ export default defineEventHandler(async (event) => {
     status: 'AWAITING_EXTERNAL',
     submitted_at: now,
     submitted_by: account.id,
+    // Cleared, or a request chased while it waited for the form can never be chased again once
+    // the form is in, which is the half of the wait actually worth chasing.
+    escalated_at: null,
     su_reference: input.suReference,
     updated_at: now,
   })
@@ -29,7 +32,9 @@ export default defineEventHandler(async (event) => {
     actorId: account.id,
     action: 'external.request.submitted',
     target: `external:${id}`,
-    detail: { reference: input.suReference },
+    // Whether they gave us a reference, never its text: audit detail is append-only, and free
+    // text an officer typed cannot be corrected or erased later (0010, 0011).
+    detail: { referenced: input.suReference !== null },
   }))
 
   await notify(event, {

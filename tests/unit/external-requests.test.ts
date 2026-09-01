@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  assignForm, externalRequestForm, judgeExternal, refusalToAct, refuseAssignmentForm, saysExternalStatus,
+  assignForm, EXTERNAL_REFUSALS, externalRequestForm, judgeExternal, refusalToAct, refuseAssignmentForm,
+  saysExternalStatus,
 } from '#shared/utils/external-requests'
 
 // C-120's pure half: the lifecycle, and what the union needs before it will answer.
@@ -40,7 +41,22 @@ describe('what the union needs before it will answer', () => {
   // Opening hours, capacity and an active flag are things the union never tells us, so asking
   // about them would be inventing an answer.
   test('nothing is judged that the union never told us', () => {
-    expect(judgeExternal(span(20), CONTEXT)).toEqual([])
+    const everything = judgeExternal(span(-2), { ...CONTEXT, hasMembership: false }).map(one => one.reason)
+    expect(everything.every(reason => EXTERNAL_REFUSALS.includes(reason))).toBe(true)
+    expect(everything).not.toContain('CLOSED')
+  })
+
+  // The clocks going forward makes three London days 71 hours, and a window counted in blocks of
+  // 24 refused an ask that had the notice the setting names (0014).
+  test('notice counts London days, so a clock change does not eat one', () => {
+    const clocksChange = {
+      ...CONTEXT,
+      noticeDays: 3,
+      now: new Date('2027-03-26T12:00:00Z'),
+    }
+    const across = { startsAt: new Date('2027-03-29T10:30:00Z'), endsAt: new Date('2027-03-29T12:30:00Z') }
+
+    expect(judgeExternal(across, clocksChange).map(one => one.reason)).not.toContain('SHORT_NOTICE')
   })
 })
 
@@ -55,9 +71,17 @@ describe('the lifecycle', () => {
     expect(refusalToAct({ status: 'AWAITING_EXTERNAL' }, 'submit')).toContain('cannot be sent to the union')
   })
 
-  test('it can be sent back to the union while it is with them', () => {
+  // The union moving us room to room after confirming is ordinary, so a confirmed request can
+  // still be corrected or sent back; only a settled one cannot.
+  test('it can be sent back to the union while it is with them, or after they answered', () => {
     expect(refusalToAct({ status: 'AWAITING_EXTERNAL' }, 'refuse-assignment')).toBeNull()
-    expect(refusalToAct({ status: 'CONFIRMED' }, 'refuse-assignment')).not.toBeNull()
+    expect(refusalToAct({ status: 'CONFIRMED' }, 'refuse-assignment')).toBeNull()
+    expect(refusalToAct({ status: 'CANCELLED' }, 'refuse-assignment')).not.toBeNull()
+  })
+
+  test('and the room they gave us can be corrected', () => {
+    expect(refusalToAct({ status: 'CONFIRMED' }, 'assign')).toBeNull()
+    expect(refusalToAct({ status: 'REQUESTED' }, 'assign')).not.toBeNull()
   })
 
   test('it can be turned down at either open step', () => {

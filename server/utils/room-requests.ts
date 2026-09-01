@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, sql } from 'drizzle-orm'
 import { dueToEscalate, dueToExpire } from '#shared/utils/requests'
 import { formatLondon } from '#shared/utils/london'
 import type { H3Event } from 'h3'
@@ -25,6 +25,10 @@ export async function approvers(): Promise<{ id: string, name: string }[]> {
     ))
 }
 
+// A cap, because the first sweep after the booking import could otherwise mail every approver
+// once per historic open request in a single night. The same guard membership.ts carries.
+const EXTERNAL_CHASE_CAP = 50
+
 // A union request escalates but never expires: expiry frees a held slot, and this holds none, so
 // lapsing one would tell the member nothing while the union may still answer (C-120, 0036).
 export async function sweepExternalRequests(event: H3Event | undefined, at = new Date()): Promise<number> {
@@ -42,8 +46,14 @@ export async function sweepExternalRequests(event: H3Event | undefined, at = new
   })
     .from(schema.externalRequests)
     .innerJoin(schema.users, eq(schema.users.id, schema.externalRequests.userId))
-    .where(inArray(schema.externalRequests.status, ['REQUESTED', 'AWAITING_EXTERNAL']))
+    .where(and(
+      inArray(schema.externalRequests.status, ['REQUESTED', 'AWAITING_EXTERNAL']),
+      // Nobody is chased about a room whose date has passed: an imported history of open
+      // requests is not a backlog anybody can act on.
+      gte(schema.externalRequests.endsAt, now),
+    ))
     .orderBy(asc(schema.externalRequests.createdAt))
+    .limit(EXTERNAL_CHASE_CAP)
 
   let escalated = 0
   for (const request of waiting) {

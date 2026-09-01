@@ -1,6 +1,8 @@
 import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
 import type { SQL } from 'drizzle-orm'
+import { chunked } from '#shared/utils/approvals'
+import { OPEN_STATUSES } from '#shared/utils/external-requests'
 import type { ExternalStatus } from '#shared/utils/external-requests'
 
 // Reading and answering a member's ask for a union room (C-120). Every write is guarded on the
@@ -27,6 +29,9 @@ export interface RequestRow {
   rejectionReason: string | null
   createdAt: number
 }
+
+// One over the cap, so a caller can say that more exist rather than reporting the cap as a total.
+export const LIST_CAP = 200
 
 const preferred = alias(schema.externalSpaces, 'preferred_space')
 const assigned = alias(schema.externalSpaces, 'assigned_space')
@@ -63,7 +68,7 @@ async function selectRequests(where: SQL | undefined, order: SQL): Promise<Reque
     .leftJoin(assigned, eq(assigned.id, schema.externalRequests.assignedSpaceId))
     .where(where)
     .orderBy(order)
-    .limit(200)
+    .limit(LIST_CAP + 1)
 }
 
 export async function externalRequest(id: string): Promise<RequestRow | undefined> {
@@ -81,8 +86,16 @@ export async function externalRequestsFor(userId: string, when: 'upcoming' | 'pa
   )
 }
 
+// Open first and soonest first, then the settled ones most recent first: the queue is a list of
+// work, and an answered request from last term is a lookup, not the top of it.
 export async function externalQueue(statuses: readonly ExternalStatus[]): Promise<RequestRow[]> {
-  return selectRequests(inArray(schema.externalRequests.status, [...statuses]), asc(schema.externalRequests.startsAt))
+  const open = sql.join(OPEN_STATUSES.map(status => sql`${status}`), sql`, `)
+  const settled = sql`CASE WHEN ${schema.externalRequests.status} IN (${open}) THEN 0 ELSE 1 END`
+
+  return selectRequests(
+    inArray(schema.externalRequests.status, [...statuses]),
+    sql`${settled}, CASE WHEN ${settled} = 0 THEN ${schema.externalRequests.startsAt} ELSE -${schema.externalRequests.startsAt} END`,
+  )
 }
 
 export interface AssignmentRow {
@@ -95,10 +108,24 @@ export interface AssignmentRow {
   recordedAt: number
 }
 
-// Every room the union offered, and whether it suited. Without this the second answer overwrites
-// the first and nobody can see that we asked again, which is the spreadsheet all over again.
-export async function assignmentsFor(requestId: string): Promise<AssignmentRow[]> {
+// Every room the union offered, and whether it suited, for a page of requests at once. Without
+// this the second answer overwrites the first and nobody can see that we asked again.
+export async function assignmentsFor(requestIds: string[]): Promise<Map<string, AssignmentRow[]>> {
+  const rows: (AssignmentRow & { requestId: string })[] = []
+  for (const batch of chunked(requestIds)) rows.push(...await assignmentRows(batch))
+
+  const byRequest = new Map<string, AssignmentRow[]>()
+  for (const { requestId, ...row } of rows) {
+    byRequest.set(requestId, [...(byRequest.get(requestId) ?? []), row])
+  }
+  return byRequest
+}
+
+async function assignmentRows(requestIds: string[]): Promise<(AssignmentRow & { requestId: string })[]> {
+  if (requestIds.length === 0) return []
+
   return db.select({
+    requestId: schema.externalAssignments.requestId,
     id: schema.externalAssignments.id,
     spaceId: schema.externalAssignments.spaceId,
     space: schema.externalSpaces.name,
@@ -110,7 +137,7 @@ export async function assignmentsFor(requestId: string): Promise<AssignmentRow[]
     .from(schema.externalAssignments)
     .innerJoin(schema.externalSpaces, eq(schema.externalSpaces.id, schema.externalAssignments.spaceId))
     .leftJoin(schema.users, eq(schema.users.id, schema.externalAssignments.recordedBy))
-    .where(eq(schema.externalAssignments.requestId, requestId))
+    .where(inArray(schema.externalAssignments.requestId, requestIds))
     .orderBy(asc(schema.externalAssignments.recordedAt))
 }
 

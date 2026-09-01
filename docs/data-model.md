@@ -469,9 +469,8 @@ bool · `sensitive` bool (books via the approval queue regardless of policy) · 
 `updated_at` · `min_booking_minutes` / `max_booking_hours` / `notice_hours` / `horizon_weeks` /
 `active_bookings_cap`, each NULL falling back to the estate setting of the same name; nought is an
 override meaning none needed, so resolution tests absence rather than falsiness (C-106 criterion 1)
-· `is_external` bool · `campus` · `building` · `contact` (free text: a name, an
-address, whatever gets the room booked). Indexed on `is_active`, which is what a member-facing
-calendar filters on, and on `is_external`.
+· `campus` · `building` · `contact` (free text: a name, an address, whatever gets the room
+booked). Indexed on `is_active`, which is what a member-facing calendar filters on.
 **Every room here is one we control.** A `venue` is where a performance happens, and an internally
 managed room may be one: the auditorium is booked for rehearsals and hosts performances. So the noun
 is always *room*. Rooms the Students' Union manages are **not in this table at all**: they are
@@ -693,7 +692,11 @@ silently vanish from the member's page, their feed and the queue.
 
 The lifecycle is `REQUESTED → AWAITING_EXTERNAL → CONFIRMED`, with `refuse-assignment` looping back
 to the union and `reject`/`cancel` ending it. Every write is guarded on the status it read (0006).
-**Confirm is folded into assign**: an accepted assignment is the confirmation. `AWAITING_EXTERNAL`
+**Confirm is folded into assign**: an accepted assignment is the confirmation. `assign` and
+`refuse-assignment` are both allowed **from `CONFIRMED` as well**, because the union moving us room
+to room after answering is ordinary: a refusal clears `assigned_space_id` and returns the request to
+`AWAITING_EXTERNAL`, and submitting again clears `escalated_at` so the new wait is chased on its own
+terms. `AWAITING_EXTERNAL`
 keeps exactly its old meaning, the form is in and they have not answered, so C-118's import no
 longer translates it away.
 
@@ -720,8 +723,15 @@ A confirmed union room reaches everywhere a booking does: the member's calendar 
 while it is still with the union, since they may yet say no) and the day-before reminder, which
 sends one message covering our rooms and theirs together.
 
+Both list endpoints return `{ items, total, more }` capped at 200 rows, `more` saying plainly that
+the cap was hit rather than reporting it as a total. The officer's queue orders **open first and
+soonest first, then the settled ones most recent first**: it is a list of work, and an answered
+request from last term is a lookup. Every request's offers arrive with it in one query, chunked at
+90 bound parameters (0003).
+
 Erasure scrubs the member's words from a request and keeps what was asked; an assignment scrubs
-`recorded_by` and keeps what the union offered.
+`recorded_by` and keeps what the union offered, and `submitted_by`/`decided_by` are scrubbed like
+every other officer column in the module.
 
 ### external_spaces and external_space_notes
 `external_spaces`: `id` PK · `name` UNIQUE · `campus` · `building` · `contact` · `capacity` CHECK

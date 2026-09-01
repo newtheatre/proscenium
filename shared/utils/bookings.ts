@@ -33,6 +33,10 @@ export const PURPOSES = [
 ] as const
 export type Purpose = (typeof PURPOSES)[number]
 
+// What the importer writes where nobody was ever asked. `external_requests.purpose` is NOT NULL
+// and the table cascades, so a rebuild to make it nullable is refused (0003, C-118).
+export const UNRECORDED_PURPOSE = 'UNRECORDED'
+
 export function isPurpose(value: string): value is Purpose {
   return (PURPOSES as readonly string[]).includes(value)
 }
@@ -40,7 +44,7 @@ export function isPurpose(value: string): value is Purpose {
 // For reading rather than writing: ROOM_PURPOSES is committee-editable and history carries
 // purposes nobody was asked for, so an unregistered one reads as itself (0027's habit).
 export function describePurpose(value: string | null): string {
-  if (!value) return 'Not recorded'
+  if (!value || value === UNRECORDED_PURPOSE) return 'Not recorded'
   return value.charAt(0) + value.slice(1).toLowerCase().replaceAll('_', ' ')
 }
 

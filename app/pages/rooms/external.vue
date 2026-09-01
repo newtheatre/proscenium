@@ -12,7 +12,7 @@ const request = useRequestFetch()
 
 const state = reactive({
   title: '',
-  purpose: String(route.query.purpose ?? ''),
+  purpose: '',
   attendees: undefined as number | undefined,
   day: String(route.query.day ?? ''),
   from: String(route.query.at ?? '18:00'),
@@ -32,6 +32,12 @@ const { data: rules } = await useAsyncData(
 
 const purposeOptions = computed(() =>
   rules.value.purposes.map(purpose => ({ label: describePurpose(purpose), value: purpose })))
+
+// A purpose off the query string is a suggestion, and it only lands if the vocabulary still holds
+// it: an unknown one would be sent and refused, or worse, warned about against nothing.
+if (rules.value.purposes.includes(String(route.query.purpose ?? ''))) {
+  state.purpose = String(route.query.purpose)
+}
 
 function addMinutes(clock: string, minutes: number): string {
   const [hour, minute] = clock.split(':').map(Number)

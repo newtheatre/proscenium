@@ -40,14 +40,6 @@ const ROOMS = [
     sensitive: true,
     hours: [1, 2, 3, 4, 5, 6, 0].map(weekday => ({ weekday, opens: '09:00', closes: '23:00' })),
   },
-  {
-    name: 'Portland B12',
-    capacity: 30,
-    sensitive: false,
-    campus: 'University Park',
-    building: 'Portland Building',
-    contact: 'SU reception, room bookings desk',
-  },
 ]
 
 function seedRooms(): { id: string, name: string }[] {

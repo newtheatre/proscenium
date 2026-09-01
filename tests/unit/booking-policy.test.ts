@@ -136,9 +136,10 @@ describe('a sensitive room always goes to a person', () => {
   })
 
   // A union room is no longer a room at all: it is a request of its own kind, judged by
-  // judgeExternal, so nothing here knows about one (C-120, 0036).
+  // judgeExternal, so nothing here can refuse or approve on account of one (C-120, 0036).
   test('the policy engine judges only rooms we control', () => {
-    expect(Object.keys(ROOM)).not.toContain('isExternal')
+    const verdict = judge(GOOD, policy(), { ...ROOM, isExternal: true } as never, CONTEXT)
+    expect(verdict).toEqual(judge(GOOD, policy(), ROOM, CONTEXT))
   })
 
   test('anything that fails a rule needs approval too, rather than being refused outright', () => {

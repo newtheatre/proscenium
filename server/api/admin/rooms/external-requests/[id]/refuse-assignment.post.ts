@@ -19,7 +19,15 @@ export default defineEventHandler(async (event) => {
 
   const now = Math.floor(Date.now() / 1000)
 
-  // The status does not move: it is still with the union, we have simply asked them again.
+  // Guarded, or a refusal lands against a request a colleague just confirmed (0006). A room
+  // refused after confirming is still a room we no longer have, so it goes back to the union.
+  const still = await moveRequest(id, ['AWAITING_EXTERNAL', 'CONFIRMED'], {
+    status: 'AWAITING_EXTERNAL',
+    assigned_space_id: null,
+    updated_at: now,
+  })
+  if (!still) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
+
   await db.insert(schema.externalAssignments).values({
     id: newId(),
     requestId: id,
@@ -48,12 +56,25 @@ export default defineEventHandler(async (event) => {
       })
   }
 
-  await db.insert(schema.auditLog).values(auditEntry({
+  const entries = [auditEntry({
     actorId: account.id,
     action: 'external.request.assignment.refused',
     target: `external:${id}`,
     detail: { space: space.id, noted: input.note?.verdict ?? null },
-  }))
+  })]
+
+  // Audited like the peer route that makes the same change: a privileged mutation may not lose
+  // its trail entry by being reached from a different screen (CLAUDE.md).
+  if (input.note) {
+    entries.push(auditEntry({
+      actorId: account.id,
+      action: 'external.space.note.set',
+      target: `space:${space.id}`,
+      detail: { space: space.id, purpose: request.purpose, verdict: input.note.verdict },
+    }))
+  }
+
+  await db.insert(schema.auditLog).values(entries)
 
   await notify(event, {
     type: 'external.request.reassigning',
@@ -67,5 +88,5 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  return { ok: true, id, status: request.status, askedAgain: true }
+  return { ok: true, id, status: 'AWAITING_EXTERNAL', askedAgain: true }
 })

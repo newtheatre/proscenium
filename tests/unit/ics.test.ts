@@ -64,9 +64,20 @@ describe('a status reads as a calendar reads it (criterion 2 and 5)', () => {
 
   // A client keeps the copy it already fetched unless the new one outranks it.
   test('a cancelled event outranks the version already held', () => {
-    const calendar = calendarFor([booking({ status: 'CANCELLED' })], { name: 'Mine', host: HOST })
+    const calendar = calendarFor([booking({ status: 'CANCELLED', updatedAt: 1_700_000_500 })], { name: 'Mine', host: HOST })
     expect(calendar).toContain('STATUS:CANCELLED')
-    expect(calendar).toContain('SEQUENCE:1')
+    expect(calendar).toContain('SEQUENCE:1700000500')
+  })
+
+  // Not only cancellation: an approver moving a booking to a different room has to reach a client
+  // that already holds the event, or it shows the old room until the subscription is remade.
+  test('a booking moved to another room outranks it too', () => {
+    const first = calendarFor([booking()], { name: 'Mine', host: HOST })
+    const moved = calendarFor([booking({ room: 'The Rehearsal Room', updatedAt: 1_700_000_900 })], { name: 'Mine', host: HOST })
+
+    const sequence = (calendar: string): number => Number(/SEQUENCE:(\d+)/.exec(calendar)![1])
+    expect(sequence(moved)).toBeGreaterThan(sequence(first))
+    expect(moved).toContain('LOCATION:The Rehearsal Room')
   })
 
   test('an unknown status is tentative rather than a broken calendar', () => {

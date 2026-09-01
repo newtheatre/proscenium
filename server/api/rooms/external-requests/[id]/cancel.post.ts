@@ -16,10 +16,12 @@ export default defineEventHandler(async (event) => {
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
   const now = Math.floor(Date.now() / 1000)
-  const moved = await moveRequest(id, ['REQUESTED', 'AWAITING_EXTERNAL', 'CONFIRMED'], {
-    status: 'CANCELLED',
-    updated_at: now,
-  })
+  const cancelling = { status: 'CANCELLED', updated_at: now }
+
+  // Two guarded attempts rather than one, because whether the union already holds this decides
+  // who gets told, and a submit landing between the read and the write would make a read lie.
+  const withUnion = await moveRequest(id, ['AWAITING_EXTERNAL', 'CONFIRMED'], cancelling)
+  const moved = withUnion || await moveRequest(id, ['REQUESTED'], cancelling)
 
   if (!moved) throw createError({ statusCode: 409, statusMessage: 'That request has already been decided' })
 
@@ -32,7 +34,6 @@ export default defineEventHandler(async (event) => {
 
   // The approvers are told whenever the union already has it, because our arrangement with them
   // stands until a person withdraws it (C-112 criterion 3).
-  const withUnion = request.status !== 'REQUESTED'
   if (withUnion) {
     for (const approver of await approvers()) {
       await notify(event, {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { EXTERNAL_REASON_LIMIT, saysExternalStatus } from '#shared/utils/external-requests'
+import { saysVerdict } from '#shared/utils/external-spaces'
 import { describePurpose } from '#shared/utils/bookings'
 import { formatLondon } from '#shared/utils/london'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
@@ -49,8 +50,10 @@ const reference = ref('')
 const chosenSpace = ref<string | undefined>()
 const despite = ref(false)
 const blockedBy = ref<{ verdict: string, reason: string } | null>(null)
+const inModal = ref<string | null>(null)
 const refusalReason = ref('')
 const noteToo = ref(true)
+const noteVerdict = ref<'CAUTION' | 'UNSUITABLE'>('UNSUITABLE')
 const rejectionReason = ref('')
 
 async function load(): Promise<void> {
@@ -99,7 +102,9 @@ async function act(path: string, body: Record<string, unknown>, said: string): P
       blockedBy.value = data.note
       return false
     }
-    failure.value = refusalText(error)
+    // Shown inside the modal: the page-root alert sits behind the overlay, so a 409 from a
+    // colleague acting first read as the button simply doing nothing.
+    inModal.value = refusalText(error)
     return false
   }
   finally {
@@ -132,7 +137,7 @@ async function refuse(): Promise<void> {
   const done = await act(`/api/admin/rooms/external-requests/${one.id}/refuse-assignment`, {
     spaceId: chosenSpace.value,
     reason: refusalReason.value,
-    note: noteToo.value ? { verdict: 'UNSUITABLE', reason: refusalReason.value } : null,
+    note: noteToo.value ? { verdict: noteVerdict.value, reason: refusalReason.value } : null,
   }, 'Recorded, and the union asked again')
   if (done) refusing.value = null
 }
@@ -145,13 +150,24 @@ async function reject(): Promise<void> {
   }
 }
 
+// An override is asserted about one room, so changing the room withdraws it. Without this, a
+// despite ticked for a room we know is no good waves the next room through unseen.
+watch(chosenSpace, () => {
+  despite.value = false
+  blockedBy.value = null
+})
+
 function begin(which: 'submit' | 'assign' | 'refuse' | 'reject', one: Request): void {
+  inModal.value = null
   reference.value = one.suReference ?? ''
-  chosenSpace.value = which === 'assign' ? (one.preferredSpaceId ?? undefined) : undefined
+  // Never pre-selected. SpacePicker renders nothing until a search returns, so a value set here
+  // arms the button while the box still looks empty, and one click records the wrong room.
+  chosenSpace.value = undefined
   despite.value = false
   blockedBy.value = null
   refusalReason.value = ''
   noteToo.value = true
+  noteVerdict.value = 'UNSUITABLE'
   rejectionReason.value = ''
 
   if (which === 'submit') submitting.value = one
@@ -184,6 +200,11 @@ const columns = computed<TableColumn<Request>[]>(() => [
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.who),
       h('div', { class: 'text-xs text-muted' }, `${row.original.title} (${describePurpose(row.original.purpose)})`),
+      row.original.attendees
+        ? h('div', { class: 'text-xs text-muted' }, plural(row.original.attendees, 'person', 'people'))
+        : null,
+      // Written by the member for the union's form, so the person filling it in has to see it.
+      row.original.notes ? h('p', { class: 'mt-1 text-sm' }, row.original.notes) : null,
     ]),
   },
   {
@@ -329,6 +350,14 @@ onMounted(load)
       @update:open="submitting = null"
     >
       <template #body>
+        <UAlert
+          v-if="inModal"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="inModal"
+          data-test="modal-failure"
+        />
         <UFormField
           label="Their reference"
           hint="Optional"
@@ -365,6 +394,14 @@ onMounted(load)
       @update:open="assigning = null"
     >
       <template #body>
+        <UAlert
+          v-if="inModal"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="inModal"
+          data-test="modal-failure"
+        />
         <div class="space-y-4">
           <UFormField
             label="The room"
@@ -434,6 +471,14 @@ onMounted(load)
       @update:open="refusing = null"
     >
       <template #body>
+        <UAlert
+          v-if="inModal"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="inModal"
+          data-test="modal-failure"
+        />
         <div class="space-y-4">
           <UFormField
             label="Which room they offered"
@@ -457,6 +502,27 @@ onMounted(load)
               class="w-full"
               data-test="refuse-reason"
             />
+          </UFormField>
+
+          <UFormField
+            v-if="noteToo"
+            label="How bad is it"
+            description="A one-off problem is a caution. Unsuitable refuses the room outright next time."
+          >
+            <div class="flex flex-wrap gap-1">
+              <UButton
+                v-for="verdict in ['CAUTION', 'UNSUITABLE'] as const"
+                :key="verdict"
+                size="sm"
+                :color="noteVerdict === verdict ? (verdict === 'UNSUITABLE' ? 'error' : 'warning') : 'neutral'"
+                :variant="noteVerdict === verdict ? 'solid' : 'outline'"
+                :aria-pressed="noteVerdict === verdict"
+                :data-test="`refuse-verdict-${verdict}`"
+                @click="noteVerdict = verdict"
+              >
+                {{ saysVerdict(verdict) }}
+              </UButton>
+            </div>
           </UFormField>
 
           <UCheckbox
@@ -494,6 +560,14 @@ onMounted(load)
       @update:open="rejecting = null"
     >
       <template #body>
+        <UAlert
+          v-if="inModal"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="inModal"
+          data-test="modal-failure"
+        />
         <UFormField
           label="Why it is not going to the union"
           required
