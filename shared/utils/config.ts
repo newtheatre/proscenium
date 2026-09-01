@@ -165,11 +165,23 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Bookings an availability sweep may cover before it refuses. It refuses, never truncates.',
   },
-  EXTERNAL_REQUEST_NOTICE_DAYS: {
+  EXTERNAL_REQUEST_NOTICE_WORKING_DAYS: {
     schema: z.number().int().positive(),
-    default: 10,
+    default: 3,
     workshop: 'spaces-and-training',
-    describes: 'Notice needed before a room we do not manage is wanted. Longer than our own, because a person fills in a form and waits.',
+    describes: 'Working days needed before a room we do not manage is wanted. Weekends and bank holidays do not count; the booking itself may still fall on one.',
+  },
+  BANK_HOLIDAYS: {
+    schema: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+    default: [
+      '2026-12-25', '2026-12-28',
+      '2027-01-01', '2027-03-26', '2027-03-29', '2027-05-03', '2027-05-31', '2027-08-30',
+      '2027-12-27', '2027-12-28',
+      '2028-01-03', '2028-04-14', '2028-04-17', '2028-05-01', '2028-05-29', '2028-08-28',
+      '2028-12-25', '2028-12-26',
+    ],
+    workshop: 'spaces-and-training',
+    describes: 'Days that do not count towards notice, as published for England and Wales. A request is refused rather than judged once this list stops reaching far enough ahead.',
   },
   ROOM_PURPOSES: {
     schema: z.array(z.string()).nonempty(),
@@ -412,7 +424,8 @@ export const ENFORCED_KEYS = [
   'ROOM_SERIES_MAX_OCCURRENCES',
   'ROOM_PRIORITY_TIERS',
   'ROOM_PURPOSES',
-  'EXTERNAL_REQUEST_NOTICE_DAYS',
+  'EXTERNAL_REQUEST_NOTICE_WORKING_DAYS',
+  'BANK_HOLIDAYS',
   'ROOM_NO_SHOW_WINDOW_DAYS',
   'ROOM_NO_SHOW_RECORD_AT',
   'ROOM_NO_SHOW_PREAPPROVAL_AT',

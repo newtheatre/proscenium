@@ -105,7 +105,7 @@ async function listSpace(name: string): Promise<string> {
   return (await answered.json() as { id: string }).id
 }
 
-// Well past the union's notice window, so only the case under test can refuse it.
+// Well past the notice window, so only the case under test can refuse it.
 function span(daysAhead = 30, hour = 18): { startsAt: string, endsAt: string } {
   const start = new Date()
   start.setUTCDate(start.getUTCDate() + daysAhead)
@@ -171,12 +171,34 @@ describe.skipIf(skip !== null)('asking, with an optional preference (criterion 1
       { title: 'And the union too', purpose: 'REHEARSAL', ...when }, member.cookie)).status).toBe(200)
   })
 
-  test('the union needs its notice, and says why', async () => {
+  test('too little notice is refused, and says why', async () => {
     const answered = await send('POST', '/api/rooms/external-requests',
       { title: 'Tomorrow', purpose: 'REHEARSAL', ...span(1) }, member.cookie)
 
     expect(answered.status).toBe(422)
     expect((await answered.json() as { statusMessage: string }).statusMessage).toContain('needs')
+  })
+
+  // A calendar that has run out must refuse rather than count a bank holiday as a working day,
+  // which would grant less notice than the rule asks for (C-121, 0038).
+  test('a date past the end of the bank holiday list is refused, not guessed at', async () => {
+    // Asserted, not assumed: a setup call that silently fails turns this into a test of the
+    // default list, which passes for the wrong reason.
+    expect((await send('PUT', '/api/admin/config/BANK_HOLIDAYS', { value: ['2026-09-02'] }, officer)).status).toBe(200)
+    try {
+      const answered = await send('POST', '/api/rooms/external-requests',
+        { title: 'Beyond the calendar', purpose: 'REHEARSAL', ...span(40) }, member.cookie)
+
+      expect(answered.status).toBe(422)
+      const said = await answered.json() as { statusMessage: string, data: { failures: { reason: string }[] } }
+      expect(said.data.failures.map(one => one.reason)).toContain('HOLIDAYS_UNKNOWN')
+      expect(said.statusMessage).toContain('2026-09-02')
+    }
+    finally {
+      // Restored to something that reaches well past every other span here, and holds no date
+      // near them, so the rest of the suite is judged exactly as the default would judge it.
+      await send('PUT', '/api/admin/config/BANK_HOLIDAYS', { value: ['2029-12-25'] }, officer)
+    }
   })
 
   test('a lapsed membership cannot ask', async () => {
@@ -560,7 +582,7 @@ describe.skipIf(skip !== null)('a union room reaches the rest of the system', ()
     await send('POST', `/api/admin/rooms/external-requests/${id}/submit`, {}, officer)
     await send('POST', `/api/admin/rooms/external-requests/${id}/assign`, { spaceId: space }, officer)
 
-    // Moved to tomorrow directly, because the union needs ten days' notice to be asked at all.
+    // Moved to tomorrow directly, because it could not be asked for at this notice.
     const { year, month, day } = londonParts(new Date())
     const at = Math.floor(fromLondonWallClock(year, month, day + 1, 19).getTime() / 1000)
     write('UPDATE external_requests SET starts_at = ?, ends_at = ? WHERE id = ?', at, at + 7200, id)

@@ -4,25 +4,27 @@ import {
   saysExternalStatus,
 } from '#shared/utils/external-requests'
 
-// C-120's pure half: the lifecycle, and what the union needs before it will answer.
+// C-120's pure half: the lifecycle, and what is needed before anybody will answer.
 
 const NOW = new Date('2027-03-01T12:00:00Z')
-const CONTEXT = { now: NOW, hasMembership: true, noticeDays: 10, horizonWeeks: 12 }
+// Reaching well past every span below, so only the case under test can refuse (C-121).
+const HOLIDAYS = ['2027-03-26', '2027-03-29', '2027-05-03', '2028-01-03']
+const CONTEXT = { now: NOW, hasMembership: true, noticeWorkingDays: 3, horizonWeeks: 12, holidays: HOLIDAYS }
 const span = (days: number): { startsAt: Date, endsAt: Date } => ({
   startsAt: new Date(NOW.getTime() + days * 86_400_000),
   endsAt: new Date(NOW.getTime() + days * 86_400_000 + 7_200_000),
 })
 
-describe('what the union needs before it will answer', () => {
+describe('what is needed before anybody will answer', () => {
   test('a request with enough notice passes', () => {
     expect(judgeExternal(span(20), CONTEXT)).toEqual([])
   })
 
   // Longer than our own notice window, because a person fills in the form and waits.
-  test('too little notice is refused, and says why the union needs it', () => {
-    const failures = judgeExternal(span(2), CONTEXT)
+  test('too little notice is refused, and says why it is needed', () => {
+    const failures = judgeExternal(span(1), CONTEXT)
     expect(failures.map(one => one.reason)).toContain('SHORT_NOTICE')
-    expect(failures[0]!.says).toContain('10 days')
+    expect(failures[0]!.says).toContain('3 working days')
   })
 
   test('beyond the horizon is refused', () => {
@@ -38,25 +40,45 @@ describe('what the union needs before it will answer', () => {
       .toContain('NO_MEMBERSHIP')
   })
 
-  // Opening hours, capacity and an active flag are things the union never tells us, so asking
-  // about them would be inventing an answer.
-  test('nothing is judged that the union never told us', () => {
+  // Opening hours, capacity and an active flag are things nobody tells us about a room we do
+  // not manage, so asking about them would be inventing an answer.
+  test('nothing is judged that nobody ever told us', () => {
     const everything = judgeExternal(span(-2), { ...CONTEXT, hasMembership: false }).map(one => one.reason)
     expect(everything.every(reason => EXTERNAL_REFUSALS.includes(reason))).toBe(true)
     expect(everything).not.toContain('CLOSED')
   })
 
-  // The clocks going forward makes three London days 71 hours, and a window counted in blocks of
-  // 24 refused an ask that had the notice the setting names (0014).
-  test('notice counts London days, so a clock change does not eat one', () => {
-    const clocksChange = {
-      ...CONTEXT,
-      noticeDays: 3,
-      now: new Date('2027-03-26T12:00:00Z'),
-    }
-    const across = { startsAt: new Date('2027-03-29T10:30:00Z'), endsAt: new Date('2027-03-29T12:30:00Z') }
+  // A weekend and two bank holidays sit between the Thursday and the following Wednesday, so
+  // six calendar days are two working ones (C-121).
+  test('notice counts working days, so a weekend and a bank holiday do not pay for it', () => {
+    const easter = { ...CONTEXT, now: new Date('2027-03-25T12:00:00Z') }
+    const after = { startsAt: new Date('2027-03-31T18:00:00Z'), endsAt: new Date('2027-03-31T20:00:00Z') }
 
-    expect(judgeExternal(across, clocksChange).map(one => one.reason)).not.toContain('SHORT_NOTICE')
+    expect(judgeExternal(after, easter).map(one => one.reason)).toContain('SHORT_NOTICE')
+  })
+
+  // A booking may fall on a weekend or a bank holiday: only the gap before it is judged.
+  test('a booking on a bank holiday is ordinary, given the notice', () => {
+    const wellAhead = { ...CONTEXT, now: new Date('2027-04-01T12:00:00Z') }
+    const onTheHoliday = { startsAt: new Date('2027-05-03T18:00:00Z'), endsAt: new Date('2027-05-03T20:00:00Z') }
+
+    expect(judgeExternal(onTheHoliday, wellAhead)).toEqual([])
+  })
+
+  // A list that has run out must never read as "no holidays": that grants less notice than the
+  // rule asks for, which is the failure the rule exists to prevent (0038).
+  test('a date past the end of the calendar is refused, not guessed at', () => {
+    const short = { ...CONTEXT, holidays: ['2027-03-26'] }
+    const failures = judgeExternal(span(30), short)
+
+    expect(failures.map(one => one.reason)).toContain('HOLIDAYS_UNKNOWN')
+    expect(failures.map(one => one.reason)).not.toContain('SHORT_NOTICE')
+    expect(failures.find(one => one.reason === 'HOLIDAYS_UNKNOWN')!.says).toContain('2027-03-26')
+  })
+
+  test('and an empty calendar refuses everything rather than counting every day', () => {
+    expect(judgeExternal(span(30), { ...CONTEXT, holidays: [] }).map(one => one.reason))
+      .toContain('HOLIDAYS_UNKNOWN')
   })
 })
 

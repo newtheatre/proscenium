@@ -1,7 +1,27 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
+import { coversThrough, lastCovered, londonDate } from '#shared/utils/working-days'
 
 definePageMeta({ layout: 'admin', title: 'Settings', middleware: 'signed-in' })
+
+// A holiday list that has run out refuses requests near the horizon, so it says how far it
+// reaches before anybody is refused rather than at the moment they are (C-121, 0038).
+const HORIZON_WEEKS = 12
+
+function coverage(setting: { key: string, value: unknown, default: unknown }): { says: string, short: boolean } | null {
+  if (setting.key !== 'BANK_HOLIDAYS') return null
+
+  const dates = (Array.isArray(setting.value) ? setting.value : setting.default) as string[] | undefined
+  if (!Array.isArray(dates)) return null
+
+  const horizon = new Date(Date.now() + HORIZON_WEEKS * 7 * 86_400_000)
+  const reach = lastCovered(dates)
+  if (!reach) return { says: 'No dates recorded, so every request for a room not listed here is refused.', short: true }
+
+  return coversThrough(dates, horizon)
+    ? { says: `Covers to ${reach}.`, short: false }
+    : { says: `Covers only to ${reach}, and requests are judged as far as ${londonDate(horizon)}. Anything past ${reach} is refused.`, short: true }
+}
 
 interface Setting {
   key: string
@@ -193,6 +213,14 @@ onMounted(load)
                 </p>
                 <p class="text-sm text-muted">
                   {{ setting.describes }}
+                </p>
+                <p
+                  v-if="coverage(setting)"
+                  class="text-sm"
+                  :class="coverage(setting)!.short ? 'text-error' : 'text-muted'"
+                  :data-test="`coverage-${setting.key}`"
+                >
+                  {{ coverage(setting)!.says }}
                 </p>
               </div>
               <div class="flex gap-1">

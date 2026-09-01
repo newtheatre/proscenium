@@ -7,8 +7,8 @@ conflict masking), while the calendar, the policy engine, blackouts, tiers and n
 new build. Equipment loans arrive in V2 as the sibling the room store always implied, gated by live
 training records because the gate and the record now share one database.
 
-Counts: 20 MVP stories (C-101 to C-120), 6 V2 stories (C-201 to C-206), 2 Later epic stubs
-(C-301, C-302). 28 total.
+Counts: 21 MVP stories (C-101 to C-121), 6 V2 stories (C-201 to C-206), 2 Later epic stubs
+(C-301, C-302). 29 total.
 
 ## Open questions
 
@@ -326,6 +326,21 @@ Counts: 20 MVP stories (C-101 to C-120), 6 V2 stories (C-201 to C-206), 2 Later 
   5. Where something unsuitable is offered, the officer records it and asks again: the request returns to AWAITING_EXTERNAL with the room it was given cleared, so it never stands as a booking we cannot use. The offer is kept, and the suitability note may be written in the same action.
   6. A member may withdraw at any open step and after confirmation; where the form is already in, the approvers are told, because our arrangement stands until a person cancels it.
 - Source: the Theatre Manager's own account of the process; decision 0036; audit RM-6.
+
+## C-121: Three working days, and the days that are not
+
+- Role: Member
+- Phase: MVP
+- Story: As a member, I want a room I ask for elsewhere refused up front when there is not time to ask for it, so that I find out now rather than after the request has sat in a queue.
+- Depends on: C-120
+- Acceptance criteria:
+  1. Notice for a room we do not manage is counted in **working days**: Saturdays, Sundays and bank holidays do not count. The number is configuration, defaulting to three.
+  2. The count runs from **the member's ask**, not from the day the form goes in. A request waiting in the queue eats its own slack, and the officer's screen shows the date the form has to go in by.
+  3. **The booking's own date is never judged.** A Saturday get-in, a Sunday rehearsal and a bank holiday meeting are all ordinary; only the gap before the booking is counted.
+  4. Bank holidays are a configured list of dates, editable by the committee, defaulting to the published England and Wales dates.
+  5. A request is **refused** when the list does not cover the period being counted, naming the last date it does cover. A list that has run out must never be read as "no holidays", because that silently grants less notice than the rule requires.
+  6. Coverage running short is visible before anybody is refused: `/api/health` reports it, and the settings screen shows the last covered date beside the list.
+- Source: the Theatre Manager's account of the Students' Union's form; decision 0038.
 
 ## C-201: Asset register
 
