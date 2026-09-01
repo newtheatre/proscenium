@@ -84,6 +84,22 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Departments this person led. Stewardship history survives an erasure, and it names nobody else.',
   },
   {
+    name: 'training_records',
+    column: 'user_id',
+    // Its own section: `department_leads` already holds `training`, and the bundle keys by section.
+    section: 'training-records',
+    // The reason is exported as well as scrubbed: it is a thing written about them, the way a
+    // booking's rejection reason is, and a subject access request reaches it.
+    columns: ['module_id', 'awarded_on', 'expires_on', 'source', 'evidence_ref', 'revoked_at', 'revoke_reason', 'created_at'],
+    erasure: 'scrub',
+    // The append-only trigger names this clearing as one of its three sanctioned edits, so the
+    // generic statement runs here rather than a bespoke one (0010, 0011, G-122 criterion 6).
+    scrub: ['evidence_ref', 'revoke_reason'],
+    // `granted_by` and `revoked_by` hold the acting officer rather than the subject, so they are
+    // not scrubbed and resolve to the tombstone, as `config.updated_by` does.
+    why: 'Training this person held. Who was competent to do what is safety history; the evidence for it and the words written about them are not.',
+  },
+  {
     name: 'notification_preferences',
     column: 'user_id',
     section: 'notification-preferences',

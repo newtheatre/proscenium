@@ -56,6 +56,19 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
       VALUES (?, ?, ?, ?, ?, ?, 'REJECTED', ?, ?, ?)`,
     `b-${id}`, `room-${id}`, id, `${NAME}'s read-through`, now + 3600, now + 7200,
     `${NAME} has a key`, `${NAME} needs it for a deadline`, `Told ${NAME} the room is in a get-in`],
+    ['INSERT INTO departments (code, name) VALUES (?, ?)', `dept-${id}`, 'Technical'],
+    ['INSERT INTO department_leads (id, department, user_id) VALUES (?, ?, ?)', `dl-${id}`, `dept-${id}`, id],
+    ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)',
+      `mod-${id}`, `dept-${id}`, 'MODULE', 'Working at height'],
+    // Two records, because the append-only guard treats them differently: free text on a live one,
+    // and free text written at revocation on one already revoked (0010, G-122 criterion 6).
+    [`INSERT INTO training_records (id, user_id, module_id, awarded_on, source, evidence_ref, granted_by)
+      VALUES (?, ?, ?, '2026-09-14', 'SIGNOFF', ?, ?)`,
+    `tr-${id}`, id, `mod-${id}`, `Certificate held by ${NAME}`, id],
+    [`INSERT INTO training_records (id, user_id, module_id, awarded_on, source, granted_by,
+      revoked_at, revoked_by, revoke_reason)
+      VALUES (?, ?, ?, '2026-09-14', 'SIGNOFF', ?, ?, ?, ?)`,
+    `tr2-${id}`, id, `mod-${id}`, id, now, id, `${NAME} was found not competent`],
   ])
   return id
 }

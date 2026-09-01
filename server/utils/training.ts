@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, not, or } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, not, or } from 'drizzle-orm'
 import { isMonthDay, londonParts } from '#shared/utils/london'
 import { expiryFor, leadsDepartment } from '#shared/utils/training'
 import type { AcademicYear, ExpiryPolicy, LeadAssignment, ModuleInput } from '#shared/utils/training'
@@ -57,6 +57,53 @@ const liveLead = (now: Date) => or(
   isNull(schema.departmentLeads.expiresAt),
   gt(schema.departmentLeads.expiresAt, Math.floor(now.getTime() / 1000)),
 )
+
+// The SQL twin of countsAsHeld. Expiring is held, so the warning window cancels out and no gate
+// query ever reads it: held is unrevoked and not yet at its expiry date (G-101 criterion 3).
+export function heldNow(today: string) {
+  return and(
+    isNull(schema.trainingRecords.revokedAt),
+    or(isNull(schema.trainingRecords.expiresOn), gt(schema.trainingRecords.expiresOn, today)),
+  )
+}
+
+export interface RecordRow {
+  id: string
+  moduleId: string
+  moduleName: string
+  department: string
+  kind: string
+  awardedOn: string
+  expiresOn: string | null
+  source: string
+  revokedAt: number | null
+  createdAt: number
+}
+
+const RECORD_COLUMNS = {
+  id: schema.trainingRecords.id,
+  moduleId: schema.trainingRecords.moduleId,
+  moduleName: schema.trainingModules.name,
+  department: schema.trainingModules.department,
+  kind: schema.trainingModules.kind,
+  awardedOn: schema.trainingRecords.awardedOn,
+  expiresOn: schema.trainingRecords.expiresOn,
+  source: schema.trainingRecords.source,
+  revokedAt: schema.trainingRecords.revokedAt,
+  createdAt: schema.trainingRecords.createdAt,
+}
+
+// Somebody's own records, newest award first. Revoked ones are the caller's to filter: a member
+// never sees them and a lead's history view is the only place they show (G-101 criterion 6).
+export async function recordsFor(userId: string, includeRevoked = false): Promise<RecordRow[]> {
+  return db.select(RECORD_COLUMNS).from(schema.trainingRecords)
+    .innerJoin(schema.trainingModules, eq(schema.trainingModules.id, schema.trainingRecords.moduleId))
+    .where(and(
+      eq(schema.trainingRecords.userId, userId),
+      includeRevoked ? undefined : isNull(schema.trainingRecords.revokedAt),
+    ))
+    .orderBy(desc(schema.trainingRecords.awardedOn), desc(schema.trainingRecords.createdAt))
+}
 
 // The departments somebody currently leads, as a predicate rather than as a list of ids.
 function ledBy(userId: string, now: Date) {

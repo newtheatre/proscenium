@@ -239,6 +239,20 @@
       "when": 1788292119567,
       "tag": "0033_last_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1788299537876,
+      "tag": "0034_military_shiva",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1788299595680,
+      "tag": "0035_training_records_append_only",
+      "breakpoints": true
     }
   ]
 }
