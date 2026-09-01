@@ -208,12 +208,16 @@ export const CONFIG_KEYS = {
     describes: 'Days before expiry that the final warning is sent.',
   },
   TRAINING_CARRY_OVER_DAYS: {
-    schema: z.number().int().positive(),
+    // Under a year, because the carry-over rolls the boundary once: a window longer than the year
+    // it carries across could not do what it says (G-123 criterion 2).
+    schema: z.number().int().positive().max(364),
     default: 60,
     workshop: 'spaces-and-training',
     describes: 'Carry-over window across the academic year boundary. A constant in the old module.',
   },
   ACADEMIC_YEAR_BOUNDARY: {
+    // Shape only: which MM-DD values are real days is config-rules' DAY_OF_YEAR_KEYS, whose
+    // refusal names the rule rather than the key (G-123 criterion 5, J-104 criterion 3).
     schema: z.string().regex(/^\d{2}-\d{2}$/),
     default: '08-31',
     workshop: 'spaces-and-training',
@@ -401,6 +405,7 @@ export function isConfigKey(name: string): name is ConfigKey {
 // The keys something actually reads today; a key absent here is recorded but not yet enforced,
 // which the surface says plainly (0012). A test greps the server for the reads, so it cannot drift.
 export const ENFORCED_KEYS = [
+  'ACADEMIC_YEAR_BOUNDARY',
   'ADMIN_TOKEN_HOURS',
   'MAGIC_LINK_MINUTES',
   'MFA_ATTEMPT_MINUTES',
@@ -435,6 +440,7 @@ export const ENFORCED_KEYS = [
   // effect until K-111 builds the sweep itself.
   'RETENTION_FULL_ACCOUNT_YEARS',
   'SIGN_IN_ATTEMPTS_PER_ACCOUNT',
+  'TRAINING_CARRY_OVER_DAYS',
   'SIGN_IN_ATTEMPTS_PER_ADDRESS_WINDOW_MINUTES',
   'UNVERIFIED_ACCOUNT_DAYS',
   'UNVERIFIED_EXPIRY_CAP',

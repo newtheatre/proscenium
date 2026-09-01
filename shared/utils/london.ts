@@ -73,6 +73,17 @@ export function fromLondonWallClock(year: number, month: number, day: number, ho
   return new Date(wall - offsetMs(new Date(once)))
 }
 
+// A recurring London day of the year, written MM-DD. Judged against a common year, because a
+// boundary that only exists in a leap year would read as NaN in three years out of four.
+export function isMonthDay(value: string): boolean {
+  const match = /^(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return false
+  const month = Number(match[1])
+  const day = Number(match[2])
+  if (month < 1 || month > 12) return false
+  return day >= 1 && day <= new Date(Date.UTC(2001, month, 0)).getUTCDate()
+}
+
 // The last instant of 31 July, London: when roles lapse and the committee year turns (0009).
 export function committeeYearEnd(year: number): Date {
   return fromLondonWallClock(year, COMMITTEE_YEAR_END_MONTH, COMMITTEE_YEAR_END_DAY, 23, 59, 59, 999)
