@@ -90,6 +90,12 @@ const CATALOGUE = {
   'external.space.updated': { label: 'SU room changed', module: 'spaces' },
   'external.space.note.set': { label: 'SU room suitability noted', module: 'spaces' },
   'external.space.note.removed': { label: 'SU room suitability note removed', module: 'spaces' },
+  'external.requested': { label: 'Union room asked for', module: 'spaces', self: true },
+  'external.request.submitted': { label: 'Union form submitted', module: 'spaces' },
+  'external.request.assigned': { label: 'Union room recorded', module: 'spaces' },
+  'external.request.assignment.refused': { label: 'Union room refused as unsuitable', module: 'spaces' },
+  'external.request.rejected': { label: 'Union room request turned down', module: 'spaces' },
+  'external.request.cancelled': { label: 'Union room request withdrawn', module: 'spaces', self: true },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).
   'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },

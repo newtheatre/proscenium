@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { UNRECORDED_PURPOSE } from '#shared/utils/bookings'
 import { STATUS_MAP, reconcile, transformBookings } from '#migration/bookings'
 import { createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -65,7 +66,7 @@ async function targetWithEstate(): Promise<TestDatabase> {
     ['INSERT INTO users (id, email, name, verified, anonymised_at) VALUES (?, ?, ?, 1, ?)',
       'new-ghost', 'deleted-x@anonymised.invalid', 'Deleted user', 1_700_000_000],
     ['INSERT INTO rooms (id, name) VALUES (?, ?)', 'new-studio', 'The Studio'],
-    ['INSERT INTO rooms (id, name, is_external) VALUES (?, ?, 1)', 'new-su', 'Portland Building, C11'],
+    ['INSERT INTO external_spaces (id, name, building) VALUES (?, ?, ?)', 'new-su', 'Portland C11', 'Portland Building'],
   ])
   return target
 }
@@ -74,9 +75,11 @@ function run(source: Database, target: TestDatabase, accounts = new Map([['old-u
   return transformBookings({
     source,
     accounts,
-    rooms: new Map([['room:1', 'new-studio'], ['venue:7', 'new-su']]),
+    rooms: new Map([['room:1', 'new-studio']]),
+    spaces: new Map([['venue:7', 'new-su']]),
     bookingIds: new Map(),
     seriesIds: new Map(),
+    externalIds: new Map(),
     target: (target as unknown as { raw: Database }).raw ?? (target as unknown as Database),
   })
 }
@@ -120,14 +123,73 @@ describe('the old history imports keyed to the canonical account (criterion 1)',
     }
   })
 
-  test('a booking of an external venue lands in the room that replaced it', async () => {
+  // A booking at a union venue was never a booking of ours: it is a request (C-120, 0036).
+  test('a booking of a union venue becomes a request, not a booking', async () => {
+    const source = oldEstate()
+    place(source, { id: 1, over: { room_id: null, external_venue_id: 7 } })
+    const target = await targetWithEstate()
+
+    try {
+      const { summary } = run(source, target)
+      expect(summary.externalWritten).toBe(1)
+      expect(summary.written).toBe(0)
+      expect(rows(target, 'SELECT id FROM room_bookings')).toHaveLength(0)
+      expect(rows(target, 'SELECT id FROM external_requests')).toHaveLength(1)
+    }
+    finally {
+      target.close()
+    }
+  })
+
+  // The venue a row names meant different things depending on where it had got to.
+  test('AWAITING_EXTERNAL survives, and its venue is what we asked for', async () => {
+    const source = oldEstate()
+    place(source, { id: 1, over: { room_id: null, external_venue_id: 7, status: 'AWAITING_EXTERNAL' } })
+    const target = await targetWithEstate()
+
+    try {
+      run(source, target)
+      const [request] = rows<{ status: string, preferred_space_id: string | null, assigned_space_id: string | null }>(
+        target, 'SELECT status, preferred_space_id, assigned_space_id FROM external_requests')
+
+      expect(request?.status).toBe('AWAITING_EXTERNAL')
+      expect(request?.preferred_space_id).toBe('new-su')
+      expect(request?.assigned_space_id).toBeNull()
+    }
+    finally {
+      target.close()
+    }
+  })
+
+  test('a confirmed one carries its venue as the room we were given', async () => {
+    const source = oldEstate()
+    place(source, { id: 1, over: { room_id: null, external_venue_id: 7, status: 'CONFIRMED' } })
+    const target = await targetWithEstate()
+
+    try {
+      run(source, target)
+      const [request] = rows<{ status: string, preferred_space_id: string | null, assigned_space_id: string | null }>(
+        target, 'SELECT status, preferred_space_id, assigned_space_id FROM external_requests')
+
+      expect(request?.status).toBe('CONFIRMED')
+      expect(request?.assigned_space_id).toBe('new-su')
+      expect(request?.preferred_space_id).toBeNull()
+    }
+    finally {
+      target.close()
+    }
+  })
+
+  // The purpose is never invented: nobody was ever asked.
+  test('an imported request records no purpose', async () => {
     const source = oldEstate()
     place(source, { id: 1, over: { room_id: null, external_venue_id: 7 } })
     const target = await targetWithEstate()
 
     try {
       run(source, target)
-      expect(rows<{ room_id: string }>(target, 'SELECT room_id FROM room_bookings')[0]?.room_id).toBe('new-su')
+      expect(rows<{ purpose: string }>(target, 'SELECT purpose FROM external_requests')[0]?.purpose)
+        .toBe(UNRECORDED_PURPOSE)
     }
     finally {
       target.close()
@@ -331,14 +393,17 @@ describe('a rehearsal runs again without doubling the history (criterion 5)', ()
       // the first minted rather than making new ones.
       const bookingIds = new Map<string, string>()
       const seriesIds = new Map<string, string>()
+      const externalIds = new Map<string, string>()
       const raw = (target as unknown as { raw: Database }).raw ?? (target as unknown as Database)
       const accounts = new Map([['old-user-1', 'new-user-1']])
-      const rooms = new Map([['room:1', 'new-studio'], ['venue:7', 'new-su']])
+      const rooms = new Map([['room:1', 'new-studio']])
+      const spaces = new Map([['venue:7', 'new-su']])
+      const carried = { source, accounts, rooms, spaces, seriesIds, externalIds, target: raw }
 
-      transformBookings({ source, accounts, rooms, bookingIds, seriesIds, target: raw })
+      transformBookings({ ...carried, bookingIds })
       const first = rows<{ id: string }>(target, 'SELECT id FROM room_bookings ORDER BY starts_at').map(one => one.id)
 
-      transformBookings({ source, accounts, rooms, bookingIds, seriesIds, target: raw })
+      transformBookings({ ...carried, bookingIds })
       const second = rows<{ id: string }>(target, 'SELECT id FROM room_bookings ORDER BY starts_at').map(one => one.id)
 
       expect(second).toHaveLength(2)
@@ -361,8 +426,10 @@ describe('a rehearsal runs again without doubling the history (criterion 5)', ()
         source,
         accounts: new Map([['old-user-1', 'new-user-1']]),
         rooms: new Map([['room:1', 'new-studio']]),
+        spaces: new Map(),
         bookingIds,
         seriesIds: new Map(),
+        externalIds: new Map(),
         target: raw,
       })
 

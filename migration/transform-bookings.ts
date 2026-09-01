@@ -35,28 +35,34 @@ const write = async (name: string, map: Map<string, string>): Promise<void> => {
 const accounts = await readMap('id-map.tsv')
 const bookingIds = await readMap('booking-id-map.tsv')
 const seriesIds = await readMap('series-id-map.tsv')
+const externalIds = await readMap('external-id-map.tsv')
 
 const source = await loadDump('rooms', stamp)
 const target = new Database(targetPath)
 
-// Old room and venue ids to the unified estate, matched by name. Written by hand for a rehearsal
-// rather than guessed, because a wrong room silently rewrites years of utilisation.
-const roomMapPath = join(OUT, 'room-map.tsv')
+// Written by hand for a rehearsal rather than guessed, because a wrong room silently rewrites
+// years of utilisation. Two files now: a venue is a union room, not a room we control (C-120).
 const rooms = await readMap('room-map.tsv')
-if (rooms.size === 0) {
-  console.error(`No ${roomMapPath}: map each "room:<id>" and "venue:<id>" to a unified room id first.`)
+const spaces = await readMap('space-map.tsv')
+if (rooms.size === 0 || spaces.size === 0) {
+  console.error(`No ${join(OUT, 'room-map.tsv')} or ${join(OUT, 'space-map.tsv')}: map each`)
+  console.error('"room:<id>" to a unified room and each "venue:<id>" to a union room first.')
   process.exit(1)
 }
 
-const { summary, exceptions } = transformBookings({ source, accounts, rooms, bookingIds, seriesIds, target })
+const { summary, exceptions } = transformBookings({
+  source, accounts, rooms, spaces, bookingIds, seriesIds, externalIds, target,
+})
 const check = reconcile(source, target, summary)
 
 await write('booking-id-map.tsv', bookingIds)
 await write('series-id-map.tsv', seriesIds)
+await write('external-id-map.tsv', externalIds)
 await Bun.write(join(OUT, 'booking-exceptions.txt'), exceptions.join('\n') + (exceptions.length ? '\n' : ''))
 await Bun.write(join(OUT, 'booking-summary.json'), `${JSON.stringify({ stamp, ...summary, problems: check.problems }, null, 2)}\n`)
 
-console.log(`bookings: read ${summary.read}, wrote ${summary.written}, ${summary.series} series`)
+console.log(`bookings: read ${summary.read}, wrote ${summary.written} of ours`)
+console.log(`union requests: ${summary.externalWritten}, and ${summary.series} series`)
 console.log(`skipped: ${summary.skippedNoRoom} without a room, ${summary.skippedNoAccount} without an account`)
 if (exceptions.length) console.log(`exceptions: ${exceptions.length}, in out/booking-exceptions.txt`)
 

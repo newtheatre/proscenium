@@ -127,42 +127,12 @@ describe.skipIf(skip !== null)('describing the bookable estate (C-101)', () => {
     expect((await send('DELETE', '/api/admin/rooms/not-a-room')).status).toBe(404)
   })
 
-  // Criterion 3, in the terms the estate uses: a room somebody else manages, not a "venue".
-  test('an external room records where it is and who to ask', async () => {
-    const id = await addRoom(`Portland ${crypto.randomUUID().slice(0, 6)}`, {
-      isExternal: true,
-      campus: 'University Park',
-      building: 'Portland Building',
-      contact: 'SU reception, portland@example.invalid',
-    })
-
-    const listing = await (await send('GET', '/api/admin/rooms')).json() as Listing
-    const room = listing.items.find(one => one.id === id) as { isExternal: boolean, campus: string } | undefined
-
-    expect(room?.isExternal).toBe(true)
-    expect(room?.campus).toBe('University Park')
-  })
-
-  test('an internal room says nothing about a campus it does not have', async () => {
-    const id = await addRoom(`Internal ${crypto.randomUUID().slice(0, 6)}`)
-    const row = read<{ isExternal: number, campus: string | null }>(
-      'SELECT is_external AS isExternal, campus FROM rooms WHERE id = ?', id)
-
-    expect(row?.isExternal).toBe(0)
-    expect(row?.campus).toBeNull()
-  })
-
-  test('turning a room external is a change the trail names', async () => {
-    const id = await addRoom(`Moving ${crypto.randomUUID().slice(0, 6)}`)
-    await send('PUT', `/api/admin/rooms/${id}`, { name: 'Moving', isExternal: true, campus: 'Jubilee' })
-
-    const entry = read<{ detail: string }>(
-      `SELECT detail FROM audit_log WHERE action = 'room.updated' AND target = ? ORDER BY created_at DESC LIMIT 1`,
-      `room:${id}`)
-    const detail = JSON.parse(entry!.detail) as Record<string, [unknown, unknown]>
-
-    expect(detail.isExternal).toEqual([false, true])
-    expect(detail.campus?.[1]).toBe('Jubilee')
+  // Criterion 3 moved to C-119: a union room is a reference catalogue rather than part of the
+  // bookable estate, and tests/e2e/external-spaces.test.ts covers it (0036).
+  test('a campus is recorded for a room that has one', async () => {
+    const id = await addRoom(`Jubilee ${crypto.randomUUID().slice(0, 6)}`, { campus: 'Jubilee' })
+    const row = read<{ campus: string | null }>('SELECT campus FROM rooms WHERE id = ?', id)
+    expect(row?.campus).toBe('Jubilee')
   })
 
   // The bug as reported. On the server $fetch carries no cookies, so the render came back

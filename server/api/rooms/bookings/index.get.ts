@@ -16,7 +16,6 @@ export default defineEventHandler(async (event) => {
     id: schema.roomBookings.id,
     roomId: schema.roomBookings.roomId,
     room: schema.rooms.name,
-    isExternal: schema.rooms.isExternal,
     title: schema.roomBookings.title,
     attendees: schema.roomBookings.attendees,
     startsAt: schema.roomBookings.startsAt,

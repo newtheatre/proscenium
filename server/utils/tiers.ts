@@ -65,7 +65,6 @@ export async function alternativesFor(displaced: Displaced, withinDays = 14): Pr
     .from(schema.rooms)
     .where(and(
       eq(schema.rooms.isActive, true),
-      eq(schema.rooms.isExternal, false),
       // At least as big, and a room whose capacity nobody recorded cannot be shown to be: a
       // broom cupboard offered in place of the auditorium is worse than offering nothing.
       displaced.capacity === null

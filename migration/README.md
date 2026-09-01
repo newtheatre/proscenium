@@ -63,8 +63,12 @@ step is offline against the dumps.
   a booking whose account or room did not come across is skipped and named in
   `out/booking-exceptions.txt` rather than given one, and tombstones stay tombstones. Web push
   subscriptions are deliberately not read; push consent is re-collected when push works.
-  `out/room-map.tsv` maps each old `room:<id>` and `venue:<id>` to a unified room and is written by
-  hand, because a wrong room silently rewrites years of utilisation.
+  `out/room-map.tsv` maps each old `room:<id>` to a unified room and `out/space-map.tsv` maps each
+  `venue:<id>` to a union room; both are written by hand, because a wrong room silently rewrites
+  years of utilisation. A booking at a union venue imports into `external_requests` rather than
+  `room_bookings`, keeping `AWAITING_EXTERNAL` with the meaning it always had (C-120, 0036), and
+  the venue it names lands in `preferred_space_id` where the union had not yet answered and in
+  `assigned_space_id` where it had. The reconciliation checksums both tables.
 
 - **Load** (K-112 criterion 4): turns the core into `out/load.sql`, upserts keyed on identity, and
   applies it to a local target when given one. It never deletes, so a person or a grant that

@@ -30,25 +30,28 @@ const now = Math.floor(Date.now() / 1000)
 
 // Named the way the society names them, so a screen looks like the real thing rather than like a
 // fixture. Hours are left empty on most: a room with none is open whenever (C-101).
-const ROOMS = [
-  { name: 'The Studio', capacity: 40, description: 'The rehearsal room upstairs.', sensitive: false, isExternal: false },
-  { name: 'The Workshop', capacity: 25, description: 'Bench space, and the only room with a sink.', sensitive: false, isExternal: false },
+
+// Where a room is and who to ask are optional: ours are in one building and need no telling.
+interface SeedRoom {
+  name: string
+  capacity: number
+  description: string
+  sensitive: boolean
+  campus?: string
+  building?: string
+  contact?: string
+  hours?: { weekday: number, opens: string, closes: string }[]
+}
+
+const ROOMS: SeedRoom[] = [
+  { name: 'The Studio', capacity: 40, description: 'The rehearsal room upstairs.', sensitive: false },
+  { name: 'The Workshop', capacity: 25, description: 'Bench space, and the only room with a sink.', sensitive: false },
   {
     name: 'The Auditorium',
     capacity: 120,
     description: 'The house. Booked around the season, so every request is agreed by a person.',
     sensitive: true,
-    isExternal: false,
     hours: [1, 2, 3, 4, 5, 6, 0].map(weekday => ({ weekday, opens: '09:00', closes: '23:00' })),
-  },
-  {
-    name: 'Portland B12',
-    capacity: 30,
-    sensitive: false,
-    isExternal: true,
-    campus: 'University Park',
-    building: 'Portland Building',
-    contact: 'SU reception, room bookings desk',
   },
 ]
 
@@ -64,11 +67,10 @@ function seedRooms(): { id: string, name: string }[] {
 
     const roomId = id()
     db.query(`
-      INSERT INTO rooms (id, name, description, capacity, sensitive, is_external, campus, building, contact)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO rooms (id, name, description, capacity, sensitive, campus, building, contact)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      roomId, room.name, room.description ?? null, room.capacity,
-      room.sensitive ? 1 : 0, room.isExternal ? 1 : 0,
+      roomId, room.name, room.description ?? null, room.capacity, room.sensitive ? 1 : 0,
       room.campus ?? null, room.building ?? null, room.contact ?? null,
     )
 

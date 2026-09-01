@@ -33,7 +33,6 @@ interface Request {
   decidedAt: number | null
   failures: Failure[]
   sensitive: boolean
-  isExternal: boolean
 }
 
 interface Outcome { id: string, ok: boolean, says?: string }
@@ -236,7 +235,6 @@ const columns = computed<TableColumn<Request>[]>(() => [
     cell: ({ row }) => h('div', { class: 'space-y-1' }, [
       h('div', { class: 'flex flex-wrap gap-1' }, [
         ...(row.original.sensitive ? [h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Always asks')] : []),
-        ...(row.original.isExternal ? [h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => 'Booked through the SU')] : []),
         ...row.original.failures.map(fail =>
           h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm', title: fail.says }, () => fail.says)),
       ]),

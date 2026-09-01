@@ -40,6 +40,8 @@ erDiagram
   users ||--o| room_feed_tokens : subscribes_with
   rooms ||--o{ room_blackouts : closed_by
   external_spaces ||--o{ external_space_notes : judged_by
+  users ||--o{ external_requests : asks_for
+  external_requests ||--o{ external_assignments : offered
   room_bookings ||--o{ room_no_shows : missed_as
   room_series ||--o{ room_bookings : expands_to
   users ||--o{ ledger_entries : acts_in
@@ -467,16 +469,14 @@ bool · `sensitive` bool (books via the approval queue regardless of policy) · 
 `updated_at` · `min_booking_minutes` / `max_booking_hours` / `notice_hours` / `horizon_weeks` /
 `active_bookings_cap`, each NULL falling back to the estate setting of the same name; nought is an
 override meaning none needed, so resolution tests absence rather than falsiness (C-106 criterion 1)
-· `is_external` bool · `campus` · `building` · `contact` (free text: a name, an
-address, whatever gets the room booked). Indexed on `is_active`, which is what a member-facing
-calendar filters on, and on `is_external`.
-**External, not "venue".** A `venue` here is where a performance happens, and an internally managed
-room may be one: the auditorium is booked for rehearsals and hosts performances. So the noun is
-always *room*, and `is_external` says only who arranges it (C-101). An external room is an SU room:
-a member's booking for one is always a request, because the Theatre Manager books it by filling in
-the SU's form. Venues outside the SU are hired for performances and are module B's, not these.
-`sensitive` and `is_external` therefore both send a booking to the approval queue whatever the
-policy says, and for the same reason: a person has to do something before the room is really held.
+· `campus` · `building` · `contact` (free text: a name, an address, whatever gets the room
+booked). Indexed on `is_active`, which is what a member-facing calendar filters on.
+**Every room here is one we control.** A `venue` is where a performance happens, and an internally
+managed room may be one: the auditorium is booked for rehearsals and hosts performances. So the noun
+is always *room*. Rooms the Students' Union manages are **not in this table at all**: they are
+`external_spaces`, a reference catalogue, because we can never guarantee availability we do not
+control (decision 0036, C-119, C-120). `is_external` is gone with them, and `sensitive` is now the
+only room-level reason a booking goes to the approval queue whatever the policy says.
 Retired, never deleted: a booking made last term still names something (C-101 criterion 2), and
 there is no delete endpoint at all rather than one that refuses. Capacity is compared against a
 booking's attendee count as a **warning, never a refusal**: the old estate recorded both and
@@ -673,6 +673,70 @@ records, withdrawals included, so a correction is visible rather than a gap (cri
 Erasure keeps the rows: append-only means a scrub could not run here even if it were wanted, and
 the reference resolves to the tombstone the user row became, so the statistics survive and the
 ladder dies with the account (criterion 6, 0010, 0011).
+
+### external_requests and external_assignments
+`external_requests`: `id` PK · `user_id` → users restrict · `title` · `purpose` · `attendees` ·
+`starts_at`, `ends_at` CHECK `ends_at > starts_at` · `preferred_space_id`, `assigned_space_id` →
+external_spaces NULL · `notes` · `su_reference` · `status` CHECK
+`REQUESTED|AWAITING_EXTERNAL|CONFIRMED|REJECTED|CANCELLED` · `submitted_at`/`by` ·
+`decided_at`/`by` · `rejection_reason` · `escalated_at` · timestamps. Indexed on `status` and
+`user_id`. `external_assignments`: `id` PK · `request_id` → external_requests cascade · `space_id`
+→ external_spaces restrict · `outcome` CHECK `ACCEPTED|REFUSED` · `reason` · `recorded_by` → users
+· `recorded_at`.
+
+**A request is not a booking** (decision 0036). It holds no slot anywhere, so two members may ask
+for the same evening and a union ask never blocks a booking of our own. It has no room until the
+union answers, which is why it cannot live in `room_bookings`: `room_id` is NOT NULL and every
+member-facing read of it is an `innerJoin`, so a nullable room would make an in-flight request
+silently vanish from the member's page, their feed and the queue.
+
+**The screens never say "the union", and never "ask the union".** A member books *a room not
+listed here*; the estate calls these *rooms we do not manage*. The Students' Union is named only
+where a person needs to know whose form it is and who decides. The identifiers keep `external`,
+which is the domain word and is not read by anybody outside this repository.
+
+The lifecycle is `REQUESTED → AWAITING_EXTERNAL → CONFIRMED`, with `refuse-assignment` looping back
+to the union and `reject`/`cancel` ending it. Every write is guarded on the status it read (0006).
+**Confirm is folded into assign**: an accepted assignment is the confirmation. `assign` and
+`refuse-assignment` are both allowed **from `CONFIRMED` as well**, because the union moving us room
+to room after answering is ordinary: a refusal clears `assigned_space_id` and returns the request to
+`AWAITING_EXTERNAL`, and submitting again clears `escalated_at` so the new wait is chased on its own
+terms. `AWAITING_EXTERNAL`
+keeps exactly its old meaning, the form is in and they have not answered, so C-118's import no
+longer translates it away.
+
+`external_assignments` is why asking again is not the spreadsheet all over again: **every room the
+union offered is kept**, with whether it suited and why, so nobody later has to remember that we
+asked for one room, were given another, and sent it back. Refusing an offer may write the
+suitability note in the same action, so the blacklist builds itself out of the work.
+
+Assigning a room noted `UNSUITABLE` for the request's purpose is **refused with 409** unless the
+body says `despite`. That is deliberately not the "warn and allow" shape `overCapacity` uses: the
+whole complaint is that nobody knew the room was wrong until they turned up to it, and a warning
+there would be read past. The audit records that a note existed and was overridden, never its
+wording (0011).
+
+Cancelling one the union already has **tells the approvers**, because our arrangement with them
+stands until a person withdraws it. That closes the C-112 criterion 3 gap `docs/known-issues.md`
+recorded, which could not be closed before because there was no arrangement object to withdraw.
+
+An external request **escalates but never expires**: expiry frees a held slot and this holds none,
+so lapsing one would tell the member nothing while the union may still answer. `rooms:sweep` chases
+the approvers once past `ROOM_REQUEST_ESCALATE_HOURS`, saying which half of the wait it is stuck in.
+
+A confirmed union room reaches everywhere a booking does: the member's calendar feed (tentative
+while it is still with the union, since they may yet say no) and the day-before reminder, which
+sends one message covering our rooms and theirs together.
+
+Both list endpoints return `{ items, total, more }` capped at 200 rows, `more` saying plainly that
+the cap was hit rather than reporting it as a total. The officer's queue orders **open first and
+soonest first, then the settled ones most recent first**: it is a list of work, and an answered
+request from last term is a lookup. Every request's offers arrive with it in one query, chunked at
+90 bound parameters (0003).
+
+Erasure scrubs the member's words from a request and keeps what was asked; an assignment scrubs
+`recorded_by` and keeps what the union offered, and `submitted_by`/`decided_by` are scrubbed like
+every other officer column in the module.
 
 ### external_spaces and external_space_notes
 `external_spaces`: `id` PK · `name` UNIQUE · `campus` · `building` · `contact` · `capacity` CHECK

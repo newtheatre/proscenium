@@ -115,7 +115,6 @@ export interface BookingRow {
   id: string
   roomId: string
   room: string
-  isExternal: boolean
   userId: string
   title: string
   startsAt: number
@@ -131,7 +130,6 @@ export async function bookingFor(id: string): Promise<BookingRow | undefined> {
     id: schema.roomBookings.id,
     roomId: schema.roomBookings.roomId,
     room: schema.rooms.name,
-    isExternal: schema.rooms.isExternal,
     userId: schema.roomBookings.userId,
     title: schema.roomBookings.title,
     startsAt: schema.roomBookings.startsAt,

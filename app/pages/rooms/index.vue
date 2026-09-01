@@ -17,7 +17,6 @@ interface Taken {
 interface Room extends GridRoom {
   capacity: number | null
   sensitive: boolean
-  isExternal: boolean
   taken: Taken[]
   closed: { startsAt: number, endsAt: number, reason: string }[]
 }
@@ -212,6 +211,16 @@ useSeoMeta({ title: 'Rooms' })
         aria-label="Refresh"
         @click="refresh()"
       />
+
+      <UButton
+        icon="i-lucide-map-pin"
+        color="neutral"
+        variant="ghost"
+        to="/rooms/external"
+        data-test="ask-the-union"
+      >
+        Book a room not listed here
+      </UButton>
     </div>
 
     <p

@@ -28,7 +28,6 @@ export default defineEventHandler(async (event) => {
         capacity: input.capacity,
         isActive: input.isActive,
         sensitive: input.sensitive,
-        isExternal: input.isExternal,
         campus: input.campus,
         building: input.building,
         contact: input.contact,

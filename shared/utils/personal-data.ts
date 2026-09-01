@@ -185,9 +185,51 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     section: 'no-shows',
     columns: ['kind', 'recorded_at'],
     erasure: 'keep',
-    // Append-only and trigger-enforced, so a scrub could not run here even if it were wanted: the
-    // reference resolves to the tombstone the user row became, and the ladder dies with it (0010).
+    // Nothing here needs scrubbing: the reference resolves to the tombstone the user row became
+    // and the ladder dies with it. Append-only does not forbid one, as audit_log shows (0010).
     why: 'Rooms booked and not used. The statistics survive an erasure; the person in them does not.',
+  },
+  {
+    name: 'external_requests',
+    column: 'user_id',
+    section: 'union-room-requests',
+    columns: ['title', 'purpose', 'starts_at', 'ends_at', 'status', 'rejection_reason', 'created_at'],
+    erasure: 'scrub',
+    // The ask is a fact about the estate; the member's words about it are theirs (0011).
+    scrub: ['title', 'notes', 'rejection_reason'],
+    scrubTo: { title: 'Erased request' },
+    why: 'Union rooms this person asked for. What was asked survives; their words do not.',
+  },
+  {
+    name: 'external_requests',
+    column: 'decided_by',
+    section: null,
+    columns: null,
+    erasure: 'scrub',
+    // The officer who handled somebody else's ask is cleared like every other officer column;
+    // who did it stays in the audit trail, which erasure redacts on its own terms (0011).
+    scrub: ['submitted_by', 'decided_by'],
+    why: 'Union room requests this person handled for somebody else. The request survives; the officer does not.',
+  },
+  {
+    name: 'room_bookings',
+    column: 'decided_by',
+    section: null,
+    columns: null,
+    erasure: 'scrub',
+    // Matches every other officer column in the module: the decision is a fact, the decider is not.
+    scrub: ['decided_by'],
+    why: 'Room requests this person approved or turned down. The decision survives; the officer does not.',
+  },
+  {
+    name: 'external_assignments',
+    column: 'recorded_by',
+    section: null,
+    columns: null,
+    erasure: 'scrub',
+    // What the union gave us is a fact about the union; who typed it in is in the audit trail.
+    scrub: ['recorded_by'],
+    why: 'What the union offered, and whether it suited. The record survives; the officer does not.',
   },
   {
     name: 'external_space_notes',
@@ -225,8 +267,8 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     section: 'money',
     columns: ['happened_at', 'london_day', 'source', 'tender', 'total_pence'],
     erasure: 'keep',
-    // Append-only and trigger-enforced, so a scrub could not run here even if it were wanted: the
-    // reference resolves to the tombstone the user row became (0004, 0010, 0011).
+    // Nothing here needs scrubbing: the reference resolves to the tombstone the user row became.
+    // Append-only does not forbid one, as audit_log shows (0004, 0010, 0011).
     why: 'Money the theatre took. Sales statistics survive an erasure; the person in them does not.',
   },
   {

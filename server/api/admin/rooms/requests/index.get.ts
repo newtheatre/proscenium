@@ -76,7 +76,6 @@ export default defineEventHandler(async (event) => {
       ...row,
       failures: verdict ? verdict.failures : [],
       sensitive: room?.sensitive ?? false,
-      isExternal: room?.isExternal ?? false,
     }
   })
 

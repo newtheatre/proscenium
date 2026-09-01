@@ -5,7 +5,7 @@ import { describePurpose } from '#shared/utils/bookings'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'admin', title: 'SU rooms', middleware: 'signed-in' })
+definePageMeta({ layout: 'admin', title: 'Other rooms', middleware: 'signed-in' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
@@ -167,7 +167,7 @@ const columns: TableColumn<Space>[] = [
         row.original.isActive ? null : h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Retired'),
       ]),
       h('div', { class: 'text-xs text-muted' },
-        [row.original.building, row.original.campus].filter(Boolean).join(', ') || 'Somewhere in the union'),
+        [row.original.building, row.original.campus].filter(Boolean).join(', ') || 'Somewhere on campus'),
     ]),
   },
   {
@@ -237,7 +237,7 @@ const columns: TableColumn<Space>[] = [
       color="neutral"
       variant="subtle"
       icon="i-lucide-map-pin"
-      title="Rooms the union manages, not rooms we can promise"
+      title="Rooms we do not manage, and cannot promise"
       description="Nothing here holds a slot or appears on a calendar. It is what a member may state a preference for, and what we have learned about each room, so nobody is sent to a meeting room to rehearse in again."
     />
 
@@ -292,7 +292,7 @@ const columns: TableColumn<Space>[] = [
     <UModal
       v-model:open="open"
       :title="editing ? `Edit ${editing.name}` : 'List an SU room'"
-      description="What we know about where it is and who to ask. The union tells us little, so most of this is optional."
+      description="What we know about where it is and who to ask. We are told little, so most of this is optional."
     >
       <template #body>
         <UForm

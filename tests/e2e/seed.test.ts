@@ -81,7 +81,11 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
   })
 
   test('the rooms and a week of bookings are there', () => {
-    expect(read<{ n: number }>('SELECT count(*) n FROM rooms')?.n).toBeGreaterThanOrEqual(4)
+    expect(read<{ n: number }>('SELECT count(*) n FROM rooms')?.n).toBeGreaterThanOrEqual(3)
+    // Union rooms are a catalogue, not rooms: seeded so the SU screens have something to show,
+    // with a note apiece so the suitability warning is reachable by hand (0036).
+    expect(read<{ n: number }>('SELECT count(*) n FROM external_spaces')?.n).toBeGreaterThan(0)
+    expect(read<{ n: number }>('SELECT count(*) n FROM external_space_notes')?.n).toBeGreaterThan(0)
     expect(read<{ n: number }>('SELECT count(*) n FROM room_bookings')?.n).toBeGreaterThan(0)
     // One waiting on a decision, so the pending state has something to show.
     expect(read<{ n: number }>(`SELECT count(*) n FROM room_bookings WHERE status = 'PENDING_APPROVAL'`)?.n)

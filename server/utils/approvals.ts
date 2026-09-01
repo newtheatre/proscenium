@@ -114,12 +114,16 @@ async function whyItFailed(id: string, intoRoom: string | null): Promise<Decisio
   if (settled) return { id, ok: false, why: 'settled', says: settled }
 
   const roomId = intoRoom ?? row.roomId
-  const [room] = await db.select({ id: schema.rooms.id })
+  const [room] = await db.select({ id: schema.rooms.id, isActive: schema.rooms.isActive })
     .from(schema.rooms)
     .where(eq(schema.rooms.id, roomId))
     .limit(1)
 
-  if (!room) return { id, ok: false, why: 'gone', says: 'That room is no longer bookable' }
+  // Mirrors the is_active predicate the approving write carries, or a retired room reads as
+  // "somebody took that slot", which is untrue and suggests no fix.
+  if (!room || !room.isActive) {
+    return { id, ok: false, why: 'gone', says: 'That room is no longer bookable' }
+  }
 
   return {
     id,

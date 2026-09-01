@@ -17,7 +17,6 @@ const ESTATE = {
 const ROOM = {
   isActive: true,
   sensitive: false,
-  isExternal: false,
   hours: [{ weekday: 1, opens: '09:00', closes: '22:00' }],
   minBookingMinutes: null,
   maxBookingHours: null,
@@ -136,12 +135,11 @@ describe('a sensitive room always goes to a person', () => {
     expect(verdict.needsApproval).toBe(true)
   })
 
-  // An external room is booked by the Theatre Manager filling in the SU's form, so a member's
-  // booking is a request for somebody to do that, never an instant confirmation.
-  test('an external room always goes to a person, whatever the policy says', () => {
-    const verdict = judge(GOOD, policy(), { ...ROOM, isExternal: true }, CONTEXT)
-    expect(verdict.failures).toEqual([])
-    expect(verdict.needsApproval).toBe(true)
+  // A union room is no longer a room at all: it is a request of its own kind, judged by
+  // judgeExternal, so nothing here can refuse or approve on account of one (C-120, 0036).
+  test('the policy engine judges only rooms we control', () => {
+    const verdict = judge(GOOD, policy(), { ...ROOM, isExternal: true } as never, CONTEXT)
+    expect(verdict).toEqual(judge(GOOD, policy(), ROOM, CONTEXT))
   })
 
   test('anything that fails a rule needs approval too, rather than being refused outright', () => {

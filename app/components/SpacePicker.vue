@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// A room the SU manages, chosen rather than typed. Searched on the server, because the union has
+// A room somebody else manages, chosen rather than typed. Searched on the server, because there
 // hundreds of rooms and a dropdown holding all of them is a page nobody can use (C-119).
 
 interface Space {
@@ -58,7 +58,7 @@ function choose(option: { value: string } | undefined): void {
 const warning = computed(() => shown.value.find(space => space.id === model.value)?.warning ?? null)
 
 function where(space: Space): string {
-  return [space.building, space.campus].filter(Boolean).join(', ') || 'Somewhere in the union'
+  return [space.building, space.campus].filter(Boolean).join(', ') || 'Somewhere on campus'
 }
 </script>
 

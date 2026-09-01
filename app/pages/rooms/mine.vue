@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
+import { saysExternalStatus } from '#shared/utils/external-requests'
 
 definePageMeta({ middleware: 'signed-in' })
 
 interface Booking {
   id: string
   room: string
-  isExternal: boolean
   title: string
   attendees: number | null
   startsAt: number
@@ -74,6 +74,54 @@ async function copyFeed(): Promise<void> {
   }
 }
 
+interface UnionRequest {
+  id: string
+  title: string
+  purpose: string
+  startsAt: number
+  endsAt: number
+  status: string
+  preferred: string | null
+  assigned: string | null
+  rejectionReason: string | null
+  cancellable: boolean
+}
+
+const { data: union, refresh: refreshUnion } = await useAsyncData(
+  () => `my-union-requests-${when.value}`,
+  () => request<{ items: UnionRequest[] }>('/api/rooms/external-requests', { query: { when: when.value } }),
+  { watch: [when], default: (): { items: UnionRequest[] } => ({ items: [] }) },
+)
+
+const cancellingUnion = ref<UnionRequest | null>(null)
+
+// A room we do not manage is a different thing, so it says so rather than posing as a booking.
+async function cancelUnion(): Promise<void> {
+  const one = cancellingUnion.value
+  if (!one) return
+
+  working.value = true
+  try {
+    const answer = await $fetch<{ unionTold: boolean }>(`/api/rooms/external-requests/${one.id}/cancel`, { method: 'POST' })
+    toast.add({
+      title: 'Withdrawn',
+      description: answer.unionTold
+        ? 'The Theatre Manager has been told, because our booking for it still stands.'
+        : 'It had not been requested yet.',
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    cancellingUnion.value = null
+    await refreshUnion()
+  }
+  catch (error) {
+    toast.add({ title: refusalText(error), color: 'error' })
+  }
+  finally {
+    working.value = false
+  }
+}
+
 const { data, status, refresh } = await useAsyncData(
   () => `my-bookings-${when.value}`,
   () => request<Listing>('/api/rooms/bookings', { query: { when: when.value } }),
@@ -118,11 +166,9 @@ async function cancel(): Promise<void> {
     })
     toast.add({
       title: answer.cancelled > 1 ? `${plural(answer.cancelled, 'booking')} cancelled` : 'Cancelled',
-      description: booking.isExternal
-        ? 'The Theatre Manager arranged this one with the SU and will need telling.'
-        : 'The slot is free for somebody else.',
+      description: 'The slot is free for somebody else.',
       icon: 'i-lucide-check',
-      color: booking.isExternal ? 'warning' : 'success',
+      color: 'success',
     })
     cancelling.value = null
     await refresh()
@@ -211,14 +257,6 @@ useSeoMeta({ title: 'My bookings' })
             >
               {{ stateOf(booking.status).label }}
             </UBadge>
-            <UBadge
-              v-if="booking.isExternal"
-              color="info"
-              variant="subtle"
-              size="sm"
-            >
-              Booked through the SU
-            </UBadge>
           </p>
           <p class="text-sm text-muted">
             {{ spanOf(booking) }}
@@ -285,6 +323,65 @@ useSeoMeta({ title: 'My bookings' })
     >
       {{ plural(data.total, 'booking') }}
     </p>
+
+    <section
+      v-if="union.items.length"
+      class="mt-10"
+      data-test="union-list"
+    >
+      <h2 class="nnt-headline text-lg">
+        Rooms we do not manage
+      </h2>
+      <p class="mt-1 text-sm text-muted">
+        Somebody else decides which room we get, so none of these is held until they answer.
+      </p>
+
+      <ul class="mt-4 divide-y divide-default">
+        <li
+          v-for="one in union.items"
+          :key="one.id"
+          class="flex flex-wrap items-start gap-3 py-4"
+          :data-test="`union-${one.id}`"
+        >
+          <div class="min-w-0 flex-1">
+            <p class="flex flex-wrap items-center gap-2 font-medium">
+              {{ one.assigned ?? one.preferred ?? 'A room not listed on the site' }}
+              <UBadge
+                :color="one.status === 'CONFIRMED' ? 'success' : one.status === 'AWAITING_EXTERNAL' ? 'info' : 'neutral'"
+                variant="subtle"
+                size="sm"
+              >
+                {{ saysExternalStatus(one.status) }}
+              </UBadge>
+            </p>
+            <p class="text-sm text-muted">
+              {{ formatLondon(new Date(one.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }) }}
+              to {{ formatLondon(new Date(one.endsAt * 1000), { timeStyle: 'short' }) }}
+            </p>
+            <p class="text-sm">
+              {{ one.title }}
+            </p>
+            <p
+              v-if="one.rejectionReason"
+              class="mt-1 text-sm text-error"
+            >
+              {{ one.rejectionReason }}
+            </p>
+          </div>
+
+          <UButton
+            v-if="one.cancellable"
+            size="sm"
+            color="error"
+            variant="subtle"
+            :data-test="`cancel-union-${one.id}`"
+            @click="cancellingUnion = one"
+          >
+            Withdraw
+          </UButton>
+        </li>
+      </ul>
+    </section>
 
     <UAlert
       v-if="standing.standing !== 'CLEAR'"
@@ -354,6 +451,37 @@ useSeoMeta({ title: 'My bookings' })
       </div>
     </UPageCard>
 
+    <UModal
+      :open="cancellingUnion !== null"
+      title="Withdraw this request?"
+      description="This was arranged by hand, so withdrawing here tells the Theatre Manager to withdraw it with them."
+      @update:open="cancellingUnion = null"
+    >
+      <template #body>
+        <p class="text-sm">
+          Nothing is freed automatically: our booking for it stands until a person cancels
+          it with them.
+        </p>
+      </template>
+      <template #footer>
+        <UButton
+          color="error"
+          :loading="working"
+          data-test="cancel-union-confirm"
+          @click="cancelUnion"
+        >
+          Withdraw it
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="cancellingUnion = null"
+        >
+          Keep it
+        </UButton>
+      </template>
+    </UModal>
+
     <!-- Asked before doing it: the slot goes to whoever wants it next, and there is no undo. -->
     <UModal
       :open="cancelling !== null"
@@ -377,14 +505,6 @@ useSeoMeta({ title: 'My bookings' })
             { label: 'Just this one', description: `Week ${cancelling.occurrence} of ${cancelling.seriesLength}. The rest stand.`, value: 'occurrence' },
             { label: 'The whole series', description: 'Every date still standing. Ones already cancelled or turned down are left alone.', value: 'series' },
           ]"
-        />
-        <UAlert
-          v-if="cancelling?.isExternal"
-          class="mt-4"
-          color="warning"
-          variant="subtle"
-          icon="i-lucide-hand"
-          description="This room was arranged with the SU by hand, so the Theatre Manager will need telling as well."
         />
       </template>
 

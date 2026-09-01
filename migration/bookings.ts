@@ -1,14 +1,24 @@
+import { UNRECORDED_PURPOSE } from '../shared/utils/bookings'
 import { nanoid } from './lib'
 import type { Database } from 'bun:sqlite'
 
 // The old rooms app's booking history, keyed to the canonical account (C-118). Utilisation
 // reporting and a member's own history start with years of truth rather than an empty table.
 
-// The old vocabulary against the new one. AWAITING_EXTERNAL has no equivalent because the unified
-// system models an external room as a request the Theatre Manager answers (C-101, C-108).
+// A booking of one of our own rooms. AWAITING_EXTERNAL never appears here: a booking waiting on
+// the union is not a booking at all in the unified system (C-120, 0036).
 export const STATUS_MAP: Record<string, string> = {
   PENDING: 'PENDING_APPROVAL',
-  AWAITING_EXTERNAL: 'PENDING_APPROVAL',
+  CONFIRMED: 'CONFIRMED',
+  REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED',
+}
+
+// The union side keeps its own vocabulary, so AWAITING_EXTERNAL survives the import with the
+// meaning it always had: the form is in and they have not answered (C-118 criterion 1).
+export const EXTERNAL_STATUS_MAP: Record<string, string> = {
+  PENDING: 'REQUESTED',
+  AWAITING_EXTERNAL: 'AWAITING_EXTERNAL',
   CONFIRMED: 'CONFIRMED',
   REJECTED: 'REJECTED',
   CANCELLED: 'CANCELLED',
@@ -42,11 +52,13 @@ export interface OldBooking {
 export interface BookingSummary {
   read: number
   written: number
+  externalWritten: number
   skippedNoRoom: number
   skippedNoAccount: number
   series: number
   droppedPatterns: number
   byStatus: Record<string, number>
+  byExternalStatus: Record<string, number>
 }
 
 export interface TransformInput {
@@ -54,11 +66,14 @@ export interface TransformInput {
   source: Database
   // Old account id to the id the identity transform minted. Nothing imports without one.
   accounts: Map<string, string>
-  // Old room and external venue ids to rooms in the unified estate.
+  // Old room ids to rooms in the unified estate, keyed `room:<id>`.
   rooms: Map<string, string>
+  // Old venue ids to the union catalogue, keyed `venue:<id>`. A venue is not a room any more.
+  spaces: Map<string, string>
   // Old booking id to unified id, read back before minting so a rehearsal does not duplicate.
   bookingIds: Map<string, string>
   seriesIds: Map<string, string>
+  externalIds: Map<string, string>
   target: Database
 }
 
@@ -75,9 +90,10 @@ function idFor(map: Map<string, string>, key: string): string {
 }
 
 export function transformBookings(input: TransformInput): { summary: BookingSummary, exceptions: string[] } {
-  const { source, accounts, rooms, bookingIds, seriesIds, target } = input
+  const { source, accounts, rooms, spaces, bookingIds, seriesIds, externalIds, target } = input
   const exceptions: string[] = []
   const byStatus: Record<string, number> = {}
+  const byExternalStatus: Record<string, number> = {}
 
   const old = source.query('SELECT * FROM bookings ORDER BY id').all() as OldBooking[]
   const patterns = new Map<number, { frequency: string, days_of_week: string | null, max_occurrences: number }>()
@@ -93,11 +109,13 @@ export function transformBookings(input: TransformInput): { summary: BookingSumm
   const summary: BookingSummary = {
     read: old.length,
     written: 0,
+    externalWritten: 0,
     skippedNoRoom: 0,
     skippedNoAccount: 0,
     series: 0,
     droppedPatterns: 0,
     byStatus,
+    byExternalStatus,
   }
 
   // Heads first, so an occurrence always finds the series it belongs to.
@@ -111,9 +129,15 @@ export function transformBookings(input: TransformInput): { summary: BookingSumm
       continue
     }
 
-    const roomId = head.room_id !== null
-      ? rooms.get(`room:${head.room_id}`)
-      : rooms.get(`venue:${head.external_venue_id}`)
+    // A union request carries no series: room_series references a room we control, and inventing
+    // one would put a room on it that the union never gave us.
+    if (head.room_id === null) {
+      summary.droppedPatterns++
+      exceptions.push(`booking ${head.id}: a union request carries no series, so its occurrences import unlinked`)
+      continue
+    }
+
+    const roomId = rooms.get(`room:${head.room_id}`)
     const userId = head.user_id ? accounts.get(head.user_id) : undefined
     if (!roomId || !userId) continue
 
@@ -136,9 +160,52 @@ export function transformBookings(input: TransformInput): { summary: BookingSumm
   }
 
   for (const row of old) {
-    const roomId = row.room_id !== null
-      ? rooms.get(`room:${row.room_id}`)
-      : rooms.get(`venue:${row.external_venue_id}`)
+    const userIdEarly = row.user_id ? accounts.get(row.user_id) : undefined
+
+    // A booking at a union venue is a request, not a booking: it named a space we do not control
+    // and held nothing here (C-120, 0036).
+    if (row.external_venue_id !== null) {
+      const spaceId = spaces.get(`venue:${row.external_venue_id}`)
+      if (!spaceId) {
+        summary.skippedNoRoom++
+        exceptions.push(`booking ${row.id}: no union room in the catalogue`)
+        continue
+      }
+      if (!userIdEarly) {
+        summary.skippedNoAccount++
+        exceptions.push(`booking ${row.id}: no canonical account`)
+        continue
+      }
+
+      const status = EXTERNAL_STATUS_MAP[row.status]
+      if (!status) {
+        exceptions.push(`booking ${row.id}: unknown status ${row.status}`)
+        continue
+      }
+
+      // Only a confirmed row names a room the union granted. A refused or withdrawn one names
+      // what we asked for, exactly as an unanswered one does.
+      const answered = status === 'CONFIRMED'
+
+      target.query(`
+        INSERT OR REPLACE INTO external_requests
+          (id, user_id, title, purpose, attendees, starts_at, ends_at, preferred_space_id,
+           assigned_space_id, notes, status, rejection_reason, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        idFor(externalIds, String(row.id)), userIdEarly, row.event_title, UNRECORDED_PURPOSE,
+        row.number_of_attendees,
+        seconds(row.start_time), seconds(row.end_time),
+        answered ? null : spaceId, answered ? spaceId : null,
+        row.notes, status, row.rejection_reason, seconds(row.created_at), seconds(row.created_at),
+      )
+
+      byExternalStatus[status] = (byExternalStatus[status] ?? 0) + 1
+      summary.externalWritten++
+      continue
+    }
+
+    const roomId = rooms.get(`room:${row.room_id}`)
 
     if (!roomId) {
       summary.skippedNoRoom++
@@ -192,14 +259,16 @@ export interface Reconciliation {
 export function reconcile(source: Database, target: Database, summary: BookingSummary): Reconciliation {
   const problems: string[] = []
 
-  const accounted = summary.written + summary.skippedNoRoom + summary.skippedNoAccount
+  const accounted = summary.written + summary.externalWritten + summary.skippedNoRoom + summary.skippedNoAccount
   if (accounted !== summary.read) {
     problems.push(`read ${summary.read} bookings but accounted for ${accounted}`)
   }
 
   const landed = (target.query('SELECT count(*) AS n FROM room_bookings WHERE created_at > 0').get() as { n: number }).n
-  if (landed < summary.written) {
-    problems.push(`wrote ${summary.written} bookings but ${landed} are in the target`)
+    + (target.query('SELECT count(*) AS n FROM external_requests').get() as { n: number }).n
+  const expected = summary.written + summary.externalWritten
+  if (landed < expected) {
+    problems.push(`wrote ${expected} bookings but ${landed} are in the target`)
   }
 
   // Total booked seconds, which catches a unit error a row count never would.
@@ -208,6 +277,9 @@ export function reconcile(source: Database, target: Database, summary: BookingSu
   ).get() as { total: number }).total
   const targetSeconds = (target.query(
     'SELECT coalesce(sum(ends_at - starts_at), 0) AS total FROM room_bookings',
+  ).get() as { total: number }).total
+  + (target.query(
+    'SELECT coalesce(sum(ends_at - starts_at), 0) AS total FROM external_requests',
   ).get() as { total: number }).total
 
   if (summary.skippedNoRoom === 0 && summary.skippedNoAccount === 0 && sourceSeconds !== targetSeconds) {

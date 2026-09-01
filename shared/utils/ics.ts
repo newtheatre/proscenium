@@ -103,8 +103,9 @@ function event(booking: CalendarEvent, host: string): string[] {
     `SUMMARY:${escapeText(booking.title)}`,
     `LOCATION:${escapeText(booking.room)}`,
     `STATUS:${showsAs(booking.status)}`,
-    // A cancelled event has to outrank the version a client already holds, or it stays on screen.
-    `SEQUENCE:${showsAs(booking.status) === 'CANCELLED' ? 1 : 0}`,
+    // Rises with every edit, so a moved room or a cancellation outranks the version a client
+    // already holds. A cancelled-or-not flag left a reassigned booking showing the old room.
+    `SEQUENCE:${Math.max(0, booking.updatedAt)}`,
     'END:VEVENT',
   ]
 }

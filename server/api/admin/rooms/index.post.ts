@@ -19,7 +19,6 @@ export default defineEventHandler(async (event) => {
       capacity: input.capacity,
       isActive: input.isActive,
       sensitive: input.sensitive,
-      isExternal: input.isExternal,
       campus: input.campus,
       building: input.building,
       contact: input.contact,
@@ -34,7 +33,7 @@ export default defineEventHandler(async (event) => {
       actorId: resolved.account.id,
       action: 'room.created',
       target: `room:${id}`,
-      detail: { name: input.name, sensitive: input.sensitive, external: input.isExternal },
+      detail: { name: input.name, sensitive: input.sensitive },
     })),
   ])
 
