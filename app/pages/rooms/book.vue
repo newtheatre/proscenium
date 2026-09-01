@@ -43,7 +43,8 @@ const state = reactive({
   title: '',
   day: String(route.query.day ?? ''),
   from: String(route.query.at ?? '10:00'),
-  to: addMinutes(String(route.query.at ?? '10:00'), 60),
+  // A drag across the calendar arrives with both ends; a single click brings one and an hour.
+  to: String(route.query.until ?? addMinutes(String(route.query.at ?? '10:00'), 60)),
   attendees: undefined as number | undefined,
   tier: 'GENERAL' as (typeof TIERS)[number],
 })

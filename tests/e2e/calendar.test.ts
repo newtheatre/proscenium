@@ -329,6 +329,49 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
     }
   }, 120_000)
 
+  // A drag across four quarter hours is an hour, and one slot is one slot rather than nothing.
+  test('dragging across slots carries both ends to the form', async () => {
+    const password = generatePassword()
+    const dragger = await registerMember(app, 'dragger', password)
+    giveMembership(dragger.id)
+    const room = await makeRoom()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', dragger.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+
+      await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
+      await click(view, '[data-test="calendar-day"]')
+      await waitFor(view, `document.querySelectorAll('[data-test^="slot-${room}-"]').length > 0`, 30_000)
+
+      // Pointer events rather than a click: the drag is what is under test.
+      await view.evaluate(`(() => {
+        const slots = [...document.querySelectorAll('[data-test^="slot-${room}-"]')].filter(one => !one.disabled)
+        const down = (element, type) => element.dispatchEvent(new PointerEvent(type, { bubbles: true }))
+        down(slots[8], 'pointerdown')
+        down(slots[9], 'pointerenter')
+        down(slots[10], 'pointerenter')
+        down(slots[11], 'pointerenter')
+        down(slots[11], 'pointerup')
+      })()`)
+
+      await waitFor(view, `document.querySelector('[data-test="booking-form"]')`, 30_000)
+      const from = await view.evaluate<string>(`document.querySelector('[data-test="booking-from"]').value`)
+      const to = await view.evaluate<string>(`document.querySelector('[data-test="booking-to"]').value`)
+
+      // Four quarter hours, so the far edge of the fourth is an hour after the first.
+      const minutes = (clock: string): number => Number(clock.split(':')[0]) * 60 + Number(clock.split(':')[1])
+      expect(minutes(to) - minutes(from)).toBe(60)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
   test('signing in is required to see what is booked', async () => {
     const shut = await fetch(`${app.baseURL}/api/rooms/availability?from=2026-09-14&to=2026-09-14`)
     expect(shut.status).toBe(401)
