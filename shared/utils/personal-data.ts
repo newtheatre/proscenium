@@ -20,6 +20,9 @@ export interface PersonalTable {
   erasure: Erasure
   // The columns a scrub clears, for a table that survives without its person.
   scrub?: string[]
+  // What a scrubbed column becomes where it cannot be null. Nulling a NOT NULL column fails the
+  // whole erasure batch, and erasure is all or nothing (0011).
+  scrubTo?: Record<string, string>
   why: string
 }
 
@@ -156,11 +159,12 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     name: 'room_bookings',
     column: 'user_id',
     section: 'bookings',
-    columns: ['title', 'starts_at', 'ends_at', 'status', 'created_at'],
+    columns: ['title', 'starts_at', 'ends_at', 'status', 'reason', 'rejection_reason', 'created_at'],
     erasure: 'scrub',
     // The row survives because the room was used and that is a fact about the room, not the
-    // person. What they wrote about it does not (0011).
-    scrub: ['title', 'notes'],
+    // person. What they wrote about it does not, and neither does what was written back (0011).
+    scrub: ['title', 'notes', 'reason', 'rejection_reason'],
+    scrubTo: { title: 'Erased booking' },
     why: 'Rooms this person booked. Utilisation survives an erasure; their words in it do not.',
   },
   {

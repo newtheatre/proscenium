@@ -68,7 +68,15 @@ export const roomBookings = sqliteTable('room_bookings', {
   tier: text('tier').notNull().default('GENERAL'),
   status: text('status').notNull().default('CONFIRMED'),
   notes: text('notes'),
+  // Why the member is asking for something outside policy. Required on a request (C-108).
+  reason: text('reason'),
+  // When the approvers were told this had been waiting, so a nightly sweep tells them once.
+  escalatedAt: integer('escalated_at'),
   rejectionReason: text('rejection_reason'),
+  // Who answered the request, and when. No delete action: SQLite cannot add one to an existing
+  // table, and erasure anonymises rather than deletes, so no row loses its officer (0011).
+  decidedBy: text('decided_by').references(() => users.id),
+  decidedAt: integer('decided_at'),
   noShowRecordedAt: integer('no_show_recorded_at'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
@@ -76,6 +84,8 @@ export const roomBookings = sqliteTable('room_bookings', {
   // The clash predicate reads exactly this, on every booking attempt.
   index('room_bookings_clash').on(table.roomId, table.startsAt, table.endsAt),
   index('room_bookings_user').on(table.userId),
+  // The sweep reads pending rows by age, and there are few of them beside the confirmed ones.
+  index('room_bookings_status').on(table.status),
   check('room_bookings_span', sql`${table.endsAt} > ${table.startsAt}`),
   check(
     'room_bookings_status',

@@ -48,6 +48,13 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
     // redaction exists for (0011, "aim is not guarantee").
     ['INSERT INTO audit_log (id, actor_id, action, target, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)',
       `al-${id}`, id, 'account.registered', `user:${id}`, JSON.stringify({ who: NAME, address: EMAIL }), now],
+    ['INSERT INTO rooms (id, name) VALUES (?, ?)', `room-${id}`, 'The Studio'],
+    // Everything a member types about a booking: the title, the note, why they asked for an
+    // exception, and what was written back when it was refused (C-108, C-109).
+    [`INSERT INTO room_bookings (id, room_id, user_id, title, starts_at, ends_at, status, notes, reason, rejection_reason)
+      VALUES (?, ?, ?, ?, ?, ?, 'REJECTED', ?, ?, ?)`,
+    `b-${id}`, `room-${id}`, id, `${NAME}'s read-through`, now + 3600, now + 7200,
+    `${NAME} has a key`, `${NAME} needs it for a deadline`, `Told ${NAME} the room is in a get-in`],
   ])
   return id
 }
@@ -114,8 +121,18 @@ describe('erasure (K-109, 0011)', () => {
       const id = seedPerson(database)
       await erase(database, id)
 
-      // Bookings and sales have no tables yet. What exists of the same kind is the membership
-      // year and the message log, and both survive without the person in them.
+      // The room was used, which is a fact about the room. What the person wrote about it, and
+      // what was written back to them, is not (0011).
+      const bookings = rows<{ status: string, title: string | null, notes: string | null, reason: string | null, rejection: string | null }>(
+        database,
+        'SELECT status, title, notes, reason, rejection_reason AS rejection FROM room_bookings WHERE user_id = ?',
+        id)
+      expect(bookings).toHaveLength(1)
+      // The title cannot be null, so it becomes a neutral one rather than failing the batch.
+      expect(bookings[0]).toMatchObject({ status: 'REJECTED', title: 'Erased booking', notes: null, reason: null, rejection: null })
+
+      // Sales have no table yet. What exists of the same kind is the membership year and the
+      // message log, and both survive without the person in them.
       const memberships = rows<{ startsOn: string, evidence: string | null }>(database,
         'SELECT starts_on AS startsOn, evidence FROM memberships WHERE user_id = ?', id)
       expect(memberships).toHaveLength(1)
@@ -185,6 +202,26 @@ describe('erasure takes the credential timestamps with it (A-113)', () => {
         SELECT password_set_at, password_last_used_at, google_linked_at, google_last_used_at
         FROM users WHERE id = ?`, id)
       expect(Object.values(row!).every(value => value === null)).toBe(true)
+    })
+  })
+})
+
+// A scrub that nulls a NOT NULL column throws, and erasure is one batch, so the whole erasure
+// fails on a row nobody thought about. Checked against the schema the migrations actually build.
+describe('every scrubbed column can hold what a scrub writes (0011)', () => {
+  test('a NOT NULL column names what it becomes instead', async () => {
+    await withDatabase((database) => {
+      const offenders: string[] = []
+      for (const entry of PERSONAL_TABLES) {
+        if (entry.erasure !== 'scrub' || !entry.scrub?.length) continue
+        const columns = rows<{ name: string, notnull: number }>(database, `PRAGMA table_info(${entry.name})`)
+        for (const name of entry.scrub) {
+          const column = columns.find(candidate => candidate.name === name)
+          expect(`${entry.name}.${name} exists: ${column !== undefined}`).toBe(`${entry.name}.${name} exists: true`)
+          if (column?.notnull === 1 && entry.scrubTo?.[name] === undefined) offenders.push(`${entry.name}.${name}`)
+        }
+      }
+      expect(offenders).toEqual([])
     })
   })
 })

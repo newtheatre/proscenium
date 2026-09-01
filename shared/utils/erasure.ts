@@ -29,7 +29,12 @@ export function erasureStatements(userId: string, now: number): SQL[] {
     }
 
     if (entry.erasure === 'scrub' && entry.scrub?.length) {
-      const assignments = sql.join(entry.scrub.map(name => sql`${sql.identifier(name)} = null`), sql`, `)
+      const assignments = sql.join(entry.scrub.map((name) => {
+        const instead = entry.scrubTo?.[name]
+        return instead === undefined
+          ? sql`${sql.identifier(name)} = null`
+          : sql`${sql.identifier(name)} = ${instead}`
+      }), sql`, `)
       statements.push(sql`update ${table} set ${assignments} where ${column} = ${userId}`)
     }
   }

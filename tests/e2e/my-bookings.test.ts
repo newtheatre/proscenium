@@ -74,16 +74,21 @@ async function makeRoom(over: Record<string, unknown> = {}): Promise<string> {
   return (await answered.json() as { id: string }).id
 }
 
-// Placed directly, because what is under test is the cancelling rather than the booking.
-function placeBooking(roomId: string, userId: string, daysAhead: number, status = 'CONFIRMED'): string {
+// Placed directly, because what is under test is the cancelling rather than the booking. Midday,
+// so the London day and the UTC day cannot disagree about which day it is on (0014).
+function placeBooking(roomId: string, userId: string, daysAhead: number, status = 'CONFIRMED'): { id: string, day: string } {
   const id = crypto.randomUUID().replaceAll('-', '')
-  const start = Math.floor(Date.now() / 1000) + daysAhead * 86_400
+  const at = new Date()
+  at.setUTCDate(at.getUTCDate() + daysAhead)
+  at.setUTCHours(12, 0, 0, 0)
+
+  const start = Math.floor(at.getTime() / 1000)
   write(
     `INSERT INTO room_bookings (id, room_id, user_id, title, starts_at, ends_at, tier, status)
      VALUES (?, ?, ?, 'Rehearsal', ?, ?, 'GENERAL', ?)`,
     id, roomId, userId, start, start + 7200, status,
   )
-  return id
+  return { id, day: at.toISOString().slice(0, 10) }
 }
 
 interface Listing { items: { id: string, status: string, cancellable: boolean }[], total: number }
@@ -95,7 +100,7 @@ describe.skipIf(skip !== null)('the bookings a member holds (C-112)', () => {
   test('what they hold is listed, and what somebody else holds is not', async () => {
     const room = await makeRoom()
     const stranger = await registerMember(app, 'stranger', generatePassword())
-    const ours = placeBooking(room, member.id, 3)
+    const ours = placeBooking(room, member.id, 3).id
     placeBooking(room, stranger.id, 4)
 
     const listed = await mine(member.cookie)
@@ -104,7 +109,7 @@ describe.skipIf(skip !== null)('the bookings a member holds (C-112)', () => {
 
   test('a past booking stays visible, on the other tab', async () => {
     const room = await makeRoom()
-    const over = placeBooking(room, member.id, -10)
+    const over = placeBooking(room, member.id, -10).id
 
     expect((await mine(member.cookie)).items.map(booking => booking.id)).not.toContain(over)
     expect((await mine(member.cookie, 'past')).items.map(booking => booking.id)).toContain(over)
@@ -113,7 +118,7 @@ describe.skipIf(skip !== null)('the bookings a member holds (C-112)', () => {
   // Criterion 2: a status change, and no delete path exists for a member at all.
   test('cancelling keeps the row and changes its status', async () => {
     const room = await makeRoom()
-    const booking = placeBooking(room, member.id, 5)
+    const booking = placeBooking(room, member.id, 5).id
 
     expect((await send('POST', `/api/rooms/bookings/${booking}/cancel`, {}, member.cookie)).status).toBe(200)
 
@@ -123,8 +128,7 @@ describe.skipIf(skip !== null)('the bookings a member holds (C-112)', () => {
 
   test('the slot frees the moment it is cancelled', async () => {
     const room = await makeRoom()
-    const booking = placeBooking(room, member.id, 6)
-    const day = new Date((Math.floor(Date.now() / 1000) + 6 * 86_400) * 1000).toISOString().slice(0, 10)
+    const { id: booking, day } = placeBooking(room, member.id, 6)
 
     const before = await (await send('GET', `/api/rooms/availability?from=${day}&to=${day}&roomId=${room}`, undefined, member.cookie)).json() as { rooms: { taken: unknown[] }[] }
     expect(before.rooms[0]?.taken.length).toBeGreaterThan(0)
@@ -137,14 +141,14 @@ describe.skipIf(skip !== null)('the bookings a member holds (C-112)', () => {
 
   test('a request waiting on a decision may be withdrawn', async () => {
     const room = await makeRoom()
-    const booking = placeBooking(room, member.id, 7, 'PENDING_APPROVAL')
+    const booking = placeBooking(room, member.id, 7, 'PENDING_APPROVAL').id
     expect((await send('POST', `/api/rooms/bookings/${booking}/cancel`, {}, member.cookie)).status).toBe(200)
   })
 
   // Criterion 5: terminal, and still in the history.
   test('cancelling twice is refused, and the booking stays in the list', async () => {
     const room = await makeRoom()
-    const booking = placeBooking(room, member.id, 8)
+    const booking = placeBooking(room, member.id, 8).id
 
     await send('POST', `/api/rooms/bookings/${booking}/cancel`, {}, member.cookie)
     expect((await send('POST', `/api/rooms/bookings/${booking}/cancel`, {}, member.cookie)).status).toBe(409)
@@ -154,7 +158,7 @@ describe.skipIf(skip !== null)('the bookings a member holds (C-112)', () => {
   test('somebody else\'s booking cannot be cancelled, and the refusal does not confirm it exists', async () => {
     const room = await makeRoom()
     const stranger = await registerMember(app, 'not-mine', generatePassword())
-    const theirs = placeBooking(room, stranger.id, 9)
+    const theirs = placeBooking(room, stranger.id, 9).id
 
     const refused = await send('POST', `/api/rooms/bookings/${theirs}/cancel`, {}, member.cookie)
     expect(refused.status).toBe(404)
@@ -168,7 +172,7 @@ describe.skipIf(skip !== null)('the bookings a member holds (C-112)', () => {
   // Two cancels racing must not both count as the one that freed the slot.
   test('two simultaneous cancels leave one success', async () => {
     const room = await makeRoom()
-    const booking = placeBooking(room, member.id, 11)
+    const booking = placeBooking(room, member.id, 11).id
 
     const answers = await Promise.all([
       send('POST', `/api/rooms/bookings/${booking}/cancel`, {}, member.cookie),
@@ -200,7 +204,7 @@ describe.skipIf(skip !== null)('being told (C-113, the member half)', () => {
 
   test('cancelling sends one too', async () => {
     const room = await makeRoom()
-    const booking = placeBooking(room, member.id, 12)
+    const booking = placeBooking(room, member.id, 12).id
     await send('POST', `/api/rooms/bookings/${booking}/cancel`, {}, member.cookie)
 
     const sent = read<{ n: number }>(`
@@ -213,7 +217,7 @@ describe.skipIf(skip !== null)('being told (C-113, the member half)', () => {
 describe.skipIf(skip !== null)('the screen (C-112)', () => {
   test('a member cancels from the page, and the row stays with its new status', async () => {
     const room = await makeRoom()
-    const booking = placeBooking(room, member.id, 13)
+    const booking = placeBooking(room, member.id, 13).id
 
     const view = await openSignedOutView(app.baseURL)
     try {
@@ -230,7 +234,9 @@ describe.skipIf(skip !== null)('the screen (C-112)', () => {
       await waitFor(view, `document.querySelector('[data-test="cancel-confirm"]')`, 30_000)
       await click(view, '[data-test="cancel-confirm"]')
 
-      await waitFor(view, `document.body.innerText.includes('Cancelled')`, 30_000)
+      // This row's own cancel button, not the word anywhere on the page: earlier cases in this
+      // suite cancelled bookings for the same member, so "Cancelled" is already on screen.
+      await waitFor(view, `!document.querySelector('[data-test="cancel-${booking}"]')`, 30_000)
       expect(read<{ status: string }>('SELECT status FROM room_bookings WHERE id = ?', booking)?.status)
         .toBe('CANCELLED')
     }

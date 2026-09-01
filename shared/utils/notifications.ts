@@ -58,6 +58,33 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'room-booked',
   },
+  'room.request.received': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-requested',
+  },
+  'room.request.waiting': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-request-waiting',
+  },
+  'room.request.expired': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-request-expired',
+  },
+  // One message carries every decision taken on one member's requests in one action, so a batch
+  // of five is one email rather than five (C-109 criterion 4).
+  'room.request.approved': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-approved',
+  },
+  'room.request.rejected': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-rejected',
+  },
   'room.booking.cancelled': {
     topic: 'ROOMS',
     channels: ['EMAIL'],

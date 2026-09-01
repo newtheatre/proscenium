@@ -1,34 +1,28 @@
-import { bookingForm, maskConflicts } from '#shared/utils/bookings'
+import { requestForm } from '#shared/utils/requests'
+import { maskConflicts } from '#shared/utils/bookings'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { formatLondon } from '#shared/utils/london'
 
-// Book a room.
+// Ask for a slot the policy will not confirm on its own.
 export default defineEventHandler(async (event) => {
-  // authority rather than requirePermission: booking is a member's own act, and the permissions
-  // only decide whether they may exceed the maximum and see whose booking is in the way.
   const { account, permissions } = await authority(event)
-  const input = await readValidatedBodyOrThrow(event, bookingForm)
+  const input = await readValidatedBodyOrThrow(event, requestForm)
 
   const room = await findRoom(input.roomId)
-  // Retired rooms are not offered, so asking for one is asking for something gone.
   if (!room || !room.isActive) throw createError({ statusCode: 410, statusMessage: 'That room is no longer bookable' })
 
   const startsAt = new Date(input.startsAt)
   const endsAt = new Date(input.endsAt)
   const now = new Date()
 
-  const estate = await estatePolicy(event)
-  const policy = resolvePolicy(room, estate)
-
-  const verdict = judge({ startsAt, endsAt }, policy, room, {
+  const verdict = judge({ startsAt, endsAt }, resolvePolicy(room, await estatePolicy(event)), room, {
     now,
     isAdmin: permissions.has('rooms.write'),
     hasMembership: await hasCurrentMembership(event, account.id, now),
     activeBookings: await activeBookingsFor(account.id, Math.floor(now.getTime() / 1000)),
   })
 
-  // Nothing an approver could agree to (a lapsed membership, a slot already past), so it is a
-  // refusal rather than a request (C-105 criterion 4).
+  // Nothing an approver could agree to, so it is not a request either (C-105 criterion 4).
   if (verdict.refusedOutright) {
     throw createError({
       statusCode: 422,
@@ -37,16 +31,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Out of policy, or a sensitive room. The request itself is C-108; this names what a request
-  // would have to be for, so the screen can offer one.
-  if (verdict.needsApproval) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: 'That booking needs somebody to agree to it',
-      data: { failures: verdict.failures, canRequest: true, sensitive: room.sensitive },
-    })
-  }
-
+  // A request holds its slot, or an instant booking would take it from under a decision somebody
+  // is in the middle of making (criterion 2).
   const claimed = await claimSlot({
     roomId: room.id,
     userId: account.id,
@@ -55,8 +41,9 @@ export default defineEventHandler(async (event) => {
     startsAt: Math.floor(startsAt.getTime() / 1000),
     endsAt: Math.floor(endsAt.getTime() / 1000),
     tier: input.tier,
-    status: 'CONFIRMED',
+    status: 'PENDING_APPROVAL',
     notes: input.notes,
+    reason: input.reason,
   })
 
   if (!claimed.won && claimed.why === 'gone') {
@@ -66,20 +53,20 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 409,
       statusMessage: 'Somebody booked that slot first',
-      // Masked unless the reader may see whose it is (C-103 criteria 4 and 5).
       data: { conflicts: maskConflicts(claimed.conflicts, permissions.has('rooms.read')) },
     })
   }
 
   await db.insert(schema.auditLog).values(auditEntry({
     actorId: account.id,
-    action: 'room.booked',
+    action: 'room.requested',
     target: `booking:${claimed.id}`,
-    detail: { room: room.id, tier: input.tier },
+    // The rules it broke, never the reason: that is the member's own words (0011).
+    detail: { room: room.id, failed: verdict.failures.map(failure => failure.reason) },
   }))
 
   await notify(event, {
-    type: 'room.booking.confirmed',
+    type: 'room.request.received',
     userId: account.id,
     context: {
       name: account.name,
@@ -93,8 +80,8 @@ export default defineEventHandler(async (event) => {
   return {
     ok: true,
     id: claimed.id,
-    status: 'CONFIRMED' as const,
-    // A warning, never a refusal: the room still fits what somebody agreed to (C-101 criterion 5).
+    status: 'PENDING_APPROVAL' as const,
+    failures: verdict.failures,
     warning: overCapacity(room.capacity, input.attendees),
   }
 })
