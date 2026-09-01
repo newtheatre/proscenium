@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, gt, inArray, isNull, not, or } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, not, or, sql } from 'drizzle-orm'
 import { isMonthDay, londonParts } from '#shared/utils/london'
-import { expiryFor, leadsDepartment } from '#shared/utils/training'
+import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment } from '#shared/utils/training'
 import type { AcademicYear, ExpiryPolicy, LeadAssignment, ModuleInput } from '#shared/utils/training'
 import type { Authority } from '#server/utils/authorise'
 import type { H3Event } from 'h3'
@@ -57,6 +57,63 @@ const liveLead = (now: Date) => or(
   isNull(schema.departmentLeads.expiresAt),
   gt(schema.departmentLeads.expiresAt, Math.floor(now.getTime() / 1000)),
 )
+
+// Whether the proposed prerequisite already leads back to the module, and by which path. A
+// recursive walk, so nothing binds a parameter per edge and no id list is built (0003, G-108 c2).
+export async function cyclePath(moduleId: string, requiresId: string): Promise<string | null> {
+  const found = await db.all<{ path: string }>(sql`
+    with recursive reaches(module_id, path, depth) as (
+      select ${requiresId}, ${requiresId}, 0
+      union all
+      select p.requires_id, r.path || ' -> ' || p.requires_id, r.depth + 1
+      from module_prerequisites p join reaches r on p.module_id = r.module_id
+      where r.depth < ${MAX_PREREQUISITE_DEPTH}
+        and instr(' -> ' || r.path || ' -> ', ' -> ' || p.requires_id || ' -> ') = 0
+    )
+    select path from reaches where module_id = ${moduleId} limit 1
+  `)
+  return found[0]?.path ?? null
+}
+
+// A module's direct prerequisites, with the module each one names. Direct edges only: there is no
+// transitive expression anywhere in this system (G-108 criterion 1).
+export async function prerequisitesOf(moduleIds: string[]): Promise<Map<string, PrerequisiteRow[]>> {
+  if (moduleIds.length === 0) return new Map()
+
+  const rows = await db.select({
+    id: schema.modulePrerequisites.id,
+    moduleId: schema.modulePrerequisites.moduleId,
+    requiresId: schema.modulePrerequisites.requiresId,
+    requiresName: schema.trainingModules.name,
+    requiresKind: schema.trainingModules.kind,
+  })
+    .from(schema.modulePrerequisites)
+    .innerJoin(schema.trainingModules, eq(schema.trainingModules.id, schema.modulePrerequisites.requiresId))
+    .orderBy(asc(schema.modulePrerequisites.requiresId))
+
+  const byModule = new Map<string, PrerequisiteRow[]>()
+  for (const row of rows.filter(row => moduleIds.includes(row.moduleId))) {
+    byModule.set(row.moduleId, [...(byModule.get(row.moduleId) ?? []), row])
+  }
+  return byModule
+}
+
+export interface PrerequisiteRow {
+  id: string
+  moduleId: string
+  requiresId: string
+  requiresName: string
+  requiresKind: string
+}
+
+// Which modules somebody currently holds, expiring included, as a set the caller can ask of any
+// prerequisite (G-108 criterion 5, G-101 criterion 3).
+export async function modulesHeldBy(userId: string, today: string): Promise<Set<string>> {
+  const rows = await db.select({ moduleId: schema.trainingRecords.moduleId })
+    .from(schema.trainingRecords)
+    .where(and(eq(schema.trainingRecords.userId, userId), heldNow(today)))
+  return new Set(rows.map(row => row.moduleId))
+}
 
 // The SQL twin of countsAsHeld. Expiring is held, so the warning window cancels out and no gate
 // query ever reads it: held is unrevoked and not yet at its expiry date (G-101 criterion 3).
@@ -252,11 +309,19 @@ export async function listModules(
   }))
 }
 
-export async function moduleById(id: string): Promise<{ id: string, department: string, name: string } | undefined> {
+export interface ModuleHeader {
+  id: string
+  department: string
+  name: string
+  kind: string
+}
+
+export async function moduleById(id: string): Promise<ModuleHeader | undefined> {
   const [row] = await db.select({
     id: schema.trainingModules.id,
     department: schema.trainingModules.department,
     name: schema.trainingModules.name,
+    kind: schema.trainingModules.kind,
   }).from(schema.trainingModules).where(eq(schema.trainingModules.id, id)).limit(1)
   return row
 }

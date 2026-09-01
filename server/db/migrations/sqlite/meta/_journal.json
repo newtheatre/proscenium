@@ -267,6 +267,13 @@
       "when": 1788352213853,
       "tag": "0037_training_records_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1788302850575,
+      "tag": "0036_mysterious_lady_deathstrike",
+      "breakpoints": true
     }
   ]
 }

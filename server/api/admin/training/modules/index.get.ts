@@ -19,5 +19,11 @@ export default defineEventHandler(async (event) => {
     await academicYear(event),
     true,
   )
-  return { items, total: items.length }
+
+  // Direct edges only, carried with the module so the editor has them without a second call.
+  const prerequisites = await prerequisitesOf(items.map(module => module.id))
+  return {
+    items: items.map(module => ({ ...module, prerequisites: prerequisites.get(module.id) ?? [] })),
+    total: items.length,
+  }
 })

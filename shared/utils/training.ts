@@ -17,6 +17,10 @@ export type ModuleLifecycle = (typeof MODULE_LIFECYCLE)[number]
 // The longest lifetime any policy may stamp on a record (G-123 criterion 4).
 export const MAX_EXPIRY_MONTHS = 120
 
+// Belt and braces on the prerequisite walk: the visited check is what makes it terminate on a
+// graph that already holds a cycle, and this is what makes it terminate if that reasoning is wrong.
+export const MAX_PREREQUISITE_DEPTH = 64
+
 // A published id is quoted by members and printed on paper, so it is the key itself and is
 // immutable once created (G-107 criterion 1).
 export const MODULE_ID = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$/
