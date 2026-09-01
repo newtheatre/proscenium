@@ -517,8 +517,24 @@ is exactly what the clash predicate reads, and on `user_id` for the active-booki
 `tier` carries no CHECK because `ROOM_PRIORITY_TIERS` is committee-editable, and a constraint
 behind an editable list breaks writes the moment the list is used (0033's reasoning, C-115).
 `series_id` → room_series NULL and `occurrence` NULL carry an occurrence's place in its term
-(C-110); `bumped_to_booking_id` arrives with C-115. Indexed on `series_id`, which every
-series-scoped action reads. Adding a column is not a rebuild, and this table is not append-only.
+(C-110). `bumped_to_booking_id` and `bumped_reason` carry a bump (C-115). Indexed on `series_id`,
+which every series-scoped action reads. Adding a column is not a rebuild, and this table is not
+append-only.
+
+**Bumping** (C-115) is never automatic: a booking over a confirmed one is still a 409, and only an
+officer with `rooms.write` may take a slot, with a mandatory reason. The order comes from
+`ROOM_PRIORITY_TIERS`, so a committee that reorders the tiers reorders the rule; a tier the setting
+no longer lists ranks below everything, and an equal or lower tier can never bump. The displaced
+booking becomes `BUMPED`, which is distinct from `CANCELLED` and is never deleted, and links to
+what was offered in its place.
+
+The displaced member is offered **the nearest equivalent slot, held for them rather than
+suggested**: the same room first, then a room whose recorded capacity is at least equal, closest in
+time either side, skipping anything booked or closed. A room whose capacity nobody recorded is not
+offered against a room that has one, because it cannot be shown to be big enough. If nothing
+equivalent is free the bump still goes ahead and the message says so. The whole thing is one batch:
+the displaced row flips guarded on `CONFIRMED`, and both the claimant's booking and the offer are
+written only if that flip landed, so a lost race leaves nothing behind.
 Erasure scrubs `notes`, `reason` and `rejection_reason` to null and `title` to `Erased booking`,
 and keeps the row: the room was used, which is a fact about the room rather than about the person
 (0011). `title` is NOT NULL, and nulling it would fail the whole erasure batch, so the register

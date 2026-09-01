@@ -127,6 +127,13 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'room-blackout-cancelled',
   },
+  // Their room was taken for something with a higher claim, so it leads with the reason and
+  // what they have instead (C-115 criterion 3).
+  'room.booking.bumped': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-bumped',
+  },
   // Security, so no topic can suppress it, and no reachesUnverified (A-102 criterion 2).
   'account.method-removed': {
     topic: null,

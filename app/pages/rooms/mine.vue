@@ -17,6 +17,8 @@ interface Booking {
   seriesId: string | null
   occurrence: number | null
   seriesLength: number | null
+  bumpedReason: string | null
+  bumpedToBookingId: string | null
 }
 
 interface Listing { when: string, items: Booking[], total: number }
@@ -229,6 +231,14 @@ useSeoMeta({ title: 'My bookings' })
             class="mt-1 text-sm text-error"
           >
             {{ booking.rejectionReason }}
+          </p>
+          <p
+            v-if="booking.bumpedReason"
+            class="mt-1 text-sm text-warning"
+            :data-test="`bumped-${booking.id}`"
+          >
+            Given to something with a higher claim: {{ booking.bumpedReason }}.
+            {{ booking.bumpedToBookingId ? 'A replacement is held for you below.' : '' }}
           </p>
         </div>
 

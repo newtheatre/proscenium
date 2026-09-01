@@ -108,6 +108,10 @@ export const roomBookings = sqliteTable('room_bookings', {
   // rule in the module treats an occurrence as one (C-110 criterion 5).
   seriesId: text('series_id').references(() => roomSeries.id),
   occurrence: integer('occurrence'),
+  // The booking offered in place of one that was bumped. A bumped row is never deleted, so the
+  // displaced member can see what happened and what they were given instead (C-115 criterion 4).
+  bumpedToBookingId: text('bumped_to_booking_id'),
+  bumpedReason: text('bumped_reason'),
   noShowRecordedAt: integer('no_show_recorded_at'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),

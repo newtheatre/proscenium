@@ -27,6 +27,8 @@ export default defineEventHandler(async (event) => {
     seriesId: schema.roomBookings.seriesId,
     occurrence: schema.roomBookings.occurrence,
     seriesLength: schema.roomSeries.occurrences,
+    bumpedReason: schema.roomBookings.bumpedReason,
+    bumpedToBookingId: schema.roomBookings.bumpedToBookingId,
   })
     .from(schema.roomBookings)
     .innerJoin(schema.rooms, eq(schema.rooms.id, schema.roomBookings.roomId))

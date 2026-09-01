@@ -377,6 +377,37 @@ The Nottingham New Theatre`,
     }
   },
 
+  'room-bumped': (context: TemplateContext): Rendered => {
+    const offered = context.offered ? String(context.offered) : null
+    return {
+      subject: `Moved: ${String(context.room)}, ${String(context.when)}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Your booking of ${context.room}, ${context.when}, has been given to something with a higher
+claim on the room: ${context.reason}.</p>
+<p>${context.title}</p>
+${offered
+  ? `<p>You have been booked into <strong>${offered}</strong> instead, and that slot is held for
+you. If it does not suit, cancel it and book something else.</p>`
+  : `<p>Nothing equivalent was free nearby, so nothing has been booked in its place. Please find
+another slot.</p>`}
+<p><a href="${String(context.roomsUrl)}">See what you hold</a></p>`),
+      text: `Hello ${context.name},
+
+Your booking of ${String(context.room)}, ${String(context.when)}, has been given to something with
+a higher claim on the room: ${String(context.reason)}.
+
+${String(context.title)}
+
+${offered
+  ? `You have been booked into ${offered} instead, and that slot is held for you. If it does not suit, cancel it and book something else.`
+  : 'Nothing equivalent was free nearby, so nothing has been booked in its place. Please find another slot.'}
+
+See what you hold: ${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'account-exists': (context: TemplateContext): Rendered => ({
     subject: 'You already have an account',
     html: layout(`<p>Hello ${context.name},</p>
