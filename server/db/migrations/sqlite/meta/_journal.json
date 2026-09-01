@@ -232,6 +232,13 @@
       "when": 1788264393117,
       "tag": "0032_lame_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1788292119567,
+      "tag": "0033_last_xorn",
+      "breakpoints": true
     }
   ]
 }

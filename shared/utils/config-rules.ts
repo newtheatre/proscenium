@@ -1,4 +1,5 @@
 import { CONFIG_KEYS } from './config'
+import { isMonthDay } from './london'
 import type { ConfigKey } from './config'
 
 // A value is refused before it is stored, and the refusal names the rule (J-104 criterion 3).
@@ -6,20 +7,18 @@ import type { ConfigKey } from './config'
 
 // A boundary written as MM-DD has to exist in every year, so February stops at the 28th: 29
 // February is a boundary that is absent three years in four (audit TR-7).
-const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 const DAY_OF_YEAR_KEYS = ['SEASON_START', 'SEASON_END', 'ACADEMIC_YEAR_BOUNDARY'] as const
 
+// The verdict is isMonthDay's, so a boundary means the same here as it does to the code that
+// computes an expiry from one; what this adds is a refusal naming the rule (G-123 criterion 5).
 function dayOfYearProblem(value: string): string | null {
+  if (isMonthDay(value)) return null
+
   const [month, day] = value.split('-').map(Number)
   if (!month || !day || month < 1 || month > 12) return 'That is not a month and a day'
-
-  const limit = DAYS_IN_MONTH[month - 1]!
-  if (day < 1 || day > limit) {
-    return month === 2 && day === 29
-      ? 'A yearly boundary must fall in every year, and 29 February does not'
-      : `There is no day ${day} in month ${month}`
-  }
-  return null
+  return month === 2 && day === 29
+    ? 'A yearly boundary must fall in every year, and 29 February does not'
+    : `There is no day ${day} in month ${month}`
 }
 
 // Reads the value of another key as it will stand after this change, so a pair can be checked

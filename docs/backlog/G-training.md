@@ -12,6 +12,7 @@ Counts: 26 MVP stories (G-101 to G-126), 8 V2 stories (G-201 to G-208), 2 Later 
 4. Session stewardship scope: any department leadership currently stewards any session. Should the unified system scope stewardship to the module's owning department?
 5. Quiz governance for V2: who authors and reviews quiz content, and does editing a quiz after people have passed it invalidate or merely date-stamp their attempts?
 6. Should the register's freeze of what a session teaches be releasable by an admin before any mark is made, or is re-creating the session the only path?
+7. Who may appoint a department lead? G-110 says the administrator, and the catalogue slice shipped it that way: `training.leads` is held by ADMIN alone, so the training officer and the general manager edit every department's modules but appoint nobody. Should TRAINING_MANAGER hold it too? This is a question about authority rather than about code; it is one line of the permission map whenever the committee answers it.
 
 ## G-101: My training dashboard with derived validity
 

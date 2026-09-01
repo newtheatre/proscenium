@@ -845,17 +845,44 @@ register referencing `users` and training records.
 Carries the old rehearsal design nearly verbatim (0018), with delivery modes added.
 
 ### departments / department_leads
-`code` PK vocabulary; leads UNIQUE (`department`, `user_id`) with provenance.
+`departments`: `code` PK vocabulary · `name` · `description` · `is_active` · `sort` ·
+timestamps. Committee-editable, so it is a table rather than a CHECK (0033).
+
+`department_leads`: `id` PK · `department` restrict · `user_id` cascade · `expires_at` NULL =
+permanent, with no column default: the write path stamps the next 31 July, London ·
+`granted_by` set null · `granted_at`. UNIQUE (`department`, `user_id`), and indexed on
+`expires_at`, which is what makes the never-swept read cheap. The only assigned standing in the
+module: trainer and supervisor standing derive from records instead, and expiry is read at every
+leads-only surface rather than swept (0037, G-110).
+Erasure keeps the row: who stewarded a department in a year is governance history, it holds no
+free text, and it names nobody but its subject.
 
 ### modules
 `id` PK (published human id, e.g. `TECH-111`) · `department` restrict · `kind` CHECK
 `MODULE|CERTIFICATION|BRIEF` · `name` · `description` · `notes` (lead-only) ·
-`delivery_mode` CHECK `IN_PERSON|SELF_DIRECTED|HYBRID` (safety-critical may never be
-SELF_DIRECTED, write-enforced) · `materials_url` · `expiry_mode` CHECK
+`delivery_mode` CHECK `IN_PERSON|SELF_DIRECTED|HYBRID` · `expiry_mode` CHECK
 `NONE|MONTHS|ACADEMIC_YEAR` · `expiry_months` · `allows_external` bool ·
 `external_evidence` · `safety_critical` bool · `signoff_required` bool · `grants_trainer` /
 `grants_supervisor` bool (frozen while unrevoked records exist) · `self_registrable` bool
 (BRIEF only, G-208) · `status` CHECK `DRAFT|ACTIVE|RETIRED` · `sort` · timestamps.
+
+Six further CHECKs carry rules the form also states, because a rule stated only in a form holds
+only until somebody writes a second writer: safety-critical is never `SELF_DIRECTED`; a `MONTHS`
+policy carries months and nothing else does; a months policy is between 1 and 120; a `BRIEF`
+carries no expiry policy; a `BRIEF` grants neither standing; only a `BRIEF` is self-registrable.
+Each is a closed set about process, so each may carry a constraint (0033). The cap is also
+`MAX_EXPIRY_MONTHS` in `shared/utils/training.ts`, and the two move together only by hand.
+
+A module stores an expiry **policy**, never a date. What a record earned today would run to is
+computed on the way out of a request from the policy, `ACADEMIC_YEAR_BOUNDARY` and
+`TRAINING_CARRY_OVER_DAYS`; an award stamps the answer onto the record, and no later change to
+the policy moves it (G-123, G-124).
+
+### module_materials
+`id` PK · `module_id` cascade · `label` · `url` · `sort` · `created_at`. Zero or more links
+per module, owned by the module's department and editable by its leads (G-107 criteria 1 and
+5). The single `materials_url` column this section previously named was an error against 0018,
+which has always said links, plural.
 
 ### module_prerequisites
 Direct edges only, UNIQUE pair, cycle-checked at write.

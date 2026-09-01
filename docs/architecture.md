@@ -75,11 +75,14 @@ becomes interactive.
 
 - Sealed first-party session cookie (nuxt-auth-utils), 30 days, epoch-revoked (0007).
   Privileged requests re-verify the user row every time; there is no staleness window.
-- Authorisation resolves in `server/utils/authorise.ts` from three sources, in order:
+- Authorisation resolves from three sources, in order:
   1. **Permissions** from held, unexpired roles via the static permission map in `shared/`.
+     `server/utils/authorise.ts` owns this, and `requirePermission` is the guard.
   2. **Derived authority**: tonight's confirmed shift (04:00 to 04:00 London), a currently
      valid training record, department leadership. Computed by joins at request time, never
-     cached beyond the request (0009).
+     cached beyond the request (0009). It resolves in the module utility that owns the fact it
+     derives from, behind a guard of its own: `server/utils/training.ts` reads department
+     leadership, and `requireCatalogueReader` and `requireCatalogueAuthority` are its guards.
   3. **Ownership**: the row's own user id.
 - Guards are server-side and fail closed; route middleware is rendering convenience only.
 - MFA (TOTP + passkeys) is enforced at guard level for permission-bearing roles (0008).

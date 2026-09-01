@@ -135,6 +135,15 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/rooms/reports/export.get.ts', exempt: 'the same figures as a file; no personal column is in it' },
   { route: 'server/api/auth/sign-out.post.ts', exempt: 'ending your own session changes no record' },
 
+  { route: 'server/api/admin/training/departments/index.get.ts', exempt: 'reads the department vocabulary' },
+  { route: 'server/api/admin/training/departments/index.post.ts', actions: ['department.created'] },
+  { route: 'server/api/admin/training/departments/[code]/index.put.ts', actions: ['department.updated'] },
+  { route: 'server/api/admin/training/departments/[code]/leads.post.ts', actions: ['department.lead.assigned'] },
+  { route: 'server/api/admin/training/leads/[id].delete.ts', actions: ['department.lead.removed'] },
+  { route: 'server/api/admin/training/modules/index.get.ts', exempt: 'reads the training catalogue' },
+  { route: 'server/api/admin/training/modules/index.post.ts', actions: ['module.created'] },
+  { route: 'server/api/admin/training/modules/[id]/index.put.ts', actions: ['module.updated'] },
+
   // Development only, and absent from a build: nuxt.config excludes both files (K-124).
   {
     route: 'server/api/dev/seed.post.ts',

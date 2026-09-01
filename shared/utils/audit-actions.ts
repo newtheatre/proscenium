@@ -3,7 +3,7 @@
 
 // The backlog module an action belongs to, declared rather than parsed out of the action's first
 // segment. `unknown` is what an unregistered action reads as, and nothing ever writes it.
-export const AUDIT_MODULES = ['identity', 'governance', 'spaces'] as const
+export const AUDIT_MODULES = ['identity', 'governance', 'spaces', 'training'] as const
 export const UNKNOWN_MODULE = 'unknown'
 
 export type AuditModule = (typeof AUDIT_MODULES)[number]
@@ -96,6 +96,13 @@ const CATALOGUE = {
   'external.request.assignment.refused': { label: 'Union room refused as unsuitable', module: 'spaces' },
   'external.request.rejected': { label: 'Union room request turned down', module: 'spaces' },
   'external.request.cancelled': { label: 'Union room request withdrawn', module: 'spaces', self: true },
+
+  'department.created': { label: 'Department added', module: 'training' },
+  'department.updated': { label: 'Department changed', module: 'training' },
+  'department.lead.assigned': { label: 'Department lead assigned', module: 'training' },
+  'department.lead.removed': { label: 'Department lead removed', module: 'training' },
+  'module.created': { label: 'Training module added', module: 'training' },
+  'module.updated': { label: 'Training module changed', module: 'training' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).
   'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },

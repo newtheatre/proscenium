@@ -74,6 +74,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Who held which office in which year is governance history; the note about them is not.',
   },
   {
+    name: 'department_leads',
+    column: 'user_id',
+    section: 'training',
+    columns: ['department', 'granted_at', 'expires_at'],
+    // Nothing free-text is held: the assignment is a department and two dates, and who stewarded
+    // a department in a year is governance history the same way an office is (G-110).
+    erasure: 'keep',
+    why: 'Departments this person led. Stewardship history survives an erasure, and it names nobody else.',
+  },
+  {
     name: 'notification_preferences',
     column: 'user_id',
     section: 'notification-preferences',
