@@ -121,6 +121,12 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'room-series-cancelled',
   },
+  // Nobody asked for this one: the room was shut under them, so it leads with the reason.
+  'room.blackout.cancelled': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-blackout-cancelled',
+  },
   // Security, so no topic can suppress it, and no reachesUnverified (A-102 criterion 2).
   'account.method-removed': {
     topic: null,

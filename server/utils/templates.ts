@@ -349,6 +349,34 @@ The Nottingham New Theatre`,
     }
   },
 
+  'room-blackout-cancelled': (context: TemplateContext): Rendered => {
+    const bookings = context.bookings as { room: string, title: string, when: string }[]
+    const one = bookings.length === 1
+    return {
+      subject: one
+        ? `Cancelled: ${bookings[0]!.room}, ${bookings[0]!.when}`
+        : `Cancelled: ${bookings.length} bookings`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${one ? 'A room you booked has' : 'Rooms you booked have'} been closed: ${context.reason}.</p>
+<p>${one ? 'This booking is' : 'These bookings are'} cancelled. Nothing is rebooked automatically,
+so please book again if you still need the space.</p>
+<ul>${bookings.map(booking => `<li>${booking.room}, ${booking.when}: ${booking.title}</li>`).join('')}</ul>
+<p><a href="${String(context.roomsUrl)}">Find another slot</a></p>`),
+      text: `Hello ${context.name},
+
+${one ? 'A room you booked has' : 'Rooms you booked have'} been closed: ${String(context.reason)}.
+
+${one ? 'This booking is' : 'These bookings are'} cancelled. Nothing is rebooked automatically, so
+please book again if you still need the space.
+
+${bookings.map(booking => `- ${booking.room}, ${booking.when}: ${booking.title}`).join('\n')}
+
+Find another slot: ${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'account-exists': (context: TemplateContext): Rendered => ({
     subject: 'You already have an account',
     html: layout(`<p>Hello ${context.name},</p>

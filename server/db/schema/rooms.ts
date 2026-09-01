@@ -137,3 +137,22 @@ export const roomFeedTokens = sqliteTable('room_feed_tokens', {
   lastFetchedAt: integer('last_fetched_at'),
   createdAt: integer('created_at').notNull().default(now),
 })
+
+// A room shut for maintenance, a get-in or an external hire (C-114). The old app had no way to
+// say a room was closed, so people booked into a get-in and found out on the night.
+export const roomBlackouts = sqliteTable('room_blackouts', {
+  id: id(),
+  // Null is every room, which is what a fire alarm test or a building closure means.
+  roomId: text('room_id').references(() => rooms.id, { onDelete: 'cascade' }),
+  // Shown to everybody on the calendar, never masked: a closed room explains itself (criterion 4).
+  reason: text('reason').notNull(),
+  startsAt: integer('starts_at').notNull(),
+  endsAt: integer('ends_at').notNull(),
+  createdBy: text('created_by').references(() => users.id),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  index('room_blackouts_span').on(table.startsAt, table.endsAt),
+  index('room_blackouts_room').on(table.roomId),
+  check('room_blackouts_span', sql`${table.endsAt} > ${table.startsAt}`),
+])

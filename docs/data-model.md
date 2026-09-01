@@ -38,6 +38,7 @@ erDiagram
   users ||--o{ training_records : earns
   users ||--o{ room_bookings : requests
   users ||--o| room_feed_tokens : subscribes_with
+  rooms ||--o{ room_blackouts : closed_by
   room_series ||--o{ room_bookings : expands_to
   users ||--o{ ledger_entries : acts_in
   shows ||--o{ performances : runs
@@ -593,6 +594,32 @@ pure, so both transitions are unit cases rather than a hope.
 
 `GET /api/rooms/bookings/[id]/ics` is the same builder for one booking, and the confirmation email
 carries that file as an attachment (criterion 1).
+
+### room_blackouts
+`id` PK · `room_id` → rooms cascade NULL · `reason` NOT NULL · `starts_at`, `ends_at` CHECK
+`ends_at > starts_at` · `created_by` → users NULL · timestamps. Indexed on `(starts_at, ends_at)`
+and on `room_id`. **A null `room_id` is every room**, which is what a building closure or a fire
+alarm test means (C-114 criterion 1). The old app had no blackout mechanism at all, so members
+booked into a get-in and found out on the night (RM-6).
+
+A booking, a request or a series occurrence overlapping a closure is refused **with the reason
+attached** (criterion 2). That is the one deliberate exception to C-103's conflict masking: a
+closure renders on the calendar for everybody with its stated reason and is never shown as
+"Booked" (criterion 4), because a member turned away deserves to know it is rewiring rather than
+go looking for whoever booked it. A series lists a blacked-out occurrence among its refusals like
+any other, so the member skips it explicitly rather than having it dropped for them.
+
+Creating a closure **cancels what is already booked under it, in the same batch that writes it**,
+and writes the reason into each `rejection_reason`. Only the occurrences a closure actually covers
+are cancelled, never a whole series: a get-in on one Monday does not take a term with it
+(criterion 3). Any series whose head went has the next occurrence promoted. Everybody affected is
+told once, however many of their bookings went, naming each (C-113 criterion 2).
+
+Removal **restores nothing** (criterion 5). A cancelled booking stays cancelled and has to be made
+again, because its slot may be somebody else's by then. Creation and removal are both audited.
+
+Erasure scrubs `created_by` to null and keeps the closure: the room was shut, which is a fact
+about the room; who typed it in lives in the audit trail (0010, 0011).
 
 ### room_series
 `id` PK · `user_id` → users restrict · `room_id` → rooms restrict · `title` · `frequency` CHECK

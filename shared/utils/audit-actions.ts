@@ -81,6 +81,8 @@ const CATALOGUE = {
   'account.calendar-feed.issued': { label: 'Calendar feed link minted', module: 'spaces', self: true },
   'room.booking.cancelled': { label: 'Room booking cancelled', module: 'spaces', self: true },
   'room.hours.set': { label: 'Room opening hours set', module: 'spaces' },
+  'room.blackout.created': { label: 'Room closed', module: 'spaces' },
+  'room.blackout.removed': { label: 'Room reopened', module: 'spaces' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).
   'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },

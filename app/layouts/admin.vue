@@ -8,6 +8,7 @@ const links = [[
   { label: 'Fellows', icon: 'i-lucide-award', to: '/admin/fellows' },
   { label: 'Rooms', icon: 'i-lucide-door-open', to: '/admin/rooms' },
   { label: 'Room requests', icon: 'i-lucide-inbox', to: '/admin/requests' },
+  { label: 'Closures', icon: 'i-lucide-construction', to: '/admin/blackouts' },
   { label: 'Audit trail', icon: 'i-lucide-scroll-text', to: '/admin/audit' },
   { label: 'Settings', icon: 'i-lucide-settings', to: '/admin/config' },
 ], // Development only, and absent from a build because the page it points at is (K-124).

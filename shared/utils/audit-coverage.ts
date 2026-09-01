@@ -106,6 +106,9 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/rooms/index.post.ts', actions: ['room.created'] },
   { route: 'server/api/admin/rooms/[id]/index.put.ts', actions: ['room.updated', 'room.hours.set'] },
   { route: 'server/api/admin/rooms/[id]/index.delete.ts', actions: ['room.updated'] },
+  { route: 'server/api/admin/rooms/blackouts/index.get.ts', exempt: 'reads which rooms are shut' },
+  { route: 'server/api/admin/rooms/blackouts/index.post.ts', actions: ['room.blackout.created'] },
+  { route: 'server/api/admin/rooms/blackouts/[id].delete.ts', actions: ['room.blackout.removed'] },
   { route: 'server/api/auth/sign-out.post.ts', exempt: 'ending your own session changes no record' },
 
   // Development only, and absent from a build: nuxt.config excludes both files (K-124).

@@ -169,6 +169,13 @@
       "when": 1788249351733,
       "tag": "0023_past_wendell_rand",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1788252688736,
+      "tag": "0024_last_red_skull",
+      "breakpoints": true
     }
   ]
 }
