@@ -515,8 +515,10 @@ is exactly what the clash predicate reads, and on `user_id` for the active-booki
 behind an editable list breaks writes the moment the list is used (0033's reasoning, C-115).
 `series_id`, `occurrence` and `bumped_to_booking_id` arrive with C-110 and C-115; adding a column
 is not a rebuild, and this table is not append-only in any case.
-Erasure scrubs `title` and `notes` and keeps the row: the room was used, which is a fact about the
-room rather than about the person (0011).
+Erasure scrubs `notes`, `reason` and `rejection_reason` to null and `title` to `Erased booking`,
+and keeps the row: the room was used, which is a fact about the room rather than about the person
+(0011). `title` is NOT NULL, and nulling it would fail the whole erasure batch, so the register
+names what a non-nullable scrubbed column becomes instead (`scrubTo`).
 A member cancels through `POST /api/rooms/bookings/[id]/cancel`, which is **a status change and
 never a deletion**: no member-facing delete path exists at all, rather than one that refuses
 (C-112 criterion 2, audit RM-3). The write is guarded on the status it read, so two cancels racing
