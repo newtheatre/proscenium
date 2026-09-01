@@ -7,8 +7,8 @@ conflict masking), while the calendar, the policy engine, blackouts, tiers and n
 new build. Equipment loans arrive in V2 as the sibling the room store always implied, gated by live
 training records because the gate and the record now share one database.
 
-Counts: 18 MVP stories (C-101 to C-118), 6 V2 stories (C-201 to C-206), 2 Later epic stubs
-(C-301, C-302). 26 total.
+Counts: 19 MVP stories (C-101 to C-119), 6 V2 stories (C-201 to C-206), 2 Later epic stubs
+(C-301, C-302). 27 total.
 
 ## Open questions
 
@@ -284,6 +284,20 @@ Counts: 18 MVP stories (C-101 to C-118), 6 V2 stories (C-201 to C-206), 2 Later 
   4. Web push subscriptions are deliberately not migrated; push consent is re-collected when push actually works.
   5. The import is re-runnable against fresh exports during migration rehearsals without duplicating rows.
 - Source: Prompt Book C-1; audit RM-1, EW-2; Get-In part 3 (rooms inventory row, cutover order 2).
+
+## C-119: The union's rooms, and what they are good for
+
+- Role: Theatre Manager
+- Phase: MVP
+- Story: As the Theatre Manager, I want the rooms the SU manages listed with what each is good and bad for, so that nobody is sent to rehearse in a room with a fixed table in it again.
+- Depends on: C-101
+- Acceptance criteria:
+  1. An SU room carries a name, campus, building, contact and capacity, and is retired rather than deleted so an old request still names something. It is a reference catalogue and never part of the bookable estate: nothing in it holds a slot or appears on a calendar.
+  2. A suitability note records one verdict (suitable, caution, unsuitable) against one room and one purpose, with a mandatory reason. The same room may be unsuitable for a rehearsal and suitable for a meeting, which is the case the pairing exists for. Noting the same pair again replaces the verdict; notes are ordinary editable rows, not an append-only register.
+  3. A member searching for a room sees, per result, whether it suits the purpose they are asking for, and the reason.
+  4. The catalogue is searched on the server and never shipped whole: the union has hundreds of rooms.
+  5. Every listing, change and note is audited; the wording of a note stays out of the trail, because it may describe a person's experience.
+- Source: the Theatre Manager's spreadsheet, checked by hand before answering the SU; audit RM-6.
 
 ## C-201: Asset register
 

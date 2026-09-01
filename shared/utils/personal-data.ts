@@ -190,6 +190,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Rooms booked and not used. The statistics survive an erasure; the person in them does not.',
   },
   {
+    name: 'external_space_notes',
+    column: 'written_by',
+    section: null,
+    columns: null,
+    erasure: 'scrub',
+    // What we learned about a room outlives whoever wrote it down; the audit trail keeps who.
+    scrub: ['written_by'],
+    why: 'An officer noted what an SU room is no good for. The knowledge survives; the officer does not.',
+  },
+  {
     name: 'room_blackouts',
     column: 'created_by',
     section: null,

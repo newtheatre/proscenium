@@ -39,6 +39,7 @@ erDiagram
   users ||--o{ room_bookings : requests
   users ||--o| room_feed_tokens : subscribes_with
   rooms ||--o{ room_blackouts : closed_by
+  external_spaces ||--o{ external_space_notes : judged_by
   room_bookings ||--o{ room_no_shows : missed_as
   room_series ||--o{ room_bookings : expands_to
   users ||--o{ ledger_entries : acts_in
@@ -672,6 +673,33 @@ records, withdrawals included, so a correction is visible rather than a gap (cri
 Erasure keeps the rows: append-only means a scrub could not run here even if it were wanted, and
 the reference resolves to the tombstone the user row became, so the statistics survive and the
 ladder dies with the account (criterion 6, 0010, 0011).
+
+### external_spaces and external_space_notes
+`external_spaces`: `id` PK · `name` UNIQUE · `campus` · `building` · `contact` · `capacity` CHECK
+`> 0 OR NULL` · `is_active` · timestamps. `external_space_notes`: `id` PK · `space_id` →
+external_spaces cascade · `purpose` · `verdict` CHECK `SUITABLE|CAUTION|UNSUITABLE` · `reason`
+NOT NULL · `written_by` → users NULL · timestamps, UNIQUE `(space_id, purpose)`.
+
+**A catalogue, never an estate.** These are rooms the Students' Union manages, listed so a member
+can state a preference and so we remember what we learned about each. Nothing here holds a slot,
+appears on a calendar, or can be booked: we cannot promise a room we do not control (C-119
+criterion 1). A room is retired rather than deleted, so an old request still names something.
+
+**A verdict is about one room and one purpose**, which is the whole point of the pairing: the fixed
+table that ruins a rehearsal is exactly what a meeting wants. `UNIQUE (space_id, purpose)` means
+noting the same pair again replaces the verdict rather than leaving two claims nobody can choose
+between. Notes are **ordinary editable rows, not an 0010 append-only register**: they say what we
+believe about a room today, and a room that gets its table removed should simply stop being marked
+bad. `purpose` carries no CHECK because `ROOM_PURPOSES` is committee-editable (0033's family).
+
+`GET /api/rooms/external-spaces` searches on the server and never ships the catalogue, and returns
+per result the verdict and warning for the purpose asked about, so a member is warned before the SU
+is ever troubled. Notes for a set of spaces are read in one statement, split at 90 because the ids
+come from a result set (0003, 0006).
+
+Erasure scrubs `written_by` and keeps the note: what we learned about a room outlives whoever wrote
+it down, and the audit trail keeps who. The wording never enters an audit detail, because a note may
+describe a person's experience (0011).
 
 ### room_blackouts
 `id` PK · `room_id` → rooms cascade NULL · `reason` NOT NULL · `starts_at`, `ends_at` CHECK

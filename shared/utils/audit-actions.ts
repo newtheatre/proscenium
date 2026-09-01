@@ -86,6 +86,10 @@ const CATALOGUE = {
   'room.booking.bumped': { label: 'Room booking bumped', module: 'spaces' },
   'room.no-show.recorded': { label: 'No-show recorded', module: 'spaces' },
   'room.no-show.withdrawn': { label: 'No-show withdrawn', module: 'spaces' },
+  'external.space.created': { label: 'SU room listed', module: 'spaces' },
+  'external.space.updated': { label: 'SU room changed', module: 'spaces' },
+  'external.space.note.set': { label: 'SU room suitability noted', module: 'spaces' },
+  'external.space.note.removed': { label: 'SU room suitability note removed', module: 'spaces' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).
   'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },
