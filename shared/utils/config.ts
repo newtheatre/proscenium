@@ -391,6 +391,7 @@ export const ENFORCED_KEYS = [
   'ROOM_MAX_BOOKING_ADMINS_EXEMPT',
   'ROOM_MAX_BOOKING_HOURS',
   'ROOM_MIN_BOOKING_MINUTES',
+  'ROOM_SERIES_MAX_OCCURRENCES',
   'MEMBERSHIP_RENEWAL_NOTICE_DAYS',
   'PRIVILEGED_ROLES',
   // Read by the directory to count the accounts a sweep would warn, which is the whole of its

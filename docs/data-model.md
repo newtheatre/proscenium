@@ -38,6 +38,7 @@ erDiagram
   users ||--o{ training_records : earns
   users ||--o{ room_bookings : requests
   users ||--o| room_feed_tokens : subscribes_with
+  room_series ||--o{ room_bookings : expands_to
   users ||--o{ ledger_entries : acts_in
   shows ||--o{ performances : runs
   performances ||--o{ reservations : sells
@@ -514,8 +515,9 @@ scrub · `reason` scrub (why an exception is asked for, the member's own words, 
 is exactly what the clash predicate reads, and on `user_id` for the active-bookings cap.
 `tier` carries no CHECK because `ROOM_PRIORITY_TIERS` is committee-editable, and a constraint
 behind an editable list breaks writes the moment the list is used (0033's reasoning, C-115).
-`series_id`, `occurrence` and `bumped_to_booking_id` arrive with C-110 and C-115; adding a column
-is not a rebuild, and this table is not append-only in any case.
+`series_id` → room_series NULL and `occurrence` NULL carry an occurrence's place in its term
+(C-110); `bumped_to_booking_id` arrives with C-115. Indexed on `series_id`, which every
+series-scoped action reads. Adding a column is not a rebuild, and this table is not append-only.
 Erasure scrubs `notes`, `reason` and `rejection_reason` to null and `title` to `Erased booking`,
 and keeps the row: the room was used, which is a fact about the room rather than about the person
 (0011). `title` is NOT NULL, and nulling it would fail the whole erasure batch, so the register
@@ -593,9 +595,50 @@ pure, so both transitions are unit cases rather than a hope.
 carries that file as an attachment (criterion 1).
 
 ### room_series
-`id` PK · recurrence descriptor (frequency, interval, days, count, until) · `created_at`.
-Occurrences are expanded at creation, checked before any row is written; London wall-clock
-arithmetic throughout.
+`id` PK · `user_id` → users restrict · `room_id` → rooms restrict · `title` · `frequency` CHECK
+`DAILY|WEEKLY` · `weekdays` (sorted list, Sunday nought; null for a daily series) · `starts_on`
+London day · `clock_from`, `clock_to` wall clocks · `occurrences` CHECK `> 0` ·
+`head_booking_id` NULL · timestamps. Indexed on `user_id`.
+
+**The recurrence is stored as the member described it, never as instants.** A wall clock and a
+London day expand to instants on demand; storing instants would bake one DST offset into a whole
+term, which is the bug C-110 criterion 4 names (0014). `shared/utils/series.ts` does the expansion
+and walks calendar days, never milliseconds: one week is 167 hours in March and 169 in October, so
+a 19:00 rehearsal that stays 19:00 is not evenly spaced in real time. Both transitions are
+automated cases.
+
+Creation expands, then **policy- and conflict-checks every occurrence before any row is written**
+(criterion 2). Each occurrence counts against `ROOM_ACTIVE_BOOKINGS_PER_MEMBER` as the check walks
+the term, which is what the setting means by "a series counts each occurrence". If any occurrence
+fails, nothing is written and the refusal lists every failing occurrence with its day and reason,
+so a member resubmits with `skip` and keeps every other week where it was (criterion 3). The whole
+series confirms or the whole series queues; an occurrence is never a different kind of thing from
+its siblings (criterion 6). Occurrences carry `series_id` and `occurrence`, and are ordinary
+bookings for every other rule in the module (criterion 5).
+
+The write is one `db.batch`: the series row, then a guarded claim per occurrence, then a statement
+that fails the batch unless every claim landed (**0035**). A guarded `INSERT` matching nothing
+writes no row and raises nothing, so without that assertion a series beaten to one slot would
+commit eleven of its twelve weeks silently.
+
+`head_booking_id` is the earliest occurrence still standing. Cancelling it promotes the next **in
+the same batch as the cancel**, whatever the scope, so a series never splits and nothing can read
+a head that is already gone (C-111 criterion 3).
+
+Cancelling from a series **always asks which**: `POST /api/rooms/bookings/[id]/cancel` refuses a
+booking carrying a `series_id` unless the body names `scope` as `occurrence` or `series`. There is
+no default, because a single button meaning either one week or a whole term is the ambiguity the
+story exists to remove (criterion 1). A series-scoped cancel covers every non-terminal occurrence
+in one predicate rather than an id list, so a term of any length is one statement (0003, 0006);
+already cancelled or rejected occurrences are untouched (criterion 2). One message names the weeks
+that went, never one per occurrence (criterion 5).
+
+Editing an occurrence or a series is not built: no booking-edit path exists anywhere in the module
+yet, so a series edit would mean inventing a single-booking edit first.
+
+Erasure scrubs the series title to `Erased series` and keeps the row, the same rule its occurrences
+follow. It exports under its own section, because the bundle keys by section and sharing the
+bookings one would lose a table.
 
 Equipment (C V2) tables are deliberately not designed yet; nothing above precludes an asset
 register referencing `users` and training records.

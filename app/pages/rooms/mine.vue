@@ -14,6 +14,9 @@ interface Booking {
   status: string
   rejectionReason: string | null
   cancellable: boolean
+  seriesId: string | null
+  occurrence: number | null
+  seriesLength: number | null
 }
 
 interface Listing { when: string, items: Booking[], total: number }
@@ -86,15 +89,26 @@ function spanOf(booking: Booking): string {
   return `${from} to ${to}`
 }
 
+// Which of the two, chosen explicitly. Nothing is preselected: a member cancelling one week must
+// not lose a term to a button whose meaning they had to infer (C-111 criterion 1).
+const scope = ref<'occurrence' | 'series' | undefined>()
+
+watch(cancelling, (booking) => {
+  scope.value = booking?.seriesId ? undefined : 'occurrence'
+})
+
 async function cancel(): Promise<void> {
   const booking = cancelling.value
-  if (!booking) return
+  if (!booking || scope.value === undefined) return
 
   working.value = true
   try {
-    await $fetch(`/api/rooms/bookings/${booking.id}/cancel`, { method: 'POST' })
+    const answer = await $fetch<{ cancelled: number }>(`/api/rooms/bookings/${booking.id}/cancel`, {
+      method: 'POST',
+      body: { scope: scope.value },
+    })
     toast.add({
-      title: 'Cancelled',
+      title: answer.cancelled > 1 ? `${plural(answer.cancelled, 'booking')} cancelled` : 'Cancelled',
       description: booking.isExternal
         ? 'The Theatre Manager arranged this one with the SU and will need telling.'
         : 'The slot is free for somebody else.',
@@ -202,6 +216,13 @@ useSeoMeta({ title: 'My bookings' })
           </p>
           <p class="text-sm">
             {{ booking.title }}
+          </p>
+          <p
+            v-if="booking.seriesId"
+            class="text-xs text-muted"
+            :data-test="`series-of-${booking.id}`"
+          >
+            Week {{ booking.occurrence }} of {{ booking.seriesLength }} in a series
           </p>
           <p
             v-if="booking.rejectionReason"
@@ -317,6 +338,18 @@ useSeoMeta({ title: 'My bookings' })
           The slot frees straight away and somebody else may take it. Cancelling cannot be undone;
           you would have to book again.
         </p>
+
+        <!-- Both named, neither chosen: the button stays disabled until the member says which. -->
+        <URadioGroup
+          v-if="cancelling?.seriesId"
+          v-model="scope"
+          class="mt-4"
+          data-test="cancel-scope"
+          :items="[
+            { label: 'Just this one', description: `Week ${cancelling.occurrence} of ${cancelling.seriesLength}. The rest stand.`, value: 'occurrence' },
+            { label: 'The whole series', description: 'Every date still standing. Ones already cancelled or turned down are left alone.', value: 'series' },
+          ]"
+        />
         <UAlert
           v-if="cancelling?.isExternal"
           class="mt-4"
@@ -332,10 +365,11 @@ useSeoMeta({ title: 'My bookings' })
           <UButton
             color="error"
             :loading="working"
+            :disabled="scope === undefined"
             data-test="cancel-confirm"
             @click="cancel"
           >
-            Cancel the booking
+            {{ scope === 'series' ? 'Cancel the whole series' : 'Cancel the booking' }}
           </UButton>
           <UButton
             color="neutral"
