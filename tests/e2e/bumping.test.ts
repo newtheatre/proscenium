@@ -88,7 +88,7 @@ function span(daysAhead: number, hour = 14, hours = 2): { startsAt: string, ends
 }
 
 async function bookAs(roomId: string, when: { startsAt: string, endsAt: string }, who: TestMember, tier = 'GENERAL'): Promise<string> {
-  const answered = await send('POST', '/api/rooms/bookings', { roomId, title: 'Rehearsal', tier, ...when }, who.cookie)
+  const answered = await send('POST', '/api/rooms/bookings', { roomId, title: 'Rehearsal', purpose: 'REHEARSAL', tier, ...when }, who.cookie)
   expect(answered.status).toBe(200)
   return (await answered.json() as { id: string }).id
 }
@@ -97,6 +97,7 @@ const bump = (id: string, over: Record<string, unknown> = {}, as = officer): Pro
   send('POST', `/api/admin/rooms/bookings/${id}/bump`, {
     userId: claimant.id,
     title: 'Dress run',
+    purpose: 'REHEARSAL',
     tier: 'PRODUCTION',
     reason: 'Show week for the autumn production',
     ...over,
@@ -140,6 +141,7 @@ describe.skipIf(skip !== null)('only a higher tier may bump (criterion 2)', () =
     const asked = await send('POST', '/api/rooms/requests', {
       roomId: room,
       title: 'Waiting',
+      purpose: 'REHEARSAL',
       reason: 'Sensitive rooms always ask',
       ...span(33),
     }, member.cookie)
@@ -170,7 +172,7 @@ describe.skipIf(skip !== null)('only a higher tier may bump (criterion 2)', () =
     await bookAs(room, when, member)
 
     const over = await send('POST', '/api/rooms/bookings',
-      { roomId: room, title: 'Higher claim', tier: 'PRODUCTION', ...when }, claimant.cookie)
+      { roomId: room, title: 'Higher claim', purpose: 'REHEARSAL', tier: 'PRODUCTION', ...when }, claimant.cookie)
     expect(over.status).toBe(409)
   })
 
@@ -354,7 +356,7 @@ describe.skipIf(skip !== null)('a bump is not a cancellation (criterion 4)', () 
     await bump(booking)
 
     // The claimant holds it now, so a third member is refused.
-    const third = await send('POST', '/api/rooms/bookings', { roomId: room, title: 'Me too', ...when }, member.cookie)
+    const third = await send('POST', '/api/rooms/bookings', { roomId: room, title: 'Me too', purpose: 'REHEARSAL', ...when }, member.cookie)
     expect(third.status).toBe(409)
   })
 })

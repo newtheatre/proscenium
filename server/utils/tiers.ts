@@ -21,6 +21,7 @@ export interface Displaced {
   endsAt: number
   status: string
   tier: string
+  purpose: string | null
   capacity: number | null
 }
 
@@ -37,6 +38,7 @@ export async function displacedBooking(id: string): Promise<Displaced | undefine
     endsAt: schema.roomBookings.endsAt,
     status: schema.roomBookings.status,
     tier: schema.roomBookings.tier,
+    purpose: schema.roomBookings.purpose,
     capacity: schema.rooms.capacity,
   })
     .from(schema.roomBookings)
@@ -119,6 +121,7 @@ export async function performBump(input: {
   claimantId: string
   title: string
   tier: string
+  purpose: string
   reason: string
   offer: Alternative | undefined
   now: number
@@ -137,10 +140,10 @@ export async function performBump(input: {
     `),
     // Written only if the bump landed, so a lost race leaves no booking behind.
     db.run(sql`
-      INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, status)
+      INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status)
       SELECT ${claimId}, ${input.displaced.roomId}, ${input.claimantId}, ${input.title},
              ${input.displaced.attendees}, ${input.displaced.startsAt}, ${input.displaced.endsAt},
-             ${input.tier}, 'CONFIRMED'
+             ${input.tier}, ${input.purpose}, 'CONFIRMED'
       WHERE EXISTS (SELECT 1 FROM room_bookings WHERE id = ${input.displaced.id} AND status = 'BUMPED')
         AND NOT EXISTS (
           SELECT 1 FROM room_bookings
@@ -156,10 +159,10 @@ export async function performBump(input: {
   // book while the member reads their email is not an offer (criterion 3).
   if (input.offer && offerId) {
     statements.push(db.run(sql`
-      INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, status, notes)
+      INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes)
       SELECT ${offerId}, ${input.offer.roomId}, ${input.displaced.userId}, ${input.displaced.title},
              ${input.displaced.attendees}, ${input.offer.startsAt}, ${input.offer.endsAt},
-             ${input.displaced.tier}, 'CONFIRMED', 'Offered in place of a bumped booking'
+             ${input.displaced.tier}, ${input.displaced.purpose}, 'CONFIRMED', 'Offered in place of a bumped booking'
       WHERE EXISTS (SELECT 1 FROM room_bookings WHERE id = ${input.displaced.id} AND status = 'BUMPED')
         AND NOT EXISTS (
           SELECT 1 FROM room_bookings

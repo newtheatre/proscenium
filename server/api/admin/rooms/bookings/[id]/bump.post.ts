@@ -29,6 +29,7 @@ export default defineEventHandler(async (event) => {
     claimantId: claimant.id,
     title: input.title,
     tier: input.tier,
+    purpose: await requirePurpose(event, input.purpose),
     reason: input.reason,
     offer,
     now,

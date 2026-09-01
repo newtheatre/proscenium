@@ -21,6 +21,7 @@ export interface SeriesWrite {
   title: string
   attendees: number | null
   tier: string
+  purpose: string
   notes: string | null
   status: 'CONFIRMED' | 'PENDING_APPROVAL'
   recurrence: Recurrence
@@ -87,10 +88,10 @@ export async function writeSeries(write: SeriesWrite): Promise<{ ids: string[] }
 
   const claims = write.occurrences.map((one, at) => sql`
     INSERT INTO room_bookings
-      (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, status, notes, series_id, occurrence)
+      (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes, series_id, occurrence)
     SELECT ${ids[at]}, ${write.roomId}, ${write.userId}, ${write.title}, ${write.attendees},
            ${Math.floor(one.startsAt.getTime() / 1000)}, ${Math.floor(one.endsAt.getTime() / 1000)},
-           ${write.tier}, ${write.status}, ${write.notes}, ${write.seriesId}, ${one.occurrence}
+           ${write.tier}, ${write.purpose}, ${write.status}, ${write.notes}, ${write.seriesId}, ${one.occurrence}
     WHERE EXISTS (SELECT 1 FROM rooms WHERE id = ${write.roomId} AND is_active = 1)
       AND NOT EXISTS (
         SELECT 1 FROM room_bookings

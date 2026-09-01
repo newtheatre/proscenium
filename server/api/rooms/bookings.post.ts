@@ -72,6 +72,7 @@ export default defineEventHandler(async (event) => {
     startsAt: Math.floor(startsAt.getTime() / 1000),
     endsAt: Math.floor(endsAt.getTime() / 1000),
     tier: input.tier,
+    purpose: await requirePurpose(event, input.purpose),
     status: 'CONFIRMED',
     notes: input.notes,
   })

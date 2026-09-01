@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TIERS } from '#shared/utils/bookings'
+import { TIERS, describePurpose } from '#shared/utils/bookings'
 import { saysRecurrence } from '#shared/utils/series'
 import type { FREQUENCIES } from '#shared/utils/series'
 import { overCapacity } from '#shared/utils/rooms'
@@ -36,6 +36,7 @@ const form = z.object({
   to: z.string().regex(/^\d{2}:\d{2}$/, 'Choose an end time'),
   attendees: z.number().int().positive().nullish(),
   tier: z.enum(TIERS),
+  purpose: z.string().min(1, 'Say what the room is for'),
 }).refine(booking => booking.to > booking.from, {
   path: ['to'],
   message: 'A booking ends after it starts',
@@ -50,6 +51,9 @@ const state = reactive({
   to: String(route.query.until ?? addMinutes(String(route.query.at ?? '10:00'), 60)),
   attendees: undefined as number | undefined,
   tier: 'GENERAL' as (typeof TIERS)[number],
+  // Never defaulted, but taken from the link: a QR code an officer made says what the room is for,
+  // and a value nobody chose is the failure the notes exist to remove (C-119).
+  purpose: String(route.query.purpose ?? ''),
 })
 
 const saving = ref(false)
@@ -69,9 +73,12 @@ const refusals = ref<{ occurrence: number, day: string, failures: Failure[], con
 // stops being true the moment they change it (0012).
 const { data: rules } = await useAsyncData(
   'room-policy',
-  () => request<{ seriesCap: number }>('/api/rooms/policy'),
-  { default: () => ({ seriesCap: 12 }) },
+  () => request<{ seriesCap: number, purposes: string[] }>('/api/rooms/policy'),
+  { default: () => ({ seriesCap: 12, purposes: [] as string[] }) },
 )
+
+const purposeOptions = computed(() =>
+  rules.value.purposes.map(purpose => ({ label: describePurpose(purpose), value: purpose })))
 const seriesCap = computed(() => rules.value.seriesCap)
 
 // Said before submitting, not after: a member on the ladder should know every booking is going to
@@ -110,7 +117,7 @@ const recurrence = computed(() => ({
 }))
 
 const seriesReady = computed(() =>
-  Boolean(state.roomId && state.title.trim() && state.day)
+  Boolean(state.roomId && state.title.trim() && state.day && state.purpose)
   && (frequency.value === 'DAILY' || weekdays.value.length > 0))
 
 async function bookSeries(): Promise<void> {
@@ -126,6 +133,7 @@ async function bookSeries(): Promise<void> {
         title: state.title,
         attendees: state.attendees ?? null,
         tier: state.tier,
+        purpose: state.purpose,
         ...recurrence.value,
       },
     })
@@ -245,6 +253,7 @@ async function book(event: FormSubmitEvent<z.output<typeof form>>): Promise<void
         endsAt: instantOf(event.data.day, event.data.to),
         attendees: event.data.attendees ?? null,
         tier: event.data.tier,
+        purpose: event.data.purpose,
       },
     })
 
@@ -281,6 +290,7 @@ async function ask(): Promise<void> {
         endsAt: instantOf(state.day, state.to),
         attendees: state.attendees ?? null,
         tier: state.tier,
+        purpose: state.purpose,
         reason: reason.value,
       },
     })
@@ -411,8 +421,25 @@ useSeoMeta({ title: 'Book a room' })
         </UFormField>
 
         <UFormField
-          label="What kind of booking"
+          label="What the room is for"
+          name="purpose"
+          required
+          description="What you need the room to be like. It is what an SU room is judged suitable for."
+        >
+          <USelect
+            v-model="state.purpose"
+            :items="purposeOptions"
+            value-key="value"
+            placeholder="Choose what it is for"
+            class="w-full"
+            data-test="booking-purpose"
+          />
+        </UFormField>
+
+        <UFormField
+          label="Priority if the slot is contested"
           name="tier"
+          description="An officer may change this. It decides who keeps the room, not what it is used for."
         >
           <USelect
             v-model="state.tier"
@@ -573,7 +600,7 @@ useSeoMeta({ title: 'Book a room' })
           <UButton
             v-if="askInstead"
             :loading="saving"
-            :disabled="!reason.trim()"
+            :disabled="!reason.trim() || !state.purpose"
             data-test="request-submit"
             @click="ask"
           >

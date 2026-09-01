@@ -247,6 +247,7 @@ describe.skipIf(skip !== null)('the ladder, and what it costs (criteria 3 and 4)
     const booked = await send('POST', '/api/rooms/bookings', {
       roomId: room,
       title: 'Perfectly in policy',
+      purpose: 'REHEARSAL',
       startsAt: when.toISOString(),
       endsAt: new Date(when.getTime() + 7_200_000).toISOString(),
     }, laddered.cookie)
@@ -264,6 +265,7 @@ describe.skipIf(skip !== null)('the ladder, and what it costs (criteria 3 and 4)
     const asked = await send('POST', '/api/rooms/requests', {
       roomId: room,
       title: 'Asking instead',
+      purpose: 'REHEARSAL',
       reason: 'I am on the ladder',
       startsAt: when.toISOString(),
       endsAt: new Date(when.getTime() + 7_200_000).toISOString(),
@@ -298,6 +300,7 @@ describe.skipIf(skip !== null)('the ladder, and what it costs (criteria 3 and 4)
     const booked = await send('POST', '/api/rooms/bookings', {
       roomId: room,
       title: 'Back to normal',
+      purpose: 'REHEARSAL',
       startsAt: when.toISOString(),
       endsAt: new Date(when.getTime() + 7_200_000).toISOString(),
     }, laddered.cookie)

@@ -136,7 +136,7 @@ function seedBookings(rooms: { id: string, name: string }[], people: Seeded[]): 
     { room: studio, who: 0, title: 'Read-through, The Seagull', from: at(1, 18), hours: 2, status: 'CONFIRMED' },
     { room: studio, who: 1, title: 'Blocking, act one', from: at(2, 19), hours: 2, status: 'CONFIRMED' },
     { room: studio, who: 0, title: 'Blocking, act two', from: at(3, 19), hours: 2, status: 'CONFIRMED' },
-    { room: workshop, who: 2, title: 'Set build', from: at(2, 14), hours: 4, status: 'CONFIRMED' },
+    { room: workshop, who: 2, title: 'Set build', from: at(2, 14), hours: 4, status: 'CONFIRMED', purpose: 'GET_IN' },
     { room: workshop, who: 3, title: 'Paint call', from: at(4, 10), hours: 3, status: 'CONFIRMED' },
     // Two waiting on a decision, so the approval queue has something in it to look at (C-109).
     {
@@ -162,10 +162,12 @@ function seedBookings(rooms: { id: string, name: string }[], people: Seeded[]): 
 
   for (const booking of planned) {
     db.query(`
-      INSERT INTO room_bookings (id, room_id, user_id, title, starts_at, ends_at, tier, status, reason)
-      VALUES (?, ?, ?, ?, ?, ?, 'REHEARSAL', ?, ?)
+      INSERT INTO room_bookings (id, room_id, user_id, title, starts_at, ends_at, tier, purpose, status, reason)
+      VALUES (?, ?, ?, ?, ?, ?, 'REHEARSAL', ?, ?, ?)
     `).run(id(), booking.room.id, people[booking.who]!.id, booking.title,
-      booking.from, booking.from + booking.hours * 3600, booking.status, ('reason' in booking ? booking.reason : null) ?? null)
+      booking.from, booking.from + booking.hours * 3600,
+      ('purpose' in booking ? booking.purpose : undefined) ?? 'REHEARSAL',
+      booking.status, ('reason' in booking ? booking.reason : null) ?? null)
   }
 
   return planned.length

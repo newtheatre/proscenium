@@ -243,6 +243,7 @@ describe.skipIf(skip !== null)('one booking on its own (criterion 1)', () => {
     const booked = await send('POST', '/api/rooms/bookings', {
       roomId: room,
       title: 'Read-through',
+      purpose: 'REHEARSAL',
       startsAt: start.toISOString(),
       endsAt: new Date(start.getTime() + 2 * 3_600_000).toISOString(),
     }, member.cookie)

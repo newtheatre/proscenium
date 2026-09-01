@@ -81,14 +81,14 @@ function soon(daysAhead: number, hour = 10, hours = 2): { startsAt: string, ends
 }
 
 const ask = (roomId: string, span: { startsAt: string, endsAt: string }, reason: string, as = member.cookie): Promise<Response> =>
-  send('POST', '/api/rooms/requests', { roomId, title: 'Dress run', ...span, reason }, as)
+  send('POST', '/api/rooms/requests', { roomId, title: 'Dress run', purpose: 'REHEARSAL', ...span, reason }, as)
 
 describe.skipIf(skip !== null)('asking for a slot outside policy (C-108)', () => {
   test('a short-notice span is refused as a booking and accepted as a request', async () => {
     const room = await makeRoom()
     const span = soon(1, 9)
 
-    const refused = await send('POST', '/api/rooms/bookings', { roomId: room, title: 'Dress run', ...span }, member.cookie)
+    const refused = await send('POST', '/api/rooms/bookings', { roomId: room, title: 'Dress run', purpose: 'REHEARSAL', ...span }, member.cookie)
     expect(refused.status).toBe(422)
     expect((await refused.json() as { data: { canRequest: boolean } }).data.canRequest).toBe(true)
 
@@ -111,7 +111,7 @@ describe.skipIf(skip !== null)('asking for a slot outside policy (C-108)', () =>
 
     const other = await registerMember(app, 'other-asker', generatePassword())
     giveMembership(other.id)
-    const beaten = await send('POST', '/api/rooms/bookings', { roomId: room, title: 'Mine', ...span }, other.cookie)
+    const beaten = await send('POST', '/api/rooms/bookings', { roomId: room, title: 'Mine', purpose: 'REHEARSAL', ...span }, other.cookie)
     expect([409, 422]).toContain(beaten.status)
   })
 

@@ -125,6 +125,7 @@ describe('what a series may ask for', () => {
   const valid = {
     roomId: 'studio',
     title: 'Rehearsal',
+    purpose: 'REHEARSAL',
     frequency: 'WEEKLY',
     weekdays: [1],
     startsOn: '2026-03-16',
