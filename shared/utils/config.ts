@@ -147,6 +147,12 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'How long a request may wait before it lapses and the member is told.',
   },
+  ROOM_FEED_WEEKS: {
+    schema: z.number().int().positive(),
+    default: 26,
+    workshop: 'spaces-and-training',
+    describes: 'How far ahead a personal calendar feed carries bookings.',
+  },
   ROOM_AVAILABILITY_ROW_BOUND: {
     schema: z.number().int().positive(),
     default: 1000,
@@ -377,6 +383,7 @@ export const ENFORCED_KEYS = [
   'MEMBERSHIP_GRACE_DAYS',
   'ROOM_ACTIVE_BOOKINGS_PER_MEMBER',
   'ROOM_AVAILABILITY_ROW_BOUND',
+  'ROOM_FEED_WEEKS',
   'ROOM_REQUEST_ESCALATE_HOURS',
   'ROOM_REQUEST_EXPIRE_HOURS',
   'ROOM_AUTO_APPROVE_NOTICE_HOURS',

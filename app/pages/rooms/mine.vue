@@ -23,6 +23,44 @@ const request = useRequestFetch()
 const when = ref<'upcoming' | 'past'>('upcoming')
 const cancelling = ref<Booking | null>(null)
 const working = ref(false)
+const feedUrl = ref<string | null>(null)
+const minting = ref(false)
+const copied = ref(false)
+
+const { data: feed } = await useAsyncData(
+  'room-feed',
+  () => request<{ exists: boolean }>('/api/account/room-feed'),
+  { default: () => ({ exists: false }) },
+)
+
+// The plaintext exists only in the response that mints it, so a second visit cannot show the
+// URL again: it can only replace it, which is what makes revoking one an ordinary action.
+async function mintFeed(): Promise<void> {
+  minting.value = true
+  copied.value = false
+  try {
+    feedUrl.value = (await $fetch<{ url: string }>('/api/account/room-feed', { method: 'POST' })).url
+    feed.value = { exists: true }
+  }
+  catch (error) {
+    toast.add({ title: refusalText(error), color: 'error' })
+  }
+  finally {
+    minting.value = false
+  }
+}
+
+async function copyFeed(): Promise<void> {
+  if (!feedUrl.value) return
+  try {
+    await navigator.clipboard.writeText(feedUrl.value)
+    copied.value = true
+  }
+  catch {
+    // A browser that refuses the clipboard leaves the URL on screen to copy by hand.
+    copied.value = false
+  }
+}
 
 const { data, status, refresh } = await useAsyncData(
   () => `my-bookings-${when.value}`,
@@ -173,16 +211,33 @@ useSeoMeta({ title: 'My bookings' })
           </p>
         </div>
 
-        <UButton
-          v-if="booking.cancellable"
-          size="sm"
-          color="error"
-          variant="subtle"
-          :data-test="`cancel-${booking.id}`"
-          @click="cancelling = booking"
-        >
-          Cancel
-        </UButton>
+        <div class="flex flex-wrap items-center gap-2">
+          <UButton
+            v-if="booking.status === 'CONFIRMED'"
+            size="sm"
+            color="neutral"
+            variant="subtle"
+            icon="i-lucide-calendar-plus"
+            :to="`/api/rooms/bookings/${booking.id}/ics`"
+            external
+            download
+            :aria-label="`Add ${booking.room} to my calendar`"
+            :data-test="`ics-${booking.id}`"
+          >
+            Add to calendar
+          </UButton>
+
+          <UButton
+            v-if="booking.cancellable"
+            size="sm"
+            color="error"
+            variant="subtle"
+            :data-test="`cancel-${booking.id}`"
+            @click="cancelling = booking"
+          >
+            Cancel
+          </UButton>
+        </div>
       </li>
     </ul>
 
@@ -192,6 +247,63 @@ useSeoMeta({ title: 'My bookings' })
     >
       {{ plural(data.total, 'booking') }}
     </p>
+
+    <UPageCard
+      class="mt-10"
+      title="Your bookings in your own calendar"
+      description="Subscribe once and every booking appears where the rest of your life is planned. The link is yours alone, so do not share it."
+      data-test="feed-card"
+    >
+      <div class="space-y-3">
+        <div
+          v-if="feedUrl"
+          class="space-y-2"
+        >
+          <UInput
+            :model-value="feedUrl"
+            readonly
+            class="w-full font-mono text-xs"
+            data-test="feed-url"
+            @focus="(event: FocusEvent) => (event.target as HTMLInputElement).select()"
+          />
+          <p class="text-sm text-muted">
+            Copy this now. It is shown once, and asking for another replaces it.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <UButton
+            v-if="feedUrl"
+            color="neutral"
+            variant="outline"
+            :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'"
+            data-test="feed-copy"
+            @click="copyFeed"
+          >
+            {{ copied ? 'Copied' : 'Copy the link' }}
+          </UButton>
+
+          <UButton
+            :loading="minting"
+            :color="feed.exists ? 'neutral' : 'primary'"
+            :variant="feed.exists ? 'outline' : 'solid'"
+            data-test="feed-mint"
+            @click="mintFeed"
+          >
+            {{ feed.exists ? 'Replace my calendar link' : 'Create my calendar link' }}
+          </UButton>
+        </div>
+
+        <p
+          v-if="feed.exists && !feedUrl"
+          class="text-sm text-muted"
+          data-test="feed-exists"
+        >
+          You already have one. Replacing it makes a new link and stops the old one working
+          straight away.
+        </p>
+      </div>
+    </UPageCard>
 
     <!-- Asked before doing it: the slot goes to whoever wants it next, and there is no undo. -->
     <UModal
