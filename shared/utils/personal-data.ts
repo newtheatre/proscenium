@@ -185,8 +185,8 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     section: 'no-shows',
     columns: ['kind', 'recorded_at'],
     erasure: 'keep',
-    // Append-only and trigger-enforced, so a scrub could not run here even if it were wanted: the
-    // reference resolves to the tombstone the user row became, and the ladder dies with it (0010).
+    // Nothing here needs scrubbing: the reference resolves to the tombstone the user row became
+    // and the ladder dies with it. Append-only does not forbid one, as audit_log shows (0010).
     why: 'Rooms booked and not used. The statistics survive an erasure; the person in them does not.',
   },
   {
@@ -267,8 +267,8 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     section: 'money',
     columns: ['happened_at', 'london_day', 'source', 'tender', 'total_pence'],
     erasure: 'keep',
-    // Append-only and trigger-enforced, so a scrub could not run here even if it were wanted: the
-    // reference resolves to the tombstone the user row became (0004, 0010, 0011).
+    // Nothing here needs scrubbing: the reference resolves to the tombstone the user row became.
+    // Append-only does not forbid one, as audit_log shows (0004, 0010, 0011).
     why: 'Money the theatre took. Sales statistics survive an erasure; the person in them does not.',
   },
   {
