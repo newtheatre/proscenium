@@ -21,6 +21,9 @@ fixed, in the pull request that fixes it.
 | **`content/` holds no pages**, so `check:content-tokens` passes over zero tokens. | The check is green by vacuum, and will not have been exercised on real content until J-110. | J-110. |
 
 
+| **C-112 tells the member, and nobody else.** Criterion 3 wants cancelling a booking at an externally arranged room to warn the approvers, and criterion 4 wants approvers told about short-notice cancellations inside a configurable window. | Cancelling an SU room frees it here while the Theatre Manager's arrangement with the SU stands, so the two disagree until somebody notices. The screen and the response both say the room was arranged by hand, which is a prompt rather than a notification. | C-109, which builds the approver queue there is currently nobody in, and a configuration key for the short-notice window, which has no proposed value in the workshop register. |
+| **C-113 is a confirmation and a cancellation, not the story.** Rejection, bump, blackout and expiry notices, coalescing several changes into one message, and the day-before reminder with its ICS attachment are all unbuilt. | Room bookings are one notification topic, so a member who mutes it mutes everything about rooms including the parts not yet built. That is the intended shape, not a gap. | C-109 for the approver notices, C-104 for the ICS, C-114 and C-115 for the blackout and bump notices, and a scheduled task for the reminder. |
+
 ## Platform
 
 | What | Why it matters | Where it belongs |

@@ -2,6 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import { bookingForm, maskConflicts } from '#shared/utils/bookings'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { isCurrent } from '#shared/utils/membership'
+import { formatLondon } from '#shared/utils/london'
 import type { H3Event } from 'h3'
 
 // Book a room.
@@ -79,6 +80,18 @@ export default defineEventHandler(async (event) => {
     target: `booking:${claimed.id}`,
     detail: { room: room.id, tier: input.tier },
   }))
+
+  await notify(event, {
+    type: 'room.booking.confirmed',
+    userId: account.id,
+    context: {
+      name: account.name,
+      room: room.name,
+      when: formatLondon(startsAt, { dateStyle: 'full', timeStyle: 'short' }),
+      title: input.title,
+      roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
+    },
+  })
 
   return {
     ok: true,

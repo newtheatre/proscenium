@@ -52,6 +52,17 @@ export const MESSAGE_TYPES = {
     template: 'set-password',
     reachesUnverified: true,
   },
+  // A booking is a thing somebody arranged, so it carries the rooms topic and its preference.
+  'room.booking.confirmed': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-booked',
+  },
+  'room.booking.cancelled': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-cancelled',
+  },
   // Security, so no topic can suppress it, and no reachesUnverified (A-102 criterion 2).
   'account.method-removed': {
     topic: null,

@@ -19,6 +19,20 @@ export function isTier(value: string): value is Tier {
   return (TIERS as readonly string[]).includes(value)
 }
 
+// A member cancels what still holds a slot; everything else has already been decided, and the
+// slot may be somebody else's by now (C-112 criterion 5).
+export const CANCELLABLE: readonly BookingStatus[] = ['CONFIRMED', 'PENDING_APPROVAL']
+
+// One refusal for a booking that is not yours and one that does not exist, because a member who
+// may not see a booking may not learn that it is there either.
+export function refusalToCancel(booking: { userId: string, status: string }, viewerId: string): string | null {
+  if (booking.userId !== viewerId) return 'That is not your booking'
+  if (!CANCELLABLE.includes(booking.status as BookingStatus)) {
+    return `That booking is already ${booking.status.toLowerCase().replace('_', ' ')}`
+  }
+  return null
+}
+
 export interface Span {
   startsAt: number
   endsAt: number

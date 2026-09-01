@@ -97,6 +97,53 @@ The Nottingham New Theatre`,
     }
   },
 
+  'room-booked': (context: TemplateContext): Rendered => {
+    const room = String(context.room)
+    const when = String(context.when)
+    return {
+      subject: `${room} is yours, ${when}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${room} is booked for you, ${when}.</p>
+<p>${context.title}</p>
+<p><a href="${String(context.roomsUrl)}">See your bookings</a>, where you can cancel it if your
+plans change.</p>`),
+      text: `Hello ${context.name},
+
+${room} is booked for you, ${when}.
+
+${String(context.title)}
+
+See your bookings, or cancel it if your plans change:
+
+${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
+  'room-cancelled': (context: TemplateContext): Rendered => {
+    const room = String(context.room)
+    const when = String(context.when)
+    return {
+      subject: `Cancelled: ${room}, ${when}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Your booking of ${room}, ${when}, is cancelled and the slot is free for somebody else.</p>
+<p>${context.title}</p>
+<p>If that was not you, <a href="${String(context.roomsUrl)}">check your bookings</a>.</p>`),
+      text: `Hello ${context.name},
+
+Your booking of ${room}, ${when}, is cancelled and the slot is free for somebody else.
+
+${String(context.title)}
+
+If that was not you, check your bookings:
+
+${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'account-exists': (context: TemplateContext): Rendered => ({
     subject: 'You already have an account',
     html: layout(`<p>Hello ${context.name},</p>
