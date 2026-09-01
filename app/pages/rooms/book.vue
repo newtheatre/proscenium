@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { TIERS } from '#shared/utils/bookings'
+import { saysRecurrence } from '#shared/utils/series'
+import type { FREQUENCIES } from '#shared/utils/series'
 import { overCapacity } from '#shared/utils/rooms'
 import { REQUEST_REASON_LIMIT } from '#shared/utils/requests'
-import { formatLondon, fromLondonWallClock } from '#shared/utils/london'
+import { formatLondon, fromLondonWallClock, londonWeekday } from '#shared/utils/london'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { RoomHours } from '#shared/utils/rooms'
 import { z } from 'zod'
@@ -54,6 +56,127 @@ const saving = ref(false)
 const failures = ref<Failure[]>([])
 const askInstead = ref(false)
 const reason = ref('')
+
+// A term of rehearsals is one action, so repeating is part of this form rather than a screen of
+// its own (C-110). Off by default: most bookings are one evening.
+const repeats = ref(false)
+const frequency = ref<(typeof FREQUENCIES)[number]>('WEEKLY')
+const weekdays = ref<number[]>([])
+const occurrences = ref(4)
+const refusals = ref<{ occurrence: number, day: string, failures: Failure[], conflicts: unknown[] }[]>([])
+
+// Read rather than restated: the cap is committee-editable, and a number written into a screen
+// stops being true the moment they change it (0012).
+const { data: rules } = await useAsyncData(
+  'room-policy',
+  () => request<{ seriesCap: number }>('/api/rooms/policy'),
+  { default: () => ({ seriesCap: 12 }) },
+)
+const seriesCap = computed(() => rules.value.seriesCap)
+
+const WEEKDAYS = [
+  { label: 'Mon', value: 1 },
+  { label: 'Tue', value: 2 },
+  { label: 'Wed', value: 3 },
+  { label: 'Thu', value: 4 },
+  { label: 'Fri', value: 5 },
+  { label: 'Sat', value: 6 },
+  { label: 'Sun', value: 0 },
+]
+
+// The day the member picked, so a weekly series starts on the day they were looking at. Immediate,
+// because a deep link from the calendar arrives with the day already set.
+watch(() => state.day, (day) => {
+  if (!day || weekdays.value.length > 0) return
+  const [year, month, date] = day.split('-').map(Number)
+  weekdays.value = [londonWeekday(fromLondonWallClock(year!, month!, date!, 12))]
+}, { immediate: true })
+
+const recurrence = computed(() => ({
+  frequency: frequency.value,
+  weekdays: weekdays.value,
+  startsOn: state.day,
+  from: state.from,
+  to: state.to,
+  occurrences: occurrences.value,
+}))
+
+const seriesReady = computed(() =>
+  Boolean(state.roomId && state.title.trim() && state.day)
+  && (frequency.value === 'DAILY' || weekdays.value.length > 0))
+
+async function bookSeries(): Promise<void> {
+  saving.value = true
+  failures.value = []
+  refusals.value = []
+
+  try {
+    const answer = await $fetch<{ id: string, status: string, occurrences: unknown[] }>('/api/rooms/series', {
+      method: 'POST',
+      body: {
+        roomId: state.roomId,
+        title: state.title,
+        attendees: state.attendees ?? null,
+        tier: state.tier,
+        ...recurrence.value,
+      },
+    })
+
+    toast.add({
+      title: answer.status === 'CONFIRMED'
+        ? `${plural(answer.occurrences.length, 'booking')} made`
+        : `${plural(answer.occurrences.length, 'booking')} asked for`,
+      description: answer.status === 'CONFIRMED'
+        ? 'Cancelling asks whether you mean one week or the whole run.'
+        : 'The slots are held while somebody decides.',
+      icon: 'i-lucide-check',
+      color: answer.status === 'CONFIRMED' ? 'success' : 'warning',
+    })
+    await navigateTo('/rooms/mine')
+  }
+  catch (error) {
+    const data = refusalData<{ refusals?: typeof refusals.value }>(error)
+    refusals.value = data?.refusals ?? []
+    if (refusals.value.length === 0) toast.add({ title: refusalText(error), color: 'error' })
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+// Resubmitted without the weeks that failed, which keeps every other week where it was.
+async function bookWithoutRefused(): Promise<void> {
+  const skip = refusals.value.map(one => one.day)
+  saving.value = true
+  try {
+    const answer = await $fetch<{ occurrences: unknown[] }>('/api/rooms/series', {
+      method: 'POST',
+      body: {
+        roomId: state.roomId,
+        title: state.title,
+        attendees: state.attendees ?? null,
+        tier: state.tier,
+        ...recurrence.value,
+        skip,
+      },
+    })
+    toast.add({
+      title: `${plural(answer.occurrences.length, 'booking')} made`,
+      description: `${plural(skip.length, 'week')} left out.`,
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    await navigateTo('/rooms/mine')
+  }
+  catch (error) {
+    const data = refusalData<{ refusals?: typeof refusals.value }>(error)
+    refusals.value = data?.refusals ?? []
+    if (refusals.value.length === 0) toast.add({ title: refusalText(error), color: 'error' })
+  }
+  finally {
+    saving.value = false
+  }
+}
 
 const { data: rooms } = await useAsyncData(
   'bookable-rooms',
@@ -290,6 +413,112 @@ useSeoMeta({ title: 'Book a room' })
           />
         </UFormField>
 
+        <UCollapsible v-model:open="repeats">
+          <UButton
+            color="neutral"
+            variant="ghost"
+            class="w-full justify-between"
+            :icon="repeats ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+            data-test="repeat-toggle"
+          >
+            Repeat this booking
+          </UButton>
+
+          <template #content>
+            <div class="mt-3 space-y-4 rounded-md border border-default p-4">
+              <p class="text-sm text-muted">
+                A term of rehearsals is booked as one series. Every date is checked before any of
+                them is held, so a week somebody else has stops the whole run rather than leaving
+                you with half of it.
+              </p>
+
+              <UFormField label="How often">
+                <USelect
+                  v-model="frequency"
+                  :items="[{ label: 'Every week', value: 'WEEKLY' }, { label: 'Every day', value: 'DAILY' }]"
+                  value-key="value"
+                  class="w-full"
+                  data-test="repeat-frequency"
+                />
+              </UFormField>
+
+              <UFormField
+                v-if="frequency === 'WEEKLY'"
+                label="On which days"
+                required
+              >
+                <div class="flex flex-wrap gap-1">
+                  <UButton
+                    v-for="weekday in WEEKDAYS"
+                    :key="weekday.value"
+                    size="sm"
+                    :color="weekdays.includes(weekday.value) ? 'primary' : 'neutral'"
+                    :variant="weekdays.includes(weekday.value) ? 'solid' : 'outline'"
+                    :aria-pressed="weekdays.includes(weekday.value)"
+                    :data-test="`repeat-day-${weekday.value}`"
+                    @click="weekdays = weekdays.includes(weekday.value)
+                      ? weekdays.filter(one => one !== weekday.value)
+                      : [...weekdays, weekday.value]"
+                  >
+                    {{ weekday.label }}
+                  </UButton>
+                </div>
+              </UFormField>
+
+              <UFormField
+                label="How many times"
+                :description="`Up to ${seriesCap}.`"
+              >
+                <UInputNumber
+                  v-model="occurrences"
+                  :min="1"
+                  :max="seriesCap"
+                  class="w-full"
+                  data-test="repeat-count"
+                />
+              </UFormField>
+
+              <p
+                v-if="seriesReady"
+                class="text-sm"
+                data-test="repeat-summary"
+              >
+                {{ saysRecurrence(recurrence) }}, from {{ state.from }} to {{ state.to }}.
+              </p>
+            </div>
+          </template>
+        </UCollapsible>
+
+        <UAlert
+          v-if="refusals.length"
+          color="warning"
+          variant="subtle"
+          title="Some of those dates cannot be booked"
+          data-test="series-refusals"
+        >
+          <template #description>
+            <p>Nothing has been booked. Leave these out and the rest go ahead.</p>
+            <ul class="mt-1 list-disc ps-4">
+              <li
+                v-for="refusal in refusals"
+                :key="refusal.day"
+              >
+                {{ refusal.day }}:
+                {{ refusal.conflicts.length ? 'somebody already has it' : refusal.failures.map(one => one.says).join(' ') }}
+              </li>
+            </ul>
+            <UButton
+              class="mt-3"
+              size="sm"
+              :loading="saving"
+              data-test="series-without-refused"
+              @click="bookWithoutRefused"
+            >
+              Book the other {{ plural(occurrences - refusals.length, 'date') }}
+            </UButton>
+          </template>
+        </UAlert>
+
         <UAlert
           v-if="failures.length"
           :color="askInstead ? 'warning' : 'error'"
@@ -340,6 +569,15 @@ useSeoMeta({ title: 'Book a room' })
             @click="ask"
           >
             Ask for it
+          </UButton>
+          <UButton
+            v-else-if="repeats"
+            :loading="saving"
+            :disabled="!seriesReady"
+            data-test="series-submit"
+            @click="bookSeries"
+          >
+            Book {{ plural(occurrences, 'date') }}
           </UButton>
           <UButton
             v-else

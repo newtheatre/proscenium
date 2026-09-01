@@ -40,3 +40,4 @@ afterwards, only superseded.
 | 0032 | The admin surface has one set of component conventions | which component for which job, and what the test holds |
 | 0033 | A ledger line's kind is enforced in code | which ledger constraints are permanent, and which are not |
 | 0034 | The booking horizon is a number of weeks | how far ahead a member may book, and why not to the end of term |
+| 0035 | A multi-row claim asserts its own completeness | why a series batch ends with a statement that looks like a mistake |

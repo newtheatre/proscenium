@@ -53,6 +53,33 @@ export const roomHours = sqliteTable('room_hours', {
   check('room_hours_order', sql`${table.closes} > ${table.opens}`),
 ])
 
+// A term of rehearsals booked as one action (C-110). The recurrence is kept as the member
+// described it, so a series can say what it is rather than being inferred from its occurrences.
+export const roomSeries = sqliteTable('room_series', {
+  id: id(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  roomId: text('room_id').notNull().references(() => rooms.id, { onDelete: 'restrict' }),
+  title: text('title').notNull(),
+  frequency: text('frequency').notNull(),
+  // London weekdays as a sorted list, Sunday nought. Null for a daily series.
+  weekdays: text('weekdays'),
+  // Wall clocks and a London day, never instants: the arithmetic that expands them is the
+  // recurrence, and storing instants would bake one DST offset into the whole term (0014).
+  startsOn: text('starts_on').notNull(),
+  clockFrom: text('clock_from').notNull(),
+  clockTo: text('clock_to').notNull(),
+  occurrences: integer('occurrences').notNull(),
+  // The earliest occurrence still standing. Cancelling it promotes the next in the same batch,
+  // so a series never splits (C-111 criterion 3).
+  headBookingId: text('head_booking_id'),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  index('room_series_user').on(table.userId),
+  check('room_series_frequency', sql`${table.frequency} IN ('DAILY', 'WEEKLY')`),
+  check('room_series_occurrences', sql`${table.occurrences} > 0`),
+])
+
 export const roomBookings = sqliteTable('room_bookings', {
   id: id(),
   // Restrict, not cascade: a room is retired rather than deleted, so a booking losing its room
@@ -77,6 +104,10 @@ export const roomBookings = sqliteTable('room_bookings', {
   // table, and erasure anonymises rather than deletes, so no row loses its officer (0011).
   decidedBy: text('decided_by').references(() => users.id),
   decidedAt: integer('decided_at'),
+  // Which series this belongs to, and where in it. Null on an ordinary booking, and every other
+  // rule in the module treats an occurrence as one (C-110 criterion 5).
+  seriesId: text('series_id').references(() => roomSeries.id),
+  occurrence: integer('occurrence'),
   noShowRecordedAt: integer('no_show_recorded_at'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
@@ -86,6 +117,8 @@ export const roomBookings = sqliteTable('room_bookings', {
   index('room_bookings_user').on(table.userId),
   // The sweep reads pending rows by age, and there are few of them beside the confirmed ones.
   index('room_bookings_status').on(table.status),
+  // A series-scoped action reads every occurrence by this, never by an id list (0003, 0006).
+  index('room_bookings_series').on(table.seriesId),
   check('room_bookings_span', sql`${table.endsAt} > ${table.startsAt}`),
   check(
     'room_bookings_status',

@@ -24,9 +24,13 @@ export default defineEventHandler(async (event) => {
     status: schema.roomBookings.status,
     tier: schema.roomBookings.tier,
     rejectionReason: schema.roomBookings.rejectionReason,
+    seriesId: schema.roomBookings.seriesId,
+    occurrence: schema.roomBookings.occurrence,
+    seriesLength: schema.roomSeries.occurrences,
   })
     .from(schema.roomBookings)
     .innerJoin(schema.rooms, eq(schema.rooms.id, schema.roomBookings.roomId))
+    .leftJoin(schema.roomSeries, eq(schema.roomSeries.id, schema.roomBookings.seriesId))
     .where(and(
       eq(schema.roomBookings.userId, account.id),
       input.when === 'upcoming' ? gte(schema.roomBookings.endsAt, now) : lt(schema.roomBookings.endsAt, now),

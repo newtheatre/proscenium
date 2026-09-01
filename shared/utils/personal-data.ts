@@ -168,6 +168,18 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Rooms this person booked. Utilisation survives an erasure; their words in it do not.',
   },
   {
+    name: 'room_series',
+    column: 'user_id',
+    // Its own section: the bundle keys by section, so sharing one loses a table.
+    section: 'booking-series',
+    columns: ['title', 'frequency', 'starts_on', 'clock_from', 'clock_to', 'occurrences'],
+    erasure: 'scrub',
+    // The rule its occurrences follow: the rooms were used, what they were called is theirs (0011).
+    scrub: ['title'],
+    scrubTo: { title: 'Erased series' },
+    why: 'A term of rooms this person booked. Utilisation survives an erasure; their words do not.',
+  },
+  {
     name: 'room_feed_tokens',
     column: 'user_id',
     section: null,

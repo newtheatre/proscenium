@@ -33,6 +33,15 @@ export function refusalToCancel(booking: { userId: string, status: string }, vie
   return null
 }
 
+// Which of the two a member meant. There is no default: a single button that might cancel one
+// week or a whole term is the ambiguity C-111 criterion 1 exists to remove.
+export const SCOPES = ['occurrence', 'series'] as const
+export type Scope = (typeof SCOPES)[number]
+
+export const cancelForm = z.object({
+  scope: z.enum(SCOPES).nullish().transform(value => value ?? null),
+})
+
 export interface Span {
   startsAt: number
   endsAt: number

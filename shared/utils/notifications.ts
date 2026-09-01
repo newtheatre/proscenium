@@ -104,6 +104,23 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'room-reminder',
   },
+
+  // One message for a series, never one per occurrence (C-113 criterion 2).
+  'room.series.confirmed': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-series-booked',
+  },
+  'room.series.requested': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-series-requested',
+  },
+  'room.series.cancelled': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-series-cancelled',
+  },
   // Security, so no topic can suppress it, and no reachesUnverified (A-102 criterion 2).
   'account.method-removed': {
     topic: null,

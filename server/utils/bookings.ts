@@ -121,6 +121,8 @@ export interface BookingRow {
   endsAt: number
   status: string
   updatedAt: number
+  seriesId: string | null
+  occurrence: number | null
 }
 
 export async function bookingFor(id: string): Promise<BookingRow | undefined> {
@@ -135,6 +137,8 @@ export async function bookingFor(id: string): Promise<BookingRow | undefined> {
     endsAt: schema.roomBookings.endsAt,
     status: schema.roomBookings.status,
     updatedAt: schema.roomBookings.updatedAt,
+    seriesId: schema.roomBookings.seriesId,
+    occurrence: schema.roomBookings.occurrence,
   })
     .from(schema.roomBookings)
     .innerJoin(schema.rooms, eq(schema.rooms.id, schema.roomBookings.roomId))

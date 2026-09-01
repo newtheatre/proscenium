@@ -290,6 +290,65 @@ The Nottingham New Theatre`,
     }
   },
 
+  'room-series-booked': (context: TemplateContext): Rendered => ({
+    subject: `Booked: ${String(context.count)} rehearsals in ${String(context.room)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>${context.count} bookings in ${context.room} are confirmed, from ${context.first} to
+${context.last}.</p>
+<p>${context.title}</p>
+<p><a href="${String(context.roomsUrl)}">See what you hold</a>. Cancelling asks whether you mean
+one week or the whole run.</p>`),
+    text: `Hello ${context.name},
+
+${String(context.count)} bookings in ${String(context.room)} are confirmed, from
+${String(context.first)} to ${String(context.last)}.
+
+${String(context.title)}
+
+See what you hold: ${String(context.roomsUrl)}
+Cancelling asks whether you mean one week or the whole run.
+
+The Nottingham New Theatre`,
+  }),
+
+  'room-series-requested': (context: TemplateContext): Rendered => ({
+    subject: `Asked for: ${String(context.count)} rehearsals in ${String(context.room)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Your request for ${context.count} bookings in ${context.room}, from ${context.first} to
+${context.last}, is waiting for a decision.</p>
+<p>${context.title}</p>
+<p>The slots are held while somebody decides, so nobody else can book them meanwhile.</p>`),
+    text: `Hello ${context.name},
+
+Your request for ${String(context.count)} bookings in ${String(context.room)}, from
+${String(context.first)} to ${String(context.last)}, is waiting for a decision.
+
+${String(context.title)}
+
+The slots are held while somebody decides, so nobody else can book them meanwhile.
+
+The Nottingham New Theatre`,
+  }),
+
+  // Names the occurrences rather than the count, because which weeks went is the question a
+  // member will have (C-111 criterion 5).
+  'room-series-cancelled': (context: TemplateContext): Rendered => {
+    const days = context.days as string[]
+    return {
+      subject: `Cancelled: ${days.length} bookings in ${String(context.room)}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>These bookings in ${context.room} are cancelled, and the slots are free again.</p>
+<ul>${days.map(day => `<li>${day}</li>`).join('')}</ul>`),
+      text: `Hello ${context.name},
+
+These bookings in ${String(context.room)} are cancelled, and the slots are free again.
+
+${days.map(day => `- ${day}`).join('\n')}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'account-exists': (context: TemplateContext): Rendered => ({
     subject: 'You already have an account',
     html: layout(`<p>Hello ${context.name},</p>
