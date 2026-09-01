@@ -127,6 +127,55 @@ export function exceedsExpiryCap(awardedOn: string, expiresOn: string): boolean 
   return expiresOn > addMonths(awardedOn, MAX_EXPIRY_MONTHS)
 }
 
+export const RECORD_SOURCES = ['SESSION', 'SIGNOFF', 'EXTERNAL', 'SELF', 'LEGACY'] as const
+export const RECORD_STATES = ['VALID', 'EXPIRING', 'EXPIRED'] as const
+
+export type RecordSource = (typeof RECORD_SOURCES)[number]
+export type RecordState = (typeof RECORD_STATES)[number]
+
+// Worked out from the dates every time it is asked for, never stored (0018, G-101 criterion 1).
+// A record expires on its expiry date: on the day itself it no longer counts (criterion 2).
+export function stateOf(expiresOn: string | null, today: string, warningDays: number): RecordState {
+  if (expiresOn === null) return 'VALID'
+  if (today >= expiresOn) return 'EXPIRED'
+  return daysBetween(today, expiresOn) <= warningDays ? 'EXPIRING' : 'VALID'
+}
+
+// Expiring counts as held at every gate, so an ability never flickers off before its date
+// (G-101 criterion 3, G-108 criterion 5, G-120 criterion 2).
+export function countsAsHeld(state: RecordState): boolean {
+  return state !== 'EXPIRED'
+}
+
+export function saysState(state: RecordState): string {
+  if (state === 'EXPIRING') return 'Expiring'
+  if (state === 'EXPIRED') return 'Expired'
+  return 'Valid'
+}
+
+export interface HeldRecord {
+  id: string
+  moduleId: string
+  awardedOn: string
+  createdAt: number
+}
+
+// A renewal is a newer record rather than an edit, so which one is current is derived too
+// (G-120 criterion 6). Ties break on createdAt, because an award date is a day, not an instant.
+export function supersededIn(records: HeldRecord[]): Set<string> {
+  const newest = new Map<string, HeldRecord>()
+  for (const record of records) {
+    const held = newest.get(record.moduleId)
+    const later = !held
+      || record.awardedOn > held.awardedOn
+      || (record.awardedOn === held.awardedOn && record.createdAt > held.createdAt)
+    if (later) newest.set(record.moduleId, record)
+  }
+
+  const current = new Set([...newest.values()].map(record => record.id))
+  return new Set(records.filter(record => !current.has(record.id)).map(record => record.id))
+}
+
 export interface LeadAssignment {
   department: string
   expiresAt: number | null
