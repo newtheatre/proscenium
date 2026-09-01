@@ -103,6 +103,8 @@ const CATALOGUE = {
   'department.lead.removed': { label: 'Department lead removed', module: 'training' },
   'module.created': { label: 'Training module added', module: 'training' },
   'module.updated': { label: 'Training module changed', module: 'training' },
+  'prerequisite.added': { label: 'Prerequisite added', module: 'training' },
+  'prerequisite.removed': { label: 'Prerequisite removed', module: 'training' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).
   'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },

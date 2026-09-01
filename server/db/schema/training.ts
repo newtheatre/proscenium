@@ -95,6 +95,19 @@ export const moduleMaterials = sqliteTable('module_materials', {
   index('module_materials_module').on(table.moduleId),
 ])
 
+// Direct edges only, and a cycle is refused at the write by naming it (G-108). No `created_by`:
+// a column ending `_by` would demand a personal-data entry for a table that names nobody.
+export const modulePrerequisites = sqliteTable('module_prerequisites', {
+  id: id(),
+  moduleId: text('module_id').notNull().references(() => trainingModules.id, { onDelete: 'cascade' }),
+  requiresId: text('requires_id').notNull().references(() => trainingModules.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  unique('module_prerequisites_edge').on(table.moduleId, table.requiresId),
+  index('module_prerequisites_requires').on(table.requiresId),
+  check('module_prerequisites_not_self', sql`${table.moduleId} <> ${table.requiresId}`),
+])
+
 // Append-only and trigger-enforced (0010). Validity is worked out from these dates every time it
 // is read and is never stored, so there is no state column here and never may be (0018, G-101).
 export const trainingRecords = sqliteTable('training_records', {
