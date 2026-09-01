@@ -134,6 +134,13 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'room-bumped',
   },
+  // Sent when the mark changes what booking costs them, not for every mark: a message about
+  // nothing teaches people to ignore messages (C-116 criterion 5).
+  'room.no-show.recorded': {
+    topic: 'ROOMS',
+    channels: ['EMAIL'],
+    template: 'room-no-show',
+  },
   // Security, so no topic can suppress it, and no reachesUnverified (A-102 criterion 2).
   'account.method-removed': {
     topic: null,

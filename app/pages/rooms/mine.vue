@@ -32,6 +32,13 @@ const feedUrl = ref<string | null>(null)
 const minting = ref(false)
 const copied = ref(false)
 
+// Their own record, shown to them rather than sprung on them (C-116 criterion 5).
+const { data: standing } = await useAsyncData(
+  'my-standing',
+  () => request<{ count: number, standing: string, says: string }>('/api/rooms/standing'),
+  { default: () => ({ count: 0, standing: 'CLEAR', says: '' }) },
+)
+
 const { data: feed } = await useAsyncData(
   'room-feed',
   () => request<{ exists: boolean }>('/api/account/room-feed'),
@@ -278,6 +285,17 @@ useSeoMeta({ title: 'My bookings' })
     >
       {{ plural(data.total, 'booking') }}
     </p>
+
+    <UAlert
+      v-if="standing.standing !== 'CLEAR'"
+      class="mt-8"
+      :color="standing.standing === 'PRE_APPROVAL' ? 'warning' : 'neutral'"
+      variant="subtle"
+      icon="i-lucide-user-x"
+      :title="standing.standing === 'PRE_APPROVAL' ? 'Your bookings are checked before they are held' : 'Bookings you did not use'"
+      :description="standing.says"
+      data-test="standing"
+    />
 
     <UPageCard
       class="mt-10"

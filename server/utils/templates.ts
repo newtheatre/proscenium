@@ -408,6 +408,33 @@ The Nottingham New Theatre`,
     }
   },
 
+  'room-no-show': (context: TemplateContext): Rendered => {
+    const stopped = context.underPreApproval === true
+    return {
+      subject: stopped ? 'Your bookings now need approving first' : 'A booking you did not use',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${context.room}, ${context.title}, was booked and not used. That is ${context.count} now.</p>
+${stopped
+  ? `<p>From now on every room you book is checked by a person before it is held. That lifts once
+your record is back below ${context.preApprovalAt}.</p>`
+  : `<p>At ${context.preApprovalAt}, every booking you make is checked by a person first. If you
+cannot use a room, cancelling frees it for somebody else and costs you nothing.</p>`}
+<p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
+      text: `Hello ${context.name},
+
+${String(context.room)}, ${String(context.title)}, was booked and not used. That is
+${String(context.count)} now.
+
+${stopped
+  ? `From now on every room you book is checked by a person before it is held. That lifts once your record is back below ${String(context.preApprovalAt)}.`
+  : `At ${String(context.preApprovalAt)}, every booking you make is checked by a person first. If you cannot use a room, cancelling frees it for somebody else and costs you nothing.`}
+
+See your bookings: ${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'account-exists': (context: TemplateContext): Rendered => ({
     subject: 'You already have an account',
     html: layout(`<p>Hello ${context.name},</p>

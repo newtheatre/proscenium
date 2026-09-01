@@ -39,6 +39,7 @@ export default defineEventHandler(async (event) => {
   const isAdmin = permissions.has('rooms.write')
   const hasMembership = await hasCurrentMembership(event, account.id, now)
   const alreadyHeld = await activeBookingsFor(account.id, Math.floor(now.getTime() / 1000))
+  const preApproval = await underPreApproval(event, account.id, now)
   const clashes = await conflictsAcross(room.id, occurrences)
   // Read once for the whole term. A blacked-out occurrence is a refusal like any other, so the
   // member skips it explicitly rather than having it dropped for them (criterion 2).
@@ -59,6 +60,7 @@ export default defineEventHandler(async (event) => {
       isAdmin,
       hasMembership,
       activeBookings: alreadyHeld + at,
+      underPreApproval: preApproval,
     })
 
     const conflicts = clashes.get(one.occurrence) ?? []

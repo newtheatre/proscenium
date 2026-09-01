@@ -39,6 +39,7 @@ erDiagram
   users ||--o{ room_bookings : requests
   users ||--o| room_feed_tokens : subscribes_with
   rooms ||--o{ room_blackouts : closed_by
+  room_bookings ||--o{ room_no_shows : missed_as
   room_series ||--o{ room_bookings : expands_to
   users ||--o{ ledger_entries : acts_in
   shows ||--o{ performances : runs
@@ -489,10 +490,6 @@ strings, which is why no part of the opening-hours rules involves a date or a ti
 Replaced wholesale on an edit rather than patched: seven days is small enough that a diff would
 be more code than value.
 
-### room_blackouts
-`id` PK · `room_id` NULL = all rooms · `starts_at` · `ends_at` · `reason` (shown to members)
-· `created_by`. Booking inside one is refused; existing bookings cancel with notification.
-
 ```mermaid
 stateDiagram-v2
   [*] --> CONFIRMED : in policy, standard room, instant
@@ -610,6 +607,37 @@ pure, so both transitions are unit cases rather than a hope.
 
 `GET /api/rooms/bookings/[id]/ics` is the same builder for one booking, and the confirmation email
 carries that file as an attachment (criterion 1).
+
+### room_no_shows
+`id` PK · `booking_id` → room_bookings restrict · `user_id` → users restrict · `kind` CHECK
+`RECORDED|WITHDRAWN` · `reason` NULL · `supersedes_id` NULL · `recorded_by` → users NULL ·
+`recorded_at`. Indexed on `user_id` and on `booking_id`. **Append-only, trigger-enforced**, joining
+the 0010 set: a correction is a superseding `WITHDRAWN` entry naming what it replaces, never an
+edit, so the count a member is judged on can always be reconstructed (C-116 criterion 2). The old
+app promised no-show tracking and never built it, so an empty booked room cost nothing (RM-1).
+
+Anyone holding `rooms.write` may mark a booking, and only a **past confirmed** one: a booking still
+to come cannot have been missed, and one nobody held cannot either (criterion 1).
+
+**One booking is one no-show** however many entries exist about it: the count is the latest entry
+per booking, not a row count. Ties break on `rowid` rather than on `id`, because `recorded_at` is
+whole seconds and a mark and its withdrawal can share one; the table never deletes, so a later
+insert always has the higher rowid. `latestFor` orders identically, so what a withdrawal supersedes
+and what the ladder counts can never disagree.
+
+The ladder is `ROOM_NO_SHOW_RECORD_AT` (2) and `ROOM_NO_SHOW_PREAPPROVAL_AT` (3), counted over a
+window that is **rolling and bounded by the committee year, whichever is shorter**
+(`ROOM_NO_SHOW_WINDOW_DAYS`, 365): a June no-show survives the July handover, and one from two
+committees ago does not follow somebody about (0009, criterion 3).
+
+At the pre-approval step, `judge()` sets `needsApproval` for **every** booking whatever the policy
+says about it, so it diverts to the approval queue, and the booking form says so before the member
+fills it in (criterion 4). `GET /api/rooms/standing` gives a member their own count, standing and
+records, withdrawals included, so a correction is visible rather than a gap (criterion 5).
+
+Erasure keeps the rows: append-only means a scrub could not run here even if it were wanted, and
+the reference resolves to the tombstone the user row became, so the statistics survive and the
+ladder dies with the account (criterion 6, 0010, 0011).
 
 ### room_blackouts
 `id` PK · `room_id` → rooms cascade NULL · `reason` NOT NULL · `starts_at`, `ends_at` CHECK

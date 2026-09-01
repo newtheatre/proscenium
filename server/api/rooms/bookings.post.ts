@@ -41,6 +41,7 @@ export default defineEventHandler(async (event) => {
     isAdmin: permissions.has('rooms.write'),
     hasMembership: await hasCurrentMembership(event, account.id, now),
     activeBookings: await activeBookingsFor(account.id, Math.floor(now.getTime() / 1000)),
+    underPreApproval: await underPreApproval(event, account.id, now),
   })
 
   // Nothing an approver could agree to (a lapsed membership, a slot already past), so it is a

@@ -160,3 +160,22 @@ export const roomBlackouts = sqliteTable('room_blackouts', {
   index('room_blackouts_room').on(table.roomId),
   check('room_blackouts_span', sql`${table.endsAt} > ${table.startsAt}`),
 ])
+
+// Bookings nobody turned up for (C-116). Append-only: a correction is a superseding entry with a
+// reason, never an edit, so the count can always be reconstructed (0010).
+export const roomNoShows = sqliteTable('room_no_shows', {
+  id: id(),
+  bookingId: text('booking_id').notNull().references(() => roomBookings.id, { onDelete: 'restrict' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  // RECORDED asserts one; WITHDRAWN supersedes an earlier assertion about the same booking.
+  kind: text('kind').notNull().default('RECORDED'),
+  // Why it was withdrawn. Never personal free text, the same rule audit detail follows (0011).
+  reason: text('reason'),
+  supersedesId: text('supersedes_id'),
+  recordedBy: text('recorded_by').references(() => users.id),
+  recordedAt: integer('recorded_at').notNull().default(now),
+}, table => [
+  index('room_no_shows_user').on(table.userId),
+  index('room_no_shows_booking').on(table.bookingId),
+  check('room_no_shows_kind', sql`${table.kind} IN ('RECORDED', 'WITHDRAWN')`),
+])

@@ -70,6 +70,8 @@ export interface Context {
   isAdmin: boolean
   hasMembership: boolean
   activeBookings: number
+  // Repeated no-shows send every booking to the queue, however compliant it is (C-116).
+  underPreApproval?: boolean
 }
 
 export interface PolicyVerdict {
@@ -157,9 +159,9 @@ export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderP
   }
 
   const refusedOutright = failures.some(failure => NOT_DIVERTIBLE.includes(failure.reason))
-  // An external room is booked by the Theatre Manager filling in the SU's form, so a member's
-  // booking is always a request for somebody to do that (C-101, C-108).
-  const alwaysAsks = room.sensitive || room.isExternal
+  // An external room is a request for the Theatre Manager to fill in the SU's form (C-101), and a
+  // member on the no-show ladder asks for every room whatever the policy says (C-116).
+  const alwaysAsks = room.sensitive || room.isExternal || context.underPreApproval === true
   return {
     failures,
     needsApproval: !refusedOutright && (alwaysAsks || failures.length > 0),

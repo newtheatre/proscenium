@@ -84,6 +84,8 @@ const CATALOGUE = {
   'room.blackout.created': { label: 'Room closed', module: 'spaces' },
   'room.blackout.removed': { label: 'Room reopened', module: 'spaces' },
   'room.booking.bumped': { label: 'Room booking bumped', module: 'spaces' },
+  'room.no-show.recorded': { label: 'No-show recorded', module: 'spaces' },
+  'room.no-show.withdrawn': { label: 'No-show withdrawn', module: 'spaces' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).
   'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },
