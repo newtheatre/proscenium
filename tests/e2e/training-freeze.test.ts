@@ -70,6 +70,8 @@ interface ModuleBody {
   safetyCritical?: boolean
   description?: string | null
   deliveryMode?: string
+  expiryMode?: string
+  expiryMonths?: number
 }
 
 function body(over: Partial<ModuleBody> = {}): ModuleBody {
@@ -133,16 +135,10 @@ describe.skipIf(skip !== null)('a kind is frozen while records exist (G-109 crit
   // Unrevoked, not currently valid: a record that lapsed years ago was still awarded under these
   // semantics, and changing them now would rewrite what it certified.
   test('a record long expired but never revoked freezes the kind just the same', async () => {
-    const module = await addModule({ kind: 'CERTIFICATION' })
-    const record = await award(module)
-    const database = new Database(app.databaseFile)
-    try {
-      database.query('UPDATE training_records SET awarded_on = ?, expires_on = ? WHERE id = ?')
-        .run('2019-01-01', '2020-01-01', record)
-    }
-    finally {
-      database.close()
-    }
+    // Awarded long ago through the real route, not backdated afterwards: rewriting `awarded_on`
+    // is what the append-only trigger exists to refuse (0010).
+    const module = await addModule({ kind: 'CERTIFICATION', expiryMode: 'MONTHS', expiryMonths: 12 })
+    await award(module, '2019-01-01')
 
     expect((await edit(module, { kind: 'MODULE' })).status).toBe(409)
   })
