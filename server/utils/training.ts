@@ -354,6 +354,8 @@ export interface ModuleRow {
   materials: { label: string, url: string }[]
   // Derived on the way out, so a later policy change moves this and no stored date (G-123).
   expiresIfAwardedToday: string | null
+  // Whether its kind and granting flags are frozen. Asked of the records, never stored (G-109).
+  frozen?: boolean
 }
 
 export interface ModuleFilter {
@@ -412,12 +414,27 @@ export async function listModules(
     ))
     .orderBy(asc(schema.moduleMaterials.sort))
 
+  // Which modules may no longer change their safety semantics, scoped by the same subquery as the
+  // materials so no parameter count grows with the page (0003, G-109). A member never asks.
+  const frozen = leadOnly
+    ? new Set((await db.selectDistinct({ moduleId: schema.trainingRecords.moduleId })
+        .from(schema.trainingRecords)
+        .where(and(
+          isNull(schema.trainingRecords.revokedAt),
+          inArray(
+            schema.trainingRecords.moduleId,
+            db.select({ id: schema.trainingModules.id }).from(schema.trainingModules).where(wanted),
+          ),
+        ))).map(record => record.moduleId))
+    : null
+
   const today = londonToday(now)
   return rows.map(row => ({
     ...row,
     materials: materials.filter(material => material.moduleId === row.id)
       .map(({ label, url }) => ({ label, url })),
     expiresIfAwardedToday: expiryFor(row as ExpiryPolicy, today, year),
+    ...(frozen ? { frozen: frozen.has(row.id) } : {}),
   }))
 }
 
@@ -426,6 +443,8 @@ export interface ModuleHeader {
   department: string
   name: string
   kind: string
+  grantsTrainer: boolean
+  grantsSupervisor: boolean
 }
 
 // The policy a sign-off stamps from, with the lifecycle and kind its refusals turn on.
@@ -448,8 +467,23 @@ export async function moduleById(id: string): Promise<ModuleHeader | undefined> 
     department: schema.trainingModules.department,
     name: schema.trainingModules.name,
     kind: schema.trainingModules.kind,
+    grantsTrainer: schema.trainingModules.grantsTrainer,
+    grantsSupervisor: schema.trainingModules.grantsSupervisor,
   }).from(schema.trainingModules).where(eq(schema.trainingModules.id, id)).limit(1)
   return row
+}
+
+// Unrevoked, never "currently valid": an expired record was still awarded under the semantics the
+// freeze protects (G-109). One bound parameter whatever the module carries (0003).
+export async function recordsExistAgainst(moduleId: string): Promise<boolean> {
+  const [row] = await db.select({ id: schema.trainingRecords.id })
+    .from(schema.trainingRecords)
+    .where(and(
+      eq(schema.trainingRecords.moduleId, moduleId),
+      isNull(schema.trainingRecords.revokedAt),
+    ))
+    .limit(1)
+  return row !== undefined
 }
 
 // The academic year an award would be measured against, read live so a settings change takes

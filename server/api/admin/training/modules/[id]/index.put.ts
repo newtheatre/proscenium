@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { moduleForm } from '#shared/utils/training'
+import { frozenChanges, moduleForm, saysFrozenChange } from '#shared/utils/training'
 
 // Edit a module. Both the department it is leaving and the one it is joining have to be one the
 // editor stewards, or a lead could move a module out of their own reach (G-110 criterion 2).
@@ -17,6 +17,13 @@ export default defineEventHandler(async (event) => {
     if (!await departmentByCode(input.department)) {
       throw createError({ statusCode: 404, statusMessage: 'No such department' })
     }
+  }
+
+  // What every record against this module was awarded under, so it is fixed while one stands. An
+  // expired record counts: it was still awarded under these semantics (G-109 criteria 1 and 2).
+  const frozen = frozenChanges(held, input)
+  if (frozen.length > 0 && await recordsExistAgainst(id)) {
+    throw createError({ statusCode: 409, statusMessage: saysFrozenChange(frozen) })
   }
 
   // A brief gates nothing, so becoming one while another module requires it would leave an edge
