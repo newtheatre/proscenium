@@ -1,10 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { londonParts } from '#shared/utils/london'
-import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
-import { codeForStep, stepFor } from '#shared/utils/totp'
+import { adminSession, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-102. Doing more should be a visible path rather than folklore, and the path is recomputed on
@@ -21,7 +20,6 @@ const password = generatePassword()
 const member = { ...syntheticPerson(29), email: registrableAddress('next-member') }
 let memberId = ''
 let memberCookie = ''
-let memberSecret = ''
 
 beforeAll(async () => {
   if (skip) return
@@ -33,8 +31,6 @@ beforeAll(async () => {
   memberId = read<{ id: string }>('SELECT id FROM users WHERE email = ?', member.email)!.id
   const signedIn = await send('POST', '/api/auth/sign-in', { email: member.email, password }, '')
   memberCookie = (signedIn.headers.get('set-cookie') ?? '').split(';')[0]!
-  memberSecret = (await (await send('POST', '/api/account/mfa/enrol', {}, memberCookie)).json() as { secret: string }).secret
-  await send('POST', '/api/account/mfa/confirm', { code: await codeForStep(memberSecret, stepFor(new Date())) }, memberCookie)
 
   department = `NXT${suffix()}`
   await send('POST', '/api/admin/training/departments', { code: department, name: 'Next steps' })
@@ -225,15 +221,12 @@ describe.skipIf(skip !== null)('the dashboard shows the path (G-102 criterion 1)
   test('what you could do next renders for a member', async () => {
     const module = await addModule({ name: 'Sweeping the stage' })
 
-    forgetSpentStep(app, member.email)
     const view = await openSignedOutView(app.baseURL)
     try {
       await visit(view, `${app.baseURL}/sign-in`)
       await fill(view, 'form input[type="email"]', member.email)
       await fill(view, 'form input[type="password"]', password)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelectorAll('[data-test="mfa-challenge"] input').length >= 6`)
-      await fillPin(view, '[data-test="mfa-challenge"] input', await codeForStep(memberSecret, stepFor(new Date()) + 1))
       await waitFor(view, `document.querySelector('[data-test="sign-out"]')`, 30_000)
 
       await visit(view, `${app.baseURL}/training`, '[data-test="training-page"]')
