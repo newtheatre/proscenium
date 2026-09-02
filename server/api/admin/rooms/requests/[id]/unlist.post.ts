@@ -40,9 +40,11 @@ export default defineEventHandler(async (event) => {
   // The reason does not cross: it answers why a member is asking for something outside our
   // policy, which is not a question the other side asks (C-123 criterion 6).
   const insert = sql`
-    INSERT INTO external_requests (id, user_id, title, purpose, attendees, starts_at, ends_at, notes, status, converted_from_booking_id)
+    INSERT INTO external_requests (id, user_id, title, purpose, attendees, starts_at, ends_at, notes, status,
+                                   converted_from_booking_id, series_id, occurrence)
     VALUES (${requestId}, ${booking.userId}, ${booking.title}, ${booking.purpose ?? UNRECORDED_PURPOSE},
-            ${booking.attendees}, ${booking.startsAt}, ${booking.endsAt}, ${booking.notes}, 'REQUESTED', ${id})
+            ${booking.attendees}, ${booking.startsAt}, ${booking.endsAt}, ${booking.notes}, 'REQUESTED', ${id},
+            ${booking.seriesId}, ${booking.occurrence})
   `
 
   const move = sql`
@@ -61,8 +63,13 @@ export default defineEventHandler(async (event) => {
     )
   `
 
+  // The head follows what is left, and it moves in the same batch: a series read between the two
+  // would name a week that has already gone somewhere else (C-124 criterion 4).
+  const statements = [db.run(insert), db.run(move), db.run(assertion)]
+  if (booking.seriesId) statements.push(promoteHead(booking.seriesId, now))
+
   try {
-    await db.batch([db.run(insert), db.run(move), db.run(assertion)])
+    await db.batch(statements as unknown as Parameters<typeof db.batch>[0])
   }
   catch {
     throw createError({ statusCode: 409, statusMessage: 'That request has already been decided' })

@@ -122,6 +122,10 @@ function placeRequest(roomId: string, userId: string, span: { startsAt: string, 
   return id
 }
 
+function roomOf(id: string): string {
+  return read<{ room_id: string }>('SELECT room_id FROM room_bookings WHERE id = ?', id)!.room_id
+}
+
 function statusOf(id: string): string | undefined {
   return read<{ status: string }>('SELECT status FROM room_bookings WHERE id = ?', id)?.status
 }
@@ -552,12 +556,20 @@ describe.skipIf(skip !== null)('moving a request to the other kind', () => {
     expect(statusOf(id)).toBe('PENDING_APPROVAL')
   })
 
-  test('a booking in a series is refused rather than quietly taken out of it', async () => {
+  // A term may hold weeks of both kinds, so one week moving keeps its place rather than breaking
+  // the term up. The head and the cancel rules for that live in the series suite (C-124).
+  test('a booking in a series moves too, and keeps its place in the term', async () => {
     const id = placeRequest(await makeRoom(), member.id, soon(31))
-    write('UPDATE room_bookings SET series_id = ? WHERE id = ?', 'not-a-real-series', id)
+    write('UPDATE room_series (id, user_id, room_id, title, frequency, starts_on, clock_from, clock_to, occurrences) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'.replace('UPDATE', 'INSERT INTO'),
+      'series-for-unlist', member.id, roomOf(id), 'Weekly', 'WEEKLY', '2027-01-04', '19:00', '21:00', 1)
+    write('UPDATE room_bookings SET series_id = ?, occurrence = 2 WHERE id = ?', 'series-for-unlist', id)
 
     const answered = await send('POST', `/api/admin/rooms/requests/${id}/unlist`, { reason: 'One week' }, officer)
-    expect(answered.status).toBe(409)
-    expect((await answered.json() as { statusMessage: string }).statusMessage).toContain('part of a series')
+    expect(answered.status).toBe(200)
+    const { became } = await answered.json() as { became: string }
+
+    expect(read<{ series_id: string, occurrence: number }>(
+      'SELECT series_id, occurrence FROM external_requests WHERE id = ?', became))
+      .toEqual({ series_id: 'series-for-unlist', occurrence: 2 })
   })
 })

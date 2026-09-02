@@ -586,3 +586,77 @@ describe.skipIf(skip !== null)('the screens (C-110, C-111)', () => {
     }
   }, 180_000)
 })
+
+// C-124. A term is not always all in one room: one week may clash with a production, and moving
+// that week elsewhere must not break up the term.
+describe.skipIf(skip !== null)('a term that mixes both kinds of room', () => {
+  async function pendingSeries(): Promise<{ seriesId: string, occurrences: ReturnType<typeof occurrencesOf> }> {
+    const room = await makeRoom({ sensitive: true })
+    const answered = await bookSeries(room)
+    const { id } = await answered.json() as SeriesAnswer
+    return { seriesId: id, occurrences: occurrencesOf(id) }
+  }
+
+  test('one week moves elsewhere and keeps its place in the term', async () => {
+    const { seriesId, occurrences } = await pendingSeries()
+    const second = occurrences[1]!
+
+    const answered = await send('POST', `/api/admin/rooms/requests/${second.id}/unlist`,
+      { reason: 'A production has the room that week' }, officer)
+    expect(answered.status).toBe(200)
+    const { became } = await answered.json() as { became: string }
+
+    const moved = read<{ series_id: string, occurrence: number, status: string }>(
+      'SELECT series_id, occurrence, status FROM external_requests WHERE id = ?', became)
+    expect(moved).toEqual({ series_id: seriesId, occurrence: second.occurrence, status: 'REQUESTED' })
+
+    // The rest of the term is untouched, and the moved week is superseded rather than lost.
+    const after = occurrencesOf(seriesId)
+    expect(after.filter(one => one.status === 'PENDING_APPROVAL')).toHaveLength(3)
+    expect(after.find(one => one.id === second.id)?.status).toBe('CANCELLED')
+  })
+
+  // The head is the earliest still standing of either kind, or a term whose first week moved
+  // would point at a week that is no longer ours (criterion 4).
+  test('the head follows the earliest week still standing, whichever kind it is', async () => {
+    const { seriesId, occurrences } = await pendingSeries()
+    const first = occurrences[0]!
+
+    const answered = await send('POST', `/api/admin/rooms/requests/${first.id}/unlist`,
+      { reason: 'The first week clashes' }, officer)
+    expect(answered.status).toBe(200)
+    const { became } = await answered.json() as { became: string }
+
+    const head = read<{ head_booking_id: string | null, head_request_id: string | null }>(
+      'SELECT head_booking_id, head_request_id FROM room_series WHERE id = ?', seriesId)
+    expect(head?.head_request_id).toBe(became)
+    expect(head?.head_booking_id).toBeNull()
+  })
+
+  test('cancelling the term cancels the weeks asked for elsewhere too', async () => {
+    const { seriesId, occurrences } = await pendingSeries()
+    const moved = await send('POST', `/api/admin/rooms/requests/${occurrences[2]!.id}/unlist`,
+      { reason: 'That week is out' }, officer)
+    expect(moved.status).toBe(200)
+
+    const still = occurrencesOf(seriesId).find(one => one.status === 'PENDING_APPROVAL')!
+    // Counted as a delta: earlier cases in this file cancel their own terms as the same member.
+    const before = read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.series.cancelled'`,
+      member.id)?.n ?? 0
+
+    const answered = await send('POST', `/api/rooms/bookings/${still.id}/cancel`, { scope: 'series' }, member.cookie)
+    expect(answered.status).toBe(200)
+
+    // A week left waiting on somebody after the term is gone is a form nobody withdraws.
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM external_requests WHERE series_id = ? AND status <> 'CANCELLED'`, seriesId)?.n).toBe(0)
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM room_bookings WHERE series_id = ? AND status = 'PENDING_APPROVAL'`, seriesId)?.n).toBe(0)
+
+    // Still one message, naming the weeks, rather than one per week (C-111 criterion 5).
+    expect((read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.series.cancelled'`,
+      member.id)?.n ?? 0) - before).toBe(1)
+  })
+})

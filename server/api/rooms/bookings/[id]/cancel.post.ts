@@ -1,5 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { CANCELLABLE, cancelForm, refusalToCancel } from '#shared/utils/bookings'
+import { LIVE_EXTERNAL } from '#shared/utils/external-requests'
 import { formatLondon } from '#shared/utils/london'
 
 // Cancel a booking you hold, or the series it belongs to.
@@ -90,8 +91,21 @@ async function cancelSeries(seriesId: string, userId: string, now: number): Prom
     ))
     .returning({ id: schema.roomBookings.id, startsAt: schema.roomBookings.startsAt })
 
-  const [cancelled] = await db.batch([cancel, promoteHead(seriesId, now)] as unknown as Parameters<typeof db.batch>[0])
-  return cancelled as Cancelled[]
+  // A term may hold weeks in rooms we do not manage, and cancelling it means all of them: a week
+  // left waiting on somebody after the term is gone is a form nobody withdraws (C-124).
+  const alsoTheirs = db.update(schema.externalRequests)
+    .set({ status: 'CANCELLED', updatedAt: now })
+    .where(and(
+      eq(schema.externalRequests.seriesId, seriesId),
+      eq(schema.externalRequests.userId, userId),
+      inArray(schema.externalRequests.status, [...LIVE_EXTERNAL]),
+    ))
+    .returning({ id: schema.externalRequests.id, startsAt: schema.externalRequests.startsAt })
+
+  const [ours, theirs] = await db.batch(
+    [cancel, alsoTheirs, promoteHead(seriesId, now)] as unknown as Parameters<typeof db.batch>[0],
+  )
+  return [...(ours as Cancelled[]), ...(theirs as Cancelled[])].sort((a, b) => a.startsAt - b.startsAt)
 }
 
 // One message naming which weeks went, never one per occurrence (C-111 criterion 5).

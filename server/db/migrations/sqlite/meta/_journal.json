@@ -239,6 +239,13 @@
       "when": 1788264394117,
       "tag": "0033_a_moved_request_points_at_what_replaced_it",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1788264395117,
+      "tag": "0034_a_series_may_mix_both_kinds_of_room",
+      "breakpoints": true
     }
   ]
 }
