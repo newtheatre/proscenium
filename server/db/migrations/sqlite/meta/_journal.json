@@ -255,17 +255,17 @@
       "breakpoints": true
     },
     {
-      "idx": 34,
+      "idx": 36,
       "version": "6",
-      "when": 1788299537876,
-      "tag": "0034_military_shiva",
+      "when": 1788352212853,
+      "tag": "0036_hard_ultimatum",
       "breakpoints": true
     },
     {
-      "idx": 35,
+      "idx": 37,
       "version": "6",
-      "when": 1788299595680,
-      "tag": "0035_training_records_append_only",
+      "when": 1788352213853,
+      "tag": "0037_training_records_append_only",
       "breakpoints": true
     }
   ]
