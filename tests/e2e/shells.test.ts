@@ -53,7 +53,7 @@ describe.skipIf(skip !== null)('the three shells (docs/design-language.md)', () 
   // At most one marquee CTA, one sticker and one spotlight per view. The budget is a rule and
   // not a suggestion, so it is a test rather than a habit.
   test('a public view spends its expressive budget at most once each', async () => {
-    for (const path of ['/', '/sign-in', '/register', '/verify', '/reset', '/magic']) {
+    for (const path of ['/', '/sign-in', '/register', '/verify', '/reset', '/magic', '/training/modules']) {
       const counts = await inspect<Record<string, number>>(path, KIT_COUNTS)
       for (const [element, count] of Object.entries(counts)) {
         expect(`${path} ${element}: ${count <= 1}`).toBe(`${path} ${element}: true`)

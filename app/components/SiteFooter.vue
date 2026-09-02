@@ -13,8 +13,8 @@ function href(entry: NavEntry): string {
 }
 
 const columns = computed(() => [
-  { label: 'My theatre', links: MEMBER_NAV },
-  { label: 'The theatre', links: PUBLIC_NAV },
+  { label: 'My theatre', links: MEMBER_NAV, public: false },
+  { label: 'The theatre', links: PUBLIC_NAV, public: true },
 ].filter(column => column.links.length > 0))
 </script>
 
@@ -44,7 +44,7 @@ const columns = computed(() => [
             <ULink
               v-for="entry in column.links"
               :key="entry.to"
-              :to="href(entry)"
+              :to="column.public ? entry.to : href(entry)"
               class="text-sm text-muted hover:text-default"
             >
               {{ entry.label }}

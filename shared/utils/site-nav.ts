@@ -1,4 +1,5 @@
 import {
+  anybody,
   decideRoomRequests,
   reachConsole,
   runTrainingSessions,
@@ -118,9 +119,11 @@ export const SHELL_NAV: NavEntry[] = [
   { label: 'Manage', icon: 'i-lucide-layout-dashboard', to: '/admin', ability: reachConsole },
 ]
 
-// The public half of the footer. J-110 writes these pages; until it does there is nothing to link
-// to, and a link to a route that 404s is worse than no navigation at all.
-export const PUBLIC_NAV: NavEntry[] = []
+// The public half of the footer: pages a visitor reads before they are anybody here. The policy
+// pages J-110 writes join this list.
+export const PUBLIC_NAV: NavEntry[] = [
+  { label: 'What we teach', icon: 'i-lucide-graduation-cap', to: '/training/modules', ability: anybody },
+]
 
 // Longest prefix wins, so /rooms/manage/requests is matched by its own entry and not by /rooms.
 export function entryFor(path: string): NavEntry | null {
