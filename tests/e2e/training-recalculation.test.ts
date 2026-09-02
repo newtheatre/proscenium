@@ -353,10 +353,15 @@ describe.skipIf(skip !== null)('the officer screen', () => {
       expect(await textOf(view, '[data-test="affected-total"]')).toContain('1 record')
       expect(await textOf(view, '[data-test="affected-table"]')).toContain('2027-01-15')
 
-      // The confirmation is the count itself, typed back (criterion 3).
+      // The confirmation is the count itself, typed back (criterion 3). The button is disabled
+      // until it matches, and a click on a disabled button is silently nothing.
       await fillNumber(view, '[data-test="echoed-count"]', '1')
+      await waitFor(view, `!document.querySelector('[data-test="recalculate"]').disabled`, 30_000)
       await click(view, '[data-test="recalculate"]')
-      await waitFor(view, `document.querySelector('[data-test="affected-table"]')`, 30_000)
+
+      // Restating leaves nothing to restate, which is the signal that the run landed. Waiting on
+      // the table alone proves nothing: it was already on the screen.
+      await waitFor(view, `document.body.innerText.includes('0 records')`, 30_000)
     }
     finally {
       view.close()
