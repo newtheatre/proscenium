@@ -17,7 +17,7 @@ import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { DeliveryMode, ExpiryMode, ModuleInput, ModuleKind, ModuleLifecycle } from '#shared/utils/training'
 
-definePageMeta({ layout: 'admin', title: 'Training catalogue', middleware: 'signed-in' })
+definePageMeta({ layout: 'console', title: 'Training catalogue', middleware: 'console' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

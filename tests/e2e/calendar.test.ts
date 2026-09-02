@@ -224,7 +224,7 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       await fill(view, 'form input[type="email"]', planner.email)
       await fill(view, 'form input[type="password"]', password)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
       await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
       // A week of every room is the summary; the slots live behind the day view.
@@ -253,7 +253,7 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       await fill(view, 'form input[type="email"]', planner.email)
       await fill(view, 'form input[type="password"]', password)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
       await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
       await click(view, '[data-test="calendar-day"]')
@@ -313,7 +313,7 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       await fill(view, 'form input[type="email"]', planner.email)
       await fill(view, 'form input[type="password"]', password)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
       // Every room, a week: a count per room per day rather than an unreadable grid.
       await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
@@ -342,7 +342,7 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       await fill(view, 'form input[type="email"]', dragger.email)
       await fill(view, 'form input[type="password"]', password)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
       await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
       await click(view, '[data-test="calendar-day"]')

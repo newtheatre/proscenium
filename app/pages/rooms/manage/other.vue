@@ -5,7 +5,7 @@ import { describePurpose } from '#shared/utils/bookings'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'admin', title: 'Other rooms', middleware: 'signed-in' })
+definePageMeta({ layout: 'console', title: 'Other rooms', middleware: 'console' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

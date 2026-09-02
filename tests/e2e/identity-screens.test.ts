@@ -185,7 +185,7 @@ describe.skipIf(skip !== null)('signing in in a browser (A-103, A-111)', () => {
       await fill(view, PASSWORD_FIELD, password)
       await click(view, SUBMIT)
 
-      await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
     }
     finally {
       view.close()
@@ -238,7 +238,7 @@ describe.skipIf(skip !== null)('signing in in a browser (A-103, A-111)', () => {
       expect(await textOf(view)).not.toContain('Sign out')
 
       await fillPin(view, CHALLENGE, await nextCode(secret))
-      await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
     }
     finally {
       view.close()
@@ -263,7 +263,7 @@ describe.skipIf(skip !== null)('signing in in a browser (A-103, A-111)', () => {
       expect(await view.evaluate<number>(`document.querySelectorAll('${CHALLENGE}').length`)).toBeGreaterThanOrEqual(6)
 
       await fillPin(view, CHALLENGE, await nextCode(secret))
-      await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
     }
     finally {
       view.close()
@@ -299,7 +299,7 @@ describe.skipIf(skip !== null)('the links that arrive by email (A-107, A-108)', 
 
     const view = await open(`/magic?token=${token}`)
     try {
-      await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
       expect(verifiedFlag(email)).toBe(1)
     }
     finally {
@@ -317,7 +317,7 @@ describe.skipIf(skip !== null)('the links that arrive by email (A-107, A-108)', 
     try {
       await waitFor(view, `document.querySelectorAll('${CHALLENGE}').length >= 6`)
       await fillPin(view, CHALLENGE, await nextCode(secret))
-      await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
     }
     finally {
       view.close()

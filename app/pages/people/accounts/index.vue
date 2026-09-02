@@ -6,7 +6,7 @@ import type { Role } from '#shared/utils/roles'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'admin', title: 'People', middleware: 'signed-in' })
+definePageMeta({ layout: 'console', title: 'Accounts', middleware: 'console' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
@@ -185,7 +185,7 @@ const columns: TableColumn<Account>[] = [
     header: '',
     meta: { class: { td: 'text-right' } },
     cell: ({ row }) => h(UButton, {
-      'to': `/admin/people/${row.original.id}`,
+      'to': `/people/accounts/${row.original.id}`,
       'variant': 'ghost',
       'size': 'sm',
       'icon': 'i-lucide-chevron-right',

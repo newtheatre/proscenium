@@ -232,9 +232,9 @@ describe.skipIf(skip !== null)('the account screen', () => {
       await click(view, 'form button[type="submit"]')
       await waitFor(view, 'document.querySelectorAll(\'[data-test="mfa-challenge"] input\').length >= 6')
       await fillPin(view, '[data-test="mfa-challenge"] input', await unusedCode())
-      await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
 
-      await visit(view, `${app.baseURL}/admin/people/${person.id}`, '[data-test="account-name"]')
+      await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="account-name"]')
       expect(await textOf(view)).toContain(person.email)
 
       await click(view, '[data-test="disable"]')

@@ -52,6 +52,24 @@ migration/              the SP-3 tooling (standalone, never imported by the app)
 tests/                  unit / integration / e2e, bun test
 ```
 
+## Routes and shells
+
+A prefix names the domain; the shell follows the posture of the work rather than the URL (0040).
+`/admin` means System and nothing else.
+
+| Prefix | Shell | Who |
+| --- | --- | --- |
+| `/`, `/sign-in`, `/register`, `/verify`, `/reset`, `/magic` | `default` | Anybody |
+| `/rooms`, `/rooms/mine`, `/account/*` | `member` | A member, about themselves |
+| `/rooms/manage/*`, `/people/*`, `/admin/*` | `console` | Somebody working for the theatre |
+| `/tonight/*` | `tonight` | Somebody on shift, on a phone |
+
+A domain with both audiences puts the member's screens at the top and the console's under `manage`
+(`/rooms` against `/rooms/manage/requests`). A domain with no member surface sits flat
+(`/people/accounts`, and `/bar/stock` when it lands). Every navigable destination is declared once
+in `shared/utils/site-nav.ts`, which the console sidebar renders and the console middleware guards
+from, so a deep link and the sidebar cannot disagree.
+
 ## The identity screens
 
 `/sign-in` and `/register` are the two entry points, and each carries its own steps rather than
@@ -90,6 +108,11 @@ becomes interactive.
      (0037, G-111).
   3. **Ownership**: the row's own user id.
 - Guards are server-side and fail closed; route middleware is rendering convenience only.
+- `nuxt-authorization` abilities (`shared/utils/abilities.ts`) are named views over the same
+  permission map, used to decide what the chrome shows. Two resolvers hand an ability its viewer:
+  `server/plugins/authorisation.ts` from the account row and its live grants,
+  `app/plugins/authorization.ts` from the account snapshot. Neither reads authority from the
+  cookie, and neither replaces `requirePermission`, which also holds the MFA gate (0040).
 - MFA (TOTP + passkeys) is enforced at guard level for permission-bearing roles (0008).
 - A passkey is a complete sign-in and no challenge follows it: the authenticator verified the
   person before it would sign, so the credential step and the second step happened at once

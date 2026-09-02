@@ -5,7 +5,7 @@ import { formatLondon, fromLondonWallClock } from '#shared/utils/london'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'admin', title: 'Closures', middleware: 'signed-in' })
+definePageMeta({ layout: 'console', title: 'Closures', middleware: 'console' })
 
 const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')

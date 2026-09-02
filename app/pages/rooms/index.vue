@@ -3,7 +3,7 @@ import { formatLondon, fromLondonWallClock, londonWeekday } from '#shared/utils/
 import { closedOn } from '#shared/utils/rooms'
 import type { GridColumn, GridRoom } from '~/components/RoomGrid.vue'
 
-definePageMeta({ middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in' })
 
 interface Taken {
   startsAt: number

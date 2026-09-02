@@ -249,9 +249,9 @@ describe.skipIf(skip !== null)('the screen (C-119)', () => {
       for (const [index, digit] of [...code].entries()) {
         await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
       }
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-      await visit(view, `${app.baseURL}/admin/other-rooms`, '[data-test="spaces-table"]')
+      await visit(view, `${app.baseURL}/rooms/manage/other`, '[data-test="spaces-table"]')
       // A server render cannot see a hydration failure, so the page is read after it is live.
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
 

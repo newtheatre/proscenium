@@ -9,7 +9,7 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 import type { RoomHours } from '#shared/utils/rooms'
 import { z } from 'zod'
 
-definePageMeta({ middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in' })
 
 interface Room {
   id: string

@@ -4,7 +4,7 @@ import { RECOVERY_CODE_COUNT } from '#shared/utils/recovery-codes'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, openSignedOutView, signOut, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
@@ -60,7 +60,7 @@ async function registerAndSignIn(prefix: string): Promise<{ email: string, view:
   await fill(view, 'form input[type="email"]', email)
   await fill(view, 'form input[type="password"]', password)
   await click(view, 'form button[type="submit"]')
-  await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+  await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
   return { email, view }
 }
 
@@ -206,8 +206,8 @@ describe.skipIf(skip !== null)('managing a second factor on the account (A-109, 
       await enrol(view, email)
       const secret = secretFor(email)
 
-      await click(view, '[data-test="sign-out"]')
-      await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\') === null')
+      await signOut(view)
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\') === null')
 
       await visit(view, `${app.baseURL}/sign-in`)
       await fill(view, 'form input[type="email"]', email)
@@ -216,7 +216,7 @@ describe.skipIf(skip !== null)('managing a second factor on the account (A-109, 
 
       await waitFor(view, 'document.querySelectorAll(\'[data-test="mfa-challenge"] input\').length >= 6')
       await fillPin(view, '[data-test="mfa-challenge"] input', await nextCode(secret))
-      await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
     }
     finally {
       view.close()

@@ -294,9 +294,9 @@ describe.skipIf(skip !== null)('the directory screen', () => {
 
       forgetSpentStep(app, officer.email)
       await fillPin(view, '[data-test="mfa-challenge"] input', await codeForStep(secret, stepFor(new Date())))
-      await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
 
-      await visit(view, `${app.baseURL}/admin/people`, '[data-test="toolbar-search"]')
+      await visit(view, `${app.baseURL}/people/accounts`, '[data-test="toolbar-search"]')
       await waitFor(view, `document.body.innerText.includes(${JSON.stringify(known)})`)
 
       // Searching narrows to one, and the total below the table says so.

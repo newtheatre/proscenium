@@ -5,7 +5,7 @@ import type { UtilisationRow } from '#shared/utils/utilisation'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'admin', title: 'Utilisation', middleware: 'signed-in' })
+definePageMeta({ layout: 'console', title: 'Utilisation', middleware: 'console' })
 
 const UBadge = resolveComponent('UBadge')
 

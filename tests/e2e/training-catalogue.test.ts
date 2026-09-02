@@ -60,7 +60,7 @@ async function signedInView(): Promise<Bun.WebView> {
   for (const [index, digit] of [...code].entries()) {
     await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
   }
-  await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
   return view
 }
 
@@ -481,7 +481,7 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
     const id = `SCREEN-${suffix()}`
 
     try {
-      await visit(view, `${app.baseURL}/admin/training`, '[data-test="modules-table"]')
+      await visit(view, `${app.baseURL}/training/manage`, '[data-test="modules-table"]')
       // A server render cannot see a hydration failure, so the page is read after it is live.
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
 
@@ -520,7 +520,7 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
     const code = `SCRN${suffix()}`
 
     try {
-      await visit(view, `${app.baseURL}/admin/departments`, '[data-test="departments-table"]')
+      await visit(view, `${app.baseURL}/training/manage/departments`, '[data-test="departments-table"]')
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
 
       await click(view, '[data-test="add-department"]')

@@ -2,25 +2,12 @@
 // Public surfaces get the expressive kit; the chrome is stage black in both colour modes.
 // That is one `dark` class on the subtree, never an override of slot classes.
 
+// Nothing in the header for a signed-out visitor: the marketing pages are J-110's and do not
+// exist, and a link to a route that 404s is worse than no header nav at all.
 const { account } = useAccount()
-
-// Nothing for a signed-out visitor: the marketing pages are J-110's and do not exist, and a link
-// to a route that 404s is worse than no header nav at all.
 const links = computed(() => (account.value.signedIn
   ? [{ label: 'Rooms', to: '/rooms' }, { label: 'My bookings', to: '/rooms/mine' }]
   : []))
-
-// Most members arrive by a link somebody sent them, so the footer is for finding your way back
-// rather than for browsing.
-const footer = computed(() => (account.value.signedIn
-  ? [
-      { label: 'Book a room', to: '/rooms' },
-      { label: 'Book a room not listed here', to: '/rooms/external' },
-      { label: 'My bookings', to: '/rooms/mine' },
-      { label: 'My profile', to: '/account/profile' },
-      { label: 'Sign-in and security', to: '/account/security' },
-    ]
-  : [{ label: 'Sign in', to: '/sign-in' }, { label: 'Create an account', to: '/register' }]))
 </script>
 
 <template>
@@ -49,29 +36,6 @@ const footer = computed(() => (account.value.signedIn
       <slot />
     </UMain>
 
-    <div class="dark">
-      <UFooter :ui="{ root: 'bg-default' }">
-        <template #left>
-          <p class="text-sm text-muted">
-            The Nottingham New Theatre, the country's only entirely student-run theatre.
-          </p>
-        </template>
-        <template #right>
-          <nav
-            class="flex flex-wrap items-center gap-x-4 gap-y-1"
-            data-test="footer-links"
-          >
-            <ULink
-              v-for="link in footer"
-              :key="link.to"
-              :to="link.to"
-              class="text-sm text-muted hover:text-default"
-            >
-              {{ link.label }}
-            </ULink>
-          </nav>
-        </template>
-      </UFooter>
-    </div>
+    <SiteFooter />
   </div>
 </template>

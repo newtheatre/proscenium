@@ -100,13 +100,19 @@ page load, including the door scanner on a bad foyer connection.
 The tokens and the component theme are shared; the layouts are not. Each surface is assembled
 from Nuxt UI's structural components:
 
-| Surface | Built from |
-| --- | --- |
-| Public site | `UHeader`, `UMain`, `UFooter`, `UFooterColumns`, `UNavigationMenu`, the `UPage*` family |
-| Admin, rooms, training, reports | `UDashboardGroup`, `UDashboardSidebar`, `UDashboardPanel`, `UDashboardNavbar`, `UDashboardSearch`, `UTable` |
-| Show night | A plain dark subtree, because a phone held in a foyer is not a dashboard |
+| Surface | Layout | Built from |
+| --- | --- | --- |
+| Public site | `default` | `UHeader`, `UMain`, `UFooter`, `UFooterColumns`, `UNavigationMenu`, the `UPage*` family |
+| A member's own screens | `member` | The site header, a `UNavigationMenu` sub-nav, the shared footer. No sidebar |
+| Console: managing rooms, training, the bar, the box office, people, money | `console` | `UDashboardGroup`, `UDashboardSidebar`, `UDashboardPanel`, `UDashboardNavbar`, `UDashboardSearch`, `UTable` |
+| Show night | `tonight` | A plain dark subtree, because a phone held in a foyer is not a dashboard |
 
-Three rules follow:
+The shell follows the posture of the work, not the URL, and which shell a screen takes is a
+decision record rather than a habit (`decisions/0040-navigation-is-shaped-by-posture-and-filtered-by-ability.md`).
+`UDashboardSearch` is in the matrix above and is not built yet: it is the answer once the sidebar
+passes roughly forty items.
+
+Four rules follow:
 
 1. **A permanently dark region is marked `dark`.** The public header and footer are stage black
    in both colour modes. That is one class on the subtree, after which every semantic token
@@ -120,6 +126,11 @@ Three rules follow:
 3. **The show-night screens are phone-first and work offline.** They cache their night on open
    and render from cache when the network drops (`architecture.md`, module K). Anything that only
    looks right on a desk monitor is wrong for the surface it is on.
+4. **Navigation is declared once and filtered by ability.** Every destination in the console
+   sidebar, the member sub-nav, the account menu and the footer comes from
+   `shared/utils/site-nav.ts`, and the console middleware guards a route from the same entry the
+   sidebar renders. A screen added to a layout and not to the declaration fails
+   `tests/unit/site-nav.test.ts` (0040).
 
 ## Photography and show artwork
 

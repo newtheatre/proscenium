@@ -5,7 +5,7 @@ import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { AwardFellowship } from '#shared/utils/admin-forms'
 
-definePageMeta({ layout: 'admin', title: 'Fellows', middleware: 'signed-in' })
+definePageMeta({ layout: 'console', title: 'Fellows', middleware: 'console' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
@@ -164,7 +164,7 @@ const columns: TableColumn<Fellow>[] = [
     meta: { class: { td: 'text-right whitespace-nowrap' } },
     cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
       h(UButton, {
-        'to': `/admin/people/${row.original.userId}`,
+        'to': `/people/accounts/${row.original.userId}`,
         'variant': 'ghost',
         'size': 'sm',
         'icon': 'i-lucide-user',

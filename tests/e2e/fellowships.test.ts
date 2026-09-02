@@ -166,9 +166,9 @@ describe.skipIf(skip !== null)('the roll in a browser (A-127)', () => {
       for (const [index, digit] of [...code].entries()) {
         await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
       }
-      await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
 
-      await visit(view, `${app.baseURL}/admin/fellows`, '[data-test="fellows-table"]')
+      await visit(view, `${app.baseURL}/people/fellows`, '[data-test="fellows-table"]')
       await click(view, '[data-test="award"]')
       // Searched by address, because syntheticPerson draws first names from a short list and two
       // people sharing one would let the picker choose the wrong person.

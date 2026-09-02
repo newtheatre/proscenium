@@ -2,7 +2,7 @@
 import { renderSVG } from 'uqr'
 import { formatLondon } from '#shared/utils/london'
 
-definePageMeta({ middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in' })
 
 interface FactorState {
   confirmed: boolean

@@ -6,7 +6,7 @@ import type { RecordMembership } from '#shared/utils/admin-forms'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'admin', title: 'Members', middleware: 'signed-in' })
+definePageMeta({ layout: 'console', title: 'Members', middleware: 'console' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
@@ -180,7 +180,7 @@ const columns: TableColumn<Member>[] = [
     header: '',
     meta: { class: { td: 'text-right' } },
     cell: ({ row }) => h(UButton, {
-      'to': `/admin/people/${row.original.userId}`,
+      'to': `/people/accounts/${row.original.userId}`,
       'variant': 'ghost',
       'size': 'sm',
       'icon': 'i-lucide-chevron-right',

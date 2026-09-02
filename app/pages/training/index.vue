@@ -2,7 +2,7 @@
 import { saysKind, saysSource, saysState } from '#shared/utils/training'
 import type { RecordState } from '#shared/utils/training'
 
-definePageMeta({ middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in' })
 
 interface Record {
   id: string
