@@ -112,6 +112,14 @@ export const MESSAGE_TYPES = {
     template: 'training-request-scheduled',
   },
 
+  // Nothing has been held against them and nothing has been taken away: the module is simply
+  // still outstanding, and the schedule is the way out of that.
+  'training.session.absent': {
+    topic: 'TRAINING',
+    channels: ['EMAIL'],
+    template: 'training-session-absent',
+  },
+
   // Blunt, because it is to an officer about a system failure rather than to a member about
   // themselves: until the register is marked, the training did not happen (G-119).
   'training.register.unmarked': {
