@@ -6,6 +6,7 @@ import { Database } from 'bun:sqlite'
 import { Hash } from '@adonisjs/hash'
 import { Scrypt } from '@adonisjs/hash/drivers/scrypt'
 import { assertLocalTarget, assertNotProduction, generatePassword, registrableAddress } from '../tests/helpers/seed'
+import { DEPARTMENTS, readCatalogue } from './lib/catalogue'
 
 const DEFAULT_TARGET = '.data/db/sqlite.db'
 const target = process.argv[2] ?? DEFAULT_TARGET
@@ -213,8 +214,65 @@ function seedExternalSpaces(): number {
   return spaces.length
 }
 
+// The subcommittee's draft catalogue, so a development database looks like the real thing rather
+// than like three modules somebody invented. The real one is migrated from the old database.
+async function seedCatalogue(): Promise<{ departments: number, modules: number, prerequisites: number }> {
+  for (const department of DEPARTMENTS) {
+    db.query(`INSERT INTO departments (code, name, sort) VALUES (?, ?, ?)
+              ON CONFLICT (code) DO UPDATE SET name = excluded.name, sort = excluded.sort`)
+      .run(department.code, department.name, department.sort)
+  }
+
+  const modules = await readCatalogue()
+  const known = new Set(DEPARTMENTS.map(department => department.code))
+
+  for (const module of modules) {
+    if (!known.has(module.department as typeof DEPARTMENTS[number]['code'])) {
+      throw new Error(`${module.id} names unknown department "${module.department}"`)
+    }
+
+    db.query(`INSERT INTO modules (
+                id, department, kind, name, description, notes, delivery_mode, expiry_mode,
+                expiry_months, safety_critical, signoff_required, grants_trainer, grants_supervisor,
+                status, sort
+              ) VALUES (?, ?, ?, ?, ?, ?, 'IN_PERSON', ?, ?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT (id) DO UPDATE SET
+                name = excluded.name, description = excluded.description, notes = excluded.notes,
+                expiry_mode = excluded.expiry_mode, expiry_months = excluded.expiry_months,
+                safety_critical = excluded.safety_critical, status = excluded.status,
+                sort = excluded.sort`)
+      .run(
+        module.id, module.department, module.kind, module.name, module.description, module.notes,
+        module.expiryMode, module.expiryMonths, Number(module.safetyCritical),
+        Number(module.signoffRequired), Number(module.grantsTrainer), Number(module.grantsSupervisor),
+        module.status, module.sort,
+      )
+
+    // One link per module in the draft, which is a row here rather than a column (G-107 c1).
+    if (module.materialsUrl) {
+      db.query(`INSERT INTO module_materials (id, module_id, label, url, sort)
+                VALUES (?, ?, 'Training materials', ?, 0)
+                ON CONFLICT DO NOTHING`)
+        .run(id(), module.id, module.materialsUrl)
+    }
+  }
+
+  let prerequisites = 0
+  for (const module of modules) {
+    for (const need of module.prerequisites) {
+      db.query(`INSERT INTO module_prerequisites (id, module_id, requires_id) VALUES (?, ?, ?)
+                ON CONFLICT (module_id, requires_id) DO NOTHING`)
+        .run(id(), module.id, need)
+      prerequisites++
+    }
+  }
+
+  return { departments: DEPARTMENTS.length, modules: modules.length, prerequisites }
+}
+
 const rooms = seedRooms()
 const spaces = seedExternalSpaces()
+const catalogue = await seedCatalogue()
 const people = await seedPeople()
 const bookings = seedBookings(rooms, people)
 db.close()
@@ -222,7 +280,11 @@ db.close()
 // Printed once, and nowhere else. Nothing here is committed and there is no way to read a
 // password back (K-120 criterion 1).
 console.info(`\nSeeded ${target}\n`)
-console.info(`  ${rooms.length} rooms, ${spaces} SU rooms, ${people.length} people, ${bookings} bookings\n`)
+console.info(`  ${rooms.length} rooms, ${spaces} SU rooms, ${people.length} people, ${bookings} bookings`)
+console.info(`  ${catalogue.modules} training modules across ${catalogue.departments} departments, `
+  + `${catalogue.prerequisites} prerequisites\n`)
+console.info('  Every module is a DRAFT, as the subcommittee draft has them, so members see none of')
+console.info('  them until somebody publishes one.\n')
 console.info('  Sign in as any of these. The passwords are shown here and nowhere else:\n')
 for (const person of people) console.info(`    ${person.email}\n      ${person.password}`)
 console.info('\n  Give one of them the run of the place with:')
