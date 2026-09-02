@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { londonParts } from '#shared/utils/london'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillDate, openSignedOutView, openView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillDate, openSignedOutView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-121: competence earned elsewhere counts, without our pretending we assessed it.
@@ -378,7 +378,9 @@ describe.skipIf(skip !== null)('the officer screen (G-121)', () => {
     const module = await addModule({ name: 'Driving the desk' })
     expect((await record(complete(module))).status).toBe(200)
 
-    const view = await openView()
+    // Signed out first, the way every other suite does it: openView() keeps whatever session the
+    // browser already had, and the screen then answers for the wrong person.
+    const view = await openSignedOutView(app.baseURL)
     try {
       await visit(view, `${app.baseURL}/sign-in`)
       await fill(view, 'form input[type="email"]', member.email)
