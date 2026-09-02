@@ -402,6 +402,15 @@ export const revokeForm = z.object({
   reason: z.string().trim().min(1).max(REVOKE_REASON_LIMIT),
 })
 
+// The one retroactive path to a stamped expiry, and the only mechanism that may take it
+// (G-124 criterion 1). The count is typed back from the preview and checked again at the write.
+export const recalculationForm = z.object({
+  moduleId: z.string().trim().min(1).max(32),
+  expectedCount: z.number().int().positive().max(1_000_000),
+})
+
+export type RecalculationInput = z.output<typeof recalculationForm>
+
 export const SESSION_STATUSES = ['PLANNED', 'OPEN', 'FULL', 'DELIVERED', 'CANCELLED'] as const
 export type SessionStatus = (typeof SESSION_STATUSES)[number]
 
