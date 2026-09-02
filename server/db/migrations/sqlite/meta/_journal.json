@@ -253,6 +253,20 @@
       "when": 1788351861492,
       "tag": "0035_silly_agent_zero",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1788352212853,
+      "tag": "0036_hard_ultimatum",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1788352213853,
+      "tag": "0037_training_records_append_only",
+      "breakpoints": true
     }
   ]
 }

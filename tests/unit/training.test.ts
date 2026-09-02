@@ -11,8 +11,12 @@ import {
   expiryFor,
   isLeadLive,
   leadsDepartment,
+  countsAsHeld,
   moduleForm,
   newModuleForm,
+  saysState,
+  stateOf,
+  supersededIn,
 } from '#shared/utils/training'
 
 // The catalogue's pure half. Validity is derived from dates every time it is read, so there is no
@@ -230,5 +234,83 @@ describe('lead standing is read live (G-110 criteria 2, 3 and 4)', () => {
   // Criterion 3: the platform role model's handover date, not a training one of its own (0009).
   test('the default expiry is the next handover', () => {
     expect(nextCommitteeYearEnd(now).toISOString()).toBe('2027-07-31T22:59:59.999Z')
+  })
+})
+
+describe('a record\'s validity is derived from its dates (G-101 criteria 1 to 5)', () => {
+  const WARNING = CONFIG_KEYS.TRAINING_EXPIRY_WARNING_DAYS.default
+
+  test('a record with no expiry is always valid, which is what a brief holds (criterion 5)', () => {
+    expect(stateOf(null, '2026-09-14', WARNING)).toBe('VALID')
+    expect(stateOf(null, '2099-01-01', WARNING)).toBe('VALID')
+  })
+
+  // Criterion 2, and the one that decides whether somebody works a shift on the day.
+  test('a record expires on its expiry date, not after it', () => {
+    expect(stateOf('2026-09-14', '2026-09-13', WARNING)).toBe('EXPIRING')
+    expect(stateOf('2026-09-14', '2026-09-14', WARNING)).toBe('EXPIRED')
+    expect(stateOf('2026-09-14', '2026-09-15', WARNING)).toBe('EXPIRED')
+  })
+
+  test('the warning window is where expiring begins (criterion 4)', () => {
+    expect(stateOf('2027-01-01', '2026-12-01', WARNING)).toBe('EXPIRING')
+    expect(stateOf('2027-01-01', '2026-01-01', WARNING)).toBe('VALID')
+  })
+
+  test('the boundary of the window is inclusive, and a day outside it is not', () => {
+    const expires = '2027-01-01'
+    const onTheEdge = '2026-11-02'
+    expect(daysBetween(onTheEdge, expires)).toBe(WARNING)
+    expect(stateOf(expires, onTheEdge, WARNING)).toBe('EXPIRING')
+    expect(stateOf(expires, '2026-11-01', WARNING)).toBe('VALID')
+  })
+
+  // Criterion 3. This is the property every gate in the system leans on.
+  test('expiring counts as held, and expired does not', () => {
+    expect(countsAsHeld('VALID')).toBe(true)
+    expect(countsAsHeld('EXPIRING')).toBe(true)
+    expect(countsAsHeld('EXPIRED')).toBe(false)
+  })
+
+  test('each state reads as a word rather than as a token', () => {
+    expect(saysState('VALID')).toBe('Valid')
+    expect(saysState('EXPIRING')).toBe('Expiring')
+    expect(saysState('EXPIRED')).toBe('Expired')
+  })
+})
+
+describe('which record is current is derived too (G-101 criterion 6, G-120 criterion 6)', () => {
+  const record = (id: string, moduleId: string, awardedOn: string, createdAt = 1) =>
+    ({ id, moduleId, awardedOn, createdAt })
+
+  test('nothing is superseded when a person holds one record per module', () => {
+    expect(supersededIn([record('a', 'TECH-111', '2026-09-14'), record('b', 'FOH-101', '2026-09-14')]).size).toBe(0)
+  })
+
+  test('a renewal supersedes the award it renews', () => {
+    const superseded = supersededIn([
+      record('old', 'TECH-111', '2025-09-14'),
+      record('new', 'TECH-111', '2026-09-14'),
+    ])
+    expect([...superseded]).toEqual(['old'])
+  })
+
+  // An award date is a London day, so two awards can share one and the tie needs breaking on
+  // something monotonic rather than left to whichever row came back first.
+  test('two awards on one day break the tie on when they were written', () => {
+    const superseded = supersededIn([
+      record('first', 'TECH-111', '2026-09-14', 1000),
+      record('second', 'TECH-111', '2026-09-14', 2000),
+    ])
+    expect([...superseded]).toEqual(['first'])
+  })
+
+  test('supersession is per module, so a renewal of one leaves the other alone', () => {
+    const superseded = supersededIn([
+      record('tech-old', 'TECH-111', '2025-09-14'),
+      record('tech-new', 'TECH-111', '2026-09-14'),
+      record('foh', 'FOH-101', '2024-01-01'),
+    ])
+    expect([...superseded]).toEqual(['tech-old'])
   })
 })

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import { check, index, integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { users } from './identity'
 
 const now = sql`(unixepoch())`
@@ -93,4 +93,40 @@ export const moduleMaterials = sqliteTable('module_materials', {
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
   index('module_materials_module').on(table.moduleId),
+])
+
+// Append-only and trigger-enforced (0010). Validity is worked out from these dates every time it
+// is read and is never stored, so there is no state column here and never may be (0018, G-101).
+export const trainingRecords = sqliteTable('training_records', {
+  id: id(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  moduleId: text('module_id').notNull().references(() => trainingModules.id, { onDelete: 'restrict' }),
+  awardedOn: text('awarded_on').notNull(),
+  // NULL is never. Stamped from the module's policy at award, and moved by G-124 alone.
+  expiresOn: text('expires_on'),
+  // An explicit expiry rather than the policy's, which is what makes G-124 skip this row.
+  expiryOverridden: integer('expiry_overridden', { mode: 'boolean' }).notNull().default(false),
+  source: text('source').notNull(),
+  // No foreign key, now or ever: the sessions table is G-112's, and adding a key later is a
+  // rebuild, which the append-only triggers make a refusal (0010).
+  sessionId: text('session_id'),
+  grantedBy: text('granted_by').references(() => users.id, { onDelete: 'set null' }),
+  evidenceRef: text('evidence_ref'),
+  revokedAt: integer('revoked_at'),
+  revokedBy: text('revoked_by').references(() => users.id, { onDelete: 'set null' }),
+  revokeReason: text('revoke_reason'),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  index('training_records_user_module').on(table.userId, table.moduleId),
+  index('training_records_module').on(table.moduleId),
+  // Marking one register twice awards one record per person per module (G-116, 0006). Bare column
+  // names: a qualified reference is legal in a CHECK and not in a partial index's WHERE.
+  uniqueIndex('training_records_session_award').on(table.sessionId, table.userId, table.moduleId)
+    .where(sql`session_id is not null and revoked_at is null`),
+  // Closed by 0018 and frozen by 0010: a sixth source would be a rebuild, so all five ship now.
+  // LEGACY is vocabulary only and nothing writes it (G-127 resolved).
+  check('training_records_source', sql`${table.source} IN ('SESSION', 'SIGNOFF', 'EXTERNAL', 'SELF', 'LEGACY')`),
+  check('training_records_term', sql`${table.expiresOn} IS NULL OR ${table.expiresOn} > ${table.awardedOn}`),
+  // No CHECK ties revoke_reason to revoked_at: erasure must be able to clear the reason, and a
+  // CHECK on an append-only table can never be dropped. The reason is mandatory at the write path.
 ])

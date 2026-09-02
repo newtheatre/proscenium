@@ -947,10 +947,29 @@ stateDiagram-v2
 `SESSION|SIGNOFF|EXTERNAL|SELF|LEGACY` (`SELF` is G-208 brief self-registration and V2
 quizzes; `LEGACY` is vocabulary only, nothing writes it) · `session_id` NULL ·
 `granted_by` · `evidence_ref` scrub · `revoked_at` / `revoked_by` / `revoke_reason` scrub ·
-`created_at`.
-Validity is derived (`VALID|EXPIRING|EXPIRED`), never stored; expiring counts as held.
+`created_at`. Indexed on (`user_id`, `module_id`) and on `module_id`.
+Validity is derived (`VALID|EXPIRING|EXPIRED`), never stored; expiring counts as held. Which
+record is current is derived the same way: a renewal is a newer award for the same person and
+module, and supersession is computed, not a column.
 Partial UNIQUE (`session_id`, `user_id`, `module_id`) WHERE session NOT NULL AND revoked
 NULL.
+
+`session_id` carries **no foreign key, now or ever**. The sessions table is G-112's, and adding a
+key to this one later would be a table rebuild, which the append-only triggers make a refusal
+(0010). G-112 enforces the reference at its write path instead.
+
+The append-only trigger is an allow-list rather than a blanket refusal, in the shape
+`audit_log` has used since migration 0001. It admits exactly three edits and refuses every other:
+erasure clearing `evidence_ref` and `revoke_reason`; a revocation stamping `revoked_at`,
+`revoked_by` and `revoke_reason` once; and G-124's recalculation restating `expires_on` on a
+record that is neither overridden nor revoked, which is criterion 4 of that story expressed in the
+database. Two consequences worth stating, because both look like good practice from the outside:
+
+- **No CHECK ties `revoke_reason` to `revoked_at`.** The reason is mandatory at revocation, but
+  erasure must be able to clear it, and a CHECK on an append-only table can never be dropped.
+  The rule lives in Zod and at the write path.
+- **The table can never be rebuilt.** `ALTER TABLE ADD COLUMN` still works; a new CHECK, a new
+  foreign key or a widened CHECK does not.
 
 ### module_requests
 One open request per (user, module) by partial unique; decline carries a reason shown to the
