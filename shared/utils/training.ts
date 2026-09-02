@@ -423,6 +423,7 @@ export const sessionForm = z.object({
   capacity: z.number().int().min(SESSION_CAPACITY_MIN).max(SESSION_CAPACITY_MAX),
   // Absent opens sign-up now; a later instant keeps it invisible to members until then.
   opensAt: z.number().int().positive().nullish().transform(value => value ?? null),
+  description: text(2000),
   notes: text(2000),
   moduleIds: z.array(z.string().trim().min(1).max(32)).min(1).max(10),
 }).refine(session => session.endsAt > session.startsAt, {

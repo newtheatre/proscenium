@@ -391,6 +391,42 @@ export async function fillDate(view: Bun.WebView, selector: string, day: string)
   throw new Error(`${selector} would not take the date ${day}`)
 }
 
+// A time field is segments like a date field, so it is typed the same way: hour then minute, on a
+// 24-hour clock, with the same read-back because the segments render before Vue attaches.
+export async function fillTime(view: Bun.WebView, selector: string, time: string): Promise<void> {
+  const [hour, minute] = time.split(':')
+  const segments = JSON.stringify(`${selector} [data-reka-time-field-segment]`)
+  const digits = JSON.stringify(`${hour}${minute}`)
+
+  const type = `(() => {
+    const parts = [...document.querySelectorAll(${segments})]
+      .filter(segment => segment.getAttribute('data-reka-time-field-segment') !== 'literal')
+    const digits = ${digits}
+    let index = 0
+    for (const segment of parts.slice(0, 2)) {
+      segment.focus()
+      for (let typed = 0; typed < 2; typed++) {
+        segment.dispatchEvent(new KeyboardEvent('keydown', { key: digits[index++], bubbles: true }))
+      }
+    }
+  })()`
+  const readBack = `[...document.querySelectorAll(${segments})].map(segment => segment.innerText).join('')`
+
+  await waitFor(view, `document.querySelectorAll(${segments}).length >= 2`)
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    await view.evaluate(type)
+    for (let settle = 0; settle < 12; settle++) {
+      await Bun.sleep(250)
+      if (!String(await view.evaluate(readBack)).includes(minute!)) continue
+      await view.evaluate(`document.activeElement instanceof HTMLElement && document.activeElement.blur()`)
+      await Bun.sleep(250)
+      return
+    }
+  }
+  throw new Error(`${selector} would not take the time ${time}`)
+}
+
 // The picker searches the server, so this types, waits for the person to appear, and clicks them.
 export async function pickPerson(view: Bun.WebView, selector: string, term: string, name: string): Promise<void> {
   await click(view, `${selector} input`)

@@ -129,6 +129,7 @@ export interface MemberSessionRow {
   capacity: number
   opensAt: number | null
   status: string
+  description: string | null
   registerOpenedAt: number | null
   trainerName: string
   signedUp: number
@@ -161,6 +162,7 @@ export async function sessionsForMember(
   const rows = await db.all<MemberSessionRow>(sql`
     select s.id, s.held_on as heldOn, s.starts_at as startsAt, s.ends_at as endsAt,
       s.place as place, s.capacity as capacity, s.opens_at as opensAt, s.status as status,
+      s.description as description,
       s.register_opened_at as registerOpenedAt, u.name as trainerName,
       (select count(*) from session_attendees a
         where a.session_id = s.id and a.status <> 'CANCELLED') as signedUp,

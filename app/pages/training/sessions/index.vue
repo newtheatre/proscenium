@@ -13,6 +13,7 @@ interface Session {
   endsAt: string
   place: string | null
   capacity: number
+  description: string | null
   status: string
   trainerName: string
   signedUp: number
@@ -159,6 +160,13 @@ const placesLeft = (session: Session): number => Math.max(0, session.capacity - 
                   · {{ session.place }}
                 </template>
                 · with {{ session.trainerName }}
+              </p>
+              <p
+                v-if="session.description"
+                class="mt-2 text-sm"
+                :data-test="`expect-${session.id}`"
+              >
+                {{ session.description }}
               </p>
               <p
                 v-if="!session.placed"

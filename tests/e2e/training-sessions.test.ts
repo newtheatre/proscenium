@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { londonParts } from '#shared/utils/london'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fillDate, fillNumber, openSignedOutView, fill, fillPin, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fillDate, fillNumber, fillTime, openSignedOutView, fill, fillPin, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-111 and G-112. Standing to run a session derives from a current certification and nothing
@@ -357,8 +357,8 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
       await click(view, '[data-test="add-session"]')
       await waitFor(view, `document.querySelector('[data-test="session-starts"]')`, 30_000)
       await fillDate(view, '[data-test="session-day"]', day)
-      await fill(view, '[data-test="session-starts"]', '18:30')
-      await fill(view, '[data-test="session-ends"]', '20:30')
+      await fillTime(view, '[data-test="session-starts"]', '18:30')
+      await fillTime(view, '[data-test="session-ends"]', '20:30')
       await fill(view, '[data-test="session-place"]', 'The studio')
       // The attribute lands on the inner input, not a wrapper: UInputNumber binds $attrs onto
       // the field itself, so there is nothing to descend into (0032).

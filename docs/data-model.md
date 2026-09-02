@@ -1005,6 +1005,10 @@ rather than taught (G-112 criteria 3 and 4).
 
 ### The register: opening it, and marking it
 
+A session carries two pieces of prose with different audiences. `description` is what to expect,
+written for a member deciding whether to come and shown wherever the session is; `notes` are the
+trainer's own and the department leads', and reach neither the member listing nor the catalogue.
+
 `training_sessions` carries four stamps: `register_opened_at` / `register_opened_by` and
 `marked_at` / `marked_by`. Both are written **once, by a conditional write**, and both are what
 their respective races turn on.

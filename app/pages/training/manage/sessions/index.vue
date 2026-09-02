@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { fromLondonWallClock } from '#shared/utils/london'
+import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { DELIVERY_ATTENDEES_MAX, SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysSessionStatus, saysSource, sessionForm } from '#shared/utils/training'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
@@ -93,13 +93,22 @@ const state = reactive<{
   endsAt: string
   place?: string
   capacity: number
+  description?: string
   notes?: string
   moduleIds: string[]
   opensAt?: number | null
 }>({ heldOn: '', startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [], opensAt: null })
 
-// Sign-up opening is one instant on the wire. It is collected as a day and a wall clock, read in
-// London like every other domain date (0014), because a browser in another zone would be wrong.
+// Scheduled ahead and logged behind: the write path refuses each the other way round, so the
+// pickers say so rather than letting somebody find out at the submit.
+const today = computed(() => {
+  const parts = londonParts(new Date())
+  const pad = (part: number, width: number): string => String(part).padStart(width, '0')
+  return `${pad(parts.year, 4)}-${pad(parts.month, 2)}-${pad(parts.day, 2)}`
+})
+
+// Sign-up opening is one instant on the wire, collected as a day and a wall clock and read in
+// London like every other domain date (0014): a browser in another zone would be wrong.
 const opensNow = ref(true)
 const opensOnDay = ref('')
 const opensAtTime = ref('09:00')
@@ -126,6 +135,7 @@ function begin(): void {
     endsAt: '21:00',
     place: undefined,
     capacity: 20,
+    description: undefined,
     notes: undefined,
     moduleIds: [],
     opensAt: null,
@@ -492,6 +502,7 @@ const columns: TableColumn<Session>[] = [
           >
             <DateField
               v-model="state.heldOn"
+              :min="today"
               data-test="session-day"
               class="w-full"
             />
@@ -503,9 +514,8 @@ const columns: TableColumn<Session>[] = [
               name="startsAt"
               required
             >
-              <UInput
+              <TimeField
                 v-model="state.startsAt"
-                placeholder="19:00"
                 class="w-full"
                 data-test="session-starts"
               />
@@ -515,9 +525,8 @@ const columns: TableColumn<Session>[] = [
               name="endsAt"
               required
             >
-              <UInput
+              <TimeField
                 v-model="state.endsAt"
-                placeholder="21:00"
                 class="w-full"
                 data-test="session-ends"
               />
@@ -574,9 +583,24 @@ const columns: TableColumn<Session>[] = [
           </UFormField>
 
           <UFormField
+            label="What to expect"
+            name="description"
+            hint="Optional"
+            description="Shown to members deciding whether to come. Where to meet, what to bring."
+          >
+            <UTextarea
+              v-model="state.description"
+              :rows="2"
+              class="w-full"
+              data-test="session-description"
+            />
+          </UFormField>
+
+          <UFormField
             label="Notes"
             name="notes"
             hint="Optional"
+            description="Yours and the department leads'. Members never see these."
           >
             <UTextarea
               v-model="state.notes"
@@ -604,6 +628,7 @@ const columns: TableColumn<Session>[] = [
             >
               <DateField
                 v-model="opensOnDay"
+                :min="today"
                 data-test="session-opens-day"
                 class="w-full"
               />
@@ -667,6 +692,7 @@ const columns: TableColumn<Session>[] = [
             >
               <DateField
                 v-model="heldOn"
+                :max="today"
                 data-test="delivery-day"
                 class="w-full sm:w-64"
               />
