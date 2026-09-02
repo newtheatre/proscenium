@@ -13,9 +13,12 @@ describe('the page routes', () => {
   })
 
   test('a page beside a directory of its own name renders its children', async () => {
-    const directories = new Set(files
-      .map(file => file.split('/').slice(0, -1).join('/'))
-      .filter(Boolean))
+    // Every ancestor, not just the immediate parent: a page beside a directory whose only files sit
+    // deeper is the same trap, and counting parents alone let one through.
+    const directories = new Set(files.flatMap((file) => {
+      const parts = file.split('/').slice(0, -1)
+      return parts.map((_, depth) => parts.slice(0, depth + 1).join('/'))
+    }).filter(Boolean))
 
     const shadowing: string[] = []
     for (const file of files) {

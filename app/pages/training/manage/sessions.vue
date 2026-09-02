@@ -581,9 +581,8 @@ const columns: TableColumn<Session>[] = [
               label="At"
               required
             >
-              <UInput
+              <TimeField
                 v-model="opensAtTime"
-                type="time"
                 class="w-full"
                 data-test="session-opens-time"
               />
