@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { BOUND_PARAMETER_CHUNK } from './approvals'
 import { isMonthDay } from './london'
 
 // The catalogue's vocabulary and its expiry arithmetic. Nothing here stores a state: a record's
@@ -484,3 +485,86 @@ export const requestDeclineForm = z.object({
 })
 
 export type RequestDeclineInput = z.output<typeof requestDeclineForm>
+
+// A gap in a safety-critical module's prerequisites is never a judgement call; a gap in an
+// ordinary module's is the trainer's to make and to record (G-118 c3, G-105 c3, G-117 c4).
+export const GAP_SEVERITIES = ['BLOCKS', 'ACKNOWLEDGE'] as const
+export type GapSeverity = (typeof GAP_SEVERITIES)[number]
+
+export interface PrerequisiteNeed {
+  requiresId: string
+  requiresName: string
+}
+
+export interface PrerequisiteGap extends PrerequisiteNeed {
+  moduleId: string
+  severity: GapSeverity
+}
+
+// Held is held: the set is built by the SQL twin of countsAsHeld, so expiring counts here too.
+export function missingPrerequisites(
+  needed: readonly PrerequisiteNeed[],
+  held: ReadonlySet<string>,
+): PrerequisiteNeed[] {
+  return needed.filter(need => !held.has(need.requiresId))
+}
+
+export function prerequisiteGaps(
+  module: { id: string, safetyCritical: boolean },
+  needed: readonly PrerequisiteNeed[],
+  held: ReadonlySet<string>,
+): PrerequisiteGap[] {
+  return missingPrerequisites(needed, held).map(need => ({
+    moduleId: module.id,
+    requiresId: need.requiresId,
+    requiresName: need.requiresName,
+    severity: module.safetyCritical ? 'BLOCKS' : 'ACKNOWLEDGE',
+  }))
+}
+
+// One acknowledgement per gap, keyed by what is missing and for whom, so a tick cannot travel to
+// another person or another module (G-118 criterion 3).
+export function gapKey(gap: { userId: string, moduleId: string, requiresId: string }): string {
+  return `${gap.userId}:${gap.moduleId}:${gap.requiresId}`
+}
+
+// Named rather than counted: somebody told only "no" tries the same submission again.
+export function saysGaps(gaps: readonly PrerequisiteNeed[]): string {
+  return gaps.map(gap => `${gap.requiresId} ${gap.requiresName}`).join(', ')
+}
+
+// A room's worth of people and an evening's worth of modules: the same ceilings a scheduled
+// session carries, so a log cannot quietly become a bulk import (G-118).
+export const DELIVERY_ATTENDEES_MAX = SESSION_CAPACITY_MAX
+export const DELIVERY_MODULES_MAX = 10
+export const DELIVERY_RECORDS_MAX = DELIVERY_ATTENDEES_MAX * DELIVERY_MODULES_MAX
+
+// A record binds seven parameters, so this many rows per INSERT stays inside D1's cap however
+// many people were taught (0003).
+export const DELIVERY_RECORD_COLUMNS = 7
+export const DELIVERY_RECORDS_PER_STATEMENT
+  = Math.floor(BOUND_PARAMETER_CHUNK / DELIVERY_RECORD_COLUMNS)
+
+// Named twice is taught once: a repeated id would otherwise award the same person the same record.
+const distinct = (max: number) => z.array(z.string().trim().min(1).max(64)).min(1).max(max)
+  .transform(ids => [...new Set(ids)])
+
+const deliveryFields = z.object({
+  heldOn: z.string().regex(CIVIL_DATE, 'A delivery date reads as YYYY-MM-DD'),
+  moduleIds: distinct(DELIVERY_MODULES_MAX),
+  userIds: distinct(DELIVERY_ATTENDEES_MAX),
+})
+
+export const deliveryPreviewForm = deliveryFields
+
+export const deliveryLogForm = deliveryFields.extend({
+  // Typed back from the dry-run and checked again at the write, so the preview is what the log is
+  // held to rather than a courtesy shown first (G-118 criterion 2).
+  expectedCount: z.number().int().positive().max(DELIVERY_RECORDS_MAX),
+  // One key per ordinary gap the trainer takes responsibility for. A safety-critical gap has no
+  // key and no path: nothing in this body can wave one through (criterion 3).
+  acknowledged: z.array(z.string().trim().min(1).max(200)).max(DELIVERY_RECORDS_MAX).default([]),
+})
+
+export type DeliveryPreviewInput = z.output<typeof deliveryPreviewForm>
+export type DeliveryLogInput = z.output<typeof deliveryLogForm>

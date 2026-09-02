@@ -113,6 +113,7 @@ const CATALOGUE = {
   'record.revoked': { label: 'Training record revoked', module: 'training' },
   'record.expiry.recalculated': { label: 'Training expiries recalculated', module: 'training' },
   'session.scheduled': { label: 'Training session scheduled', module: 'training' },
+  'record.delivery-logged': { label: 'Delivered training logged', module: 'training' },
   'request.declined': { label: 'Training request answered', module: 'training' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).

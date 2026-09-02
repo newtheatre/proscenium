@@ -2,9 +2,10 @@ import { and, asc, desc, eq, gt, inArray, isNull, not, or, sql } from 'drizzle-o
 import { isMonthDay, londonParts } from '#shared/utils/london'
 import { previewStatement, restatableCount } from '#shared/utils/recalculation'
 import type { PreviewRow } from '#shared/utils/recalculation'
-import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment } from '#shared/utils/training'
-import type { AcademicYear, ExpiryPolicy, LeadAssignment, ModuleInput } from '#shared/utils/training'
+import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment, missingPrerequisites, saysGaps } from '#shared/utils/training'
+import type { AcademicYear, ExpiryMode, ExpiryPolicy, LeadAssignment, ModuleInput } from '#shared/utils/training'
 import type { Authority } from '#server/utils/authorise'
+import type { SQL, SQLWrapper } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
 // Reading and writing the training catalogue. Nothing here writes a validity, a standing or a
@@ -585,15 +586,82 @@ export async function assertAwardable(
   // any kind, which the criterion demands of a certification.
   const needed = (await prerequisitesOf([input.moduleId])).get(input.moduleId) ?? []
   const held = await modulesHeldBy(input.userId, today)
-  const gaps = needed.filter(edge => !held.has(edge.requiresId))
+  const gaps = missingPrerequisites(needed, held)
   if (gaps.length > 0) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: `Not held yet: ${gaps.map(gap => `${gap.requiresId} ${gap.requiresName}`).join(', ')}`,
-    })
+    throw createError({ statusCode: 422, statusMessage: `Not held yet: ${saysGaps(gaps)}` })
   }
 
   return policy
+}
+
+export interface TeachableModule {
+  id: string
+  name: string
+  department: string
+  safetyCritical: boolean
+  expiryMode: ExpiryMode
+  expiryMonths: number | null
+}
+
+// What may be taught, and by whom: active, not proved by experience rather than by a room, and
+// held by whoever teaches it. The officer is exempt, acting on a trainer's behalf (G-112 c3, c4).
+export async function assertTeachable(
+  resolved: Authority,
+  moduleIds: string[],
+  today: string,
+): Promise<TeachableModule[]> {
+  const taught = await db.select({
+    id: schema.trainingModules.id,
+    name: schema.trainingModules.name,
+    department: schema.trainingModules.department,
+    safetyCritical: schema.trainingModules.safetyCritical,
+    expiryMode: schema.trainingModules.expiryMode,
+    expiryMonths: schema.trainingModules.expiryMonths,
+    status: schema.trainingModules.status,
+    signoffRequired: schema.trainingModules.signoffRequired,
+  }).from(schema.trainingModules)
+    .where(inArray(schema.trainingModules.id, moduleIds))
+    .orderBy(asc(schema.trainingModules.sort), asc(schema.trainingModules.id))
+
+  const missing = moduleIds.filter(id => !taught.some(module => module.id === id))
+  if (missing.length > 0) {
+    throw createError({ statusCode: 404, statusMessage: `No such module: ${missing.join(', ')}` })
+  }
+
+  const refused = taught.filter(module => module.status !== 'ACTIVE' || module.signoffRequired)
+  if (refused.length > 0) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: `Cannot be taught by session: ${refused.map(module => `${module.id} ${module.name}`).join(', ')}`,
+    })
+  }
+
+  // Question 4's answer: a trainer teaches what they hold, scoped by competence not department.
+  if (!resolved.permissions.has('training.write')) {
+    const held = await modulesHeldBy(resolved.account.id, today)
+    const unheld = taught.filter(module => !held.has(module.id))
+    if (unheld.length > 0) {
+      throw createError({
+        statusCode: 422,
+        statusMessage: `You do not hold: ${unheld.map(module => `${module.id} ${module.name}`).join(', ')}`,
+      })
+    }
+  }
+
+  return taught.map(module => ({
+    id: module.id,
+    name: module.name,
+    department: module.department,
+    safetyCritical: module.safetyCritical,
+    expiryMode: module.expiryMode as ExpiryMode,
+    expiryMonths: module.expiryMonths,
+  }))
+}
+
+// A set of ids passed as one JSON parameter, so a predicate covering a room binds one parameter
+// rather than one per person (0003).
+export function inJsonSet(column: SQLWrapper, values: readonly string[]): SQL {
+  return sql`${column} in (select value from json_each(${JSON.stringify(values)}))`
 }
 
 // What a write actually puts in the row, so the create and the edit cannot drift apart.

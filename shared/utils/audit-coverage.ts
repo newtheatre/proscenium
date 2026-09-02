@@ -174,6 +174,14 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/admin/training/sessions/index.post.ts', actions: ['session.scheduled'] },
   { route: 'server/api/admin/training/sessions/index.get.ts', exempt: 'reads the scheduled sessions' },
+  {
+    route: 'server/api/admin/training/deliveries/preview.post.ts',
+    exempt: 'the dry-run for a retrospective log; it writes nothing at all',
+  },
+  {
+    route: 'server/api/admin/training/deliveries/index.post.ts',
+    actions: ['record.delivery-logged'],
+  },
 
   // Development only, and absent from a build: nuxt.config excludes both files (K-124).
   {

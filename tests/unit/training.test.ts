@@ -1,13 +1,21 @@
 import { describe, expect, test } from 'bun:test'
+import { BOUND_PARAMETER_CHUNK } from '#shared/utils/approvals'
 import { CONFIG_KEYS } from '#shared/utils/config'
 import { isMonthDay, nextCommitteeYearEnd } from '#shared/utils/london'
 import {
+  DELIVERY_ATTENDEES_MAX,
+  DELIVERY_MODULES_MAX,
+  DELIVERY_RECORDS_MAX,
+  DELIVERY_RECORDS_PER_STATEMENT,
+  DELIVERY_RECORD_COLUMNS,
   MAX_EXPIRY_MONTHS,
   RECORD_SOURCES,
   academicYearEnd,
   addMonths,
   countsAsHeld,
   daysBetween,
+  deliveryLogForm,
+  deliveryPreviewForm,
   describeExpiry,
   exceedsExpiryCap,
   expiryFor,
@@ -15,11 +23,15 @@ import {
   externalCertificateForm,
   externalExpiryProblem,
   frozenChanges,
+  gapKey,
   isLeadLive,
   leadsDepartment,
+  missingPrerequisites,
   moduleForm,
   newModuleForm,
+  prerequisiteGaps,
   saysFrozenChange,
+  saysGaps,
   saysSource,
   saysState,
   stateOf,
@@ -420,5 +432,98 @@ describe('an external certificate is recorded, never assessed (G-121)', () => {
     expect(saysSource('EXTERNAL')).toBe('External certificate')
     expect(saysSource('SIGNOFF')).not.toBe(saysSource('EXTERNAL'))
     expect(new Set(said).size).toBe(RECORD_SOURCES.length)
+  })
+})
+
+// The asymmetry is deliberate and is shared: a sign-up (G-105), a walk-in (G-117) and a
+// retrospective log (G-118) all read it here rather than each carrying its own copy.
+describe('a prerequisite gap blocks or asks, by the module it is a gap in (G-118 criterion 3)', () => {
+  const needed = [
+    { requiresId: 'TECH-1', requiresName: 'Working at height' },
+    { requiresId: 'TECH-2', requiresName: 'Rigging' },
+  ]
+
+  test('a gap in a safety-critical module blocks', () => {
+    const gaps = prerequisiteGaps({ id: 'TECH-9', safetyCritical: true }, needed, new Set())
+    expect(gaps.map(gap => gap.severity)).toEqual(['BLOCKS', 'BLOCKS'])
+  })
+
+  test('a gap in an ordinary module asks to be acknowledged', () => {
+    const gaps = prerequisiteGaps({ id: 'TECH-9', safetyCritical: false }, needed, new Set())
+    expect(gaps.map(gap => gap.severity)).toEqual(['ACKNOWLEDGE', 'ACKNOWLEDGE'])
+  })
+
+  test('what is held is not a gap, whichever kind of module it is', () => {
+    const held = new Set(['TECH-1', 'TECH-2'])
+    expect(prerequisiteGaps({ id: 'TECH-9', safetyCritical: true }, needed, held)).toEqual([])
+    expect(missingPrerequisites(needed, new Set(['TECH-1']))).toEqual([needed[1]!])
+  })
+
+  test('a module with no prerequisites has no gaps', () => {
+    expect(prerequisiteGaps({ id: 'TECH-9', safetyCritical: true }, [], new Set())).toEqual([])
+  })
+
+  // A tick belongs to one person, one module and one missing prerequisite, so nothing it was
+  // never shown for can ride on it.
+  test('an acknowledgement key names the person, the module and what is missing', () => {
+    const one = gapKey({ userId: 'u1', moduleId: 'TECH-9', requiresId: 'TECH-1' })
+    expect(one).toBe('u1:TECH-9:TECH-1')
+    expect(gapKey({ userId: 'u2', moduleId: 'TECH-9', requiresId: 'TECH-1' })).not.toBe(one)
+    expect(gapKey({ userId: 'u1', moduleId: 'TECH-8', requiresId: 'TECH-1' })).not.toBe(one)
+    expect(gapKey({ userId: 'u1', moduleId: 'TECH-9', requiresId: 'TECH-2' })).not.toBe(one)
+  })
+
+  test('a refusal names the modules rather than counting them', () => {
+    expect(saysGaps(needed)).toBe('TECH-1 Working at height, TECH-2 Rigging')
+  })
+})
+
+describe('a retrospective log names its modules, its day and its people (G-118 criterion 1)', () => {
+  const body = {
+    heldOn: '2026-08-14',
+    moduleIds: ['TECH-1'],
+    userIds: ['u1', 'u2'],
+    expectedCount: 2,
+  }
+
+  test('a log with no modules or nobody in the room is refused', () => {
+    expect(deliveryLogForm.safeParse(body).success).toBe(true)
+    expect(deliveryLogForm.safeParse({ ...body, moduleIds: [] }).success).toBe(false)
+    expect(deliveryLogForm.safeParse({ ...body, userIds: [] }).success).toBe(false)
+  })
+
+  test('a day that is not a London civil date is refused', () => {
+    expect(deliveryLogForm.safeParse({ ...body, heldOn: '14/08/2026' }).success).toBe(false)
+  })
+
+  test('somebody named twice is taught once', () => {
+    const parsed = deliveryLogForm.parse({ ...body, userIds: ['u1', 'u1', 'u2'] })
+    expect(parsed.userIds).toEqual(['u1', 'u2'])
+    expect(deliveryPreviewForm.parse({ ...body, moduleIds: ['TECH-1', 'TECH-1'] }).moduleIds)
+      .toEqual(['TECH-1'])
+  })
+
+  // Criterion 2. The count comes back from the dry-run, so a write that never previewed has
+  // nothing to send and a write whose preview has moved is refused rather than guessed at.
+  test('the count seen at the dry-run is mandatory at the write and absent from the preview', () => {
+    expect(deliveryLogForm.safeParse({ ...body, expectedCount: undefined }).success).toBe(false)
+    expect(deliveryLogForm.safeParse({ ...body, expectedCount: 0 }).success).toBe(false)
+    expect(deliveryPreviewForm.safeParse({ heldOn: body.heldOn, moduleIds: ['TECH-1'], userIds: ['u1'] })
+      .success).toBe(true)
+  })
+
+  test('acknowledgements default to none rather than to trust', () => {
+    expect(deliveryLogForm.parse(body).acknowledged).toEqual([])
+  })
+
+  // Criterion 4 against 0003: the whole log is one batch, and no statement in it binds a
+  // parameter per person.
+  test('a full room of records chunks into statements inside the D1 cap', () => {
+    const records = DELIVERY_ATTENDEES_MAX * DELIVERY_MODULES_MAX
+    const statements = Math.ceil(records / DELIVERY_RECORDS_PER_STATEMENT)
+    expect(DELIVERY_RECORDS_PER_STATEMENT * DELIVERY_RECORD_COLUMNS)
+      .toBeLessThanOrEqual(BOUND_PARAMETER_CHUNK)
+    expect(statements * DELIVERY_RECORDS_PER_STATEMENT).toBeGreaterThanOrEqual(records)
+    expect(records).toBe(DELIVERY_RECORDS_MAX)
   })
 })
