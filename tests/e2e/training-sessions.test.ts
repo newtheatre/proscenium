@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { londonParts } from '#shared/utils/london'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fillDate, fillNumber, fillTime, openSignedOutView, fill, fillPin, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillDate, fillNumber, fillPin, fillTime, menuOptions, openSignedOutView, pickOptions, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-111 and G-112. Standing to run a session derives from a current certification and nothing
@@ -366,7 +366,7 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
 
       // A closed set is a row of buttons: a Nuxt UI select is a listbox and a click commits
       // nothing on one (0032).
-      await click(view, `[data-test="session-module-${module}"]`)
+      await pickOptions(view, '[data-test="session-modules"]', [module])
       await click(view, '[data-test="session-submit"]')
 
       await waitFor(view, `document.body.innerText.includes(${JSON.stringify(day)})`, 30_000)
@@ -388,9 +388,9 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
       await visit(view, `${app.baseURL}/training/manage/sessions`, '[data-test="sessions-table"]')
       await click(view, '[data-test="add-session"]')
       await waitFor(view, `document.querySelector('[data-test="session-starts"]')`, 30_000)
-      expect(await view.evaluate<boolean>(
-        `!!document.querySelector('[data-test="session-module-${trainerCert}"]')`,
-      )).toBe(false)
+      // A certification is signed off on experience, so it is not among what a session may teach.
+      const offered = await menuOptions(view, '[data-test="session-modules"]')
+      expect(offered.some(option => option.includes(trainerCert))).toBe(false)
     }
     finally {
       view.close()

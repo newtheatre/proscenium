@@ -427,6 +427,85 @@ export async function fillTime(view: Bun.WebView, selector: string, time: string
   throw new Error(`${selector} would not take the time ${time}`)
 }
 
+// A Nuxt UI select is a listbox in a portal, so a value cannot be set on it the way an input takes
+// one: the trigger is opened and the option itself is clicked, the way a person does it.
+async function openMenu(view: Bun.WebView, selector: string): Promise<void> {
+  await waitFor(view, `document.querySelector(${JSON.stringify(selector)})`)
+  await view.evaluate(`(() => {
+    const root = document.querySelector(${JSON.stringify(selector)})
+    const trigger = root.matches('button,[role="combobox"]') ? root : root.querySelector('button,[role="combobox"]')
+    trigger.click()
+  })()`)
+  await waitFor(view, `document.querySelector('[role="option"]')`, 15_000)
+}
+
+// Reka commits on pointerup rather than on click, so the whole sequence is sent.
+const CHOOSE = (label: string): string => `(() => {
+  const wanted = ${JSON.stringify(label)}
+  const option = [...document.querySelectorAll('[role="option"]')]
+    .find(item => item.innerText.trim() === wanted)
+    ?? [...document.querySelectorAll('[role="option"]')]
+      .find(item => item.innerText.trim().startsWith(wanted))
+  if (!option) return false
+  for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+    option.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }))
+  }
+  return true
+})()`
+
+async function narrow(view: Bun.WebView, term: string): Promise<void> {
+  const typed = await view.evaluate<boolean>(`(() => {
+    const panel = document.querySelector('[data-reka-popper-content-wrapper]')
+      ?? document.querySelector('[role="listbox"]')?.parentElement
+    const search = panel?.querySelector('input')
+    if (!search) return false
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    setter.call(search, ${JSON.stringify(term)})
+    search.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })()`)
+  if (typed) await Bun.sleep(400)
+}
+
+/** What a select is offering, so a test can assert something is not on the list. */
+export async function menuOptions(view: Bun.WebView, selector: string): Promise<string[]> {
+  await openMenu(view, selector)
+  const found = await view.evaluate<string>(
+    `JSON.stringify([...document.querySelectorAll('[role="option"]')].map(item => item.innerText.trim()))`,
+  )
+  await view.evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+  return JSON.parse(found) as string[]
+}
+
+/** Choose one option from a select by the text it shows. */
+export async function pickOption(view: Bun.WebView, selector: string, label: string): Promise<void> {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    await openMenu(view, selector)
+    await narrow(view, label)
+    if (await view.evaluate<boolean>(CHOOSE(label))) {
+      await Bun.sleep(300)
+      return
+    }
+    await view.evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+    await Bun.sleep(200)
+  }
+  throw new Error(`${selector} would not take the option ${label}`)
+}
+
+/** Choose several from a multiple select, then close it. */
+export async function pickOptions(view: Bun.WebView, selector: string, labels: string[]): Promise<void> {
+  await openMenu(view, selector)
+  for (const label of labels) {
+    await narrow(view, label)
+    if (!await view.evaluate<boolean>(CHOOSE(label))) {
+      throw new Error(`${selector} would not take the option ${label}`)
+    }
+    await Bun.sleep(250)
+  }
+  await view.evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+  await Bun.sleep(300)
+}
+
 // The picker searches the server, so this types, waits for the person to appear, and clicks them.
 export async function pickPerson(view: Bun.WebView, selector: string, term: string, name: string): Promise<void> {
   await click(view, `${selector} input`)

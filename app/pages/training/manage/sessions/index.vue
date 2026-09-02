@@ -78,6 +78,10 @@ const { data: catalogue } = await useAsyncData(
 const teachable = computed(() => catalogue.value.items.filter(module =>
   module.status === 'ACTIVE' && !module.signoffRequired))
 
+// The catalogue runs to dozens, so this is searched rather than scanned.
+const teachableOptions = computed(() => teachable.value
+  .map(module => ({ label: `${module.id} ${module.name}`, value: module.id })))
+
 const shown = computed(() => {
   const term = search.value.trim().toLowerCase()
   if (!term) return data.value.items
@@ -147,12 +151,6 @@ function begin(): void {
   open.value = true
 }
 
-function toggle(id: string): void {
-  state.moduleIds = state.moduleIds.includes(id)
-    ? state.moduleIds.filter(one => one !== id)
-    : [...state.moduleIds, id]
-}
-
 async function save(event: FormSubmitEvent<SessionInput>): Promise<void> {
   saving.value = true
   failure.value = null
@@ -213,12 +211,6 @@ function beginLog(): void {
   theirName.value = ''
   failure.value = null
   logging.value = true
-}
-
-function toggleModule(id: string): void {
-  moduleIds.value = moduleIds.value.includes(id)
-    ? moduleIds.value.filter(one => one !== id)
-    : [...moduleIds.value, id]
 }
 
 function addPerson(): void {
@@ -566,20 +558,15 @@ const columns: TableColumn<Session>[] = [
             required
             description="You may teach only what you currently hold. Certifications are not taught by session."
           >
-            <div class="flex flex-wrap gap-1">
-              <UButton
-                v-for="module in teachable"
-                :key="module.id"
-                size="sm"
-                :color="state.moduleIds.includes(module.id) ? 'primary' : 'neutral'"
-                :variant="state.moduleIds.includes(module.id) ? 'solid' : 'outline'"
-                :aria-pressed="state.moduleIds.includes(module.id)"
-                :data-test="`session-module-${module.id}`"
-                @click="toggle(module.id)"
-              >
-                {{ module.id }}
-              </UButton>
-            </div>
+            <USelectMenu
+              v-model="state.moduleIds"
+              :items="teachableOptions"
+              value-key="value"
+              multiple
+              placeholder="Search the catalogue"
+              class="w-full"
+              data-test="session-modules"
+            />
           </UFormField>
 
           <UFormField
@@ -703,20 +690,15 @@ const columns: TableColumn<Session>[] = [
               required
               description="You may log only what you currently hold. Certifications are signed off, not taught."
             >
-              <div class="flex flex-wrap gap-1">
-                <UButton
-                  v-for="module in teachable"
-                  :key="module.id"
-                  size="sm"
-                  :color="moduleIds.includes(module.id) ? 'primary' : 'neutral'"
-                  :variant="moduleIds.includes(module.id) ? 'solid' : 'outline'"
-                  :aria-pressed="moduleIds.includes(module.id)"
-                  :data-test="`delivery-module-${module.id}`"
-                  @click="toggleModule(module.id)"
-                >
-                  {{ module.id }}
-                </UButton>
-              </div>
+              <USelectMenu
+                v-model="moduleIds"
+                :items="teachableOptions"
+                value-key="value"
+                multiple
+                placeholder="Search the catalogue"
+                class="w-full"
+                data-test="delivery-modules"
+              />
             </UFormField>
 
             <UFormField
