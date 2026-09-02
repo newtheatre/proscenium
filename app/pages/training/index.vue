@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysKind, saysState } from '#shared/utils/training'
+import { saysKind, saysSource, saysState } from '#shared/utils/training'
 import type { RecordState } from '#shared/utils/training'
 
 definePageMeta({ middleware: 'signed-in' })
@@ -123,7 +123,8 @@ const standings = computed(() => [
                 </UBadge>
               </div>
               <p class="mt-1 text-sm text-muted">
-                {{ saysKind(record.kind) }} · Awarded {{ record.awardedOn }}
+                <!-- How it was come by, because a certificate we recorded is not one we ran (G-121 c4). -->
+                {{ saysKind(record.kind) }} · {{ saysSource(record.source) }} · Awarded {{ record.awardedOn }}
                 <!-- A brief never expires, so it shows what it is instead of a date (criterion 5). -->
                 <template v-if="record.kind === 'BRIEF'">
                   · Last attended

@@ -229,6 +229,61 @@ describe('what a record may say (0018, G-120)', () => {
   })
 })
 
+describe('an external certificate is a record like any other (G-121 criterion 5)', () => {
+  const external = {
+    id: 'r2',
+    source: 'EXTERNAL',
+    expires_on: '2029-09-14',
+    expiry_overridden: 1,
+    evidence_ref: 'IPAF 3a, certificate 44821',
+  }
+
+  test('it lands with its evidence and its overridden expiry', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      award(database, external)
+      const [held] = rows<{ source: string, expires: string, overridden: number, evidence: string }>(
+        database,
+        `SELECT source, expires_on expires, expiry_overridden overridden, evidence_ref evidence
+         FROM training_records WHERE id = 'r2'`,
+      )
+      expect(held).toMatchObject({
+        source: 'EXTERNAL',
+        expires: '2029-09-14',
+        overridden: 1,
+        evidence: 'IPAF 3a, certificate 44821',
+      })
+    })
+  })
+
+  // Its term is the issuing body's, so recalculation has nothing to say about it (G-124 c4).
+  test('its expiry cannot be restated, because it is overridden', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      award(database, external)
+      expect(() => database.batch([set(`expires_on = '2030-09-14'`, 'r2')])).toThrow(/append-only/i)
+    })
+  })
+
+  test('the evidence clears on erasure and cannot be put back', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      award(database, external)
+      database.batch([set(`evidence_ref = NULL`, 'r2')])
+      expect(() => database.batch([set(`evidence_ref = 'Put it back'`, 'r2')])).toThrow(/append-only/i)
+    })
+  })
+
+  // Criterion 4 is a fact about the row, not a label a screen adds: nothing can restate a
+  // sign-off as a certificate we never assessed.
+  test('a sign-off cannot be rewritten into one', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(() => database.batch([set(`source = 'EXTERNAL'`)])).toThrow(/append-only/i)
+    })
+  })
+})
+
 describe('one register awards one record per person per module (G-116, 0006)', () => {
   test('a second award for the same session, person and module is refused', async () => {
     await withDatabase((database) => {

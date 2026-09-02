@@ -6,44 +6,12 @@ export default defineEventHandler(async (event) => {
   const resolved = await requireCatalogueAuthority(event)
   const input = await readValidatedBodyOrThrow(event, signOffForm)
 
-  const module = await moduleById(input.moduleId)
-  if (!module) throw createError({ statusCode: 404, statusMessage: 'No such module' })
-
-  // Criterion 1. A lead of another department is refused; the training officer bypasses the scope.
-  assertStewards(resolved, module.department)
-
-  const account = await findById(input.userId)
-  if (!account) throw createError({ statusCode: 404, statusMessage: 'No such account' })
-  if (account.anonymisedAt !== null) {
-    throw createError({ statusCode: 409, statusMessage: 'That account has been erased' })
-  }
-
-  const policy = await modulePolicy(input.moduleId)
-  if (!policy) throw createError({ statusCode: 404, statusMessage: 'No such module' })
-  if (policy.status === 'RETIRED') {
-    throw createError({ statusCode: 409, statusMessage: 'A retired module takes no new sign-offs' })
-  }
-  if (policy.kind === 'BRIEF') {
-    throw createError({ statusCode: 409, statusMessage: 'A brief is attended, not signed off' })
-  }
-
-  // Criterion 3. A future award would read as valid to every gate between now and then.
-  const today = londonToday()
-  if (input.awardedOn > today) {
-    throw createError({ statusCode: 422, statusMessage: 'An award cannot be dated in the future' })
-  }
-
-  // Criterion 2: every direct prerequisite held, expiring included, and the refusal names the gaps.
-  // No acknowledgement path exists for any kind, which the criterion demands of a certification.
-  const needed = (await prerequisitesOf([input.moduleId])).get(input.moduleId) ?? []
-  const held = await modulesHeldBy(input.userId, today)
-  const gaps = needed.filter(edge => !held.has(edge.requiresId))
-  if (gaps.length > 0) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: `Not held yet: ${gaps.map(gap => `${gap.requiresId} ${gap.requiresName}`).join(', ')}`,
-    })
-  }
+  // Criteria 1 to 3: the department is the actor's, the module takes a sign-off, the award is not
+  // in the future, and every direct prerequisite is currently held.
+  const policy = await assertAwardable(resolved, input, {
+    retired: 'A retired module takes no new sign-offs',
+    brief: 'A brief is attended, not signed off',
+  })
 
   // Criterion 5. Never is break-glass: an explicit null expiry needs a permission the screen does
   // not offer, and its use is audited under its own action.

@@ -3,19 +3,24 @@ import { CONFIG_KEYS } from '#shared/utils/config'
 import { isMonthDay, nextCommitteeYearEnd } from '#shared/utils/london'
 import {
   MAX_EXPIRY_MONTHS,
+  RECORD_SOURCES,
   academicYearEnd,
   addMonths,
+  countsAsHeld,
   daysBetween,
   describeExpiry,
   exceedsExpiryCap,
   expiryFor,
+  expiryProblem,
+  externalCertificateForm,
+  externalExpiryProblem,
   frozenChanges,
-  saysFrozenChange,
   isLeadLive,
   leadsDepartment,
-  countsAsHeld,
   moduleForm,
   newModuleForm,
+  saysFrozenChange,
+  saysSource,
   saysState,
   stateOf,
   supersededIn,
@@ -363,5 +368,57 @@ describe('a module\'s safety semantics are compared field by field (G-109 criter
     expect(said).toContain('kind')
     expect(said).toContain('retire')
     expect(saysFrozenChange(['grantsTrainer', 'grantsSupervisor'])).toContain('supervisor')
+  })
+})
+
+describe('an external certificate is recorded, never assessed (G-121)', () => {
+  const body = {
+    userId: 'u1',
+    moduleId: 'TECH-111',
+    awardedOn: '2026-09-14',
+    expiresOn: '2029-09-14',
+    evidenceRef: 'IPAF 3a, certificate 44821',
+  }
+
+  // Criterion 2. The reference is the whole of what we trust in place of having assessed it.
+  test('an evidence reference is mandatory', () => {
+    expect(externalCertificateForm.safeParse(body).success).toBe(true)
+    expect(externalCertificateForm.safeParse({ ...body, evidenceRef: undefined }).success).toBe(false)
+    expect(externalCertificateForm.safeParse({ ...body, evidenceRef: null }).success).toBe(false)
+    expect(externalCertificateForm.safeParse({ ...body, evidenceRef: '   ' }).success).toBe(false)
+  })
+
+  // Criterion 3. No shape of this body inherits the module's policy, and none of them means never.
+  test('an explicit expiry is mandatory, and never is not on offer', () => {
+    expect(externalCertificateForm.safeParse({ ...body, expiresOn: undefined }).success).toBe(false)
+    expect(externalCertificateForm.safeParse({ ...body, expiresOn: null }).success).toBe(false)
+    expect(externalCertificateForm.safeParse({ ...body, expiresOn: '14/09/2029' }).success).toBe(false)
+  })
+
+  test('an expiry on or before the award is refused', () => {
+    expect(externalExpiryProblem('2026-09-14', '2026-09-14')).toBeTruthy()
+    expect(externalExpiryProblem('2026-09-14', '2026-09-13')).toBeTruthy()
+  })
+
+  test('the catalogue-wide cap binds it', () => {
+    expect(externalExpiryProblem('2026-09-14', addMonths('2026-09-14', MAX_EXPIRY_MONTHS))).toBeNull()
+    expect(externalExpiryProblem('2026-09-14', addMonths('2026-09-14', MAX_EXPIRY_MONTHS + 1)))
+      .toContain(String(MAX_EXPIRY_MONTHS))
+  })
+
+  // The issuing body set the term, so a house policy of twelve months does not shorten a
+  // three-year ticket: the module's policy is exactly what is never inherited (criterion 3).
+  test('the module policy does not bind it, where a sign-off would be refused', () => {
+    const policy = { expiryMode: 'MONTHS' as const, expiryMonths: 12 }
+    expect(expiryProblem(policy, '2026-09-14', '2029-09-14')).toBeTruthy()
+    expect(externalExpiryProblem('2026-09-14', '2029-09-14')).toBeNull()
+  })
+
+  // Criterion 4. Every view says how a record was come by, and no two sources read alike.
+  test('each source reads as words, and external says so', () => {
+    const said = RECORD_SOURCES.map(source => saysSource(source))
+    expect(saysSource('EXTERNAL')).toBe('External certificate')
+    expect(saysSource('SIGNOFF')).not.toBe(saysSource('EXTERNAL'))
+    expect(new Set(said).size).toBe(RECORD_SOURCES.length)
   })
 })
