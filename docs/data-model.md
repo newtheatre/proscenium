@@ -919,7 +919,24 @@ per module, owned by the module's department and editable by its leads (G-107 cr
 which has always said links, plural.
 
 ### module_prerequisites
-Direct edges only, UNIQUE pair, cycle-checked at write.
+`id` PK · `module_id` cascade · `requires_id` restrict · `created_at`. UNIQUE
+(`module_id`, `requires_id`), CHECK `module_id <> requires_id`, indexed on `requires_id`.
+
+Direct edges only: there is no transitive or grouped expression anywhere, and every prerequisite
+check in the system evaluates these edges against currently held records, with EXPIRING counting
+as held (G-108). Cascade from the requiring end and restrict from the required end, so an edge
+dies with the module that declared it and never takes the module it points at with it.
+
+A cycle is refused at the write by a recursive walk that returns the shortest path back, so the
+refusal names the loop rather than saying one exists: the officer cannot see a path running
+through modules they are not looking at. The walk binds three parameters whatever the graph's
+size, and its visited check compares whole ids, because matching on a bare substring would let a
+module whose id ends in another's stop the walk early and miss a real loop (0003).
+
+Two rules are the write path's rather than the schema's, because each is a fact about the other
+table: a `BRIEF` can never be the target of an edge, and a module another requires cannot be
+changed into one. No `created_by` column: the trail carries provenance, and a column ending `_by`
+would demand a personal-data entry for a table that names nobody.
 
 ### training_sessions / session_modules / session_attendees
 As proven: sessions carry `held_on` civil date, status CHECK

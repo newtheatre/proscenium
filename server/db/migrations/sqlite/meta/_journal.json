@@ -267,6 +267,13 @@
       "when": 1788352213853,
       "tag": "0037_training_records_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1788352648327,
+      "tag": "0038_lively_pet_avengers",
+      "breakpoints": true
     }
   ]
 }

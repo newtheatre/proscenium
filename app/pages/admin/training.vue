@@ -44,6 +44,7 @@ interface Module {
   status: ModuleLifecycle
   sort: number
   materials: Material[]
+  prerequisites: { id: string, requiresId: string, requiresName: string }[]
   expiresIfAwardedToday: string | null
 }
 
@@ -558,6 +559,20 @@ const columns: TableColumn<Module>[] = [
               label="People can register themselves for it"
             />
           </div>
+
+          <UFormField
+            v-if="editing"
+            label="Needs first"
+            description="Direct edges only. A brief can never be required, and a loop is refused by naming it."
+          >
+            <PrerequisiteEditor
+              :module-id="editing.id"
+              :prerequisites="editing.prerequisites"
+              :candidates="data.items"
+              @changed="refresh()"
+              @failed="message => failure = message"
+            />
+          </UFormField>
 
           <UFormField
             label="Notes for leads"

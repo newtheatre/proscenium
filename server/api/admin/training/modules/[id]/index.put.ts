@@ -19,6 +19,21 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // A brief gates nothing, so becoming one while another module requires it would leave an edge
+  // that can never be satisfied. G-108 criterion 3 read from the other end.
+  if (input.kind === 'BRIEF' && held.kind !== 'BRIEF') {
+    const [required] = await db.select({ moduleId: schema.modulePrerequisites.moduleId })
+      .from(schema.modulePrerequisites)
+      .where(eq(schema.modulePrerequisites.requiresId, id))
+      .limit(1)
+    if (required) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `${required.moduleId} requires this module, so it cannot become a brief`,
+      })
+    }
+  }
+
   // Given links replace the lot, which is a smaller change than a diff for a handful of rows.
   // Absent links are left alone, so an edit that never mentions them cannot delete them.
   const replacing = input.materials !== undefined
