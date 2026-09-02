@@ -120,6 +120,14 @@ export const MESSAGE_TYPES = {
     template: 'training-register-unmarked',
   },
 
+  // Transactional, so no training preference can silence it: somebody who turned training email
+  // off would otherwise lose a place they were never told they had (G-106 criterion 5).
+  'training.session.promoted': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'training-session-promoted',
+  },
+
   // Two warnings at different urgencies, neither suppressing the other (G-125 criterion 1).
   'training.expiry.window': {
     topic: 'TRAINING',

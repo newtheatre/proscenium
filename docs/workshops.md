@@ -40,6 +40,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Opening hours per room | none | per-room, set in session | Held on the room rather than in settings, so a room can be renamed or archived with them (0025, C-101) |
 | Training expiry warning window | 60 days | 60 days | Final warning at 14 days |
 | Academic year boundary | 31 August | **30 September** | Changed from 31 August: the committee's own catalogue draft of 10 August 2026 defines an academic-year expiry as 30 September, and seven modules use it. A day that exists in every year, so never 29 February. The carry-over window keeps its old value but is a setting rather than a constant, and an award inside it rolls to the following year |
+| Session sign-up close | none: the old app took sign-ups until the door | 24 hours before the session starts | New setting. The session day arriving closes sign-up anyway, so this is only how much *more* notice a trainer wants; anything shorter than the gap from midnight to the start has no effect. Owner: IT Manager |
 | Session edit window | 14 days | 14 days | |
 | Register nag cadence | from day 2, weekly, stop at 60 days | unchanged | |
 | Practice window grace | 4 hours | 4 hours | Flagged as a guess in the old docs; confirm |

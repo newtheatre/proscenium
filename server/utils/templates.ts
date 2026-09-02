@@ -265,6 +265,32 @@ The Nottingham New Theatre`,
     }
   },
 
+  // Good news, so it leads with it. The way out is in the same breath as the place, because a
+  // place nobody uses is one somebody else was waiting for.
+  'training-session-promoted': (context: TemplateContext): Rendered => {
+    const modules = context.modules as { id: string, name: string }[]
+    const taught = modules.map(module => `${module.name} (${module.id})`).join(', ')
+    return {
+      subject: 'A place has come up on a training session',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Somebody has dropped out, so the place you were waiting for is yours.</p>
+<p>${taught}, on ${context.heldOn} at ${context.startsAt}, at ${context.where}.</p>
+<p>Nothing to do if you are coming. If you cannot make it after all, please
+<a href="${String(context.sessionsUrl)}">withdraw</a> so the next person on the list gets it.</p>`),
+      text: `Hello ${context.name},
+
+Somebody has dropped out, so the place you were waiting for is yours.
+
+${taught}, on ${context.heldOn} at ${context.startsAt}, at ${context.where}.
+
+Nothing to do if you are coming. If you cannot make it after all, please withdraw so the next
+person on the list gets it:
+${String(context.sessionsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   // Asking is what put it in the diary, and saying so is the only feedback a request gives.
   'training-request-scheduled': (context: TemplateContext): Rendered => ({
     subject: `Being taught: ${String(context.moduleName)}`,

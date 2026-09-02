@@ -132,6 +132,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Sessions this person ran. What training the theatre delivered is safety history; the trainer\'s notes on a night are not.',
   },
   {
+    name: 'session_attendees',
+    column: 'user_id',
+    section: 'training-attendance',
+    columns: ['session_id', 'status', 'source', 'signed_up_at', 'marked_at', 'created_at'],
+    // Nothing free-text is held: the row is a session, an order and a mark. Who was taught what
+    // on which night is the evidence a training record rests on, so it survives an erasure.
+    erasure: 'keep',
+    why: 'Sessions this person signed up to and was marked at. Attendance is safety history, and it names nobody else.',
+  },
+  {
     name: 'notification_preferences',
     column: 'user_id',
     section: 'notification-preferences',

@@ -190,6 +190,30 @@ export const trainingRecords = sqliteTable('training_records', {
   // CHECK on an append-only table can never be dropped. The reason is mandatory at the write path.
 ])
 
+// Everyone signed up to a session, in the order they signed up. There is no waitlist table and no
+// position column: a place is derived from this order against the session's capacity (G-105).
+export const sessionAttendees = sqliteTable('session_attendees', {
+  id: id(),
+  sessionId: text('session_id').notNull().references(() => trainingSessions.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // ATTENDED and ABSENT are the register's marks (G-116); sign-up writes only the first two.
+  status: text('status').notNull().default('SIGNED_UP'),
+  source: text('source').notNull().default('SIGNUP'),
+  // The whole of the ordering. Re-joining after a withdrawal resets it, which puts somebody at
+  // the back with no position column to renumber (G-105 criterion 2).
+  signedUpAt: integer('signed_up_at').notNull().default(now),
+  markedAt: integer('marked_at'),
+  markedBy: text('marked_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  // One row per person per session, which is what makes a withdrawal reversible in place.
+  unique('session_attendees_person').on(table.sessionId, table.userId),
+  index('session_attendees_order').on(table.sessionId, table.signedUpAt),
+  index('session_attendees_user').on(table.userId),
+  check('session_attendees_status', sql`${table.status} IN ('SIGNED_UP', 'CANCELLED', 'ATTENDED', 'ABSENT')`),
+  check('session_attendees_source', sql`${table.source} IN ('SIGNUP', 'WALK_IN')`),
+])
+
 // A member asking to be taught something. A demand signal and nothing else: it confers no queue
 // position, no priority and no place in any session (G-104 criterion 5).
 export const moduleRequests = sqliteTable('module_requests', {

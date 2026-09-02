@@ -110,6 +110,7 @@ export const MEMBER_NAV: NavEntry[] = [
   { label: 'My bookings', icon: 'i-lucide-calendar-check', to: '/rooms/mine', ability: signedIn },
   { label: 'Book a room', icon: 'i-lucide-door-open', to: '/rooms', ability: signedIn, exact: true },
   { label: 'My training', icon: 'i-lucide-graduation-cap', to: '/training', ability: signedIn, exact: true },
+  { label: 'Training sessions', icon: 'i-lucide-calendar-days', to: '/training/sessions', ability: signedIn },
   { label: 'My profile', icon: 'i-lucide-user', to: '/account/profile', ability: signedIn },
   { label: 'Sign-in and security', icon: 'i-lucide-shield', to: '/account/security', ability: signedIn },
 ]

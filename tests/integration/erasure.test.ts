@@ -72,6 +72,9 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
     [`INSERT INTO training_sessions (id, held_on, starts_at, ends_at, capacity, notes, trainer_id)
       VALUES (?, '2027-01-14', '19:00', '21:00', 20, ?, ?)`,
     `ts-${id}`, `${NAME} is bringing the harnesses`, id],
+    // Holds no free text at all, which is the whole reason it survives an erasure untouched.
+    [`INSERT INTO session_attendees (id, session_id, user_id, status, signed_up_at)
+      VALUES (?, ?, ?, 'ATTENDED', ?)`, `sa-${id}`, `ts-${id}`, id, now],
   ])
   return id
 }

@@ -108,6 +108,25 @@ async function withdraw(id: string): Promise<void> {
   }
 }
 
+interface SignedUp {
+  id: string
+  heldOn: string
+  startsAt: string
+  place: string | null
+  placed: boolean
+  waitlistPosition: number | null
+  myPosition: number | null
+  modules: { id: string, name: string }[]
+}
+
+const { data: sessions } = await useAsyncData(
+  'training-my-sessions',
+  () => request<{ items: SignedUp[] }>('/api/training/sessions'),
+  { default: () => ({ items: [] as SignedUp[] }) },
+)
+
+const signedUpTo = computed(() => sessions.value.items.filter(session => session.myPosition !== null))
+
 const { data: next } = await useAsyncData(
   'training-next',
   () => request<{ items: NextStep[] }>('/api/training/next'),
@@ -289,6 +308,66 @@ const standings = computed(() => [
         </ul>
       </section>
     </div>
+
+    <section
+      class="mt-12"
+      data-test="my-sessions"
+    >
+      <h2 class="text-sm font-semibold text-muted uppercase tracking-wide">
+        What you are signed up to
+      </h2>
+
+      <p
+        v-if="signedUpTo.length === 0"
+        class="mt-1 text-sm text-muted"
+      >
+        Nothing yet.
+        <ULink to="/training/sessions">
+          The schedule
+        </ULink>
+        shows what is being taught, and a full session takes you onto its waiting list rather than
+        turning you away.
+      </p>
+
+      <ul
+        v-else
+        class="mt-3 space-y-3"
+      >
+        <li
+          v-for="session in signedUpTo"
+          :key="session.id"
+          class="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-default p-4"
+          :data-test="`signed-up-${session.id}`"
+        >
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-medium">{{ session.modules.map(module => module.name).join(', ') }}</span>
+              <UBadge
+                :color="session.placed ? 'success' : 'warning'"
+                variant="subtle"
+                size="sm"
+              >
+                {{ session.placed ? 'You have a place' : `Waiting, number ${session.waitlistPosition}` }}
+              </UBadge>
+            </div>
+            <p class="mt-1 text-sm text-muted">
+              {{ session.heldOn }} at {{ session.startsAt }}
+              <template v-if="session.place">
+                · {{ session.place }}
+              </template>
+            </p>
+          </div>
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            to="/training/sessions"
+          >
+            The schedule
+          </UButton>
+        </li>
+      </ul>
+    </section>
 
     <section
       v-if="next.items.length > 0"
