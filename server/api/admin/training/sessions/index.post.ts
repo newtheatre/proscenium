@@ -80,5 +80,11 @@ export default defineEventHandler(async (event) => {
     })),
   ])
 
-  return { ok: true, id }
+  // G-104 criterion 4. A session members can see resolves the asks it answers; one they cannot
+  // see yet resolves nothing, because nobody can sign up to it.
+  const resolvedRequests = input.opensAt === null
+    ? await resolveRequestsFor(event, id, input.moduleIds)
+    : 0
+
+  return { ok: true, id, resolvedRequests }
 })

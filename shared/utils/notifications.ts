@@ -105,6 +105,13 @@ export const MESSAGE_TYPES = {
     template: 'room-reminder',
   },
 
+  // Asking put it in the diary, which is worth saying: it is the only feedback a request gives.
+  'training.request.scheduled': {
+    topic: 'TRAINING',
+    channels: ['EMAIL'],
+    template: 'training-request-scheduled',
+  },
+
   // Two warnings at different urgencies, neither suppressing the other (G-125 criterion 1).
   'training.expiry.window': {
     topic: 'TRAINING',

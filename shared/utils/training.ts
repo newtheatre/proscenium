@@ -161,8 +161,10 @@ export function saysSource(source: string): string {
   return 'Signed off'
 }
 
+// "Renew soon" rather than "Expiring": it is an instruction, and it still counts as held, so the
+// word should ask for something rather than describe a decline.
 export function saysState(state: RecordState): string {
-  if (state === 'EXPIRING') return 'Expiring'
+  if (state === 'EXPIRING') return 'Renew soon'
   if (state === 'EXPIRED') return 'Expired'
   return 'Valid'
 }
@@ -453,3 +455,32 @@ export const leadForm = z.object({
 })
 
 export type LeadInput = z.output<typeof leadForm>
+
+export const REQUEST_STATUSES = ['OPEN', 'SCHEDULED', 'DECLINED', 'WITHDRAWN'] as const
+export type RequestStatus = typeof REQUEST_STATUSES[number]
+
+export const REQUEST_NOTE_LIMIT = 500
+export const DECLINE_REASON_LIMIT = 500
+
+export function saysRequestStatus(status: string): string {
+  // "Answered" rather than "Declined": the lead wrote back, and what they wrote is shown. A
+  // request nobody has answered is waiting, which is the state the board exists to clear.
+  if (status === 'SCHEDULED') return 'Scheduled'
+  if (status === 'DECLINED') return 'Answered'
+  if (status === 'WITHDRAWN') return 'Withdrawn'
+  return 'Waiting'
+}
+
+export const moduleRequestForm = z.object({
+  moduleId: z.string().trim().min(1).max(32),
+  // "When you are free, why you need it, who else wants it": what a lead can actually act on.
+  note: text(REQUEST_NOTE_LIMIT),
+})
+
+export type ModuleRequestInput = z.output<typeof moduleRequestForm>
+
+export const requestDeclineForm = z.object({
+  reason: z.string().trim().min(3).max(DECLINE_REASON_LIMIT),
+})
+
+export type RequestDeclineInput = z.output<typeof requestDeclineForm>

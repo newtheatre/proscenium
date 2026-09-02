@@ -301,7 +301,7 @@ describe('a record\'s validity is derived from its dates (G-101 criteria 1 to 5)
 
   test('each state reads as a word rather than as a token', () => {
     expect(saysState('VALID')).toBe('Valid')
-    expect(saysState('EXPIRING')).toBe('Expiring')
+    expect(saysState('EXPIRING')).toBe('Renew soon')
     expect(saysState('EXPIRED')).toBe('Expired')
   })
 })

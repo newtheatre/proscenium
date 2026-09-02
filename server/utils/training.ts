@@ -678,3 +678,136 @@ export async function whatsNextFor(userId: string, today: string): Promise<NextS
     order by m.sort, m.id
   `)
 }
+
+export interface ModuleRequestRow {
+  id: string
+  moduleId: string
+  moduleName: string
+  department: string
+  note: string | null
+  status: string
+  reason: string | null
+  createdAt: number
+}
+
+export async function requestsBy(userId: string): Promise<ModuleRequestRow[]> {
+  return db.select({
+    id: schema.moduleRequests.id,
+    moduleId: schema.moduleRequests.moduleId,
+    moduleName: schema.trainingModules.name,
+    department: schema.trainingModules.department,
+    note: schema.moduleRequests.note,
+    status: schema.moduleRequests.status,
+    reason: schema.moduleRequests.reason,
+    createdAt: schema.moduleRequests.createdAt,
+  })
+    .from(schema.moduleRequests)
+    .innerJoin(schema.trainingModules, eq(schema.trainingModules.id, schema.moduleRequests.moduleId))
+    .where(eq(schema.moduleRequests.userId, userId))
+    .orderBy(desc(schema.moduleRequests.createdAt))
+}
+
+export interface DemandRow {
+  moduleId: string
+  moduleName: string
+  department: string
+  waiting: number
+  // `id` is the request's, not the person's: it is what answering acts on.
+  requesters: { id: string, userId: string, name: string, note: string | null }[]
+}
+
+// The board a lead answers, busiest first. Scoped by subquery when the reader is a lead rather
+// than an officer, so no parameter count grows with how many departments they steward (0003).
+export async function demandBoard(leadOf: string | undefined, limit = 20): Promise<DemandRow[]> {
+  const scope = leadOf === undefined
+    ? sql`1 = 1`
+    : sql`m.department in (
+        select department from department_leads
+        where user_id = ${leadOf} and (expires_at is null or expires_at > unixepoch()))`
+
+  const modules = await db.all<{ moduleId: string, moduleName: string, department: string, waiting: number }>(sql`
+    select r.module_id as moduleId, m.name as moduleName, m.department as department,
+      count(*) as waiting
+    from module_requests r
+    join modules m on m.id = r.module_id
+    where r.status = 'OPEN' and ${scope}
+    group by r.module_id, m.name, m.department
+    order by count(*) desc, m.name
+    limit ${limit}
+  `)
+
+  if (modules.length === 0) return []
+
+  // The requesters for the page of modules being shown, fetched by repeating the predicate as a
+  // subquery rather than by an id list built from the rows above (0003).
+  const people = await db.all<{ moduleId: string, id: string, userId: string, name: string, note: string | null }>(sql`
+    select r.module_id as moduleId, r.id as id, u.id as userId, u.name as name, r.note as note
+    from module_requests r
+    join users u on u.id = r.user_id
+    join modules m on m.id = r.module_id
+    where r.status = 'OPEN' and ${scope}
+      and r.module_id in (
+        select module_id from module_requests inner_r
+        join modules inner_m on inner_m.id = inner_r.module_id
+        where inner_r.status = 'OPEN' and ${scope}
+        group by module_id
+        order by count(*) desc, inner_m.name
+        limit ${limit})
+    order by r.created_at
+  `)
+
+  const byModule = new Map<string, DemandRow['requesters']>()
+  for (const row of people) {
+    byModule.set(row.moduleId, [...(byModule.get(row.moduleId) ?? []),
+      { id: row.id, userId: row.userId, name: row.name, note: row.note }])
+  }
+  return modules.map(module => ({ ...module, requesters: byModule.get(module.moduleId) ?? [] }))
+}
+
+// Criterion 4. A session that members can see resolves the asks it answers, and each requester
+// hears once. A session created but not yet open resolves nothing: nobody can sign up to it yet.
+export async function resolveRequestsFor(
+  event: H3Event | undefined,
+  sessionId: string,
+  moduleIds: string[],
+): Promise<number> {
+  const waiting = await db.all<{ id: string, userId: string, moduleId: string, moduleName: string }>(sql`
+    select r.id as id, r.user_id as userId, r.module_id as moduleId, m.name as moduleName
+    from module_requests r
+    join modules m on m.id = r.module_id
+    where r.status = 'OPEN'
+      and r.module_id in (select value from json_each(${JSON.stringify(moduleIds)}))
+  `)
+  if (waiting.length === 0) return 0
+
+  await db.run(sql`
+    update module_requests
+    set status = 'SCHEDULED', decided_at = unixepoch()
+    where status = 'OPEN'
+      and module_id in (select value from json_each(${JSON.stringify(moduleIds)}))
+  `)
+
+  let told = 0
+  for (const row of waiting) {
+    const took = await claimNotification({
+      userId: row.userId,
+      type: 'training.request.scheduled',
+      key: `training.request.scheduled:${row.id}`,
+      sessionId,
+    })
+    if (!took) continue
+
+    await notify(event, {
+      type: 'training.request.scheduled',
+      userId: row.userId,
+      context: {
+        name: '',
+        moduleName: row.moduleName,
+        moduleId: row.moduleId,
+        sessionsUrl: `${useRuntimeConfig(event).public.baseURL}/training`,
+      },
+    })
+    told++
+  }
+  return told
+}

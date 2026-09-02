@@ -100,6 +100,17 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Training this person held. Who was competent to do what is safety history; the evidence for it and the words written about them are not.',
   },
   {
+    name: 'module_requests',
+    column: 'user_id',
+    section: 'training-requests',
+    // The reply is exported as well as scrubbed: it is a thing written about them and shown to
+    // them, the way a booking's rejection reason is.
+    columns: ['module_id', 'note', 'status', 'reason', 'created_at'],
+    erasure: 'scrub',
+    scrub: ['note', 'reason'],
+    why: 'What this person asked to be taught. How much demand a module had is worth keeping; what they wrote about themselves, and what was written back, is not.',
+  },
+  {
     name: 'training_sessions',
     column: 'trainer_id',
     section: 'training-sessions',
