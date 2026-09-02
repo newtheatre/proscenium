@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { CONFIG_KEYS } from '#shared/utils/config'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -437,8 +438,10 @@ describe.skipIf(skip !== null)('a module declares its expiry policy once (G-123)
     const items = await catalogue()
     expect(items.find(one => one.id === never.id)?.expiresIfAwardedToday).toBeNull()
     expect(items.find(one => one.id === months.id)?.expiresIfAwardedToday).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    // The configured boundary, and nothing stored: moving the setting moves this answer (0012).
-    expect(items.find(one => one.id === academic.id)?.expiresIfAwardedToday).toMatch(/-08-31$/)
+    // The configured boundary, and nothing stored: moving the setting moves this answer (0012),
+    // so this reads the register rather than restating a number the committee may change.
+    expect(items.find(one => one.id === academic.id)?.expiresIfAwardedToday)
+      .toMatch(new RegExp(`-${CONFIG_KEYS.ACADEMIC_YEAR_BOUNDARY.default}$`))
   })
 
   test('no column anywhere holds a computed expiry or a validity (criterion 3)', async () => {
@@ -463,7 +466,11 @@ describe.skipIf(skip !== null)('a module declares its expiry policy once (G-123)
     expect(refused.status).toBe(400)
     expect((await send('PUT', '/api/admin/config/ACADEMIC_YEAR_BOUNDARY', { value: '13-01' })).status).toBe(400)
     expect((await send('PUT', '/api/admin/config/ACADEMIC_YEAR_BOUNDARY', { value: '07-31' })).status).toBe(200)
-    await send('PUT', '/api/admin/config/ACADEMIC_YEAR_BOUNDARY', { value: '08-31' })
+    // Put back what the register ships, so a later case in this file is not reading a boundary
+    // this one left behind.
+    await send('PUT', '/api/admin/config/ACADEMIC_YEAR_BOUNDARY', {
+      value: CONFIG_KEYS.ACADEMIC_YEAR_BOUNDARY.default,
+    })
   })
 })
 

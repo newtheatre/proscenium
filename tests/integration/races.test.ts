@@ -42,6 +42,48 @@ describe('contended invariants (K-105)', () => {
       database.close()
     }
   })
+  // G-122's named case. Revocation is idempotent, so the second attempt must write nothing and
+  // log nothing rather than refuse: two administrators pressing the button is not an error.
+  test('the revocation race: the second revocation writes no row and no second entry', async () => {
+    const database = await createTestDatabase()
+    try {
+      database.batch([
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-held', 'held@example.invalid', 'A Member'],
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-admin', 'admin@example.invalid', 'An Officer'],
+        ['INSERT INTO departments (code, name) VALUES (?, ?)', 'TECH', 'Technical'],
+        ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'TECH-111', 'TECH', 'MODULE', 'Working at height'],
+        [`INSERT INTO training_records (id, user_id, module_id, awarded_on, source)
+          VALUES ('tr-1', 'u-held', 'TECH-111', '2026-09-01', 'SIGNOFF')`],
+      ])
+
+      // The two statements the route runs, in the order it runs them: the entry first, because the
+      // update would otherwise falsify the guard the entry rides on.
+      const revoke = (entryId: string, at: number): void => {
+        database.batch([
+          [`INSERT INTO audit_log (id, actor_id, action, target, detail)
+            SELECT ?, 'u-admin', 'record.revoked', 'user:u-held', '{"record":"tr-1"}'
+            WHERE EXISTS (SELECT 1 FROM training_records WHERE id = 'tr-1' AND revoked_at IS NULL)`, entryId],
+          [`UPDATE training_records SET revoked_at = ?, revoked_by = 'u-admin', revoke_reason = 'Found not competent'
+            WHERE id = 'tr-1' AND revoked_at IS NULL`, at],
+        ])
+      }
+
+      revoke('al-first', 1789000000)
+      revoke('al-second', 1789999999)
+
+      // One stamp, and it is the first one: the loser changed nothing.
+      expect(rows<{ at: number }>(database, `SELECT revoked_at at FROM training_records WHERE id = 'tr-1'`)[0]?.at)
+        .toBe(1789000000)
+      expect(rows(database, `SELECT id FROM audit_log WHERE action = 'record.revoked'`)).toHaveLength(1)
+      // Never deleted: the row is still there, still readable, still naming its award (criterion 5).
+      expect(rows<{ awarded: string }>(database, `SELECT awarded_on awarded FROM training_records`)[0]?.awarded)
+        .toBe('2026-09-01')
+    }
+    finally {
+      database.close()
+    }
+  })
+
   test.todo('at most one confirmed duty manager per performance', () => {})
   test.todo('a promotion notification is sent at most once', () => {})
   test.todo('a sale\'s payment, lines and stock movements commit atomically', () => {})

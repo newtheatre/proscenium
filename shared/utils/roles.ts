@@ -37,6 +37,10 @@ export const PERMISSIONS = [
   'training.write',
   // Appointing a department's stewards is the administrator's, not the training officer's (G-110).
   'training.leads',
+  // Taking a record away is the administrator's (G-122 criterion 1), and so is signing one off as
+  // never expiring, which is break-glass and absent from every screen (G-120 criterion 5).
+  'training.revoke',
+  'training.override',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
