@@ -297,6 +297,37 @@ export const moduleForm = moduleFields.superRefine(refuseImpossibleModules)
 
 export type ModuleInput = z.output<typeof moduleForm>
 
+// The fields every record's meaning rests on. Changing one under an unrevoked record would
+// rewrite what that record certified, so the path is to retire and recreate (G-109).
+export const FROZEN_MODULE_FIELDS = ['kind', 'grantsTrainer', 'grantsSupervisor'] as const
+
+export type FrozenModuleField = (typeof FROZEN_MODULE_FIELDS)[number]
+
+export interface ModuleSemantics {
+  kind: string
+  grantsTrainer: boolean
+  grantsSupervisor: boolean
+}
+
+export function frozenChanges(held: ModuleSemantics, input: ModuleSemantics): FrozenModuleField[] {
+  return FROZEN_MODULE_FIELDS.filter(field => held[field] !== input[field])
+}
+
+const SAYS_FROZEN: Record<FrozenModuleField, string> = {
+  kind: 'its kind',
+  grantsTrainer: 'whether it grants trainer standing',
+  grantsSupervisor: 'whether it grants supervisor standing',
+}
+
+// Says which field is frozen and what to do instead, because an officer told only "no" will try
+// the same edit again (G-109 criterion 1).
+export function saysFrozenChange(fields: FrozenModuleField[]): string {
+  const named = fields.map(field => SAYS_FROZEN[field])
+  const listed = named.length > 1 ? `${named.slice(0, -1).join(', ')} and ${named.at(-1)}` : named[0]
+  return `Records exist against this module, so ${listed} cannot change. `
+    + 'Please retire it and create a successor module instead.'
+}
+
 export const newModuleForm = moduleFields.extend({
   id: z.string().trim().regex(MODULE_ID, 'A module id is uppercase letters, digits and hyphens').max(32),
 }).superRefine(refuseImpossibleModules)

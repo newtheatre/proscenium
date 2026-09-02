@@ -909,6 +909,19 @@ carries no expiry policy; a `BRIEF` grants neither standing; only a `BRIEF` is s
 Each is a closed set about process, so each may carry a constraint (0033). The cap is also
 `MAX_EXPIRY_MONTHS` in `shared/utils/training.ts`, and the two move together only by hand.
 
+`kind`, `grants_trainer` and `grants_supervisor` are **frozen while any unrevoked record exists
+against the module**: the write path refuses the edit with a 409 naming the field and asking for a
+retirement instead (G-109). Unrevoked is the test, not currently valid: a record that lapsed years
+ago was still awarded under those semantics, and changing them now would rewrite what it certified.
+Revoking every record against a module thaws the three again. Nothing stores the answer; the
+listing's `frozen` flag on the leads' surface is derived per request from the records, the same way
+validity and standing are (0018).
+
+The documented path to a different meaning is **retire and recreate**: set the old module
+`RETIRED`, which is not frozen and keeps it readable so an old record's module link still resolves,
+then create a successor under a new published id. The successor carries no records, so its own
+semantics are editable until it awards its first.
+
 A module stores an expiry **policy**, never a date. What a record earned today would run to is
 computed on the way out of a request from the policy, `ACADEMIC_YEAR_BOUNDARY` and
 `TRAINING_CARRY_OVER_DAYS`; an award stamps the answer onto the record, and no later change to

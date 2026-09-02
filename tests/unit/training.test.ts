@@ -9,6 +9,8 @@ import {
   describeExpiry,
   exceedsExpiryCap,
   expiryFor,
+  frozenChanges,
+  saysFrozenChange,
   isLeadLive,
   leadsDepartment,
   countsAsHeld,
@@ -332,5 +334,34 @@ describe('which record is current is derived too (G-101 criterion 6, G-120 crite
       record('foh', 'FOH-101', '2024-01-01'),
     ])
     expect([...superseded]).toEqual(['tech-old'])
+  })
+})
+
+describe('a module\'s safety semantics are compared field by field (G-109 criteria 1 and 2)', () => {
+  const HELD = { kind: 'MODULE', grantsTrainer: false, grantsSupervisor: false }
+
+  test('an edit that leaves the three alone changes nothing frozen', () => {
+    expect(frozenChanges(HELD, { ...HELD })).toEqual([])
+  })
+
+  test('a kind change is frozen (criterion 1)', () => {
+    expect(frozenChanges(HELD, { ...HELD, kind: 'CERTIFICATION' })).toEqual(['kind'])
+  })
+
+  test('the granting flags are frozen the same way (criterion 2)', () => {
+    expect(frozenChanges(HELD, { ...HELD, grantsTrainer: true })).toEqual(['grantsTrainer'])
+    expect(frozenChanges(HELD, { ...HELD, grantsSupervisor: true })).toEqual(['grantsSupervisor'])
+    expect(frozenChanges({ ...HELD, grantsTrainer: true }, HELD)).toEqual(['grantsTrainer'])
+  })
+
+  test('every other field on the form is editable while records exist', () => {
+    expect(frozenChanges(HELD, { ...HELD, name: 'Renamed', safetyCritical: true } as typeof HELD)).toEqual([])
+  })
+
+  test('the refusal names each frozen field and says to retire and recreate (criterion 1)', () => {
+    const said = saysFrozenChange(['kind']).toLowerCase()
+    expect(said).toContain('kind')
+    expect(said).toContain('retire')
+    expect(saysFrozenChange(['grantsTrainer', 'grantsSupervisor'])).toContain('supervisor')
   })
 })

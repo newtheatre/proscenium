@@ -46,6 +46,7 @@ interface Module {
   materials: Material[]
   prerequisites: { id: string, requiresId: string, requiresName: string }[]
   expiresIfAwardedToday: string | null
+  frozen?: boolean
 }
 
 interface Department { code: string, name: string }
@@ -150,6 +151,10 @@ function edit(module: Module | null): void {
     : { department: departments.value.items[0]?.code ?? '' })
   open.value = true
 }
+
+// Records against the module fix what it means, so the screen says so rather than offering an edit
+// the write path will refuse (G-109).
+const frozen = computed(() => editing.value?.frozen === true)
 
 // The refusals a brief and a safety-critical module carry are rules, so the form clears what they
 // forbid rather than letting somebody submit into a refusal (G-107 criteria 2 and 4).
@@ -433,12 +438,21 @@ const columns: TableColumn<Module>[] = [
                 :color="state.kind === option ? 'primary' : 'neutral'"
                 :variant="state.kind === option ? 'solid' : 'outline'"
                 :aria-pressed="state.kind === option"
+                :disabled="frozen"
                 :data-test="`module-kind-${option}`"
                 @click="state.kind = option"
               >
                 {{ saysKind(option) }}
               </UButton>
             </div>
+            <p
+              v-if="frozen"
+              class="mt-2 text-sm text-muted"
+              data-test="module-frozen"
+            >
+              Records exist against this module, so its kind and the standing it grants are fixed.
+              Retire it and create a successor to mean something else.
+            </p>
           </UFormField>
 
           <UFormField
@@ -539,14 +553,14 @@ const columns: TableColumn<Module>[] = [
             />
             <USwitch
               v-model="state.grantsTrainer"
-              :disabled="state.kind === 'BRIEF'"
+              :disabled="state.kind === 'BRIEF' || frozen"
               label="Holding it makes somebody a trainer"
               description="Standing is derived from a current record on this module, never granted as a role."
               data-test="module-grants-trainer"
             />
             <USwitch
               v-model="state.grantsSupervisor"
-              :disabled="state.kind === 'BRIEF'"
+              :disabled="state.kind === 'BRIEF' || frozen"
               label="Holding it makes somebody a supervisor"
             />
             <USwitch
