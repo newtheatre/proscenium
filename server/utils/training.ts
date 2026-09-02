@@ -58,6 +58,105 @@ const liveLead = (now: Date) => or(
   gt(schema.departmentLeads.expiresAt, Math.floor(now.getTime() / 1000)),
 )
 
+export interface SessionRow {
+  id: string
+  heldOn: string
+  startsAt: string
+  endsAt: string
+  place: string | null
+  capacity: number
+  opensAt: number | null
+  status: string
+  trainerId: string
+  trainerName: string
+  modules: { id: string, name: string }[]
+}
+
+// Sessions with what each teaches. Soonest first, because a trainer's next one is the one they
+// came to look at.
+export async function listSessions(filter: { status?: string, trainerId?: string }): Promise<SessionRow[]> {
+  const wanted = and(
+    filter.status ? eq(schema.trainingSessions.status, filter.status) : undefined,
+    filter.trainerId ? eq(schema.trainingSessions.trainerId, filter.trainerId) : undefined,
+  )
+
+  const rows = await db.select({
+    id: schema.trainingSessions.id,
+    heldOn: schema.trainingSessions.heldOn,
+    startsAt: schema.trainingSessions.startsAt,
+    endsAt: schema.trainingSessions.endsAt,
+    place: schema.trainingSessions.place,
+    capacity: schema.trainingSessions.capacity,
+    opensAt: schema.trainingSessions.opensAt,
+    status: schema.trainingSessions.status,
+    trainerId: schema.trainingSessions.trainerId,
+    trainerName: schema.users.name,
+  })
+    .from(schema.trainingSessions)
+    .innerJoin(schema.users, eq(schema.users.id, schema.trainingSessions.trainerId))
+    .where(wanted)
+    .orderBy(asc(schema.trainingSessions.heldOn), asc(schema.trainingSessions.startsAt))
+
+  // Scoped by repeating the predicate as a subquery, so nothing binds a parameter per session.
+  const taught = await db.select({
+    sessionId: schema.sessionModules.sessionId,
+    id: schema.trainingModules.id,
+    name: schema.trainingModules.name,
+  })
+    .from(schema.sessionModules)
+    .innerJoin(schema.trainingModules, eq(schema.trainingModules.id, schema.sessionModules.moduleId))
+    .where(inArray(
+      schema.sessionModules.sessionId,
+      db.select({ id: schema.trainingSessions.id }).from(schema.trainingSessions).where(wanted),
+    ))
+
+  return rows.map(row => ({
+    ...row,
+    modules: taught.filter(module => module.sessionId === row.id).map(({ id, name }) => ({ id, name })),
+  }))
+}
+
+// Trainer standing exists if and only if somebody currently holds a valid or expiring record on a
+// module flagged trainer-granting. Never a role, never a flag, so nothing needs revoking (G-111).
+export async function trainerStandingOf(userId: string, today: string): Promise<{ trainer: boolean, supervisor: boolean }> {
+  const rows = await db.select({
+    trainer: schema.trainingModules.grantsTrainer,
+    supervisor: schema.trainingModules.grantsSupervisor,
+  })
+    .from(schema.trainingRecords)
+    .innerJoin(schema.trainingModules, eq(schema.trainingModules.id, schema.trainingRecords.moduleId))
+    .where(and(
+      eq(schema.trainingRecords.userId, userId),
+      heldNow(today),
+      or(eq(schema.trainingModules.grantsTrainer, true), eq(schema.trainingModules.grantsSupervisor, true)),
+    ))
+
+  return {
+    trainer: rows.some(row => row.trainer),
+    supervisor: rows.some(row => row.supervisor),
+  }
+}
+
+// A trainer surface. Standing dies the moment the record behind it expires or is revoked, so this
+// is read at the request and cached nowhere (G-111 criterion 2).
+export async function requireTrainer(event: H3Event): Promise<Authority> {
+  const resolved = await authority(event)
+
+  // The training officer runs the catalogue and may act without holding a certification.
+  if (!resolved.permissions.has('training.write')) {
+    const standing = await trainerStandingOf(resolved.account.id, londonToday())
+    if (!standing.trainer) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Running a session needs a current trainer certification',
+      })
+    }
+  }
+
+  await requireSecondFactorIfPrivileged(event, resolved)
+  return resolved
+}
+
 // Whether the proposed prerequisite already leads back to the module, and by which path. A
 // recursive walk, so nothing binds a parameter per edge and no id list is built (0003, G-108 c2).
 export async function cyclePath(moduleId: string, requiresId: string): Promise<string | null> {

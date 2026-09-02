@@ -36,6 +36,8 @@ erDiagram
   users ||--o{ reservations : books
   users ||--o{ shifts : works
   users ||--o{ training_records : earns
+  users ||--o{ training_sessions : runs
+  training_sessions ||--o{ session_modules : teaches
   users ||--o{ room_bookings : requests
   users ||--o| room_feed_tokens : subscribes_with
   rooms ||--o{ room_blackouts : closed_by
@@ -938,12 +940,38 @@ table: a `BRIEF` can never be the target of an edge, and a module another requir
 changed into one. No `created_by` column: the trail carries provenance, and a column ending `_by`
 would demand a personal-data entry for a table that names nobody.
 
-### training_sessions / session_modules / session_attendees
-As proven: sessions carry `held_on` civil date, status CHECK
-`PLANNED|OPEN|FULL|DELIVERED|CANCELLED`, capacity, register stamps; attendees UNIQUE
-(session, user) with status CHECK `SIGNED_UP|CANCELLED|ATTENDED|ABSENT`, sign-up order is
-the derived waitlist; the register opens on the day, marks must cover it exactly, and
-delivery is a single-winner conditional write.
+### training_sessions
+`id` PK · `held_on` civil date · `starts_at` / `ends_at` `HH:MM` text · `place` NULL ·
+`capacity` CHECK 1 to 60 · `opens_at` NULL = open already · `status` CHECK
+`PLANNED|OPEN|FULL|DELIVERED|CANCELLED` · `notes` scrub · `trainer_id` restrict ·
+`created_at` · `updated_at`. Indexed on `held_on`, on `status` and on `trainer_id`.
+A CHECK holds `ends_at` after `starts_at`, which compares as text because both are zero-padded.
+
+The times are **wall clock text, not an instant**. A session is the hour a member turns up for,
+so a 19:00 session is 19:00 on both sides of a clock change; storing an offset from a UTC instant
+moves it by an hour twice a year (0014, G-112 criterion 5).
+
+`opens_at` is what a member can see: NULL means sign-up is open now and the row is written `OPEN`,
+an instant in the future means `PLANNED` and members resolve nothing against it until then.
+
+### session_modules
+`id` PK · `session_id` cascade · `module_id` restrict. UNIQUE (`session_id`, `module_id`),
+indexed on `module_id`. The join dies with the session because it is the session's own record of
+what it taught, and a module a session teaches cannot be deleted out from under it.
+
+Scheduling is G-112. Standing to run a session is derived, never granted: somebody may schedule
+one if and only if they currently hold a valid or expiring record on a module marked
+`grants_trainer`, and expiring counts as held (G-111, 0037). What may be taught is scoped by
+competence rather than by department: a trainer may name only modules they themselves currently
+hold. The holder of `training.write` is exempt, because they schedule on somebody's behalf rather
+than teaching it. A retired module, a draft, and a module carrying `signoff_required` are all
+refused: a certification is proved by experience gained outside a session, so it is signed off
+rather than taught (G-112 criteria 3 and 4).
+
+### session_attendees
+As proposed: UNIQUE (session, user) with status CHECK `SIGNED_UP|CANCELLED|ATTENDED|ABSENT`,
+sign-up order is the derived waitlist; the register opens on the day, marks must cover it
+exactly, and delivery is a single-winner conditional write (G-105, G-115, G-116).
 
 Validity is derived at read time, never stored; the diagram is the derivation, not a status
 column:

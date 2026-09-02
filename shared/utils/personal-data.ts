@@ -100,6 +100,17 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Training this person held. Who was competent to do what is safety history; the evidence for it and the words written about them are not.',
   },
   {
+    name: 'training_sessions',
+    column: 'trainer_id',
+    section: 'training-sessions',
+    columns: ['held_on', 'starts_at', 'ends_at', 'place', 'capacity', 'status', 'created_at'],
+    erasure: 'scrub',
+    // `trainer_id` is NOT NULL and stays pointing at the tombstoned account, so what the session
+    // was survives the person who ran it.
+    scrub: ['notes'],
+    why: 'Sessions this person ran. What training the theatre delivered is safety history; the trainer\'s notes on a night are not.',
+  },
+  {
     name: 'notification_preferences',
     column: 'user_id',
     section: 'notification-preferences',

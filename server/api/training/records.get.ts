@@ -28,5 +28,9 @@ export default defineEventHandler(async (event) => {
     }
   })
 
-  return { items, total: items.length }
+  // Derived, not stored: a certification is what makes somebody a trainer or a supervisor, and
+  // it stops being true the moment that record expires or is revoked (G-111 criteria 1 and 4).
+  const standing = await trainerStandingOf(account.id, today)
+
+  return { items, total: items.length, standing }
 })
