@@ -35,15 +35,9 @@ export async function requiresSecondFactor(event: H3Event, account: AccountRow, 
   return grants.some(grant => privileged.has(grant.role))
 }
 
-// Guards fail closed: a permission that is not held is a 403, and nothing reaches the handler.
-export async function requirePermission(event: H3Event, permission: Permission): Promise<Authority> {
-  const resolved = await authority(event)
-
-  if (!resolved.permissions.has(permission)) {
-    throw createError({ statusCode: 403, statusMessage: 'You do not have permission to do that' })
-  }
-
-  // Blocked until done, with the way out named in the refusal rather than left to be guessed.
+// Blocked until done, with the way out named in the refusal rather than left to be guessed. It
+// weighs granted roles only: standing that derives carries no second factor yet (A-112).
+export async function requireSecondFactorIfPrivileged(event: H3Event, resolved: Authority): Promise<void> {
   const grants = await liveGrants(resolved.account.id)
   if (await requiresSecondFactor(event, resolved.account, grants) && !await confirmedFactor(resolved.account.id)) {
     throw createError({
@@ -52,7 +46,17 @@ export async function requirePermission(event: H3Event, permission: Permission):
       data: { enrol: '/account/security' },
     })
   }
+}
 
+// Guards fail closed: a permission that is not held is a 403, and nothing reaches the handler.
+export async function requirePermission(event: H3Event, permission: Permission): Promise<Authority> {
+  const resolved = await authority(event)
+
+  if (!resolved.permissions.has(permission)) {
+    throw createError({ statusCode: 403, statusMessage: 'You do not have permission to do that' })
+  }
+
+  await requireSecondFactorIfPrivileged(event, resolved)
   return resolved
 }
 

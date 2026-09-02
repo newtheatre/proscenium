@@ -1,5 +1,11 @@
+import { z } from 'zod'
 import type { H3Event } from 'h3'
 import type { ZodType } from 'zod'
+
+// A query string carries text, and `z.coerce.boolean()` reads "false" as true, so a flag written
+// that way is on however it is set. Anything but a plain yes is no.
+export const yesOrNo = z.union([z.boolean(), z.enum(['true', 'false', '1', '0'])])
+  .transform(value => value === true || value === 'true' || value === '1')
 
 // Every request body and query string is validated (CONTRIBUTING). Failures are a 400 with the
 // field paths and never the offending values, which may be a password.

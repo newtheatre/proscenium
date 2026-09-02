@@ -33,6 +33,10 @@ export const PERMISSIONS = [
   'config.write',
   'rooms.read',
   'rooms.write',
+  'training.read',
+  'training.write',
+  // Appointing a department's stewards is the administrator's, not the training officer's (G-110).
+  'training.leads',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
@@ -41,11 +45,13 @@ export type Permission = (typeof PERMISSIONS)[number]
 // now would grant authority over features nobody has reviewed.
 export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   ADMIN: PERMISSIONS,
-  MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'fellowships.write', 'members.read', 'members.write', 'rooms.read', 'rooms.write'],
+  MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'fellowships.write', 'members.read', 'members.write', 'rooms.read', 'rooms.write', 'training.read', 'training.write'],
   // J-103's story is the Theatre Manager's: they are who searches the trail and records what
   // happened outside the system.
-  THEATRE_MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'members.read', 'rooms.read', 'rooms.write'],
-  TRAINING_MANAGER: ['accounts.read', 'members.read', 'rooms.read'],
+  THEATRE_MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'members.read', 'rooms.read', 'rooms.write', 'training.read'],
+  // The training officer owns the catalogue; a department's own leads edit their part of it
+  // without holding a role at all, because lead standing is an assignment (G-107, G-110).
+  TRAINING_MANAGER: ['accounts.read', 'members.read', 'rooms.read', 'training.read', 'training.write'],
   BOX_OFFICE: [],
   FOH_MANAGER: [],
   FRONT_OF_HOUSE: [],
