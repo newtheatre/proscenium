@@ -115,6 +115,10 @@ const CATALOGUE = {
   'session.scheduled': { label: 'Training session scheduled', module: 'training' },
   'record.delivery-logged': { label: 'Delivered training logged', module: 'training' },
   'request.declined': { label: 'Training request answered', module: 'training' },
+  'practice.target.created': { label: 'Practice target added', module: 'training' },
+  'practice.target.updated': { label: 'Practice target changed', module: 'training' },
+  'practice.window.opened': { label: 'Practice window opened', module: 'training' },
+  'practice.window.closed': { label: 'Practice window closed', module: 'training' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).
   'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },

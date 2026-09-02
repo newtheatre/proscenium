@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNull, not, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, lte, not, or, sql } from 'drizzle-orm'
 import { isMonthDay, londonParts } from '#shared/utils/london'
 import { previewStatement, restatableCount } from '#shared/utils/recalculation'
 import type { PreviewRow } from '#shared/utils/recalculation'
@@ -878,4 +878,58 @@ export async function resolveRequestsFor(
     told++
   }
   return told
+}
+
+export interface PracticeTargetRow {
+  key: string
+  name: string
+  description: string | null
+  windowHours: number
+  isActive: boolean
+  moduleIds: string[]
+}
+
+export async function listPracticeTargets(): Promise<PracticeTargetRow[]> {
+  const targets = await db.select({
+    key: schema.practiceTargets.key,
+    name: schema.practiceTargets.name,
+    description: schema.practiceTargets.description,
+    windowHours: schema.practiceTargets.windowHours,
+    isActive: schema.practiceTargets.isActive,
+  }).from(schema.practiceTargets).orderBy(asc(schema.practiceTargets.key))
+
+  const links = await db.select({
+    targetKey: schema.practiceTargetModules.targetKey,
+    moduleId: schema.practiceTargetModules.moduleId,
+  }).from(schema.practiceTargetModules).orderBy(asc(schema.practiceTargetModules.moduleId))
+
+  const byTarget = new Map<string, string[]>()
+  for (const row of links) byTarget.set(row.targetKey, [...(byTarget.get(row.targetKey) ?? []), row.moduleId])
+  return targets.map(target => ({ ...target, moduleIds: byTarget.get(target.key) ?? [] }))
+}
+
+// Criterion 4. Read from the table every time and never cached: the old estate served this
+// no-store, because practice access is enforced rather than advisory.
+export async function practiceOpenFor(userId: string, targetKey: string, at: number): Promise<boolean> {
+  const found = await db.select({ id: schema.practiceWindows.id })
+    .from(schema.practiceWindows)
+    .where(and(
+      eq(schema.practiceWindows.userId, userId),
+      eq(schema.practiceWindows.targetKey, targetKey),
+      isNull(schema.practiceWindows.closedAt),
+      lte(schema.practiceWindows.opensAt, at),
+      gt(schema.practiceWindows.expiresAt, at),
+    ))
+    .limit(1)
+  return found.length > 0
+}
+
+// Criterion 3. Closing lapsed windows is the only thing the sweep does; it never opens one and
+// never touches a record.
+export async function closeLapsedPractice(at: number): Promise<number> {
+  const closed = await db.update(schema.practiceWindows)
+    .set({ closedAt: at })
+    .where(and(isNull(schema.practiceWindows.closedAt), lte(schema.practiceWindows.expiresAt, at)))
+    .returning({ id: schema.practiceWindows.id })
+  return closed.length
 }

@@ -13,6 +13,7 @@ export interface SweepRun {
   final: number
   digests: number
   pruned: number
+  practiceClosed: number
   // What a disarmed run would have sent, so the report is the same shape either way.
   wouldSend: { userId: string, kind: WarningKind, moduleIds: string[] }[]
 }
@@ -60,7 +61,7 @@ export async function sweepExpiries(event: H3Event | undefined, at = new Date())
   const finalDays = await configValue(event, 'TRAINING_FINAL_WARNING_DAYS')
   const today = londonDay(at)
 
-  const run: SweepRun = { armed, window: 0, final: 0, digests: 0, pruned: 0, wouldSend: [] }
+  const run: SweepRun = { armed, window: 0, final: 0, digests: 0, pruned: 0, practiceClosed: 0, wouldSend: [] }
 
   // The final warning is the tighter window, so it is swept first: a record inside both is
   // urgent, and the two warnings are independent rather than one superseding the other.
@@ -113,6 +114,9 @@ export async function sweepExpiries(event: H3Event | undefined, at = new Date())
 
   run.digests = await sendDigests(event, at, armed)
   run.pruned = await pruneLedger(event, at)
+  // G-126 criterion 3. Closing a lapsed window is the only thing this does to practice, and it
+  // runs in both modes: a window that has expired has expired whether or not we are sending mail.
+  run.practiceClosed = await closeLapsedPractice(Math.floor(at.getTime() / 1000))
   return run
 }
 
