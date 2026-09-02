@@ -443,7 +443,9 @@ describe.skipIf(skip !== null)('the trainer screen (G-118)', () => {
 
     const view = await officerView()
     try {
-      await visit(view, `${app.baseURL}/training/manage/deliveries`, '[data-test="delivery-form"]')
+      await visit(view, `${app.baseURL}/training/manage/sessions`, '[data-test="sessions-table"]')
+      await click(view, '[data-test="log-session"]')
+      await waitFor(view, `document.querySelector('[data-test="delivery-form"]')`)
       // A server render cannot see a hydration failure, so the page is read after it is live.
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
 

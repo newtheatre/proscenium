@@ -141,12 +141,15 @@ counts for each window, `digests` and `pruned`.
 ## Logging training that was delivered off-system
 
 Teaching that happened without a scheduled session still ends in records.
-`/training/manage/deliveries` is where a trainer logs it, and it needs a current trainer
-certification rather than a role (the training officer may use it on a trainer's behalf).
+`/training/manage/sessions` is where a trainer logs it, under **Log a session**, and it needs a
+current trainer certification rather than a role (the training officer may use it on a trainer's
+behalf). Scheduling a session and logging one that already happened are the same job at two ends of
+the same day, so they share one screen.
 
 Logging one:
 
-1. Name the day it was taught, what was taught, and everybody who was there. The day cannot be in
+1. Press **Log a session**, then name the day it was taught, what was taught, and everybody who was
+   there. The day cannot be in
    the future, and you may name only modules you currently hold.
 2. Press **Show me what this creates**. The dry-run lists every record the log would write, one
    line per person per module, with the expiry each would carry. It writes nothing, and changing
