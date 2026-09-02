@@ -12,7 +12,7 @@ defineProps<{ disabled?: boolean }>()
 const field = useTemplateRef('field')
 
 // The value coming back is a calendar date from Reka's own copy of the date library, so
-// `instanceof` is false for one and discards it silently. Read the parts (0038).
+// `instanceof` is false for one and discards it silently. Read the parts (0039).
 function civilDate(next: unknown): string | undefined {
   const date = next as { year?: unknown, month?: unknown, day?: unknown } | null | undefined
   if (typeof date?.year !== 'number' || typeof date.month !== 'number' || typeof date.day !== 'number') {
