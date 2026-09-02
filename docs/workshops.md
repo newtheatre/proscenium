@@ -43,7 +43,9 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Session sign-up close | none: the old app took sign-ups until the door | 24 hours before the session starts | New setting. The session day arriving closes sign-up anyway, so this is only how much *more* notice a trainer wants; anything shorter than the gap from midnight to the start has no effect. Owner: IT Manager |
 | Session edit window | 14 days | 14 days | |
 | Register nag cadence | from day 2, weekly, stop at 60 days | unchanged | |
-| Practice window grace | 4 hours | 4 hours | Flagged as a guess in the old docs; confirm |
+| Practice window length | 4 hours, one value for everything | **per surface, set on the target** | Superseded rather than confirmed: G-126 gives each practice surface its own window length, because a till sandbox and a lighting desk are not the same amount of rehearsal. The old single grace has no equivalent setting; the number now lives on each target |
+| Expiry sweep armed | none: the old app sent from day one | **off**, armed deliberately | New setting. The sweep computes and reports what it would send until somebody turns it on, so arming it later still warns everybody who was due. Turning it on is a settings change and is audited. Owner: IT Manager |
+| Notification ledger retention | none: the old app kept everything | 24 months | New setting. The ledger holds the claims that stop a warning being sent twice, so it is evidence rather than logging; pruned in every mode, armed or not |
 
 ## Session 3: people, communications and cutover (60 minutes)
 
