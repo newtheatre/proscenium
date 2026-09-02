@@ -281,6 +281,13 @@
       "when": 1788353822336,
       "tag": "0039_lively_lord_tyger",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1788355822464,
+      "tag": "0040_spotty_demogoblin",
+      "breakpoints": true
     }
   ]
 }

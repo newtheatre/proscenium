@@ -110,6 +110,39 @@ async function record(userId: string | null, type: string, channel: Channel, sta
   })
 }
 
+// A claim on the ledger: it writes the row and the unique index refuses the second attempt, so a
+// caller that must not repeat itself never reads before writing (0006, G-125 criterion 1).
+export async function claimNotification(claim: {
+  userId: string
+  type: string
+  key: string
+  recordId?: string
+  sessionId?: string
+}): Promise<boolean> {
+  const taken = await db.insert(schema.notificationLog).values({
+    id: crypto.randomUUID().replaceAll('-', ''),
+    userId: claim.userId,
+    type: claim.type,
+    channel: 'EMAIL',
+    status: 'SENT',
+    recordId: claim.recordId,
+    sessionId: claim.sessionId,
+    claim: claim.key,
+    sentAt: Math.floor(Date.now() / 1000),
+  }).onConflictDoNothing().returning({ id: schema.notificationLog.id })
+
+  return taken.length > 0
+}
+
+// Whether a claim is already held, for a dry run that must report without taking it.
+export async function claimHeld(key: string): Promise<boolean> {
+  const found = await db.select({ id: schema.notificationLog.id })
+    .from(schema.notificationLog)
+    .where(eq(schema.notificationLog.claim, key))
+    .limit(1)
+  return found.length > 0
+}
+
 // Sends one message. Every outcome is logged, including the ones that never reach a provider,
 // so a silence is always explained somewhere.
 export async function notify(event: H3Event | undefined, notification: Notification): Promise<Status> {

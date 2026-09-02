@@ -265,6 +265,102 @@ The Nottingham New Theatre`,
     }
   },
 
+  // A nudge, never a telling-off: these go to volunteers, and expired training has not been
+  // taken away from anybody. It stops counting, which is a different and smaller thing.
+  'training-expiry-window': (context: TemplateContext): Rendered => {
+    const modules = context.modules as { id: string, name: string, expiresOn: string }[]
+    const one = modules.length === 1
+    return {
+      subject: 'A heads-up about your training',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${one ? 'A training module you hold expires before long.' : `${modules.length} training modules you hold expire before long.`}</p>
+<ul>${modules.map(module => `<li>${module.name} (${module.id}), until ${module.expiresOn}</li>`).join('')}</ul>
+<p>There is nothing to do today: ${one ? 'it' : 'they'} still count until then. Expired training does
+not disappear from your record, it just stops counting towards the things that need it.</p>
+<p><a href="${String(context.trainingUrl)}">Your training</a> shows what you hold and what you could
+do next. If there is no session that suits you, ask for the module to be taught and we will know
+there is demand for it.</p>`),
+      text: `Hello ${context.name},
+
+${one ? 'A training module you hold expires before long.' : `${modules.length} training modules you hold expire before long.`}
+
+${modules.map(module => `- ${module.name} (${module.id}), until ${module.expiresOn}`).join('\n')}
+
+There is nothing to do today: ${one ? 'it' : 'they'} still count until then. Expired training does not
+disappear from your record, it just stops counting towards the things that need it.
+
+Your training, and what you could do next:
+${String(context.trainingUrl)}
+
+If there is no session that suits you, ask for the module to be taught and we will know there is
+demand for it.
+
+The Nottingham New Theatre`,
+    }
+  },
+
+  'training-expiry-final': (context: TemplateContext): Rendered => {
+    const modules = context.modules as { id: string, name: string, expiresOn: string }[]
+    const one = modules.length === 1
+    return {
+      subject: one ? 'Your training expires soon' : 'Some of your training expires soon',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${one ? 'A training module you hold expires within the next fortnight.' : `${modules.length} training modules you hold expire within the next fortnight.`}</p>
+<ul>${modules.map(module => `<li>${module.name} (${module.id}), until ${module.expiresOn}</li>`).join('')}</ul>
+<p>${one ? 'It' : 'They'} still count until then, so nothing has changed yet.</p>
+<p><a href="${String(context.trainingUrl)}">Your training</a> has the rest, and asking for a module to
+be taught is what tells the department there is demand.</p>`),
+      text: `Hello ${context.name},
+
+${one ? 'A training module you hold expires within the next fortnight.' : `${modules.length} training modules you hold expire within the next fortnight.`}
+
+${modules.map(module => `- ${module.name} (${module.id}), until ${module.expiresOn}`).join('\n')}
+
+${one ? 'It' : 'They'} still count until then, so nothing has changed yet.
+
+Your training:
+${String(context.trainingUrl)}
+
+Asking for a module to be taught is what tells the department there is demand.
+
+The Nottingham New Theatre`,
+    }
+  },
+
+  // Sent whether or not it has anything in it: a month with no digest means the clockwork stopped,
+  // and that is the thing worth noticing (G-125 criterion 3).
+  'training-expiry-digest': (context: TemplateContext): Rendered => {
+    const expiring = context.expiring as { name: string, moduleId: string, moduleName: string, expiresOn: string }[]
+    const expired = context.expired as { name: string, moduleId: string, moduleName: string, expiresOn: string }[]
+    const nothing = expiring.length === 0 && expired.length === 0
+    const list = (rows: typeof expiring): string =>
+      rows.map(row => `<li>${row.name}: ${row.moduleName} (${row.moduleId}), ${row.expiresOn}</li>`).join('')
+    const plain = (rows: typeof expiring): string =>
+      rows.map(row => `- ${row.name}: ${row.moduleName} (${row.moduleId}), ${row.expiresOn}`).join('\n')
+
+    return {
+      subject: `Training expiry digest, ${String(context.period)}`,
+      html: layout(`<p>Hello ${context.name},</p>
+${nothing
+  ? `<p>Nothing is expiring or expired. This email still arrives every month, so that its absence
+means something is wrong with the clockwork rather than that there was nothing to say.</p>`
+  : `${expired.length > 0 ? `<p>Already expired:</p><ul>${list(expired)}</ul>` : ''}
+${expiring.length > 0 ? `<p>Expiring soon:</p><ul>${list(expiring)}</ul>` : ''}`}
+<p><a href="${String(context.trainingUrl)}">Training records</a> has the detail.</p>`),
+      text: `Hello ${context.name},
+
+${nothing
+  ? `Nothing is expiring or expired. This email still arrives every month, so that its absence means
+something is wrong with the clockwork rather than that there was nothing to say.`
+  : `${expired.length > 0 ? `Already expired:\n${plain(expired)}\n` : ''}${expiring.length > 0 ? `\nExpiring soon:\n${plain(expiring)}` : ''}`}
+
+Training records:
+${String(context.trainingUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'room-reminder': (context: TemplateContext): Rendered => {
     const bookings = context.bookings as { room: string, title: string, when: string }[]
     const one = bookings.length === 1

@@ -207,6 +207,20 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Days before expiry that the final warning is sent.',
   },
+  TRAINING_SWEEP_ARMED: {
+    // Ships disarmed: the sweep computes and reports what it would send until somebody turns it
+    // on deliberately, and turning it on is audited (G-125 criterion 4).
+    schema: z.boolean(),
+    default: false,
+    workshop: 'spaces-and-training',
+    describes: 'Whether the training expiry sweep sends what it finds, or only reports it.',
+  },
+  TRAINING_LEDGER_MONTHS: {
+    schema: z.number().int().positive().max(120),
+    default: 24,
+    workshop: 'spaces-and-training',
+    describes: 'How long a sent notification stays in the ledger before the sweep prunes it.',
+  },
   TRAINING_CARRY_OVER_DAYS: {
     // Under a year, because the carry-over rolls the boundary once: a window longer than the year
     // it carries across could not do what it says (G-123 criterion 2).
@@ -442,6 +456,9 @@ export const ENFORCED_KEYS = [
   'SIGN_IN_ATTEMPTS_PER_ACCOUNT',
   'TRAINING_CARRY_OVER_DAYS',
   'TRAINING_EXPIRY_WARNING_DAYS',
+  'TRAINING_FINAL_WARNING_DAYS',
+  'TRAINING_LEDGER_MONTHS',
+  'TRAINING_SWEEP_ARMED',
   'SIGN_IN_ATTEMPTS_PER_ADDRESS_WINDOW_MINUTES',
   'UNVERIFIED_ACCOUNT_DAYS',
   'UNVERIFIED_EXPIRY_CAP',

@@ -101,18 +101,44 @@ A 503 naming migrations means the deploy won the race. Run the migrate workflow 
 Registered in `nuxt.config.ts` and mirrored in the wrangler cron triggers; the two lists must
 agree, and `tests/unit/tasks.test.ts` fails if they drift or if a name has no handler.
 
-**Only `daily:sweeps` does work today.** The other seven are stubs that report the story they are
-waiting for, and exist so their cron trigger has something to call: a cron pointing at a missing
-handler errors on every firing.
+**`daily:sweeps` and `training:expiry-sweep` do work today.** The other six are stubs that report
+the story they are waiting for, and exist so their cron trigger has something to call: a cron
+pointing at a missing handler errors on every firing.
 
 `daily:sweeps` (04:00 London) removes lapsed rate-limit windows, lapsed MFA attempts and unclaimed
 sign-in tokens. Everything it touches is already spent by claim, so what it finds was never used.
+
+### training:expiry-sweep (06:00)
+
+Warns members before their training lapses, digests to the leads on the first of the month, and
+prunes the notification ledger. It reads training records and writes only the ledger: expiry
+happens because the calendar moved, and the sweep merely notices (G-125 criterion 5).
+
+**It ships disarmed.** With `TRAINING_SWEEP_ARMED` false it computes exactly what it would send and
+returns it as `wouldSend`, claiming nothing, so arming it later still warns everybody who was due.
+Arming it is a settings change and is audited like any other.
+
+Two warnings go out per record, and they are independent: one when it enters
+`TRAINING_EXPIRY_WARNING_DAYS` (60), one at `TRAINING_FINAL_WARNING_DAYS` (14). The gentle one
+having gone out never suppresses the urgent one. Each is claimed once per record and window in the
+ledger, so re-running the sweep, or two of them racing, sends nothing twice. Briefs are excluded
+entirely: a brief never expires, and warning about one would be inventing an obligation.
+
+Digests go on the first of the month to every department lead for their departments, and to
+administrators and the training officer for everything. **They send even when there is nothing in
+them**, because a month with no digest means the clockwork stopped, and that is the thing worth
+noticing. Somebody who is both an officer and a lead gets the wider scope, not two emails.
+
+The ledger is pruned at `TRAINING_LEDGER_MONTHS` (24) in every mode, armed or not.
+
+To run it by hand, `POST /_nitro/tasks/training:expiry-sweep`. The result reports `armed`, the
+counts for each window, `digests` and `pruned`.
 
 ## Recalculating a module's training expiries
 
 A training record's expiry is stamped the day it is earned, from the module's policy as it stood
 then. Changing that policy afterwards moves nothing: every record already awarded keeps the date
-it has. `/admin/training-recalculation` is the only way that date ever moves, and it is
+it has. `/training/manage/recalculation` is the only way that date ever moves, and it is
 administrator-only (`training.recalculate`).
 
 Running one:
