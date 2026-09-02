@@ -148,6 +148,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/training/modules.get.ts', exempt: 'reads the member-facing catalogue' },
   { route: 'server/api/admin/training/modules/[id]/prerequisites.post.ts', actions: ['prerequisite.added'] },
   { route: 'server/api/admin/training/prerequisites/[id].delete.ts', actions: ['prerequisite.removed'] },
+  {
+    route: 'server/api/admin/training/signoffs/index.post.ts',
+    actions: ['record.signed-off', 'record.signoff.unbounded'],
+  },
+  { route: 'server/api/admin/training/records/[id]/revoke.post.ts', actions: ['record.revoked'] },
 
   // Development only, and absent from a build: nuxt.config excludes both files (K-124).
   {

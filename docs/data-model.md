@@ -954,6 +954,19 @@ database. Two consequences worth stating, because both look like good practice f
 - **The table can never be rebuilt.** `ALTER TABLE ADD COLUMN` still works; a new CHECK, a new
   foreign key or a widened CHECK does not.
 
+A sign-off is the first thing that writes one (G-120). It is scoped to the module's owning
+department, refuses a future award date, refuses while any direct prerequisite is not currently
+held, and stamps `expires_on` from the module's policy as at the award date. An explicit expiry
+sets `expiry_overridden` and has to fall after the award, inside the module's own policy and
+inside the catalogue-wide cap, whichever is tighter. A null expiry means never, needs
+`training.override`, and is audited under its own action because it is break-glass.
+
+Revocation is `training.revoke` and administrator-only. It is idempotent by predicate rather
+than by a read, so two administrators racing produce one stamp and one audit entry rather than
+one refusal; the entry is written first in the batch, because the update would otherwise
+falsify the guard the entry rides on. The reason never reaches audit detail, which carries
+identifiers and never people (0011).
+
 ### module_requests
 One open request per (user, module) by partial unique; decline carries a reason shown to the
 requester (scrub).

@@ -105,6 +105,9 @@ const CATALOGUE = {
   'module.updated': { label: 'Training module changed', module: 'training' },
   'prerequisite.added': { label: 'Prerequisite added', module: 'training' },
   'prerequisite.removed': { label: 'Prerequisite removed', module: 'training' },
+  'record.signed-off': { label: 'Training signed off', module: 'training' },
+  'record.signoff.unbounded': { label: 'Signed off as never expiring', module: 'training' },
+  'record.revoked': { label: 'Training record revoked', module: 'training' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).
   'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },

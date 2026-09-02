@@ -14,6 +14,7 @@ const links = [[
   { label: 'Utilisation', icon: 'i-lucide-chart-column', to: '/admin/utilisation' },
   { label: 'Training', icon: 'i-lucide-graduation-cap', to: '/admin/training' },
   { label: 'Departments', icon: 'i-lucide-building-2', to: '/admin/departments' },
+  { label: 'Training records', icon: 'i-lucide-clipboard-check', to: '/admin/training-records' },
   { label: 'Audit trail', icon: 'i-lucide-scroll-text', to: '/admin/audit' },
   { label: 'Settings', icon: 'i-lucide-settings', to: '/admin/config' },
 ], // Development only, and absent from a build because the page it points at is (K-124).
