@@ -104,15 +104,21 @@ interface FormState {
 
 const state = reactive<FormState>(blank())
 
+// Every key, including the ones that may be absent: this is assigned over the last form's state,
+// so a field left out here keeps whatever the module before it had.
 function blank(): FormState {
   return {
     id: '',
     department: '',
     kind: 'MODULE',
     name: '',
+    description: undefined,
+    notes: undefined,
     deliveryMode: 'IN_PERSON',
     expiryMode: 'NONE',
+    expiryMonths: undefined,
     allowsExternal: false,
+    externalEvidence: undefined,
     safetyCritical: false,
     signoffRequired: false,
     grantsTrainer: false,
@@ -688,6 +694,7 @@ const columns: TableColumn<Module>[] = [
             <UButton
               color="neutral"
               variant="ghost"
+              data-test="module-cancel"
               @click="open = false"
             >
               Back

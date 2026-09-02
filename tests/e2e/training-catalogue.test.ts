@@ -580,6 +580,52 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
     )).toMatchObject({ kind: 'BRIEF', expiryMode: 'NONE', grantsTrainer: 0, allowsExternal: 0 })
   }, CASE_TIMEOUT_MS)
 
+  test('opening the add form after an edit carries nothing over from it', async () => {
+    const department = await addDepartment()
+    const id = `LEAK-${suffix()}`
+    expect((await send('POST', '/api/admin/training/modules', {
+      id,
+      department,
+      kind: 'MODULE',
+      name: 'Something with a description',
+      description: 'This text belongs to this module and to no other.',
+      notes: 'A note for the leads.',
+      expiryMode: 'MONTHS',
+      expiryMonths: 18,
+      status: 'ACTIVE',
+    })).status).toBe(200)
+
+    const view = await signedInView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage`, '[data-test="modules-table"]')
+      await click(view, `[data-test="edit-module-${id}"]`)
+      await waitFor(view, `document.querySelector('[data-test="module-description"]')`, 30_000)
+      expect(await view.evaluate<string>(
+        `document.querySelector('[data-test="module-description"]').value`,
+      )).toContain('belongs to this module')
+
+      // Close it and start a new one: the form is a fresh module, not the last one with its id
+      // rubbed out.
+      await click(view, '[data-test="module-cancel"]')
+      await waitFor(view, `!document.querySelector('[data-test="module-description"]')`, 30_000)
+      await click(view, '[data-test="add-module"]')
+      await waitFor(view, `document.querySelector('[data-test="module-id"]')`, 30_000)
+
+      for (const field of ['module-description', 'module-name']) {
+        expect(await view.evaluate<string>(
+          `document.querySelector('[data-test="${field}"]')?.value ?? ''`,
+        )).toBe('')
+      }
+      // The months field belongs to a policy this new module does not have.
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="module-months"]')`,
+      )).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('standing belongs to a certification, and the switches follow the kind', async () => {
     const department = await addDepartment()
     const view = await signedInView()

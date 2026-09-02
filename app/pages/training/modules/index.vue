@@ -107,58 +107,60 @@ const groups = computed(() => data.value.departments
       Nothing matches that.
     </p>
 
-    <section
-      v-for="group in groups"
-      :key="group.code"
-      class="mt-12"
-    >
-      <h2 class="text-sm font-semibold uppercase tracking-wide text-muted">
-        {{ group.name }}
-      </h2>
+    <div data-test="catalogue">
+      <section
+        v-for="group in groups"
+        :key="group.code"
+        class="mt-12"
+      >
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-muted">
+          {{ group.name }}
+        </h2>
 
-      <ul class="mt-4 grid gap-3 sm:grid-cols-2">
-        <li
-          v-for="module in group.modules"
-          :key="module.id"
-        >
-          <ULink
-            :to="`/training/modules/${module.id}`"
-            class="flex h-full flex-col gap-2 rounded-lg border border-default p-4 transition-colors hover:bg-elevated/50"
-            :data-test="`catalogue-module-${module.id}`"
+        <ul class="mt-4 grid gap-3 sm:grid-cols-2">
+          <li
+            v-for="module in group.modules"
+            :key="module.id"
           >
-            <span class="flex flex-wrap items-center gap-2">
-              <span class="font-mono text-xs text-muted">{{ module.id }}</span>
-              <UBadge
-                v-if="module.safetyCritical"
-                color="warning"
-                variant="subtle"
-                size="sm"
-              >
-                Safety critical
-              </UBadge>
-              <UBadge
-                v-if="module.held"
-                color="success"
-                variant="subtle"
-                size="sm"
-              >
-                You hold this
-              </UBadge>
-            </span>
-            <span class="font-semibold">{{ module.name }}</span>
-            <span
-              v-if="module.description"
-              class="line-clamp-3 text-sm text-muted"
+            <ULink
+              :to="`/training/modules/${module.id}`"
+              class="flex h-full flex-col gap-2 rounded-lg border border-default p-4 transition-colors hover:bg-elevated/50"
+              :data-test="`catalogue-module-${module.id}`"
             >
-              {{ module.description }}
-            </span>
-            <span class="mt-auto pt-1 text-xs text-muted">
-              {{ saysKind(module.kind) }} · {{ describeExpiry(module) }}
-            </span>
-          </ULink>
-        </li>
-      </ul>
-    </section>
+              <span class="flex flex-wrap items-center gap-2">
+                <span class="font-mono text-xs text-muted">{{ module.id }}</span>
+                <UBadge
+                  v-if="module.safetyCritical"
+                  color="warning"
+                  variant="subtle"
+                  size="sm"
+                >
+                  Safety critical
+                </UBadge>
+                <UBadge
+                  v-if="module.held"
+                  color="success"
+                  variant="subtle"
+                  size="sm"
+                >
+                  You hold this
+                </UBadge>
+              </span>
+              <span class="font-semibold">{{ module.name }}</span>
+              <span
+                v-if="module.description"
+                class="line-clamp-3 text-sm text-muted"
+              >
+                {{ module.description }}
+              </span>
+              <span class="mt-auto pt-1 text-xs text-muted">
+                {{ saysKind(module.kind) }} · {{ describeExpiry(module) }}
+              </span>
+            </ULink>
+          </li>
+        </ul>
+      </section>
+    </div>
 
     <p
       v-if="!data.signedIn && data.total > 0"
