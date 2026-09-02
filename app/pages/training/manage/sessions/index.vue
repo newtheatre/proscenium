@@ -338,19 +338,17 @@ const columns: TableColumn<Session>[] = [
     }, () => saysSessionStatus(row.original.status)),
   },
   {
-    id: 'register',
+    id: 'open',
     header: '',
     meta: { class: { td: 'text-right whitespace-nowrap' } },
-    cell: ({ row }) => row.original.status === 'CANCELLED'
-      ? null
-      : h(UButton, {
-          'to': `/training/sessions/${row.original.id}/register`,
-          'variant': 'ghost',
-          'size': 'sm',
-          'icon': 'i-lucide-clipboard-check',
-          'data-test': `register-${row.original.id}`,
-          'aria-label': `Take the register for ${row.original.heldOn}`,
-        }, () => 'Register'),
+    cell: ({ row }) => h(UButton, {
+      'to': `/training/manage/sessions/${row.original.id}`,
+      'variant': 'ghost',
+      'size': 'sm',
+      'icon': 'i-lucide-chevron-right',
+      'data-test': `open-${row.original.id}`,
+      'aria-label': `Open the session on ${row.original.heldOn}`,
+    }),
   },
 ]
 </script>
