@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "433dad4d-63f1-4016-8720-cf02e78eda50",
-  "prevId": "7874b415-9089-4b69-a0d5-6f960e53dd50",
+  "id": "1c2fb083-fff4-4855-b4fd-174d77f90a5b",
+  "prevId": "b41363cc-b1ec-464c-8d7a-9ec90163ac1c",
   "tables": {
     "audit_log": {
       "name": "audit_log",
@@ -723,6 +723,34 @@
           "notNull": false,
           "autoincrement": false
         },
+        "converted_to_booking_id": {
+          "name": "converted_to_booking_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "converted_from_booking_id": {
+          "name": "converted_from_booking_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "series_id": {
+          "name": "series_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "occurrence": {
+          "name": "occurrence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -745,6 +773,13 @@
           "name": "external_requests_status",
           "columns": [
             "status"
+          ],
+          "isUnique": false
+        },
+        "external_requests_series": {
+          "name": "external_requests_series",
+          "columns": [
+            "series_id"
           ],
           "isUnique": false
         },
@@ -815,6 +850,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "decided_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "external_requests_series_id_room_series_id_fk": {
+          "name": "external_requests_series_id_room_series_id_fk",
+          "tableFrom": "external_requests",
+          "tableTo": "room_series",
+          "columnsFrom": [
+            "series_id"
           ],
           "columnsTo": [
             "id"
@@ -2759,6 +2807,20 @@
           "notNull": false,
           "autoincrement": false
         },
+        "converted_to_request_id": {
+          "name": "converted_to_request_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "converted_from_request_id": {
+          "name": "converted_from_request_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -3229,6 +3291,13 @@
         },
         "head_booking_id": {
           "name": "head_booking_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "head_request_id": {
+          "name": "head_request_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
