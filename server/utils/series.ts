@@ -1,5 +1,6 @@
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
+import { LIVE_EXTERNAL } from '#shared/utils/external-requests'
 import type { Conflict } from '#shared/utils/bookings'
 import type { Occurrence, Recurrence } from '#shared/utils/series'
 import type { Failure } from '#shared/utils/booking-policy'
@@ -157,16 +158,40 @@ export async function seriesFor(id: string): Promise<SeriesRow | undefined> {
   return row
 }
 
-// The head is the earliest occurrence still standing, resolved by the statement rather than by
-// the caller. Batched with the cancel that moved it, so the two cannot interleave (C-111).
+// The head is the earliest occurrence still standing, of either kind, resolved by the statement
+// rather than by the caller. Batched with the cancel that moved it, so they cannot interleave.
 export function promoteHead(seriesId: string, now: number): ReturnType<typeof db.run> {
   const held = HOLDS_A_SLOT.map(status => sql`${status}`)
+  const live = LIVE_EXTERNAL.map(status => sql`${status}`)
+
+  // One subquery per kind, and the earlier of the two wins. Exactly one column ends up set: an
+  // occurrence we do not manage is not a booking, and a head naming both would name neither.
+  const soonestOurs = sql`
+    SELECT starts_at FROM room_bookings
+    WHERE series_id = ${seriesId} AND status IN (${sql.join(held, sql`, `)})
+    ORDER BY starts_at LIMIT 1
+  `
+  const soonestTheirs = sql`
+    SELECT starts_at FROM external_requests
+    WHERE series_id = ${seriesId} AND status IN (${sql.join(live, sql`, `)})
+    ORDER BY starts_at LIMIT 1
+  `
+
   return db.run(sql`
-    UPDATE room_series SET head_booking_id = (
-      SELECT id FROM room_bookings
-      WHERE series_id = ${seriesId} AND status IN (${sql.join(held, sql`, `)})
-      ORDER BY starts_at LIMIT 1
-    ), updated_at = ${now}
+    UPDATE room_series SET
+      head_booking_id = CASE WHEN (${soonestOurs}) IS NOT NULL
+        AND ((${soonestTheirs}) IS NULL OR (${soonestOurs}) <= (${soonestTheirs}))
+        THEN (SELECT id FROM room_bookings
+              WHERE series_id = ${seriesId} AND status IN (${sql.join(held, sql`, `)})
+              ORDER BY starts_at LIMIT 1)
+      END,
+      head_request_id = CASE WHEN (${soonestTheirs}) IS NOT NULL
+        AND ((${soonestOurs}) IS NULL OR (${soonestTheirs}) < (${soonestOurs}))
+        THEN (SELECT id FROM external_requests
+              WHERE series_id = ${seriesId} AND status IN (${sql.join(live, sql`, `)})
+              ORDER BY starts_at LIMIT 1)
+      END,
+      updated_at = ${now}
     WHERE id = ${seriesId}
   `)
 }

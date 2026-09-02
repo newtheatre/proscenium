@@ -65,9 +65,10 @@ export const roomSeries = sqliteTable('room_series', {
   clockFrom: text('clock_from').notNull(),
   clockTo: text('clock_to').notNull(),
   occurrences: integer('occurrences').notNull(),
-  // The earliest occurrence still standing. Cancelling it promotes the next in the same batch,
-  // so a series never splits (C-111 criterion 3).
+  // The earliest occurrence still standing, of either kind, promoted in the same batch as the
+  // cancel that moved it so a series never splits. One is set, never both (C-111, C-124).
   headBookingId: text('head_booking_id'),
+  headRequestId: text('head_request_id'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 }, table => [
@@ -247,10 +248,14 @@ export const externalRequests = sqliteTable('external_requests', {
   escalatedAt: integer('escalated_at'),
   convertedToBookingId: text('converted_to_booking_id'),
   convertedFromBookingId: text('converted_from_booking_id'),
+  // An occurrence keeps its place in the series whichever kind of room it ends up in (C-124).
+  seriesId: text('series_id').references(() => roomSeries.id),
+  occurrence: integer('occurrence'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 }, table => [
   index('external_requests_status').on(table.status),
+  index('external_requests_series').on(table.seriesId),
   index('external_requests_user').on(table.userId),
   check('external_requests_span', sql`${table.endsAt} > ${table.startsAt}`),
   // A closed set about process, unlike a purpose, so a CHECK is right here (0033's distinction).

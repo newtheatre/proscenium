@@ -63,12 +63,9 @@ const BOOKING_STATE: Record<string, string> = {
   BUMPED: 'Given to a higher priority',
 }
 
-// Only a request waiting on a decision moves: it holds a slot nobody is relying on yet, and a
-// confirmed booking is somebody's arrangement rather than a question.
+// Only a request waiting on a decision moves: a confirmed booking is somebody's arrangement
+// rather than a question. A series occurrence moves like any other, keeping its place (C-124).
 export function refusalToUnlist(booking: { status: string, seriesId: string | null }): string | null {
-  if (booking.seriesId) {
-    return 'That booking is part of a series, so it cannot be moved on its own yet'
-  }
   if (booking.status !== 'PENDING_APPROVAL') {
     return `That booking is ${saysBookingState(booking).toLowerCase()}, so there is nothing to move`
   }

@@ -40,11 +40,10 @@ describe('which rows may move', () => {
     expect(refusalToUnlist({ status: 'CANCELLED', seriesId: null })).not.toBeNull()
   })
 
-  // A term of rehearsals is one action, and moving one week of it silently would leave the member
-  // holding a term that no longer means what it says (C-124 makes a series able to mix).
-  test('an occurrence of a series may not, and says why', () => {
-    expect(refusalToUnlist({ status: 'PENDING_APPROVAL', seriesId: 'series-1' }))
-      .toContain('part of a series')
+  // A term may hold weeks of both kinds, so one week moving is ordinary and keeps its place
+  // rather than breaking the term up (C-124).
+  test('an occurrence of a series may too, and keeps its place', () => {
+    expect(refusalToUnlist({ status: 'PENDING_APPROVAL', seriesId: 'series-1' })).toBeNull()
   })
 
   test('an open request may be relisted, a settled one may not', () => {

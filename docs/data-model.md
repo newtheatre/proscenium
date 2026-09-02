@@ -690,6 +690,15 @@ union answers, which is why it cannot live in `room_bookings`: `room_id` is NOT 
 member-facing read of it is an `innerJoin`, so a nullable room would make an in-flight request
 silently vanish from the member's page, their feed and the queue.
 
+**A series may hold occurrences of both kinds** (C-124). `external_requests` carries `series_id`
+and `occurrence` like a booking does, so a week moved elsewhere keeps its place in the term rather
+than breaking it up. `room_series.head_booking_id` and `head_request_id` name the earliest
+occurrence still standing of either kind, and exactly one is ever set: a head naming both would
+name neither. `room_series.room_id` stays NOT NULL and keeps meaning *the room the series was
+booked in*, which is the form's default and stays true when one week moves; it is not a claim about
+every occurrence. Cancelling a term cancels both kinds, because a week left waiting on somebody
+after the term is gone is a form nobody withdraws, and it still sends one message naming the weeks.
+
 **A request moves between the two tables rather than being cancelled and re-asked** (C-123).
 Neither `status` set can gain a value: both carry a `CHECK` and both tables have cascading
 dependents, so `check:migrations` refuses the rebuild. So a move is a **supersede**, the habit the

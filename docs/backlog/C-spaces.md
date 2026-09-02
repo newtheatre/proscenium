@@ -7,8 +7,8 @@ conflict masking), while the calendar, the policy engine, blackouts, tiers and n
 new build. Equipment loans arrive in V2 as the sibling the room store always implied, gated by live
 training records because the gate and the record now share one database.
 
-Counts: 23 MVP stories (C-101 to C-123), 6 V2 stories (C-201 to C-206), 2 Later epic stubs
-(C-301, C-302). 31 total.
+Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later epic stubs
+(C-301, C-302). 32 total.
 
 ## Open questions
 
@@ -372,6 +372,21 @@ Counts: 23 MVP stories (C-101 to C-123), 6 V2 stories (C-201 to C-206), 2 Later 
   6. Title, purpose, attendee count, times and notes cross. The reason a member gave for asking outside policy does not, because the other side never asks that question.
   7. Both directions need `rooms.write`, are audited, and tell the member what happened: whether they lost their slot, and what happens next.
 - Source: the Theatre Manager, on requests that arrive naming the wrong kind of room; decision 0036 for why the two tables stay separate.
+
+## C-124: A term that mixes rooms we manage with rooms we do not
+
+- Role: Member
+- Phase: MVP
+- Story: As a member booking a term of rehearsals, I want the weeks we cannot get one of our own rooms for to be asked for elsewhere without breaking up the term, so that a series still means what it says.
+- Depends on: C-123
+- Acceptance criteria:
+  1. A series holds occurrences of both kinds. One room throughout is the default the form offers; it is not a rule the data enforces, because it is not always possible.
+  2. Moving one occurrence to a room we do not manage **keeps it in the series**, at the same occurrence number. The rest of the term is untouched.
+  3. Each occurrence asked for elsewhere carries **its own deadline** off its own date, and may sit waiting while the rest of the term is confirmed. One week unanswered does not hold up the others.
+  4. The head of a series is the earliest occurrence still standing **of either kind**, so cancelling the first week promotes the next whether it is ours or not.
+  5. Cancelling a whole series cancels every occurrence still standing of both kinds, and still sends one message naming the weeks rather than one per week.
+  6. `room_series.room_id` keeps meaning the room the series was booked in, which stays true when a week moves; it is the form's default, not a claim about every occurrence.
+- Source: the Theatre Manager, on terms where one week clashes with a production; C-123, which refuses this until it is built.
 
 ## C-201: Asset register
 

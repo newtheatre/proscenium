@@ -44,13 +44,14 @@ export function saysExternalState(request: { status: string, convertedToBookingI
 // Anything still live moves, confirmed included: a room of ours coming free is a better outcome
 // than one we were lent, and it should not need a cancellation and a fresh ask to take it.
 export function refusalToRelist(request: { status: string }): string | null {
-  if (!LIVE_STATUSES.includes(request.status as ExternalStatus)) {
+  if (!LIVE_EXTERNAL.includes(request.status as ExternalStatus)) {
     return `That request is ${saysExternalStatus(request.status).toLowerCase()}, so there is nothing to move`
   }
   return null
 }
 
-const LIVE_STATUSES: readonly ExternalStatus[] = ['REQUESTED', 'AWAITING_EXTERNAL', 'CONFIRMED']
+// Still live: waiting on somebody, or answered and standing. A series head may be one of these.
+export const LIVE_EXTERNAL: readonly ExternalStatus[] = ['REQUESTED', 'AWAITING_EXTERNAL', 'CONFIRMED']
 
 // One phrase or null, so a route and a screen refuse for the same reason in the same words.
 export function refusalToAct(request: { status: string }, verb: Verb): string | null {
