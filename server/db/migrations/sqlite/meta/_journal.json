@@ -288,6 +288,13 @@
       "when": 1788355822464,
       "tag": "0040_spotty_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1788356855889,
+      "tag": "0041_curved_domino",
+      "breakpoints": true
     }
   ]
 }

@@ -181,3 +181,25 @@ export const trainingRecords = sqliteTable('training_records', {
   // No CHECK ties revoke_reason to revoked_at: erasure must be able to clear the reason, and a
   // CHECK on an append-only table can never be dropped. The reason is mandatory at the write path.
 ])
+
+// A member asking to be taught something. A demand signal and nothing else: it confers no queue
+// position, no priority and no place in any session (G-104 criterion 5).
+export const moduleRequests = sqliteTable('module_requests', {
+  id: id(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  moduleId: text('module_id').notNull().references(() => trainingModules.id, { onDelete: 'cascade' }),
+  note: text('note'),
+  status: text('status').notNull().default('OPEN'),
+  // What the lead wrote back. The requester is shown it, so it is a reply rather than a verdict.
+  reason: text('reason'),
+  decidedBy: text('decided_by').references(() => users.id, { onDelete: 'set null' }),
+  decidedAt: integer('decided_at'),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  // Criterion 1, in the database rather than in a handler: one open request per person per
+  // module, and withdrawing frees the re-ask because a withdrawn row leaves the index.
+  uniqueIndex('module_requests_open').on(table.userId, table.moduleId).where(sql`status = 'OPEN'`),
+  index('module_requests_module_status').on(table.moduleId, table.status),
+  index('module_requests_user').on(table.userId),
+  check('module_requests_status', sql`${table.status} IN ('OPEN', 'SCHEDULED', 'DECLINED', 'WITHDRAWN')`),
+])

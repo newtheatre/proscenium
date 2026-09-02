@@ -265,6 +265,25 @@ The Nottingham New Theatre`,
     }
   },
 
+  // Asking is what put it in the diary, and saying so is the only feedback a request gives.
+  'training-request-scheduled': (context: TemplateContext): Rendered => ({
+    subject: `Being taught: ${String(context.moduleName)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>You asked to be taught ${context.moduleName} (${context.moduleId}), and it is now in the diary.
+Asking put it there, so thank you for saying.</p>
+<p>A place is not held for you: <a href="${String(context.sessionsUrl)}">the schedule</a> is where you
+take one.</p>`),
+    text: `Hello ${context.name},
+
+You asked to be taught ${context.moduleName} (${context.moduleId}), and it is now in the diary.
+Asking put it there, so thank you for saying.
+
+A place is not held for you. The schedule is where you take one:
+${String(context.sessionsUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
   // A nudge, never a telling-off: these go to volunteers, and expired training has not been
   // taken away from anybody. It stops counting, which is a different and smaller thing.
   'training-expiry-window': (context: TemplateContext): Rendered => {

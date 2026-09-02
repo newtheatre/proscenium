@@ -224,7 +224,7 @@ describe.skipIf(skip !== null)('the screen (G-101)', () => {
       // A server render cannot see a hydration failure, so the page is read after it is live.
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
       expect(await textOf(view, '[data-test="records"]')).toContain(module)
-      expect(await textOf(view, `[data-test="state-${module}"]`)).toBe('Expiring')
+      expect(await textOf(view, `[data-test="state-${module}"]`)).toBe('Renew soon')
     }
     finally {
       view.close()

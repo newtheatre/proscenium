@@ -1099,8 +1099,28 @@ bound-parameter count fixed however many records the run covers, which is what D
 `tests/integration/training-recalculation.test.ts` pins the two against each other day by day.
 
 ### module_requests
-One open request per (user, module) by partial unique; decline carries a reason shown to the
-requester (scrub).
+`id` PK · `user_id` cascade · `module_id` cascade · `note` scrub · `status` CHECK
+`OPEN|SCHEDULED|DECLINED|WITHDRAWN` · `reason` scrub · `decided_by` set null · `decided_at` ·
+`created_at`. Indexed on (`module_id`, `status`) and on `user_id`.
+
+**Partial UNIQUE (`user_id`, `module_id`) WHERE `status` = 'OPEN'.** Criterion 1 asks for a
+database constraint rather than an application read, and being partial is what makes withdrawing
+free the re-ask: an answered or withdrawn row leaves the index rather than blocking the next ask.
+The write path lets the index refuse the second one and turns that into a 409, so two asks racing
+produce one row (0006).
+
+A request is a **demand signal and nothing else**: no queue position, no priority, and no place in
+any session (criterion 5). Nothing resolves it on a timer either, so an ask nobody acts on keeps
+appearing on the board, which is the whole point of it.
+
+Both free-text columns are scrubbed on erasure and exported: `note` is what the member said about
+themselves, `reason` is what was written back to them, and a subject access request reaches both.
+The reason never reaches audit detail, which carries identifiers and never words about a person
+(0011).
+
+Opening a session for sign-up resolves every open ask for the modules it teaches and tells each
+requester once, the claim held by the notification ledger (criterion 4). A session created but not
+yet open resolves nothing, because there is nothing for a member to sign up to.
 
 ### practice_targets / practice_windows
 Targets keyed by immutable `key`; windows opened by register-open or by hand, closed by
