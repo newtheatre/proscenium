@@ -310,6 +310,32 @@ ${String(context.sessionsUrl)}
 The Nottingham New Theatre`,
   }),
 
+  'training-session-absent': (context: TemplateContext): Rendered => ({
+    subject: 'Sorry we missed you',
+    html: layout(`<p>Hello ${context.name},</p>
+<p>You were signed up for the session on ${context.heldOn} and we did not see you there, so there is
+nothing on your training record for it.</p>
+<p><strong>Nothing has been held against you and nothing has been taken away.</strong> It only means
+this module is still outstanding, so anything that needs it is still waiting on it.</p>
+<p><a href="${String(context.trainingUrl)}">Your training</a> has the rest, and if there is no date
+that suits you, ask for the module to be taught again and we will know there is demand for it.</p>
+<p>If you did come and this is wrong, tell whoever ran the session and they can put it right.</p>`),
+    text: `Hello ${context.name},
+
+You were signed up for the session on ${context.heldOn} and we did not see you there, so there is
+nothing on your training record for it.
+
+Nothing has been held against you and nothing has been taken away. It only means this module is
+still outstanding, so anything that needs it is still waiting on it.
+
+Your training, and asking for a module to be taught again:
+${String(context.trainingUrl)}
+
+If you did come and this is wrong, tell whoever ran the session and they can put it right.
+
+The Nottingham New Theatre`,
+  }),
+
   'training-register-unmarked': (context: TemplateContext): Rendered => ({
     subject: `The register from ${String(context.heldOn)} is still unmarked`,
     html: layout(`<p>Hello ${context.name},</p>

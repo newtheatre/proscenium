@@ -153,6 +153,17 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/training/requests/[id].delete.ts', exempt: 'withdraws your own ask' },
   { route: 'server/api/admin/training/requests/index.get.ts', exempt: 'reads the demand board' },
   { route: 'server/api/admin/training/requests/[id]/decline.post.ts', actions: ['request.declined'] },
+  { route: 'server/api/admin/training/sessions/[id]/register.get.ts', exempt: 'reads the register a trainer is about to mark' },
+  { route: 'server/api/admin/training/sessions/[id]/open-register.post.ts', actions: ['register.opened'] },
+  {
+    route: 'server/api/admin/training/sessions/[id]/mark.post.ts',
+    actions: ['register.marked'],
+    via: ['server/utils/training-register.ts'],
+  },
+  {
+    route: 'server/api/admin/training/sessions/[id]/modules.put.ts',
+    actions: ['session.modules.changed', 'register.freeze.released'],
+  },
   { route: 'server/api/admin/training/practice-targets/index.get.ts', exempt: 'reads the practice surfaces' },
   { route: 'server/api/admin/training/practice-targets/index.post.ts', actions: ['practice.target.created'] },
   { route: 'server/api/admin/training/practice-targets/[key].put.ts', actions: ['practice.target.updated'] },

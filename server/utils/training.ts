@@ -933,3 +933,40 @@ export async function closeLapsedPractice(at: number): Promise<number> {
     .returning({ id: schema.practiceWindows.id })
   return closed.length
 }
+
+// G-115 criterion 3, and the old estate's duplicate-window bug. One window per placed member per
+// matching active target, and the partial unique index is what makes a second attempt a no-op.
+export async function openPracticeWindowsFor(
+  sessionId: string,
+  openedBy: string,
+  at: number,
+): Promise<number> {
+  const targets = await db.all<{ key: string, windowHours: number }>(sql`
+    select distinct t.key as key, t.window_hours as windowHours
+    from practice_targets t
+    join practice_target_modules m on m.target_key = t.key
+    join session_modules sm on sm.module_id = m.module_id
+    where sm.session_id = ${sessionId} and t.is_active = 1
+  `)
+  if (targets.length === 0) return 0
+
+  const { placed } = await placesOnSession(sessionId)
+  if (placed.length === 0) return 0
+
+  // One insert per target, each covering every placed member, so the statement count follows the
+  // targets rather than the room: the people go in as one JSON parameter (0003).
+  let opened = 0
+  for (const target of targets) {
+    const written = await db.all<{ id: string }>(sql`
+      insert into practice_windows (id, target_key, user_id, session_id, opens_at, expires_at, opened_by)
+      select lower(hex(randomblob(16))), ${target.key}, value, ${sessionId}, ${at},
+        ${at + target.windowHours * 3600}, ${openedBy}
+      from json_each(${JSON.stringify(placed.map(place => place.userId))})
+      where true
+      on conflict do nothing
+      returning id
+    `)
+    opened += written.length
+  }
+  return opened
+}

@@ -996,6 +996,37 @@ than teaching it. A retired module, a draft, and a module carrying `signoff_requ
 refused: a certification is proved by experience gained outside a session, so it is signed off
 rather than taught (G-112 criteria 3 and 4).
 
+### The register: opening it, and marking it
+
+`training_sessions` carries four stamps: `register_opened_at` / `register_opened_by` and
+`marked_at` / `marked_by`. Both are written **once, by a conditional write**, and both are what
+their respective races turn on.
+
+**Opening** is stamped `WHERE register_opened_at IS NULL`, so two devices opening the same register
+produce one open register: the loser's update matches nothing and it opens no practice windows
+(G-115 criterion 4). Opening closes sign-up, freezes what the session teaches, and opens one
+practice window per placed member per matching active target.
+
+**The freeze is releasable by the session's own trainer while no marks exist** (open question 6,
+answered 2 September). The release is conditional on `marked_at IS NULL`, so a release racing a
+submission cannot change what a mark is about to award.
+
+**Marking is the single act that awards.** Everything it does is one `db.batch`: the stamp, the
+attendee marks, the records, and the audit entry. Every statement after the stamp is guarded on
+**the stamp being ours** (`marked_at = ? AND marked_by = ?`) rather than on the register being
+unmarked, because the batch's own first statement marks it and an unmarked predicate would refuse
+the rest of its own batch. The loser of a race writes nothing rather than half an award set, and
+takes a 409.
+
+Records are dated to the session's **held-on day, never the day the register was marked**, so a
+register marked three weeks late still awards correctly. Records go in through `json_each` chunked
+at twelve rows of seven columns, so eighty-four parameters is the ceiling however many people were
+in the room (0003).
+
+An **absent** mark produces no record of any kind and sends one email saying so, claimed in the
+ledger so it goes once. The copy makes clear that nothing has been held against anybody: the module
+is simply still outstanding.
+
 ### session_attendees
 `id` PK · `session_id` cascade · `user_id` cascade · `status` CHECK
 `SIGNED_UP|CANCELLED|ATTENDED|ABSENT` default `SIGNED_UP` · `source` CHECK `SIGNUP|WALK_IN`
@@ -1256,6 +1287,12 @@ racing send one message between them (0006). The index is partial on `claim IS N
 everything with nothing to claim, which is most messages, writes freely. `claimNotification()` and
 `claimHeld()` in `server/utils/notify.ts` are the only things that touch it: the notification centre
 owns the ledger for the same reason it owns sending (0013).
+
+**A claimed message writes two rows, not one.** The claim is inserted first and `notify()` then
+records its own outcome, so counting how many messages of a type reached somebody double-counts
+unless the query says `claim IS NOT NULL` (or `IS NULL`, depending which it wants). Both rows are
+correct and both are wanted: one is the promise not to send again, the other is what happened when
+we tried. It is written down here because it has cost two people an hour.
 
 The refs carry **no foreign key**. The ledger outlives what it refers to, and a message sent is a
 fact about the past that deleting a record must not rewrite. `user_id` is the exception and is
