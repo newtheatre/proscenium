@@ -116,6 +116,7 @@ const CATALOGUE = {
   'session.capacity.changed': { label: 'Training session capacity changed', module: 'training' },
   'request.declined': { label: 'Training request answered', module: 'training' },
   'register.opened': { label: 'Register opened', module: 'training' },
+  'session.attendee.added': { label: 'Added to a register', module: 'training' },
   'register.marked': { label: 'Register marked', module: 'training' },
   'register.freeze.released': { label: 'Register module freeze released', module: 'training' },
   'session.modules.changed': { label: 'Session modules changed', module: 'training' },
