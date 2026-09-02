@@ -207,7 +207,7 @@ export const CONFIG_KEYS = {
     // Shape only: which MM-DD values are real days is config-rules' DAY_OF_YEAR_KEYS, whose
     // refusal names the rule rather than the key (G-123 criterion 5, J-104 criterion 3).
     schema: z.string().regex(/^\d{2}-\d{2}$/),
-    default: '08-31',
+    default: '09-30',
     workshop: 'spaces-and-training',
     describes: 'Month and day the academic year turns over, London. Distinct from the season boundary.',
   },
