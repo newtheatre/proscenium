@@ -138,7 +138,7 @@ counts for each window, `digests` and `pruned`.
 
 A training record's expiry is stamped the day it is earned, from the module's policy as it stood
 then. Changing that policy afterwards moves nothing: every record already awarded keeps the date
-it has. `/admin/training-recalculation` is the only way that date ever moves, and it is
+it has. `/training/manage/recalculation` is the only way that date ever moves, and it is
 administrator-only (`training.recalculate`).
 
 Running one:

@@ -149,7 +149,7 @@ async function sendDigests(event: H3Event | undefined, at: Date, armed: boolean)
         period,
         expiring: lines.filter(line => line.state === 'EXPIRING'),
         expired: lines.filter(line => line.state === 'EXPIRED'),
-        trainingUrl: `${useRuntimeConfig(event).public.baseURL}/admin/training-records`,
+        trainingUrl: `${useRuntimeConfig(event).public.baseURL}/training/manage/records`,
       },
     })
     sent++
