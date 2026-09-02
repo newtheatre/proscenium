@@ -29,6 +29,8 @@ export default defineEventHandler(async (event) => {
     seriesLength: schema.roomSeries.occurrences,
     bumpedReason: schema.roomBookings.bumpedReason,
     bumpedToBookingId: schema.roomBookings.bumpedToBookingId,
+    // A cancellation carrying this was moved, not withdrawn, and must not read as cancelled.
+    convertedToRequestId: schema.roomBookings.convertedToRequestId,
   })
     .from(schema.roomBookings)
     .innerJoin(schema.rooms, eq(schema.rooms.id, schema.roomBookings.roomId))

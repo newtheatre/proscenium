@@ -99,6 +99,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/rooms/bookings.post.ts', actions: ['room.booked'] },
   { route: 'server/api/admin/rooms/index.get.ts', exempt: 'reads the bookable estate' },
   { route: 'server/api/admin/rooms/queue.get.ts', exempt: 'reads what is waiting on a decision, ours and not' },
+  { route: 'server/api/admin/rooms/requests/[id]/unlist.post.ts', actions: ['room.request.unlisted'] },
+  { route: 'server/api/admin/rooms/external-requests/[id]/relist.post.ts', actions: ['external.request.relisted'] },
   {
     route: 'server/api/admin/rooms/requests/decide.post.ts',
     actions: ['room.request.approved', 'room.request.rejected'],

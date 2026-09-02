@@ -96,6 +96,8 @@ const CATALOGUE = {
   'external.request.assignment.refused': { label: 'Other room refused as unsuitable', module: 'spaces' },
   'external.request.rejected': { label: 'Other room request turned down', module: 'spaces' },
   'external.request.cancelled': { label: 'Other room request withdrawn', module: 'spaces', self: true },
+  'room.request.unlisted': { label: 'Request moved to a room we do not manage', module: 'spaces' },
+  'external.request.relisted': { label: 'Request moved into one of our rooms', module: 'spaces' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).
   'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },

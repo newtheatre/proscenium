@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { BULK_LIMIT, REJECTION_REASON_LIMIT } from '#shared/utils/approvals'
-import { describePurpose } from '#shared/utils/bookings'
-import { EXTERNAL_REASON_LIMIT, saysExternalStatus } from '#shared/utils/external-requests'
+import { describePurpose, saysBookingState } from '#shared/utils/bookings'
+import { EXTERNAL_REASON_LIMIT, saysExternalState, saysExternalStatus } from '#shared/utils/external-requests'
 import { saysVerdict } from '#shared/utils/external-spaces'
 import { formatLondon } from '#shared/utils/london'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
@@ -47,6 +47,8 @@ interface Request {
   suReference?: string | null
   notes?: string | null
   formDueBy?: string | null
+  convertedToRequestId?: string | null
+  convertedToBookingId?: string | null
   offers?: Offer[]
 }
 
@@ -91,6 +93,37 @@ const refusalReason = ref('')
 const noteToo = ref(true)
 const noteVerdict = ref<'CAUTION' | 'UNSUITABLE'>('UNSUITABLE')
 const unlistedRejectReason = ref('')
+
+// Moving a request to the other kind (C-123). One reason field, because the member is shown it
+// either way, and the direction is whichever row the officer started from.
+const unlisting = ref<Request | null>(null)
+const relisting = ref<Request | null>(null)
+const moveReason = ref('')
+const moveRoom = ref('')
+
+async function unlist(): Promise<void> {
+  const one = unlisting.value
+  if (!one) return
+  if (await act(`/api/admin/rooms/requests/${one.id}/unlist`, { reason: moveReason.value }, 'Moved, and the slot freed')) {
+    unlisting.value = null
+  }
+}
+
+async function relist(): Promise<void> {
+  const one = relisting.value
+  if (!one || !moveRoom.value) return
+  if (await act(`/api/admin/rooms/external-requests/${one.id}/relist`, { roomId: moveRoom.value, reason: moveReason.value }, 'Moved into one of ours')) {
+    relisting.value = null
+  }
+}
+
+function beginMove(which: 'unlist' | 'relist', one: Request): void {
+  inModal.value = null
+  moveReason.value = ''
+  moveRoom.value = ''
+  if (which === 'unlist') unlisting.value = one
+  else relisting.value = one
+}
 
 async function act(path: string, body: Record<string, unknown>, said: string): Promise<boolean> {
   acting.value = true
@@ -413,6 +446,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
             row.original.status === 'REQUESTED' || row.original.status === 'AWAITING_EXTERNAL'
               ? h(UButton, { 'size': 'sm', 'color': 'error', 'variant': 'ghost', 'data-test': `turn-down-${row.original.id}`, 'onClick': () => begin('reject', row.original) }, () => 'Turn down')
               : null,
+            h(UButton, { 'size': 'sm', 'color': 'neutral', 'variant': 'ghost', 'data-test': `relist-${row.original.id}`, 'onClick': () => beginMove('relist', row.original) }, () => 'Use one of ours'),
           ]
         : [
             h(UButton, {
@@ -438,17 +472,28 @@ const columns = computed<TableColumn<Request>[]>(() => [
               'data-test': `reject-${row.original.id}`,
               'onClick': () => askToReject([row.original.id]),
             }, () => 'Reject'),
+            h(UButton, {
+              'size': 'sm',
+              'color': 'neutral',
+              'variant': 'ghost',
+              'data-test': `unlist-${row.original.id}`,
+              'onClick': () => beginMove('unlist', row.original),
+            }, () => 'Not one of ours'),
           ]),
     } satisfies TableColumn<Request>]
     : [{
       id: 'outcome',
       header: 'Answer',
+      // A moved row is CANCELLED carrying a pointer, and "Not approved" would be the opposite of
+      // what happened to it (C-123 criterion 5).
       cell: ({ row }) => h('div', {}, [
         h(UBadge, {
           color: row.original.status === 'CONFIRMED' ? 'success' : 'neutral',
           variant: 'subtle',
           size: 'sm',
-        }, () => row.original.status === 'CONFIRMED' ? 'Approved' : 'Not approved'),
+        }, () => (row.original.kind === 'unlisted'
+          ? saysExternalState(row.original)
+          : saysBookingState(row.original))),
         row.original.rejectionReason ? h('p', { class: 'mt-1 text-sm text-muted' }, row.original.rejectionReason) : null,
       ]),
     } satisfies TableColumn<Request>]),
@@ -895,6 +940,107 @@ onMounted(async () => {
           color="neutral"
           variant="ghost"
           @click="unlistedRejecting = null"
+        >
+          Back
+        </UButton>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="unlisting !== null"
+      title="Ask for a room not listed here instead"
+      description="The slot this is holding is freed straight away, and nothing is held until whoever manages the new room answers."
+      @update:open="unlisting = null"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UAlert
+            v-if="inModal"
+            color="error"
+            variant="subtle"
+            :description="inModal"
+          />
+          <UFormField
+            label="Why"
+            :hint="`${moveReason.length}/${REJECTION_REASON_LIMIT}`"
+          >
+            <UTextarea
+              v-model="moveReason"
+              :maxlength="REJECTION_REASON_LIMIT"
+              class="w-full"
+              data-test="unlist-reason"
+            />
+          </UFormField>
+        </div>
+      </template>
+      <template #footer>
+        <UButton
+          :loading="acting"
+          :disabled="!moveReason.trim()"
+          data-test="unlist-confirm"
+          @click="unlist"
+        >
+          Move it, and free the slot
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="unlisting = null"
+        >
+          Back
+        </UButton>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="relisting !== null"
+      title="Use one of our rooms instead"
+      description="This claims the room straight away, so it can fail if somebody else holds it for that span."
+      @update:open="relisting = null"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UAlert
+            v-if="inModal"
+            color="error"
+            variant="subtle"
+            :description="inModal"
+          />
+          <UFormField label="Room">
+            <USelect
+              v-model="moveRoom"
+              :items="roomOptions.filter(one => one.value !== EVERY_ROOM)"
+              value-key="value"
+              class="w-full"
+              data-test="relist-room"
+            />
+          </UFormField>
+          <UFormField
+            label="Why"
+            :hint="`${moveReason.length}/${REJECTION_REASON_LIMIT}`"
+          >
+            <UTextarea
+              v-model="moveReason"
+              :maxlength="REJECTION_REASON_LIMIT"
+              class="w-full"
+              data-test="relist-reason"
+            />
+          </UFormField>
+        </div>
+      </template>
+      <template #footer>
+        <UButton
+          :loading="acting"
+          :disabled="!moveRoom || !moveReason.trim()"
+          data-test="relist-confirm"
+          @click="relist"
+        >
+          Move it into that room
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="relisting = null"
         >
           Back
         </UButton>

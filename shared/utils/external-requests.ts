@@ -35,6 +35,23 @@ export function saysExternalStatus(status: string): string {
   return status
 }
 
+// A cancellation carrying a conversion pointer was moved rather than withdrawn (C-123).
+export function saysExternalState(request: { status: string, convertedToBookingId?: string | null }): string {
+  if (request.status === 'CANCELLED' && request.convertedToBookingId) return 'Moved to one of our rooms'
+  return saysExternalStatus(request.status)
+}
+
+// Anything still live moves, confirmed included: a room of ours coming free is a better outcome
+// than one we were lent, and it should not need a cancellation and a fresh ask to take it.
+export function refusalToRelist(request: { status: string }): string | null {
+  if (!LIVE_STATUSES.includes(request.status as ExternalStatus)) {
+    return `That request is ${saysExternalStatus(request.status).toLowerCase()}, so there is nothing to move`
+  }
+  return null
+}
+
+const LIVE_STATUSES: readonly ExternalStatus[] = ['REQUESTED', 'AWAITING_EXTERNAL', 'CONFIRMED']
+
 // One phrase or null, so a route and a screen refuse for the same reason in the same words.
 export function refusalToAct(request: { status: string }, verb: Verb): string | null {
   if (ALLOWED[verb].includes(request.status as ExternalStatus)) return null

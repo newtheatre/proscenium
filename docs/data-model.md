@@ -690,6 +690,23 @@ union answers, which is why it cannot live in `room_bookings`: `room_id` is NOT 
 member-facing read of it is an `innerJoin`, so a nullable room would make an in-flight request
 silently vanish from the member's page, their feed and the queue.
 
+**A request moves between the two tables rather than being cancelled and re-asked** (C-123).
+Neither `status` set can gain a value: both carry a `CHECK` and both tables have cascading
+dependents, so `check:migrations` refuses the rebuild. So a move is a **supersede**, the habit the
+rest of the estate already has: the old row goes to `CANCELLED` carrying `converted_to_request_id`
+or `converted_to_booking_id`, and the new row points back the other way. **A cancellation carrying
+one of those pointers must never display as "Cancelled"**: `saysBookingState` and
+`saysExternalState` exist for that, and a member seeing a live request marked withdrawn is the
+defect they prevent.
+
+The two directions are not symmetric. Unlisting **frees** the slot the request was holding and
+always succeeds, but is refused when there is no longer time to ask, naming the date the form would
+have had to go in by. Relisting **claims** a slot, so it is `claimSlot` with the predicate on the
+INSERT, it refuses naming the room when somebody else has it, and it lands `CONFIRMED` or
+`PENDING_APPROVAL` according to the policy: choosing the room is not a licence to skip the rules.
+Title, purpose, attendees, times and notes cross; the member's `reason` does not, because it
+answers a question the other side never asks.
+
 **The screens never say "the union", and never "ask the union".** A member books *a room not
 listed here*; the estate calls these *rooms we do not manage*. The Students' Union is named only
 where a person needs to know whose form it is and who decides. The identifiers keep `external`,

@@ -151,6 +151,9 @@ export const MESSAGE_TYPES = {
   'external.request.rejected': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-rejected' },
   'external.request.withdrawn': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-withdrawn' },
   'external.request.waiting': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-waiting' },
+  // A move changes what the member holds, so both directions say whether the slot went (C-123).
+  'room.request.unlisted': { topic: 'ROOMS', channels: ['EMAIL'], template: 'request-unlisted' },
+  'external.request.relisted': { topic: 'ROOMS', channels: ['EMAIL'], template: 'request-relisted' },
   // Security, so no topic can suppress it, and no reachesUnverified (A-102 criterion 2).
   'account.method-removed': {
     topic: null,
