@@ -22,6 +22,9 @@ interface Item {
 
 const model = defineModel<string | undefined>()
 
+// The name as well as the id, for a screen building a list of people rather than holding one.
+const emit = defineEmits<{ chosen: [{ id: string, name: string } | null] }>()
+
 const props = withDefaults(defineProps<{
   placeholder?: string
   disabled?: boolean
@@ -69,6 +72,7 @@ const shown = computed<Item[]>(() =>
 function choose(item: Item | undefined): void {
   chosen.value = item ?? null
   model.value = item?.value
+  emit('chosen', item ? { id: item.value, name: item.label } : null)
 }
 
 // A form that resets its state clears the name too, rather than showing the last person picked.

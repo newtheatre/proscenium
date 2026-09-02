@@ -1,4 +1,3 @@
-import { inArray } from 'drizzle-orm'
 import { sessionForm } from '#shared/utils/training'
 
 // Schedule a session. Standing to run one is derived from a current trainer certification, and
@@ -16,41 +15,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const taught = await db.select({
-    id: schema.trainingModules.id,
-    name: schema.trainingModules.name,
-    status: schema.trainingModules.status,
-    kind: schema.trainingModules.kind,
-    signoffRequired: schema.trainingModules.signoffRequired,
-  }).from(schema.trainingModules).where(inArray(schema.trainingModules.id, input.moduleIds))
-
-  const missing = input.moduleIds.filter(id => !taught.some(module => module.id === id))
-  if (missing.length > 0) {
-    throw createError({ statusCode: 404, statusMessage: `No such module: ${missing.join(', ')}` })
-  }
-
-  // Criteria 3 and 4. A retired module takes nothing new, a draft is not a thing to teach yet, and
-  // a sign-off-only module is proved by experience rather than by sitting in a room.
-  const refused = taught.filter(module => module.status !== 'ACTIVE' || module.signoffRequired)
-  if (refused.length > 0) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: `Cannot be taught by session: ${refused.map(module => `${module.id} ${module.name}`).join(', ')}`,
-    })
-  }
-
-  // Question 4's answer: a trainer teaches what they hold. The training officer is exempt, because
-  // they schedule on somebody's behalf rather than teaching it themselves.
-  if (!resolved.permissions.has('training.write')) {
-    const held = await modulesHeldBy(resolved.account.id, today)
-    const unheld = taught.filter(module => !held.has(module.id))
-    if (unheld.length > 0) {
-      throw createError({
-        statusCode: 422,
-        statusMessage: `You do not hold: ${unheld.map(module => `${module.id} ${module.name}`).join(', ')}`,
-      })
-    }
-  }
+  // Criteria 3 and 4, and question 4's answer. Shared with the retrospective log, which refuses
+  // the same modules for the same reasons (G-118).
+  await assertTeachable(resolved, input.moduleIds, today)
 
   const id = newId()
   await db.batch([

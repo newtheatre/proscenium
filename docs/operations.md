@@ -134,6 +134,38 @@ The ledger is pruned at `TRAINING_LEDGER_MONTHS` (24) in every mode, armed or no
 To run it by hand, `POST /_nitro/tasks/training:expiry-sweep`. The result reports `armed`, the
 counts for each window, `digests` and `pruned`.
 
+## Logging training that was delivered off-system
+
+Teaching that happened without a scheduled session still ends in records.
+`/training/manage/deliveries` is where a trainer logs it, and it needs a current trainer
+certification rather than a role (the training officer may use it on a trainer's behalf).
+
+Logging one:
+
+1. Name the day it was taught, what was taught, and everybody who was there. The day cannot be in
+   the future, and you may name only modules you currently hold.
+2. Press **Show me what this creates**. The dry-run lists every record the log would write, one
+   line per person per module, with the expiry each would carry. It writes nothing, and changing
+   anything on the form puts it back so the preview always matches what would happen.
+3. Clear whatever it reports. A missing prerequisite for a **safety-critical** module stops the log
+   outright: teach or sign off the prerequisite first, there is no way to wave it through. A
+   missing prerequisite for an ordinary module shows a tick box per gap, and each has to be ticked.
+4. Press **Log it**. Every record lands in one batch, dated to the day it was taught.
+
+What it refuses:
+
+- **A day in the future**: an award dated ahead would read as valid at every gate until then.
+- **A retired, draft or sign-off-only module**, and any module you do not hold yourself.
+- **A safety-critical prerequisite gap**, absolutely.
+- **An unacknowledged ordinary gap**, naming what is missing.
+- **A count that no longer matches the dry-run**: a 409 quoting both figures. Logging the same
+  evening twice hits this, because the second attempt would create nothing.
+
+Records already dated to that day for the same person and module are shown as already recorded and
+are not written again. Correction is revocation with a reason and then a fresh log; nothing here
+edits a record, because the table is append-only. Every attendee gets one `record.delivery-logged`
+audit entry naming the day and the modules, and no person is named in the detail.
+
 ## Recalculating a module's training expiries
 
 A training record's expiry is stamped the day it is earned, from the module's policy as it stood

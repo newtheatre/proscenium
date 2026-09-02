@@ -1065,6 +1065,43 @@ Three things are its own:
 a certificate we recorded never reads as one we assessed (criterion 4). There is no break-glass
 "never expires" here: the form has no shape that means it.
 
+A **retrospective delivery log** (G-118) is the third, at `POST /api/admin/training/deliveries`,
+with its dry-run at `POST /api/admin/training/deliveries/preview`. It writes one record per
+attendee per module, `source` `SESSION`, dated to the day it was taught.
+
+**It writes no `training_sessions` row, and its records leave `session_id` null.** A session row
+carries a capacity, a wall clock and a register, and a delivery logged after the fact has none of
+those to record honestly; G-118 depends on G-107 and G-111 rather than on G-112, and correction is
+revocation plus a fresh log (G-122) rather than G-114's edit window, which belongs to a marked
+register. The partial unique index therefore does not cover these rows, so the same log submitted
+twice is stopped by the count check below instead.
+
+What it refuses, and what it asks:
+
+- **A day in the future**, the same refusal a sign-off makes.
+- **A module that cannot be taught**: retired, draft or `signoff_required`, and a module the
+  trainer does not currently hold. Identical to scheduling a session, and shared with it
+  (`assertTeachable`); the holder of `training.write` is exempt from the last.
+- **A safety-critical module's prerequisite gap blocks absolutely.** There is no acknowledgement
+  parameter and no override: a gap in `safety_critical` refuses the whole log, naming what is
+  missing.
+- **An ordinary module's prerequisite gap needs an explicit acknowledgement per gap**, keyed
+  `userId:moduleId:requiresId`, so a tick cannot travel to another person or module. The rule that
+  decides which of the two a gap is lives in `shared/utils/training.ts` (`prerequisiteGaps`) and
+  is shared with sign-up (G-105) and walk-ins (G-117).
+- **A prerequisite taught by the same log is not a gap**, because the same batch awards it at the
+  same date.
+- **The count seen at the dry-run is sent back and checked again at the write.** A mismatch is a
+  409 quoting both figures, which is also what stops a double submission: the second attempt would
+  create nothing, because an unrevoked award already dated to that day for that person and module
+  is the same award.
+
+The dry-run and the write compute the same plan from one function (`planDelivery`), so the preview
+can never disagree with the result (criterion 5). The whole log is one `db.batch`, and the record
+inserts are chunked at `DELIVERY_RECORDS_PER_STATEMENT` rows so no statement's bound-parameter
+count grows with the number of people taught (0003). Every attendee gets one
+`record.delivery-logged` audit entry in the same batch, naming the modules and the day.
+
 Revocation is `training.revoke`, held by the administrator and the training officer (question 8).
 It is idempotent by predicate rather than by a read, so two officers racing produce one stamp and
 one audit entry rather than one refusal; the entry is written first in the batch, because the
