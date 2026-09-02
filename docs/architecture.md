@@ -164,7 +164,7 @@ waiting for and do nothing else; only `daily:sweeps` does work today.
 | `*/10 * * * *` | `holds:release` | Releases expired reservation holds, cascades waiting-list offers, sends pre-expiry reminders. The one task that changes booking state, and only ever in the direction the customer was warned about. |
 | `0 6 * * *` | `training:expiry-sweep` | Expiry warnings and digests (dry-run gated). |
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |
-| `0 9 * * *` | `sessions:sweep` | Session reminders, unmarked-register nags, lapsed practice windows. |
+| `0 9 * * *` | `sessions:sweep` | Session reminders and unmarked-register nags (G-119, not yet built). |
 | `0 10 * * *` | `shifts:remind` | Tomorrow's rota with calendar attachments. |
 | `0 17 * * *` | `rooms:remind` | Tomorrow's room bookings, one message per member however many they hold, with the calendar file attached (C-113). Idempotent: a second run the same London day sends nothing, read from `notification_log` rather than a column. |
 | `12 0 * * *` | `nights:close` | Auto-closes unsigned night reports inside 24 hours, retries unsent report emails. |

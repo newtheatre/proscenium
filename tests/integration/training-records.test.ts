@@ -2,8 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
-// A record on the real migrations. Append-only admits three named edits and refuses everything
-// else, so each disjunct of the trigger is exercised in both directions (0010, 0011, G-122, G-124).
+// A record on the real migrations. Append-only admits two named edits and refuses everything
+// else, so each disjunct of the trigger is exercised in both directions (0010, 0011, G-122, 0041).
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()
@@ -51,6 +51,7 @@ describe('the award itself is frozen (0010)', () => {
     `user_id = 'u2'`,
     `module_id = 'TECH-111x'`,
     `awarded_on = '2026-01-01'`,
+    `expires_on = '2028-09-14'`,
     `source = 'EXTERNAL'`,
     `session_id = 's1'`,
     `granted_by = 'u1'`,
@@ -162,17 +163,15 @@ describe('erasure reaches the free text through the guard (0011, G-122 criterion
   })
 })
 
-describe('an expiry is restated only where recalculation may (G-124 criteria 1 and 4)', () => {
-  test('a live record on the module policy can be restated', async () => {
+describe('a stamped expiry never moves (0041)', () => {
+  test('a live record on the module policy is refused', async () => {
     await withDatabase((database) => {
       seed(database, { expires_on: '2027-09-14' })
-      database.batch([set(`expires_on = '2028-09-14'`)])
-      expect(rows<{ expires: string }>(database, `SELECT expires_on expires FROM training_records`)[0]?.expires)
-        .toBe('2028-09-14')
+      expect(() => database.batch([set(`expires_on = '2028-09-14'`)])).toThrow(/append-only/i)
     })
   })
 
-  test('an overridden expiry is refused, because recalculation skips it', async () => {
+  test('an overridden expiry is refused', async () => {
     await withDatabase((database) => {
       seed(database, { expires_on: '2027-09-14', expiry_overridden: 1 })
       expect(() => database.batch([set(`expires_on = '2028-09-14'`)])).toThrow(/append-only/i)
@@ -256,8 +255,8 @@ describe('an external certificate is a record like any other (G-121 criterion 5)
     })
   })
 
-  // Its term is the issuing body's, so recalculation has nothing to say about it (G-124 c4).
-  test('its expiry cannot be restated, because it is overridden', async () => {
+  // Its term is the issuing body's, and a stamped expiry never moves anyway (0041).
+  test('its expiry cannot be restated', async () => {
     await withDatabase((database) => {
       seed(database)
       award(database, external)

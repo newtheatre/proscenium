@@ -112,8 +112,8 @@ export function academicYearEnd(awardedOn: string, year: AcademicYear): string {
   return ends
 }
 
-// What a record earned today would expire on. Stamped at award and never recomputed by a later
-// policy change; G-124's previewed recalculation is the only retroactive path (G-123 criterion 3).
+// What a record earned today would expire on. Stamped at award, and nothing ever moves it: a
+// lifetime is fixed the day it is earned (G-123 criterion 3, 0041).
 export function expiryFor(policy: ExpiryPolicy, awardedOn: string, year: AcademicYear): string | null {
   switch (policy.expiryMode) {
     case 'NONE': return null
@@ -405,15 +405,6 @@ export const revokeForm = z.object({
   reason: z.string().trim().min(1).max(REVOKE_REASON_LIMIT),
 })
 
-// The one retroactive path to a stamped expiry, and the only mechanism that may take it
-// (G-124 criterion 1). The count is typed back from the preview and checked again at the write.
-export const recalculationForm = z.object({
-  moduleId: z.string().trim().min(1).max(32),
-  expectedCount: z.number().int().positive().max(1_000_000),
-})
-
-export type RecalculationInput = z.output<typeof recalculationForm>
-
 export const SESSION_STATUSES = ['PLANNED', 'OPEN', 'FULL', 'DELIVERED', 'CANCELLED'] as const
 export type SessionStatus = (typeof SESSION_STATUSES)[number]
 
@@ -571,9 +562,6 @@ export type DeliveryLogInput = z.output<typeof deliveryLogForm>
 export const ATTENDANCE_MARKS = ['ATTENDED', 'ABSENT'] as const
 export type AttendanceMark = typeof ATTENDANCE_MARKS[number]
 
-export const PRACTICE_KEY = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
-export const MAX_PRACTICE_WINDOW_HOURS = 8760
-
 // A register is opened on or after the session day, never before: a record stamps from the
 // held-on date, and a future-dated one would read as valid to every gate (G-115 criterion 1).
 export function registerOpenable(heldOn: string, today: string): boolean {
@@ -614,18 +602,3 @@ export function coverageProblem(expected: string[], marked: string[]): {
   if (strangers.length === 0 && duplicates.length === 0 && missing.length === 0) return null
   return { strangers: [...new Set(strangers)], duplicates: [...new Set(duplicates)], missing }
 }
-
-export const practiceTargetForm = z.object({
-  name: z.string().trim().min(1).max(120),
-  description: text(2000),
-  windowHours: z.number().int().min(1).max(MAX_PRACTICE_WINDOW_HOURS),
-  isActive: z.boolean().default(true),
-  moduleIds: z.array(z.string().trim().min(1).max(32)).max(40).default([]),
-})
-
-export const newPracticeTargetForm = practiceTargetForm.extend({
-  // Immutable once created, because consumers reference it (G-126 criterion 1).
-  key: z.string().trim().min(2).max(40).regex(PRACTICE_KEY, 'A practice key is lower case, digits and hyphens'),
-})
-
-export type PracticeTargetInput = z.output<typeof practiceTargetForm>

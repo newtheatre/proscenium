@@ -111,7 +111,6 @@ const CATALOGUE = {
   'record.signoff.unbounded': { label: 'Signed off as never expiring', module: 'training' },
   'record.external-certificate': { label: 'External certificate recorded', module: 'training' },
   'record.revoked': { label: 'Training record revoked', module: 'training' },
-  'record.expiry.recalculated': { label: 'Training expiries recalculated', module: 'training' },
   'session.scheduled': { label: 'Training session scheduled', module: 'training' },
   'record.delivery-logged': { label: 'Delivered training logged', module: 'training' },
   'session.capacity.changed': { label: 'Training session capacity changed', module: 'training' },
@@ -120,10 +119,6 @@ const CATALOGUE = {
   'register.marked': { label: 'Register marked', module: 'training' },
   'register.freeze.released': { label: 'Register module freeze released', module: 'training' },
   'session.modules.changed': { label: 'Session modules changed', module: 'training' },
-  'practice.target.created': { label: 'Practice target added', module: 'training' },
-  'practice.target.updated': { label: 'Practice target changed', module: 'training' },
-  'practice.window.opened': { label: 'Practice window opened', module: 'training' },
-  'practice.window.closed': { label: 'Practice window closed', module: 'training' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).
   'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },

@@ -1,7 +1,5 @@
-import { and, asc, desc, eq, gt, inArray, isNull, lte, not, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, not, or, sql } from 'drizzle-orm'
 import { isMonthDay, londonParts } from '#shared/utils/london'
-import { previewStatement, restatableCount } from '#shared/utils/recalculation'
-import type { PreviewRow } from '#shared/utils/recalculation'
 import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment, missingPrerequisites, saysGaps } from '#shared/utils/training'
 import type { AcademicYear, ExpiryMode, ExpiryPolicy, LeadAssignment, ModuleInput } from '#shared/utils/training'
 import type { Authority } from '#server/utils/authorise'
@@ -687,29 +685,6 @@ export function moduleValues(input: ModuleInput) {
   }
 }
 
-// How many records a recalculation would restate, as it stands now. Read at the preview and again
-// after a refused run, so the figure quoted back is the one that refused it (G-124 criterion 3).
-export async function countRestatable(
-  moduleId: string,
-  policy: ExpiryPolicy,
-  year: AcademicYear,
-): Promise<number> {
-  const found = await db.all<{ n: number }>(restatableCount(moduleId, policy, year))
-  return found[0]?.n ?? 0
-}
-
-// Every affected record, with the date standing and the date the policy would put there. Paged in
-// SQL, and scoped by predicate rather than by an id list (0003, G-124 criterion 2).
-export async function previewRestatable(
-  moduleId: string,
-  policy: ExpiryPolicy,
-  year: AcademicYear,
-  limit: number,
-  offset: number,
-): Promise<PreviewRow[]> {
-  return db.all<PreviewRow>(previewStatement(moduleId, policy, year, limit, offset))
-}
-
 export interface NextStep {
   id: string
   name: string
@@ -878,95 +853,4 @@ export async function resolveRequestsFor(
     told++
   }
   return told
-}
-
-export interface PracticeTargetRow {
-  key: string
-  name: string
-  description: string | null
-  windowHours: number
-  isActive: boolean
-  moduleIds: string[]
-}
-
-export async function listPracticeTargets(): Promise<PracticeTargetRow[]> {
-  const targets = await db.select({
-    key: schema.practiceTargets.key,
-    name: schema.practiceTargets.name,
-    description: schema.practiceTargets.description,
-    windowHours: schema.practiceTargets.windowHours,
-    isActive: schema.practiceTargets.isActive,
-  }).from(schema.practiceTargets).orderBy(asc(schema.practiceTargets.key))
-
-  const links = await db.select({
-    targetKey: schema.practiceTargetModules.targetKey,
-    moduleId: schema.practiceTargetModules.moduleId,
-  }).from(schema.practiceTargetModules).orderBy(asc(schema.practiceTargetModules.moduleId))
-
-  const byTarget = new Map<string, string[]>()
-  for (const row of links) byTarget.set(row.targetKey, [...(byTarget.get(row.targetKey) ?? []), row.moduleId])
-  return targets.map(target => ({ ...target, moduleIds: byTarget.get(target.key) ?? [] }))
-}
-
-// Criterion 4. Read from the table every time and never cached: the old estate served this
-// no-store, because practice access is enforced rather than advisory.
-export async function practiceOpenFor(userId: string, targetKey: string, at: number): Promise<boolean> {
-  const found = await db.select({ id: schema.practiceWindows.id })
-    .from(schema.practiceWindows)
-    .where(and(
-      eq(schema.practiceWindows.userId, userId),
-      eq(schema.practiceWindows.targetKey, targetKey),
-      isNull(schema.practiceWindows.closedAt),
-      lte(schema.practiceWindows.opensAt, at),
-      gt(schema.practiceWindows.expiresAt, at),
-    ))
-    .limit(1)
-  return found.length > 0
-}
-
-// Criterion 3. Closing lapsed windows is the only thing the sweep does; it never opens one and
-// never touches a record.
-export async function closeLapsedPractice(at: number): Promise<number> {
-  const closed = await db.update(schema.practiceWindows)
-    .set({ closedAt: at })
-    .where(and(isNull(schema.practiceWindows.closedAt), lte(schema.practiceWindows.expiresAt, at)))
-    .returning({ id: schema.practiceWindows.id })
-  return closed.length
-}
-
-// G-115 criterion 3, and the old estate's duplicate-window bug. One window per placed member per
-// matching active target, and the partial unique index is what makes a second attempt a no-op.
-export async function openPracticeWindowsFor(
-  sessionId: string,
-  openedBy: string,
-  at: number,
-): Promise<number> {
-  const targets = await db.all<{ key: string, windowHours: number }>(sql`
-    select distinct t.key as key, t.window_hours as windowHours
-    from practice_targets t
-    join practice_target_modules m on m.target_key = t.key
-    join session_modules sm on sm.module_id = m.module_id
-    where sm.session_id = ${sessionId} and t.is_active = 1
-  `)
-  if (targets.length === 0) return 0
-
-  const { placed } = await placesOnSession(sessionId)
-  if (placed.length === 0) return 0
-
-  // One insert per target, each covering every placed member, so the statement count follows the
-  // targets rather than the room: the people go in as one JSON parameter (0003).
-  let opened = 0
-  for (const target of targets) {
-    const written = await db.all<{ id: string }>(sql`
-      insert into practice_windows (id, target_key, user_id, session_id, opens_at, expires_at, opened_by)
-      select lower(hex(randomblob(16))), ${target.key}, value, ${sessionId}, ${at},
-        ${at + target.windowHours * 3600}, ${openedBy}
-      from json_each(${JSON.stringify(placed.map(place => place.userId))})
-      where true
-      on conflict do nothing
-      returning id
-    `)
-    opened += written.length
-  }
-  return opened
 }

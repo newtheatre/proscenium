@@ -164,11 +164,6 @@ export const AUDIT_COVERAGE: Coverage[] = [
     route: 'server/api/admin/training/sessions/[id]/modules.put.ts',
     actions: ['session.modules.changed', 'register.freeze.released'],
   },
-  { route: 'server/api/admin/training/practice-targets/index.get.ts', exempt: 'reads the practice surfaces' },
-  { route: 'server/api/admin/training/practice-targets/index.post.ts', actions: ['practice.target.created'] },
-  { route: 'server/api/admin/training/practice-targets/[key].put.ts', actions: ['practice.target.updated'] },
-  { route: 'server/api/admin/training/practice-windows/index.post.ts', actions: ['practice.window.opened'] },
-  { route: 'server/api/admin/training/practice-windows/[id]/close.post.ts', actions: ['practice.window.closed'] },
   { route: 'server/api/admin/training/modules/[id]/prerequisites.post.ts', actions: ['prerequisite.added'] },
   { route: 'server/api/admin/training/prerequisites/[id].delete.ts', actions: ['prerequisite.removed'] },
   {
@@ -180,14 +175,6 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['record.external-certificate'],
   },
   { route: 'server/api/admin/training/records/[id]/revoke.post.ts', actions: ['record.revoked'] },
-  {
-    route: 'server/api/admin/training/recalculations/preview.get.ts',
-    exempt: 'previews what a recalculation would restate; it writes nothing',
-  },
-  {
-    route: 'server/api/admin/training/recalculations/index.post.ts',
-    actions: ['record.expiry.recalculated'],
-  },
   { route: 'server/api/admin/training/sessions/index.post.ts', actions: ['session.scheduled'] },
   { route: 'server/api/admin/training/sessions/index.get.ts', exempt: 'reads the scheduled sessions' },
   {

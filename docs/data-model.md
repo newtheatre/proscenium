@@ -931,8 +931,8 @@ guidance and never a validation rule (G-121 criterion 1).
 
 A module stores an expiry **policy**, never a date. What a record earned today would run to is
 computed on the way out of a request from the policy, `ACADEMIC_YEAR_BOUNDARY` and
-`TRAINING_CARRY_OVER_DAYS`; an award stamps the answer onto the record, and no later change to
-the policy moves it (G-123, G-124).
+`TRAINING_CARRY_OVER_DAYS`; an award stamps the answer onto the record, and nothing moves it
+afterwards (G-123, 0041).
 
 ### module_materials
 `id` PK · `module_id` cascade · `label` · `url` · `sort` · `created_at`. Zero or more links
@@ -1003,9 +1003,8 @@ rather than taught (G-112 criteria 3 and 4).
 their respective races turn on.
 
 **Opening** is stamped `WHERE register_opened_at IS NULL`, so two devices opening the same register
-produce one open register: the loser's update matches nothing and it opens no practice windows
-(G-115 criterion 4). Opening closes sign-up, freezes what the session teaches, and opens one
-practice window per placed member per matching active target.
+produce one open register: the loser's update matches nothing (G-115 criterion 4). Opening closes
+sign-up and freezes what the session teaches.
 
 **The freeze is releasable by the session's own trainer while no marks exist** (open question 6,
 answered 2 September). The release is conditional on `marked_at IS NULL`, so a release racing a
@@ -1106,11 +1105,11 @@ key to this one later would be a table rebuild, which the append-only triggers m
 (0010). G-112 enforces the reference at its write path instead.
 
 The append-only trigger is an allow-list rather than a blanket refusal, in the shape
-`audit_log` has used since migration 0001. It admits exactly three edits and refuses every other:
-erasure clearing `evidence_ref` and `revoke_reason`; a revocation stamping `revoked_at`,
-`revoked_by` and `revoke_reason` once; and G-124's recalculation restating `expires_on` on a
-record that is neither overridden nor revoked, which is criterion 4 of that story expressed in the
-database. Two consequences worth stating, because both look like good practice from the outside:
+`audit_log` has used since migration 0001. It admits exactly two edits and refuses every other:
+erasure clearing `evidence_ref` and `revoke_reason`, and a revocation stamping `revoked_at`,
+`revoked_by` and `revoke_reason` once. **`expires_on` is not among them**: a lifetime is fixed the
+day it is earned, so the column is written at the award and never again from any path (0041).
+Two consequences worth stating, because both look like good practice from the outside:
 
 - **No CHECK ties `revoke_reason` to `revoked_at`.** The reason is mandatory at revocation, but
   erasure must be able to clear it, and a CHECK on an append-only table can never be dropped.
@@ -1135,7 +1134,7 @@ Three things are its own:
   It never reaches audit detail, which carries identifiers and not the paper (0011).
 - **`expires_on` is always given and `expiry_overridden` is always true.** The issuing body set the
   term, so the module's own policy is never inherited and never binds it; only the catalogue-wide
-  120-month cap and "after the award" do. Recalculation therefore skips every one of these rows.
+  120-month cap and "after the award" do.
 
 `source` is `EXTERNAL`, and both record endpoints, both screens and the erasure export carry it, so
 a certificate we recorded never reads as one we assessed (criterion 4). There is no break-glass
@@ -1184,32 +1183,11 @@ one audit entry rather than one refusal; the entry is written first in the batch
 update would otherwise falsify the guard the entry rides on. The reason never reaches audit
 detail, which carries identifiers and never people (0011).
 
-**Recalculation is the only thing in the system that moves an `expires_on`** (G-124). Nothing
-else writes that column after the award: changing a module's expiry policy leaves every existing
-record exactly where it was, because a lifetime is fixed the day it is earned (G-123 criterion 3).
-It is `training.recalculate`, administrator-only, and scoped to one module a run.
-
-A record is restatable when it belongs to the module, is not revoked, does not carry
-`expiry_overridden`, is not superseded by a later unrevoked award of the same module to the same
-person, and stands at something other than what the policy says. The first three are criterion 4,
-and the append-only trigger refuses the same three from the other side: the code skips them so a
-run does not abort, and the trigger means it could not have written them if the code were wrong.
-
-The whole run is two statements in one batch (`shared/utils/recalculation.ts`):
-
-1. the audit entry, inserted only where the restatable count equals the count the administrator
-   echoed back from the preview;
-2. the update, whose `WHERE` carries the same predicate plus `EXISTS` on that entry.
-
-So the count is recomputed at the write rather than trusted from the preview, and a run that
-writes nothing writes no entry either. The route reads the entry back afterwards: its absence is
-the abort, answered as a 409 quoting the echoed figure and the recomputed one.
-
-The new expiry is computed **in SQL**, from the award date, not row by row. `expirySql` is the
-twin of `expiryFor`: months clamp to the last day of the target month, and an academic year rolls
-on the carry-over window, exactly as the TypeScript does. That is what keeps every statement's
-bound-parameter count fixed however many records the run covers, which is what D1 requires (0003).
-`tests/integration/training-recalculation.test.ts` pins the two against each other day by day.
+**Nothing in the system moves an `expires_on`** (0041). Changing a module's expiry policy leaves
+every existing record exactly where it was, because a lifetime is fixed the day it is earned
+(G-123 criterion 3), and the append-only trigger refuses the write rather than trusting the code to
+avoid it. Where a module changes materially, the retroactive path is invalidation by revocation
+plus a bootstrap of the people who already know the new thing (G-209, G-210), not a restated date.
 
 ### module_requests
 `id` PK · `user_id` cascade · `module_id` cascade · `note` scrub · `status` CHECK
@@ -1234,40 +1212,6 @@ The reason never reaches audit detail, which carries identifiers and never words
 Opening a session for sign-up resolves every open ask for the modules it teaches and tells each
 requester once, the claim held by the notification ledger (criterion 4). A session created but not
 yet open resolves nothing, because there is nothing for a member to sign up to.
-
-### practice_targets / practice_target_modules
-`practice_targets`: `key` PK · `name` · `description` · `window_hours` CHECK 1 to 8760 ·
-`is_active` · `created_at` · `updated_at`. `practice_target_modules` maps a target to the modules
-that open it, UNIQUE on the pair, cascading from both ends.
-
-**The key is the primary key and never changes**, because a consumer quotes it when it asks whether
-somebody may practise (G-126 criterion 1). Everything else about a target is editable, including
-which modules open it and whether it is in use at all.
-
-### practice_windows
-`id` PK · `target_key` cascade · `user_id` cascade · `session_id` · `opens_at` · `expires_at` ·
-`closed_at` · `closed_by` set null · `opened_by` set null · `created_at`. Indexed on `user_id` and
-on `expires_at`.
-
-**Partial UNIQUE (`target_key`, `user_id`, `session_id`) WHERE `session_id` IS NOT NULL.** Opening
-a register opens one window per placed member per matching target, and two devices opening the same
-register must not open two: the old estate could, and this is where that is made impossible rather
-than unlikely (criterion 2). The index is partial because a window opened by hand carries no session
-and must not contend with a register's claim; the write path extends an open one instead of
-duplicating it, since two windows would expire at different times and the later would look like
-access the earlier had already ended.
-
-`session_id` carries **no foreign key**: a window outlives the session that opened it, and access
-granted is a fact about the past.
-
-**Window state is read from the table every time and never cached** (criterion 4). The old estate
-served it no-store for the same reason: practice access is enforced, not advisory, so a stale yes is
-a person in a sandbox they should not be in.
-
-Closing is `whoever opened it, with an administrator as the backstop` (open question 3, answered
-2 September). A window opened by a register has no opener of its own, so it is the administrator's.
-The scheduled sweep closes lapsed windows and **does nothing else**: it never opens one, and it
-never touches a record.
 
 ## Platform (modules H, J, K)
 

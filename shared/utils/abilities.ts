@@ -38,8 +38,6 @@ export const viewTrainingCatalogue = defineAbility((viewer: Viewer) => holds(vie
 // Running a session derives from a current trainer certification (requireTrainer, G-111).
 export const runTrainingSessions = defineAbility((viewer: Viewer) => holds(viewer, 'training.write') || viewer.isTrainer)
 
-export const recalculateTraining = defineAbility((viewer: Viewer) => holds(viewer, 'training.recalculate'))
-
 // Tonight is derived from a confirmed shift and expires at 04:00 with nothing to revoke (0014,
 // E-111), so it is read from the request rather than from anything the viewer holds.
 export const workTonight = defineAbility((viewer: Viewer) => viewer.onShiftTonight)
@@ -63,5 +61,4 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewSettings: 'config.read',
   viewTrainingCatalogue: 'training.read',
   runTrainingSessions: 'training.write',
-  recalculateTraining: 'training.recalculate',
 }

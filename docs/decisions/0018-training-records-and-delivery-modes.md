@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-26
+- Superseded in part by 0041: a stamped expiry is final, and recalculation is withdrawn
 
 ## Context
 

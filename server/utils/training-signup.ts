@@ -23,8 +23,8 @@ export interface SessionPlaces {
   waitlisted: Place[]
 }
 
-// The one definition of who holds a place. G-115 opens a practice window per placed member from
-// this, so there is no second reading of the same order anywhere.
+// The one definition of who holds a place, so there is no second reading of the same order
+// anywhere.
 export async function placesOnSession(sessionId: string): Promise<SessionPlaces> {
   const [session] = await db.select({ capacity: schema.trainingSessions.capacity })
     .from(schema.trainingSessions)

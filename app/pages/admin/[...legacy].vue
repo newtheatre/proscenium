@@ -16,7 +16,6 @@ const MOVED: Record<string, string> = {
   'departments': '/training/manage/departments',
   'training-records': '/training/manage/records',
   'training-sessions': '/training/manage/sessions',
-  'training-recalculation': '/training/manage/recalculation',
 }
 
 definePageMeta({

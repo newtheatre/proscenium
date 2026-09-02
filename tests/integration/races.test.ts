@@ -1,6 +1,4 @@
 import { describe, expect, test } from 'bun:test'
-import { auditEntry } from '#shared/utils/audit'
-import { recalculationStatements } from '#shared/utils/recalculation'
 import { placesFrom, promotedBy, promotionClaimFor, signUpOrderStatement, withdrawStatement } from '#shared/utils/training-signup'
 import type { Place, SignUpOrder } from '#shared/utils/training-signup'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
@@ -69,9 +67,9 @@ describe('contended invariants (K-105)', () => {
     }
   })
 
-  // G-115 criterion 4. The old estate could open two sets of practice windows from one register,
-  // and the partial unique index is what makes the second attempt a no-op rather than a duplicate.
-  test('the register-open race: two devices opening one register open one set of windows', async () => {
+  // G-115 criterion 4. The stamp is a conditional write, so the second device's update matches
+  // nothing rather than opening the register a second time.
+  test('the register-open race: two devices opening one register open it once', async () => {
     const database = await createTestDatabase()
     try {
       const now = Math.floor(Date.now() / 1000)
@@ -80,8 +78,6 @@ describe('contended invariants (K-105)', () => {
         ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-one', 'one@example.invalid', 'One'],
         ['INSERT INTO departments (code, name) VALUES (?, ?)', 'BAR', 'Bar'],
         [`INSERT INTO modules (id, department, kind, name, status) VALUES ('BAR-1', 'BAR', 'MODULE', 'Till', 'ACTIVE')`],
-        [`INSERT INTO practice_targets (key, name, window_hours) VALUES ('till-sandbox', 'Till sandbox', 72)`],
-        [`INSERT INTO practice_target_modules (id, target_key, module_id) VALUES ('ptm1', 'till-sandbox', 'BAR-1')`],
         [`INSERT INTO training_sessions (id, held_on, starts_at, ends_at, capacity, trainer_id)
           VALUES ('s1', '2026-10-05', '19:00', '21:00', 20, 'u-trainer')`],
         [`INSERT INTO session_modules (id, session_id, module_id) VALUES ('sm1', 's1', 'BAR-1')`],
@@ -96,24 +92,15 @@ describe('contended invariants (K-105)', () => {
         const won = rows<{ by: string }>(
           database, `SELECT register_opened_by by FROM training_sessions WHERE id = 's1'`,
         )[0]?.by === by
-        if (!won) return 0
-
-        database.batch([[
-          `INSERT INTO practice_windows (id, target_key, user_id, session_id, opens_at, expires_at, opened_by)
-           VALUES (?, 'till-sandbox', 'u-one', 's1', ?, ?, ?)
-           ON CONFLICT DO NOTHING`,
-          `w-${by}`, at, at + 259200, by,
-        ]])
-        return 1
+        return won ? 1 : 0
       }
 
       expect(open('u-trainer', now)).toBe(1)
       expect(open('u-one', now + 1)).toBe(0)
 
-      expect(rows(database, 'SELECT id FROM practice_windows')).toHaveLength(1)
-      expect(rows<{ by: string }>(
-        database, `SELECT register_opened_by by FROM training_sessions WHERE id = 's1'`,
-      )[0]?.by).toBe('u-trainer')
+      expect(rows<{ at: number, by: string }>(
+        database, `SELECT register_opened_at at, register_opened_by by FROM training_sessions WHERE id = 's1'`,
+      )[0]).toMatchObject({ at: now, by: 'u-trainer' })
     }
     finally {
       database.close()
@@ -191,69 +178,6 @@ describe('contended invariants (K-105)', () => {
       // Never deleted: the row is still there, still readable, still naming its award (criterion 5).
       expect(rows<{ awarded: string }>(database, `SELECT awarded_on awarded FROM training_records`)[0]?.awarded)
         .toBe('2026-09-01')
-    }
-    finally {
-      database.close()
-    }
-  })
-
-  // G-124's named case. The echoed count is the administrator's from a preview; what decides the
-  // run is the count as it stands when the batch reaches the database.
-  test('the recalculation race: an affected set that moved between preview and confirmation aborts', async () => {
-    const database = await createTestDatabase()
-    try {
-      database.batch([
-        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-one', 'one@example.invalid', 'Ada'],
-        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-two', 'two@example.invalid', 'Bea'],
-        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-admin', 'admin@example.invalid', 'An Officer'],
-        ['INSERT INTO departments (code, name) VALUES (?, ?)', 'TECH', 'Technical'],
-        ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'TECH-111', 'TECH', 'MODULE', 'Working at height'],
-      ])
-
-      const award = (id: string, userId: string): void => {
-        database.batch([[
-          `INSERT INTO training_records (id, user_id, module_id, awarded_on, source)
-           VALUES (?, ?, 'TECH-111', '2026-09-14', 'SIGNOFF')`,
-          id, userId,
-        ]])
-      }
-      award('tr-1', 'u-one')
-      award('tr-2', 'u-two')
-
-      const entry = auditEntry({
-        actorId: 'u-admin',
-        action: 'record.expiry.recalculated',
-        target: 'module:TECH-111',
-        // The administrator previewed two, which is what the screen made them type back.
-        detail: { module: 'TECH-111', restated: 2 },
-      })
-      const confirm = (): void => {
-        database.batch(recalculationStatements({
-          moduleId: 'TECH-111',
-          policy: { expiryMode: 'MONTHS', expiryMonths: 12 },
-          year: { boundary: '09-30', carryOverDays: 60 },
-          expectedCount: 2,
-          entry,
-        }).map(statement => boundStatement(database, statement)))
-      }
-
-      // A third award lands between the preview and the confirmation.
-      award('tr-3', 'u-admin')
-      confirm()
-
-      expect(rows(database, 'SELECT id FROM audit_log WHERE id = ?', entry.id)).toHaveLength(0)
-      expect(rows(database, 'SELECT id FROM training_records WHERE expires_on IS NOT NULL')).toHaveLength(0)
-
-      // Revoke the newcomer, and the same confirmation is right again: the count decides, not a
-      // token, and nothing was left half-restated to get in its way.
-      database.batch([[
-        `UPDATE training_records SET revoked_at = 1789000000, revoked_by = 'u-admin', revoke_reason = 'In error'
-         WHERE id = 'tr-3'`,
-      ]])
-      confirm()
-
-      expect(rows(database, 'SELECT id FROM audit_log WHERE id = ?', entry.id)).toHaveLength(1)
-      expect(rows(database, `SELECT id FROM training_records WHERE expires_on = '2027-09-14'`)).toHaveLength(2)
     }
     finally {
       database.close()

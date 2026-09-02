@@ -2,13 +2,13 @@
 
 Training was the old estate's best module, and this backlog carries its judgement wholesale: records are append-only with validity derived at read time, marking a register is the single act that awards records for taught sessions, and clockwork notices expiry but never enacts anything. The unified system removes the API seam between records and the surfaces they gate (shifts, the till, kit loans), so a gate reads live competence with nothing to fail open. New in this system are delivery modes: in-person, self-directed online, or hybrid; mode and external material links are MVP schema, while quiz assessment, hybrid completion and the question channel are V2, and a safety-critical module can never be fully self-directed.
 
-Counts: 26 MVP stories (G-101 to G-126), 8 V2 stories (G-201 to G-208), 2 Later stubs (G-301, G-302), 1 resolved won't-build (G-127). 37 total.
+Counts: 24 MVP stories (G-101 to G-123, G-125), 11 V2 stories (G-201 to G-211), 2 Later stubs (G-301, G-302), 3 resolved (G-124 and G-126 withdrawn, G-127 won't build). 40 total.
 
 ## Open questions
 
 1. Answered 26 August: there is no legacy import (G-127 resolved); legacy records do not map to the current module system, and history stays in the archived old estate.
 2. Certification auto-suspension when a constituent module lapses: the old system deliberately only flags. Does the committee ever want it to suspend, and if so with what notice?
-3. Answered 2 September: a practice window is closed by whoever opened it, with an administrator as the backstop. It is the narrowest and most accountable answer, and it accepts a known cost: on a committee that turns over yearly, an opener who graduates strands their window until an administrator closes it. G-126 builds both paths.
+3. Moot from 2 September: who closes a practice window no longer arises, because there are no practice windows (0042, G-126 withdrawn). The question G-211 carries in its place is what qualifies somebody to enter practice mode: holding the module, or holding it currently.
 4. Answered 2 September: session running is scoped, but by competence rather than by department. Trainer standing is one cross-department certification (LEAD-CERT), and a trainer may teach only a module they currently hold a record for. A trainer may never sign off a certification, and a certification is not normally attached to a session at all, because it is issued on experience gained outside training; G-112 criterion 3's refusal of sign-off-only modules already covers that.
 5. Quiz governance for V2: who authors and reviews quiz content, and does editing a quiz after people have passed it invalidate or merely date-stamp their attempts?
 6. Answered 2 September: the session's own trainer may release the freeze, and only while the register carries no marks. Waiting on an officer at 18:50 is the friction that answer removes. Two consequences for G-115 and G-116: the release is a conditional write predicated on zero marks existing rather than a read followed by a write, and G-116's marking race has to assume the module list can change under it until the first mark lands.
@@ -225,8 +225,8 @@ Counts: 26 MVP stories (G-101 to G-126), 8 V2 stories (G-201 to G-208), 2 Later 
 - Acceptance criteria:
   1. The register can be opened only on or after the session day (Europe/London): records stamp from the held-on date, and a future-dated record would read as valid to every gate.
   2. Opening the register freezes the set of modules the session teaches; subsequent changes to the session's modules are refused.
-  3. Opening the register closes sign-up and opens a practice window for every signed-up member, one per matching active practice target (G-126).
-  4. Two devices opening the same register concurrently result in one open register and exactly one set of practice windows, pinned by a regression test (the old estate could duplicate windows here).
+  3. Opening the register closes sign-up.
+  4. Two devices opening the same register concurrently result in one open register, pinned by a regression test: the stamp is a conditional write, so the loser's update matches nothing.
   5. Withdrawal remains open to members while the register is open.
 - Source: Prompt Book G-2; audit TR-5, TR-10
 
@@ -349,16 +349,14 @@ Counts: 26 MVP stories (G-101 to G-126), 8 V2 stories (G-201 to G-208), 2 Later 
 ## G-124: Previewed, count-confirmed recalculation
 
 - Role: Administrator
-- Phase: MVP
-- Story: As an administrator, I want one audited recalculation tool as the only retroactive path so that changing a policy never silently rewrites history.
-- Depends on: G-123
-- Acceptance criteria:
-  1. Recalculation is the only mechanism that may restate stamped expiry dates; no other write path touches them.
-  2. It previews every affected record (person, module, old date, new date) before anything is written.
-  3. Confirmation requires echoing back the affected-row count; a mismatch between the echoed count and the recomputed count at write time aborts the run.
-  4. Overridden, revoked and superseded records are always skipped.
-  5. The audit entry is written in the same batch as the restated dates, so a partial run cannot exist unaudited.
-- Source: Prompt Book G-3; audit TR-7
+- Phase: Resolved, withdrawn (0041, 2 September 2026)
+- Story: Withdrawn. It was built and then removed: it answers a question the theatre does not ask.
+- Resolution:
+  1. A module's expiry policy is the least likely thing about it to change, and the committee's own rule is that a lifetime is fixed the day it is earned, so leaving every existing record alone is the honest answer to a policy that moved.
+  2. What actually changes is the content of a module, and no restatement of a date can express that: the record is not late, it is wrong. G-209 invalidates instead, and G-210 bootstraps what invalidation would otherwise cost.
+  3. A stamped `expires_on` is now final from every path, enforced by the append-only trigger rather than by convention. G-123 criterion 3 stands with no exception at all.
+  4. Between now and G-209, a material change is handled by revoking the affected records one at a time. If that proves painful, it argues for pulling G-209 forward, not for restoring this.
+- Source: Prompt Book G-3; audit TR-7; withdrawn by 0041
 
 ## G-125: Expiry warnings and monthly digests
 
@@ -378,16 +376,14 @@ Counts: 26 MVP stories (G-101 to G-126), 8 V2 stories (G-201 to G-208), 2 Later 
 ## G-126: Practice targets and windows
 
 - Role: Training officer
-- Phase: MVP
-- Story: As the training officer, I want practice targets that map modules to practice surfaces so that finishing training opens a time-boxed window to rehearse the real tools.
-- Depends on: G-107, G-115
-- Acceptance criteria:
-  1. A practice target maps one or more modules to a practice surface key (for example the till sandbox) with a window length; target keys are immutable once created because consumers reference them.
-  2. Opening a register opens one window per signed-up member per matching active target (G-115), race-safe against duplicate windows.
-  3. Windows expire at the end of their time box; a scheduled sweep closes lapsed windows, and closing is the only thing the sweep does.
-  4. Window state is read internally with no caching (the old estate served it no-store): practice access is enforced, never advisory.
-  5. Trainers can open and close a window for a person manually; closure rights follow the answer to open question 3.
-- Source: Prompt Book G-5; audit TR-5, TR-7, TR-8; Get-In disposition (practice targets carry)
+- Phase: Resolved, withdrawn (0042, 2 September 2026)
+- Story: Withdrawn. It was built and then removed: nothing ever read a practice window.
+- Resolution:
+  1. The gate that would have enforced a window had no caller anywhere, there was no member-facing practice surface, and the sandboxes that would have consumed it (G-206) are V2 and unbuilt. It wrote and expired rows nothing asked about.
+  2. It also put the decision in the wrong place: a window was granted to a member by somebody else finishing an administrative act, for a length configured months earlier. The person who knows whether they want to rehearse is the member.
+  3. G-211 replaces it: practice mode is entered from the screen of the tool itself, gated on the record held, with no window to hand out and nothing to close on a timer.
+  4. The three tables are dropped and the per-target window length leaves the workshop register. No member's access changes, because no window was ever read.
+- Source: Prompt Book G-5; audit TR-5, TR-7, TR-8; withdrawn by 0042
 
 ## G-127: Legacy data import as LEGACY records
 
@@ -475,7 +471,7 @@ Counts: 26 MVP stories (G-101 to G-126), 8 V2 stories (G-201 to G-208), 2 Later 
 - Role: Member
 - Phase: V2
 - Story: As a new volunteer, I want practice modes of the till, door scan and Challenge 25 so that my first sale is not my first attempt.
-- Depends on: G-126
+- Depends on: G-211
 - Acceptance criteria:
   1. A practice mode appears only while the person holds an open practice window for the matching target; with no window there is no tile and no hint the feature exists.
   2. Sandboxes mirror the till, door scan and Challenge 25 flows against practice data only, isolated by schema namespace from every operational table, and the isolation is enforced by a CI check.
@@ -510,6 +506,53 @@ Counts: 26 MVP stories (G-101 to G-126), 8 V2 stories (G-201 to G-208), 2 Later 
   4. Scanning while signed out routes through sign-in and back to the confirm screen; re-scanning after registering shows the last-attended date instead of a second confirm, and a repeat confirmation on the same day is idempotent.
   5. An optional active window per poster (for example the get-in fortnight) refuses registrations outside it with the window quoted; leads see who registered, when, per production period.
 - Source: Committee direction 26 August (new capability); Prompt Book G-1 (briefs never expire and never gate); audit TR-1 (brief semantics).
+
+## G-209: A material change invalidates a module's existing training
+
+- Role: Training officer
+- Phase: V2
+- Story: As the training officer, I want to declare a change to a module material and invalidate the training people hold from it so that a module taught on equipment we no longer own stops counting.
+- Depends on: G-107, G-122
+- Acceptance criteria:
+  1. Editing a module offers invalidation as a deliberate, separately confirmed act; an ordinary edit (a typo, a material link, a description) never invalidates anything.
+  2. Invalidation is revocation with a reason naming the change, so the append-only table is respected: no record is deleted, no record is edited, and each keeps its award date and its stamped expiry.
+  3. It previews every record it would invalidate, naming the person and the award date, and the affected-row count is echoed back before it writes; a count that moved between the preview and the write aborts the run quoting both figures.
+  4. Already-revoked records are skipped, so running it twice invalidates nothing the second time and is refused for a count of zero.
+  5. Everybody who loses a record is told once, naming the module and why, with the claim held by the notification ledger.
+  6. The audit entry is written in the same batch as the revocations, so a partial run cannot exist unaudited; it names the module and the count, and no person.
+  7. Invalidating a module that grants trainer or supervisor standing removes that standing live, because standing derives from a current record (G-111).
+- Source: 0041; committee direction, 2 September 2026
+
+## G-210: Bootstrap a new or materially changed module
+
+- Role: Training officer
+- Phase: V2
+- Story: As the training officer, I want to grant a module to the people who already know it so that creating a module, or invalidating one, does not mean re-teaching the whole theatre.
+- Depends on: G-107, G-120, G-209
+- Acceptance criteria:
+  1. A module that is new, or that has just been invalidated, offers a bootstrap: the officer picks people from the directory and grants them the module in one action.
+  2. The grant is previewed before it writes, one line per person, showing the award date and the expiry each record would carry; the affected-row count is echoed back, and a mismatch at the write aborts the run.
+  3. Records are written with a source that says they were bootstrapped rather than taught, so a bootstrapped record is never mistaken for an assessed one.
+  4. Anybody already holding a current unrevoked record for that module is shown as already recorded and is not written again.
+  5. Prerequisites are enforced as they are for a sign-off: a safety-critical gap blocks outright, and an ordinary gap is acknowledged per person.
+  6. Every grant is audited in the same batch, naming the module and the count and no person, and each person is told what they now hold.
+  7. Bootstrapping is the training officer's, not every lead's, because it awards without assessing.
+- Source: 0041; committee direction, 2 September 2026
+
+## G-211: Practice mode is entered from the tool
+
+- Role: Member
+- Phase: V2
+- Story: As a member who has been trained on the till, I want to enter practice mode from the till itself when I want to rehearse so that practising is my decision rather than a window somebody handed me.
+- Depends on: G-101, G-111
+- Acceptance criteria:
+  1. A screen for a tool that has a practice mode offers it to a member who holds the qualifying module, and shows nothing at all to a member who does not.
+  2. Eligibility derives from the record held, read live at the moment of entry; there is no window row, nothing to grant and nothing to expire on a timer.
+  3. Entering and leaving practice mode is the member's own act, repeatable as often as they like.
+  4. Whether a lapsed record still qualifies somebody to rehearse is settled by this story and stated in one place, because the answer differs from whether it qualifies them to work.
+  5. While a member is in practice mode, the operational surface for that tool is locked for them, so a rehearsal cannot be mistaken for a real transaction.
+  6. Entering practice mode is not an audited privileged act, because it grants nothing: it is audited only where it locks an operational surface.
+- Source: 0042; committee direction, 2 September 2026
 
 ## G-301: Certification auto-suspension (stub)
 
