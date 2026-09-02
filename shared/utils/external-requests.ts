@@ -1,4 +1,5 @@
 import { londonParts } from './london'
+import { coversThrough, lastCovered, workingDaysBetween } from './working-days'
 import { z } from 'zod'
 
 // Asking for a room we do not manage (C-120). The lifecycle has three decision points where
@@ -48,7 +49,7 @@ function past(verb: Verb): string {
   return 'cancelled'
 }
 
-export const EXTERNAL_REFUSALS = ['NO_MEMBERSHIP', 'IN_THE_PAST', 'SHORT_NOTICE', 'BEYOND_HORIZON'] as const
+export const EXTERNAL_REFUSALS = ['NO_MEMBERSHIP', 'IN_THE_PAST', 'SHORT_NOTICE', 'BEYOND_HORIZON', 'HOLIDAYS_UNKNOWN'] as const
 export type ExternalRefusal = (typeof EXTERNAL_REFUSALS)[number]
 
 export interface ExternalFailure { reason: ExternalRefusal, says: string }
@@ -56,8 +57,9 @@ export interface ExternalFailure { reason: ExternalRefusal, says: string }
 export interface ExternalContext {
   now: Date
   hasMembership: boolean
-  noticeDays: number
+  noticeWorkingDays: number
   horizonWeeks: number
+  holidays: readonly string[]
 }
 
 // Judged separately from a room of ours: opening hours, capacity and an active flag are things
@@ -72,15 +74,25 @@ export function judgeExternal(span: { startsAt: Date, endsAt: Date }, context: E
     failures.push({ reason: 'IN_THE_PAST', says: 'That slot has already happened.' })
   }
 
-  // London days, not blocks of 24 hours: a window spanning a clock change is an hour out and
-  // refuses an ask that had the notice the setting names (0014).
-  const days = londonDaysBetween(context.now, span.startsAt)
-  if (days < context.noticeDays) {
+  // Notice is working days; the horizon is calendar weeks. Two different questions, and counting
+  // the horizon in working days would quietly stretch it by two days a week.
+  if (!coversThrough(context.holidays, span.startsAt)) {
+    const reach = lastCovered(context.holidays)
     failures.push({
-      reason: 'SHORT_NOTICE',
-      says: `This needs ${context.noticeDays} days, because a person fills in a form and waits for an answer.`,
+      reason: 'HOLIDAYS_UNKNOWN',
+      says: reach
+        ? `We cannot count the notice for that date: bank holidays are only known up to ${reach}.`
+        : 'We cannot count the notice for that date: no bank holidays are recorded.',
     })
   }
+  else if (workingDaysBetween(context.now, span.startsAt, context.holidays) < context.noticeWorkingDays) {
+    failures.push({
+      reason: 'SHORT_NOTICE',
+      says: `This needs ${context.noticeWorkingDays} working days, because a person fills in a form and waits for an answer. Weekends and bank holidays do not count.`,
+    })
+  }
+
+  const days = londonDaysBetween(context.now, span.startsAt)
   if (days / 7 > context.horizonWeeks) {
     failures.push({ reason: 'BEYOND_HORIZON', says: `Rooms are asked for up to ${context.horizonWeeks} weeks ahead.` })
   }

@@ -15,8 +15,9 @@ export default defineEventHandler(async (event) => {
   const failures = judgeExternal({ startsAt, endsAt }, {
     now,
     hasMembership: await hasCurrentMembership(event, account.id, now),
-    noticeDays: await configValue(event, 'EXTERNAL_REQUEST_NOTICE_DAYS'),
+    noticeWorkingDays: await configValue(event, 'EXTERNAL_REQUEST_NOTICE_WORKING_DAYS'),
     horizonWeeks: await configValue(event, 'ROOM_BOOKING_HORIZON_WEEKS'),
+    holidays: await configValue(event, 'BANK_HOLIDAYS'),
   })
 
   // Nothing an officer could wave through, because somebody else is the one being asked.

@@ -41,4 +41,5 @@ afterwards, only superseded.
 | 0033 | A ledger line's kind is enforced in code | which ledger constraints are permanent, and which are not |
 | 0034 | The booking horizon is a number of weeks | how far ahead a member may book, and why not to the end of term |
 | 0035 | A multi-row claim asserts its own completeness | why a series batch ends with a statement that looks like a mistake |
-| 0036 | An externally arranged room is a request, not a booking | why a union room is not in the estate, and what supersedes C-103 criterion 2 |
+| 0036 | An externally arranged room is a request, not a booking | why a room we do not manage is not in the estate, and what supersedes C-103 criterion 2 |
+| 0038 | Notice for a room we do not manage is working days | how three working days are counted, and why a gap in the calendar refuses |

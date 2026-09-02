@@ -728,6 +728,14 @@ A confirmed union room reaches everywhere a booking does: the member's calendar 
 while it is still with the union, since they may yet say no) and the day-before reminder, which
 sends one message covering our rooms and theirs together.
 
+**Notice is counted in working days**, defaulting to three, from the member's ask rather than from
+the day the form goes in: a request waiting in the queue eats its own slack. Saturdays, Sundays and
+any date in `BANK_HOLIDAYS` do not count, and **the booking's own date is never judged**, only the
+gap before it, so a Saturday get-in is ordinary. Where the holiday list does not reach the date
+being judged the request is **refused** rather than counted, because a list read as "no holidays"
+grants less notice than the rule requires; `/api/health` and the settings screen both report
+coverage running short before anybody is refused (C-121, decision 0038).
+
 Both list endpoints return `{ items, total, more }` capped at 200 rows, `more` saying plainly that
 the cap was hit rather than reporting it as a total. The officer's queue orders **open first and
 soonest first, then the settled ones most recent first**: it is a list of work, and an answered
