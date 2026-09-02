@@ -407,3 +407,14 @@ export async function click(view: Bun.WebView, selector: string): Promise<void> 
 export async function textOf(view: Bun.WebView, selector = 'body'): Promise<string> {
   return view.evaluate<string>(`(document.querySelector(${JSON.stringify(selector)})?.innerText ?? '')`)
 }
+
+// Sign-out sits inside the account menu, which is the one component every shell renders (0040).
+export async function signOut(view: Bun.WebView): Promise<void> {
+  await click(view, '[data-test=account-menu]')
+  await click(view, '.sign-out')
+}
+
+// Every label the console sidebar is currently showing, which is what a permission filter changes.
+export async function navLabels(view: Bun.WebView): Promise<string[]> {
+  return view.evaluate<string[]>(`[...document.querySelectorAll('nav a, nav button')].map(node => node.innerText.trim()).filter(Boolean)`)
+}

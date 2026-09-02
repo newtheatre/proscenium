@@ -85,7 +85,7 @@ async function signedInView(): Promise<Bun.WebView> {
   await fill(view, 'form input[type="email"]', email)
   await fill(view, 'form input[type="password"]', password)
   await click(view, 'form button[type="submit"]')
-  await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+  await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
   return view
 }
 

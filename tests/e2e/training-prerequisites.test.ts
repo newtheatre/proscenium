@@ -258,7 +258,7 @@ describe.skipIf(skip !== null)('the catalogue a member browses (G-103)', () => {
       await fill(view, 'form input[type="email"]', member.email)
       await fill(view, 'form input[type="password"]', password)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
 
       await visit(view, `${app.baseURL}/training/catalogue`, '[data-test="catalogue-page"]')
       // A server render cannot see a hydration failure, so the page is read after it is live.

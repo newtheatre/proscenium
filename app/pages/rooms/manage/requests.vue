@@ -8,7 +8,7 @@ import { formatLondon } from '#shared/utils/london'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'admin', title: 'Room requests', middleware: 'signed-in' })
+definePageMeta({ layout: 'console', title: 'Room requests', middleware: 'console' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

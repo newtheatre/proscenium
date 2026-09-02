@@ -342,9 +342,9 @@ describe.skipIf(skip !== null)('the officer screen', () => {
       for (const [index, digit] of [...code].entries()) {
         await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
       }
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
 
-      await visit(view, `${app.baseURL}/admin/training-recalculation`, `[data-test="module-${module}"]`)
+      await visit(view, `${app.baseURL}/training/manage/recalculation`, `[data-test="module-${module}"]`)
       // A server render cannot see a hydration failure, so the page is read after it is live.
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
 

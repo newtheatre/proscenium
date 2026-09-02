@@ -141,7 +141,7 @@ describe.skipIf(skip !== null)('describing the bookable estate (C-101)', () => {
     const name = `Onload ${crypto.randomUUID().slice(0, 6)}`
     await addRoom(name)
 
-    const rendered = await fetch(`${app.baseURL}/admin/rooms`, { headers: { cookie } })
+    const rendered = await fetch(`${app.baseURL}/rooms/manage`, { headers: { cookie } })
     expect(rendered.status).toBe(200)
     expect(await rendered.text()).toContain(name)
   })

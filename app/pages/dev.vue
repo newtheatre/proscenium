@@ -3,7 +3,7 @@ import type { Persona } from '#shared/utils/personas'
 
 // Development only: nuxt.config keeps this file out of a production build (K-124).
 
-definePageMeta({ layout: 'admin', title: 'Developer tools' })
+definePageMeta({ layout: 'console', title: 'Developer tools' })
 
 interface Seeded { id: string, email: string, name: string, anonymisedAt: number | null }
 interface Row extends Persona { account: Seeded | null }

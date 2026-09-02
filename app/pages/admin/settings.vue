@@ -2,7 +2,7 @@
 import { formatLondon } from '#shared/utils/london'
 import { coversThrough, lastCovered, londonDate } from '#shared/utils/working-days'
 
-definePageMeta({ layout: 'admin', title: 'Settings', middleware: 'signed-in' })
+definePageMeta({ layout: 'console', title: 'Settings', middleware: 'console' })
 
 // A holiday list that has run out refuses requests near the horizon, so it says how far it
 // reaches before anybody is refused rather than at the moment they are (C-121, 0038).

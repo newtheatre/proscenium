@@ -65,7 +65,7 @@ async function officerView(): Promise<Bun.WebView> {
   await click(view, 'form button[type="submit"]')
   await waitFor(view, `document.querySelectorAll('[data-test="mfa-challenge"] input').length >= 6`)
   await fillPin(view, '[data-test="mfa-challenge"] input', await codeForStep(officerSecret, stepFor(new Date()) + 1))
-  await waitFor(view, `document.querySelector('[data-test="sign-out"]')`, 30_000)
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
   return view
 }
 
@@ -350,7 +350,7 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
     const view = await officerView()
 
     try {
-      await visit(view, `${app.baseURL}/admin/training-sessions`, '[data-test="sessions-table"]')
+      await visit(view, `${app.baseURL}/training/manage/sessions`, '[data-test="sessions-table"]')
       // A server render cannot see a hydration failure, so the page is read after it is live.
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
 
@@ -385,7 +385,7 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
   test('a certification is absent from what the screen offers to teach', async () => {
     const view = await officerView()
     try {
-      await visit(view, `${app.baseURL}/admin/training-sessions`, '[data-test="sessions-table"]')
+      await visit(view, `${app.baseURL}/training/manage/sessions`, '[data-test="sessions-table"]')
       await click(view, '[data-test="add-session"]')
       await waitFor(view, `document.querySelector('[data-test="session-starts"]')`, 30_000)
       expect(await view.evaluate<boolean>(

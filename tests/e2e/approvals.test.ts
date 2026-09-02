@@ -458,9 +458,9 @@ describe.skipIf(skip !== null)('the queue in a browser (C-109)', () => {
       for (const [index, digit] of [...code].entries()) {
         await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
       }
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-      await visit(view, `${app.baseURL}/admin/requests`, '[data-test="requests-table"]')
+      await visit(view, `${app.baseURL}/rooms/manage/requests`, '[data-test="requests-table"]')
       // A server render cannot see a hydration failure, so the screen is read after it is live.
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
       await waitFor(view, `document.querySelector('[data-test="approve-${id}"]')`, 30_000)
@@ -493,9 +493,9 @@ describe.skipIf(skip !== null)('the queue in a browser (C-109)', () => {
       for (const [index, digit] of [...code].entries()) {
         await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
       }
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-      await visit(view, `${app.baseURL}/admin/requests`, '[data-test="requests-table"]')
+      await visit(view, `${app.baseURL}/rooms/manage/requests`, '[data-test="requests-table"]')
       await waitFor(view, `document.querySelector('[data-test="reject-${id}"]')`, 30_000)
       await click(view, `[data-test="reject-${id}"]`)
       await waitFor(view, `document.querySelector('[data-test="rejection-reason"]')`, 30_000)

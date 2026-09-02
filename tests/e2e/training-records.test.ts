@@ -217,7 +217,7 @@ describe.skipIf(skip !== null)('the screen (G-101)', () => {
       await fill(view, 'form input[type="email"]', member.email)
       await fill(view, 'form input[type="password"]', password)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
 
       await visit(view, `${app.baseURL}/training`, '[data-test="training-page"]')
       await waitFor(view, `document.querySelector('[data-test="records"]')`, 30_000)

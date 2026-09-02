@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
 
-definePageMeta({ layout: 'admin', title: 'Account', middleware: 'signed-in' })
+definePageMeta({ layout: 'console', title: 'Account', middleware: 'console' })
 
 interface Grant { role: string, expiresAt: number | null, grantedAt: number, live: boolean }
 

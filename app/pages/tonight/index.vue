@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'foh' })
+definePageMeta({ layout: 'tonight' })
 useSeoMeta({ title: 'Tonight' })
 </script>
 

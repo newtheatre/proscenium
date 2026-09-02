@@ -295,7 +295,7 @@ async function signedInView(): Promise<Bun.WebView> {
   for (const [index, digit] of [...code].entries()) {
     await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
   }
-  await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+  await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
   return view
 }
 

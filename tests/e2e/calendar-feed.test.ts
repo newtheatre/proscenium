@@ -271,7 +271,7 @@ describe.skipIf(skip !== null)('the screen (C-104)', () => {
       await fill(view, 'form input[type="email"]', member.email)
       await fill(view, 'form input[type="password"]', memberPassword)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
       await visit(view, `${app.baseURL}/rooms/mine`, '[data-test="feed-card"]')
       // A server render cannot see a hydration failure, so the page is read after it is live.

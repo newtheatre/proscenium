@@ -2,7 +2,7 @@
 import { describeExpiry, saysDeliveryMode, saysKind } from '#shared/utils/training'
 import type { DeliveryMode, ExpiryMode, ModuleKind } from '#shared/utils/training'
 
-definePageMeta({ middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in' })
 
 interface Prerequisite { moduleId: string, name: string, held: boolean }
 

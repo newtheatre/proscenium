@@ -354,7 +354,7 @@ describe.skipIf(skip !== null)('the journey, end to end', () => {
       await fill(view, 'form input[type="email"]', member.email)
       await fill(view, 'form input[type="password"]', password)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
 
       await visit(view, `${app.baseURL}/training`, '[data-test="training-page"]')
       await waitFor(view, `document.querySelector('[data-test="records"]')`, 30_000)
@@ -398,9 +398,9 @@ describe.skipIf(skip !== null)('the officer screen (G-120, G-122)', () => {
       for (const [index, digit] of [...code].entries()) {
         await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
       }
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
 
-      await visit(view, `${app.baseURL}/admin/training-records`, '[data-test="person-picker"]')
+      await visit(view, `${app.baseURL}/training/manage/records`, '[data-test="person-picker"]')
       // A server render cannot see a hydration failure, so the page is read after it is live.
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
       expect(await textOf(view, 'body')).toContain('Whose records')

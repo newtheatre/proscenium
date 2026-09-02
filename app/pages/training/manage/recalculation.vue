@@ -4,7 +4,7 @@ import { saysKind } from '#shared/utils/training'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'admin', title: 'Recalculation', middleware: 'signed-in' })
+definePageMeta({ layout: 'console', title: 'Recalculation', middleware: 'console' })
 
 interface Affected {
   id: string

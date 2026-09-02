@@ -191,9 +191,9 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       await waitFor(view, 'document.querySelectorAll(\'[data-test="mfa-challenge"] input\').length >= 6')
 
       await fillPin(view, '[data-test="mfa-challenge"] input', await unusedCode())
-      await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
 
-      await visit(view, `${app.baseURL}/admin/config`, '[data-test="config-search"]')
+      await visit(view, `${app.baseURL}/admin/settings`, '[data-test="config-search"]')
 
       // Fifty keys, found by searching for what the key decides rather than its name (0032).
       await fill(view, 'input[data-test="config-search"]', 'bar tab')

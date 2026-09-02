@@ -5,7 +5,7 @@ import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { RoomHours } from '#shared/utils/rooms'
 import type { z } from 'zod'
 
-definePageMeta({ layout: 'admin', title: 'Rooms' })
+definePageMeta({ layout: 'console', title: 'Rooms', middleware: 'console' })
 
 interface Room {
   id: string
@@ -230,7 +230,7 @@ const columns: TableColumn<Room>[] = [
 
       <template #actions>
         <UButton
-          to="/admin/other-rooms"
+          to="/rooms/manage/other"
           color="neutral"
           variant="outline"
           icon="i-lucide-map-pin"

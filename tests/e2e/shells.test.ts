@@ -61,14 +61,15 @@ describe.skipIf(skip !== null)('the three shells (docs/design-language.md)', () 
     }
   }, 60_000)
 
-  // Internal tools use the calm defaults only. No poster kit in admin.
-  test('the admin shell uses none of the expressive kit', async () => {
-    expect(await inspect<Record<string, number>>('/admin', KIT_COUNTS))
+  // No poster kit in the console. On /dev because it wears the console layout and holds no
+  // middleware, so a signed-out view renders the shell rather than the sign-in screen (0040).
+  test('the console shell uses none of the expressive kit', async () => {
+    expect(await inspect<Record<string, number>>('/dev', KIT_COUNTS))
       .toEqual({ marquee: 0, sticker: 0, spotlight: 0 })
   })
 
   test('the show-night shell is a dark subtree, not a dashboard', async () => {
-    const seen = await inspect<{ bg: string, dashboard: number }>('/foh', `(() => ({
+    const seen = await inspect<{ bg: string, dashboard: number }>('/tonight', `(() => ({
       bg: getComputedStyle(document.querySelector('.dark')).backgroundColor,
       dashboard: document.querySelectorAll('[class*="dashboard"]').length,
     }))()`)

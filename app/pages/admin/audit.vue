@@ -8,7 +8,7 @@ import type { AuditActionName, AuditModule } from '#shared/utils/audit-actions'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'admin', title: 'Audit trail', middleware: 'signed-in' })
+definePageMeta({ layout: 'console', title: 'Audit trail', middleware: 'console' })
 
 const UBadge = resolveComponent('UBadge')
 

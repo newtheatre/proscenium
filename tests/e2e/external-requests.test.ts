@@ -465,7 +465,7 @@ describe.skipIf(skip !== null)('the screens (C-120)', () => {
       await fill(view, 'form input[type="email"]', member.email)
       await fill(view, 'form input[type="password"]', memberPassword)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
       const day = new Date()
       day.setUTCDate(day.getUTCDate() + 40)
@@ -507,10 +507,10 @@ describe.skipIf(skip !== null)('the screens (C-120)', () => {
       for (const [index, digit] of [...code].entries()) {
         await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
       }
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
       // The old path redirects here filtered, which is what officers were emailed (C-122).
-      await visit(view, `${app.baseURL}/admin/su-requests`, '[data-test="requests-table"]')
+      await visit(view, `${app.baseURL}/rooms/manage/requests?kind=unlisted`, '[data-test="requests-table"]')
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
 
       await click(view, `[data-test="submit-${id}"]`)

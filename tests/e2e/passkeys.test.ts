@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, signOut, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // A-105, driven through a real ceremony: Chrome's virtual authenticator signs for us, so what is
@@ -66,7 +66,7 @@ async function signedInView(prefix: string): Promise<{ email: string, view: Bun.
   await fill(view, 'form input[type="email"]', email)
   await fill(view, 'form input[type="password"]', password)
   await click(view, 'form button[type="submit"]')
-  await waitFor(view, 'document.querySelector(\'[data-test="sign-out"]\')')
+  await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
   return { email, view }
 }
 
@@ -121,14 +121,14 @@ describe.skipIf(skip !== null)('signing in with a passkey (A-105)', () => {
       await enrol(view)
       await waitFor(view, `document.querySelector('[data-test="methods"]').innerText.includes('passkey')`, 30_000)
 
-      await click(view, '[data-test="sign-out"]')
+      await signOut(view)
       await waitFor(view, 'location.pathname === "/"')
 
       await visit(view, `${app.baseURL}/sign-in`, '[data-test="passkey-sign-in"]')
       await click(view, '[data-test="passkey-sign-in"]')
 
       // No challenge screen in between: a passkey is a complete sign-in (criterion 2).
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
       const challenged = await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="mfa-challenge"]'))`)
       expect(challenged).toBe(false)
 
@@ -150,11 +150,11 @@ describe.skipIf(skip !== null)('signing in with a passkey (A-105)', () => {
       await waitFor(view, `document.querySelector('[data-test="methods"]').innerText.includes('passkey')`, 30_000)
       expect(passkeyOf(email)?.lastUsedAt).toBeNull()
 
-      await click(view, '[data-test="sign-out"]')
+      await signOut(view)
       await waitFor(view, 'location.pathname === "/"')
       await visit(view, `${app.baseURL}/sign-in`, '[data-test="passkey-sign-in"]')
       await click(view, '[data-test="passkey-sign-in"]')
-      await waitFor(view, `document.querySelector('[data-test="sign-out"]')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
 
       const after = passkeyOf(email)
       expect(after?.lastUsedAt).toBeGreaterThan(0)

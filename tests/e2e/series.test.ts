@@ -514,7 +514,7 @@ describe.skipIf(skip !== null)('the screens (C-110, C-111)', () => {
     await fill(view, 'form input[type="email"]', member.email)
     await fill(view, 'form input[type="password"]', memberPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
   }
 
   test('a member books a term from the form, and the list says where each week falls', async () => {
