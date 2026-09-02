@@ -41,8 +41,6 @@ export const PERMISSIONS = [
   // never expiring, which is break-glass and absent from every screen (G-120 criterion 5).
   'training.revoke',
   'training.override',
-  // Restating a stamped expiry is the one retroactive path, and the administrator's alone (G-124).
-  'training.recalculate',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

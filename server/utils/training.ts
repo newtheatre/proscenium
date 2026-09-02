@@ -1,7 +1,5 @@
 import { and, asc, desc, eq, gt, inArray, isNull, lte, not, or, sql } from 'drizzle-orm'
 import { isMonthDay, londonParts } from '#shared/utils/london'
-import { previewStatement, restatableCount } from '#shared/utils/recalculation'
-import type { PreviewRow } from '#shared/utils/recalculation'
 import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment, missingPrerequisites, saysGaps } from '#shared/utils/training'
 import type { AcademicYear, ExpiryMode, ExpiryPolicy, LeadAssignment, ModuleInput } from '#shared/utils/training'
 import type { Authority } from '#server/utils/authorise'
@@ -685,29 +683,6 @@ export function moduleValues(input: ModuleInput) {
     status: input.status,
     sort: input.sort,
   }
-}
-
-// How many records a recalculation would restate, as it stands now. Read at the preview and again
-// after a refused run, so the figure quoted back is the one that refused it (G-124 criterion 3).
-export async function countRestatable(
-  moduleId: string,
-  policy: ExpiryPolicy,
-  year: AcademicYear,
-): Promise<number> {
-  const found = await db.all<{ n: number }>(restatableCount(moduleId, policy, year))
-  return found[0]?.n ?? 0
-}
-
-// Every affected record, with the date standing and the date the policy would put there. Paged in
-// SQL, and scoped by predicate rather than by an id list (0003, G-124 criterion 2).
-export async function previewRestatable(
-  moduleId: string,
-  policy: ExpiryPolicy,
-  year: AcademicYear,
-  limit: number,
-  offset: number,
-): Promise<PreviewRow[]> {
-  return db.all<PreviewRow>(previewStatement(moduleId, policy, year, limit, offset))
 }
 
 export interface NextStep {

@@ -1,7 +1,6 @@
 import {
   decideRoomRequests,
   reachConsole,
-  recalculateTraining,
   runTrainingSessions,
   signedIn,
   viewAccounts,
@@ -75,7 +74,6 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Sessions', icon: 'i-lucide-calendar-days', to: '/training/manage/sessions', ability: runTrainingSessions },
       { label: 'Requests', icon: 'i-lucide-hand', to: '/training/manage/requests', ability: viewTrainingCatalogue },
       { label: 'Practice', icon: 'i-lucide-joystick', to: '/training/manage/practice', ability: viewTrainingCatalogue },
-      { label: 'Recalculation', icon: 'i-lucide-calendar-sync', to: '/training/manage/recalculation', ability: recalculateTraining },
     ],
   },
   {

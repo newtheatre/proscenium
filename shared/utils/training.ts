@@ -112,8 +112,8 @@ export function academicYearEnd(awardedOn: string, year: AcademicYear): string {
   return ends
 }
 
-// What a record earned today would expire on. Stamped at award and never recomputed by a later
-// policy change; G-124's previewed recalculation is the only retroactive path (G-123 criterion 3).
+// What a record earned today would expire on. Stamped at award, and nothing ever moves it: a
+// lifetime is fixed the day it is earned (G-123 criterion 3, 0041).
 export function expiryFor(policy: ExpiryPolicy, awardedOn: string, year: AcademicYear): string | null {
   switch (policy.expiryMode) {
     case 'NONE': return null
@@ -404,15 +404,6 @@ export const revokeForm = z.object({
   // Mandatory, because taking a record away is deliberate or it is a mistake (G-122 criterion 2).
   reason: z.string().trim().min(1).max(REVOKE_REASON_LIMIT),
 })
-
-// The one retroactive path to a stamped expiry, and the only mechanism that may take it
-// (G-124 criterion 1). The count is typed back from the preview and checked again at the write.
-export const recalculationForm = z.object({
-  moduleId: z.string().trim().min(1).max(32),
-  expectedCount: z.number().int().positive().max(1_000_000),
-})
-
-export type RecalculationInput = z.output<typeof recalculationForm>
 
 export const SESSION_STATUSES = ['PLANNED', 'OPEN', 'FULL', 'DELIVERED', 'CANCELLED'] as const
 export type SessionStatus = (typeof SESSION_STATUSES)[number]

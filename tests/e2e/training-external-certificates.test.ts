@@ -172,7 +172,7 @@ describe.skipIf(skip !== null)('the term is the issuer\'s, inside our cap (G-121
     expect((await record(complete(module, { expiresOn: null }))).status).toBe(400)
   })
 
-  test('the expiry is stored as an override, so recalculation leaves it alone', async () => {
+  test('the expiry is stored as an override, so it keeps the issuing body term', async () => {
     const module = await addModule({ expiryMode: 'MONTHS', expiryMonths: 12 })
     const answered = await record(complete(module, { expiresOn: daysFrom(90) }))
     expect(answered.status).toBe(200)

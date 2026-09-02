@@ -111,7 +111,6 @@ const CATALOGUE = {
   'record.signoff.unbounded': { label: 'Signed off as never expiring', module: 'training' },
   'record.external-certificate': { label: 'External certificate recorded', module: 'training' },
   'record.revoked': { label: 'Training record revoked', module: 'training' },
-  'record.expiry.recalculated': { label: 'Training expiries recalculated', module: 'training' },
   'session.scheduled': { label: 'Training session scheduled', module: 'training' },
   'record.delivery-logged': { label: 'Delivered training logged', module: 'training' },
   'session.capacity.changed': { label: 'Training session capacity changed', module: 'training' },
