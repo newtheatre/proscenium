@@ -509,7 +509,8 @@ describe.skipIf(skip !== null)('the screens (C-120)', () => {
       }
       await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
 
-      await visit(view, `${app.baseURL}/admin/su-requests`, '[data-test="su-requests-table"]')
+      // The old path redirects here filtered, which is what officers were emailed (C-122).
+      await visit(view, `${app.baseURL}/admin/su-requests`, '[data-test="requests-table"]')
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
 
       await click(view, `[data-test="submit-${id}"]`)
@@ -710,7 +711,7 @@ describe('what the officer sees first', () => {
     await send('POST', `/api/rooms/external-requests/${settled}/cancel`, {}, member.cookie)
     const open = await ask(span(46))
 
-    const answered = await send('GET', '/api/admin/rooms/external-requests?when=all', undefined, officer)
+    const answered = await send('GET', '/api/admin/rooms/queue?when=all&kind=unlisted', undefined, officer)
     const { items } = await answered.json() as { items: { id: string, status: string }[] }
 
     const firstSettled = items.findIndex(one => one.status === 'CANCELLED')
@@ -727,7 +728,7 @@ describe('what the officer sees first', () => {
       spaceId: space, reason: 'No floor space',
     }, officer)
 
-    const answered = await send('GET', '/api/admin/rooms/external-requests?when=all', undefined, officer)
+    const answered = await send('GET', '/api/admin/rooms/queue?when=all&kind=unlisted', undefined, officer)
     const { items, more } = await answered.json() as {
       items: { id: string, offers: { outcome: string }[] }[]
       more: boolean

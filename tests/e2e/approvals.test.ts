@@ -133,7 +133,7 @@ describe.skipIf(skip !== null)('the queue (C-109)', () => {
     // would depend on the hour the suite happened to run.
     const id = placeRequest(room, member.id, soon(1), 'The get-in is that morning')
 
-    const answered = await send('GET', '/api/admin/rooms/requests', null, officer)
+    const answered = await send('GET', '/api/admin/rooms/queue', null, officer)
     const body = await answered.json() as { items: { id: string, requester: string, reason: string, room: string, failures: { reason: string }[] }[] }
     const row = body.items.find(item => item.id === id)
 
@@ -146,12 +146,12 @@ describe.skipIf(skip !== null)('the queue (C-109)', () => {
   })
 
   test('a member cannot read the queue', async () => {
-    const answered = await send('GET', '/api/admin/rooms/requests', null, member.cookie)
+    const answered = await send('GET', '/api/admin/rooms/queue', null, member.cookie)
     expect(answered.status).toBe(403)
   })
 
   test('a signed-out visitor cannot read the queue', async () => {
-    const answered = await send('GET', '/api/admin/rooms/requests', null, '')
+    const answered = await send('GET', '/api/admin/rooms/queue', null, '')
     expect([401, 403]).toContain(answered.status)
   })
 })

@@ -273,7 +273,7 @@ describe.skipIf(skip !== null)('the ladder, and what it costs (criteria 3 and 4)
     expect(asked.status).toBe(200)
 
     const { id } = await asked.json() as { id: string }
-    const queue = await (await send('GET', '/api/admin/rooms/requests', null, officer)).json() as
+    const queue = await (await send('GET', '/api/admin/rooms/queue', null, officer)).json() as
       { items: { id: string }[] }
     expect(queue.items.some(item => item.id === id)).toBe(true)
   })

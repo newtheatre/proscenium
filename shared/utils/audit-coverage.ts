@@ -98,7 +98,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/rooms/series.post.ts', actions: ['room.series.booked', 'room.series.requested'] },
   { route: 'server/api/rooms/bookings.post.ts', actions: ['room.booked'] },
   { route: 'server/api/admin/rooms/index.get.ts', exempt: 'reads the bookable estate' },
-  { route: 'server/api/admin/rooms/requests/index.get.ts', exempt: 'reads what is waiting on a decision' },
+  { route: 'server/api/admin/rooms/queue.get.ts', exempt: 'reads what is waiting on a decision, ours and not' },
   {
     route: 'server/api/admin/rooms/requests/decide.post.ts',
     actions: ['room.request.approved', 'room.request.rejected'],
@@ -118,7 +118,6 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/rooms/external-requests.get.ts', exempt: 'reads the unlisted rooms you asked for' },
   { route: 'server/api/rooms/external-requests.post.ts', actions: ['external.requested'] },
   { route: 'server/api/rooms/external-requests/[id]/cancel.post.ts', actions: ['external.request.cancelled'] },
-  { route: 'server/api/admin/rooms/external-requests/index.get.ts', exempt: 'reads what is waiting on somebody else' },
   { route: 'server/api/admin/rooms/external-requests/[id]/submit.post.ts', actions: ['external.request.submitted'] },
   { route: 'server/api/admin/rooms/external-requests/[id]/assign.post.ts', actions: ['external.request.assigned'] },
   {

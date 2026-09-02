@@ -92,7 +92,9 @@ async function warm(port: number): Promise<void> {
 // Freeing the socket is not enough: a surviving runner takes the port straight back.
 function held(port: number): void {
   if (!portIsFree(port)) {
-    throw new Error(`port ${port} is already held: stop the process on it, then run this again`)
+    throw new Error(`port ${port} is already held. Check whose it is before killing anything: `
+      + `ps -eo pid,args | grep "[r]un-tests.ts". Another run on this machine binds the same port `
+      + `by default, and clearing it takes that run down. Set E2E_BASE_PORT to avoid sharing.`)
   }
 }
 
@@ -193,10 +195,15 @@ async function e2e(files: string[]): Promise<boolean> {
   }
 }
 
-// Named files go straight to bun, unsharded: sharding one suite buys nothing and hides its output
-// behind a prefix.
+// Named files go straight to bun, unsharded: sharding one suite buys nothing and hides its output.
+
+// E2E_BASE_URL is set here too, or a filtered run silently ignores E2E_BASE_PORT.
 if (only.length) {
-  const run = Bun.spawn(['bun', 'test', ...only], { stdout: 'inherit', stderr: 'inherit' })
+  const run = Bun.spawn(['bun', 'test', ...only], {
+    env: { ...process.env, E2E_BASE_URL: process.env.E2E_BASE_URL ?? `http://localhost:${BASE_PORT}` },
+    stdout: 'inherit',
+    stderr: 'inherit',
+  })
   process.exit(await run.exited)
 }
 

@@ -1,21 +1,30 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 import { isCurrent } from '#shared/utils/membership'
-import { z } from 'zod'
+import { LIST_CAP } from '#server/utils/external-requests'
+import { addWorkingDays, coversThrough, londonDate } from '#shared/utils/working-days'
+import type { QueueItem } from '#shared/utils/queue'
 import type { H3Event } from 'h3'
 
-const query = z.object({
-  room: z.string().max(64).optional(),
-  // Answered requests stay readable, so a decision can be looked up rather than remembered.
-  when: z.enum(['waiting', 'decided']).default('waiting'),
-})
+// The date the form has to go in by, counted back from the booking in working days, so the
+// deadline belongs to the person who can meet it (C-121 criterion 2). Null when unknowable.
+export async function formDeadline(event: H3Event | undefined, startsAt: number): Promise<string | null> {
+  const holidays = await configValue(event, 'BANK_HOLIDAYS')
+  const at = new Date(startsAt * 1000)
+  if (!coversThrough(holidays, at)) return null
 
-// Requests waiting on a decision, with what each one breaks.
-export default defineEventHandler(async (event) => {
-  await requirePermission(event, 'rooms.write')
-  const input = await getValidatedQueryOrThrow(event, query)
+  const notice = await configValue(event, 'EXTERNAL_REQUEST_NOTICE_WORKING_DAYS')
+  return londonDate(addWorkingDays(at, -notice, holidays))
+}
 
+// Requests for our own rooms, judged as they are read: one written on Monday may have run out of
+// notice by Thursday, and the officer deciding needs what is true today (C-109 criterion 1).
+export async function pendingRoomRequests(
+  event: H3Event,
+  when: 'open' | 'all',
+  room?: string,
+): Promise<QueueItem[]> {
   const rows = await db.select({
     id: schema.roomBookings.id,
     roomId: schema.roomBookings.roomId,
@@ -39,16 +48,14 @@ export default defineEventHandler(async (event) => {
     .innerJoin(schema.rooms, eq(schema.rooms.id, schema.roomBookings.roomId))
     .innerJoin(schema.users, eq(schema.users.id, schema.roomBookings.userId))
     .where(and(
-      input.when === 'waiting'
+      when === 'open'
         ? eq(schema.roomBookings.status, 'PENDING_APPROVAL')
-        : sql`${schema.roomBookings.decidedAt} IS NOT NULL`,
-      input.room ? eq(schema.roomBookings.roomId, input.room) : undefined,
+        : sql`(${schema.roomBookings.status} = 'PENDING_APPROVAL' OR ${schema.roomBookings.decidedAt} IS NOT NULL)`,
+      room ? eq(schema.roomBookings.roomId, room) : undefined,
     ))
-    .orderBy(input.when === 'waiting' ? asc(schema.roomBookings.createdAt) : desc(schema.roomBookings.decidedAt))
-    .limit(200)
+    .orderBy(asc(schema.roomBookings.startsAt))
+    .limit(LIST_CAP + 1)
 
-  // Judged now rather than recalled: a request written on Monday may have run out of notice by
-  // Thursday, and the officer deciding needs what is true today (C-106).
   const rooms = await listRooms(true)
   const estate = await estatePolicy(event)
   const now = new Date()
@@ -56,12 +63,12 @@ export default defineEventHandler(async (event) => {
   const current = await membersAmongRequesters(event, now)
   const stopped = await requestersUnderPreApproval(event, rows, now)
 
-  const items = rows.map((row) => {
-    const room = rooms.find(one => one.id === row.roomId)
-    const verdict = room && judge(
+  return rows.map((row) => {
+    const found = rooms.find(one => one.id === row.roomId)
+    const verdict = found && judge(
       { startsAt: new Date(row.startsAt * 1000), endsAt: new Date(row.endsAt * 1000) },
-      resolvePolicy(room, estate),
-      room,
+      resolvePolicy(found, estate),
+      found,
       {
         now,
         // The requester's standing, never the reader's: this is what they were judged against.
@@ -74,13 +81,13 @@ export default defineEventHandler(async (event) => {
 
     return {
       ...row,
+      kind: 'room' as const,
+      where: row.room,
       failures: verdict ? verdict.failures : [],
-      sensitive: room?.sensitive ?? false,
+      sensitive: found?.sensitive ?? false,
     }
   })
-
-  return { when: input.when, items, total: items.length }
-})
+}
 
 // Which requesters are on the no-show ladder. Counted per person rather than in one statement,
 // because the count is a window function over the latest entry per booking (C-116).
