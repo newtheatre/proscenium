@@ -88,3 +88,11 @@ The end-to-end helper that fills a date can only verify the rendered segments, b
 driving a browser cannot see Vue state, and it duly reported success while the model stayed empty.
 So a test of any form carrying a date must assert the row that was saved. Filling a date field is
 not evidence that a date was submitted.
+
+That last point generalises well past `instanceof`, and it is the reason this survived as long as
+it did. **A date field can display exactly the right answer while holding nothing**, so an
+assertion that reads the segments proves less than it appears to: it passes identically with the
+defect and without it. The rooms suite carried one such assertion, checking the rendered segments
+held eight digits, and it never once exercised the setter, because every rooms case supplies its
+date through the query string instead of typing it. A path no test drives is not a path a green
+suite vouches for.
