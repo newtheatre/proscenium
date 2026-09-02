@@ -568,3 +568,64 @@ export const deliveryLogForm = deliveryFields.extend({
 
 export type DeliveryPreviewInput = z.output<typeof deliveryPreviewForm>
 export type DeliveryLogInput = z.output<typeof deliveryLogForm>
+export const ATTENDANCE_MARKS = ['ATTENDED', 'ABSENT'] as const
+export type AttendanceMark = typeof ATTENDANCE_MARKS[number]
+
+export const PRACTICE_KEY = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
+export const MAX_PRACTICE_WINDOW_HOURS = 8760
+
+// A register is opened on or after the session day, never before: a record stamps from the
+// held-on date, and a future-dated one would read as valid to every gate (G-115 criterion 1).
+export function registerOpenable(heldOn: string, today: string): boolean {
+  return today >= heldOn
+}
+
+export const markForm = z.object({
+  marks: z.array(z.object({
+    userId: z.string().trim().min(1).max(64),
+    mark: z.enum(ATTENDANCE_MARKS),
+  })).min(1).max(120),
+  // Criterion 2. Everybody absent is a real answer and a suspicious one, so it is confirmed
+  // rather than refused.
+  confirmedAllAbsent: z.boolean().optional(),
+})
+
+export type MarkInput = z.output<typeof markForm>
+
+// Criterion 1. The marks must cover the register exactly: no strangers, no duplicates, nobody
+// skipped. Returned as three lists so the refusal can say which of the three went wrong.
+export function coverageProblem(expected: string[], marked: string[]): {
+  strangers: string[]
+  duplicates: string[]
+  missing: string[]
+} | null {
+  const onRegister = new Set(expected)
+  const seen = new Set<string>()
+  const duplicates: string[] = []
+  const strangers: string[] = []
+
+  for (const userId of marked) {
+    if (seen.has(userId)) duplicates.push(userId)
+    seen.add(userId)
+    if (!onRegister.has(userId)) strangers.push(userId)
+  }
+  const missing = expected.filter(userId => !seen.has(userId))
+
+  if (strangers.length === 0 && duplicates.length === 0 && missing.length === 0) return null
+  return { strangers: [...new Set(strangers)], duplicates: [...new Set(duplicates)], missing }
+}
+
+export const practiceTargetForm = z.object({
+  name: z.string().trim().min(1).max(120),
+  description: text(2000),
+  windowHours: z.number().int().min(1).max(MAX_PRACTICE_WINDOW_HOURS),
+  isActive: z.boolean().default(true),
+  moduleIds: z.array(z.string().trim().min(1).max(32)).max(40).default([]),
+})
+
+export const newPracticeTargetForm = practiceTargetForm.extend({
+  // Immutable once created, because consumers reference it (G-126 criterion 1).
+  key: z.string().trim().min(2).max(40).regex(PRACTICE_KEY, 'A practice key is lower case, digits and hyphens'),
+})
+
+export type PracticeTargetInput = z.output<typeof practiceTargetForm>

@@ -1159,9 +1159,39 @@ Opening a session for sign-up resolves every open ask for the modules it teaches
 requester once, the claim held by the notification ledger (criterion 4). A session created but not
 yet open resolves nothing, because there is nothing for a member to sign up to.
 
-### practice_targets / practice_windows
-Targets keyed by immutable `key`; windows opened by register-open or by hand, closed by
-sweep; consumers inside the same database now, no API seam.
+### practice_targets / practice_target_modules
+`practice_targets`: `key` PK · `name` · `description` · `window_hours` CHECK 1 to 8760 ·
+`is_active` · `created_at` · `updated_at`. `practice_target_modules` maps a target to the modules
+that open it, UNIQUE on the pair, cascading from both ends.
+
+**The key is the primary key and never changes**, because a consumer quotes it when it asks whether
+somebody may practise (G-126 criterion 1). Everything else about a target is editable, including
+which modules open it and whether it is in use at all.
+
+### practice_windows
+`id` PK · `target_key` cascade · `user_id` cascade · `session_id` · `opens_at` · `expires_at` ·
+`closed_at` · `closed_by` set null · `opened_by` set null · `created_at`. Indexed on `user_id` and
+on `expires_at`.
+
+**Partial UNIQUE (`target_key`, `user_id`, `session_id`) WHERE `session_id` IS NOT NULL.** Opening
+a register opens one window per placed member per matching target, and two devices opening the same
+register must not open two: the old estate could, and this is where that is made impossible rather
+than unlikely (criterion 2). The index is partial because a window opened by hand carries no session
+and must not contend with a register's claim; the write path extends an open one instead of
+duplicating it, since two windows would expire at different times and the later would look like
+access the earlier had already ended.
+
+`session_id` carries **no foreign key**: a window outlives the session that opened it, and access
+granted is a fact about the past.
+
+**Window state is read from the table every time and never cached** (criterion 4). The old estate
+served it no-store for the same reason: practice access is enforced, not advisory, so a stale yes is
+a person in a sandbox they should not be in.
+
+Closing is `whoever opened it, with an administrator as the backstop` (open question 3, answered
+2 September). A window opened by a register has no opener of its own, so it is the administrator's.
+The scheduled sweep closes lapsed windows and **does nothing else**: it never opens one, and it
+never touches a record.
 
 ## Platform (modules H, J, K)
 

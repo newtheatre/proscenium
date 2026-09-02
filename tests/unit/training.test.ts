@@ -9,6 +9,8 @@ import {
   DELIVERY_RECORDS_PER_STATEMENT,
   DELIVERY_RECORD_COLUMNS,
   MAX_EXPIRY_MONTHS,
+  coverageProblem,
+  registerOpenable,
   RECORD_SOURCES,
   academicYearEnd,
   addMonths,
@@ -525,5 +527,81 @@ describe('a retrospective log names its modules, its day and its people (G-118 c
       .toBeLessThanOrEqual(BOUND_PARAMETER_CHUNK)
     expect(statements * DELIVERY_RECORDS_PER_STATEMENT).toBeGreaterThanOrEqual(records)
     expect(records).toBe(DELIVERY_RECORDS_MAX)
+  })
+})
+
+// G-115 criterion 1. A register opens on the day or after it, never before: records stamp from the
+// held-on date, and a future-dated record would read as valid to every gate.
+describe('a register opens on the day, not before (G-115 criterion 1)', () => {
+  test('the day itself is open, and the day before is not', () => {
+    expect(registerOpenable('2026-10-05', '2026-10-05')).toBe(true)
+    expect(registerOpenable('2026-10-05', '2026-10-04')).toBe(false)
+  })
+
+  test('an old session is still openable, because marking late still awards', () => {
+    expect(registerOpenable('2026-01-05', '2026-10-05')).toBe(true)
+  })
+})
+
+// G-116 criterion 1. The marks cover the register exactly: no strangers, no duplicates, nobody
+// skipped. Three separate failures, because the refusal has to say which one happened.
+describe('a register is covered exactly (G-116 criterion 1)', () => {
+  test('every person marked once is the only shape that passes', () => {
+    expect(coverageProblem(['a', 'b'], ['a', 'b'])).toBeNull()
+    expect(coverageProblem([], [])).toBeNull()
+  })
+
+  test('order does not matter, because a register is a set', () => {
+    expect(coverageProblem(['a', 'b', 'c'], ['c', 'a', 'b'])).toBeNull()
+  })
+
+  test('somebody skipped is named', () => {
+    expect(coverageProblem(['a', 'b'], ['a'])?.missing).toEqual(['b'])
+  })
+
+  test('a stranger is named', () => {
+    expect(coverageProblem(['a'], ['a', 'z'])?.strangers).toEqual(['z'])
+  })
+
+  test('a duplicate is named, and does not also read as covering', () => {
+    const problem = coverageProblem(['a', 'b'], ['a', 'a'])
+    expect(problem?.duplicates).toEqual(['a'])
+    expect(problem?.missing).toEqual(['b'])
+  })
+
+  test('the three failures are reported together, not one at a time', () => {
+    const problem = coverageProblem(['a', 'b'], ['a', 'a', 'z'])
+    expect(problem).toEqual({ strangers: ['z'], duplicates: ['a'], missing: ['b'] })
+  })
+})
+
+// G-119. Weekly from day 2, silent before that and after 60 days, and the week index is what the
+// ledger claims so a re-run inside the same week sends nothing.
+describe('an unmarked register is nagged weekly (G-119 criteria 1 and 2)', () => {
+  test('nothing on the day itself or the day after', async () => {
+    const { nagWeek } = await import('#shared/utils/training-expiry')
+    expect(nagWeek('2026-10-05', '2026-10-05')).toBeNull()
+    expect(nagWeek('2026-10-05', '2026-10-06')).toBeNull()
+  })
+
+  test('the first nag is day 2, and the week does not turn until day 9', async () => {
+    const { nagWeek } = await import('#shared/utils/training-expiry')
+    expect(nagWeek('2026-10-05', '2026-10-07')).toBe(0)
+    expect(nagWeek('2026-10-05', '2026-10-13')).toBe(0)
+    expect(nagWeek('2026-10-05', '2026-10-14')).toBe(1)
+  })
+
+  test('nags stop after sixty days, and the register is still stale', async () => {
+    const { nagWeek } = await import('#shared/utils/training-expiry')
+    expect(nagWeek('2026-10-05', '2026-12-04')).toBe(8)
+    expect(nagWeek('2026-10-05', '2026-12-05')).toBeNull()
+    expect(nagWeek('2026-10-05', '2027-06-05')).toBeNull()
+  })
+
+  test('a claim is per session and per week, so a re-run in the same week is silent', async () => {
+    const { nagClaimFor } = await import('#shared/utils/training-expiry')
+    expect(nagClaimFor('s1', 0)).toBe(nagClaimFor('s1', 0))
+    expect(nagClaimFor('s1', 0)).not.toBe(nagClaimFor('s1', 1))
+    expect(nagClaimFor('s1', 0)).not.toBe(nagClaimFor('s2', 0))
   })
 })

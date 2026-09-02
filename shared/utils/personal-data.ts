@@ -100,6 +100,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Training this person held. Who was competent to do what is safety history; the evidence for it and the words written about them are not.',
   },
   {
+    name: 'practice_windows',
+    column: 'user_id',
+    section: 'training-practice',
+    columns: ['target_key', 'opens_at', 'expires_at', 'closed_at', 'created_at'],
+    // Nothing is written about the person here, only when they could rehearse on what, so there
+    // is nothing to clear: the row survives pointing at the tombstoned account.
+    erasure: 'keep',
+    why: 'When this person could practise on which surface. How much a sandbox was used is worth keeping, and the row holds no words about anybody.',
+  },
+  {
     name: 'module_requests',
     column: 'user_id',
     section: 'training-requests',
