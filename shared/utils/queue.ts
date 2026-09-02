@@ -31,6 +31,8 @@ export interface QueueItem {
   preferredWarning?: string | null
   suReference?: string | null
   formDueBy?: string | null
+  convertedToRequestId?: string | null
+  convertedToBookingId?: string | null
   offers?: { id: string, spaceId: string, space: string, outcome: string, reason: string | null, by: string | null, recordedAt: number }[]
 }
 

@@ -7,8 +7,8 @@ conflict masking), while the calendar, the policy engine, blackouts, tiers and n
 new build. Equipment loans arrive in V2 as the sibling the room store always implied, gated by live
 training records because the gate and the record now share one database.
 
-Counts: 22 MVP stories (C-101 to C-122), 6 V2 stories (C-201 to C-206), 2 Later epic stubs
-(C-301, C-302). 30 total.
+Counts: 23 MVP stories (C-101 to C-123), 6 V2 stories (C-201 to C-206), 2 Later epic stubs
+(C-301, C-302). 31 total.
 
 ## Open questions
 
@@ -356,6 +356,22 @@ Counts: 22 MVP stories (C-101 to C-122), 6 V2 stories (C-201 to C-206), 2 Later 
   5. Every action available on either old screen is available here, and no action appears on a row it would refuse.
   6. The endpoint returns a pagination envelope and says when it has capped, rather than reporting the cap as a total.
 - Source: the two queues C-109 and C-120 shipped separately, and the officer who has to watch both.
+
+## C-123: Move a request between a room we manage and one we do not
+
+- Role: Theatre Manager
+- Phase: MVP
+- Story: As an approver, I want to move a request to the other kind when the room it asks for is the wrong one, so that a member who asked for the wrong thing does not have to cancel and start again.
+- Depends on: C-122
+- Acceptance criteria:
+  1. A request for one of our rooms can be moved to a room we do not manage. It **frees the slot it was holding**, which is the point: nothing about the new request holds one.
+  2. Moving that way is **refused when there is no longer time to ask**, naming the date the form would have had to go in by. Converting on the day is the moment the member most needs telling that it cannot work.
+  3. A request for a room we do not manage can be moved into one of ours, chosen by the officer from those actually free for the span. This **claims a slot**, so it is a conditional write with the predicate on the statement and it refuses naming the room when somebody else has it.
+  4. Moving that way lands CONFIRMED if it passes the policy, and PENDING_APPROVAL if it does not. Choosing the room is not a licence to skip the rules.
+  5. A moved row is superseded, never deleted: it goes to CANCELLED carrying a pointer to what replaced it, and **never reads as "Cancelled" anywhere**. A member seeing a live request marked withdrawn is the defect this criterion exists to prevent.
+  6. Title, purpose, attendee count, times and notes cross. The reason a member gave for asking outside policy does not, because the other side never asks that question.
+  7. Both directions need `rooms.write`, are audited, and tell the member what happened: whether they lost their slot, and what happens next.
+- Source: the Theatre Manager, on requests that arrive naming the wrong kind of room; decision 0036 for why the two tables stay separate.
 
 ## C-201: Asset register
 

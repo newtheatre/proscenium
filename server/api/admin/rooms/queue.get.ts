@@ -62,6 +62,7 @@ async function unlistedRequests(event: H3Event, when: 'open' | 'all'): Promise<Q
     suReference: one.suReference,
     notes: one.notes,
     rejectionReason: one.rejectionReason,
+    convertedToBookingId: one.convertedToBookingId,
     // The date it has to go in by, so the deadline belongs to whoever can meet it (C-121).
     formDueBy: one.status === 'REQUESTED' ? await formDeadline(event, one.startsAt) : null,
     offers: offers.get(one.id) ?? [],

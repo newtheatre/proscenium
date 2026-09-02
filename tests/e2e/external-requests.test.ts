@@ -739,3 +739,75 @@ describe('what the officer sees first', () => {
     expect(more).toBe(false)
   })
 })
+
+// C-123. A room of ours coming free is a better outcome than one we were lent, so a request can
+// move the other way too. This one claims a slot, so unlike unlisting it can fail.
+describe.skipIf(skip !== null)('moving a request into one of our rooms', () => {
+  async function ourRoom(): Promise<string> {
+    const answered = await send('POST', '/api/admin/rooms', { name: `Ours ${crypto.randomUUID().slice(0, 8)}` }, officer)
+    return (await answered.json() as { id: string }).id
+  }
+
+  test('it claims the room, supersedes the request, and never reads as cancelled', async () => {
+    const id = await ask(span(35))
+    const room = await ourRoom()
+
+    const answered = await send('POST', `/api/admin/rooms/external-requests/${id}/relist`,
+      { roomId: room, reason: 'The Studio came free' }, officer)
+    expect(answered.status).toBe(200)
+    const { became, status } = await answered.json() as { became: string, status: string }
+
+    expect(statusOf(id)).toBe('CANCELLED')
+    expect(read<{ converted_to_booking_id: string }>(
+      'SELECT converted_to_booking_id FROM external_requests WHERE id = ?', id)?.converted_to_booking_id).toBe(became)
+    expect(read<{ room_id: string, converted_from_request_id: string }>(
+      'SELECT room_id, converted_from_request_id FROM room_bookings WHERE id = ?', became))
+      .toEqual({ room_id: room, converted_from_request_id: id })
+    expect(['CONFIRMED', 'PENDING_APPROVAL']).toContain(status)
+  })
+
+  // Choosing the room is not a licence to skip the rules: a span the policy refuses still queues.
+  test('a span inside the notice window lands in the queue rather than confirmed', async () => {
+    const id = await ask(span(35))
+    const room = await ourRoom()
+    const soon = Math.floor(Date.now() / 1000) + 3600
+    write('UPDATE external_requests SET starts_at = ?, ends_at = ? WHERE id = ?', soon, soon + 7200, id)
+
+    const answered = await send('POST', `/api/admin/rooms/external-requests/${id}/relist`,
+      { roomId: room, reason: 'Tonight, and ours is free' }, officer)
+
+    expect(answered.status).toBe(200)
+    expect((await answered.json() as { status: string }).status).toBe('PENDING_APPROVAL')
+  })
+
+  test('a settled request has nothing to move', async () => {
+    const id = await ask(span(36))
+    await send('POST', `/api/rooms/external-requests/${id}/cancel`, {}, member.cookie)
+
+    const answered = await send('POST', `/api/admin/rooms/external-requests/${id}/relist`,
+      { roomId: await ourRoom(), reason: 'Too late' }, officer)
+    expect(answered.status).toBe(409)
+  })
+
+  // The predicate rides the INSERT, so this is a race rather than a comment (0003, C-107).
+  test('two officers claiming one room for two requests: exactly one wins', async () => {
+    const room = await ourRoom()
+    const when = span(37)
+    const first = await ask(when)
+    const second = await ask(when, other.cookie)
+
+    const [a, b] = await Promise.all([
+      send('POST', `/api/admin/rooms/external-requests/${first}/relist`, { roomId: room, reason: 'Ours' }, officer),
+      send('POST', `/api/admin/rooms/external-requests/${second}/relist`, { roomId: room, reason: 'Ours' }, officer),
+    ])
+
+    const codes = [a.status, b.status].sort()
+    expect(codes).toEqual([200, 409])
+
+    // And the loser is untouched: it is still a request somebody can answer.
+    const held = read<{ n: number }>(
+      `SELECT count(*) n FROM room_bookings WHERE room_id = ? AND status IN ('CONFIRMED','PENDING_APPROVAL')`, room)
+    expect(held?.n).toBe(1)
+    expect([statusOf(first), statusOf(second)].filter(status => status === 'CANCELLED')).toHaveLength(1)
+  })
+})

@@ -43,6 +43,7 @@ export async function pendingRoomRequests(
     createdAt: schema.roomBookings.createdAt,
     escalatedAt: schema.roomBookings.escalatedAt,
     decidedAt: schema.roomBookings.decidedAt,
+    convertedToRequestId: schema.roomBookings.convertedToRequestId,
   })
     .from(schema.roomBookings)
     .innerJoin(schema.rooms, eq(schema.rooms.id, schema.roomBookings.roomId))

@@ -48,6 +48,33 @@ export function describePurpose(value: string | null): string {
   return value.charAt(0) + value.slice(1).toLowerCase().replaceAll('_', ' ')
 }
 
+// What a member reads for a booking's state. A cancellation carrying a conversion pointer was
+// moved rather than withdrawn, and reading it as "Cancelled" would say the opposite (C-123).
+export function saysBookingState(booking: { status: string, convertedToRequestId?: string | null }): string {
+  if (booking.status === 'CANCELLED' && booking.convertedToRequestId) return 'Moved to a room not listed here'
+  return BOOKING_STATE[booking.status] ?? booking.status
+}
+
+const BOOKING_STATE: Record<string, string> = {
+  CONFIRMED: 'Confirmed',
+  PENDING_APPROVAL: 'Waiting on a decision',
+  CANCELLED: 'Cancelled',
+  REJECTED: 'Turned down',
+  BUMPED: 'Given to a higher priority',
+}
+
+// Only a request waiting on a decision moves: it holds a slot nobody is relying on yet, and a
+// confirmed booking is somebody's arrangement rather than a question.
+export function refusalToUnlist(booking: { status: string, seriesId: string | null }): string | null {
+  if (booking.seriesId) {
+    return 'That booking is part of a series, so it cannot be moved on its own yet'
+  }
+  if (booking.status !== 'PENDING_APPROVAL') {
+    return `That booking is ${saysBookingState(booking).toLowerCase()}, so there is nothing to move`
+  }
+  return null
+}
+
 // A member cancels what still holds a slot; everything else has already been decided, and the
 // slot may be somebody else's by now (C-112 criterion 5).
 export const CANCELLABLE: readonly BookingStatus[] = ['CONFIRMED', 'PENDING_APPROVAL']

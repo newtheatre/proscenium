@@ -112,6 +112,10 @@ export const roomBookings = sqliteTable('room_bookings', {
   bumpedToBookingId: text('bumped_to_booking_id'),
   bumpedReason: text('bumped_reason'),
   noShowRecordedAt: integer('no_show_recorded_at'),
+  // Superseded rather than deleted: a moved row is CANCELLED and points at what replaced it. No
+  // new status, because room_bookings.status carries a CHECK and a rebuild is refused (C-123).
+  convertedToRequestId: text('converted_to_request_id'),
+  convertedFromRequestId: text('converted_from_request_id'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 }, table => [
@@ -241,6 +245,8 @@ export const externalRequests = sqliteTable('external_requests', {
   decidedBy: text('decided_by').references(() => users.id),
   rejectionReason: text('rejection_reason'),
   escalatedAt: integer('escalated_at'),
+  convertedToBookingId: text('converted_to_booking_id'),
+  convertedFromBookingId: text('converted_from_booking_id'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 }, table => [

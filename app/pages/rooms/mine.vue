@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
-import { saysExternalStatus } from '#shared/utils/external-requests'
+import { saysBookingState } from '#shared/utils/bookings'
+import { saysExternalState } from '#shared/utils/external-requests'
 
 definePageMeta({ middleware: 'signed-in' })
 
@@ -19,6 +20,7 @@ interface Booking {
   seriesLength: number | null
   bumpedReason: string | null
   bumpedToBookingId: string | null
+  convertedToRequestId: string | null
 }
 
 interface Listing { when: string, items: Booking[], total: number }
@@ -75,6 +77,7 @@ async function copyFeed(): Promise<void> {
 }
 
 interface UnlistedRequest {
+  convertedToBookingId: string | null
   id: string
   title: string
   purpose: string
@@ -136,9 +139,13 @@ const STATES: Record<string, { label: string, color: 'success' | 'warning' | 'ne
   BUMPED: { label: 'Given to a higher priority', color: 'neutral' },
 }
 
-// An unregistered status shows as itself rather than falling out of the list (0027's habit).
-const stateOf = (status: string): { label: string, color: 'success' | 'warning' | 'neutral' | 'error' } =>
-  STATES[status] ?? { label: status, color: 'neutral' }
+// A moved booking is CANCELLED carrying a pointer, and reading it as "Cancelled" would tell the
+// member the opposite of what happened (C-123 criterion 5).
+const stateOf = (booking: { status: string, convertedToRequestId?: string | null }): { label: string, color: 'success' | 'warning' | 'neutral' | 'error' } => {
+  const label = saysBookingState(booking)
+  if (booking.status === 'CANCELLED' && booking.convertedToRequestId) return { label, color: 'warning' }
+  return { label, color: STATES[booking.status]?.color ?? 'neutral' }
+}
 
 function spanOf(booking: Booking): string {
   const from = formatLondon(new Date(booking.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
@@ -251,11 +258,11 @@ useSeoMeta({ title: 'My bookings' })
           <p class="flex flex-wrap items-center gap-2 font-medium">
             {{ booking.room }}
             <UBadge
-              :color="stateOf(booking.status).color"
+              :color="stateOf(booking).color"
               variant="subtle"
               size="sm"
             >
-              {{ stateOf(booking.status).label }}
+              {{ stateOf(booking).label }}
             </UBadge>
           </p>
           <p class="text-sm text-muted">
@@ -351,7 +358,7 @@ useSeoMeta({ title: 'My bookings' })
                 variant="subtle"
                 size="sm"
               >
-                {{ saysExternalStatus(one.status) }}
+                {{ saysExternalState(one) }}
               </UBadge>
             </p>
             <p class="text-sm text-muted">

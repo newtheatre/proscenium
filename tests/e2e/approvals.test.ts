@@ -510,3 +510,54 @@ describe.skipIf(skip !== null)('the queue in a browser (C-109)', () => {
     }
   }, CASE_TIMEOUT_MS)
 })
+
+// C-123. A request naming the wrong kind of room moves rather than being cancelled and re-asked.
+describe.skipIf(skip !== null)('moving a request to the other kind', () => {
+  test('unlisting frees the slot it was holding, and supersedes rather than cancels', async () => {
+    const room = await makeRoom()
+    const when = soon(30)
+    const id = placeRequest(room, member.id, when)
+
+    const answered = await send('POST', `/api/admin/rooms/requests/${id}/unlist`,
+      { reason: 'Nothing of ours is big enough' }, officer)
+    expect(answered.status).toBe(200)
+    const { became } = await answered.json() as { became: string }
+
+    expect(statusOf(id)).toBe('CANCELLED')
+    expect(read<{ converted_to_request_id: string }>(
+      'SELECT converted_to_request_id FROM room_bookings WHERE id = ?', id)?.converted_to_request_id).toBe(became)
+    expect(read<{ status: string, converted_from_booking_id: string }>(
+      'SELECT status, converted_from_booking_id FROM external_requests WHERE id = ?', became))
+      .toEqual({ status: 'REQUESTED', converted_from_booking_id: id })
+
+    // The whole point: somebody else can now have the slot.
+    const rival = await registerMember(app, 'took-the-slot', generatePassword())
+    giveMembership(rival.id)
+    const taken = await send('POST', '/api/rooms/bookings', {
+      roomId: room, title: 'Took the freed slot', purpose: 'REHEARSAL', ...when,
+    }, rival.cookie)
+    // Whatever the policy makes of it, it is not refused for a clash: the slot is genuinely free.
+    expect(await taken.text()).not.toContain('CLASH')
+  })
+
+  // Converting on the day is the moment the member most needs telling that it cannot work.
+  test('and is refused when there is no longer time to ask, naming the date', async () => {
+    const id = placeRequest(await makeRoom(), member.id, soon(1))
+
+    const answered = await send('POST', `/api/admin/rooms/requests/${id}/unlist`,
+      { reason: 'Too late' }, officer)
+
+    expect(answered.status).toBe(409)
+    expect((await answered.json() as { statusMessage: string }).statusMessage).toContain('no longer time')
+    expect(statusOf(id)).toBe('PENDING_APPROVAL')
+  })
+
+  test('a booking in a series is refused rather than quietly taken out of it', async () => {
+    const id = placeRequest(await makeRoom(), member.id, soon(31))
+    write('UPDATE room_bookings SET series_id = ? WHERE id = ?', 'not-a-real-series', id)
+
+    const answered = await send('POST', `/api/admin/rooms/requests/${id}/unlist`, { reason: 'One week' }, officer)
+    expect(answered.status).toBe(409)
+    expect((await answered.json() as { statusMessage: string }).statusMessage).toContain('part of a series')
+  })
+})

@@ -27,6 +27,7 @@ export interface RequestRow {
   submittedAt: number | null
   decidedAt: number | null
   rejectionReason: string | null
+  convertedToBookingId: string | null
   createdAt: number
 }
 
@@ -55,6 +56,7 @@ const COLUMNS = {
   submittedAt: schema.externalRequests.submittedAt,
   decidedAt: schema.externalRequests.decidedAt,
   rejectionReason: schema.externalRequests.rejectionReason,
+  convertedToBookingId: schema.externalRequests.convertedToBookingId,
   createdAt: schema.externalRequests.createdAt,
 }
 

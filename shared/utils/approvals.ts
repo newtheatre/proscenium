@@ -60,3 +60,14 @@ export const decisionForm = z.object({
   })
 
 export type DecisionInput = z.output<typeof decisionForm>
+
+// Moving a request between a room we manage and one we do not (C-123). The reason is shown to the
+// member, so it is required in both directions: a room changing under them needs an explanation.
+export const unlistForm = z.object({
+  reason: z.string().trim().min(1, 'Say why, because the member is shown it').max(REJECTION_REASON_LIMIT),
+})
+
+export const relistForm = z.object({
+  roomId: z.string().min(1).max(64),
+  reason: z.string().trim().min(1, 'Say why, because the member is shown it').max(REJECTION_REASON_LIMIT),
+})

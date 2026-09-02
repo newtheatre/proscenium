@@ -123,6 +123,10 @@ export interface BookingRow {
   updatedAt: number
   seriesId: string | null
   occurrence: number | null
+  requester: string
+  purpose: string | null
+  attendees: number | null
+  notes: string | null
 }
 
 export async function bookingFor(id: string): Promise<BookingRow | undefined> {
@@ -138,9 +142,15 @@ export async function bookingFor(id: string): Promise<BookingRow | undefined> {
     updatedAt: schema.roomBookings.updatedAt,
     seriesId: schema.roomBookings.seriesId,
     occurrence: schema.roomBookings.occurrence,
+    // Carried across when a request moves to a room we do not manage (C-123).
+    requester: schema.users.name,
+    purpose: schema.roomBookings.purpose,
+    attendees: schema.roomBookings.attendees,
+    notes: schema.roomBookings.notes,
   })
     .from(schema.roomBookings)
     .innerJoin(schema.rooms, eq(schema.rooms.id, schema.roomBookings.roomId))
+    .innerJoin(schema.users, eq(schema.users.id, schema.roomBookings.userId))
     .where(eq(schema.roomBookings.id, id))
     .limit(1)
 

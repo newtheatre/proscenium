@@ -587,6 +587,57 @@ The Nottingham New Theatre`,
     }
   },
 
+  'request-unlisted': (context: TemplateContext): Rendered => ({
+    subject: `Now being asked for elsewhere: ${String(context.when)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Your request for <strong>${context.room}</strong>, ${context.when}, is being asked for as a room
+not listed here instead.</p>
+<p>Why: ${context.why}</p>
+<p><strong>${context.room} is free again</strong>, so somebody else may take it. Nothing is held
+for you until whoever manages the new room answers, and the form goes in by
+${String(context.dueBy)}.</p>
+<p><a href="${String(context.roomsUrl)}">See what you have asked for</a></p>`),
+    text: `Hello ${context.name},
+
+Your request for ${String(context.room)}, ${String(context.when)}, is being asked for as a room not
+listed here instead.
+
+Why: ${String(context.why)}
+
+${String(context.room)} is free again, so somebody else may take it. Nothing is held for you until
+whoever manages the new room answers, and the form goes in by ${String(context.dueBy)}.
+
+See what you have asked for: ${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
+  'request-relisted': (context: TemplateContext): Rendered => {
+    const settled = context.settled === true
+    return {
+      subject: `${settled ? 'You have' : 'Asked for'} ${String(context.room)}, ${String(context.when)}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${context.title}, ${context.when}, has moved into <strong>${context.room}</strong>, one of ours,
+rather than waiting on a room not listed here.</p>
+<p>${settled
+  ? 'It is confirmed, and the room is held for you.'
+  : 'It still needs a decision, because it falls outside the booking rules, so it is in the queue.'}</p>
+<p><a href="${String(context.roomsUrl)}">See what you hold</a></p>`),
+      text: `Hello ${context.name},
+
+${String(context.title)}, ${String(context.when)}, has moved into ${String(context.room)}, one of
+ours, rather than waiting on a room not listed here.
+
+${settled
+  ? 'It is confirmed, and the room is held for you.'
+  : 'It still needs a decision, because it falls outside the booking rules, so it is in the queue.'}
+
+See what you hold: ${String(context.roomsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'account-exists': (context: TemplateContext): Rendered => ({
     subject: 'You already have an account',
     html: layout(`<p>Hello ${context.name},</p>
