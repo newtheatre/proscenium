@@ -7,8 +7,8 @@ conflict masking), while the calendar, the policy engine, blackouts, tiers and n
 new build. Equipment loans arrive in V2 as the sibling the room store always implied, gated by live
 training records because the gate and the record now share one database.
 
-Counts: 21 MVP stories (C-101 to C-121), 6 V2 stories (C-201 to C-206), 2 Later epic stubs
-(C-301, C-302). 29 total.
+Counts: 22 MVP stories (C-101 to C-122), 6 V2 stories (C-201 to C-206), 2 Later epic stubs
+(C-301, C-302). 30 total.
 
 ## Open questions
 
@@ -341,6 +341,21 @@ Counts: 21 MVP stories (C-101 to C-121), 6 V2 stories (C-201 to C-206), 2 Later 
   5. A request is **refused** when the list does not cover the period being counted, naming the last date it does cover. A list that has run out must never be read as "no holidays", because that silently grants less notice than the rule requires.
   6. Coverage running short is visible before anybody is refused: `/api/health` reports it, and the settings screen shows the last covered date beside the list.
 - Source: the Theatre Manager's account of the Students' Union's form; decision 0038.
+
+## C-122: One queue, whoever manages the room
+
+- Role: Theatre Manager
+- Phase: MVP
+- Story: As an approver, I want every room request in one queue whether or not we manage the room, so that I do not have to know which screen a request landed on before I can answer it.
+- Depends on: C-109, C-120, C-121
+- Acceptance criteria:
+  1. One screen and one endpoint carry both kinds. Each row says which kind it is, and a filter narrows to our own rooms, to rooms we do not manage, or neither.
+  2. Open work comes first and soonest first; settled rows follow, most recently settled first. The queue is a list of work, and an answered request from last term is a lookup rather than the top of it.
+  3. A request for one of our rooms is re-judged as it is read, so the officer sees what is true today rather than what was true when it was written (C-109 criterion 1).
+  4. A request for a room we do not manage shows **the date the form has to go in by**, counted back from the booking in working days, so the deadline belongs to the person who can meet it (C-121 criterion 2).
+  5. Every action available on either old screen is available here, and no action appears on a row it would refuse.
+  6. The endpoint returns a pagination envelope and says when it has capped, rather than reporting the cap as a total.
+- Source: the two queues C-109 and C-120 shipped separately, and the officer who has to watch both.
 
 ## C-201: Asset register
 

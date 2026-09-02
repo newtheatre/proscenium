@@ -10,7 +10,7 @@ first tracker import resolves them.
 | --- | --- | --- | --- | --- | --- |
 | `A-identity.md` | Identity, membership and privacy | 26 | 4 | 2 | 34 |
 | `B-productions.md` | Programming and productions (deferred) | 0 | 0 | 8 | 8 |
-| `C-spaces.md` | Spaces and equipment | 21 | 6 | 2 | 29 |
+| `C-spaces.md` | Spaces and equipment | 22 | 6 | 2 | 30 |
 | `D-ticketing.md` | Box office and ticketing | 30 | 5 | 2 | 38 |
 | `E-show-night.md` | Show night operations | 27 | 4 | 1 | 32 |
 | `F-bar.md` | Bar | 21 | 3 | 1 | 26 |
@@ -19,7 +19,7 @@ first tracker import resolves them.
 | `I-finance.md` | Finance | 9 | 3 | 1 | 13 |
 | `J-governance.md` | Governance and handover | 10 | 3 | 0 | 13 |
 | `K-platform.md` | Platform foundations and migration | 21 | 0 | 0 | 24 |
-| **Total** | | **200** | **40** | **20** | **268** |
+| **Total** | | **201** | **40** | **20** | **269** |
 
 Eight stories (A-106, A-202, D-205, F-201, G-127, K-115, K-117, K-118) are resolved as
 won't-build or not-needed on the 26 August spike outcomes and committee amendments; they keep

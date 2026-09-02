@@ -74,7 +74,7 @@ export async function sweepExternalRequests(event: H3Event | undefined, at = new
           when: whenOf(request),
           // Which half of the wait it is stuck in, because the two need different action.
           formIsIn: request.status === 'AWAITING_EXTERNAL',
-          queueUrl: `${useRuntimeConfig(event).public.baseURL}/admin/su-requests`,
+          queueUrl: `${useRuntimeConfig(event).public.baseURL}/admin/requests?kind=unlisted`,
         },
       })
     }

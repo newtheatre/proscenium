@@ -2,6 +2,8 @@
 import { h, resolveComponent } from 'vue'
 import { BULK_LIMIT, REJECTION_REASON_LIMIT } from '#shared/utils/approvals'
 import { describePurpose } from '#shared/utils/bookings'
+import { EXTERNAL_REASON_LIMIT, saysExternalStatus } from '#shared/utils/external-requests'
+import { saysVerdict } from '#shared/utils/external-spaces'
 import { formatLondon } from '#shared/utils/london'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
@@ -14,10 +16,11 @@ const UCheckbox = resolveComponent('UCheckbox')
 
 interface Failure { reason: string, says: string }
 
+interface Offer { id: string, spaceId: string, space: string, outcome: string, reason: string | null, by: string | null, recordedAt: number }
+
 interface Request {
   id: string
-  roomId: string
-  room: string
+  kind: 'room' | 'unlisted'
   userId: string
   requester: string
   title: string
@@ -26,22 +29,39 @@ interface Request {
   endsAt: number
   status: string
   purpose: string | null
-  reason: string | null
-  rejectionReason: string | null
+  where: string | null
   createdAt: number
-  escalatedAt: number | null
   decidedAt: number | null
-  failures: Failure[]
-  sensitive: boolean
+  // Ours only: judged as it is read, so the officer sees what is true today (C-109).
+  roomId?: string
+  room?: string
+  reason?: string | null
+  rejectionReason?: string | null
+  escalatedAt?: number | null
+  failures?: Failure[]
+  sensitive?: boolean
+  // Not ours only: nothing here holds a slot, and the form has its own deadline (C-120, C-121).
+  preferredSpaceId?: string | null
+  assignedSpaceId?: string | null
+  preferredWarning?: string | null
+  suReference?: string | null
+  notes?: string | null
+  formDueBy?: string | null
+  offers?: Offer[]
 }
 
 interface Outcome { id: string, ok: boolean, says?: string }
 
 const EVERY_ROOM = 'all'
 
-const listing = ref<{ items: Request[], total: number } | null>(null)
+const listing = ref<{ items: Request[], total: number, more: boolean, counts: { room: number, unlisted: number } } | null>(null)
 const rooms = ref<{ id: string, name: string, isActive: boolean }[]>([])
-const when = ref<'waiting' | 'decided'>('waiting')
+// Read from the query, because /admin/su-requests redirects here filtered and officers were
+// emailed that path. A value we do not recognise falls back rather than showing nothing.
+const route = useRoute()
+const asKind = String(route.query.kind ?? '')
+const when = ref<'open' | 'all'>(String(route.query.when ?? '') === 'all' ? 'all' : 'open')
+const kind = ref<'all' | 'room' | 'unlisted'>(asKind === 'room' || asKind === 'unlisted' ? asKind : 'all')
 const room = ref(EVERY_ROOM)
 const search = ref('')
 const loading = ref(false)
@@ -57,12 +77,117 @@ const acting = ref(false)
 // What the pending modal will decide on, kept because a selection can change behind a dialog.
 const decidingOn = ref<string[]>([])
 
+// A room we do not manage has its own verbs, because nothing about it is ours to decide (C-120).
+const unlistedSubmitting = ref<Request | null>(null)
+const unlistedAssigning = ref<Request | null>(null)
+const unlistedRefusing = ref<Request | null>(null)
+const unlistedRejecting = ref<Request | null>(null)
+const reference = ref('')
+const chosenSpace = ref<string | undefined>()
+const despite = ref(false)
+const blockedBy = ref<{ verdict: string, reason: string } | null>(null)
+const inModal = ref<string | null>(null)
+const refusalReason = ref('')
+const noteToo = ref(true)
+const noteVerdict = ref<'CAUTION' | 'UNSUITABLE'>('UNSUITABLE')
+const unlistedRejectReason = ref('')
+
+async function act(path: string, body: Record<string, unknown>, said: string): Promise<boolean> {
+  acting.value = true
+  failure.value = null
+  try {
+    await $fetch(path, { method: 'POST', body })
+    toast.add({ title: said, icon: 'i-lucide-check', color: 'success' })
+    await load()
+    return true
+  }
+  catch (error) {
+    // The one refusal a person may override: the room is one we have marked no good.
+    const data = refusalData<{ note?: { verdict: string, reason: string }, needsDespite?: boolean }>(error)
+    if (data?.needsDespite && data.note) {
+      blockedBy.value = data.note
+      return false
+    }
+    // Shown inside the modal: the page-root alert sits behind the overlay, so a 409 from a
+    // colleague acting first reads as the button simply doing nothing.
+    inModal.value = refusalText(error)
+    return false
+  }
+  finally {
+    acting.value = false
+  }
+}
+
+async function submitUnlisted(): Promise<void> {
+  const one = unlistedSubmitting.value
+  if (!one) return
+  if (await act(`/api/admin/rooms/external-requests/${one.id}/submit`, { suReference: reference.value }, 'Requested')) {
+    unlistedSubmitting.value = null
+  }
+}
+
+async function assignUnlisted(): Promise<void> {
+  const one = unlistedAssigning.value
+  if (!one || !chosenSpace.value) return
+  const done = await act(`/api/admin/rooms/external-requests/${one.id}/assign`, {
+    spaceId: chosenSpace.value,
+    suReference: reference.value || null,
+    despite: despite.value,
+  }, 'Room recorded, and the member told')
+  if (done) unlistedAssigning.value = null
+}
+
+async function refuseUnlisted(): Promise<void> {
+  const one = unlistedRefusing.value
+  if (!one || !chosenSpace.value) return
+  const done = await act(`/api/admin/rooms/external-requests/${one.id}/refuse-assignment`, {
+    spaceId: chosenSpace.value,
+    reason: refusalReason.value,
+    note: noteToo.value ? { verdict: noteVerdict.value, reason: refusalReason.value } : null,
+  }, 'Recorded, and asked again')
+  if (done) unlistedRefusing.value = null
+}
+
+async function rejectUnlisted(): Promise<void> {
+  const one = unlistedRejecting.value
+  if (!one) return
+  if (await act(`/api/admin/rooms/external-requests/${one.id}/reject`, { reason: unlistedRejectReason.value }, 'Turned down')) {
+    unlistedRejecting.value = null
+  }
+}
+
+// An override is asserted about one room, so changing the room withdraws it. Without this, a
+// despite ticked for a room we know is no good waves the next room through unseen.
+watch(chosenSpace, () => {
+  despite.value = false
+  blockedBy.value = null
+})
+
+function begin(which: 'submit' | 'assign' | 'refuse' | 'reject', one: Request): void {
+  inModal.value = null
+  reference.value = one.suReference ?? ''
+  // Never pre-selected. SpacePicker renders nothing until a search returns, so a value set here
+  // arms the button while the box still looks empty, and one click records the wrong room.
+  chosenSpace.value = undefined
+  despite.value = false
+  blockedBy.value = null
+  refusalReason.value = ''
+  noteToo.value = true
+  noteVerdict.value = 'UNSUITABLE'
+  unlistedRejectReason.value = ''
+
+  if (which === 'submit') unlistedSubmitting.value = one
+  if (which === 'assign') unlistedAssigning.value = one
+  if (which === 'refuse') unlistedRefusing.value = one
+  if (which === 'reject') unlistedRejecting.value = one
+}
+
 async function load(): Promise<void> {
   loading.value = true
   failure.value = null
   try {
-    listing.value = await $fetch<{ items: Request[], total: number }>('/api/admin/rooms/requests', {
-      query: { when: when.value, ...(room.value === EVERY_ROOM ? {} : { room: room.value }) },
+    listing.value = await $fetch<typeof listing.value & object>('/api/admin/rooms/queue', {
+      query: { when: when.value, kind: kind.value, ...(room.value === EVERY_ROOM ? {} : { room: room.value }) },
     })
     selected.value = selected.value.filter(id => listing.value!.items.some(item => item.id === id))
   }
@@ -85,7 +210,7 @@ const shown = computed(() => {
   const items = listing.value?.items ?? []
   const term = search.value.trim().toLowerCase()
   if (!term) return items
-  return items.filter(item => [item.requester, item.room, item.title, item.reason ?? '']
+  return items.filter(item => [item.requester, item.where ?? '', item.title, item.reason ?? '']
     .some(field => field.toLowerCase().includes(term)))
 })
 
@@ -169,9 +294,14 @@ const activeFilters = computed<ActiveFilter[]>(() => {
       room.value = EVERY_ROOM
     } })
   }
-  if (when.value !== 'waiting') {
-    active.push({ key: 'when', label: 'Already decided', icon: 'i-lucide-history', clear: () => {
-      when.value = 'waiting'
+  if (when.value !== 'open') {
+    active.push({ key: 'when', label: 'Including settled', icon: 'i-lucide-history', clear: () => {
+      when.value = 'open'
+    } })
+  }
+  if (kind.value !== 'all') {
+    active.push({ key: 'kind', label: kind.value === 'room' ? 'Our rooms' : 'Rooms we do not manage', icon: 'i-lucide-filter', clear: () => {
+      kind.value = 'all'
     } })
   }
   return active
@@ -180,7 +310,8 @@ const activeFilters = computed<ActiveFilter[]>(() => {
 function clearFilters(): void {
   search.value = ''
   room.value = EVERY_ROOM
-  when.value = 'waiting'
+  when.value = 'open'
+  kind.value = 'all'
 }
 
 const roomOptions = computed(() => [
@@ -192,10 +323,10 @@ const moveOptions = computed(() => rooms.value
   .filter(one => one.isActive && one.id !== listing.value?.items.find(item => item.id === decidingOn.value[0])?.roomId)
   .map(one => ({ label: one.name, value: one.id })))
 
-watch([when, room], load)
+watch([when, room, kind], load)
 
 const columns = computed<TableColumn<Request>[]>(() => [
-  ...(when.value === 'waiting'
+  ...(when.value === 'open'
     ? [{
       id: 'select',
       header: () => h(UCheckbox, {
@@ -204,19 +335,26 @@ const columns = computed<TableColumn<Request>[]>(() => [
         'data-test': 'select-all',
         'onUpdate:modelValue': (on: boolean) => toggleAll(on),
       }),
-      cell: ({ row }) => h(UCheckbox, {
-        'modelValue': selected.value.includes(row.original.id),
-        'aria-label': `Select ${row.original.requester}, ${row.original.room}`,
-        'data-test': `select-${row.original.id}`,
-        'onUpdate:modelValue': (on: boolean) => toggle(row.original.id, on),
-      }),
+      cell: ({ row }) => (row.original.kind === 'room'
+        ? h(UCheckbox, {
+            'modelValue': selected.value.includes(row.original.id),
+            'aria-label': `Select ${row.original.requester}, ${row.original.where}`,
+            'data-test': `select-${row.original.id}`,
+            'onUpdate:modelValue': (on: boolean) => toggle(row.original.id, on),
+          })
+        : null),
     } satisfies TableColumn<Request>]
     : []),
   {
     id: 'who',
     header: 'Who and what',
     cell: ({ row }) => h('div', {}, [
-      h('div', {}, row.original.requester),
+      h('div', { class: 'flex items-center gap-2' }, [
+        h('span', {}, row.original.requester),
+        row.original.kind === 'unlisted'
+          ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => 'Not ours')
+          : null,
+      ]),
       h('div', { class: 'text-xs text-muted' }, `${row.original.title} (${describePurpose(row.original.purpose)})`),
     ]),
   },
@@ -226,51 +364,81 @@ const columns = computed<TableColumn<Request>[]>(() => [
     meta: { class: { td: 'whitespace-nowrap text-sm' } },
     cell: ({ row }) => h('div', {}, [
       h('div', {}, span(row.original)),
-      h('div', { class: 'text-xs text-muted' }, row.original.room),
+      h('div', { class: 'text-xs text-muted' }, row.original.where ?? 'No room yet'),
     ]),
   },
   {
     id: 'why',
     header: 'Why it is here',
-    cell: ({ row }) => h('div', { class: 'space-y-1' }, [
-      h('div', { class: 'flex flex-wrap gap-1' }, [
-        ...(row.original.sensitive ? [h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Always asks')] : []),
-        ...row.original.failures.map(fail =>
-          h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm', title: fail.says }, () => fail.says)),
-      ]),
-      row.original.reason ? h('p', { class: 'text-sm' }, row.original.reason) : null,
-    ]),
+    cell: ({ row }) => (row.original.kind === 'unlisted'
+      ? h('div', { class: 'space-y-1' }, [
+          h('div', { class: 'flex flex-wrap gap-1' }, [
+            h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => saysExternalStatus(row.original.status)),
+            row.original.preferredWarning
+              ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => row.original.preferredWarning!)
+              : null,
+          ]),
+          row.original.formDueBy
+            ? h('p', { 'class': 'text-sm', 'data-test': `due-${row.original.id}` }, `Form in by ${row.original.formDueBy}`)
+            : null,
+          row.original.notes ? h('p', { class: 'text-sm text-muted' }, row.original.notes) : null,
+        ])
+      : h('div', { class: 'space-y-1' }, [
+          h('div', { class: 'flex flex-wrap gap-1' }, [
+            ...(row.original.sensitive ? [h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Always asks')] : []),
+            ...(row.original.failures ?? []).map(fail =>
+              h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm', title: fail.says }, () => fail.says)),
+          ]),
+          row.original.reason ? h('p', { class: 'text-sm' }, row.original.reason) : null,
+        ])),
   },
-  ...(when.value === 'waiting'
+  ...(when.value === 'open'
     ? [{
       id: 'decide',
       header: '',
       meta: { class: { td: 'text-right whitespace-nowrap' } },
-      cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
-        h(UButton, {
-          'size': 'sm',
-          'variant': 'subtle',
-          'loading': acting.value,
-          'data-test': `approve-${row.original.id}`,
-          'onClick': () => decide([row.original.id], 'APPROVE'),
-        }, () => 'Approve'),
-        h(UButton, {
-          'size': 'sm',
-          'color': 'neutral',
-          'variant': 'ghost',
-          'icon': 'i-lucide-arrow-right-left',
-          'aria-label': `Approve ${row.original.requester} into another room`,
-          'data-test': `move-${row.original.id}`,
-          'onClick': () => askToMove(row.original.id),
-        }),
-        h(UButton, {
-          'size': 'sm',
-          'color': 'error',
-          'variant': 'ghost',
-          'data-test': `reject-${row.original.id}`,
-          'onClick': () => askToReject([row.original.id]),
-        }, () => 'Reject'),
-      ]),
+      // No action appears on a row it would refuse: the verbs differ by kind and by status,
+      // and an officer clicking one that cannot apply learns nothing (C-122 criterion 5).
+      cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, row.original.kind === 'unlisted'
+        ? [
+            row.original.status === 'REQUESTED'
+              ? h(UButton, { 'size': 'sm', 'variant': 'subtle', 'data-test': `submit-${row.original.id}`, 'onClick': () => begin('submit', row.original) }, () => 'Form is in')
+              : null,
+            row.original.status === 'AWAITING_EXTERNAL' || row.original.status === 'CONFIRMED'
+              ? h(UButton, { 'size': 'sm', 'variant': 'subtle', 'data-test': `assign-${row.original.id}`, 'onClick': () => begin('assign', row.original) }, () => row.original.status === 'CONFIRMED' ? 'Change room' : 'Record room')
+              : null,
+            row.original.status === 'AWAITING_EXTERNAL' || row.original.status === 'CONFIRMED'
+              ? h(UButton, { 'size': 'sm', 'color': 'neutral', 'variant': 'ghost', 'data-test': `refuse-${row.original.id}`, 'onClick': () => begin('refuse', row.original) }, () => 'Send back')
+              : null,
+            row.original.status === 'REQUESTED' || row.original.status === 'AWAITING_EXTERNAL'
+              ? h(UButton, { 'size': 'sm', 'color': 'error', 'variant': 'ghost', 'data-test': `turn-down-${row.original.id}`, 'onClick': () => begin('reject', row.original) }, () => 'Turn down')
+              : null,
+          ]
+        : [
+            h(UButton, {
+              'size': 'sm',
+              'variant': 'subtle',
+              'loading': acting.value,
+              'data-test': `approve-${row.original.id}`,
+              'onClick': () => decide([row.original.id], 'APPROVE'),
+            }, () => 'Approve'),
+            h(UButton, {
+              'size': 'sm',
+              'color': 'neutral',
+              'variant': 'ghost',
+              'icon': 'i-lucide-arrow-right-left',
+              'aria-label': `Approve ${row.original.requester} into another room`,
+              'data-test': `move-${row.original.id}`,
+              'onClick': () => askToMove(row.original.id),
+            }),
+            h(UButton, {
+              'size': 'sm',
+              'color': 'error',
+              'variant': 'ghost',
+              'data-test': `reject-${row.original.id}`,
+              'onClick': () => askToReject([row.original.id]),
+            }, () => 'Reject'),
+          ]),
     } satisfies TableColumn<Request>]
     : [{
       id: 'outcome',
@@ -321,7 +489,20 @@ onMounted(async () => {
           <USelect
             v-model="when"
             data-test="requests-when"
-            :items="[{ label: 'Waiting', value: 'waiting' }, { label: 'Already decided', value: 'decided' }]"
+            :items="[{ label: 'Open', value: 'open' }, { label: 'Everything', value: 'all' }]"
+            value-key="value"
+            class="w-full"
+          />
+        </UFormField>
+        <UFormField label="Kind">
+          <USelect
+            v-model="kind"
+            data-test="requests-kind"
+            :items="[
+              { label: 'All rooms', value: 'all' },
+              { label: 'Our rooms', value: 'room' },
+              { label: 'Rooms we do not manage', value: 'unlisted' },
+            ]"
             value-key="value"
             class="w-full"
           />
@@ -369,7 +550,7 @@ onMounted(async () => {
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ when === 'waiting'
+          {{ when === 'open'
             ? 'Nothing is waiting on a decision.'
             : 'Nothing has been decided yet.' }}
         </p>
@@ -456,6 +637,264 @@ onMounted(async () => {
           color="neutral"
           variant="ghost"
           @click="moving = false"
+        >
+          Back
+        </UButton>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="unlistedSubmitting !== null"
+      title="The form is in"
+      description="The member is told it is with them. Their reference, if they gave you one, makes reconciling the two sides possible later."
+      @update:open="unlistedSubmitting = null"
+    >
+      <template #body>
+        <UAlert
+          v-if="inModal"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="inModal"
+          data-test="modal-failure"
+        />
+        <UFormField
+          label="Their reference"
+          hint="Optional"
+        >
+          <UInput
+            v-model="reference"
+            class="w-full"
+            data-test="submit-reference"
+          />
+        </UFormField>
+      </template>
+      <template #footer>
+        <UButton
+          :loading="acting"
+          data-test="submit-confirm"
+          @click="submitUnlisted"
+        >
+          It is with them
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="unlistedSubmitting = null"
+        >
+          Back
+        </UButton>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="unlistedAssigning !== null"
+      title="What did they give us?"
+      description="Recording the room confirms the request and tells the member which room they have."
+      @update:open="unlistedAssigning = null"
+    >
+      <template #body>
+        <UAlert
+          v-if="inModal"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="inModal"
+          data-test="modal-failure"
+        />
+        <div class="space-y-4">
+          <UFormField
+            label="The room"
+            required
+          >
+            <SpacePicker
+              v-model="chosenSpace"
+              :purpose="unlistedAssigning?.purpose ?? null"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Their reference"
+            hint="Optional"
+          >
+            <UInput
+              v-model="reference"
+              class="w-full"
+            />
+          </UFormField>
+
+          <!-- The spreadsheet check, made into something that stops you rather than something
+               you read past. -->
+          <UAlert
+            v-if="blockedBy"
+            color="error"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            title="We know this room is no good for that"
+            data-test="assign-blocked"
+          >
+            <template #description>
+              <p>{{ blockedBy.reason }}</p>
+              <UCheckbox
+                v-model="despite"
+                class="mt-3"
+                label="Record it anyway"
+                data-test="assign-despite"
+              />
+            </template>
+          </UAlert>
+        </div>
+      </template>
+      <template #footer>
+        <UButton
+          :loading="acting"
+          :disabled="!chosenSpace || (blockedBy !== null && !despite)"
+          data-test="assign-confirm"
+          @click="assignUnlisted"
+        >
+          That is the room
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="unlistedAssigning = null"
+        >
+          Back
+        </UButton>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="unlistedRefusing !== null"
+      title="That room is no good"
+      description="Recorded against the room, so the next person asking for it is warned. The request stays open."
+      @update:open="unlistedRefusing = null"
+    >
+      <template #body>
+        <UAlert
+          v-if="inModal"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="inModal"
+          data-test="modal-failure"
+        />
+        <div class="space-y-4">
+          <UFormField
+            label="Which room they offered"
+            required
+          >
+            <SpacePicker
+              v-model="chosenSpace"
+              :purpose="unlistedRefusing?.purpose ?? null"
+            />
+          </UFormField>
+
+          <UFormField
+            label="What was wrong with it"
+            required
+            :description="`Up to ${EXTERNAL_REASON_LIMIT} characters.`"
+          >
+            <UTextarea
+              v-model="refusalReason"
+              :rows="3"
+              :maxlength="EXTERNAL_REASON_LIMIT"
+              class="w-full"
+              data-test="refuse-reason"
+            />
+          </UFormField>
+
+          <UFormField
+            v-if="noteToo"
+            label="How bad is it"
+            description="A one-off problem is a caution. Unsuitable refuses the room outright next time."
+          >
+            <div class="flex flex-wrap gap-1">
+              <UButton
+                v-for="verdict in ['CAUTION', 'UNSUITABLE'] as const"
+                :key="verdict"
+                size="sm"
+                :color="noteVerdict === verdict ? (verdict === 'UNSUITABLE' ? 'error' : 'warning') : 'neutral'"
+                :variant="noteVerdict === verdict ? 'solid' : 'outline'"
+                :aria-pressed="noteVerdict === verdict"
+                :data-test="`refuse-verdict-${verdict}`"
+                @click="noteVerdict = verdict"
+              >
+                {{ saysVerdict(verdict) }}
+              </UButton>
+            </div>
+          </UFormField>
+
+          <UCheckbox
+            v-model="noteToo"
+            :label="`Remember this about the room for ${describePurpose(unlistedRefusing?.purpose ?? null).toLowerCase()}`"
+            description="So the next person asking for it is warned before anybody is troubled."
+            data-test="refuse-note"
+          />
+        </div>
+      </template>
+      <template #footer>
+        <UButton
+          color="warning"
+          :loading="acting"
+          :disabled="!chosenSpace || !refusalReason.trim()"
+          data-test="refuse-confirm"
+          @click="refuseUnlisted"
+        >
+          Ask them again
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="unlistedRefusing = null"
+        >
+          Back
+        </UButton>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="unlistedRejecting !== null"
+      title="Say why"
+      description="The member is shown this word for word, so write it to them."
+      @update:open="unlistedRejecting = null"
+    >
+      <template #body>
+        <UAlert
+          v-if="inModal"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="inModal"
+          data-test="modal-failure"
+        />
+        <UFormField
+          label="Why it is not being requested"
+          required
+        >
+          <UTextarea
+            v-model="unlistedRejectReason"
+            :rows="3"
+            :maxlength="EXTERNAL_REASON_LIMIT"
+            class="w-full"
+            data-test="su-reject-reason"
+          />
+        </UFormField>
+      </template>
+      <template #footer>
+        <UButton
+          color="error"
+          :loading="acting"
+          :disabled="!unlistedRejectReason.trim()"
+          data-test="su-reject-confirm"
+          @click="rejectUnlisted"
+        >
+          Turn it down
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="unlistedRejecting = null"
         >
           Back
         </UButton>

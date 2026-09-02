@@ -68,7 +68,7 @@ export default defineEventHandler(async (event) => {
         who: account.name,
         title: input.title,
         when,
-        queueUrl: `${useRuntimeConfig(event).public.baseURL}/admin/su-requests`,
+        queueUrl: `${useRuntimeConfig(event).public.baseURL}/admin/requests?kind=unlisted`,
       },
     })
   }

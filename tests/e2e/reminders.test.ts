@@ -252,7 +252,7 @@ describe.skipIf(skip !== null)('a request tells the approvers when it arrives (c
     expect(suppressedFor(officerId, 'room.request.raised')).toBe(suppressedBefore + 1)
     expect(sentTo(officerId, 'room.request.raised')).toBe(before + 1)
 
-    const queue = await (await send('GET', '/api/admin/rooms/requests', null, officer)).json() as { items: { id: string }[] }
+    const queue = await (await send('GET', '/api/admin/rooms/queue', null, officer)).json() as { items: { id: string }[] }
     expect(queue.items.some(item => item.id === id)).toBe(true)
 
     write(`UPDATE notification_preferences SET email = 1, push = 1 WHERE user_id = ? AND topic = 'ROOMS'`, officerId)
