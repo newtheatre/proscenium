@@ -162,6 +162,19 @@ export async function recordsFor(userId: string, includeRevoked = false): Promis
     .orderBy(desc(schema.trainingRecords.awardedOn), desc(schema.trainingRecords.createdAt))
 }
 
+// One record, with what a revocation needs to name it on the trail.
+export async function recordById(id: string): Promise<
+  { id: string, userId: string, moduleId: string, revokedAt: number | null } | undefined
+> {
+  const [row] = await db.select({
+    id: schema.trainingRecords.id,
+    userId: schema.trainingRecords.userId,
+    moduleId: schema.trainingRecords.moduleId,
+    revokedAt: schema.trainingRecords.revokedAt,
+  }).from(schema.trainingRecords).where(eq(schema.trainingRecords.id, id)).limit(1)
+  return row
+}
+
 // The departments somebody currently leads, as a predicate rather than as a list of ids.
 function ledBy(userId: string, now: Date) {
   return inArray(
@@ -314,6 +327,20 @@ export interface ModuleHeader {
   department: string
   name: string
   kind: string
+}
+
+// The policy a sign-off stamps from, with the lifecycle and kind its refusals turn on.
+export async function modulePolicy(id: string): Promise<
+  (ExpiryPolicy & { kind: string, status: string, allowsExternal: boolean }) | undefined
+> {
+  const [row] = await db.select({
+    expiryMode: schema.trainingModules.expiryMode,
+    expiryMonths: schema.trainingModules.expiryMonths,
+    kind: schema.trainingModules.kind,
+    status: schema.trainingModules.status,
+    allowsExternal: schema.trainingModules.allowsExternal,
+  }).from(schema.trainingModules).where(eq(schema.trainingModules.id, id)).limit(1)
+  return row as (ExpiryPolicy & { kind: string, status: string, allowsExternal: boolean }) | undefined
 }
 
 export async function moduleById(id: string): Promise<ModuleHeader | undefined> {

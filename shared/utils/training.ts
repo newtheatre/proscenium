@@ -301,6 +301,43 @@ export const newModuleForm = moduleFields.extend({
   id: z.string().trim().regex(MODULE_ID, 'A module id is uppercase letters, digits and hyphens').max(32),
 }).superRefine(refuseImpossibleModules)
 
+// The lifetime a sign-off may stamp: after the award, inside the module's own policy, and inside
+// the catalogue-wide cap whichever is tighter (G-120 criterion 4).
+export function expiryProblem(
+  policy: ExpiryPolicy,
+  awardedOn: string,
+  expiresOn: string,
+): string | null {
+  if (expiresOn <= awardedOn) return 'An expiry falls after the award, not on or before it'
+  if (exceedsExpiryCap(awardedOn, expiresOn)) {
+    return `An expiry cannot run more than ${MAX_EXPIRY_MONTHS} months from the award`
+  }
+  if (policy.expiryMode === 'MONTHS' && policy.expiryMonths !== null) {
+    const cap = addMonths(awardedOn, policy.expiryMonths)
+    if (expiresOn > cap) return `This module's policy runs to ${cap}, so an expiry cannot pass it`
+  }
+  return null
+}
+
+export const signOffForm = z.object({
+  userId: z.string().trim().min(1).max(64),
+  moduleId: z.string().trim().min(1).max(32),
+  awardedOn: z.string().regex(CIVIL_DATE, 'An award date reads as YYYY-MM-DD'),
+  // Absent takes the module's policy. A date overrides it; null is the break-glass never, and
+  // needs a permission the screen never offers (G-120 criterion 5).
+  expiresOn: z.string().regex(CIVIL_DATE, 'An expiry reads as YYYY-MM-DD').nullish(),
+  evidenceRef: z.string().trim().max(500).nullish().transform(value => (value ?? '').trim() || null),
+})
+
+export type SignOffInput = z.output<typeof signOffForm>
+
+export const REVOKE_REASON_LIMIT = 500
+
+export const revokeForm = z.object({
+  // Mandatory, because taking a record away is deliberate or it is a mistake (G-122 criterion 2).
+  reason: z.string().trim().min(1).max(REVOKE_REASON_LIMIT),
+})
+
 export const leadForm = z.object({
   userId: z.string().trim().min(1).max(64),
   // Blank takes the next handover; an explicit null is a permanent assignment (G-110 criterion 3).
