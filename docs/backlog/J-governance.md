@@ -3,11 +3,11 @@
 The committee turns over every year, and the system treats that as its most important scheduled
 event. This module carries the machinery that outlives any one committee: the append-only audit
 trail, policy as validated configuration with preview and revert, health and backup operations
-with a tested restore drill, the old estate's audit history as a read-only archive, and operator
-documentation that lives in the app. Handover mode itself is V2, shipping before July 2027 so the
+with a tested restore drill, and operator documentation that lives in the app. The old estate's
+audit history is not imported in any shape (0030), which is what withdrew J-108. Handover mode itself is V2, shipping before July 2027 so the
 2027/28 committee is the first to be handed the system by the system.
 
-Stories: 13 (10 MVP, 3 V2).
+Stories: 13 (9 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
 
 ## Open questions
 
@@ -124,7 +124,7 @@ Stories: 13 (10 MVP, 3 V2).
 ## J-108: The audit archive import (superseded)
 
 - Role: Administrator
-- Phase: MVP
+- Phase: Resolved, superseded (0030, 30 August 2026)
 - Story: As the IT Manager, I want the four old apps' audit logs imported as a read-only archive so that accountability does not reset at cutover.
 - Depends on: J-101, J-102, J-103
 - Acceptance criteria:
