@@ -22,12 +22,9 @@ import {
 // The catalogue's pure half. Validity is derived from dates every time it is read, so there is no
 // state here to assert, only arithmetic and refusals (0018, G-107, G-110, G-123).
 
-// Read from the register rather than restated, so moving a default moves these cases with it and
-// a test cannot go on claiming a number nobody ships (0012).
-const YEAR = {
-  boundary: CONFIG_KEYS.ACADEMIC_YEAR_BOUNDARY.default,
-  carryOverDays: CONFIG_KEYS.TRAINING_CARRY_OVER_DAYS.default,
-}
+// A stated boundary rather than the configured one. These cases pin the arithmetic, and the
+// committee moving the boundary is a settings change that must not break a release (0012).
+const YEAR = { boundary: '08-31', carryOverDays: 60 }
 
 const MODULE = {
   department: 'TECH',
@@ -126,6 +123,29 @@ describe('an impossible year boundary is refused (G-123 criterion 5)', () => {
 
   test('the computation refuses one rather than stamping a date nobody can reach', () => {
     expect(() => academicYearEnd('2026-09-14', { boundary: '02-29', carryOverDays: 60 })).toThrow()
+  })
+})
+
+describe('the shipped boundary is the one the catalogue expects', () => {
+  const shipped = {
+    boundary: CONFIG_KEYS.ACADEMIC_YEAR_BOUNDARY.default,
+    carryOverDays: CONFIG_KEYS.TRAINING_CARRY_OVER_DAYS.default,
+  }
+
+  // The committee's catalogue defines an academic-year expiry as 30 September, and seven of its
+  // modules use one. A default that disagreed would date every such record a month early.
+  test('an academic year ends on the thirtieth of September', () => {
+    expect(shipped.boundary).toBe('09-30')
+  })
+
+  test('an award early in the year runs to the end of the one it falls in', () => {
+    expect(academicYearEnd('2026-10-15', shipped)).toBe('2027-09-30')
+  })
+
+  // The whole point of the carry-over: an induction taken in the week term starts is worth the
+  // year it starts, not the fortnight left of the year before.
+  test('an award just before the boundary is worth the following year', () => {
+    expect(academicYearEnd('2026-09-20', shipped)).toBe('2027-09-30')
   })
 })
 
