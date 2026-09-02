@@ -131,6 +131,10 @@ noticing. Somebody who is both an officer and a lead gets the wider scope, not t
 
 The ledger is pruned at `TRAINING_LEDGER_MONTHS` (24) in every mode, armed or not.
 
+It also closes lapsed practice windows, in both modes. A window that has expired has expired whether
+or not we are sending mail, and closing one is the only thing the sweep ever does to practice: it
+never opens a window and never touches a record (G-126 criterion 3).
+
 To run it by hand, `POST /_nitro/tasks/training:expiry-sweep`. The result reports `armed`, the
 counts for each window, `digests` and `pruned`.
 
