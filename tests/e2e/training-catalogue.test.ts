@@ -489,6 +489,7 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
       await waitFor(view, `document.querySelector('[data-test="module-id"]')`, 30_000)
       await fill(view, '[data-test="module-id"]', id)
       await fill(view, '[data-test="module-name"]', 'Driving the desk')
+      await fill(view, '[data-test="module-description"]', 'What the desk does, and how not to break it.')
 
       // Opened and picked by what it says: a Nuxt UI select is a listbox, so setting a value on
       // one does nothing at all. Every closed set on this form is a row of buttons instead.
@@ -508,11 +509,95 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
       view.close()
     }
 
-    const stored = read<{ kind: string, expiryMode: string, status: string }>(
-      'SELECT kind, expiry_mode expiryMode, status FROM modules WHERE id = ?',
+    const stored = read<{ kind: string, expiryMode: string, status: string, description: string }>(
+      'SELECT kind, expiry_mode expiryMode, status, description FROM modules WHERE id = ?',
       id,
     )
-    expect(stored).toMatchObject({ kind: 'CERTIFICATION', expiryMode: 'ACADEMIC_YEAR', status: 'ACTIVE' })
+    expect(stored).toMatchObject({
+      kind: 'CERTIFICATION',
+      expiryMode: 'ACADEMIC_YEAR',
+      status: 'ACTIVE',
+      description: 'What the desk does, and how not to break it.',
+    })
+  }, CASE_TIMEOUT_MS)
+
+  test('a brief is not offered what a brief cannot have', async () => {
+    const department = await addDepartment()
+    const view = await signedInView()
+    const id = `BRIEF-${suffix()}`
+
+    try {
+      await visit(view, `${app.baseURL}/training/manage`, '[data-test="modules-table"]')
+      await click(view, '[data-test="add-module"]')
+      await waitFor(view, `document.querySelector('[data-test="module-id"]')`, 30_000)
+
+      // Everything is on offer until the kind says otherwise.
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="module-expiry-ACADEMIC_YEAR"]')`,
+      )).toBe(true)
+
+      await fill(view, '[data-test="module-id"]', id)
+      await fill(view, '[data-test="module-name"]', 'Get-in brief')
+      await click(view, `[data-test="module-department-${department}"]`)
+      await click(view, '[data-test="module-kind-BRIEF"]')
+      await waitFor(view, `!document.querySelector('[data-test="module-expiry-ACADEMIC_YEAR"]')`, 30_000)
+
+      // A brief carries no lifetime, grants nothing, and takes no external certificate.
+      for (const gone of ['module-expiry-ACADEMIC_YEAR', 'module-grants-trainer', 'module-allows-external']) {
+        expect(await view.evaluate<boolean>(
+          `!!document.querySelector('[data-test="${gone}"]')`,
+        )).toBe(false)
+      }
+
+      await click(view, '[data-test="module-status-ACTIVE"]')
+      await click(view, '[data-test="module-submit"]')
+      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(id)})`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+
+    // What the form hides is what it sends: a brief saved from this screen carries none of it.
+    expect(read<{ kind: string, expiryMode: string, grantsTrainer: number, allowsExternal: number }>(
+      `SELECT kind, expiry_mode expiryMode, grants_trainer grantsTrainer, allows_external allowsExternal
+       FROM modules WHERE id = ?`,
+      id,
+    )).toMatchObject({ kind: 'BRIEF', expiryMode: 'NONE', grantsTrainer: 0, allowsExternal: 0 })
+  }, CASE_TIMEOUT_MS)
+
+  test('the evidence we accept appears only once an external certificate may satisfy it', async () => {
+    const department = await addDepartment()
+    const view = await signedInView()
+    const id = `EXT-${suffix()}`
+
+    try {
+      await visit(view, `${app.baseURL}/training/manage`, '[data-test="modules-table"]')
+      await click(view, '[data-test="add-module"]')
+      await waitFor(view, `document.querySelector('[data-test="module-id"]')`, 30_000)
+
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="module-external-evidence"]')`,
+      )).toBe(false)
+
+      await fill(view, '[data-test="module-id"]', id)
+      await fill(view, '[data-test="module-name"]', 'First aid')
+      await click(view, `[data-test="module-department-${department}"]`)
+      await click(view, '[data-test="module-allows-external"]')
+      await waitFor(view, `document.querySelector('[data-test="module-external-evidence"]')`, 30_000)
+
+      await fill(view, '[data-test="module-external-evidence"]', 'A current first aid at work certificate')
+      await click(view, '[data-test="module-status-ACTIVE"]')
+      await click(view, '[data-test="module-submit"]')
+      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(id)})`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+
+    expect(read<{ allowsExternal: number, externalEvidence: string }>(
+      'SELECT allows_external allowsExternal, external_evidence externalEvidence FROM modules WHERE id = ?',
+      id,
+    )).toMatchObject({ allowsExternal: 1, externalEvidence: 'A current first aid at work certificate' })
   }, CASE_TIMEOUT_MS)
 
   test('the departments screen renders and adds a department', async () => {

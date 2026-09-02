@@ -927,7 +927,14 @@ semantics are editable until it awards its first.
 `allows_external` is the department's opt-in to competence earned elsewhere: a record with source
 `EXTERNAL` against a module that has not set it is refused with a 409. `external_evidence` is the
 free-text note saying what paper that department wants to see, shown to whoever records one; it is
-guidance and never a validation rule (G-121 criterion 1).
+guidance and never a validation rule (G-121 criterion 1). The catalogue screen offers it only once
+`allows_external` is on, and clears it when that goes off, so the note never outlives the opt-in it
+describes.
+
+**A field the form hides is a field the form clears.** The screen shows what a module's kind admits
+and nothing else: a brief is offered no expiry, no grants and no external opt-in, because the write
+path and the table both refuse all three. One derivation does the clearing, so a rule and the field
+it governs cannot drift apart.
 
 A module stores an expiry **policy**, never a date. What a record earned today would run to is
 computed on the way out of a request from the policy, `ACADEMIC_YEAR_BOUNDARY` and

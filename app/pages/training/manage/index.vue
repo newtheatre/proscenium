@@ -156,26 +156,25 @@ function edit(module: Module | null): void {
 // the write path will refuse (G-109).
 const frozen = computed(() => editing.value?.frozen === true)
 
-// The refusals a brief and a safety-critical module carry are rules, so the form clears what they
-// forbid rather than letting somebody submit into a refusal (G-107 criteria 2 and 4).
-watch(() => state.kind, (kind) => {
-  if (kind !== 'BRIEF') {
-    state.selfRegistrable = false
-    return
-  }
-  state.expiryMode = 'NONE'
-  state.expiryMonths = undefined
-  state.grantsTrainer = false
-  state.grantsSupervisor = false
-})
-
-watch(() => state.expiryMode, (mode) => {
-  state.expiryMonths = mode === 'MONTHS' ? (state.expiryMonths ?? 12) : undefined
-})
-
-watch(() => state.safetyCritical, (critical) => {
-  if (critical && state.deliveryMode === 'SELF_DIRECTED') state.deliveryMode = 'HYBRID'
-})
+// Every field the form hides is cleared here, in one place, so a rule and the field it governs
+// cannot drift apart: what is not shown is never what gets submitted (G-107 criteria 2 and 4).
+watch(
+  () => [state.kind, state.expiryMode, state.safetyCritical, state.allowsExternal] as const,
+  () => {
+    if (state.kind === 'BRIEF') {
+      state.expiryMode = 'NONE'
+      state.grantsTrainer = false
+      state.grantsSupervisor = false
+      state.allowsExternal = false
+    }
+    else {
+      state.selfRegistrable = false
+    }
+    state.expiryMonths = state.expiryMode === 'MONTHS' ? (state.expiryMonths ?? 12) : undefined
+    if (!state.allowsExternal) state.externalEvidence = undefined
+    if (state.safetyCritical && state.deliveryMode === 'SELF_DIRECTED') state.deliveryMode = 'HYBRID'
+  },
+)
 
 function addMaterial(): void {
   state.materials.push({ label: '', url: '' })
@@ -404,6 +403,20 @@ const columns: TableColumn<Module>[] = [
           </UFormField>
 
           <UFormField
+            label="What it covers"
+            name="description"
+            hint="Optional"
+            description="Shown to members in the catalogue, so write it for somebody deciding whether to take it."
+          >
+            <UTextarea
+              v-model="state.description"
+              :rows="3"
+              class="w-full"
+              data-test="module-description"
+            />
+          </UFormField>
+
+          <UFormField
             label="Department"
             name="department"
             required
@@ -481,6 +494,7 @@ const columns: TableColumn<Module>[] = [
           </UFormField>
 
           <UFormField
+            v-if="state.kind !== 'BRIEF'"
             label="How long it is worth"
             name="expiryMode"
             required
@@ -491,7 +505,6 @@ const columns: TableColumn<Module>[] = [
                 v-for="option in EXPIRY_MODES"
                 :key="option"
                 size="sm"
-                :disabled="state.kind === 'BRIEF' && option !== 'NONE'"
                 :color="state.expiryMode === option ? 'primary' : 'neutral'"
                 :variant="state.expiryMode === option ? 'solid' : 'outline'"
                 :aria-pressed="state.expiryMode === option"
@@ -504,7 +517,7 @@ const columns: TableColumn<Module>[] = [
           </UFormField>
 
           <UFormField
-            v-if="state.expiryMode === 'MONTHS'"
+            v-if="state.kind !== 'BRIEF' && state.expiryMode === 'MONTHS'"
             label="Months from award"
             name="expiryMonths"
             required
@@ -552,20 +565,24 @@ const columns: TableColumn<Module>[] = [
               label="Awarded by sign-off rather than by a register"
             />
             <USwitch
+              v-if="state.kind !== 'BRIEF'"
               v-model="state.grantsTrainer"
-              :disabled="state.kind === 'BRIEF' || frozen"
+              :disabled="frozen"
               label="Holding it makes somebody a trainer"
               description="Standing is derived from a current record on this module, never granted as a role."
               data-test="module-grants-trainer"
             />
             <USwitch
+              v-if="state.kind !== 'BRIEF'"
               v-model="state.grantsSupervisor"
-              :disabled="state.kind === 'BRIEF' || frozen"
+              :disabled="frozen"
               label="Holding it makes somebody a supervisor"
             />
             <USwitch
+              v-if="state.kind !== 'BRIEF'"
               v-model="state.allowsExternal"
               label="An external certificate can satisfy it"
+              data-test="module-allows-external"
             />
             <USwitch
               v-if="state.kind === 'BRIEF'"
@@ -573,6 +590,35 @@ const columns: TableColumn<Module>[] = [
               label="People can register themselves for it"
             />
           </div>
+
+          <UFormField
+            v-if="state.kind !== 'BRIEF' && state.allowsExternal"
+            label="Evidence we accept"
+            name="externalEvidence"
+            hint="Optional"
+            description="Named on the screen that records one, so whoever is holding a certificate knows whether it counts."
+          >
+            <UInput
+              v-model="state.externalEvidence"
+              placeholder="A current first aid at work certificate"
+              class="w-full"
+              data-test="module-external-evidence"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Where it sits in the list"
+            name="sort"
+            description="Lower comes first. Modules sharing a number fall back to their published id."
+          >
+            <UInputNumber
+              v-model="state.sort"
+              :min="0"
+              :max="9999"
+              class="w-full"
+              data-test="module-sort"
+            />
+          </UFormField>
 
           <UFormField
             v-if="editing"
