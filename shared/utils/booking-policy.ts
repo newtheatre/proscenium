@@ -157,7 +157,7 @@ export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderP
   }
 
   const refusedOutright = failures.some(failure => NOT_DIVERTIBLE.includes(failure.reason))
-  // A member on the no-show ladder asks for every room whatever the policy says (C-116). A union
+  // A member on the no-show ladder asks for every room whatever the policy says (C-116). A room
   // room is not here at all any more: it is a request of its own kind (C-120, 0036).
   const alwaysAsks = room.sensitive || context.underPreApproval === true
   return {

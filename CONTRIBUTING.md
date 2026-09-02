@@ -20,16 +20,32 @@ repository at speed. Read this before your first change.
 
 ## CI gates (all green before merge, no exemptions)
 
-1. Lint and typecheck.
-2. The full test suite, including the named regression cases: the register race, the double
-   refund, the capacity race, DST recurrence arithmetic, academic-year carry-over, erasure
-   completeness, and the expected-total mismatch.
-3. Migration review check: a generated migration that rebuilds an append-only table is refused;
-   hand-edited generated migrations are refused.
-4. Comment rules: two lines maximum, constraints not narration, no JSDoc block tags, no
+Eleven steps, in `.github/workflows/ci.yml`. Run all of them before opening a pull request.
+
+1. `build`.
+2. `typecheck`, the Nuxt application, and `typecheck:bun`, a separate compiler over `tests/`,
+   `scripts/` and `migration/`. **They are two gates.** Passing one says nothing about the other,
+   and the second is the one a change to a script or a fixture fails.
+3. `lint`.
+4. `test`, the unit and integration suites, including the named regression cases: the register
+   race, the double refund, the capacity race, DST recurrence arithmetic, academic-year carry-over,
+   erasure completeness, and the expected-total mismatch.
+5. `check:comments`: two lines maximum, constraints not narration, no JSDoc block tags, no
    narrated history.
-5. Documentation drift check: a change to behaviour without a change to its document fails
-   review. Documentation drift is a defect; the old rooms application is the cautionary tale.
+6. `check:migrations`: a generated migration that rebuilds an append-only table is refused, as is a
+   hand-edited generated one, as is a journal that disagrees with the files on disk.
+7. `check:content-tokens`: a policy token on a content page that no configuration key answers.
+8. `check:ledger`: a ledger line kind that the code does not enforce.
+9. `check:notifications`: a notification type with no template, or a template nothing sends.
+10. `check:audit`: a privileged route with no audit write, or an action written but never
+    registered.
+
+`test:e2e` is **not** a CI gate. It runs nightly and on demand (0029), and a full run takes minutes
+rather than seconds.
+
+Documentation drift is a defect and fails review, but no script checks it: a change to behaviour
+without a change to its document is caught by a person. The old rooms application is the
+cautionary tale.
 
 ## Scripts and tooling
 
@@ -81,7 +97,7 @@ repository at speed. Read this before your first change.
 - Three layers, all under Bun 1.4's test tooling: unit tests for pure logic, integration tests
   against a real test database (where the racing tests live), and end-to-end interface tests
   driving the critical journeys (booking, door, till, register, room request) in a browser.
-  All three run in CI on every merge.
+  The first two gate every merge; the third runs nightly and on demand (0029).
 - The register, the ledger and erasure are correct or the system is not shippable; their tests
   are written before their implementations.
 - Every defect found in the old estate's audit becomes a regression test here before its

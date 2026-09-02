@@ -7,7 +7,7 @@ without losing a row that matters. Phasing follows the roadmap: the platform sto
 Phase 1, the migration stories rehearse weekly through Phase 2 and complete at the 31 October
 cutover.
 
-Stories: 22. Phases: 19 MVP, 0 V2, 0 Later, 3 resolved.
+Stories: 24. Phases: 21 MVP, 0 V2, 0 Later, 3 resolved.
 
 ## Open questions
 

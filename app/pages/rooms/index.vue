@@ -217,7 +217,7 @@ useSeoMeta({ title: 'Rooms' })
         color="neutral"
         variant="ghost"
         to="/rooms/external"
-        data-test="ask-the-union"
+        data-test="book-unlisted"
       >
         Book a room not listed here
       </UButton>

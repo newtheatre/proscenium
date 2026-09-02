@@ -2,7 +2,7 @@ import { assignForm, refusalToAct } from '#shared/utils/external-requests'
 import { blocksAssignment, noteFor, warningFor } from '#shared/utils/external-spaces'
 import { formatLondon } from '#shared/utils/london'
 
-// Record the room the union gave us, which confirms the request.
+// Record the room we were given, which confirms the request.
 export default defineEventHandler(async (event) => {
   const { account } = await authority(event)
   await requirePermission(event, 'rooms.write')
@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
   const space = await findSpace(input.spaceId)
-  if (!space) throw createError({ statusCode: 422, statusMessage: 'That room is not one the union lists' })
+  if (!space) throw createError({ statusCode: 422, statusMessage: 'That room is not one we have listed' })
 
   // The spreadsheet check, made into a refusal. A warning here would be read past, and the whole
   // complaint is that nobody knew the room was wrong until they turned up to it (C-120).
@@ -30,8 +30,8 @@ export default defineEventHandler(async (event) => {
   }
 
   const now = Math.floor(Date.now() / 1000)
-  // From CONFIRMED too, and guarded on both: the union moving us room to room after answering is
-  // ordinary, and the room they gave us has to be correctable (0006, C-120).
+  // From CONFIRMED too, and guarded on both: being moved room to room after an answer is
+  // ordinary, and the room we were given has to be correctable (0006, C-120).
   const moved = await moveRequest(id, ['AWAITING_EXTERNAL', 'CONFIRMED'], {
     status: 'CONFIRMED',
     assigned_space_id: space.id,
@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
 
   if (!moved) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
 
-  // Every room the union offered, kept: asking again must not overwrite what we were given first.
+  // Every room offered, kept: asking again must not overwrite what we were given first.
   await db.insert(schema.externalAssignments).values({
     id: newId(),
     requestId: id,
@@ -69,7 +69,7 @@ export default defineEventHandler(async (event) => {
       name: request.who,
       title: request.title,
       room: space.name,
-      where: [space.building, space.campus].filter(Boolean).join(', ') || 'somewhere in the union',
+      where: [space.building, space.campus].filter(Boolean).join(', ') || 'somewhere on campus',
       when: formatLondon(new Date(request.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },

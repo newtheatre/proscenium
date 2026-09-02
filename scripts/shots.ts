@@ -199,7 +199,7 @@ const SHOTS: Shot[] = [
   })()` },
   { name: '10c-rooms-filters', path: '/admin/rooms', marker: '[data-test="rooms-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '10d-requests', path: '/admin/requests', marker: '[data-test="requests-table"]' },
-  { name: '10e-su-rooms', path: '/admin/su-rooms', marker: '[data-test="spaces-table"]' },
+  { name: '10e-other-rooms', path: '/admin/other-rooms', marker: '[data-test="spaces-table"]' },
   { name: '10f-su-requests', path: '/admin/su-requests', marker: '[data-test="su-requests-table"]' },
   { name: '11-config', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
   { name: '12-dev-tools', path: '/dev', marker: '[data-test="dev-seed"]' },

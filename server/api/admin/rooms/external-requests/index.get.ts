@@ -7,7 +7,7 @@ const query = z.object({
   when: z.enum(['open', 'all']).default('open'),
 })
 
-// Union rooms asked for, and where each has got to.
+// Rooms we do not manage, asked for, and where each has got to.
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'rooms.write')
   const input = await getValidatedQueryOrThrow(event, query)
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     when: input.when,
     items: items.map(one => ({
       ...one,
-      // What we know about the room they asked for, so the officer sees it before the union does.
+      // What we know about the room they asked for, so the officer sees it before asking.
       preferredWarning: warningFor(noteFor(notes, one.preferredSpaceId ?? '', one.purpose)),
       offers: offers.get(one.id) ?? [],
     })),

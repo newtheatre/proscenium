@@ -33,9 +33,9 @@ export default defineEventHandler(async (event) => {
     ))
     .orderBy(schema.roomBookings.startsAt)
 
-  // A room the union gave us is a commitment like any other, so it belongs in the same calendar.
+  // A room we were given is a commitment like any other, so it belongs in the same calendar.
   // One that is still with them is tentative, because they may yet say no (C-120).
-  const union = await db.select({
+  const unlisted = await db.select({
     id: schema.externalRequests.id,
     title: schema.externalRequests.title,
     room: schema.externalSpaces.name,
@@ -58,10 +58,10 @@ export default defineEventHandler(async (event) => {
   // A subscription is polled, so a stale copy is worse than a fetch.
   setHeader(event, 'cache-control', 'no-store, private')
 
-  return calendarFor([...rows, ...union.map(one => ({
+  return calendarFor([...rows, ...unlisted.map(one => ({
     ...one,
-    room: one.room ?? 'A union room, not yet assigned',
-    // The union's own vocabulary against a calendar's: only a room they gave us is confirmed.
+    room: one.room ?? 'A room not listed here, not yet assigned',
+    // Their vocabulary against a calendar's: only a room we were actually given is confirmed.
     status: one.status === 'CONFIRMED' ? 'CONFIRMED' : one.status === 'AWAITING_EXTERNAL' || one.status === 'REQUESTED' ? 'PENDING_APPROVAL' : 'CANCELLED',
   }))], {
     name: 'New Theatre rooms',

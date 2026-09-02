@@ -1,7 +1,7 @@
 import { refusalToAct, refuseAssignmentForm } from '#shared/utils/external-requests'
 import { formatLondon } from '#shared/utils/london'
 
-// The union gave us something unsuitable, so we record it and ask again.
+// We were given something unsuitable, so we record it and ask again.
 export default defineEventHandler(async (event) => {
   const { account } = await authority(event)
   await requirePermission(event, 'rooms.write')
@@ -15,12 +15,12 @@ export default defineEventHandler(async (event) => {
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
   const space = await findSpace(input.spaceId)
-  if (!space) throw createError({ statusCode: 422, statusMessage: 'That room is not one the union lists' })
+  if (!space) throw createError({ statusCode: 422, statusMessage: 'That room is not one we have listed' })
 
   const now = Math.floor(Date.now() / 1000)
 
   // Guarded, or a refusal lands against a request a colleague just confirmed (0006). A room
-  // refused after confirming is still a room we no longer have, so it goes back to the union.
+  // refused after confirming is still a room we no longer have, so it goes back to waiting.
   const still = await moveRequest(id, ['AWAITING_EXTERNAL', 'CONFIRMED'], {
     status: 'AWAITING_EXTERNAL',
     assigned_space_id: null,

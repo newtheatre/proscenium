@@ -29,8 +29,8 @@ export async function approvers(): Promise<{ id: string, name: string }[]> {
 // once per historic open request in a single night. The same guard membership.ts carries.
 const EXTERNAL_CHASE_CAP = 50
 
-// A union request escalates but never expires: expiry frees a held slot, and this holds none, so
-// lapsing one would tell the member nothing while the union may still answer (C-120, 0036).
+// An external request escalates but never expires: expiry frees a held slot, this holds none, so
+// lapsing one would tell the member nothing while an answer may still come (C-120, 0036).
 export async function sweepExternalRequests(event: H3Event | undefined, at = new Date()): Promise<number> {
   const now = Math.floor(at.getTime() / 1000)
   const escalateAfter = await configValue(event, 'ROOM_REQUEST_ESCALATE_HOURS')
@@ -73,7 +73,7 @@ export async function sweepExternalRequests(event: H3Event | undefined, at = new
           title: request.title,
           when: whenOf(request),
           // Which half of the wait it is stuck in, because the two need different action.
-          withUnion: request.status === 'AWAITING_EXTERNAL',
+          formIsIn: request.status === 'AWAITING_EXTERNAL',
           queueUrl: `${useRuntimeConfig(event).public.baseURL}/admin/su-requests`,
         },
       })

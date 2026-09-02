@@ -30,7 +30,7 @@ const includeRetired = ref(false)
 const failure = ref<string | null>(null)
 
 const { data, status, refresh } = await useAsyncData(
-  'su-rooms',
+  'other-rooms',
   () => request<{ items: Space[], total: number }>('/api/admin/rooms/external-spaces', {
     query: { includeRetired: includeRetired.value },
   }),
@@ -38,7 +38,7 @@ const { data, status, refresh } = await useAsyncData(
 )
 
 const { data: rules } = await useAsyncData(
-  'su-rooms-purposes',
+  'other-rooms-purposes',
   () => request<{ purposes: string[] }>('/api/rooms/policy'),
   { default: () => ({ purposes: [] as string[] }) },
 )
@@ -277,7 +277,7 @@ const columns: TableColumn<Space>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          No SU rooms are listed. Add one and members can ask for it by name.
+          No rooms are listed here yet. Add one and members can ask for it by name.
         </p>
       </template>
     </UTable>
@@ -291,7 +291,7 @@ const columns: TableColumn<Space>[] = [
 
     <UModal
       v-model:open="open"
-      :title="editing ? `Edit ${editing.name}` : 'List an SU room'"
+      :title="editing ? `Edit ${editing.name}` : 'List a room'"
       description="What we know about where it is and who to ask. We are told little, so most of this is optional."
     >
       <template #body>
@@ -355,7 +355,7 @@ const columns: TableColumn<Space>[] = [
             label="Who to ask"
             name="contact"
             hint="Optional"
-            description="For an SU room this is usually a desk rather than a person."
+            description="Usually a desk rather than a person."
           >
             <UInput
               v-model="state.contact"

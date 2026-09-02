@@ -48,6 +48,7 @@ Before opening a pull request, run what CI gates on:
 ```bash
 bun run lint
 bun run typecheck
+bun run typecheck:bun
 bun run check:comments
 bun run check:migrations
 bun run check:content-tokens

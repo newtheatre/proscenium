@@ -251,7 +251,7 @@ describe.skipIf(skip !== null)('the screen (C-119)', () => {
       }
       await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
 
-      await visit(view, `${app.baseURL}/admin/su-rooms`, '[data-test="spaces-table"]')
+      await visit(view, `${app.baseURL}/admin/other-rooms`, '[data-test="spaces-table"]')
       // A server render cannot see a hydration failure, so the page is read after it is live.
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
 

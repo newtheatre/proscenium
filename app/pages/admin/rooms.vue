@@ -230,11 +230,11 @@ const columns: TableColumn<Room>[] = [
 
       <template #actions>
         <UButton
-          to="/admin/su-rooms"
+          to="/admin/other-rooms"
           color="neutral"
           variant="outline"
           icon="i-lucide-map-pin"
-          data-test="to-su-rooms"
+          data-test="to-other-rooms"
         >
           Other rooms
         </UButton>

@@ -183,8 +183,10 @@ Merging to `main` (once this branch becomes it) deploys via Workers Builds. Migr
 Applying and deploying cannot be sequenced from CI, so the ordering is a race; the health check is
 what makes losing it visible rather than silent.
 
-CI gates: lint, typecheck, the three test layers, comment rules, the append-only migration check,
-and the content-token check against the configuration schema (0012).
+CI gates, eleven of them: `build`, `typecheck`, `lint`, `typecheck:bun`, `test`, and the six
+checkers (comments, migrations, content tokens, ledger, notifications, audit). `typecheck` and
+`typecheck:bun` are separate compilers over separate projects, and passing one says nothing about
+the other. `test:e2e` is **not** a gate: it runs nightly and on demand (0029).
 
 ## Testing (0016)
 

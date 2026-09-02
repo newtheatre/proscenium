@@ -436,7 +436,7 @@ The Nottingham New Theatre`,
   },
 
   'external-received': (context: TemplateContext): Rendered => ({
-    subject: `Asked for: a room not listed on the site, ${String(context.when)}`,
+    subject: `Asked for: a room not listed here, ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>Your request for a room we do not manage, ${context.when}, is with the Theatre Manager, who
 fills in the Students' Union's form.</p>
@@ -457,7 +457,7 @@ The Nottingham New Theatre`,
   }),
 
   'external-raised': (context: TemplateContext): Rendered => ({
-    subject: `A room not listed on the site has been asked for: ${String(context.when)}`,
+    subject: `A room not listed here has been asked for: ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>${context.who} has asked for a room we do not manage, ${context.when}.</p>
 <p>${context.title}</p>
@@ -560,13 +560,13 @@ The Nottingham New Theatre`,
   }),
 
   'external-waiting': (context: TemplateContext): Rendered => {
-    const withUnion = context.withUnion === true
+    const formIsIn = context.formIsIn === true
     return {
-      subject: `Still waiting: a room not listed on the site, ${String(context.when)}`,
+      subject: `Still waiting: a room not listed here, ${String(context.when)}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>${context.who} asked for a room we do not manage, ${context.when}, and it has been waiting.</p>
 <p>${context.title}</p>
-<p>${withUnion
+<p>${formIsIn
   ? 'The form is in with the Students\' Union, so this may need chasing with them.'
   : 'The form has not gone in yet.'}</p>
 <p><a href="${String(context.queueUrl)}">Open the queue</a></p>`),
@@ -577,7 +577,7 @@ waiting.
 
 ${String(context.title)}
 
-${withUnion
+${formIsIn
   ? 'The form is in with the Students\' Union, so this may need chasing with them.'
   : 'The form has not gone in yet.'}
 

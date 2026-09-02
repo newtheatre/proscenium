@@ -56,9 +56,9 @@ export async function remindTomorrow(event: H3Event | undefined, at = new Date()
     ))
     .orderBy(asc(schema.roomBookings.startsAt))
 
-  // A room the union gave us is a room somebody has to turn up to, so it is reminded about like
+  // A room we were given is a room somebody has to turn up to, so it is reminded about like
   // any other. Only a confirmed one: the rest may still not happen (C-120).
-  const union = await db.select({
+  const unlisted = await db.select({
     id: schema.externalRequests.id,
     userId: schema.externalRequests.userId,
     room: schema.externalSpaces.name,
@@ -77,9 +77,9 @@ export async function remindTomorrow(event: H3Event | undefined, at = new Date()
     ))
     .orderBy(asc(schema.externalRequests.startsAt))
 
-  // One message per member however many rooms they hold tomorrow, ours and the union's alike
+  // One message per member however many rooms they hold tomorrow, ours and other people's alike
   // (criterion 2).
-  const held = [...rows, ...union].sort((a, b) => a.startsAt - b.startsAt)
+  const held = [...rows, ...unlisted].sort((a, b) => a.startsAt - b.startsAt)
   const byMember = new Map<string, typeof held>()
   for (const row of held) byMember.set(row.userId, [...(byMember.get(row.userId) ?? []), row])
 

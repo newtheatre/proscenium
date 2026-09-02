@@ -1,7 +1,7 @@
 import { refusalToAct, submitForm } from '#shared/utils/external-requests'
 import { formatLondon } from '#shared/utils/london'
 
-// Record that the union's form is in.
+// Record that the form is in.
 export default defineEventHandler(async (event) => {
   const { account } = await authority(event)
   await requirePermission(event, 'rooms.write')

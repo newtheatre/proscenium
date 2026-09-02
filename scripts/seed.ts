@@ -175,7 +175,7 @@ function seedBookings(rooms: { id: string, name: string }[], people: Seeded[]): 
   return planned.length
 }
 
-// The rooms the union manages, and the lesson that cost somebody an evening (C-119).
+// The rooms we do not manage, and the lesson that cost somebody an evening (C-119).
 function seedExternalSpaces(): number {
   const spaces = [
     { id: id(), name: 'Portland B12', building: 'Portland Building', campus: 'University Park', capacity: 20 },
