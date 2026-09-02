@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { REVOKE_REASON_LIMIT, saysKind } from '#shared/utils/training'
+import { EVIDENCE_REF_LIMIT, REVOKE_REASON_LIMIT, saysKind, saysSource } from '#shared/utils/training'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -24,7 +24,15 @@ interface Record {
   held: boolean
 }
 
-interface Module { id: string, name: string, department: string, kind: string, status: string }
+interface Module {
+  id: string
+  name: string
+  department: string
+  kind: string
+  status: string
+  allowsExternal: boolean
+  externalEvidence: string | null
+}
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -58,10 +66,55 @@ const shown = computed(() => {
 const signable = computed(() => catalogue.value.items.filter(module =>
   module.kind !== 'BRIEF' && module.status !== 'RETIRED'))
 
+// Accepting outside evidence is the module's own choice, made in the catalogue (G-121 c1).
+const external = computed(() => signable.value.filter(module => module.allowsExternal))
+
 const signing = ref(false)
 const chosen = ref<string | null>(null)
 const revoking = ref<Record | null>(null)
 const reason = ref('')
+
+interface Certificate {
+  moduleId: string
+  awardedOn: string | undefined
+  expiresOn: string | undefined
+  evidenceRef: string
+}
+
+const blank = (): Certificate =>
+  ({ moduleId: '', awardedOn: todayInLondon(), expiresOn: undefined, evidenceRef: '' })
+
+const recording = ref(false)
+const certificate = reactive<Certificate>(blank())
+
+// What the module asks to see, so the recorder knows which paper counts before they type it.
+const wanted = computed(() =>
+  external.value.find(module => module.id === certificate.moduleId)?.externalEvidence ?? null)
+
+const recordable = computed(() =>
+  Boolean(certificate.moduleId && certificate.awardedOn && certificate.expiresOn && certificate.evidenceRef.trim()))
+
+async function recordCertificate(): Promise<void> {
+  if (!person.value || !recordable.value) return
+  saving.value = true
+  failure.value = null
+  try {
+    await $fetch('/api/admin/training/external-certificates', {
+      method: 'POST',
+      body: { userId: person.value, ...certificate, evidenceRef: certificate.evidenceRef.trim() },
+    })
+    toast.add({ title: 'Recorded', icon: 'i-lucide-award', color: 'success' })
+    recording.value = false
+    Object.assign(certificate, blank())
+    await refresh()
+  }
+  catch (error) {
+    failure.value = refusalText(error)
+  }
+  finally {
+    saving.value = false
+  }
+}
 
 async function signOff(): Promise<void> {
   if (!person.value || !chosen.value) return
@@ -137,7 +190,7 @@ const columns: TableColumn<Record>[] = [
         h('span', {}, row.original.moduleName),
       ]),
       h('div', { class: 'text-xs text-muted' },
-        `${row.original.department} · ${saysKind(row.original.kind)} · ${row.original.source}`),
+        `${row.original.department} · ${saysKind(row.original.kind)} · ${saysSource(row.original.source)}`),
     ]),
   },
   {
@@ -201,7 +254,7 @@ const columns: TableColumn<Record>[] = [
       variant="subtle"
       icon="i-lucide-clipboard-check"
       title="What somebody holds, and how they came to hold it"
-      description="A sign-off records competence proven outside a session. Nothing is ever deleted: a correction is a revocation with a reason, and then a fresh award."
+      description="A sign-off records competence proven outside a session, and an external certificate records competence earned elsewhere that we never assessed. Nothing is ever deleted: a correction is a revocation with a reason, and then a fresh award."
     />
 
     <UFormField
@@ -230,6 +283,16 @@ const columns: TableColumn<Record>[] = [
             @click="signing = true"
           >
             Sign something off
+          </UButton>
+          <UButton
+            data-test="record-external"
+            icon="i-lucide-award"
+            color="neutral"
+            variant="outline"
+            :disabled="external.length === 0"
+            @click="recording = true"
+          >
+            Record a certificate
           </UButton>
         </template>
       </AdminToolbar>
@@ -290,6 +353,91 @@ const columns: TableColumn<Record>[] = [
           color="neutral"
           variant="ghost"
           @click="signing = false"
+        >
+          Back
+        </UButton>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="recording"
+      title="Record an external certificate"
+      description="Competence earned elsewhere. We record it rather than assess it, so the paper and its dates are the evidence."
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UFormField
+            label="Which module"
+            description="Only modules whose department has said they accept outside evidence."
+          >
+            <div class="flex flex-wrap gap-1">
+              <UButton
+                v-for="module in external"
+                :key="module.id"
+                size="sm"
+                :color="certificate.moduleId === module.id ? 'primary' : 'neutral'"
+                :variant="certificate.moduleId === module.id ? 'solid' : 'outline'"
+                :aria-pressed="certificate.moduleId === module.id"
+                :data-test="`external-${module.id}`"
+                @click="certificate.moduleId = module.id"
+              >
+                {{ module.id }}
+              </UButton>
+            </div>
+          </UFormField>
+
+          <UFormField
+            label="Awarded on"
+            required
+            description="The day the issuing body granted it, which cannot be in the future."
+          >
+            <DateField
+              v-model="certificate.awardedOn"
+              data-test="external-awarded"
+              class="w-full"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Runs to"
+            required
+            description="The issuing body's own expiry date. A certificate never takes the module's policy, and nothing here may run more than ten years from the award."
+          >
+            <DateField
+              v-model="certificate.expiresOn"
+              data-test="external-expiry"
+              class="w-full"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Evidence"
+            required
+            :description="wanted ?? `A certificate number, the issuing body, or a document reference. Up to ${EVIDENCE_REF_LIMIT} characters.`"
+          >
+            <UInput
+              v-model="certificate.evidenceRef"
+              class="w-full"
+              :maxlength="EVIDENCE_REF_LIMIT"
+              data-test="external-evidence"
+            />
+          </UFormField>
+        </div>
+      </template>
+
+      <template #footer>
+        <UButton
+          :loading="saving"
+          :disabled="!recordable"
+          data-test="external-submit"
+          @click="recordCertificate"
+        >
+          Record it
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="recording = false"
         >
           Back
         </UButton>

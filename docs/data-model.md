@@ -922,6 +922,11 @@ The documented path to a different meaning is **retire and recreate**: set the o
 then create a successor under a new published id. The successor carries no records, so its own
 semantics are editable until it awards its first.
 
+`allows_external` is the department's opt-in to competence earned elsewhere: a record with source
+`EXTERNAL` against a module that has not set it is refused with a 409. `external_evidence` is the
+free-text note saying what paper that department wants to see, shown to whoever records one; it is
+guidance and never a validation rule (G-121 criterion 1).
+
 A module stores an expiry **policy**, never a date. What a record earned today would run to is
 computed on the way out of a request from the policy, `ACADEMIC_YEAR_BOUNDARY` and
 `TRAINING_CARRY_OVER_DAYS`; an award stamps the answer onto the record, and no later change to
@@ -1035,6 +1040,22 @@ held, and stamps `expires_on` from the module's policy as at the award date. An 
 sets `expiry_overridden` and has to fall after the award, inside the module's own policy and
 inside the catalogue-wide cap, whichever is tighter. A null expiry means never, needs
 `training.override`, and is audited under its own action because it is break-glass.
+
+An **external certificate** (G-121) is the second thing that writes one, at
+`POST /api/admin/training/external-certificates`. It shares every refusal a sign-off makes:
+department scope, no future award date, no unheld prerequisite, no brief and no retired module.
+Three things are its own:
+
+- **The module has to have opted in.** `allows_external` is the department's choice; a 409 says so.
+- **`evidence_ref` is mandatory**, being the whole of what is trusted in place of an assessment.
+  It never reaches audit detail, which carries identifiers and not the paper (0011).
+- **`expires_on` is always given and `expiry_overridden` is always true.** The issuing body set the
+  term, so the module's own policy is never inherited and never binds it; only the catalogue-wide
+  120-month cap and "after the award" do. Recalculation therefore skips every one of these rows.
+
+`source` is `EXTERNAL`, and both record endpoints, both screens and the erasure export carry it, so
+a certificate we recorded never reads as one we assessed (criterion 4). There is no break-glass
+"never expires" here: the form has no shape that means it.
 
 Revocation is `training.revoke` and administrator-only. It is idempotent by predicate rather
 than by a read, so two administrators racing produce one stamp and one audit entry rather than

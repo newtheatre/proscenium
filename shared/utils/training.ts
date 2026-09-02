@@ -151,6 +151,16 @@ export function countsAsHeld(state: RecordState): boolean {
   return state !== 'EXPIRED'
 }
 
+// How a record was come by, said out loud. An external certificate is competence we recorded
+// rather than assessed, so no view may show it as anything else (G-121 criterion 4).
+export function saysSource(source: string): string {
+  if (source === 'SESSION') return 'Session award'
+  if (source === 'EXTERNAL') return 'External certificate'
+  if (source === 'SELF') return 'Self-registered'
+  if (source === 'LEGACY') return 'Brought over'
+  return 'Signed off'
+}
+
 export function saysState(state: RecordState): string {
   if (state === 'EXPIRING') return 'Expiring'
   if (state === 'EXPIRED') return 'Expired'
@@ -332,6 +342,16 @@ export const newModuleForm = moduleFields.extend({
   id: z.string().trim().regex(MODULE_ID, 'A module id is uppercase letters, digits and hyphens').max(32),
 }).superRefine(refuseImpossibleModules)
 
+// After the award and inside the catalogue-wide cap. An external certificate is bounded by this
+// and by nothing else: the module's policy is what it never inherits (G-121 criterion 3).
+export function externalExpiryProblem(awardedOn: string, expiresOn: string): string | null {
+  if (expiresOn <= awardedOn) return 'An expiry falls after the award, not on or before it'
+  if (exceedsExpiryCap(awardedOn, expiresOn)) {
+    return `An expiry cannot run more than ${MAX_EXPIRY_MONTHS} months from the award`
+  }
+  return null
+}
+
 // The lifetime a sign-off may stamp: after the award, inside the module's own policy, and inside
 // the catalogue-wide cap whichever is tighter (G-120 criterion 4).
 export function expiryProblem(
@@ -339,10 +359,8 @@ export function expiryProblem(
   awardedOn: string,
   expiresOn: string,
 ): string | null {
-  if (expiresOn <= awardedOn) return 'An expiry falls after the award, not on or before it'
-  if (exceedsExpiryCap(awardedOn, expiresOn)) {
-    return `An expiry cannot run more than ${MAX_EXPIRY_MONTHS} months from the award`
-  }
+  const problem = externalExpiryProblem(awardedOn, expiresOn)
+  if (problem) return problem
   if (policy.expiryMode === 'MONTHS' && policy.expiryMonths !== null) {
     const cap = addMonths(awardedOn, policy.expiryMonths)
     if (expiresOn > cap) return `This module's policy runs to ${cap}, so an expiry cannot pass it`
@@ -361,6 +379,21 @@ export const signOffForm = z.object({
 })
 
 export type SignOffInput = z.output<typeof signOffForm>
+
+export const EVIDENCE_REF_LIMIT = 500
+
+export const externalCertificateForm = z.object({
+  userId: z.string().trim().min(1).max(64),
+  moduleId: z.string().trim().min(1).max(32),
+  awardedOn: z.string().regex(CIVIL_DATE, 'An award date reads as YYYY-MM-DD'),
+  // Always explicit and never null: a certificate carries the issuer's term, and the module's
+  // policy is what it never inherits (G-121 criterion 3).
+  expiresOn: z.string().regex(CIVIL_DATE, 'An expiry reads as YYYY-MM-DD'),
+  // Mandatory: it is the whole of what we trust in place of having assessed it (criterion 2).
+  evidenceRef: z.string().trim().min(1).max(EVIDENCE_REF_LIMIT),
+})
+
+export type ExternalCertificateInput = z.output<typeof externalCertificateForm>
 
 export const REVOKE_REASON_LIMIT = 500
 

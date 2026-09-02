@@ -153,6 +153,10 @@ export const AUDIT_COVERAGE: Coverage[] = [
     route: 'server/api/admin/training/signoffs/index.post.ts',
     actions: ['record.signed-off', 'record.signoff.unbounded'],
   },
+  {
+    route: 'server/api/admin/training/external-certificates/index.post.ts',
+    actions: ['record.external-certificate'],
+  },
   { route: 'server/api/admin/training/records/[id]/revoke.post.ts', actions: ['record.revoked'] },
   { route: 'server/api/admin/training/sessions/index.post.ts', actions: ['session.scheduled'] },
   { route: 'server/api/admin/training/sessions/index.get.ts', exempt: 'reads the scheduled sessions' },

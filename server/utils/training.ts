@@ -548,6 +548,52 @@ export function assertStewards(resolved: CatalogueAuthority, department: string)
   throw createError({ statusCode: 403, statusMessage: 'You do not have permission to do that' })
 }
 
+export type AwardablePolicy = ExpiryPolicy & { kind: string, status: string, allowsExternal: boolean }
+
+// Every refusal an award outside a register makes before it writes, shared so a sign-off and a
+// certificate cannot drift apart (G-120 criteria 1 to 3, G-121 criterion 5).
+export async function assertAwardable(
+  resolved: CatalogueAuthority,
+  input: { userId: string, moduleId: string, awardedOn: string },
+  refusals: { retired: string, brief: string },
+): Promise<AwardablePolicy> {
+  const module = await moduleById(input.moduleId)
+  if (!module) throw createError({ statusCode: 404, statusMessage: 'No such module' })
+
+  assertStewards(resolved, module.department)
+
+  const account = await findById(input.userId)
+  if (!account) throw createError({ statusCode: 404, statusMessage: 'No such account' })
+  if (account.anonymisedAt !== null) {
+    throw createError({ statusCode: 409, statusMessage: 'That account has been erased' })
+  }
+
+  const policy = await modulePolicy(input.moduleId)
+  if (!policy) throw createError({ statusCode: 404, statusMessage: 'No such module' })
+  if (policy.status === 'RETIRED') throw createError({ statusCode: 409, statusMessage: refusals.retired })
+  if (policy.kind === 'BRIEF') throw createError({ statusCode: 409, statusMessage: refusals.brief })
+
+  // A future award would read as valid to every gate between now and then.
+  const today = londonToday()
+  if (input.awardedOn > today) {
+    throw createError({ statusCode: 422, statusMessage: 'An award cannot be dated in the future' })
+  }
+
+  // Expiring counts as held, and the refusal names the gaps. No acknowledgement path exists for
+  // any kind, which the criterion demands of a certification.
+  const needed = (await prerequisitesOf([input.moduleId])).get(input.moduleId) ?? []
+  const held = await modulesHeldBy(input.userId, today)
+  const gaps = needed.filter(edge => !held.has(edge.requiresId))
+  if (gaps.length > 0) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: `Not held yet: ${gaps.map(gap => `${gap.requiresId} ${gap.requiresName}`).join(', ')}`,
+    })
+  }
+
+  return policy
+}
+
 // What a write actually puts in the row, so the create and the edit cannot drift apart.
 export function moduleValues(input: ModuleInput) {
   return {
