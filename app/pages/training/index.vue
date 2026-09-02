@@ -21,6 +21,14 @@ const request = useRequestFetch()
 
 interface Standing { trainer: boolean, supervisor: boolean }
 
+interface NextStep {
+  id: string
+  name: string
+  department: string
+  kind: string
+  safetyCritical: boolean
+}
+
 const { data, status } = await useAsyncData(
   'training-records',
   () => request<{ items: Record[], total: number, standing: Standing }>('/api/training/records'),
@@ -36,6 +44,12 @@ const groups = computed(() => {
   }
   return [...byDepartment.entries()].sort(([a], [b]) => a.localeCompare(b))
 })
+
+const { data: next } = await useAsyncData(
+  'training-next',
+  () => request<{ items: NextStep[] }>('/api/training/next'),
+  { default: () => ({ items: [] as NextStep[] }) },
+)
 
 const badge = (state: RecordState): 'success' | 'warning' | 'neutral' =>
   state === 'VALID' ? 'success' : state === 'EXPIRING' ? 'warning' : 'neutral'
@@ -140,5 +154,46 @@ const standings = computed(() => [
         </ul>
       </section>
     </div>
+
+    <section
+      v-if="next.items.length > 0"
+      class="mt-12"
+      data-test="whats-next"
+    >
+      <h2 class="text-sm font-semibold text-muted uppercase tracking-wide">
+        What you could do next
+      </h2>
+      <p class="mt-1 text-sm text-muted">
+        Everything here is open to you now: you hold what it asks for. Something expiring still
+        counts, so a renewal can wait until its date.
+      </p>
+
+      <ul class="mt-3 space-y-3">
+        <li
+          v-for="step in next.items"
+          :key="step.id"
+          class="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-default p-4"
+          :data-test="`next-${step.id}`"
+        >
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-mono text-sm text-muted">{{ step.id }}</span>
+              <span class="font-medium">{{ step.name }}</span>
+              <UBadge
+                v-if="step.safetyCritical"
+                color="warning"
+                variant="subtle"
+                size="sm"
+              >
+                Safety critical
+              </UBadge>
+            </div>
+            <p class="mt-1 text-sm text-muted">
+              {{ step.department }} · {{ saysKind(step.kind) }}
+            </p>
+          </div>
+        </li>
+      </ul>
+    </section>
   </UContainer>
 </template>

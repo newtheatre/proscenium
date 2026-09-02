@@ -536,3 +536,40 @@ export function moduleValues(input: ModuleInput) {
     sort: input.sort,
   }
 }
+
+export interface NextStep {
+  id: string
+  name: string
+  department: string
+  kind: string
+  safetyCritical: boolean
+  deliveryMode: string
+}
+
+// What a member could take next: active modules they do not currently hold whose every direct
+// prerequisite they do. Two nested subqueries, so no parameter count grows with the ladder (0003).
+export async function whatsNextFor(userId: string, today: string): Promise<NextStep[]> {
+  return db.all<NextStep>(sql`
+    select m.id, m.name, m.department, m.kind, m.safety_critical as safetyCritical,
+      m.delivery_mode as deliveryMode
+    from modules m
+    where m.status = 'ACTIVE'
+      and not exists (
+        select 1 from training_records r
+        where r.user_id = ${userId} and r.module_id = m.id and r.revoked_at is null
+          and (r.expires_on is null or r.expires_on > ${today})
+      )
+      and not exists (
+        select 1 from module_prerequisites p
+        join modules req on req.id = p.requires_id
+        where p.module_id = m.id and req.kind != 'BRIEF'
+          and not exists (
+            select 1 from training_records held
+            where held.user_id = ${userId} and held.module_id = p.requires_id
+              and held.revoked_at is null
+              and (held.expires_on is null or held.expires_on > ${today})
+          )
+      )
+    order by m.sort, m.id
+  `)
+}

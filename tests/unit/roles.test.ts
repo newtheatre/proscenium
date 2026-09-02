@@ -47,6 +47,16 @@ describe('the role vocabulary', () => {
     expect([...ROLES].filter(role => !targets.has(role))).toEqual([])
   })
 
+  // Questions 7 and 8, answered 2 September. Pinned because a role widening is a governance
+  // decision, and the map is one line that a later edit could undo without anyone noticing.
+  test('the training officer appoints leads and revokes, but never stamps never-expiring', () => {
+    const officer = PERMISSION_MAP.TRAINING_MANAGER
+    expect(officer).toContain('training.leads')
+    expect(officer).toContain('training.revoke')
+    expect(officer).not.toContain('training.override')
+    expect(PERMISSION_MAP[PROTECTED_ROLE]).toContain('training.override')
+  })
+
   test('an unknown role is not a role', () => {
     expect(isRole('ADMIN')).toBe(true)
     expect(isRole('proscenium:ADMIN')).toBe(false)

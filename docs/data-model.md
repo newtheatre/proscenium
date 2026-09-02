@@ -895,6 +895,14 @@ check in the system evaluates these edges against currently held records, with E
 as held (G-108). Cascade from the requiring end and restrict from the required end, so an edge
 dies with the module that declared it and never takes the module it points at with it.
 
+These edges are also read backwards, to answer what a member could take next: the active modules
+they do not currently hold whose every direct prerequisite they do (G-102). It is one query of
+nested `not exists` subqueries in `whatsNextFor()`, so its bound-parameter count does not grow with
+the size of the ladder (0003), and nothing about the answer is stored or cached: a record awarded,
+revoked or expired changes the next read and no other write is involved. Edges onto a brief are
+skipped there as well as refused at the write, because a brief gates nothing and must never be what
+blocks somebody (G-102 criterion 2).
+
 A cycle is refused at the write by a recursive walk that returns the shortest path back, so the
 refusal names the loop rather than saying one exists: the officer cannot see a path running
 through modules they are not looking at. The walk binds three parameters whatever the graph's
@@ -989,11 +997,11 @@ sets `expiry_overridden` and has to fall after the award, inside the module's ow
 inside the catalogue-wide cap, whichever is tighter. A null expiry means never, needs
 `training.override`, and is audited under its own action because it is break-glass.
 
-Revocation is `training.revoke` and administrator-only. It is idempotent by predicate rather
-than by a read, so two administrators racing produce one stamp and one audit entry rather than
-one refusal; the entry is written first in the batch, because the update would otherwise
-falsify the guard the entry rides on. The reason never reaches audit detail, which carries
-identifiers and never people (0011).
+Revocation is `training.revoke`, held by the administrator and the training officer (question 8).
+It is idempotent by predicate rather than by a read, so two officers racing produce one stamp and
+one audit entry rather than one refusal; the entry is written first in the batch, because the
+update would otherwise falsify the guard the entry rides on. The reason never reaches audit
+detail, which carries identifiers and never people (0011).
 
 ### module_requests
 One open request per (user, module) by partial unique; decline carries a reason shown to the
