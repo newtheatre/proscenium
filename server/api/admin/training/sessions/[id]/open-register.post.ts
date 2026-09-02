@@ -1,8 +1,8 @@
 import { and, eq, isNull } from 'drizzle-orm'
 import { registerOpenable } from '#shared/utils/training'
 
-// Open the register. This is the moment a session stops being a plan: the modules freeze, sign-up
-// closes, and everybody placed gets a practice window (G-115).
+// Open the register. This is the moment a session stops being a plan: the modules freeze and
+// sign-up closes (G-115).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'No session named' })
@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
   if (session.registerOpenedAt !== null) return { ok: true, alreadyOpen: true }
 
   // Criterion 4. The stamp is a conditional write, so two devices opening at once produce one open
-  // register: the loser's update matches nothing and it opens no windows.
+  // register: the loser's update matches nothing.
   const now = Math.floor(Date.now() / 1000)
   const opened = await db.update(schema.trainingSessions)
     .set({ registerOpenedAt: now, registerOpenedBy: resolved.account.id, updatedAt: now })
@@ -54,14 +54,12 @@ export default defineEventHandler(async (event) => {
 
   if (opened.length === 0) return { ok: true, alreadyOpen: true }
 
-  const windows = await openPracticeWindowsFor(id, resolved.account.id, now)
-
   await db.insert(schema.auditLog).values(auditEntry({
     actorId: resolved.account.id,
     action: 'register.opened',
     target: `session:${id}`,
-    detail: { heldOn: session.heldOn, practiceWindows: windows },
+    detail: { heldOn: session.heldOn },
   }))
 
-  return { ok: true, alreadyOpen: false, practiceWindows: windows }
+  return { ok: true, alreadyOpen: false }
 })

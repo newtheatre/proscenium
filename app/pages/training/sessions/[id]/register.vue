@@ -180,7 +180,7 @@ async function submit(): Promise<void> {
           variant="subtle"
           icon="i-lucide-lock"
           title="The register is not open yet"
-          description="Opening it closes sign-up, freezes what this session teaches, and opens a practice window for everybody with a place. It opens on the day, not before."
+          description="Opening it closes sign-up and freezes what this session teaches. It opens on the day, not before."
         />
         <UButton
           size="xl"

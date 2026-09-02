@@ -73,7 +73,6 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Records', icon: 'i-lucide-clipboard-check', to: '/training/manage/records', ability: viewTrainingCatalogue },
       { label: 'Sessions', icon: 'i-lucide-calendar-days', to: '/training/manage/sessions', ability: runTrainingSessions },
       { label: 'Requests', icon: 'i-lucide-hand', to: '/training/manage/requests', ability: viewTrainingCatalogue },
-      { label: 'Practice', icon: 'i-lucide-joystick', to: '/training/manage/practice', ability: viewTrainingCatalogue },
     ],
   },
   {

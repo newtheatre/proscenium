@@ -269,12 +269,6 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Days after a session that nagging stops.',
   },
-  PRACTICE_WINDOW_GRACE_HOURS: {
-    schema: z.number().positive(),
-    default: 4,
-    workshop: 'spaces-and-training',
-    describes: 'Grace on a practice window before it lapses. The old documents flagged this as a guess.',
-  },
 
   PASSWORD_MIN_LENGTH: {
     schema: z.number().int().min(8).max(64),

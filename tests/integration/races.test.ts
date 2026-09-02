@@ -67,9 +67,9 @@ describe('contended invariants (K-105)', () => {
     }
   })
 
-  // G-115 criterion 4. The old estate could open two sets of practice windows from one register,
-  // and the partial unique index is what makes the second attempt a no-op rather than a duplicate.
-  test('the register-open race: two devices opening one register open one set of windows', async () => {
+  // G-115 criterion 4. The stamp is a conditional write, so the second device's update matches
+  // nothing rather than opening the register a second time.
+  test('the register-open race: two devices opening one register open it once', async () => {
     const database = await createTestDatabase()
     try {
       const now = Math.floor(Date.now() / 1000)
@@ -78,8 +78,6 @@ describe('contended invariants (K-105)', () => {
         ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-one', 'one@example.invalid', 'One'],
         ['INSERT INTO departments (code, name) VALUES (?, ?)', 'BAR', 'Bar'],
         [`INSERT INTO modules (id, department, kind, name, status) VALUES ('BAR-1', 'BAR', 'MODULE', 'Till', 'ACTIVE')`],
-        [`INSERT INTO practice_targets (key, name, window_hours) VALUES ('till-sandbox', 'Till sandbox', 72)`],
-        [`INSERT INTO practice_target_modules (id, target_key, module_id) VALUES ('ptm1', 'till-sandbox', 'BAR-1')`],
         [`INSERT INTO training_sessions (id, held_on, starts_at, ends_at, capacity, trainer_id)
           VALUES ('s1', '2026-10-05', '19:00', '21:00', 20, 'u-trainer')`],
         [`INSERT INTO session_modules (id, session_id, module_id) VALUES ('sm1', 's1', 'BAR-1')`],
@@ -94,24 +92,15 @@ describe('contended invariants (K-105)', () => {
         const won = rows<{ by: string }>(
           database, `SELECT register_opened_by by FROM training_sessions WHERE id = 's1'`,
         )[0]?.by === by
-        if (!won) return 0
-
-        database.batch([[
-          `INSERT INTO practice_windows (id, target_key, user_id, session_id, opens_at, expires_at, opened_by)
-           VALUES (?, 'till-sandbox', 'u-one', 's1', ?, ?, ?)
-           ON CONFLICT DO NOTHING`,
-          `w-${by}`, at, at + 259200, by,
-        ]])
-        return 1
+        return won ? 1 : 0
       }
 
       expect(open('u-trainer', now)).toBe(1)
       expect(open('u-one', now + 1)).toBe(0)
 
-      expect(rows(database, 'SELECT id FROM practice_windows')).toHaveLength(1)
-      expect(rows<{ by: string }>(
-        database, `SELECT register_opened_by by FROM training_sessions WHERE id = 's1'`,
-      )[0]?.by).toBe('u-trainer')
+      expect(rows<{ at: number, by: string }>(
+        database, `SELECT register_opened_at at, register_opened_by by FROM training_sessions WHERE id = 's1'`,
+      )[0]).toMatchObject({ at: now, by: 'u-trainer' })
     }
     finally {
       database.close()
