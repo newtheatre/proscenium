@@ -105,6 +105,25 @@ export const MESSAGE_TYPES = {
     template: 'room-reminder',
   },
 
+  // Two warnings at different urgencies, neither suppressing the other (G-125 criterion 1).
+  'training.expiry.window': {
+    topic: 'TRAINING',
+    channels: ['EMAIL'],
+    template: 'training-expiry-window',
+  },
+
+  'training.expiry.final': {
+    topic: 'TRAINING',
+    channels: ['EMAIL'],
+    template: 'training-expiry-final',
+  },
+
+  'training.expiry.digest': {
+    topic: 'TRAINING',
+    channels: ['EMAIL'],
+    template: 'training-expiry-digest',
+  },
+
   // One message for a series, never one per occurrence (C-113 criterion 2).
   'room.series.confirmed': {
     topic: 'ROOMS',

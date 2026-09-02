@@ -1113,9 +1113,21 @@ sweep; consumers inside the same database now, no API seam.
 `push` bool. UNIQUE pair. Transactional types have no preference rows at all.
 
 ### notification_log
-`id` PK · `user_id` NULL · `type` · `channel` · `subject` · refs (record/session/booking) ·
-`status` CHECK `SENT|FAILED|RETRYING|SKIPPED_UNDELIVERABLE` · `sent_at` · `error`.
-Idempotency claims (a promotion, a reminder) are partial unique indexes here.
+`id` PK · `user_id` NULL = set null on erasure · `type` · `channel` CHECK `EMAIL|INBOX|PUSH` ·
+`subject` · `record_id` · `session_id` · `claim` · `status` CHECK
+`SENT|FAILED|RETRYING|SKIPPED_UNDELIVERABLE` · `sent_at` · `error` · `created_at`.
+Indexed on user, type, status, `record_id` and `created_at`.
+
+**`claim` is the idempotency, and it is a partial UNIQUE index rather than a read.** A sender that
+must not repeat itself writes the claim and lets the index refuse the second attempt, so two sweeps
+racing send one message between them (0006). The index is partial on `claim IS NOT NULL`, so
+everything with nothing to claim, which is most messages, writes freely. `claimNotification()` and
+`claimHeld()` in `server/utils/notify.ts` are the only things that touch it: the notification centre
+owns the ledger for the same reason it owns sending (0013).
+
+The refs carry **no foreign key**. The ledger outlives what it refers to, and a message sent is a
+fact about the past that deleting a record must not rewrite. `user_id` is the exception and is
+`set null`, so an erased person's messages stay counted without naming them.
 
 ### inbox_items
 `id` PK · `user_id` cascade · `type` · `title` · `body` · `link` · `read_at` ·

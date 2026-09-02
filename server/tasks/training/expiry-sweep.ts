@@ -1,11 +1,11 @@
-// Registered so its cron trigger has a handler; the work arrives with G-125. It reports what it
-// is waiting for rather than a count it did not produce.
+// Daily. Warns before a record lapses, digests to the leads on the first, and prunes the ledger.
+// It writes only the notification ledger: expiry happens because the calendar moved (G-125).
 export default defineTask({
   meta: {
     name: 'training:expiry-sweep',
-    description: 'Training expiry warnings and digests (G-125, not built)',
+    description: 'Training expiry warnings and monthly digests, disarmed until turned on',
   },
-  run() {
-    return { result: { awaiting: 'G-125' } }
+  async run() {
+    return { result: await sweepExpiries(undefined, new Date()) }
   },
 })

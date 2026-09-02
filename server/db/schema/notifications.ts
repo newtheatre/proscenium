@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import { check, index, integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { users } from './identity'
 
 const now = sql`(unixepoch())`
@@ -23,6 +23,13 @@ export const notificationLog = sqliteTable('notification_log', {
   channel: text('channel').notNull(),
   subject: text('subject'),
   status: text('status').notNull(),
+  // What the message was about, for reading back what somebody has already been told. No foreign
+  // key: the ledger outlives what it refers to, and a message sent is a fact about the past.
+  recordId: text('record_id'),
+  sessionId: text('session_id'),
+  // The idempotency claim, unique while it is set. A sender that must not repeat itself writes
+  // one and lets the index refuse the second attempt, rather than reading first (0006, G-125).
+  claim: text('claim'),
   sentAt: integer('sent_at'),
   error: text('error'),
   createdAt: integer('created_at').notNull().default(now),
@@ -30,6 +37,9 @@ export const notificationLog = sqliteTable('notification_log', {
   index('notification_log_user').on(table.userId),
   index('notification_log_type').on(table.type),
   index('notification_log_status').on(table.status),
+  index('notification_log_record').on(table.recordId),
+  index('notification_log_created_at').on(table.createdAt),
+  uniqueIndex('notification_log_claim').on(table.claim).where(sql`claim is not null`),
   check('notification_log_status', sql`${table.status} IN ('SENT', 'FAILED', 'RETRYING', 'SKIPPED_UNDELIVERABLE')`),
   check('notification_log_channel', sql`${table.channel} IN ('EMAIL', 'INBOX', 'PUSH')`),
 ])
