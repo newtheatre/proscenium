@@ -19,6 +19,9 @@ const holds = (viewer: Viewer, permission: Permission): boolean => viewer.permis
 // An ability denies a signed-out caller before its body runs, so this is every signed-in member.
 export const signedIn = defineAbility((_viewer: Viewer) => true)
 
+// A public page is reachable by anybody, signed in or not.
+export const anybody = defineAbility((_viewer: Viewer) => true)
+
 // Standing permissions are administrative only (0009), so holding any of them is what admits
 // somebody to the console at all.
 export const reachConsole = defineAbility((viewer: Viewer) => viewer.permissions.length > 0)

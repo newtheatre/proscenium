@@ -2,7 +2,7 @@
 
 Training was the old estate's best module, and this backlog carries its judgement wholesale: records are append-only with validity derived at read time, marking a register is the single act that awards records for taught sessions, and clockwork notices expiry but never enacts anything. The unified system removes the API seam between records and the surfaces they gate (shifts, the till, kit loans), so a gate reads live competence with nothing to fail open. New in this system are delivery modes: in-person, self-directed online, or hybrid; mode and external material links are MVP schema, while quiz assessment, hybrid completion and the question channel are V2, and a safety-critical module can never be fully self-directed.
 
-Counts: 24 MVP stories (G-101 to G-123, G-125), 11 V2 stories (G-201 to G-211), 2 Later stubs (G-301, G-302), 3 resolved (G-124 and G-126 withdrawn, G-127 won't build). 40 total.
+Counts: 25 MVP stories (G-101 to G-123, G-125, G-128), 11 V2 stories (G-201 to G-211), 2 Later stubs (G-301, G-302), 3 resolved (G-124 and G-126 withdrawn, G-127 won't build). 41 total.
 
 ## Open questions
 
@@ -398,6 +398,22 @@ Counts: 24 MVP stories (G-101 to G-123, G-125), 11 V2 stories (G-201 to G-211), 
   2. The old data stays readable in the archived old estate for any historical question.
   3. The LEGACY record source stays in the schema vocabulary but nothing writes it; reviving it would need a superseding decision.
 - Source: Committee direction, 26 August; audit TR-10 (the import was never written in the old estate either).
+
+## G-128: The public module catalogue
+
+- Role: Visitor
+- Phase: MVP
+- Story: As somebody deciding whether to get involved, I want to read what the theatre teaches without an account so that training is a reason to join rather than something I discover afterwards.
+- Depends on: G-107, G-103
+- Acceptance criteria:
+  1. The catalogue and each module's page are readable signed out, with no account and no sign-in prompt in the way.
+  2. Draft and retired modules never appear: the public list is what is taught now.
+  3. A module's page names what it needs first and what it leads to, both as links, so the shape of a department is walkable.
+  4. Material links are shown only to a signed-in viewer: they are Workspace documents, and nothing enforces that one is world-readable.
+  5. Signing in adds whether each module and each prerequisite is already held, and changes nothing else on the page.
+  6. The pages carry a title and a description for search, and stay inside the public shell's budget of one marquee, one sticker and one spotlight per view.
+  7. The member-only catalogue is replaced rather than duplicated, and its old address still resolves.
+- Source: Committee direction, 2 September 2026; 0040 (the public shell); G-103 (the member catalogue this replaces)
 
 ## G-201: Self-directed module delivery
 

@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
       opensAt: input.opensAt,
       // Criterion 2. Open now unless a later instant was named; until then members see nothing.
       status: input.opensAt === null ? 'OPEN' : 'PLANNED',
+      description: input.description,
       notes: input.notes,
       trainerId: resolved.account.id,
     }),

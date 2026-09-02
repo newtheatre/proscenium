@@ -5,7 +5,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { londonParts } from '#shared/utils/london'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillDate, fillPin, openSignedOutView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillDate, fillPin, openSignedOutView, pickOptions, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-118. A session that already happened, previewed exactly and then written in one batch. The
@@ -458,7 +458,7 @@ describe.skipIf(skip !== null)('the trainer screen (G-118)', () => {
       )).toBe(false)
 
       await fillDate(view, '[data-test="delivery-day"]', day)
-      await click(view, `[data-test="delivery-module-${module}"]`)
+      await pickOptions(view, '[data-test="delivery-modules"]', [module])
       await pickPerson(view, '[data-test="delivery-person"]', person.email.split('@')[0]!, person.name)
       await click(view, '[data-test="delivery-add-person"]')
       await waitFor(view, `document.querySelector('[data-test="delivery-attendees"]')`, 20_000)
@@ -503,7 +503,7 @@ describe.skipIf(skip !== null)('a refusal is shown where the action was taken', 
       await waitFor(view, `document.querySelector('[data-test="delivery-form"]')`)
 
       await fillDate(view, '[data-test="delivery-day"]', day)
-      await click(view, `[data-test="delivery-module-${module}"]`)
+      await pickOptions(view, '[data-test="delivery-modules"]', [module])
       await pickPerson(view, '[data-test="delivery-person"]', person.email.split('@')[0]!, person.name)
       await click(view, '[data-test="delivery-add-person"]')
       await waitFor(view, `document.querySelector('[data-test="delivery-attendees"]')`, 20_000)

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { fromLondonWallClock } from '#shared/utils/london'
+import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { DELIVERY_ATTENDEES_MAX, SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysSessionStatus, saysSource, sessionForm } from '#shared/utils/training'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
@@ -78,6 +78,10 @@ const { data: catalogue } = await useAsyncData(
 const teachable = computed(() => catalogue.value.items.filter(module =>
   module.status === 'ACTIVE' && !module.signoffRequired))
 
+// The catalogue runs to dozens, so this is searched rather than scanned.
+const teachableOptions = computed(() => teachable.value
+  .map(module => ({ label: `${module.id} ${module.name}`, value: module.id })))
+
 const shown = computed(() => {
   const term = search.value.trim().toLowerCase()
   if (!term) return data.value.items
@@ -93,13 +97,22 @@ const state = reactive<{
   endsAt: string
   place?: string
   capacity: number
+  description?: string
   notes?: string
   moduleIds: string[]
   opensAt?: number | null
 }>({ heldOn: '', startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [], opensAt: null })
 
-// Sign-up opening is one instant on the wire. It is collected as a day and a wall clock, read in
-// London like every other domain date (0014), because a browser in another zone would be wrong.
+// Scheduled ahead and logged behind: the write path refuses each the other way round, so the
+// pickers say so rather than letting somebody find out at the submit.
+const today = computed(() => {
+  const parts = londonParts(new Date())
+  const pad = (part: number, width: number): string => String(part).padStart(width, '0')
+  return `${pad(parts.year, 4)}-${pad(parts.month, 2)}-${pad(parts.day, 2)}`
+})
+
+// Sign-up opening is one instant on the wire, collected as a day and a wall clock and read in
+// London like every other domain date (0014): a browser in another zone would be wrong.
 const opensNow = ref(true)
 const opensOnDay = ref('')
 const opensAtTime = ref('09:00')
@@ -126,6 +139,7 @@ function begin(): void {
     endsAt: '21:00',
     place: undefined,
     capacity: 20,
+    description: undefined,
     notes: undefined,
     moduleIds: [],
     opensAt: null,
@@ -135,12 +149,6 @@ function begin(): void {
   opensAtTime.value = '09:00'
   failure.value = null
   open.value = true
-}
-
-function toggle(id: string): void {
-  state.moduleIds = state.moduleIds.includes(id)
-    ? state.moduleIds.filter(one => one !== id)
-    : [...state.moduleIds, id]
 }
 
 async function save(event: FormSubmitEvent<SessionInput>): Promise<void> {
@@ -203,12 +211,6 @@ function beginLog(): void {
   theirName.value = ''
   failure.value = null
   logging.value = true
-}
-
-function toggleModule(id: string): void {
-  moduleIds.value = moduleIds.value.includes(id)
-    ? moduleIds.value.filter(one => one !== id)
-    : [...moduleIds.value, id]
 }
 
 function addPerson(): void {
@@ -492,6 +494,7 @@ const columns: TableColumn<Session>[] = [
           >
             <DateField
               v-model="state.heldOn"
+              :min="today"
               data-test="session-day"
               class="w-full"
             />
@@ -503,9 +506,8 @@ const columns: TableColumn<Session>[] = [
               name="startsAt"
               required
             >
-              <UInput
+              <TimeField
                 v-model="state.startsAt"
-                placeholder="19:00"
                 class="w-full"
                 data-test="session-starts"
               />
@@ -515,9 +517,8 @@ const columns: TableColumn<Session>[] = [
               name="endsAt"
               required
             >
-              <UInput
+              <TimeField
                 v-model="state.endsAt"
-                placeholder="21:00"
                 class="w-full"
                 data-test="session-ends"
               />
@@ -557,26 +558,36 @@ const columns: TableColumn<Session>[] = [
             required
             description="You may teach only what you currently hold. Certifications are not taught by session."
           >
-            <div class="flex flex-wrap gap-1">
-              <UButton
-                v-for="module in teachable"
-                :key="module.id"
-                size="sm"
-                :color="state.moduleIds.includes(module.id) ? 'primary' : 'neutral'"
-                :variant="state.moduleIds.includes(module.id) ? 'solid' : 'outline'"
-                :aria-pressed="state.moduleIds.includes(module.id)"
-                :data-test="`session-module-${module.id}`"
-                @click="toggle(module.id)"
-              >
-                {{ module.id }}
-              </UButton>
-            </div>
+            <USelectMenu
+              v-model="state.moduleIds"
+              :items="teachableOptions"
+              value-key="value"
+              multiple
+              placeholder="Search the catalogue"
+              class="w-full"
+              data-test="session-modules"
+            />
+          </UFormField>
+
+          <UFormField
+            label="What to expect"
+            name="description"
+            hint="Optional"
+            description="Shown to members deciding whether to come. Where to meet, what to bring."
+          >
+            <UTextarea
+              v-model="state.description"
+              :rows="2"
+              class="w-full"
+              data-test="session-description"
+            />
           </UFormField>
 
           <UFormField
             label="Notes"
             name="notes"
             hint="Optional"
+            description="Yours and the department leads'. Members never see these."
           >
             <UTextarea
               v-model="state.notes"
@@ -604,6 +615,7 @@ const columns: TableColumn<Session>[] = [
             >
               <DateField
                 v-model="opensOnDay"
+                :min="today"
                 data-test="session-opens-day"
                 class="w-full"
               />
@@ -667,6 +679,7 @@ const columns: TableColumn<Session>[] = [
             >
               <DateField
                 v-model="heldOn"
+                :max="today"
                 data-test="delivery-day"
                 class="w-full sm:w-64"
               />
@@ -677,20 +690,15 @@ const columns: TableColumn<Session>[] = [
               required
               description="You may log only what you currently hold. Certifications are signed off, not taught."
             >
-              <div class="flex flex-wrap gap-1">
-                <UButton
-                  v-for="module in teachable"
-                  :key="module.id"
-                  size="sm"
-                  :color="moduleIds.includes(module.id) ? 'primary' : 'neutral'"
-                  :variant="moduleIds.includes(module.id) ? 'solid' : 'outline'"
-                  :aria-pressed="moduleIds.includes(module.id)"
-                  :data-test="`delivery-module-${module.id}`"
-                  @click="toggleModule(module.id)"
-                >
-                  {{ module.id }}
-                </UButton>
-              </div>
+              <USelectMenu
+                v-model="moduleIds"
+                :items="teachableOptions"
+                value-key="value"
+                multiple
+                placeholder="Search the catalogue"
+                class="w-full"
+                data-test="delivery-modules"
+              />
             </UFormField>
 
             <UFormField

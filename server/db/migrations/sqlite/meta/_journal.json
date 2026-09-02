@@ -330,6 +330,13 @@
       "when": 1788373127856,
       "tag": "0046_practice_targets_and_windows_are_withdrawn",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1788383180241,
+      "tag": "0047_a_session_says_what_to_expect",
+      "breakpoints": true
     }
   ]
 }

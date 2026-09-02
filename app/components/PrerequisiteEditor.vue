@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Direct edges only, so this is a list and an add rather than a tree (G-108 criterion 1). A brief
-// never appears as a candidate, because a brief gates nothing.
+// Direct edges only, so this is a set rather than a tree (G-108 criterion 1). A brief never appears
+// as a candidate, because a brief gates nothing.
 
 interface Prerequisite { id: string, requiresId: string, requiresName: string }
 interface Candidate { id: string, name: string, kind: string }
@@ -13,41 +13,40 @@ const props = defineProps<{
 
 const emit = defineEmits<{ changed: [], failed: [message: string] }>()
 
-const adding = ref<string | null>(null)
 const working = ref(false)
 
-// A module cannot require itself, and a brief can never be required (criteria 3 and 4).
-const offered = computed(() => props.candidates.filter(candidate =>
-  candidate.id !== props.moduleId
-  && candidate.kind !== 'BRIEF'
-  && !props.prerequisites.some(need => need.requiresId === candidate.id)))
+// A module cannot require itself, and a brief can never be required (criteria 3 and 4). What is
+// already required stays on the list, because a multi-select needs its own value among the options.
+const options = computed(() => props.candidates
+  .filter(candidate => candidate.id !== props.moduleId && candidate.kind !== 'BRIEF')
+  .map(candidate => ({ label: `${candidate.id} ${candidate.name}`, value: candidate.id })))
 
-async function add(requiresId: string): Promise<void> {
+const held = computed(() => props.prerequisites.map(need => need.requiresId))
+const chosen = ref<string[]>([])
+watch(held, value => chosen.value = [...value], { immediate: true })
+
+// Each edge is its own row on the server, so a changed set becomes the adds and the drops between
+// what was there and what was picked. A refusal, a loop most likely, puts the control back.
+async function apply(next: string[]): Promise<void> {
+  const added = next.filter(id => !held.value.includes(id))
+  const dropped = props.prerequisites.filter(need => !next.includes(need.requiresId))
+
   working.value = true
   try {
-    await $fetch(`/api/admin/training/modules/${props.moduleId}/prerequisites`, {
-      method: 'POST',
-      body: { requiresId },
-    })
-    adding.value = null
+    for (const requiresId of added) {
+      await $fetch(`/api/admin/training/modules/${props.moduleId}/prerequisites`, {
+        method: 'POST',
+        body: { requiresId },
+      })
+    }
+    for (const need of dropped) {
+      await $fetch(`/api/admin/training/prerequisites/${need.id}`, { method: 'DELETE' })
+    }
     emit('changed')
   }
   catch (error) {
     emit('failed', refusalText(error))
-  }
-  finally {
-    working.value = false
-  }
-}
-
-async function remove(id: string): Promise<void> {
-  working.value = true
-  try {
-    await $fetch(`/api/admin/training/prerequisites/${id}`, { method: 'DELETE' })
-    emit('changed')
-  }
-  catch (error) {
-    emit('failed', refusalText(error))
+    chosen.value = [...held.value]
   }
   finally {
     working.value = false
@@ -56,7 +55,19 @@ async function remove(id: string): Promise<void> {
 </script>
 
 <template>
-  <div class="space-y-3">
+  <div class="space-y-2">
+    <USelectMenu
+      :model-value="chosen"
+      :items="options"
+      value-key="value"
+      multiple
+      :disabled="working || options.length === 0"
+      placeholder="Search the catalogue"
+      class="w-full"
+      data-test="module-prerequisites"
+      @update:model-value="apply"
+    />
+
     <p
       v-if="prerequisites.length === 0"
       class="text-sm text-muted"
@@ -64,49 +75,12 @@ async function remove(id: string): Promise<void> {
     >
       Nothing is needed before this one.
     </p>
-
-    <div
+    <p
       v-else
-      class="flex flex-wrap gap-2"
+      class="text-sm text-muted"
+      data-test="prerequisite-summary"
     >
-      <UBadge
-        v-for="need in prerequisites"
-        :key="need.id"
-        color="neutral"
-        variant="subtle"
-      >
-        {{ need.requiresId }} {{ need.requiresName }}
-        <UButton
-          icon="i-lucide-x"
-          size="xs"
-          variant="ghost"
-          color="neutral"
-          :disabled="working"
-          :aria-label="`Stop requiring ${need.requiresName}`"
-          :data-test="`drop-prerequisite-${need.requiresId}`"
-          @click="remove(need.id)"
-        />
-      </UBadge>
-    </div>
-
-    <!-- A row of buttons rather than a select: a Nuxt UI select is a listbox, so setting a value
-         on one does nothing, and a closed set this size reads better as buttons anyway. -->
-    <div
-      v-if="offered.length"
-      class="flex flex-wrap gap-1"
-    >
-      <UButton
-        v-for="candidate in offered"
-        :key="candidate.id"
-        size="xs"
-        color="neutral"
-        variant="outline"
-        :disabled="working"
-        :data-test="`add-prerequisite-${candidate.id}`"
-        @click="add(candidate.id)"
-      >
-        Needs {{ candidate.id }}
-      </UButton>
-    </div>
+      Needs {{ prerequisites.map(need => `${need.requiresId} ${need.requiresName}`).join(', ') }} first.
+    </p>
   </div>
 </template>

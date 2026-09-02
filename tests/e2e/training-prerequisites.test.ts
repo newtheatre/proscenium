@@ -260,7 +260,7 @@ describe.skipIf(skip !== null)('the catalogue a member browses (G-103)', () => {
       await click(view, 'form button[type="submit"]')
       await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
 
-      await visit(view, `${app.baseURL}/training/catalogue`, '[data-test="catalogue-page"]')
+      await visit(view, `${app.baseURL}/training/modules`, '[data-test="catalogue-page"]')
       // A server render cannot see a hydration failure, so the page is read after it is live.
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
       expect(await textOf(view, '[data-test="catalogue"]')).toContain(module)

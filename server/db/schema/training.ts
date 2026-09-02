@@ -108,6 +108,8 @@ export const trainingSessions = sqliteTable('training_sessions', {
   // NULL is open already. A session invisible to members resolves no requests (criterion 2).
   opensAt: integer('opens_at'),
   status: text('status').notNull().default('PLANNED'),
+  // Shown to a member deciding whether to come; `notes` is the trainer's own and is not.
+  description: text('description'),
   notes: text('notes'),
   trainerId: text('trainer_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
   // Opening the register freezes what the session teaches and closes sign-up. Stamped once by a

@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { CONFIG_KEYS } from '#shared/utils/config'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-107, G-110 and G-123 through the real routes and the real screen. Nothing here reads a stored
@@ -474,6 +474,21 @@ describe.skipIf(skip !== null)('a module declares its expiry policy once (G-123)
   })
 })
 
+// A submit either lands or is refused, and a test that only times out says neither.
+async function settle(view: Bun.WebView, id: string): Promise<void> {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (await view.evaluate<boolean>(`document.body.innerText.includes(${JSON.stringify(id)})`)) return
+    await Bun.sleep(500)
+  }
+  const refusal = await view.evaluate<string>(
+    `(document.querySelector('[data-test="failure"]')?.innerText ?? '')`,
+  )
+  const errors = await view.evaluate<string>(
+    `JSON.stringify([...document.querySelectorAll('[role="alert"], .text-error')].map(one => one.innerText.trim()))`,
+  )
+  throw new Error(`${id} never appeared. Refusal: ${refusal || 'none'}. Errors: ${errors}`)
+}
+
 describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
   test('a module is added through the catalogue screen', async () => {
     const department = await addDepartment()
@@ -489,13 +504,14 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
       await waitFor(view, `document.querySelector('[data-test="module-id"]')`, 30_000)
       await fill(view, '[data-test="module-id"]', id)
       await fill(view, '[data-test="module-name"]', 'Driving the desk')
+      await fill(view, '[data-test="module-description"]', 'What the desk does, and how not to break it.')
 
       // Opened and picked by what it says: a Nuxt UI select is a listbox, so setting a value on
       // one does nothing at all. Every closed set on this form is a row of buttons instead.
-      await click(view, `[data-test="module-department-${department}"]`)
-      await click(view, '[data-test="module-kind-CERTIFICATION"]')
-      await click(view, '[data-test="module-expiry-ACADEMIC_YEAR"]')
-      await click(view, '[data-test="module-status-ACTIVE"]')
+      await pickOption(view, '[data-test="module-department"]', department)
+      await pickOption(view, '[data-test="module-kind"]', 'Certification')
+      await pickOption(view, '[data-test="module-expiry"]', 'Ends with the academic year')
+      await pickOption(view, '[data-test="module-status"]', 'Active')
       await click(view, '[data-test="module-submit"]')
 
       await waitFor(view, `document.body.innerText.includes(${JSON.stringify(id)})`, 30_000)
@@ -508,11 +524,168 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
       view.close()
     }
 
-    const stored = read<{ kind: string, expiryMode: string, status: string }>(
-      'SELECT kind, expiry_mode expiryMode, status FROM modules WHERE id = ?',
+    const stored = read<{ kind: string, expiryMode: string, status: string, description: string }>(
+      'SELECT kind, expiry_mode expiryMode, status, description FROM modules WHERE id = ?',
       id,
     )
-    expect(stored).toMatchObject({ kind: 'CERTIFICATION', expiryMode: 'ACADEMIC_YEAR', status: 'ACTIVE' })
+    expect(stored).toMatchObject({
+      kind: 'CERTIFICATION',
+      expiryMode: 'ACADEMIC_YEAR',
+      status: 'ACTIVE',
+      description: 'What the desk does, and how not to break it.',
+    })
+  }, CASE_TIMEOUT_MS)
+
+  test('a brief is not offered what a brief cannot have', async () => {
+    const department = await addDepartment()
+    const view = await signedInView()
+    const id = `BRIEF-${suffix()}`
+
+    try {
+      await visit(view, `${app.baseURL}/training/manage`, '[data-test="modules-table"]')
+      await click(view, '[data-test="add-module"]')
+      await waitFor(view, `document.querySelector('[data-test="module-id"]')`, 30_000)
+
+      // Everything is on offer until the kind says otherwise.
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="module-expiry"]')`,
+      )).toBe(true)
+
+      await fill(view, '[data-test="module-id"]', id)
+      await fill(view, '[data-test="module-name"]', 'Get-in brief')
+      await pickOption(view, '[data-test="module-department"]', department)
+      await pickOption(view, '[data-test="module-kind"]', 'Brief')
+      await waitFor(view, `!document.querySelector('[data-test="module-expiry"]')`, 30_000)
+
+      // A brief carries no lifetime, grants nothing, and takes no external certificate.
+      for (const gone of ['module-expiry', 'module-grants-trainer', 'module-allows-external']) {
+        expect(await view.evaluate<boolean>(
+          `!!document.querySelector('[data-test="${gone}"]')`,
+        )).toBe(false)
+      }
+
+      await pickOption(view, '[data-test="module-status"]', 'Active')
+      await click(view, '[data-test="module-submit"]')
+      await settle(view, id)
+    }
+    finally {
+      view.close()
+    }
+
+    // What the form hides is what it sends: a brief saved from this screen carries none of it.
+    expect(read<{ kind: string, expiryMode: string, grantsTrainer: number, allowsExternal: number }>(
+      `SELECT kind, expiry_mode expiryMode, grants_trainer grantsTrainer, allows_external allowsExternal
+       FROM modules WHERE id = ?`,
+      id,
+    )).toMatchObject({ kind: 'BRIEF', expiryMode: 'NONE', grantsTrainer: 0, allowsExternal: 0 })
+  }, CASE_TIMEOUT_MS)
+
+  test('opening the add form after an edit carries nothing over from it', async () => {
+    const department = await addDepartment()
+    const id = `LEAK-${suffix()}`
+    expect((await send('POST', '/api/admin/training/modules', {
+      id,
+      department,
+      kind: 'MODULE',
+      name: 'Something with a description',
+      description: 'This text belongs to this module and to no other.',
+      notes: 'A note for the leads.',
+      expiryMode: 'MONTHS',
+      expiryMonths: 18,
+      status: 'ACTIVE',
+    })).status).toBe(200)
+
+    const view = await signedInView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage`, '[data-test="modules-table"]')
+      await click(view, `[data-test="edit-module-${id}"]`)
+      await waitFor(view, `document.querySelector('[data-test="module-description"]')`, 30_000)
+      expect(await view.evaluate<string>(
+        `document.querySelector('[data-test="module-description"]').value`,
+      )).toContain('belongs to this module')
+
+      // Close it and start a new one: the form is a fresh module, not the last one with its id
+      // rubbed out.
+      await click(view, '[data-test="module-cancel"]')
+      await waitFor(view, `!document.querySelector('[data-test="module-description"]')`, 30_000)
+      await click(view, '[data-test="add-module"]')
+      await waitFor(view, `document.querySelector('[data-test="module-id"]')`, 30_000)
+
+      for (const field of ['module-description', 'module-name']) {
+        expect(await view.evaluate<string>(
+          `document.querySelector('[data-test="${field}"]')?.value ?? ''`,
+        )).toBe('')
+      }
+      // The months field belongs to a policy this new module does not have.
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="module-months"]')`,
+      )).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('standing belongs to a certification, and the switches follow the kind', async () => {
+    const department = await addDepartment()
+    const view = await signedInView()
+
+    try {
+      await visit(view, `${app.baseURL}/training/manage`, '[data-test="modules-table"]')
+      await click(view, '[data-test="add-module"]')
+      await waitFor(view, `document.querySelector('[data-test="module-id"]')`, 30_000)
+      await pickOption(view, '[data-test="module-department"]', department)
+
+      // A module is taught; it does not make anybody a trainer (G-111).
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="module-grants-trainer"]')`,
+      )).toBe(false)
+
+      await pickOption(view, '[data-test="module-kind"]', 'Certification')
+      await waitFor(view, `document.querySelector('[data-test="module-grants-trainer"]')`, 30_000)
+
+      // And back again: choosing a kind changes what the form offers, not only for a brief.
+      await pickOption(view, '[data-test="module-kind"]', 'Module')
+      await waitFor(view, `!document.querySelector('[data-test="module-grants-trainer"]')`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the evidence we accept appears only once an external certificate may satisfy it', async () => {
+    const department = await addDepartment()
+    const view = await signedInView()
+    const id = `EXT-${suffix()}`
+
+    try {
+      await visit(view, `${app.baseURL}/training/manage`, '[data-test="modules-table"]')
+      await click(view, '[data-test="add-module"]')
+      await waitFor(view, `document.querySelector('[data-test="module-id"]')`, 30_000)
+
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="module-external-evidence"]')`,
+      )).toBe(false)
+
+      await fill(view, '[data-test="module-id"]', id)
+      await fill(view, '[data-test="module-name"]', 'First aid')
+      await pickOption(view, '[data-test="module-department"]', department)
+      await click(view, '[data-test="module-allows-external"]')
+      await waitFor(view, `document.querySelector('[data-test="module-external-evidence"]')`, 30_000)
+
+      await fill(view, '[data-test="module-external-evidence"]', 'A current first aid at work certificate')
+      await pickOption(view, '[data-test="module-status"]', 'Active')
+      await click(view, '[data-test="module-submit"]')
+      await settle(view, id)
+    }
+    finally {
+      view.close()
+    }
+
+    expect(read<{ allowsExternal: number, externalEvidence: string }>(
+      'SELECT allows_external allowsExternal, external_evidence externalEvidence FROM modules WHERE id = ?',
+      id,
+    )).toMatchObject({ allowsExternal: 1, externalEvidence: 'A current first aid at work certificate' })
   }, CASE_TIMEOUT_MS)
 
   test('the departments screen renders and adds a department', async () => {

@@ -7,7 +7,18 @@ import type { CalendarDate } from '@internationalized/date'
 
 const model = defineModel<string | undefined>()
 
-defineProps<{ disabled?: boolean }>()
+// A bound is a civil date like the model, so a caller never has to build a calendar value.
+const props = defineProps<{ disabled?: boolean, min?: string, max?: string }>()
+
+const bound = (value: string | undefined): CalendarDate | undefined => {
+  if (!value) return undefined
+  try {
+    return parseDate(value)
+  }
+  catch {
+    return undefined
+  }
+}
 
 const field = useTemplateRef('field')
 
@@ -43,6 +54,8 @@ const value = computed({
     ref="field"
     v-model="value"
     locale="en-GB"
+    :min-value="bound(props.min)"
+    :max-value="bound(props.max)"
     :disabled="disabled"
   >
     <template #trailing>
@@ -60,6 +73,8 @@ const value = computed({
         <template #content>
           <UCalendar
             v-model="value"
+            :min-value="bound(props.min)"
+            :max-value="bound(props.max)"
             class="p-2"
           />
         </template>

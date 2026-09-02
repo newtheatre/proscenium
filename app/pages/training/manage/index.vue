@@ -104,15 +104,21 @@ interface FormState {
 
 const state = reactive<FormState>(blank())
 
+// Every key, including the ones that may be absent: this is assigned over the last form's state,
+// so a field left out here keeps whatever the module before it had.
 function blank(): FormState {
   return {
     id: '',
     department: '',
     kind: 'MODULE',
     name: '',
+    description: undefined,
+    notes: undefined,
     deliveryMode: 'IN_PERSON',
     expiryMode: 'NONE',
+    expiryMonths: undefined,
     allowsExternal: false,
+    externalEvidence: undefined,
     safetyCritical: false,
     signoffRequired: false,
     grantsTrainer: false,
@@ -156,26 +162,50 @@ function edit(module: Module | null): void {
 // the write path will refuse (G-109).
 const frozen = computed(() => editing.value?.frozen === true)
 
-// The refusals a brief and a safety-critical module carry are rules, so the form clears what they
-// forbid rather than letting somebody submit into a refusal (G-107 criteria 2 and 4).
-watch(() => state.kind, (kind) => {
-  if (kind !== 'BRIEF') {
-    state.selfRegistrable = false
-    return
-  }
-  state.expiryMode = 'NONE'
-  state.expiryMonths = undefined
-  state.grantsTrainer = false
-  state.grantsSupervisor = false
-})
+const departmentOptions = computed(() => departments.value.items
+  .map(one => ({ label: `${one.code} ${one.name}`, value: one.code })))
 
-watch(() => state.expiryMode, (mode) => {
-  state.expiryMonths = mode === 'MONTHS' ? (state.expiryMonths ?? 12) : undefined
-})
+const kindOptions = MODULE_KINDS.map(option => ({ label: saysKind(option), value: option }))
+const lifecycleOptions = MODULE_LIFECYCLE.map(option => ({ label: saysLifecycle(option), value: option }))
 
-watch(() => state.safetyCritical, (critical) => {
-  if (critical && state.deliveryMode === 'SELF_DIRECTED') state.deliveryMode = 'HYBRID'
-})
+// A safety-critical module may never be fully self-directed, so that mode is not offered rather
+// than offered and refused (G-107 criterion 2).
+const modeOptions = computed(() => DELIVERY_MODES
+  .filter(option => !(state.safetyCritical && option === 'SELF_DIRECTED'))
+  .map(option => ({ label: saysDeliveryMode(option), value: option })))
+
+const expiryOptions = computed(() => EXPIRY_MODES
+  .map(option => ({
+    label: describeExpiry({ expiryMode: option, expiryMonths: state.expiryMonths ?? null }),
+    value: option,
+  })))
+
+// Only a certification confers standing (G-111). An older module that already carries it keeps the
+// switches on screen, because clearing one silently would be refused later as a frozen change.
+const confersStanding = computed(() =>
+  state.kind === 'CERTIFICATION' || state.grantsTrainer || state.grantsSupervisor)
+
+// Every field the form hides is cleared here, in one place, so a rule and the field it governs
+// cannot drift apart: what is not shown is never what gets submitted (G-107 criteria 2 and 4).
+watch(
+  () => [state.kind, state.expiryMode, state.safetyCritical, state.allowsExternal] as const,
+  () => {
+    if (state.kind === 'BRIEF') {
+      state.expiryMode = 'NONE'
+      state.allowsExternal = false
+    }
+    else {
+      state.selfRegistrable = false
+    }
+    if (state.kind !== 'CERTIFICATION') {
+      state.grantsTrainer = false
+      state.grantsSupervisor = false
+    }
+    state.expiryMonths = state.expiryMode === 'MONTHS' ? (state.expiryMonths ?? 12) : undefined
+    if (!state.allowsExternal) state.externalEvidence = undefined
+    if (state.safetyCritical && state.deliveryMode === 'SELF_DIRECTED') state.deliveryMode = 'HYBRID'
+  },
+)
 
 function addMaterial(): void {
   state.materials.push({ label: '', url: '' })
@@ -404,24 +434,32 @@ const columns: TableColumn<Module>[] = [
           </UFormField>
 
           <UFormField
+            label="What it covers"
+            name="description"
+            hint="Optional"
+            description="Shown to members in the catalogue, so write it for somebody deciding whether to take it."
+          >
+            <UTextarea
+              v-model="state.description"
+              :rows="3"
+              class="w-full"
+              data-test="module-description"
+            />
+          </UFormField>
+
+          <UFormField
             label="Department"
             name="department"
             required
           >
-            <div class="flex flex-wrap gap-1">
-              <UButton
-                v-for="option in departments.items"
-                :key="option.code"
-                size="sm"
-                :color="state.department === option.code ? 'primary' : 'neutral'"
-                :variant="state.department === option.code ? 'solid' : 'outline'"
-                :aria-pressed="state.department === option.code"
-                :data-test="`module-department-${option.code}`"
-                @click="state.department = option.code"
-              >
-                {{ option.name }}
-              </UButton>
-            </div>
+            <USelectMenu
+              v-model="state.department"
+              :items="departmentOptions"
+              value-key="value"
+              placeholder="Choose a department"
+              class="w-full"
+              data-test="module-department"
+            />
           </UFormField>
 
           <UFormField
@@ -430,21 +468,14 @@ const columns: TableColumn<Module>[] = [
             required
             description="A brief is taught once: it carries no expiry, grants no standing and cannot be a prerequisite."
           >
-            <div class="flex flex-wrap gap-1">
-              <UButton
-                v-for="option in MODULE_KINDS"
-                :key="option"
-                size="sm"
-                :color="state.kind === option ? 'primary' : 'neutral'"
-                :variant="state.kind === option ? 'solid' : 'outline'"
-                :aria-pressed="state.kind === option"
-                :disabled="frozen"
-                :data-test="`module-kind-${option}`"
-                @click="state.kind = option"
-              >
-                {{ saysKind(option) }}
-              </UButton>
-            </div>
+            <USelectMenu
+              v-model="state.kind"
+              :items="kindOptions"
+              value-key="value"
+              :disabled="frozen"
+              class="w-full"
+              data-test="module-kind"
+            />
             <p
               v-if="frozen"
               class="mt-2 text-sm text-muted"
@@ -463,48 +494,33 @@ const columns: TableColumn<Module>[] = [
               ? 'A safety-critical module can never be fully self-directed: online content may gate the in-person assessment, never replace it.'
               : undefined"
           >
-            <div class="flex flex-wrap gap-1">
-              <UButton
-                v-for="option in DELIVERY_MODES"
-                :key="option"
-                size="sm"
-                :disabled="state.safetyCritical && option === 'SELF_DIRECTED'"
-                :color="state.deliveryMode === option ? 'primary' : 'neutral'"
-                :variant="state.deliveryMode === option ? 'solid' : 'outline'"
-                :aria-pressed="state.deliveryMode === option"
-                :data-test="`module-mode-${option}`"
-                @click="state.deliveryMode = option"
-              >
-                {{ saysDeliveryMode(option) }}
-              </UButton>
-            </div>
+            <USelectMenu
+              v-model="state.deliveryMode"
+              :items="modeOptions"
+              value-key="value"
+              class="w-full"
+              data-test="module-mode"
+            />
           </UFormField>
 
           <UFormField
+            v-if="state.kind !== 'BRIEF'"
             label="How long it is worth"
             name="expiryMode"
             required
             description="Stamped on a record the day it is earned and never recomputed by a later change to this."
           >
-            <div class="flex flex-wrap gap-1">
-              <UButton
-                v-for="option in EXPIRY_MODES"
-                :key="option"
-                size="sm"
-                :disabled="state.kind === 'BRIEF' && option !== 'NONE'"
-                :color="state.expiryMode === option ? 'primary' : 'neutral'"
-                :variant="state.expiryMode === option ? 'solid' : 'outline'"
-                :aria-pressed="state.expiryMode === option"
-                :data-test="`module-expiry-${option}`"
-                @click="state.expiryMode = option"
-              >
-                {{ describeExpiry({ expiryMode: option, expiryMonths: state.expiryMonths ?? null }) }}
-              </UButton>
-            </div>
+            <USelectMenu
+              v-model="state.expiryMode"
+              :items="expiryOptions"
+              value-key="value"
+              class="w-full"
+              data-test="module-expiry"
+            />
           </UFormField>
 
           <UFormField
-            v-if="state.expiryMode === 'MONTHS'"
+            v-if="state.kind !== 'BRIEF' && state.expiryMode === 'MONTHS'"
             label="Months from award"
             name="expiryMonths"
             required
@@ -525,20 +541,13 @@ const columns: TableColumn<Module>[] = [
             required
             description="A draft is invisible to members. Retiring one blocks new sessions and sign-offs and leaves existing records readable."
           >
-            <div class="flex flex-wrap gap-1">
-              <UButton
-                v-for="option in MODULE_LIFECYCLE"
-                :key="option"
-                size="sm"
-                :color="state.status === option ? 'primary' : 'neutral'"
-                :variant="state.status === option ? 'solid' : 'outline'"
-                :aria-pressed="state.status === option"
-                :data-test="`module-status-${option}`"
-                @click="state.status = option"
-              >
-                {{ saysLifecycle(option) }}
-              </UButton>
-            </div>
+            <USelectMenu
+              v-model="state.status"
+              :items="lifecycleOptions"
+              value-key="value"
+              class="w-full"
+              data-test="module-status"
+            />
           </UFormField>
 
           <div class="space-y-3">
@@ -552,20 +561,24 @@ const columns: TableColumn<Module>[] = [
               label="Awarded by sign-off rather than by a register"
             />
             <USwitch
+              v-if="confersStanding"
               v-model="state.grantsTrainer"
-              :disabled="state.kind === 'BRIEF' || frozen"
+              :disabled="frozen"
               label="Holding it makes somebody a trainer"
               description="Standing is derived from a current record on this module, never granted as a role."
               data-test="module-grants-trainer"
             />
             <USwitch
+              v-if="confersStanding"
               v-model="state.grantsSupervisor"
-              :disabled="state.kind === 'BRIEF' || frozen"
+              :disabled="frozen"
               label="Holding it makes somebody a supervisor"
             />
             <USwitch
+              v-if="state.kind !== 'BRIEF'"
               v-model="state.allowsExternal"
               label="An external certificate can satisfy it"
+              data-test="module-allows-external"
             />
             <USwitch
               v-if="state.kind === 'BRIEF'"
@@ -573,6 +586,35 @@ const columns: TableColumn<Module>[] = [
               label="People can register themselves for it"
             />
           </div>
+
+          <UFormField
+            v-if="state.kind !== 'BRIEF' && state.allowsExternal"
+            label="Evidence we accept"
+            name="externalEvidence"
+            hint="Optional"
+            description="Named on the screen that records one, so whoever is holding a certificate knows whether it counts."
+          >
+            <UInput
+              v-model="state.externalEvidence"
+              placeholder="A current first aid at work certificate"
+              class="w-full"
+              data-test="module-external-evidence"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Where it sits in the list"
+            name="sort"
+            description="Lower comes first. Modules sharing a number fall back to their published id."
+          >
+            <UInputNumber
+              v-model="state.sort"
+              :min="0"
+              :max="9999"
+              class="w-full"
+              data-test="module-sort"
+            />
+          </UFormField>
 
           <UFormField
             v-if="editing"
@@ -652,6 +694,7 @@ const columns: TableColumn<Module>[] = [
             <UButton
               color="neutral"
               variant="ghost"
+              data-test="module-cancel"
               @click="open = false"
             >
               Back
