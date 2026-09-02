@@ -55,6 +55,16 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
   }
 }
 
+function all<T>(statement: string, ...parameters: unknown[]): T[] {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return database.query(statement).all(...parameters as never[]) as T[]
+  }
+  finally {
+    database.close()
+  }
+}
+
 function write(statement: string, ...parameters: unknown[]): void {
   const database = new Database(app.databaseFile)
   try {
@@ -353,6 +363,102 @@ describe.skipIf(skip !== null)('marking is the single act that awards (G-116)', 
       'SELECT status FROM training_sessions WHERE id = ?', session,
     )?.status).toBe('DELIVERED')
   })
+})
+
+describe.skipIf(skip !== null)('somebody who turned up untracked (G-117)', () => {
+  const lookup = (body: unknown, as = trainerCookie): Promise<Response> =>
+    send('POST', '/api/admin/training/attendees/lookup', body, as)
+
+  const addTo = (sessionId: string, body: unknown, as = trainerCookie): Promise<Response> =>
+    send('POST', `/api/admin/training/sessions/${sessionId}/attendees`, body, as)
+
+  test('an address with no account leaves the session holding a record', async () => {
+    const module = await addModule()
+    const session = await sessionToday([module])
+    const email = registrableAddress('walk-in-stranger')
+
+    const found = await lookup({ email, name: 'A Stranger' })
+    expect(found.status).toBe(200)
+    const { id: userId, created } = await found.json() as { id: string, created: boolean }
+    expect(created).toBe(true)
+
+    // The account they will claim: no password, and nothing signed in with it.
+    expect(read<{ password: string | null }>('SELECT password FROM users WHERE id = ?', userId))
+      .toEqual({ password: null })
+
+    await openRegister(session)
+    expect((await addTo(session, { userId })).status).toBe(200)
+
+    const marked = await mark(session, { marks: [{ userId, mark: 'ATTENDED' }] })
+    expect(marked.status).toBe(200)
+
+    expect(read<{ moduleId: string, source: string }>(
+      'SELECT module_id moduleId, source FROM training_records WHERE user_id = ?', userId,
+    )).toEqual({ moduleId: module, source: 'SESSION' })
+  }, CASE_TIMEOUT_MS)
+
+  test('a second lookup of the same address finds the account rather than making another', async () => {
+    const email = registrableAddress('walk-in-twice')
+    const first = await (await lookup({ email })).json() as { id: string, created: boolean }
+    const second = await (await lookup({ email })).json() as { id: string, created: boolean }
+
+    expect(second.id).toBe(first.id)
+    expect(second.created).toBe(false)
+  }, CASE_TIMEOUT_MS)
+
+  test('an erased account is refused, because a record cannot attach to a tombstone', async () => {
+    const email = registrableAddress('walk-in-erased')
+    const { id } = await (await lookup({ email })).json() as { id: string }
+    write('UPDATE users SET anonymised_at = ? WHERE id = ?', 1_800_000_000, id)
+
+    const refused = await lookup({ email })
+    expect(refused.status).toBe(409)
+    expect(await said(refused)).toContain('erased')
+  }, CASE_TIMEOUT_MS)
+
+  test('a walk-in goes to the back, so a placed member keeps their place', async () => {
+    const module = await addModule()
+    const session = await sessionToday([module])
+    write('UPDATE training_sessions SET capacity = 1 WHERE id = ?', session)
+
+    const early = await adminSession(app, { roles: [] })
+    signUp(session, early.id, Math.floor(Date.now() / 1000) - 500)
+
+    await openRegister(session)
+    const { id: late } = await (await lookup({ email: registrableAddress('walk-in-late') })).json() as { id: string }
+    expect((await addTo(session, { userId: late })).status).toBe(200)
+
+    const order = all<{ userId: string, source: string }>(
+      `SELECT user_id userId, source FROM session_attendees WHERE session_id = ? ORDER BY signed_up_at`, session,
+    )
+    expect(order.map(row => row.userId)).toEqual([early.id, late])
+    expect(order.at(-1)?.source).toBe('WALK_IN')
+  }, CASE_TIMEOUT_MS)
+
+  test('a marked register takes nobody else, because it would award them nothing', async () => {
+    const module = await addModule()
+    const session = await sessionToday([module])
+    const member = await adminSession(app, { roles: [] })
+    signUp(session, member.id, Math.floor(Date.now() / 1000))
+
+    await openRegister(session)
+    expect((await mark(session, { marks: [{ userId: member.id, mark: 'ATTENDED' }] })).status).toBe(200)
+
+    const { id: late } = await (await lookup({ email: registrableAddress('walk-in-too-late') })).json() as { id: string }
+    const refused = await addTo(session, { userId: late })
+    expect(refused.status).toBe(409)
+    expect(await said(refused)).toContain('already been marked')
+  }, CASE_TIMEOUT_MS)
+
+  test('an ordinary member cannot add anybody, and cannot mint an account', async () => {
+    const module = await addModule()
+    const session = await sessionToday([module])
+    const other = await adminSession(app, { roles: [] })
+    await openRegister(session)
+
+    expect((await lookup({ email: registrableAddress('walk-in-refused') }, other.cookie)).status).toBe(403)
+    expect((await addTo(session, { userId: other.id }, other.cookie)).status).toBe(403)
+  }, CASE_TIMEOUT_MS)
 })
 
 describe.skipIf(skip !== null)('the register is a screen a trainer can open (G-116)', () => {

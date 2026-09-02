@@ -8,6 +8,7 @@ interface Attendee {
   name: string
   source: string
   status: string
+  placed: boolean
 }
 
 interface Register {
@@ -40,10 +41,72 @@ const { data, status, error, refresh } = await useAsyncData(
 // there, never by failing to say they were not (G-116 criterion 1).
 const present = ref(new Set<string>())
 
+const adding = ref(false)
+const person = ref<string | undefined>(undefined)
+const picked = ref<{ id: string, name: string } | null>(null)
+const address = ref('')
+const theirName = ref('')
+
+interface Gap { key: string, moduleId: string, requiresId: string, requiresName: string }
+const owning = ref<Gap[]>([])
+
+function beginAdding(): void {
+  adding.value = true
+  failure.value = null
+  owning.value = []
+  person.value = undefined
+  picked.value = null
+  address.value = ''
+  theirName.value = ''
+}
+
+const addable = computed(() => Boolean(picked.value) || address.value.trim().length > 0)
+
+// An address with no account yet mints the claimable guest A-116 describes, so a first-week
+// fresher who turned up still leaves with a record (G-117 criterion 2).
+async function whoToAdd(): Promise<string | null> {
+  if (picked.value) return picked.value.id
+  if (!address.value.trim()) return null
+  const found = await $fetch<{ id: string }>('/api/admin/training/attendees/lookup', {
+    method: 'POST',
+    body: { email: address.value.trim(), name: theirName.value.trim() || undefined },
+  })
+  return found.id
+}
+
+async function addSomeone(owningThem = false): Promise<void> {
+  working.value = true
+  failure.value = null
+  try {
+    const userId = await whoToAdd()
+    if (!userId) return
+    await $fetch(`/api/admin/training/sessions/${route.params.id}/attendees`, {
+      method: 'POST',
+      body: { userId, acknowledged: owningThem ? owning.value.map(gap => gap.key) : [] },
+    })
+    // Somebody the trainer added by hand is here: that is why they added them.
+    present.value = new Set([...present.value, userId])
+    adding.value = false
+    await refresh()
+  }
+  catch (caught) {
+    const gaps = refusalData<{ gaps: Gap[] }>(caught)?.gaps
+    if (gaps?.length) {
+      owning.value = gaps
+      return
+    }
+    failure.value = refusalText(caught)
+  }
+  finally {
+    working.value = false
+  }
+}
+
 const open = computed(() => data.value?.registerOpenedAt !== null)
 const marked = computed(() => data.value?.markedAt !== null)
 const attendees = computed(() => data.value?.attendees ?? [])
 const presentCount = computed(() => attendees.value.filter(one => present.value.has(one.userId)).length)
+const absentCount = computed(() => attendees.value.length - presentCount.value)
 
 function toggle(userId: string): void {
   const next = new Set(present.value)
@@ -231,6 +294,16 @@ async function submit(): Promise<void> {
                 >
                   Walk-in
                 </UBadge>
+                <UBadge
+                  v-else-if="!one.placed"
+                  class="ml-2"
+                  color="warning"
+                  variant="subtle"
+                  size="sm"
+                  :data-test="`waiting-${one.userId}`"
+                >
+                  Waiting
+                </UBadge>
               </span>
               <UIcon
                 :name="present.has(one.userId) ? 'i-lucide-circle-check' : 'i-lucide-circle'"
@@ -246,8 +319,102 @@ async function submit(): Promise<void> {
           class="py-6 text-center text-sm text-muted"
           data-test="register-empty"
         >
-          Nobody is on this register. Add whoever turned up before you submit it.
+          Nobody signed up. You can still add whoever turned up.
         </p>
+
+        <UButton
+          v-if="!adding"
+          block
+          size="lg"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-user-plus"
+          data-test="add-someone"
+          @click="beginAdding"
+        >
+          Add someone
+        </UButton>
+
+        <div
+          v-else
+          class="space-y-3 rounded-lg border border-default p-4"
+          data-test="add-someone-panel"
+        >
+          <UFormField label="Somebody already known">
+            <PersonPicker
+              v-model="person"
+              class="w-full"
+              data-test="walk-in-person"
+              @chosen="value => picked = value"
+            />
+          </UFormField>
+
+          <p class="text-sm text-muted">
+            Or add them by their address. Somebody who has never signed in gets an account they can
+            claim later, and their training is waiting on it.
+          </p>
+
+          <UFormField label="Address">
+            <UInput
+              v-model="address"
+              type="email"
+              placeholder="name@nottingham.ac.uk"
+              class="w-full"
+              data-test="walk-in-email"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Their name"
+            hint="Optional"
+          >
+            <UInput
+              v-model="theirName"
+              class="w-full"
+              data-test="walk-in-name"
+            />
+          </UFormField>
+
+          <UAlert
+            v-if="owning.length"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            data-test="walk-in-gaps"
+            title="They do not hold everything this teaches"
+            :description="`${owning.map(gap => `${gap.requiresId} ${gap.requiresName}`).join(', ')}. `
+              + 'You can add them if you know why.'"
+          />
+
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              :loading="working"
+              :disabled="!addable"
+              :color="owning.length ? 'warning' : 'primary'"
+              data-test="walk-in-add"
+              @click="addSomeone(owning.length > 0)"
+            >
+              {{ owning.length ? 'Add them anyway' : 'Add them' }}
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              @click="adding = false"
+            >
+              Back
+            </UButton>
+          </div>
+        </div>
+
+        <UAlert
+          v-if="absentCount > 0 && !confirmingAllAbsent"
+          color="neutral"
+          variant="subtle"
+          icon="i-lucide-mail"
+          data-test="absentee-warning"
+          :title="`${plural(absentCount, 'person', 'people')} not marked present`"
+          description="Everybody left unmarked is emailed to say we missed them, and gets no record for this session."
+        />
 
         <UAlert
           v-if="confirmingAllAbsent"

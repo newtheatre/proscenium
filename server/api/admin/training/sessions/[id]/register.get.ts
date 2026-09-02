@@ -38,5 +38,15 @@ export default defineEventHandler(async (event) => {
     .where(eq(schema.sessionModules.sessionId, id))
     .orderBy(asc(schema.trainingModules.id))
 
-  return { ...session, modules, attendees: await registerFor(id) }
+  // Placed or waiting is derived from the order, never stored, so a trainer marking a full session
+  // can see who was only ever on the waitlist (G-105 criterion 2).
+  const places = await placesOnSession(id)
+  const standing = new Map([...places.places, ...places.waitlisted].map(place => [place.userId, place]))
+
+  const attendees = (await registerFor(id)).map(row => ({
+    ...row,
+    placed: standing.get(row.userId)?.placed ?? false,
+  }))
+
+  return { ...session, modules, attendees }
 })

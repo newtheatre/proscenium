@@ -257,6 +257,9 @@ Counts: 24 MVP stories (G-101 to G-123, G-125), 11 V2 stories (G-201 to G-211), 
   3. A walk-in joins the register like any signed-up attendee: defaults absent, must be marked, and is subject to the exact-cover rule.
   4. Safety-critical prerequisite gaps block adding the walk-in for that module with a refusal naming the gaps; ordinary gaps require the trainer to acknowledge a warning.
   5. Walk-in additions are recorded on the register as such, distinguishable from sign-ups in reporting.
+  6. Amended 2 September 2026: the same door exists when logging a session that already happened (G-118). Teaching off-system is often taught to people who have not signed in, and a story scoped to the register alone would leave the retrospective log unable to name them.
+  7. Amended 2 September 2026: a walk-in joins at the back of the sign-up order, so nobody who signed up in advance loses a place to somebody added at the door.
+  8. Amended 2 September 2026: an erased account is refused outright, in both surfaces. Attaching training to a tombstone would write a person back onto the row their erasure emptied (0011).
 - Source: Prompt Book G-2; audit TR-5
 
 ## G-118: Retrospective delivery logging with dry-run
