@@ -187,6 +187,19 @@ export const AUDIT_COVERAGE: Coverage[] = [
     route: 'server/api/admin/training/deliveries/index.post.ts',
     actions: ['record.delivery-logged'],
   },
+  {
+    route: 'server/api/admin/training/sessions/[id]/capacity.post.ts',
+    actions: ['session.capacity.changed'],
+  },
+  { route: 'server/api/training/sessions/index.get.ts', exempt: 'reads the sessions open to you, and where you stand on each' },
+  {
+    route: 'server/api/training/sessions/[id]/signup.post.ts',
+    exempt: 'joins a queue about yourself; the place it confers is derived, not granted',
+  },
+  {
+    route: 'server/api/training/sessions/[id]/signup.delete.ts',
+    exempt: 'leaves a queue you joined yourself, taking no authority with it',
+  },
 
   // Development only, and absent from a build: nuxt.config excludes both files (K-124).
   {

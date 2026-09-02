@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { auditEntry } from '#shared/utils/audit'
 import { recalculationStatements } from '#shared/utils/recalculation'
+import { placesFrom, promotedBy, promotionClaimFor, signUpOrderStatement, withdrawStatement } from '#shared/utils/training-signup'
+import type { Place, SignUpOrder } from '#shared/utils/training-signup'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 
 // Named regression cases (K-121). Every claim below is proven by a test that fires concurrent
@@ -150,6 +152,75 @@ describe('contended invariants (K-105)', () => {
   })
 
   test.todo('at most one confirmed duty manager per performance', () => {})
-  test.todo('a promotion notification is sent at most once', () => {})
+
+  // G-106's named case (criterion 3). Two withdrawals interleave the way two browser tabs do:
+  // each reads the order, cancels, reads again and claims what moved. The claim is the decider.
+  test('the promotion race: two concurrent withdrawals notify each promoted member exactly once', async () => {
+    const database = await createTestDatabase()
+    try {
+      database.batch([
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-trainer', 'trainer@example.invalid', 'A Trainer'],
+        ['INSERT INTO departments (code, name) VALUES (?, ?)', 'TECH', 'Technical'],
+        ['INSERT INTO modules (id, department, kind, name, status) VALUES (?, ?, ?, ?, ?)',
+          'TECH-111', 'TECH', 'MODULE', 'Working at height', 'ACTIVE'],
+        [`INSERT INTO training_sessions (id, held_on, starts_at, ends_at, capacity, status, trainer_id)
+          VALUES ('s1', '2027-01-14', '19:00', '21:00', 2, 'OPEN', 'u-trainer')`],
+      ])
+
+      const everybody = ['u-one', 'u-two', 'u-three', 'u-four']
+      for (const [index, id] of everybody.entries()) {
+        database.batch([
+          ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', id, `${id}@example.invalid`, `Member ${id}`],
+          [`INSERT INTO session_attendees (id, session_id, user_id, signed_up_at) VALUES (?, 's1', ?, ?)`,
+            `a-${id}`, id, 100 + index],
+        ])
+      }
+
+      const order = (): Place[] => {
+        const [text, ...parameters] = boundStatement(database, signUpOrderStatement('s1'))
+        return placesFrom(database.raw.prepare(text).all(...parameters as never[]) as SignUpOrder[], 2)
+      }
+
+      // The claim, exactly as `claimNotification` writes it: an insert the partial unique index
+      // refuses the second time, never a read followed by a write (0006).
+      const sent: string[] = []
+      const claim = (place: Place): void => {
+        const key = promotionClaimFor('s1', place.userId, place.signedUpAt)
+        // The insert's own return says whether it took, so the loser sends nothing without ever
+        // having read the ledger first.
+        const took = database.raw.prepare(
+          `INSERT INTO notification_log (id, user_id, type, channel, status, session_id, claim, sent_at)
+           VALUES (?, ?, 'training.session.promoted', 'EMAIL', 'SENT', 's1', ?, 1)
+           ON CONFLICT DO NOTHING RETURNING id`,
+        ).all(crypto.randomUUID().replaceAll('-', ''), place.userId, key) as { id: string }[]
+        if (took.length > 0) sent.push(key)
+      }
+
+      // Both read the order before either has written, which is the interleaving that makes both
+      // of them see the same promotions.
+      const beforeOne = order()
+      const beforeTwo = order()
+
+      database.batch([boundStatement(database, withdrawStatement('s1', 'u-one'))])
+      database.batch([boundStatement(database, withdrawStatement('s1', 'u-two'))])
+
+      for (const place of promotedBy(beforeOne, order())) claim(place)
+      for (const place of promotedBy(beforeTwo, order())) claim(place)
+
+      // Both promoted, each told once, and nobody who already held a place told anything.
+      expect(sent.sort()).toEqual([
+        promotionClaimFor('s1', 'u-four', 103),
+        promotionClaimFor('s1', 'u-three', 102),
+      ].sort())
+      expect(rows(database, `SELECT id FROM notification_log WHERE type = 'training.session.promoted'`))
+        .toHaveLength(2)
+      expect(rows(database, `SELECT id FROM notification_log WHERE user_id IN ('u-one', 'u-two')`))
+        .toHaveLength(0)
+    }
+    finally {
+      database.close()
+    }
+  })
+
   test.todo('a sale\'s payment, lines and stock movements commit atomically', () => {})
 })

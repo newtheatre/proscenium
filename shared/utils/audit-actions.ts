@@ -114,6 +114,7 @@ const CATALOGUE = {
   'record.expiry.recalculated': { label: 'Training expiries recalculated', module: 'training' },
   'session.scheduled': { label: 'Training session scheduled', module: 'training' },
   'record.delivery-logged': { label: 'Delivered training logged', module: 'training' },
+  'session.capacity.changed': { label: 'Training session capacity changed', module: 'training' },
   'request.declined': { label: 'Training request answered', module: 'training' },
   'practice.target.created': { label: 'Practice target added', module: 'training' },
   'practice.target.updated': { label: 'Practice target changed', module: 'training' },

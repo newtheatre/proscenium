@@ -38,6 +38,8 @@ erDiagram
   users ||--o{ training_records : earns
   users ||--o{ training_sessions : runs
   training_sessions ||--o{ session_modules : teaches
+  training_sessions ||--o{ session_attendees : signed_up_to
+  users ||--o{ session_attendees : signs_up_as
   users ||--o{ room_bookings : requests
   users ||--o| room_feed_tokens : subscribes_with
   rooms ||--o{ room_blackouts : closed_by
@@ -995,9 +997,52 @@ refused: a certification is proved by experience gained outside a session, so it
 rather than taught (G-112 criteria 3 and 4).
 
 ### session_attendees
-As proposed: UNIQUE (session, user) with status CHECK `SIGNED_UP|CANCELLED|ATTENDED|ABSENT`,
-sign-up order is the derived waitlist; the register opens on the day, marks must cover it
-exactly, and delivery is a single-winner conditional write (G-105, G-115, G-116).
+`id` PK · `session_id` cascade · `user_id` cascade · `status` CHECK
+`SIGNED_UP|CANCELLED|ATTENDED|ABSENT` default `SIGNED_UP` · `source` CHECK `SIGNUP|WALK_IN`
+default `SIGNUP` · `signed_up_at` · `marked_at` NULL · `marked_by` set null · `created_at`.
+UNIQUE (`session_id`, `user_id`), indexed on (`session_id`, `signed_up_at`) and on `user_id`.
+
+**A place is derived and never stored.** There is no waitlist table, no position column and no
+place column, and there never may be. Everybody who signs up is signed up; whether they hold a
+place is their `signed_up_at` order against the session's `capacity`, worked out by
+`placesFrom` every time it is asked for. Storing it would mean reading a count and then writing
+a status, and two people signing up at the same moment both pass that read and are both handed
+the last place (0006, G-105 criterion 1). A position column would have to be renumbered on every
+withdrawal, and a renumbering that half-fails leaves two people third with no way to tell which
+is right.
+
+Order ties inside one second break on `id`: it is stable, and a re-joiner keeps theirs, so the
+tiebreak never favours them over somebody already waiting.
+
+Sign-up **never refuses for fullness**. Past capacity a member joins the order and is told their
+exact waiting position at that moment (criterion 4). Withdrawal sets `CANCELLED` and keeps the
+row, because the row is the evidence they were there and the register marks on it; re-joining
+resets `signed_up_at`, which puts them at the back with nothing to renumber (criterion 2).
+
+`training_sessions.status = 'FULL'` is a **cached badge that nothing authoritative reads**. It
+is recomputed from the count by `refreshBadgeStatement`, in the same statement that writes it,
+on every sign-up, withdrawal and capacity change. A stale `FULL` on a session that now has room
+reads as "waitlist" and suppresses exactly the sign-ups the trainer just made space for, and a
+wrong badge is self-reinforcing because the write that would heal it is the sign-up it is
+discouraging. Nothing consults it to allow or refuse anything.
+
+Sign-up closes at whichever comes first: the register opening (G-115), the configured close
+(`SESSION_SIGNUP_CLOSES_HOURS` before the wall-clock start), or the session date arriving at
+midnight London. Withdrawal stays open while the register is open. Prerequisite gaps are decided
+by `prerequisiteGaps` in `shared/utils/training.ts`, the same rule the register and the
+retrospective log read: a gap on a **safety-critical** module is `BLOCKS` and refuses the sign-up
+with a 422 naming the missing modules, and a gap on an ordinary one is `ACKNOWLEDGE`, which warns
+and allows because the gap may well be closed by then. `EXPIRING` counts as held for both,
+because `modulesHeldBy` is the one definition of held. A `BRIEF` prerequisite gates nothing and is
+dropped before the rule sees it, exactly as the what's-next walk skips it (G-102 criterion 2).
+
+A promotion into a place is emailed once and once only. The claim is written into
+`notification_log.claim` (partial unique index) before the message is composed, keyed
+`training.session.promoted:<session>:<user>:<signed_up_at>`, so a second process attempting the
+same promotion finds the claim and sends nothing (G-106 criteria 2 and 3, named regression case
+in `tests/integration/races.test.ts`). The instant is in the key so a member who withdrew,
+re-joined and was promoted again is told again. The message is transactional: no topic
+preference silences it and no sweep dry-run suppresses it (criterion 5).
 
 Validity is derived at read time, never stored; the diagram is the derivation, not a status
 column:

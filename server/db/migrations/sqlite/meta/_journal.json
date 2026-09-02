@@ -309,6 +309,13 @@
       "when": 1788365519531,
       "tag": "0043_quiet_barracuda",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "6",
+      "when": 1788368219286,
+      "tag": "0044_light_lenny_balinger",
+      "breakpoints": true
     }
   ]
 }

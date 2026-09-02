@@ -237,6 +237,14 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Month and day the academic year turns over, London. Distinct from the season boundary.',
   },
+  SESSION_SIGNUP_CLOSES_HOURS: {
+    // The session day arriving closes sign-up anyway, so anything under the hours from midnight
+    // to an evening start has no effect: this is how much more notice a trainer wants (G-105 c5).
+    schema: z.number().int().positive().max(720),
+    default: 24,
+    workshop: 'spaces-and-training',
+    describes: 'Hours before a training session starts that sign-up closes.',
+  },
   SESSION_EDIT_WINDOW_DAYS: {
     schema: z.number().int().positive(),
     default: 14,
@@ -453,6 +461,7 @@ export const ENFORCED_KEYS = [
   // Read by the directory to count the accounts a sweep would warn, which is the whole of its
   // effect until K-111 builds the sweep itself.
   'RETENTION_FULL_ACCOUNT_YEARS',
+  'SESSION_SIGNUP_CLOSES_HOURS',
   'SIGN_IN_ATTEMPTS_PER_ACCOUNT',
   'TRAINING_CARRY_OVER_DAYS',
   'TRAINING_EXPIRY_WARNING_DAYS',
