@@ -46,3 +46,5 @@ afterwards, only superseded.
 | 0038 | Notice for a room we do not manage is working days | how three working days are counted, and why a gap in the calendar refuses |
 | 0039 | A calendar value is read by its parts, not by its class | why `instanceof` across a package boundary is a trap |
 | 0040 | Navigation is shaped by posture, and filtered by ability | the four shells, where a screen's URL comes from, and why the sidebar hides what it hides |
+| 0041 | A material change invalidates training, rather than restating an expiry | why a stamped expiry never moves, and what replaces recalculation |
+| 0042 | Practice mode is entered from the tool, not granted by a register | why practice windows were withdrawn, and how a member reaches a sandbox instead |

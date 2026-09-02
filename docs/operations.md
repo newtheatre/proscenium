@@ -131,10 +131,6 @@ noticing. Somebody who is both an officer and a lead gets the wider scope, not t
 
 The ledger is pruned at `TRAINING_LEDGER_MONTHS` (24) in every mode, armed or not.
 
-It also closes lapsed practice windows, in both modes. A window that has expired has expired whether
-or not we are sending mail, and closing one is the only thing the sweep ever does to practice: it
-never opens a window and never touches a record (G-126 criterion 3).
-
 To run it by hand, `POST /_nitro/tasks/training:expiry-sweep`. The result reports `armed`, the
 counts for each window, `digests` and `pruned`.
 
@@ -172,39 +168,6 @@ Records already dated to that day for the same person and module are shown as al
 are not written again. Correction is revocation with a reason and then a fresh log; nothing here
 edits a record, because the table is append-only. Every attendee gets one `record.delivery-logged`
 audit entry naming the day and the modules, and no person is named in the detail.
-
-## Recalculating a module's training expiries
-
-A training record's expiry is stamped the day it is earned, from the module's policy as it stood
-then. Changing that policy afterwards moves nothing: every record already awarded keeps the date
-it has. `/training/manage/recalculation` is the only way that date ever moves, and it is
-administrator-only (`training.recalculate`).
-
-Running one:
-
-1. Pick the module. The screen previews every record the run would restate, naming the person, the
-   award date, the date standing and the date the policy would put there. It writes nothing.
-2. Read the preview. It pages, so page through it rather than trusting the first page.
-3. Type the affected-row count back into the box. The Restate button stays disabled until the
-   number matches.
-4. Press it. The count is checked again against the database inside the same write, so a run whose
-   affected set moved while you were reading the preview is refused rather than half-applied.
-
-What it refuses, or skips:
-
-- **A count that no longer matches**: a 409 quoting the number you confirmed and the number that
-  now need restating. Nothing is written. Preview again and repeat.
-- **A record with an overridden expiry**: an explicit expiry set at sign-off is somebody's
-  decision, not the policy's, and a run never touches it.
-- **A revoked record**: it stopped counting when it was revoked and its dates are frozen.
-- **A superseded record**: only the current award for a person and module is restated.
-- **A record already on the policy**: it is not in the affected set at all, so running the same
-  recalculation twice restates nothing the second time and is refused for a count of zero.
-
-Every run writes one audit entry, `record.expiry.recalculated`, in the same batch as the dates it
-moved. There is no partial run and no unaudited one. The entry names the module, the policy it
-restated to and how many records moved; it names no person, because audit detail carries
-identifiers and never people.
 
 ## The first administrator in a new environment
 
