@@ -365,7 +365,9 @@ describe.skipIf(skip !== null)('the journey, end to end', () => {
       await send('POST', `/api/admin/training/records/${id}/revoke`, { reason: 'Recorded in error' })
 
       await visit(view, `${app.baseURL}/training`, '[data-test="training-page"]')
-      expect(await textOf(view, 'body')).not.toContain(module)
+      // Gone from what they hold, which is the claim. It reappears under what they could do next,
+      // because revoking reopens the module, and that is G-102 criterion 4 working.
+      expect(await textOf(view, '[data-test="records"]')).not.toContain(module)
     }
     finally {
       view.close()

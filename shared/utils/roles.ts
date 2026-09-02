@@ -55,9 +55,9 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   // J-103's story is the Theatre Manager's: they are who searches the trail and records what
   // happened outside the system.
   THEATRE_MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'members.read', 'rooms.read', 'rooms.write', 'training.read'],
-  // The training officer owns the catalogue; a department's own leads edit their part of it
-  // without holding a role at all, because lead standing is an assignment (G-107, G-110).
-  TRAINING_MANAGER: ['accounts.read', 'members.read', 'rooms.read', 'training.read', 'training.write'],
+  // Owns the catalogue and appoints its stewards; `training.override` stays ADMIN because
+  // never-expiring is the rarer break-glass (G-107, G-110, questions 7 and 8).
+  TRAINING_MANAGER: ['accounts.read', 'members.read', 'rooms.read', 'training.leads', 'training.read', 'training.revoke', 'training.write'],
   BOX_OFFICE: [],
   FOH_MANAGER: [],
   FRONT_OF_HOUSE: [],
