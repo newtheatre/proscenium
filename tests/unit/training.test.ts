@@ -9,6 +9,8 @@ import {
   DELIVERY_RECORDS_PER_STATEMENT,
   DELIVERY_RECORD_COLUMNS,
   MAX_EXPIRY_MONTHS,
+  coverageProblem,
+  registerOpenable,
   RECORD_SOURCES,
   academicYearEnd,
   addMonths,
@@ -525,5 +527,50 @@ describe('a retrospective log names its modules, its day and its people (G-118 c
       .toBeLessThanOrEqual(BOUND_PARAMETER_CHUNK)
     expect(statements * DELIVERY_RECORDS_PER_STATEMENT).toBeGreaterThanOrEqual(records)
     expect(records).toBe(DELIVERY_RECORDS_MAX)
+  })
+})
+
+// G-115 criterion 1. A register opens on the day or after it, never before: records stamp from the
+// held-on date, and a future-dated record would read as valid to every gate.
+describe('a register opens on the day, not before (G-115 criterion 1)', () => {
+  test('the day itself is open, and the day before is not', () => {
+    expect(registerOpenable('2026-10-05', '2026-10-05')).toBe(true)
+    expect(registerOpenable('2026-10-05', '2026-10-04')).toBe(false)
+  })
+
+  test('an old session is still openable, because marking late still awards', () => {
+    expect(registerOpenable('2026-01-05', '2026-10-05')).toBe(true)
+  })
+})
+
+// G-116 criterion 1. The marks cover the register exactly: no strangers, no duplicates, nobody
+// skipped. Three separate failures, because the refusal has to say which one happened.
+describe('a register is covered exactly (G-116 criterion 1)', () => {
+  test('every person marked once is the only shape that passes', () => {
+    expect(coverageProblem(['a', 'b'], ['a', 'b'])).toBeNull()
+    expect(coverageProblem([], [])).toBeNull()
+  })
+
+  test('order does not matter, because a register is a set', () => {
+    expect(coverageProblem(['a', 'b', 'c'], ['c', 'a', 'b'])).toBeNull()
+  })
+
+  test('somebody skipped is named', () => {
+    expect(coverageProblem(['a', 'b'], ['a'])?.missing).toEqual(['b'])
+  })
+
+  test('a stranger is named', () => {
+    expect(coverageProblem(['a'], ['a', 'z'])?.strangers).toEqual(['z'])
+  })
+
+  test('a duplicate is named, and does not also read as covering', () => {
+    const problem = coverageProblem(['a', 'b'], ['a', 'a'])
+    expect(problem?.duplicates).toEqual(['a'])
+    expect(problem?.missing).toEqual(['b'])
+  })
+
+  test('the three failures are reported together, not one at a time', () => {
+    const problem = coverageProblem(['a', 'b'], ['a', 'a', 'z'])
+    expect(problem).toEqual({ strangers: ['z'], duplicates: ['a'], missing: ['b'] })
   })
 })

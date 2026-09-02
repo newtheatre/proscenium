@@ -110,12 +110,20 @@ export const trainingSessions = sqliteTable('training_sessions', {
   status: text('status').notNull().default('PLANNED'),
   notes: text('notes'),
   trainerId: text('trainer_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  // Opening the register freezes what the session teaches and closes sign-up. Stamped once by a
+  // conditional write, so two devices opening it produce one open register (G-115 criterion 4).
+  registerOpenedAt: integer('register_opened_at'),
+  registerOpenedBy: text('register_opened_by').references(() => users.id, { onDelete: 'set null' }),
+  // When the marks landed. The single act that awards, and it happens once (G-116).
+  markedAt: integer('marked_at'),
+  markedBy: text('marked_by').references(() => users.id, { onDelete: 'set null' }),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 }, table => [
   index('training_sessions_held_on').on(table.heldOn),
   index('training_sessions_status').on(table.status),
   index('training_sessions_trainer').on(table.trainerId),
+  index('training_sessions_register_opened_at').on(table.registerOpenedAt),
   check('training_sessions_status', sql`${table.status} IN ('PLANNED', 'OPEN', 'FULL', 'DELIVERED', 'CANCELLED')`),
   // A closed set about process, so it may carry a CHECK (0033). One to sixty is the room a
   // workshop can hold, and nought would be a session nobody may attend (criterion 1).
@@ -202,4 +210,52 @@ export const moduleRequests = sqliteTable('module_requests', {
   index('module_requests_module_status').on(table.moduleId, table.status),
   index('module_requests_user').on(table.userId),
   check('module_requests_status', sql`${table.status} IN ('OPEN', 'SCHEDULED', 'DECLINED', 'WITHDRAWN')`),
+])
+
+// A practice surface somebody may rehearse on once they have been taught it, for example the till
+// sandbox. The key is immutable once created, because consumers reference it (G-126 criterion 1).
+export const practiceTargets = sqliteTable('practice_targets', {
+  key: text('key').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  // How long a window lasts once opened, in hours.
+  windowHours: integer('window_hours').notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  index('practice_targets_is_active').on(table.isActive),
+  check('practice_targets_window_hours', sql`${table.windowHours} BETWEEN 1 AND 8760`),
+])
+
+export const practiceTargetModules = sqliteTable('practice_target_modules', {
+  id: id(),
+  targetKey: text('target_key').notNull().references(() => practiceTargets.key, { onDelete: 'cascade' }),
+  moduleId: text('module_id').notNull().references(() => trainingModules.id, { onDelete: 'cascade' }),
+}, table => [
+  unique('practice_target_modules_pair').on(table.targetKey, table.moduleId),
+  index('practice_target_modules_module').on(table.moduleId),
+])
+
+// An open window to rehearse on a surface. Access is enforced from this table and never cached:
+// the old estate served it no-store, and advisory practice access is not access control (0126 c4).
+export const practiceWindows = sqliteTable('practice_windows', {
+  id: id(),
+  targetKey: text('target_key').notNull().references(() => practiceTargets.key, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // No foreign key: a window outlives the session that opened it, and G-115 enforces the link.
+  sessionId: text('session_id'),
+  opensAt: integer('opens_at').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+  closedAt: integer('closed_at'),
+  closedBy: text('closed_by').references(() => users.id, { onDelete: 'set null' }),
+  openedBy: text('opened_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  // Criterion 2, and the old estate's bug: two devices opening one register must not open two
+  // windows. One open window per person, target and session, held by the index rather than a read.
+  uniqueIndex('practice_windows_claim').on(table.targetKey, table.userId, table.sessionId)
+    .where(sql`session_id is not null`),
+  index('practice_windows_user').on(table.userId),
+  index('practice_windows_expires_at').on(table.expiresAt),
 ])
