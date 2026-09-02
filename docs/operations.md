@@ -164,6 +164,11 @@ What it refuses:
 - **A count that no longer matches the dry-run**: a 409 quoting both figures. Logging the same
   evening twice hits this, because the second attempt would create nothing.
 
+Somebody who has never signed in is added under **By address**. They get an account with no
+password, which they claim by registering or signing in with that same address later; the training
+is already waiting on it. An address whose account has been erased is refused, because a record
+cannot be attached to a tombstone.
+
 Records already dated to that day for the same person and module are shown as already recorded and
 are not written again. Correction is revocation with a reason and then a fresh log; nothing here
 edits a record, because the table is append-only. Every attendee gets one `record.delivery-logged`

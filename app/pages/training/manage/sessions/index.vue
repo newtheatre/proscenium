@@ -198,6 +198,9 @@ function beginLog(): void {
   picked.value = null
   plan.value = null
   ticked.value = []
+  byEmail.value = false
+  address.value = ''
+  theirName.value = ''
   failure.value = null
   logging.value = true
 }
@@ -214,6 +217,36 @@ function addPerson(): void {
   attendees.value = [...attendees.value, chosen]
   person.value = undefined
   picked.value = null
+}
+
+const byEmail = ref(false)
+const address = ref('')
+const theirName = ref('')
+
+// Teaching that happened off-system was often taught to people who had not signed in yet, so the
+// log needs the same door the register has (G-117, widened).
+async function addByEmail(): Promise<void> {
+  if (!address.value.trim()) return
+  working.value = true
+  failure.value = null
+  try {
+    const found = await $fetch<{ id: string, name: string }>('/api/admin/training/attendees/lookup', {
+      method: 'POST',
+      body: { email: address.value.trim(), name: theirName.value.trim() || undefined },
+    })
+    if (!attendees.value.some(one => one.id === found.id)) {
+      attendees.value = [...attendees.value, { id: found.id, name: found.name }]
+    }
+    address.value = ''
+    theirName.value = ''
+    byEmail.value = false
+  }
+  catch (caught) {
+    failure.value = refusalText(caught)
+  }
+  finally {
+    working.value = false
+  }
 }
 
 function removePerson(id: string): void {
@@ -338,19 +371,17 @@ const columns: TableColumn<Session>[] = [
     }, () => saysSessionStatus(row.original.status)),
   },
   {
-    id: 'register',
+    id: 'open',
     header: '',
     meta: { class: { td: 'text-right whitespace-nowrap' } },
-    cell: ({ row }) => row.original.status === 'CANCELLED'
-      ? null
-      : h(UButton, {
-          'to': `/training/sessions/${row.original.id}/register`,
-          'variant': 'ghost',
-          'size': 'sm',
-          'icon': 'i-lucide-clipboard-check',
-          'data-test': `register-${row.original.id}`,
-          'aria-label': `Take the register for ${row.original.heldOn}`,
-        }, () => 'Register'),
+    cell: ({ row }) => h(UButton, {
+      'to': `/training/manage/sessions/${row.original.id}`,
+      'variant': 'ghost',
+      'size': 'sm',
+      'icon': 'i-lucide-chevron-right',
+      'data-test': `open-${row.original.id}`,
+      'aria-label': `Open the session on ${row.original.heldOn}`,
+    }),
   },
 ]
 </script>
@@ -684,8 +715,58 @@ const columns: TableColumn<Session>[] = [
                 >
                   Add
                 </UButton>
+                <UButton
+                  icon="i-lucide-mail"
+                  color="neutral"
+                  variant="ghost"
+                  :disabled="attendees.length >= DELIVERY_ATTENDEES_MAX"
+                  data-test="delivery-by-email"
+                  @click="byEmail = !byEmail"
+                >
+                  By address
+                </UButton>
               </div>
             </UFormField>
+
+            <div
+              v-if="byEmail"
+              class="space-y-3 rounded-md border border-default p-3"
+              data-test="delivery-email-panel"
+            >
+              <p class="text-sm text-muted">
+                For somebody who has never signed in. They get an account they can claim later, and
+                this training is waiting on it.
+              </p>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <UFormField label="Address">
+                  <UInput
+                    v-model="address"
+                    type="email"
+                    placeholder="name@nottingham.ac.uk"
+                    class="w-full"
+                    data-test="delivery-email"
+                  />
+                </UFormField>
+                <UFormField
+                  label="Their name"
+                  hint="Optional"
+                >
+                  <UInput
+                    v-model="theirName"
+                    class="w-full"
+                    data-test="delivery-email-name"
+                  />
+                </UFormField>
+              </div>
+              <UButton
+                :loading="working"
+                :disabled="!address.trim()"
+                data-test="delivery-email-add"
+                @click="addByEmail"
+              >
+                Add them
+              </UButton>
+            </div>
 
             <div
               v-if="attendees.length"

@@ -155,6 +155,12 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/training/requests/[id]/decline.post.ts', actions: ['request.declined'] },
   { route: 'server/api/admin/training/sessions/[id]/register.get.ts', exempt: 'reads the register a trainer is about to mark' },
   { route: 'server/api/admin/training/sessions/[id]/open-register.post.ts', actions: ['register.opened'] },
+  { route: 'server/api/admin/training/sessions/[id]/attendees.post.ts', actions: ['session.attendee.added'] },
+  {
+    route: 'server/api/admin/training/attendees/lookup.post.ts',
+    actions: ['account.created.console'],
+    via: ['server/utils/accounts.ts'],
+  },
   {
     route: 'server/api/admin/training/sessions/[id]/mark.post.ts',
     actions: ['register.marked'],

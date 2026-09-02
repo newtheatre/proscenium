@@ -1006,6 +1006,15 @@ their respective races turn on.
 produce one open register: the loser's update matches nothing (G-115 criterion 4). Opening closes
 sign-up and freezes what the session teaches.
 
+**Somebody who turned up is added to an open register** at `POST /api/admin/training/sessions/:id/attendees`
+(G-117). The row is the one a sign-up makes, with `source` `WALK_IN` and a `signed_up_at` past
+everybody already on it, so a walk-in never takes a place from somebody who signed up in advance.
+An address with no account resolves through `POST /api/admin/training/attendees/lookup`, which
+mints the claimable password-less account A-116 describes and refuses an anonymised one outright:
+attaching training to a tombstone would write a person back onto the row erasure emptied (0011).
+The same lookup serves the retrospective log, because teaching off-system is often taught to people
+who have not signed in.
+
 **The freeze is releasable by the session's own trainer while no marks exist** (open question 6,
 answered 2 September). The release is conditional on `marked_at IS NULL`, so a release racing a
 submission cannot change what a mark is about to award.

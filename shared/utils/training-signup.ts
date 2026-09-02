@@ -83,6 +83,33 @@ export function signUpStatement(id: string, sessionId: string, userId: string, a
   `
 }
 
+// A walk-in is added at the door rather than by the person themselves, so it is marked as one and
+// goes to the back of the order: they were not waiting for a place (G-117 criterion 5).
+export function walkInStatement(id: string, sessionId: string, userId: string, at: number): SQL {
+  return sql`
+    insert into session_attendees (id, session_id, user_id, status, source, signed_up_at, created_at)
+    values (${id}, ${sessionId}, ${userId}, 'SIGNED_UP', 'WALK_IN', ${at}, ${at})
+    on conflict (session_id, user_id) do nothing
+    returning id
+  `
+}
+
+// A walk-in who had withdrawn earlier keeps their row and comes back as a walk-in, because that is
+// what happened: they turned up.
+export function walkInRejoinStatement(sessionId: string, userId: string, at: number): SQL {
+  return sql`
+    update session_attendees
+    set status = 'SIGNED_UP',
+      source = 'WALK_IN',
+      signed_up_at = max(${at}, coalesce((
+        select max(signed_up_at) from session_attendees a
+        where a.session_id = ${sessionId} and a.status <> 'CANCELLED'
+      ), 0) + 1)
+    where session_id = ${sessionId} and user_id = ${userId} and status = 'CANCELLED'
+    returning id
+  `
+}
+
 // Re-joining moves the instant and keeps the row, which is what puts somebody at the back. Past
 // the last instant on the session, not merely to now: a whole second holds several sign-ups.
 export function rejoinStatement(sessionId: string, userId: string, at: number): SQL {
