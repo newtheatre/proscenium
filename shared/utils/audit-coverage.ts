@@ -147,6 +147,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/training/records/index.get.ts', exempt: 'reads one person\'s training history' },
   { route: 'server/api/training/records.get.ts', exempt: 'reads your own training records' },
   { route: 'server/api/training/modules.get.ts', exempt: 'reads the member-facing catalogue' },
+  { route: 'server/api/training/next.get.ts', exempt: 'reads what you could take next, all from your own records' },
   { route: 'server/api/admin/training/modules/[id]/prerequisites.post.ts', actions: ['prerequisite.added'] },
   { route: 'server/api/admin/training/prerequisites/[id].delete.ts', actions: ['prerequisite.removed'] },
   {
