@@ -95,6 +95,44 @@ export const moduleMaterials = sqliteTable('module_materials', {
   index('module_materials_module').on(table.moduleId),
 ])
 
+// A planned session. `held_on` is the London day it happens; the wall-clock times are stored as
+// text so no instant is implied and a clock change cannot move them (0014, G-112 criterion 5).
+export const trainingSessions = sqliteTable('training_sessions', {
+  id: id(),
+  heldOn: text('held_on').notNull(),
+  // HH:MM, zero-padded, so they compare and sort as strings, the way room hours do.
+  startsAt: text('starts_at').notNull(),
+  endsAt: text('ends_at').notNull(),
+  place: text('place'),
+  capacity: integer('capacity').notNull(),
+  // NULL is open already. A session invisible to members resolves no requests (criterion 2).
+  opensAt: integer('opens_at'),
+  status: text('status').notNull().default('PLANNED'),
+  notes: text('notes'),
+  trainerId: text('trainer_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  index('training_sessions_held_on').on(table.heldOn),
+  index('training_sessions_status').on(table.status),
+  index('training_sessions_trainer').on(table.trainerId),
+  check('training_sessions_status', sql`${table.status} IN ('PLANNED', 'OPEN', 'FULL', 'DELIVERED', 'CANCELLED')`),
+  // A closed set about process, so it may carry a CHECK (0033). One to sixty is the room a
+  // workshop can hold, and nought would be a session nobody may attend (criterion 1).
+  check('training_sessions_capacity', sql`${table.capacity} BETWEEN 1 AND 60`),
+  check('training_sessions_span', sql`${table.endsAt} > ${table.startsAt}`),
+])
+
+// What a session teaches. One or more, and frozen once the register opens (G-115 criterion 2).
+export const sessionModules = sqliteTable('session_modules', {
+  id: id(),
+  sessionId: text('session_id').notNull().references(() => trainingSessions.id, { onDelete: 'cascade' }),
+  moduleId: text('module_id').notNull().references(() => trainingModules.id, { onDelete: 'restrict' }),
+}, table => [
+  unique('session_modules_pair').on(table.sessionId, table.moduleId),
+  index('session_modules_module').on(table.moduleId),
+])
+
 // Direct edges only, and a cycle is refused at the write by naming it (G-108). No `created_by`:
 // a column ending `_by` would demand a personal-data entry for a table that names nobody.
 export const modulePrerequisites = sqliteTable('module_prerequisites', {

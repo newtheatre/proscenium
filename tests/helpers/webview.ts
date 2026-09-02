@@ -333,7 +333,10 @@ export async function fill(view: Bun.WebView, selector: string, value: string): 
 }
 
 // A number input formats and commits on blur, so a value assigned without one is never read.
+// It has to be focused first: blur() on an element that never held focus fires no event at all.
 export async function fillNumber(view: Bun.WebView, selector: string, value: string): Promise<void> {
+  await waitFor(view, `document.querySelector(${JSON.stringify(selector)})`)
+  await view.evaluate(`document.querySelector(${JSON.stringify(selector)}).focus()`)
   await fill(view, selector, value)
   await view.evaluate(`document.querySelector(${JSON.stringify(selector)}).blur()`)
 }

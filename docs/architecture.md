@@ -83,6 +83,11 @@ becomes interactive.
      cached beyond the request (0009). It resolves in the module utility that owns the fact it
      derives from, behind a guard of its own: `server/utils/training.ts` reads department
      leadership, and `requireCatalogueReader` and `requireCatalogueAuthority` are its guards.
+     Trainer and supervisor standing resolve in the same file, through `trainerStandingOf` and
+     the `requireTrainer` guard: somebody is a trainer if and only if they currently hold a
+     record on a module marked trainer-granting, and expiring counts as held. It is never a role
+     and never a flag, so revoking the certification is the whole of taking the standing away
+     (0037, G-111).
   3. **Ownership**: the row's own user id.
 - Guards are server-side and fail closed; route middleware is rendering convenience only.
 - MFA (TOTP + passkeys) is enforced at guard level for permission-bearing roles (0008).

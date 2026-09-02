@@ -260,6 +260,13 @@
       "when": 1788302850575,
       "tag": "0036_mysterious_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1788343098061,
+      "tag": "0037_odd_swordsman",
+      "breakpoints": true
     }
   ]
 }

@@ -19,10 +19,12 @@ interface Record {
 
 const request = useRequestFetch()
 
+interface Standing { trainer: boolean, supervisor: boolean }
+
 const { data, status } = await useAsyncData(
   'training-records',
-  () => request<{ items: Record[], total: number }>('/api/training/records'),
-  { default: (): { items: Record[], total: number } => ({ items: [], total: 0 }) },
+  () => request<{ items: Record[], total: number, standing: Standing }>('/api/training/records'),
+  { default: () => ({ items: [] as Record[], total: 0, standing: { trainer: false, supervisor: false } }) },
 )
 
 // Grouped by department, which is how a member thinks about what they are allowed to do
@@ -37,6 +39,12 @@ const groups = computed(() => {
 
 const badge = (state: RecordState): 'success' | 'warning' | 'neutral' =>
   state === 'VALID' ? 'success' : state === 'EXPIRING' ? 'warning' : 'neutral'
+
+// Said out loud because it is derived: it follows the certification and needs no revoking.
+const standings = computed(() => [
+  ...(data.value.standing.trainer ? ['run training sessions'] : []),
+  ...(data.value.standing.supervisor ? ['supervise'] : []),
+])
 </script>
 
 <template>
@@ -47,6 +55,17 @@ const badge = (state: RecordState): 'success' | 'warning' | 'neutral' =>
     <UPageHeader
       title="My training"
       description="What you hold, and how long each one is good for. Something expiring still counts until its date."
+    />
+
+    <UAlert
+      v-if="standings.length > 0"
+      class="mt-8"
+      color="primary"
+      variant="subtle"
+      icon="i-lucide-badge-check"
+      data-test="standing"
+      :title="`You can ${standings.join(' and ')}`"
+      description="This follows your certification: it lasts exactly as long as that record does."
     />
 
     <div

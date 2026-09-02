@@ -69,6 +69,9 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
       revoked_at, revoked_by, revoke_reason)
       VALUES (?, ?, ?, '2026-09-14', 'SIGNOFF', ?, ?, ?, ?)`,
     `tr2-${id}`, id, `mod-${id}`, id, now, id, `${NAME} was found not competent`],
+    [`INSERT INTO training_sessions (id, held_on, starts_at, ends_at, capacity, notes, trainer_id)
+      VALUES (?, '2027-01-14', '19:00', '21:00', 20, ?, ?)`,
+    `ts-${id}`, `${NAME} is bringing the harnesses`, id],
   ])
   return id
 }
