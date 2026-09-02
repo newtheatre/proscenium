@@ -284,6 +284,33 @@ ${String(context.sessionsUrl)}
 The Nottingham New Theatre`,
   }),
 
+  'training-register-unmarked': (context: TemplateContext): Rendered => ({
+    subject: `The register from ${String(context.heldOn)} is still unmarked`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>You opened the register for the session on ${context.heldOn} and it has not been marked, so
+<strong>nobody has been given a record for it</strong>.</p>
+<p>Marking the register is what creates the records, so until it is marked, as far as the rest of
+the theatre is concerned that training did not happen. Records date to the day of the session, not
+the day you mark it, so a late register is still correct.</p>
+<p><a href="${String(context.registerUrl)}">Mark it now</a>. If the session did not happen, cancel it
+instead and everybody signed up will be told.</p>`),
+    text: `Hello ${context.name},
+
+You opened the register for the session on ${context.heldOn} and it has not been marked, so nobody
+has been given a record for it.
+
+Marking the register is what creates the records, so until it is marked, as far as the rest of the
+theatre is concerned that training did not happen. Records date to the day of the session, not the
+day you mark it, so a late register is still correct.
+
+Mark it now:
+${String(context.registerUrl)}
+
+If the session did not happen, cancel it instead and everybody signed up will be told.
+
+The Nottingham New Theatre`,
+  }),
+
   // A nudge, never a telling-off: these go to volunteers, and expired training has not been
   // taken away from anybody. It stops counting, which is a different and smaller thing.
   'training-expiry-window': (context: TemplateContext): Rendered => {

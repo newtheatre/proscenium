@@ -574,3 +574,34 @@ describe('a register is covered exactly (G-116 criterion 1)', () => {
     expect(problem).toEqual({ strangers: ['z'], duplicates: ['a'], missing: ['b'] })
   })
 })
+
+// G-119. Weekly from day 2, silent before that and after 60 days, and the week index is what the
+// ledger claims so a re-run inside the same week sends nothing.
+describe('an unmarked register is nagged weekly (G-119 criteria 1 and 2)', () => {
+  test('nothing on the day itself or the day after', async () => {
+    const { nagWeek } = await import('#shared/utils/training-expiry')
+    expect(nagWeek('2026-10-05', '2026-10-05')).toBeNull()
+    expect(nagWeek('2026-10-05', '2026-10-06')).toBeNull()
+  })
+
+  test('the first nag is day 2, and the week does not turn until day 9', async () => {
+    const { nagWeek } = await import('#shared/utils/training-expiry')
+    expect(nagWeek('2026-10-05', '2026-10-07')).toBe(0)
+    expect(nagWeek('2026-10-05', '2026-10-13')).toBe(0)
+    expect(nagWeek('2026-10-05', '2026-10-14')).toBe(1)
+  })
+
+  test('nags stop after sixty days, and the register is still stale', async () => {
+    const { nagWeek } = await import('#shared/utils/training-expiry')
+    expect(nagWeek('2026-10-05', '2026-12-04')).toBe(8)
+    expect(nagWeek('2026-10-05', '2026-12-05')).toBeNull()
+    expect(nagWeek('2026-10-05', '2027-06-05')).toBeNull()
+  })
+
+  test('a claim is per session and per week, so a re-run in the same week is silent', async () => {
+    const { nagClaimFor } = await import('#shared/utils/training-expiry')
+    expect(nagClaimFor('s1', 0)).toBe(nagClaimFor('s1', 0))
+    expect(nagClaimFor('s1', 0)).not.toBe(nagClaimFor('s1', 1))
+    expect(nagClaimFor('s1', 0)).not.toBe(nagClaimFor('s2', 0))
+  })
+})

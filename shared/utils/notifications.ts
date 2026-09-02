@@ -112,6 +112,14 @@ export const MESSAGE_TYPES = {
     template: 'training-request-scheduled',
   },
 
+  // Blunt, because it is to an officer about a system failure rather than to a member about
+  // themselves: until the register is marked, the training did not happen (G-119).
+  'training.register.unmarked': {
+    topic: 'TRAINING',
+    channels: ['EMAIL'],
+    template: 'training-register-unmarked',
+  },
+
   // Two warnings at different urgencies, neither suppressing the other (G-125 criterion 1).
   'training.expiry.window': {
     topic: 'TRAINING',

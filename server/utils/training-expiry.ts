@@ -1,6 +1,6 @@
 import { and, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { londonParts } from '#shared/utils/london'
-import { claimFor, digestClaimFor } from '#shared/utils/training-expiry'
+import { claimFor, digestClaimFor, nagClaimFor, nagWeek } from '#shared/utils/training-expiry'
 import type { WarningKind } from '#shared/utils/training-expiry'
 import type { H3Event } from 'h3'
 
@@ -14,6 +14,7 @@ export interface SweepRun {
   digests: number
   pruned: number
   practiceClosed: number
+  nags: number
   // What a disarmed run would have sent, so the report is the same shape either way.
   wouldSend: { userId: string, kind: WarningKind, moduleIds: string[] }[]
 }
@@ -61,7 +62,7 @@ export async function sweepExpiries(event: H3Event | undefined, at = new Date())
   const finalDays = await configValue(event, 'TRAINING_FINAL_WARNING_DAYS')
   const today = londonDay(at)
 
-  const run: SweepRun = { armed, window: 0, final: 0, digests: 0, pruned: 0, practiceClosed: 0, wouldSend: [] }
+  const run: SweepRun = { armed, window: 0, final: 0, digests: 0, pruned: 0, practiceClosed: 0, nags: 0, wouldSend: [] }
 
   // The final warning is the tighter window, so it is swept first: a record inside both is
   // urgent, and the two warnings are independent rather than one superseding the other.
@@ -117,6 +118,7 @@ export async function sweepExpiries(event: H3Event | undefined, at = new Date())
   // G-126 criterion 3. Closing a lapsed window is the only thing this does to practice, and it
   // runs in both modes: a window that has expired has expired whether or not we are sending mail.
   run.practiceClosed = await closeLapsedPractice(Math.floor(at.getTime() / 1000))
+  run.nags = await nagUnmarkedRegisters(event, today, armed)
   return run
 }
 
@@ -247,4 +249,80 @@ async function pruneLedger(event: H3Event | undefined, at: Date): Promise<number
     ))
     .returning({ id: schema.notificationLog.id })
   return gone.length
+}
+
+// G-119. A register opened and never marked means a taught session awarded nothing, so the trainer
+// is chased weekly. The sweep only notices: nothing on any schedule ever marks or awards.
+async function nagUnmarkedRegisters(
+  event: H3Event | undefined,
+  today: string,
+  armed: boolean,
+): Promise<number> {
+  const stale = await db.all<{
+    id: string
+    heldOn: string
+    trainerId: string
+    trainerName: string
+  }>(sql`
+    select s.id as id, s.held_on as heldOn, s.trainer_id as trainerId, u.name as trainerName
+    from training_sessions s
+    join users u on u.id = s.trainer_id
+    where s.register_opened_at is not null
+      and s.marked_at is null
+      and s.status != 'CANCELLED'
+      and s.held_on < ${today}
+    order by s.held_on
+  `)
+
+  let sent = 0
+  for (const row of stale) {
+    const week = nagWeek(row.heldOn, today)
+    if (week === null) continue
+
+    const key = nagClaimFor(row.id, week)
+    if (!armed) {
+      if (!await claimHeld(key)) sent++
+      continue
+    }
+    const took = await claimNotification({
+      userId: row.trainerId,
+      type: 'training.register.unmarked',
+      key,
+      sessionId: row.id,
+    })
+    if (!took) continue
+
+    await notify(event, {
+      type: 'training.register.unmarked',
+      userId: row.trainerId,
+      context: {
+        name: '',
+        heldOn: row.heldOn,
+        registerUrl: `${useRuntimeConfig(event).public.baseURL}/training/sessions/${row.id}/register`,
+      },
+    })
+    sent++
+  }
+  return sent
+}
+
+// Criterion 2. Nags stop at sixty days; the register stays stale to leads and administrators
+// indefinitely, because an unmarked register is a session that awarded nothing.
+export async function staleRegisters(today: string): Promise<{
+  id: string
+  heldOn: string
+  trainerName: string
+  daysStale: number
+}[]> {
+  return db.all(sql`
+    select s.id as id, s.held_on as heldOn, u.name as trainerName,
+      cast(julianday(${today}) - julianday(s.held_on) as integer) as daysStale
+    from training_sessions s
+    join users u on u.id = s.trainer_id
+    where s.register_opened_at is not null
+      and s.marked_at is null
+      and s.status != 'CANCELLED'
+      and s.held_on < ${today}
+    order by s.held_on
+  `)
 }
