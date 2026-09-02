@@ -1257,6 +1257,12 @@ everything with nothing to claim, which is most messages, writes freely. `claimN
 `claimHeld()` in `server/utils/notify.ts` are the only things that touch it: the notification centre
 owns the ledger for the same reason it owns sending (0013).
 
+**A claimed message writes two rows, not one.** The claim is inserted first and `notify()` then
+records its own outcome, so counting how many messages of a type reached somebody double-counts
+unless the query says `claim IS NOT NULL` (or `IS NULL`, depending which it wants). Both rows are
+correct and both are wanted: one is the promise not to send again, the other is what happened when
+we tried. It is written down here because it has cost two people an hour.
+
 The refs carry **no foreign key**. The ledger outlives what it refers to, and a message sent is a
 fact about the past that deleting a record must not rewrite. `user_id` is the exception and is
 `set null`, so an erased person's messages stay counted without naming them.
