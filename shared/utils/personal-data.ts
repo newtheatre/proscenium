@@ -118,7 +118,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'scrub',
     // `trainer_id` is NOT NULL and stays pointing at the tombstoned account, so what the session
     // was survives the person who ran it.
-    scrub: ['notes'],
+    scrub: ['notes', 'cancel_reason'],
     why: 'Sessions this person ran. What training the theatre delivered is safety history; the trainer\'s notes on a night are not.',
   },
   {

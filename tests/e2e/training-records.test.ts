@@ -176,14 +176,22 @@ describe.skipIf(skip !== null)('a record\'s state is derived from its dates (G-1
     expect(held[0]?.id).not.toBe(older)
   })
 
-  // Nothing was written to make any of the above true: only the calendar moved.
-  test('the state moves with the date and no write, which is the whole point', async () => {
-    const module = await seedModule()
-    const id = awardTo(memberId, module, { expires_on: todayPlus(10) })
-    expect((await mine()).find(one => one.id === id)?.state).toBe('EXPIRING')
+  // Nothing was written to make any of the above true: the dates are read and the word is worked
+  // out from them on the way out.
+  test('the state is derived from the dates and stored in no column at all', async () => {
+    const soon = awardTo(memberId, await seedModule(), { expires_on: todayPlus(10) })
+    const later = awardTo(memberId, await seedModule(), { expires_on: todayPlus(400) })
 
-    write(`UPDATE training_records SET expires_on = ? WHERE id = ?`, todayPlus(400), id)
-    expect((await mine()).find(one => one.id === id)?.state).toBe('VALID')
+    const held = await mine()
+    expect(held.find(one => one.id === soon)?.state).toBe('EXPIRING')
+    expect(held.find(one => one.id === later)?.state).toBe('VALID')
+
+    // Two records a fortnight apart in policy read differently, and neither row carries the answer:
+    // a stamped expiry never moves, so this can never be demonstrated by editing one (0041).
+    const columns = read<{ names: string }>(
+      `SELECT group_concat(name) names FROM pragma_table_info('training_records')`,
+    )!.names
+    expect(columns).not.toContain('state')
   })
 
   test('a member cannot read anybody else\'s history', async () => {

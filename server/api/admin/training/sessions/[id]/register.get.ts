@@ -1,4 +1,5 @@
 import { asc, eq } from 'drizzle-orm'
+import { daysBetween } from '#shared/utils/training'
 
 // The register a trainer marks: who is on it, what it teaches, and whether it is open yet.
 export default defineEventHandler(async (event) => {
@@ -48,5 +49,10 @@ export default defineEventHandler(async (event) => {
     placed: standing.get(row.userId)?.placed ?? false,
   }))
 
-  return { ...session, modules, attendees }
+  const windowDays = await configValue(event, 'SESSION_EDIT_WINDOW_DAYS')
+  const correctable = session.markedAt !== null
+    && session.status !== 'CANCELLED'
+    && daysBetween(session.heldOn, londonToday()) <= windowDays
+
+  return { ...session, modules, attendees, correctable, editWindowDays: windowDays }
 })

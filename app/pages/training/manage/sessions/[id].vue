@@ -13,6 +13,7 @@ interface Attendee {
 }
 
 interface Session {
+  cancelReason: string | null
   id: string
   heldOn: string
   startsAt: string
@@ -31,8 +32,14 @@ interface Session {
 
 const route = useRoute()
 const request = useRequestFetch()
+const toast = useToast()
 
-const { data, status, error } = await useAsyncData(
+const failure = ref<string | null>(null)
+const working = ref(false)
+const calling = ref(false)
+const reason = ref('')
+
+const { data, status, error, refresh } = await useAsyncData(
   () => `session-${route.params.id}`,
   () => request<Session>(`/api/admin/training/sessions/${route.params.id}`),
   { default: () => null as Session | null },
@@ -41,6 +48,34 @@ const { data, status, error } = await useAsyncData(
 const registerOpen = computed(() => data.value?.registerOpenedAt !== null)
 const marked = computed(() => data.value?.markedAt !== null)
 const cancelled = computed(() => data.value?.status === 'CANCELLED')
+
+// Mandatory, because a cancellation with no reason is the locked door this exists to prevent.
+async function callOff(): Promise<void> {
+  if (!reason.value.trim()) return
+  working.value = true
+  failure.value = null
+  try {
+    const answered = await $fetch<{ told: number }>(
+      `/api/admin/training/sessions/${route.params.id}/cancel`,
+      { method: 'POST', body: { reason: reason.value.trim() } },
+    )
+    toast.add({
+      title: 'Session cancelled',
+      description: `${plural(answered.told, 'person', 'people')} told why.`,
+      icon: 'i-lucide-ban',
+      color: 'success',
+    })
+    calling.value = false
+    reason.value = ''
+    await refresh()
+  }
+  catch (caught) {
+    failure.value = refusalText(caught)
+  }
+  finally {
+    working.value = false
+  }
+}
 
 // What the button offers depends on where the session has got to, so it says which of those it is.
 const registerLabel = computed(() => {
@@ -117,13 +152,79 @@ const registerLabel = computed(() => {
       </div>
 
       <UAlert
+        v-if="failure"
+        data-test="failure"
+        color="error"
+        variant="subtle"
+        :description="failure"
+      />
+
+      <UAlert
         v-if="cancelled"
         color="error"
         variant="subtle"
         icon="i-lucide-ban"
+        data-test="session-cancelled"
         title="This session was cancelled"
-        description="It awards nothing, and its register can never be opened."
+        :description="data.cancelReason
+          ? `${data.cancelReason} Everybody signed up was told, and its register can never be opened.`
+          : 'It awards nothing, and its register can never be opened.'"
       />
+
+      <!-- Only before the register opens: after that the session happened, and the edit window is
+        how it is put right (G-113 criterion 5). -->
+      <div
+        v-else-if="!registerOpen && !calling"
+        class="flex justify-end"
+      >
+        <UButton
+          color="error"
+          variant="outline"
+          icon="i-lucide-ban"
+          data-test="cancel-session"
+          @click="calling = true"
+        >
+          Cancel this session
+        </UButton>
+      </div>
+
+      <div
+        v-else-if="!registerOpen && calling"
+        class="space-y-3 rounded-lg border border-default p-4"
+        data-test="cancel-panel"
+      >
+        <UFormField
+          label="Why it is off"
+          required
+          description="Everybody signed up is emailed this, so write it for them."
+        >
+          <UTextarea
+            v-model="reason"
+            :rows="2"
+            class="w-full"
+            placeholder="The trainer is unwell and we would rather run it properly."
+            data-test="cancel-reason"
+          />
+        </UFormField>
+        <div class="flex flex-wrap gap-2">
+          <UButton
+            color="error"
+            :loading="working"
+            :disabled="!reason.trim()"
+            data-test="cancel-submit"
+            @click="callOff"
+          >
+            Cancel it and tell everybody
+          </UButton>
+          <UButton
+            color="neutral"
+            variant="ghost"
+            @click="calling = false"
+          >
+            Back
+          </UButton>
+        </div>
+      </div>
 
       <UAlert
         v-else-if="marked"

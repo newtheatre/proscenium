@@ -455,6 +455,7 @@ export const ENFORCED_KEYS = [
   // Read by the directory to count the accounts a sweep would warn, which is the whole of its
   // effect until K-111 builds the sweep itself.
   'RETENTION_FULL_ACCOUNT_YEARS',
+  'SESSION_EDIT_WINDOW_DAYS',
   'SESSION_SIGNUP_CLOSES_HOURS',
   'SIGN_IN_ATTEMPTS_PER_ACCOUNT',
   'TRAINING_CARRY_OVER_DAYS',

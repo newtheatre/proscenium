@@ -108,6 +108,10 @@ export const trainingSessions = sqliteTable('training_sessions', {
   // NULL is open already. A session invisible to members resolves no requests (criterion 2).
   opensAt: integer('opens_at'),
   status: text('status').notNull().default('PLANNED'),
+  // Why it was called off, told to everybody signed up and kept on the session afterwards (G-113).
+  cancelledAt: integer('cancelled_at'),
+  cancelledBy: text('cancelled_by').references(() => users.id, { onDelete: 'set null' }),
+  cancelReason: text('cancel_reason'),
   // Shown to a member deciding whether to come; `notes` is the trainer's own and is not.
   description: text('description'),
   notes: text('notes'),
