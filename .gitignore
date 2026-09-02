@@ -14,15 +14,8 @@ migration/dumps/
 migration/out/
 
 
-# The end-to-end run's database lives in /tmp, outside the tree the dev server watches (0029).
-
-../../../../../tmp/nnt-e2e-3101
-
 # `bun run shots` writes here. The pictures are for looking at once, not for keeping.
 .shots/
 
 # Worktrees created for parallel work on the same clone
 .claude/worktrees/
-
-../../../../../tmp/nnt-e2e-3301
-../../../../../tmp/nnt-e2e-3201
