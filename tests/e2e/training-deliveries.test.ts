@@ -485,4 +485,61 @@ describe.skipIf(skip !== null)('the trainer screen (G-118)', () => {
   }, CASE_TIMEOUT_MS)
 })
 
+describe.skipIf(skip !== null)('a refusal is shown where the action was taken', () => {
+  // A page-level alert renders behind the modal's own overlay, so the trainer sees a spinner stop
+  // and nothing else. The refusal has to live inside the dialog that caused it.
+  test('a count that moved under the preview refuses, visibly, inside the modal', async () => {
+    const module = await addModule()
+    const person = { ...syntheticPerson(71), email: registrableAddress('delivery-refusal') }
+    await send('POST', '/api/auth/register', { email: person.email, name: person.name, password: generatePassword() }, '')
+    markVerified(app, person.email)
+    const attendee = read<{ id: string }>('SELECT id FROM users WHERE email = ?', person.email)!.id
+    const day = daysFrom(-4)
+
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage/sessions`, '[data-test="sessions-table"]')
+      await click(view, '[data-test="log-session"]')
+      await waitFor(view, `document.querySelector('[data-test="delivery-form"]')`)
+
+      await fillDate(view, '[data-test="delivery-day"]', day)
+      await click(view, `[data-test="delivery-module-${module}"]`)
+      await pickPerson(view, '[data-test="delivery-person"]', person.email.split('@')[0]!, person.name)
+      await click(view, '[data-test="delivery-add-person"]')
+      await waitFor(view, `document.querySelector('[data-test="delivery-attendees"]')`, 20_000)
+
+      await click(view, '[data-test="delivery-preview"]')
+      await waitFor(view, `document.querySelector('[data-test="delivery-plan"]')`, 30_000)
+
+      // The same evening lands from somewhere else while the preview is being read, so the plan
+      // the trainer is looking at would now create nothing.
+      expect((await log({ heldOn: day, moduleIds: [module], userIds: [attendee], expectedCount: 1 })).status)
+        .toBe(200)
+
+      await click(view, '[data-test="delivery-submit"]')
+      await waitFor(
+        view,
+        `document.querySelector('[data-test="delivery-form"]')`
+        + `?.closest('[role="dialog"]')?.querySelector('[data-test="failure"]')`,
+        30_000,
+      )
+
+      // Inside the dialog, not merely somewhere on the page behind it.
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="delivery-form"]')`
+        + `?.closest('[role="dialog"]')?.querySelector('[data-test="failure"]')`,
+      )).toBe(true)
+      expect(await textOf(view, '[data-test="failure"]')).toContain('preview it again')
+    }
+    finally {
+      view.close()
+    }
+
+    // The refusal wrote nothing: the one record is the one the race landed.
+    expect(all<{ id: string }>(
+      'SELECT id FROM training_records WHERE module_id = ? AND user_id = ?', module, attendee,
+    )).toHaveLength(1)
+  }, CASE_TIMEOUT_MS)
+})
+
 if (skip) console.warn(`[e2e] skipped: ${skip}`)

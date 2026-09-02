@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { londonParts } from '#shared/utils/london'
 import { adminSession, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-115 and G-116. Opening the register is what freezes a session, and marking it is the single
@@ -11,6 +11,7 @@ import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
+const CASE_TIMEOUT_MS = 120_000
 let app: AppUnderTest
 let cookie = ''
 let department = ''
@@ -352,6 +353,35 @@ describe.skipIf(skip !== null)('marking is the single act that awards (G-116)', 
       'SELECT status FROM training_sessions WHERE id = ?', session,
     )?.status).toBe('DELIVERED')
   })
+})
+
+describe.skipIf(skip !== null)('the register is a screen a trainer can open (G-116)', () => {
+  // Every other case here drives the API, which is how a shadowed route went unnoticed: the page
+  // beside this directory was its parent, and rendered instead of it.
+  test('its own URL renders the register, not the member sessions list', async () => {
+    const session = await sessionToday([await addModule()])
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', trainer.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+
+      await visit(view, `${app.baseURL}/training/sessions/${session}/register`)
+      await waitFor(view, `document.querySelector('[data-test="open-register"]')`, 30_000)
+
+      expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
+      // The member list is what renders here when the route nests by accident.
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="sessions-page"]')`,
+      )).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
