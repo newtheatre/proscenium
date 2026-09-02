@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { fromLondonWallClock } from '#shared/utils/london'
 import { DELIVERY_ATTENDEES_MAX, SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysSessionStatus, saysSource, sessionForm } from '#shared/utils/training'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
@@ -8,6 +9,7 @@ import type { SessionInput } from '#shared/utils/training'
 definePageMeta({ layout: 'console', title: 'Training sessions', middleware: 'console' })
 
 const UBadge = resolveComponent('UBadge')
+const UButton = resolveComponent('UButton')
 
 interface Session {
   id: string
@@ -93,7 +95,29 @@ const state = reactive<{
   capacity: number
   notes?: string
   moduleIds: string[]
-}>({ heldOn: '', startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [] })
+  opensAt?: number | null
+}>({ heldOn: '', startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [], opensAt: null })
+
+// Sign-up opening is one instant on the wire. It is collected as a day and a wall clock, read in
+// London like every other domain date (0014), because a browser in another zone would be wrong.
+const opensNow = ref(true)
+const opensOnDay = ref('')
+const opensAtTime = ref('09:00')
+
+const opensAtReady = computed(() =>
+  opensNow.value || Boolean(opensOnDay.value && /^\d{2}:\d{2}$/.test(opensAtTime.value)))
+
+watchEffect(() => {
+  if (opensNow.value || !opensAtReady.value) {
+    state.opensAt = null
+    return
+  }
+  const [year, month, day] = opensOnDay.value.split('-').map(Number)
+  const [hour, minute] = opensAtTime.value.split(':').map(Number)
+  state.opensAt = Math.floor(
+    fromLondonWallClock(year!, month!, day!, hour!, minute!).getTime() / 1000,
+  )
+})
 
 function begin(): void {
   Object.assign(state, {
@@ -104,7 +128,11 @@ function begin(): void {
     capacity: 20,
     notes: undefined,
     moduleIds: [],
+    opensAt: null,
   })
+  opensNow.value = true
+  opensOnDay.value = ''
+  opensAtTime.value = '09:00'
   failure.value = null
   open.value = true
 }
@@ -251,6 +279,14 @@ async function log(): Promise<void> {
   }
 }
 
+// A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal is
+// shown wherever the action was taken and dropped when that modal closes.
+const modalOpen = computed(() => open.value || logging.value)
+
+watch(modalOpen, (nowOpen) => {
+  if (!nowOpen) failure.value = null
+})
+
 const activeFilters = computed<ActiveFilter[]>(() => {
   const active: ActiveFilter[] = []
   if (search.value) {
@@ -301,13 +337,28 @@ const columns: TableColumn<Session>[] = [
       size: 'sm',
     }, () => saysSessionStatus(row.original.status)),
   },
+  {
+    id: 'register',
+    header: '',
+    meta: { class: { td: 'text-right whitespace-nowrap' } },
+    cell: ({ row }) => row.original.status === 'CANCELLED'
+      ? null
+      : h(UButton, {
+          'to': `/training/sessions/${row.original.id}/register`,
+          'variant': 'ghost',
+          'size': 'sm',
+          'icon': 'i-lucide-clipboard-check',
+          'data-test': `register-${row.original.id}`,
+          'aria-label': `Take the register for ${row.original.heldOn}`,
+        }, () => 'Register'),
+  },
 ]
 </script>
 
 <template>
   <div class="space-y-6">
     <UAlert
-      v-if="failure"
+      v-if="failure && !modalOpen"
       data-test="failure"
       color="error"
       variant="subtle"
@@ -384,9 +435,18 @@ const columns: TableColumn<Session>[] = [
     <UModal
       v-model:open="open"
       title="Schedule a session"
-      description="A future day, a London wall clock, and one or more modules you hold. Sign-up opens as soon as it is saved."
+      description="A future day, a London wall clock, and one or more modules you hold."
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
+
         <UForm
           :schema="sessionForm"
           :state="state"
@@ -494,10 +554,47 @@ const columns: TableColumn<Session>[] = [
             />
           </UFormField>
 
+          <UFormField label="Sign-up">
+            <USwitch
+              v-model="opensNow"
+              data-test="session-opens-now"
+              label="Open for sign-up as soon as it is saved"
+              description="Turn this off to finish the details first. A planned session is invisible to members until it opens."
+            />
+          </UFormField>
+
+          <div
+            v-if="!opensNow"
+            class="grid gap-4 sm:grid-cols-2"
+          >
+            <UFormField
+              label="Opens on"
+              required
+            >
+              <DateField
+                v-model="opensOnDay"
+                data-test="session-opens-day"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField
+              label="At"
+              required
+            >
+              <UInput
+                v-model="opensAtTime"
+                type="time"
+                class="w-full"
+                data-test="session-opens-time"
+              />
+            </UFormField>
+          </div>
+
           <div class="flex flex-wrap gap-2">
             <UButton
               type="submit"
               :loading="saving"
+              :disabled="!opensAtReady"
               data-test="session-submit"
             >
               Schedule it
@@ -521,6 +618,14 @@ const columns: TableColumn<Session>[] = [
     >
       <template #body>
         <div class="space-y-6">
+          <UAlert
+            v-if="failure"
+            data-test="failure"
+            color="error"
+            variant="subtle"
+            :description="failure"
+          />
+
           <div
             data-test="delivery-form"
             class="space-y-4"
