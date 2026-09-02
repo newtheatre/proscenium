@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { CalendarDate, parseDate } from '@internationalized/date'
+import { parseDate } from '@internationalized/date'
+import type { CalendarDate } from '@internationalized/date'
 
 // The one place that converts between the YYYY-MM-DD strings the API speaks and the calendar value
 // the input takes. British order, because every domain date here is London's (0014, 0032).
@@ -9,6 +10,17 @@ const model = defineModel<string | undefined>()
 defineProps<{ disabled?: boolean }>()
 
 const field = useTemplateRef('field')
+
+// The value coming back is a calendar date from Reka's own copy of the date library, so
+// `instanceof` is false for one and discards it silently. Read the parts (0039).
+function civilDate(next: unknown): string | undefined {
+  const date = next as { year?: unknown, month?: unknown, day?: unknown } | null | undefined
+  if (typeof date?.year !== 'number' || typeof date.month !== 'number' || typeof date.day !== 'number') {
+    return undefined
+  }
+  const pad = (part: number, width: number): string => String(part).padStart(width, '0')
+  return `${pad(date.year, 4)}-${pad(date.month, 2)}-${pad(date.day, 2)}`
+}
 
 const value = computed({
   get(): CalendarDate | null {
@@ -21,7 +33,7 @@ const value = computed({
     }
   },
   set(next: unknown) {
-    model.value = next instanceof CalendarDate ? next.toString() : undefined
+    model.value = civilDate(next)
   },
 })
 </script>

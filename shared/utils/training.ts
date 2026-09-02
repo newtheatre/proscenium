@@ -338,6 +338,41 @@ export const revokeForm = z.object({
   reason: z.string().trim().min(1).max(REVOKE_REASON_LIMIT),
 })
 
+export const SESSION_STATUSES = ['PLANNED', 'OPEN', 'FULL', 'DELIVERED', 'CANCELLED'] as const
+export type SessionStatus = (typeof SESSION_STATUSES)[number]
+
+// Zero-padded so they compare and sort as strings, and so no instant is implied: a session is a
+// wall clock on a London day, which is what survives a clock change (0014, G-112 criterion 5).
+const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+
+export const SESSION_CAPACITY_MIN = 1
+export const SESSION_CAPACITY_MAX = 60
+
+export const sessionForm = z.object({
+  heldOn: z.string().regex(CIVIL_DATE, 'A session date reads as YYYY-MM-DD'),
+  startsAt: z.string().regex(TIME, 'A time reads as HH:MM'),
+  endsAt: z.string().regex(TIME, 'A time reads as HH:MM'),
+  place: text(120),
+  capacity: z.number().int().min(SESSION_CAPACITY_MIN).max(SESSION_CAPACITY_MAX),
+  // Absent opens sign-up now; a later instant keeps it invisible to members until then.
+  opensAt: z.number().int().positive().nullish().transform(value => value ?? null),
+  notes: text(2000),
+  moduleIds: z.array(z.string().trim().min(1).max(32)).min(1).max(10),
+}).refine(session => session.endsAt > session.startsAt, {
+  path: ['endsAt'],
+  message: 'A session ends after it starts',
+})
+
+export type SessionInput = z.output<typeof sessionForm>
+
+export function saysSessionStatus(status: string): string {
+  if (status === 'OPEN') return 'Open for sign-up'
+  if (status === 'FULL') return 'Full'
+  if (status === 'DELIVERED') return 'Delivered'
+  if (status === 'CANCELLED') return 'Cancelled'
+  return 'Planned'
+}
+
 export const leadForm = z.object({
   userId: z.string().trim().min(1).max(64),
   // Blank takes the next handover; an explicit null is a permanent assignment (G-110 criterion 3).

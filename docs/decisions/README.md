@@ -44,3 +44,4 @@ afterwards, only superseded.
 | 0036 | An externally arranged room is a request, not a booking | why a room we do not manage is not in the estate, and what supersedes C-103 criterion 2 |
 | 0037 | Department leadership is assigned; every other training standing derives | why a lead is a row and a trainer is not |
 | 0038 | Notice for a room we do not manage is working days | how three working days are counted, and why a gap in the calendar refuses |
+| 0039 | A calendar value is read by its parts, not by its class | why `instanceof` across a package boundary is a trap |
