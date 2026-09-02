@@ -111,6 +111,7 @@ const CATALOGUE = {
   'record.signoff.unbounded': { label: 'Signed off as never expiring', module: 'training' },
   'record.external-certificate': { label: 'External certificate recorded', module: 'training' },
   'record.revoked': { label: 'Training record revoked', module: 'training' },
+  'record.expiry.recalculated': { label: 'Training expiries recalculated', module: 'training' },
   'session.scheduled': { label: 'Training session scheduled', module: 'training' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).

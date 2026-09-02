@@ -158,6 +158,14 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['record.external-certificate'],
   },
   { route: 'server/api/admin/training/records/[id]/revoke.post.ts', actions: ['record.revoked'] },
+  {
+    route: 'server/api/admin/training/recalculations/preview.get.ts',
+    exempt: 'previews what a recalculation would restate; it writes nothing',
+  },
+  {
+    route: 'server/api/admin/training/recalculations/index.post.ts',
+    actions: ['record.expiry.recalculated'],
+  },
   { route: 'server/api/admin/training/sessions/index.post.ts', actions: ['session.scheduled'] },
   { route: 'server/api/admin/training/sessions/index.get.ts', exempt: 'reads the scheduled sessions' },
 

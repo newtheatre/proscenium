@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { createTestDatabase, rows } from '#tests/helpers/database'
+import { auditEntry } from '#shared/utils/audit'
+import { recalculationStatements } from '#shared/utils/recalculation'
+import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 
 // Named regression cases (K-121). Every claim below is proven by a test that fires concurrent
 // requests and asserts one winner, never by a comment (K-105, 0006).
@@ -78,6 +80,69 @@ describe('contended invariants (K-105)', () => {
       // Never deleted: the row is still there, still readable, still naming its award (criterion 5).
       expect(rows<{ awarded: string }>(database, `SELECT awarded_on awarded FROM training_records`)[0]?.awarded)
         .toBe('2026-09-01')
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  // G-124's named case. The echoed count is the administrator's from a preview; what decides the
+  // run is the count as it stands when the batch reaches the database.
+  test('the recalculation race: an affected set that moved between preview and confirmation aborts', async () => {
+    const database = await createTestDatabase()
+    try {
+      database.batch([
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-one', 'one@example.invalid', 'Ada'],
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-two', 'two@example.invalid', 'Bea'],
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-admin', 'admin@example.invalid', 'An Officer'],
+        ['INSERT INTO departments (code, name) VALUES (?, ?)', 'TECH', 'Technical'],
+        ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'TECH-111', 'TECH', 'MODULE', 'Working at height'],
+      ])
+
+      const award = (id: string, userId: string): void => {
+        database.batch([[
+          `INSERT INTO training_records (id, user_id, module_id, awarded_on, source)
+           VALUES (?, ?, 'TECH-111', '2026-09-14', 'SIGNOFF')`,
+          id, userId,
+        ]])
+      }
+      award('tr-1', 'u-one')
+      award('tr-2', 'u-two')
+
+      const entry = auditEntry({
+        actorId: 'u-admin',
+        action: 'record.expiry.recalculated',
+        target: 'module:TECH-111',
+        // The administrator previewed two, which is what the screen made them type back.
+        detail: { module: 'TECH-111', restated: 2 },
+      })
+      const confirm = (): void => {
+        database.batch(recalculationStatements({
+          moduleId: 'TECH-111',
+          policy: { expiryMode: 'MONTHS', expiryMonths: 12 },
+          year: { boundary: '09-30', carryOverDays: 60 },
+          expectedCount: 2,
+          entry,
+        }).map(statement => boundStatement(database, statement)))
+      }
+
+      // A third award lands between the preview and the confirmation.
+      award('tr-3', 'u-admin')
+      confirm()
+
+      expect(rows(database, 'SELECT id FROM audit_log WHERE id = ?', entry.id)).toHaveLength(0)
+      expect(rows(database, 'SELECT id FROM training_records WHERE expires_on IS NOT NULL')).toHaveLength(0)
+
+      // Revoke the newcomer, and the same confirmation is right again: the count decides, not a
+      // token, and nothing was left half-restated to get in its way.
+      database.batch([[
+        `UPDATE training_records SET revoked_at = 1789000000, revoked_by = 'u-admin', revoke_reason = 'In error'
+         WHERE id = 'tr-3'`,
+      ]])
+      confirm()
+
+      expect(rows(database, 'SELECT id FROM audit_log WHERE id = ?', entry.id)).toHaveLength(1)
+      expect(rows(database, `SELECT id FROM training_records WHERE expires_on = '2027-09-14'`)).toHaveLength(2)
     }
     finally {
       database.close()

@@ -1063,6 +1063,33 @@ one refusal; the entry is written first in the batch, because the update would o
 falsify the guard the entry rides on. The reason never reaches audit detail, which carries
 identifiers and never people (0011).
 
+**Recalculation is the only thing in the system that moves an `expires_on`** (G-124). Nothing
+else writes that column after the award: changing a module's expiry policy leaves every existing
+record exactly where it was, because a lifetime is fixed the day it is earned (G-123 criterion 3).
+It is `training.recalculate`, administrator-only, and scoped to one module a run.
+
+A record is restatable when it belongs to the module, is not revoked, does not carry
+`expiry_overridden`, is not superseded by a later unrevoked award of the same module to the same
+person, and stands at something other than what the policy says. The first three are criterion 4,
+and the append-only trigger refuses the same three from the other side: the code skips them so a
+run does not abort, and the trigger means it could not have written them if the code were wrong.
+
+The whole run is two statements in one batch (`shared/utils/recalculation.ts`):
+
+1. the audit entry, inserted only where the restatable count equals the count the administrator
+   echoed back from the preview;
+2. the update, whose `WHERE` carries the same predicate plus `EXISTS` on that entry.
+
+So the count is recomputed at the write rather than trusted from the preview, and a run that
+writes nothing writes no entry either. The route reads the entry back afterwards: its absence is
+the abort, answered as a 409 quoting the echoed figure and the recomputed one.
+
+The new expiry is computed **in SQL**, from the award date, not row by row. `expirySql` is the
+twin of `expiryFor`: months clamp to the last day of the target month, and an academic year rolls
+on the carry-over window, exactly as the TypeScript does. That is what keeps every statement's
+bound-parameter count fixed however many records the run covers, which is what D1 requires (0003).
+`tests/integration/training-recalculation.test.ts` pins the two against each other day by day.
+
 ### module_requests
 One open request per (user, module) by partial unique; decline carries a reason shown to the
 requester (scrub).
