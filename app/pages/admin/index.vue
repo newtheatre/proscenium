@@ -18,6 +18,16 @@ const { data: trouble } = await useAsyncData(
   { default: (): { items: Trouble[], total: number } => ({ items: [], total: 0 }), immediate: false },
 )
 
+// A published show nobody has assessed is a surprise waiting to be sprung on somebody, so it is
+// put where the committee looks rather than left for a visitor to find (D-102 criterion 2).
+const { data: unassessed } = await useAsyncData(
+  'unassessed-shows',
+  () => request<{ items: { id: string, title: string }[], total: number }>('/api/admin/shows', {
+    query: { unassessed: true, pageSize: 5 },
+  }),
+  { default: (): { items: { id: string, title: string }[], total: number } => ({ items: [], total: 0 }), immediate: false },
+)
+
 const SAYS: Record<string, string> = {
   FAILED: 'The provider refused it',
   SKIPPED_UNDELIVERABLE: 'Not sent',
@@ -35,7 +45,11 @@ function saysWhy(entry: Trouble): string {
 }
 
 onMounted(() => {
-  if (account.value.signedIn) void refreshNuxtData('delivery-trouble')
+  if (!account.value.signedIn) return
+  void refreshNuxtData('delivery-trouble')
+  // Silently empty when the reader holds no ticketing permission, which is the same answer the
+  // route gives: the card renders nothing rather than a refusal they cannot act on.
+  void refreshNuxtData('unassessed-shows')
 })
 </script>
 
@@ -85,6 +99,31 @@ onMounted(() => {
           </span>
         </li>
       </ul>
+    </UPageCard>
+
+    <UPageCard
+      v-if="unassessed.total > 0"
+      title="Published shows nobody has assessed for content warnings"
+      description="No warnings and no confirmation that there are none. The show page says as much, which is honest and is not the answer anybody wants on a published show."
+      data-test="unassessed-shows"
+    >
+      <ul class="divide-y divide-default text-sm">
+        <li
+          v-for="show in unassessed.items"
+          :key="show.id"
+          class="flex flex-wrap items-baseline gap-x-3 py-2"
+        >
+          <ULink :to="`/box-office/shows/${show.id}`">
+            {{ show.title }}
+          </ULink>
+        </li>
+      </ul>
+      <p
+        v-if="unassessed.total > unassessed.items.length"
+        class="mt-2 text-xs text-muted"
+      >
+        {{ plural(unassessed.total, 'show') }} in all.
+      </p>
     </UPageCard>
 
     <p class="text-sm text-muted">

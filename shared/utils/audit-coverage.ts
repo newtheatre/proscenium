@@ -157,6 +157,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/performances/[id]/sale.post.ts', actions: ['performance.on-sale', 'performance.off-sale'] },
   { route: 'server/api/admin/performances/[id]/cancel.post.ts', actions: ['performance.cancelled'] },
   { route: 'server/api/admin/performances/[id]/index.delete.ts', actions: ['performance.deleted'] },
+  { route: 'server/api/admin/shows/[id]/warnings.put.ts', actions: ['show.warnings.set'] },
+  { route: 'server/api/admin/content-warnings/index.get.ts', exempt: 'reads the warning vocabulary' },
+  { route: 'server/api/admin/content-warnings/index.post.ts', actions: ['content-warning.created'] },
+  { route: 'server/api/admin/content-warnings/[id]/index.put.ts', actions: ['content-warning.updated'] },
+  { route: 'server/api/admin/content-warnings/[id]/index.delete.ts', actions: ['content-warning.deleted'] },
 
   // Module E: show night
 

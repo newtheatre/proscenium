@@ -50,3 +50,4 @@ afterwards, only superseded.
 | 0042 | Practice mode is entered from the tool, not granted by a register | why practice windows were withdrawn, and how a member reaches a sandbox instead |
 | 0043 | A venue is its own row, never a flagged room | what a venue is, and the one thing attaching it to a room does |
 | 0044 | An officer opens a show-night screen without a shift, and is recorded | the one exception to derived authority, and what the record keys to |
+| 0045 | A public listing caches until the next thing that changes it | how an edge-cacheable listing still closes booking on the minute |

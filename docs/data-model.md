@@ -233,7 +233,36 @@ Vocabulary (`slug` UNIQUE, `title` UNIQUE, `kind` CHECK `TECHNICAL|GENERAL`, `ca
 `warning_id` → content_warnings restrict, UNIQUE pair, `level` CHECK
 `MENTIONED|DISCUSSED|DEPICTED` NULL exactly when TECHNICAL).
 The enumerated values are a CHECK; "NULL exactly when TECHNICAL" correlates two tables, which
-SQLite cannot state as a CHECK, so D-102's write path holds that half.
+SQLite cannot state as a CHECK, so D-102's write path holds that half: `levelProblem(kind, level)`
+in `shared/utils/content-warnings.ts` is that rule, and `PUT /api/admin/shows/[id]/warnings`
+resolves each warning's kind from the vocabulary before it applies anything.
+
+**The junction holds no free text** (D-102 criterion 1). Its four columns are the id, the show, the
+warning and the level, so a show warns in the vocabulary's words or not at all, and two shows
+warning about the same thing say it the same way. The request schema is strict: an unrecognised
+field is a 400 rather than an ignored one.
+
+**Administration (D-102).** `/box-office/content-warnings` is the vocabulary and the warnings
+editor sits on `/box-office/shows/[id]`, over these routes, `ticketing.read` for the listing and
+`ticketing.write` for the rest:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/admin/content-warnings` | The paged envelope, archived entries included by default, each row carrying how many shows carry it. |
+| `POST /api/admin/content-warnings` | Adds one. The slug and the title are each refused if already held, the title without regard to capitals. |
+| `PUT /api/admin/content-warnings/[id]` | Changes everything including `archived`. The kind is refused while any show carries the entry, because it decides whether that show's level is legal. |
+| `DELETE /api/admin/content-warnings/[id]` | Deletes an entry no show carries. One a show carries is a 409 naming archiving as the way. |
+| `PUT /api/admin/shows/[id]/warnings` | Replaces a show's warnings and sets `warnings_confirmed_none`, in one batch. |
+
+A show may keep an archived entry it already carries, and may not take a new one: `warningKinds()`
+returns the live vocabulary plus whatever this show holds, so retiring a warning never rewrites a
+published page behind its back.
+
+**Three assessment states, not two** (D-102 criterion 2). `warningAssessment()` reads
+`warnings_confirmed_none` beside a count of junction rows: warnings present is WARNED, none with
+the flag set is CONFIRMED_NONE, and none without it is NOT_ASSESSED. The show page renders the last
+two differently, and the console overview lists every published show in the third. Setting the flag
+while listing warnings is a 409, because it is two answers to one question.
 
 ### performances
 `id` PK · `show_id` → shows cascade · `venue_id` → venues restrict · `starts_at` ·
@@ -254,9 +283,9 @@ for the two that read and `ticketing.write` for the rest:
 
 | Route | What it does |
 | --- | --- |
-| `GET /api/admin/shows` | The paged envelope, drafts included, each row carrying its performance count, how many are on sale and how many tickets have sold. |
+| `GET /api/admin/shows` | The paged envelope, drafts included, each row carrying its performance count, how many are on sale, how many tickets have sold and how many content warnings it carries. `unassessed=true` narrows it to published shows nobody has assessed. |
 | `POST /api/admin/shows` | Adds one, always DRAFT. The address is refused if it is already held. |
-| `GET /api/admin/shows/[id]` | One show, every performance of it, and the venues a performance may be put in. |
+| `GET /api/admin/shows/[id]` | One show, every performance of it, the venues a performance may be put in, the warnings it carries and the vocabulary it may pick from. |
 | `PUT /api/admin/shows/[id]` | Changes the copy, the address, the age guidance, the latecomer policy and the booking window default. It does not take the status. |
 | `POST /api/admin/shows/[id]/publish` | Publishes or unpublishes. `cascadePerformances` takes DRAFT performances on sale in the same batch; CANCELLED ones are skipped by predicate. |
 | `DELETE /api/admin/shows/[id]` | Deletes a show nothing has sold under, with its performances and prices. A show with sold tickets is a 409 naming unpublishing and cancelling as the way. |
@@ -275,6 +304,39 @@ because `saleRefusal()` refuses an unpublished show, so republishing restores th
 there means a seat is held. The price overrides are configuration and are not; `tickets`,
 `reservations` and `waiting_list` will be, when D-104 and D-113 build them. An integration test
 reads the live foreign keys and fails when a new referencing table is not classified.
+
+**The public programme (D-101).** `/whats-on` is the listing and `/shows/[slug]` is one show, over
+two routes that take no session at all:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/whats-on` | The paged envelope of published shows with at least one future on-sale performance, each with its public performances, availability and prices. |
+| `GET /api/shows/[slug]` | One published show. A draft show and an address nobody holds both answer 404, so the listing cannot be read backwards. |
+
+Both build every field through `publicShow()` and `publicPerformance()` in
+`shared/utils/programme.ts`, which are the allow-lists; a column absent from those interfaces is
+absent from every public payload. A performance is listable when its status is not DRAFT and its
+curtain has not passed, so a cancelled performance stays visible for whoever holds a ticket and a
+finished run drops off the listing with nothing to sweep.
+
+**Availability is one of four states, computed server-side.** `performanceAvailability()` asks
+`saleRefusal()` first, so anything the sales path would refuse (cancelled, off sale, unpublished,
+externally ticketed, past its window) reads BOOKING_CLOSED rather than offering a button that would
+409. Otherwise it is SOLD_OUT at nought seats left, LIMITED at or below
+`LISTING_LIMITED_THRESHOLD_PERCENT` of the house, and AVAILABLE above that. An uncapped venue is
+never limited and never sold out. The seats taken come from `PERFORMANCE_REFERENCES`, so the figure
+is nought until D-104 classifies `tickets` and begins counting real rows. The number of seats left
+is carried only while the state is LIMITED, which is the one case a visitor is told a figure: an
+exact unsold count on every performance is the theatre's sales, readable by anybody.
+
+**A quoted price resolves performance, then show, then the type.** `resolvePrice()` in
+`shared/utils/ticket-types.ts` resolves the price and the active flag down that chain
+independently, null meaning inherit at each level. The listing's price query excludes archived
+types, both access kinds and pass admissions in SQL as well as in the projection.
+
+**The listing caches until the next thing that changes it** (D-112 criterion 4, 0045). Both routes
+set `Cache-Control` from `listingCacheSeconds()`, which expires no later than the earliest booking
+window in the payload closing, capped at five minutes.
 
 **The booking window resolves performance, then show, then curtain-up** (D-112 criterion 1), the
 same NULL-means-inherit rule the price overrides use, so an explicit nought at either level is

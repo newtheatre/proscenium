@@ -61,6 +61,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     items: [
       { label: 'Shows', icon: 'i-lucide-drama', to: '/box-office/shows', ability: viewProgramme },
       { label: 'Ticket types', icon: 'i-lucide-tag', to: '/box-office/ticket-types', ability: viewTicketTypes },
+      { label: 'Content warnings', icon: 'i-lucide-triangle-alert', to: '/box-office/content-warnings', ability: viewProgramme },
     ],
   },
 
@@ -161,6 +162,10 @@ export const SHELL_NAV: NavEntry[] = [
 // The public half of the footer: pages a visitor reads before they are anybody here. The policy
 // pages J-110 writes join this list.
 export const PUBLIC_NAV: NavEntry[] = [
+  // Module D: ticketing
+
+  { label: 'What\'s on', icon: 'i-lucide-drama', to: '/whats-on', ability: anybody },
+
   // Module G: training
 
   { label: 'What we teach', icon: 'i-lucide-graduation-cap', to: '/training/modules', ability: anybody },

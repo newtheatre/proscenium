@@ -131,6 +131,10 @@ const CATALOGUE = {
   'performance.off-sale': { label: 'Performance taken off sale', module: 'ticketing' },
   'performance.cancelled': { label: 'Performance cancelled', module: 'ticketing' },
   'performance.deleted': { label: 'Performance deleted', module: 'ticketing' },
+  'show.warnings.set': { label: 'Show content warnings set', module: 'ticketing' },
+  'content-warning.created': { label: 'Content warning added to the vocabulary', module: 'ticketing' },
+  'content-warning.updated': { label: 'Content warning changed', module: 'ticketing' },
+  'content-warning.deleted': { label: 'Content warning deleted', module: 'ticketing' },
 
   // Module E: show night
 

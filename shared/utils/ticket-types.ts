@@ -92,3 +92,31 @@ export function saysAccessKind(accessKind: string | null): string | null {
 export function saysPrice(price: number): string {
   return `£${(price / 100).toFixed(2)}`
 }
+
+// Which level of the chain answered, which is what `tickets.price_source` records (D-120).
+export const PRICE_SOURCES = ['PERFORMANCE', 'SHOW', 'BASE'] as const
+
+export type PriceSource = (typeof PRICE_SOURCES)[number]
+
+export interface PriceOverride {
+  price: number | null
+  active: boolean | null
+}
+
+export interface ResolvedPrice {
+  price: number
+  source: PriceSource
+  active: boolean
+}
+
+// Performance, then show, then the type itself, resolving each field on its own: null means
+// inherit and an explicit nought is a free ticket, never an absence (D-120 criterion 1).
+export function resolvePrice(
+  type: { price: number, activeByDefault: boolean },
+  show: PriceOverride | null,
+  performance: PriceOverride | null,
+): ResolvedPrice {
+  const price = performance?.price ?? show?.price ?? type.price
+  const source: PriceSource = performance?.price != null ? 'PERFORMANCE' : show?.price != null ? 'SHOW' : 'BASE'
+  return { price, source, active: performance?.active ?? show?.active ?? type.activeByDefault }
+}
