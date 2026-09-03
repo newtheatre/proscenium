@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillDate, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -371,17 +371,22 @@ describe.skipIf(skip !== null)('who may administer the programme', () => {
 })
 
 describe.skipIf(skip !== null)('the screen', () => {
-  test('the box office officer sees a show, its state and its performances', async () => {
-    const title = named('On screen')
-    const id = await newShow({ title })
-    await addPerformance(id)
-
+  async function signedIn(): Promise<Bun.WebView> {
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
     await fill(view, 'form input[type="email"]', boxOffice.email)
     await fill(view, 'form input[type="password"]', boxOfficePassword)
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    return view
+  }
+
+  test('the box office officer sees a show, its state and its performances', async () => {
+    const title = named('On screen')
+    const id = await newShow({ title })
+    await addPerformance(id)
+
+    const view = await signedIn()
 
     // The console shell renders no <main>, so the screen names an element of its own.
     await visit(view, `${app.baseURL}/box-office/shows`, '[data-test="shows-table"]')
@@ -390,6 +395,25 @@ describe.skipIf(skip !== null)('the screen', () => {
     await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="performances-table"]')
     expect(await textOf(view, '[data-test="show-status"]')).toContain('Draft')
     expect(await textOf(view, '[data-test="performances-table"]')).toContain('Closes at curtain-up')
+    view.close()
+  }, 120_000)
+
+  // The screen holds a day and a wall clock and the request holds an instant, so the form's own
+  // schema has to be the screen's or the button submits nothing and says nothing.
+  test('adding a performance from the screen puts it on the table', async () => {
+    const id = await newShow({ title: named('Added on screen') })
+    const view = await signedIn()
+    await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="performances-table"]')
+
+    await click(view, '[data-test="add-performance"]')
+    await waitFor(view, `document.querySelector('[data-test="performance-form"]')`)
+    await fillDate(view, '[data-test="performance-day"]', '2027-03-04')
+    await fill(view, '[data-test="performance-clock"]', '20:15')
+    await click(view, '[data-test="performance-submit"]')
+
+    await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('4 Mar 2027')`)
+    expect(await textOf(view, '[data-test="performances-table"]')).toContain('20:15')
+    expect((await detail(id)).performances.length).toBe(1)
     view.close()
   }, 120_000)
 })

@@ -54,6 +54,8 @@ export default defineEventHandler(async (event) => {
         ageGuidance: [held.ageGuidance, input.ageGuidance ?? null],
         latecomerPolicy: [held.latecomerPolicy, input.latecomerPolicy ?? null],
         bookingClosesHoursBefore: [held.bookingClosesHoursBefore, window],
+        categoryId: [held.categoryId, input.categoryId ?? null],
+        seasonId: [held.seasonId, input.seasonId ?? null],
       }),
       copyChanged,
     },

@@ -57,20 +57,38 @@ export const publishShowForm = z.object({
   cascadePerformances: z.boolean().default(false),
 })
 
-export const performanceForm = z.object({
+// Everything about a performance that is not a moment. The request and the screen take the same
+// fields and differ only in how each spells the times.
+const performanceFields = {
   venueId: z.string().trim().min(1, 'A performance needs a venue'),
-  // Integer seconds UTC, as the column stores it. The screen sends an instant, never a wall clock.
-  startsAt: z.number().int().positive(),
-  doorsAt: z.number().int().positive().nullish(),
   durationMinutes: z.number().int().positive().max(MAX_PERFORMANCE_MINUTES).nullish(),
   intervalCount: z.number().int().nonnegative().max(5).default(0),
   intervalMinutes: z.number().int().nonnegative().max(120).nullish(),
   capacityOverride: z.number().int().nonnegative().nullish(),
   bookingClosesHoursBefore: hoursBefore.nullish(),
   notes: optionalText(2000),
+}
+
+export const performanceForm = z.object({
+  ...performanceFields,
+  // Integer seconds UTC, as the column stores it. The screen sends an instant, never a wall clock.
+  startsAt: z.number().int().positive(),
+  doorsAt: z.number().int().positive().nullish(),
 }).refine(input => input.doorsAt == null || input.doorsAt <= input.startsAt, {
   message: 'Doors open before curtain, not after it',
   path: ['doorsAt'],
+})
+
+const CIVIL_DAY = /^\d{4}-\d{2}-\d{2}$/
+const CLOCK = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+
+// What the screen holds: a London day and wall clocks, which it turns into instants before it
+// sends them. Validating the request shape against this state would fail on every field (0014).
+export const performanceScreenForm = z.object({
+  ...performanceFields,
+  day: z.string().regex(CIVIL_DAY, 'A performance needs a day'),
+  clock: z.string().regex(CLOCK, 'A curtain time reads HH:MM'),
+  doorsClock: z.union([z.literal(''), z.string().regex(CLOCK, 'A doors time reads HH:MM')]),
 })
 
 export const performanceSaleForm = z.object({

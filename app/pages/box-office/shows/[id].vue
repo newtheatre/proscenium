@@ -5,7 +5,7 @@ import {
   LATECOMER_POLICIES,
   PERFORMANCE_STATUSES,
   bookingWindowSource,
-  performanceForm,
+  performanceScreenForm,
   resolveBookingClosesHours,
   saysBookingWindow,
   saysLatecomerPolicy,
@@ -50,6 +50,10 @@ const copy = reactive({
   ageGuidance: '',
   latecomerPolicy: null as LatecomerPolicy | null,
   bookingClosesHoursBefore: null as number | null,
+  // Carried through rather than edited: no story administers the category or season vocabulary,
+  // and a full replace that dropped them would silently clear a seeded or imported show.
+  categoryId: null as string | null,
+  seasonId: null as string | null,
 })
 
 watchEffect(() => {
@@ -64,6 +68,8 @@ watchEffect(() => {
     ageGuidance: one.ageGuidance ?? '',
     latecomerPolicy: one.latecomerPolicy,
     bookingClosesHoursBefore: one.bookingClosesHoursBefore,
+    categoryId: one.categoryId,
+    seasonId: one.seasonId,
   })
 })
 
@@ -84,6 +90,8 @@ async function saveCopy(): Promise<void> {
         ageGuidance: blank(copy.ageGuidance),
         latecomerPolicy: copy.latecomerPolicy,
         bookingClosesHoursBefore: copy.bookingClosesHoursBefore,
+        categoryId: copy.categoryId,
+        seasonId: copy.seasonId,
       },
     })
     toast.add({ title: 'Show changed', icon: 'i-lucide-check', color: 'success' })
@@ -177,6 +185,21 @@ function instantOf(day: string, clock: string): number {
   return Math.floor(fromLondonWallClock(year!, month!, date!, hour!, minute!).getTime() / 1000)
 }
 
+// Counted on the civil date, never by subtracting a day of seconds, which is wrong twice a year.
+function dayBefore(day: string): string {
+  const [year, month, date] = day.split('-').map(Number)
+  const at = new Date(Date.UTC(year!, month! - 1, date!))
+  at.setUTCDate(at.getUTCDate() - 1)
+  return at.toISOString().slice(0, 10)
+}
+
+// The show night runs 04:00 to 04:00, so a curtain after midnight has its doors on the London day
+// before it (0014). Only the clocks are typed, so this is where that is worked out.
+function doorsBefore(day: string, clock: string, startsAt: number): number {
+  const sameDay = instantOf(day, clock)
+  return sameDay > startsAt ? instantOf(dayBefore(day), clock) : sameDay
+}
+
 const dayOf = (at: number): string => formatLondon(new Date(at * 1000), { year: 'numeric', month: '2-digit', day: '2-digit' })
   .split('/').reverse().join('-')
 const clockOf = (at: number): string => formatLondon(new Date(at * 1000), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
@@ -206,7 +229,7 @@ async function savePerformance(): Promise<void> {
   const body = {
     venueId: form.venueId,
     startsAt,
-    doorsAt: form.doorsClock ? instantOf(form.day, form.doorsClock) : null,
+    doorsAt: form.doorsClock ? doorsBefore(form.day, form.doorsClock, startsAt) : null,
     durationMinutes: form.durationMinutes,
     intervalCount: form.intervalCount,
     intervalMinutes: form.intervalMinutes,
@@ -679,7 +702,7 @@ const columns: TableColumn<AdminPerformance>[] = [
     >
       <template #body>
         <UForm
-          :schema="performanceForm"
+          :schema="performanceScreenForm"
           :state="form"
           class="space-y-4"
           data-test="performance-form"
@@ -709,6 +732,7 @@ const columns: TableColumn<AdminPerformance>[] = [
           <div class="grid gap-4 sm:grid-cols-3">
             <UFormField
               label="Day"
+              name="day"
               required
             >
               <DateField
@@ -719,6 +743,7 @@ const columns: TableColumn<AdminPerformance>[] = [
 
             <UFormField
               label="Curtain"
+              name="clock"
               required
             >
               <UInput
@@ -731,6 +756,7 @@ const columns: TableColumn<AdminPerformance>[] = [
 
             <UFormField
               label="Doors"
+              name="doorsClock"
               hint="Optional"
             >
               <UInput

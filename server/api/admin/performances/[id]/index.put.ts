@@ -15,12 +15,13 @@ export default defineEventHandler(async (event) => {
   const venue = (await listVenues()).find(one => one.id === input.venueId)
   if (!venue) throw createError({ statusCode: 400, statusMessage: 'No such venue' })
 
-  // Lowering capacity below what is already sold is D-105's refusal, quoting both figures. It has
-  // nothing to compare against until tickets exist, so the count is checked and the story cited.
-  if (input.capacityOverride != null && input.capacityOverride < held.soldTickets) {
+  // The capacity that will apply, so clearing the override or moving to a smaller venue is checked
+  // as well as lowering the number. Refusing quotes both figures (D-105 criterion 4).
+  const capacity = input.capacityOverride ?? venue.capacity
+  if (capacity !== null && capacity < held.soldTickets) {
     throw createError({
       statusCode: 409,
-      statusMessage: `${plural(held.soldTickets, 'ticket')} are already held on this performance, so its capacity cannot be set to ${input.capacityOverride}`,
+      statusMessage: `${plural(held.soldTickets, 'ticket')} are already held on this performance, so its capacity cannot be ${capacity}`,
     })
   }
 
@@ -49,6 +50,7 @@ export default defineEventHandler(async (event) => {
           night: [performanceNight(held.startsAt), performanceNight(input.startsAt)],
           startsAt: [held.startsAt, input.startsAt],
           capacityOverride: [held.capacityOverride, input.capacityOverride ?? null],
+          effectiveCapacity: [effectiveCapacity(held), capacity],
           bookingClosesHoursBefore: [held.bookingClosesHoursBefore, window],
         }),
         // Internal prose stays on the record; the trail records only that it moved (0011).

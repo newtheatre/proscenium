@@ -6,6 +6,7 @@ import {
   isPublicPerformance,
   performanceClosesAt,
   performanceForm,
+  performanceScreenForm,
   publicPerformance,
   publicShow,
   resolveBookingClosesHours,
@@ -147,6 +148,30 @@ describe('the booking window inherits performance, then show, then curtain-up (D
     expect(performanceForm.safeParse({ ...base, bookingClosesHoursBefore: 720 }).success).toBe(true)
     expect(performanceForm.safeParse({ ...base, bookingClosesHoursBefore: 721 }).success).toBe(false)
     expect(performanceForm.safeParse({ ...base, bookingClosesHoursBefore: -1 }).success).toBe(false)
+  })
+
+  // The screen holds a day and two wall clocks; the request holds instants. Validating the state
+  // against the request schema fails on every field, and a form that never submits says nothing.
+  test('the screen schema takes what the screen holds, which the request schema does not', () => {
+    const state = {
+      venueId: 'venue-a',
+      day: '2026-10-17',
+      clock: '19:30',
+      doorsClock: '',
+      durationMinutes: null,
+      intervalCount: 0,
+      intervalMinutes: null,
+      capacityOverride: null,
+      bookingClosesHoursBefore: null,
+      notes: '',
+    }
+    expect(performanceScreenForm.safeParse(state).success).toBe(true)
+    expect(performanceForm.safeParse(state).success).toBe(false)
+
+    expect(performanceScreenForm.safeParse({ ...state, day: '' }).success).toBe(false)
+    expect(performanceScreenForm.safeParse({ ...state, clock: '7pm' }).success).toBe(false)
+    expect(performanceScreenForm.safeParse({ ...state, doorsClock: '19:00' }).success).toBe(true)
+    expect(performanceScreenForm.safeParse({ ...state, doorsClock: '24:00' }).success).toBe(false)
   })
 
   test('doors open before curtain, never after it', () => {
