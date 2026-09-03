@@ -102,7 +102,12 @@ describe('entries sit under the banner of their own module', () => {
   // A route whose path names its module is the case that goes wrong: `admin/training/external-*`
   // reads as a rooms route to anything matching on `external`.
   test('a coverage row for a route under a module directory sits in that module', async () => {
-    const owners: Record<string, string> = { training: 'training', rooms: 'spaces', dev: 'platform' }
+    const owners: Record<string, string> = {
+      'training': 'training',
+      'rooms': 'spaces',
+      'dev': 'platform',
+      'ticket-types': 'ticketing',
+    }
     const lines = (await Bun.file('shared/utils/audit-coverage.ts').text()).split('\n')
     lines.forEach((text, index) => {
       const route = /route: '([^']+)'/.exec(text)?.[1]

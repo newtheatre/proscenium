@@ -73,7 +73,7 @@ A prefix names the domain; the shell follows the posture of the work rather than
 | --- | --- | --- |
 | `/`, `/sign-in`, `/register`, `/verify`, `/reset`, `/magic` | `default` | Anybody |
 | `/rooms`, `/rooms/mine`, `/account/*` | `member` | A member, about themselves |
-| `/rooms/manage/*`, `/people/*`, `/admin/*` | `console` | Somebody working for the theatre |
+| `/rooms/manage/*`, `/people/*`, `/box-office/*`, `/admin/*` | `console` | Somebody working for the theatre |
 | `/tonight/*` | `tonight` | Somebody on shift, on a phone |
 
 A domain with both audiences puts the member's screens at the top and the console's under `manage`
@@ -90,7 +90,7 @@ namespace, and asks the owner for one anywhere else.
 
 | Stream | Routes and files owned |
 | --- | --- |
-| Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/my/bookings`, `/admin/shows`, `/admin/ticket-types`, `/admin/passes`, `/tonight/door`, `content/` |
+| Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/` |
 | Show night | `/rota`, `/admin/rota`, `/admin/templates`, `/admin/venues/[id]/emergency`, the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board` |
 | Bar | `/tonight/till`, `/tonight/till/comps`, `/admin/bar/**`, `/admin/stock/**` |
 | Platform | `/account/notifications`, `/admin/notifications/**`, `/admin/config`, `/admin/docs`, `/policies/**`, `/admin/finance/**`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `tests/helpers/race.ts` |
@@ -309,6 +309,11 @@ to that room. Nothing else about a room is inferred from a venue or the reverse.
 | `performancesOnNight(night, venueId?)` | Every performance whose curtain falls inside the night's bounds, across the whole estate, narrowed by venue only when asked. Ordered by curtain, then venue. Two venues may run at once and one venue may run a matinee and an evening. |
 | `effectiveCapacity(performance)` | The performance's `capacity_override` if it has one, otherwise the venue's capacity. Null is uncapped; an explicit nought is a closed house, so the resolution is by absence and never by falsiness. |
 | `isOnSale(performance, at?)` | Whether an internal sales path may sell this performance: it is `ON_SALE`, its show is `PUBLISHED`, it carries no external ticketing link, and its booking window has not closed. `booking_closes_hours_before` NULL and nought both mean curtain-up. |
+
+Ticket types are administered at `/box-office/ticket-types` (D-119), which is where D-120's
+overrides, D-121's publish flow and D-123's pass products attach. What a type has ever been sold
+under is a query over the tables that point at it, declared in `server/utils/ticket-types.ts` and
+proved against the live foreign keys, never a column on the type itself.
 
 A night is a window over the whole estate, not a venue and not a day: everything record-like keys
 to a performance (E-127 criterion 1). `performancesOnNightQuery()` is the statement

@@ -17,6 +17,7 @@ let member: TestMember
 
 // Asserted on hrefs rather than labels: a word like System appears in a stylesheet too, and a
 // test that passes for the wrong reason is worse than no test.
+const BOX_OFFICE = ['/box-office/ticket-types']
 const SPACES = ['/rooms/manage', '/rooms/manage/requests', '/rooms/manage/closures', '/rooms/manage/other', '/rooms/manage/utilisation']
 const PEOPLE = ['/people/accounts', '/people/members', '/people/fellows']
 const SYSTEM = ['/admin/settings', '/admin/audit']
@@ -45,7 +46,7 @@ describe.skipIf(skip !== null)('the console sidebar shows what the caller holds 
   test('an administrator sees every group', async () => {
     const { status, html } = await shell(officer.cookie)
     expect(status).toBe(200)
-    for (const href of [...SPACES, ...PEOPLE, ...SYSTEM]) {
+    for (const href of [...BOX_OFFICE, ...SPACES, ...PEOPLE, ...SYSTEM]) {
       expect(html).toContain(`href="${href}"`)
     }
   })
@@ -58,7 +59,7 @@ describe.skipIf(skip !== null)('the console sidebar shows what the caller holds 
     for (const href of ['/rooms/manage', '/rooms/manage/closures', '/people/accounts', '/people/members']) {
       expect(html).toContain(`href="${href}"`)
     }
-    for (const href of ['/rooms/manage/requests', '/people/fellows', ...SYSTEM]) {
+    for (const href of ['/rooms/manage/requests', '/people/fellows', ...BOX_OFFICE, ...SYSTEM]) {
       expect(html).not.toContain(`href="${href}"`)
     }
   })

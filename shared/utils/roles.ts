@@ -41,6 +41,10 @@ export const PERMISSIONS = [
   // never expiring, which is break-glass and absent from every screen (G-120 criterion 5).
   'training.revoke',
   'training.override',
+  // The programme's configuration: ticket types, their prices and, from D-120, the overrides
+  // over them. Selling a ticket is operational and derives from tonight (0009).
+  'ticketing.read',
+  'ticketing.write',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
@@ -56,7 +60,9 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   // Owns the catalogue and appoints its stewards; `training.override` stays ADMIN because
   // never-expiring is the rarer break-glass (G-107, G-110, questions 7 and 8).
   TRAINING_MANAGER: ['accounts.read', 'members.read', 'rooms.read', 'training.leads', 'training.read', 'training.revoke', 'training.write'],
-  BOX_OFFICE: [],
+  // Owns the programme's configuration. Nothing operational is here: the door and the desk
+  // derive from tonight's performance and shift (0009).
+  BOX_OFFICE: ['ticketing.read', 'ticketing.write'],
   FOH_MANAGER: [],
   FRONT_OF_HOUSE: [],
   COMMITTEE: [],

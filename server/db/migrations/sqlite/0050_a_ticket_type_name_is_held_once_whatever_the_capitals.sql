@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `ticket_types_name_nocase` ON `ticket_types` ("name" COLLATE NOCASE);

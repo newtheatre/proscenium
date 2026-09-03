@@ -102,8 +102,10 @@ build does not break the running dev server.
 | 4 | D-115 + D-117 · D-116 + D-118 · D-124 · D-129 | D-116 carries the double-refund racing test. D-124 posts `PASS_SALE`. |
 | 5 | D-125 + D-126 | D-126 is the door scan under `DOOR` authority; it adopts `useNightCache` if that has merged. |
 
-Routes owned: `/whats-on`, `/shows/[slug]`, `/book`, `/my/bookings`, `/admin/shows`,
-`/admin/ticket-types`, `/admin/passes`, `/tonight/door`, `content/`.
+Routes owned: `/whats-on`, `/shows/[slug]`, `/book`, `/my/bookings`, `/box-office/**`,
+`/tonight/door`, `content/`. The console screens sit under `/box-office`, not `/admin`: `/admin`
+means System and nothing else, and the sidebar's Box office group was declared with that prefix
+(0040). Their API routes stay under `/api/admin/**`, as every other console API does.
 
 ### Show night (module E)
 
