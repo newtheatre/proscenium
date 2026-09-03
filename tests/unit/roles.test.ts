@@ -109,8 +109,15 @@ describe('permissions come from live grants only', () => {
   })
 
   test('an operational role carries no standing permission at all (0009)', () => {
-    for (const role of ['FRONT_OF_HOUSE', 'FOH_MANAGER', 'BOX_OFFICE', 'COMMITTEE'] as const) {
+    for (const role of ['FRONT_OF_HOUSE', 'FOH_MANAGER', 'COMMITTEE'] as const) {
       expect(`${role}: ${permissionsFor([{ role, expiresAt: null }], now).size}`).toBe(`${role}: 0`)
     }
+  })
+
+  // The box office administers the programme sitting down. Selling at the door and taking money
+  // at the desk are operational and still derive from tonight (0009, D-119).
+  test('the box office holds the programme configuration and nothing operational', () => {
+    const held = permissionsFor([{ role: 'BOX_OFFICE', expiresAt: null }], now)
+    expect([...held].sort()).toEqual(['ticketing.read', 'ticketing.write'])
   })
 })

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import { check, integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { performances, shows } from './programme'
 
 const id = () => text('id').primaryKey()
@@ -19,6 +19,9 @@ export const ticketTypes = sqliteTable('ticket_types', {
   activeByDefault: integer('active_by_default', { mode: 'boolean' }).notNull().default(true),
 }, table => [
   unique('ticket_types_name').on(table.name),
+  // Standard and standard are one name to everybody who reads a report, so the database says so
+  // rather than the write path alone (D-119 criterion 1).
+  uniqueIndex('ticket_types_name_nocase').on(sql`${table.name} COLLATE NOCASE`),
   check('ticket_types_kind_values', sql`${table.kind} IN ('SINGLE', 'PASS_ADMISSION')`),
   check('ticket_types_access_kind_values', sql`${table.accessKind} IS NULL OR ${table.accessKind} IN ('ACCESS', 'COMPANION')`),
   check('ticket_types_price_pence', sql`${table.price} >= 0`),

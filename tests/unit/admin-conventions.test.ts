@@ -5,13 +5,17 @@ import { plural } from '#shared/utils/text'
 // The admin conventions are a test rather than a review habit (0032), the same way the design
 // language is (0021). What review still judges is whether a screen says the right thing.
 
-const ADMIN = 'app/pages/admin'
+// Every console screen, wherever its domain put it: the prefix names the domain and only the
+// posture picks the shell, so scanning one directory would miss most of them (0040).
+const PAGES = 'app/pages'
+const CONSOLE_LAYOUT = /layout:\s*['"`]console['"`]/
 
 async function screens(): Promise<{ path: string, source: string }[]> {
   const found: { path: string, source: string }[] = []
-  for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: ADMIN, onlyFiles: true })) {
-    const path = join(ADMIN, entry)
-    found.push({ path, source: await Bun.file(path).text() })
+  for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: PAGES, onlyFiles: true })) {
+    const path = join(PAGES, entry)
+    const source = await Bun.file(path).text()
+    if (CONSOLE_LAYOUT.test(source)) found.push({ path, source })
   }
   return found.sort((a, b) => a.path.localeCompare(b.path))
 }

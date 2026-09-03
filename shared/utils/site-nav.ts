@@ -10,6 +10,7 @@ import {
   viewMembers,
   viewRooms,
   viewSettings,
+  viewTicketTypes,
   viewTrainingCatalogue,
   workTonight,
 } from './abilities'
@@ -51,7 +52,15 @@ export const CONSOLE_NAV: NavGroup[] = [
   { key: 'tonight', label: 'Tonight', icon: 'i-lucide-moon-star', prefix: '/tonight', items: [] },
 
   // Module D: ticketing
-  { key: 'box-office', label: 'Box office', icon: 'i-lucide-ticket', prefix: '/box-office', items: [] },
+  {
+    key: 'box-office',
+    label: 'Box office',
+    icon: 'i-lucide-ticket',
+    prefix: '/box-office',
+    items: [
+      { label: 'Ticket types', icon: 'i-lucide-tag', to: '/box-office/ticket-types', ability: viewTicketTypes },
+    ],
+  },
 
   // Module F: bar
   { key: 'bar', label: 'Bar', icon: 'i-lucide-beer', prefix: '/bar', items: [] },

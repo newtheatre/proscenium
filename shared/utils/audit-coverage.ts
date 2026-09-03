@@ -140,6 +140,12 @@ export const AUDIT_COVERAGE: Coverage[] = [
 
   // Module D: ticketing
 
+  { route: 'server/api/admin/ticket-types/index.get.ts', exempt: 'reads the ticket types, archived ones included' },
+  { route: 'server/api/admin/ticket-types/index.post.ts', actions: ['ticket-type.created'] },
+  { route: 'server/api/admin/ticket-types/[id]/index.put.ts', actions: ['ticket-type.updated', 'ticket-type.price.changed'] },
+  { route: 'server/api/admin/ticket-types/[id]/archive.post.ts', actions: ['ticket-type.archived', 'ticket-type.restored'] },
+  { route: 'server/api/admin/ticket-types/[id]/index.delete.ts', actions: ['ticket-type.deleted'] },
+
   // Module E: show night
 
   // Module F: bar

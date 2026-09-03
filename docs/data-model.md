@@ -285,6 +285,36 @@ stateDiagram-v2
 Archive, never delete, once sold (FK restrict from tickets). Built by Wave 0 contract (d) with
 the two override tables below; everything else in this module is unbuilt.
 
+**Administration (D-119).** `/box-office/ticket-types` over five routes, all gated on
+`ticketing.read` for the listing and `ticketing.write` for the rest:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/admin/ticket-types` | The paged envelope, archived types included by default, each row carrying whether it has ever been sold. |
+| `POST /api/admin/ticket-types` | Adds one. The name is refused if it is already held, compared without regard to capitals. |
+| `PUT /api/admin/ticket-types/[id]` | Changes the name, description, base price and default. It does not take `kind` or `access_kind`. |
+| `POST /api/admin/ticket-types/[id]/archive` | Archives one, or takes it back out. Archiving an archived type is a 409. |
+| `DELETE /api/admin/ticket-types/[id]` | Deletes one nothing has ever been sold under, with its overrides. A sold type is a 409 naming archiving as the way. |
+
+**"Has ever been sold" is a query over rows, never a column.** `TICKET_TYPE_REFERENCES` in
+`server/utils/ticket-types.ts` declares every table that points at `ticket_types` and whether a
+row there is a sale. The overrides are configuration and are not; `tickets` and
+`pass_admissions` will be, when D-104 and D-123 build them. An integration test reads the live
+foreign keys and fails when a new referencing table is not classified, so the predicate cannot
+quietly stop covering a table.
+
+`kind` and `access_kind` are what a sold ticket was sold under, so they are set at creation and
+never edited. A type set up wrongly and never sold is deleted and made again.
+
+The base price is a column, not a superseding row: `tickets.price_paid` is the snapshot that
+makes a historical ticket immune to a later change (D-120 criterion 3), so the before and after
+of a price change live in the audit trail as `ticket-type.price.changed`.
+
+**No public payload is built from a row.** `publicTicketTypes()` in
+`shared/utils/ticket-types.ts` is the projection every visitor-facing response goes through: it
+drops archived types and every flagged one, and allow-lists `id`, `name`, `description` and
+`price`. An entitled booker's access types are D-128's own resolution, never a widening of this.
+
 ### show_ticket_overrides / performance_ticket_overrides
 `id` PK · parent (`show_id` → shows cascade, or `performance_id` → performances cascade) ·
 `ticket_type_id` → ticket_types restrict · UNIQUE (parent, ticket_type) · `price` NULL =

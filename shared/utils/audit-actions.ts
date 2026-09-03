@@ -114,6 +114,13 @@ const CATALOGUE = {
 
   // Module D: ticketing
 
+  'ticket-type.created': { label: 'Ticket type added', module: 'ticketing' },
+  'ticket-type.updated': { label: 'Ticket type changed', module: 'ticketing' },
+  'ticket-type.price.changed': { label: 'Ticket type price changed', module: 'ticketing' },
+  'ticket-type.archived': { label: 'Ticket type archived', module: 'ticketing' },
+  'ticket-type.restored': { label: 'Ticket type taken out of the archive', module: 'ticketing' },
+  'ticket-type.deleted': { label: 'Ticket type deleted', module: 'ticketing' },
+
   // Module E: show night
 
   // Module F: bar
