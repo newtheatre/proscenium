@@ -134,6 +134,10 @@ const CATALOGUE = {
 
   // Module E: show night
 
+  // Written once per officer per night, venue and role: an exception the night report shows, not
+  // a standing grant (0044, E-111 criterion 4).
+  'night.officer-bypass': { label: 'Show-night screen opened by an officer without a shift', module: 'show-night' },
+
   // Module F: bar
 
   // Module G: training

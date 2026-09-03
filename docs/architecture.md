@@ -91,7 +91,7 @@ namespace, and asks the owner for one anywhere else.
 | Stream | Routes and files owned |
 | --- | --- |
 | Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/` |
-| Show night | `/rota`, `/admin/rota`, `/admin/templates`, `/admin/venues/[id]/emergency`, the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`. The console prefix for the first four is undecided and is not `/admin`; `build-order.md` says what it waits on. |
+| Show night | `/rota`, `/admin/rota`, `/admin/templates`, `/admin/venues/[id]/emergency`, the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**` and `server/utils/night-authority.ts`. The console prefix for the first four is undecided and is not `/admin`; `build-order.md` says what it waits on. |
 | Bar | `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**` |
 | Platform | `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `tests/helpers/race.ts` |
 
@@ -134,7 +134,8 @@ becomes interactive.
      the `requireTrainer` guard: somebody is a trainer if and only if they currently hold a
      record on a module marked trainer-granting, and expiring counts as held. It is never a role
      and never a flag, so revoking the certification is the whole of taking the standing away
-     (0037, G-111).
+     (0037, G-111). Show-night authority resolves in `server/utils/night-authority.ts` behind
+     `requireNightAuthority`, and has a section of its own below.
   3. **Ownership**: the row's own user id.
 - Guards are server-side and fail closed; route middleware is rendering convenience only.
 - `nuxt-authorization` abilities (`shared/utils/abilities.ts`) are named views over the same
@@ -292,6 +293,43 @@ Shift authority, the door, the till, the tonight screens, board codes, night rep
 cache label must call these as they are built; a second implementation is a defect (0014), and
 `tests/unit/show-night.test.ts` fails on one. The financial day is not the show night: the
 ledger and the Z reconciliation group by London calendar day (I-104).
+
+### Show-night authority (E-111, 0044)
+
+`requireNightAuthority(event, role, scope?)` in `server/utils/night-authority.ts` is what every
+show-night route calls, and it is the only thing that refuses one. Hiding a link is never the
+enforcement (E-111 criterion 5, restated in 0040): the three abilities in
+`shared/utils/abilities.ts` decide what the chrome shows and nothing else.
+
+| Piece | What it is |
+| --- | --- |
+| `NightRole` | `DUTY_MANAGER`, `DOOR` or `BAR`. A door shift does not open the till, and neither does the front of house officer's role. |
+| `NightScope` | `{ night?, venueId?, performanceId? }`. All optional: the common case is tonight, at the one venue running. |
+| The resolution | `{ account, night, role, venueId, performanceIds, via, shiftId? }`, where `via` is `SHIFT` or `OFFICER`. |
+| A refusal | 403 naming both ways in, the shift and the officer role. An administrator is never offered as the way out. |
+
+`night` comes from `currentShowNight()` and nothing else, so authority expires at 04:00 with
+nothing to revoke. A caller may name the night it believes it is working, which is how a screen
+left open past the boundary is refused rather than quietly resolved against a new one. The venue is
+always resolved to exactly one: a night running two venues with nothing to narrow it is a 400
+asking for the venue, because an officer covering two houses at once is not a thing to invent.
+`performanceIds` is what the request covers, and it is never empty: a cancelled performance is
+filtered out, so a venue whose only performance tonight is cancelled resolves no authority at all.
+
+Only the `OFFICER` branch resolves today. It stands on the permissions `night.door`, `night.till`
+and `night.manage`, held by `FOH_MANAGER` (door and manage) and `BAR_MANAGER` (till), which are the
+one named exception to standing permissions being administrative only (0009, 0044). Every officer
+resolution writes `night.officer-bypass` once per account, night, venue and role, held by a partial
+unique index rather than by reading before writing; the row's detail carries every performance that
+venue ran that night. The `SHIFT` branch arrives in show night wave 3 and fills a case, with no
+change to anything above. Holding one of the three does not admit anybody to the console:
+`reachConsole` reads the standing permissions that are not in `OPERATIONAL_PERMISSIONS`, or an
+officer would be shown a sidebar in which every screen answers 403 (0040, 0044).
+
+`GET /api/tonight/authority?role=&night=&venueId=&performanceId=` is that resolution as a route. It
+returns the allow-listed shape above and is the pattern every other `/api/tonight/**` and
+`/api/till/**` route follows; `tests/unit/night-authority.test.ts` fails when a route under either
+namespace does not call the guard.
 
 ## The programme (build-order contract d, 0043)
 

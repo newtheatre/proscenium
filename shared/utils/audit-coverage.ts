@@ -160,6 +160,12 @@ export const AUDIT_COVERAGE: Coverage[] = [
 
   // Module E: show night
 
+  {
+    route: 'server/api/tonight/authority.get.ts',
+    actions: ['night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+
   // Module F: bar
 
   // Module G: training

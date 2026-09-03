@@ -43,8 +43,9 @@ describe('the role vocabulary', () => {
     for (const target of targets) {
       expect(`${target}: ${isRole(target)}`).toBe(`${target}: true`)
     }
-    // Every role should be reachable by import, or the old estate has no way to grant it.
-    expect([...ROLES].filter(role => !targets.has(role))).toEqual([])
+    // Every role should be reachable by import, save the one the old estate never had: the bar
+    // was run on paper and a card reader, so there is no old row to map (0044).
+    expect([...ROLES].filter(role => !targets.has(role))).toEqual(['BAR_MANAGER'])
   })
 
   // Questions 7 and 8, answered 2 September. Pinned because a role widening is a governance
@@ -109,9 +110,16 @@ describe('permissions come from live grants only', () => {
   })
 
   test('an operational role carries no standing permission at all (0009)', () => {
-    for (const role of ['FRONT_OF_HOUSE', 'FOH_MANAGER', 'COMMITTEE'] as const) {
+    for (const role of ['FRONT_OF_HOUSE', 'COMMITTEE'] as const) {
       expect(`${role}: ${permissionsFor([{ role, expiresAt: null }], now).size}`).toBe(`${role}: 0`)
     }
+  })
+
+  // The one named exception, and it stays one: an officer role opens tonight's screens and does
+  // nothing else, and every use of it is audited (0044).
+  test('an officer role carries the night bypass and nothing besides', () => {
+    expect([...permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now)].sort()).toEqual(['night.door', 'night.manage'])
+    expect([...permissionsFor([{ role: 'BAR_MANAGER', expiresAt: null }], now)]).toEqual(['night.till'])
   })
 
   // The box office administers the programme sitting down. Selling at the door and taking money
