@@ -70,6 +70,23 @@ A domain with both audiences puts the member's screens at the top and the consol
 in `shared/utils/site-nav.ts`, which the console sidebar renders and the console middleware guards
 from, so a deep link and the sidebar cannot disagree.
 
+### Route namespaces
+
+Which stream owns which routes while the MVP is built in parallel (`build-order.md`). Ownership is
+about who edits a file, not about who may link to it: a stream adds a route inside its own
+namespace, and asks the owner for one anywhere else.
+
+| Stream | Routes and files owned |
+| --- | --- |
+| Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/my/bookings`, `/admin/shows`, `/admin/ticket-types`, `/admin/passes`, `/tonight/door`, `content/` |
+| Show night | `/rota`, `/admin/rota`, `/admin/templates`, `/admin/venues/[id]/emergency`, the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board` |
+| Bar | `/tonight/till`, `/tonight/till/comps`, `/admin/bar/**`, `/admin/stock/**` |
+| Platform | `/account/notifications`, `/admin/notifications/**`, `/admin/config`, `/admin/docs`, `/policies/**`, `/admin/finance/**`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `tests/helpers/race.ts` |
+
+`/tonight` is the one prefix three streams write under, which is why the shell below is owned by
+one of them and settled before any of the screens are built. The hub page itself was written by
+platform far enough to exercise the shell, and its content belongs to show night from E-112.
+
 ## The identity screens
 
 `/sign-in` and `/register` are the two entry points, and each carries its own steps rather than
@@ -204,6 +221,23 @@ their night's data on open and render fully from cache when the network drops; w
 and reconcile with conflicts surfaced, never merged silently. The emergency card caches at
 shift start. Mechanism (service worker or client cache layer) is an open question in
 `backlog/K-platform.md`; the acceptance criteria bind either way.
+
+### The phone-first shell (K-102)
+
+Three components under `app/components/` are what every show-night screen is assembled from, so
+the door, the till and the registers inherit the conditions rather than each remembering them. The
+`tonight` layout is settled and is not edited by the screens built on it.
+
+| Component | Props | What it guarantees |
+| --- | --- | --- |
+| `NightScreen` | `title`, `hint?`, `stale?`, `busy?` | The column caps at `max-w-md` and lays out from 360 pixels up, so the desktop view is the adaptation. Its `actions` slot is pinned to the bottom of the viewport, which is where a thumb rests. |
+| `NightAction` | `label`, `icon?`, `color?`, `disabled?`, `loading?`, `to?`, `@press` | At least 48 by 48 pixels, full width, and reachable by a single tap: no hover state, no long press, no second finger. |
+| `NightStale` | `at?`, `busy?` | "Last synced HH:MM" in Europe/London, or "Not yet synced" when nothing has loaded. It is never hidden, because a screen holding nothing is when its age matters most. Words and an icon, never colour alone. |
+
+`shared/utils/night-shell.ts` holds `NIGHT_VIEWPORT_PX`, `NIGHT_TAP_TARGET_PX` and
+`lastSyncedLabel()`, so the tests and the components read the same numbers. A screen shows its own
+age by passing `stale` the instant its data came from, which is what `useNightCache` (K-103) will
+hand it.
 
 ## Environments
 

@@ -94,6 +94,9 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
     { name: 'the home page', path: '/', marker: 'main' },
     { name: 'signing in', path: '/sign-in', marker: 'form' },
     { name: 'registering', path: '/register', marker: 'form' },
+    // K-102 criterion 3: the show-night shell is dark by default and still clears AA contrast.
+    // The hub is unguarded today; it moves to the signed-in cases when E-112 puts authority on it.
+    { name: 'the tonight hub', path: '/tonight', marker: 'main' },
   ]
 
   for (const screen of PUBLIC) {

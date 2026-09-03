@@ -269,9 +269,10 @@ function removeClaimedProfiles(): void {
   claimedProfiles.clear()
 }
 
-export async function openView(): Promise<Bun.WebView> {
+// A size is the viewport, which is how a suite stands in a 360 pixel phone (K-102).
+export async function openView(size?: { width: number, height: number }): Promise<Bun.WebView> {
   const before = profileDirectories()
-  const view = new Bun.WebView({ backend: BACKEND })
+  const view = new Bun.WebView({ backend: BACKEND, ...size })
   // Claimed on the spot and never waited for: the profile is there by the time the constructor
   // returns, and a sleep here would push a five-second test over its timeout.
   claimProfilesSince(before)
