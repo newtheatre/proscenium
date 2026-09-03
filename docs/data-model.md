@@ -9,6 +9,12 @@ this is its memory. The migration tooling (`migration/`) loads into exactly this
   the live schema carries no legacy identifiers (decision 0015).
 - **Instants** are integer seconds UTC (`*_at`), which is what `unixepoch()` returns. **Civil dates** (a performance day, a
   price's effective date) are ISO `YYYY-MM-DD` text, meaning the Europe/London day (0014).
+- **Show nights** are the operational day: 04:00 to 04:00 Europe/London, labelled `YYYY-MM-DD`
+  by the London day the night began, so a 01:00 bar sale is still the night before's. The label
+  and its bounds come from `shared/utils/show-night.ts` (`showNightOf`, `showNightBounds`,
+  `currentShowNight`) and nothing derives them any other way (E-110). The **financial day** is
+  different: `ledger_entries.london_day` and `z_readings.london_day` are plain London calendar
+  days, because the SumUp Z is a calendar-day figure (I-104).
 - **Money** is integer pence (0004). **Booleans** are integers 0/1.
 - **Enums** are text with a CHECK constraint; the values below are exhaustive.
 - **Append-only tables** (marked APPEND-ONLY) refuse UPDATE and DELETE by trigger, with the
