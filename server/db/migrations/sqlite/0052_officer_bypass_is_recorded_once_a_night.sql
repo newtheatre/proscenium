@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `audit_log_officer_bypass_once` ON `audit_log` (`actor_id`,`target`) WHERE action = 'night.officer-bypass';

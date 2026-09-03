@@ -10,13 +10,14 @@ export const ROLES = [
   'BOX_OFFICE',
   'FOH_MANAGER',
   'FRONT_OF_HOUSE',
+  'BAR_MANAGER',
   'COMMITTEE',
 ] as const
 
 export type Role = (typeof ROLES)[number]
 
-// Standing permissions are administrative only. Operational authority (the door, the till, a
-// register) derives from tonight's facts and is never granted in advance (0009).
+// Standing permissions are administrative only, with one named exception at the bottom of the
+// list. Operational authority derives from tonight's facts and is not granted in advance (0009).
 export const PERMISSIONS = [
   'accounts.read',
   'accounts.create',
@@ -45,6 +46,11 @@ export const PERMISSIONS = [
   // over them. Selling a ticket is operational and derives from tonight (0009).
   'ticketing.read',
   'ticketing.write',
+  // The one exception to the rule above, and it is named, bounded and audited: a designated
+  // officer opens tonight's screens without a shift, and every use is recorded (0044, E-111).
+  'night.door',
+  'night.till',
+  'night.manage',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
@@ -63,8 +69,13 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   // Owns the programme's configuration. Nothing operational is here: the door and the desk
   // derive from tonight's performance and shift (0009).
   BOX_OFFICE: ['ticketing.read', 'ticketing.write'],
-  FOH_MANAGER: [],
+  // The officer bypass and nothing else: the door and the duty manager's screens open without a
+  // shift, the till does not, and every use is audited (0044, E-111 criterion 4).
+  FOH_MANAGER: ['night.door', 'night.manage'],
   FRONT_OF_HOUSE: [],
+  // Opens the till without a bar shift. Nothing in the old estate grants this role, so the import
+  // cannot reach it (0044, F-101 criterion 1).
+  BAR_MANAGER: ['night.till'],
   COMMITTEE: [],
 }
 
