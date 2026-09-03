@@ -145,6 +145,18 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/ticket-types/[id]/index.put.ts', actions: ['ticket-type.updated', 'ticket-type.price.changed'] },
   { route: 'server/api/admin/ticket-types/[id]/archive.post.ts', actions: ['ticket-type.archived', 'ticket-type.restored'] },
   { route: 'server/api/admin/ticket-types/[id]/index.delete.ts', actions: ['ticket-type.deleted'] },
+  { route: 'server/api/admin/venues/index.get.ts', exempt: 'reads the venues a performance may be put in' },
+  { route: 'server/api/admin/shows/index.get.ts', exempt: 'reads the programme, drafts included' },
+  { route: 'server/api/admin/shows/index.post.ts', actions: ['show.created'] },
+  { route: 'server/api/admin/shows/[id]/index.get.ts', exempt: 'reads one show and its performances' },
+  { route: 'server/api/admin/shows/[id]/index.put.ts', actions: ['show.updated'] },
+  { route: 'server/api/admin/shows/[id]/publish.post.ts', actions: ['show.published', 'show.unpublished'] },
+  { route: 'server/api/admin/shows/[id]/index.delete.ts', actions: ['show.deleted'] },
+  { route: 'server/api/admin/shows/[id]/performances.post.ts', actions: ['performance.created'] },
+  { route: 'server/api/admin/performances/[id]/index.put.ts', actions: ['performance.updated'] },
+  { route: 'server/api/admin/performances/[id]/sale.post.ts', actions: ['performance.on-sale', 'performance.off-sale'] },
+  { route: 'server/api/admin/performances/[id]/cancel.post.ts', actions: ['performance.cancelled'] },
+  { route: 'server/api/admin/performances/[id]/index.delete.ts', actions: ['performance.deleted'] },
 
   // Module E: show night
 

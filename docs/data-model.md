@@ -222,7 +222,8 @@ season is 1 August to 31 July. CHECK `ends_on` > `starts_on`.
 `poster_key` (R2) · `category_id` NULL → show_categories restrict · `season_id` → seasons set
 null · `age_guidance` · `latecomer_policy` CHECK `ADMITTED|AT_INTERVAL|NOT_ADMITTED`, NULL
 meaning not yet stated · `warnings_confirmed_none` bool (distinct from "no rows") ·
-`content_notes` · `status` CHECK `DRAFT|PUBLISHED` · timestamps.
+`content_notes` · `booking_closes_hours_before` NULL, the default every performance inherits ·
+`status` CHECK `DRAFT|PUBLISHED` · timestamps.
 `production_id` NULL, reserved and unreferenced: module B attaches here later without a
 rebuild (B preclusion).
 
@@ -237,14 +238,49 @@ SQLite cannot state as a CHECK, so D-102's write path holds that half.
 ### performances
 `id` PK · `show_id` → shows cascade · `venue_id` → venues restrict · `starts_at` ·
 `doors_at` · `duration_minutes` · `interval_count` (default nought) · `interval_minutes` ·
-`capacity_override` NULL = venue capacity · `booking_closes_hours_before` (NULL and 0 both
-mean curtain-up) · `hold_release_minutes_before` NULL = config default ·
+`capacity_override` NULL = venue capacity · `booking_closes_hours_before` NULL = inherit the
+show's default, and an explicit 0 = this performance closes at curtain-up (D-112) ·
+`hold_release_minutes_before` NULL = config default ·
 `external_booking_url` NULL, and CHECK non-empty because an empty string is not a link-out ·
 `status` CHECK `DRAFT|ON_SALE|CANCELLED` · `notes` (internal, safe) · timestamps.
 Sold-out and completed are derived, never stored. Indexes: `starts_at`, (`venue_id`,
 `starts_at`), `show_id`. A performance belongs to the show night of its curtain, and to no
 day and no venue: two venues may run at the same time, and one venue may run a matinee and an
 evening on one night (E-127 criterion 1).
+
+**Administration and the publish flow (D-121, D-112).** `/box-office/shows` lists every show and
+`/box-office/shows/[id]` is one show with its performances, over these routes, `ticketing.read`
+for the two that read and `ticketing.write` for the rest:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/admin/shows` | The paged envelope, drafts included, each row carrying its performance count, how many are on sale and how many tickets have sold. |
+| `POST /api/admin/shows` | Adds one, always DRAFT. The address is refused if it is already held. |
+| `GET /api/admin/shows/[id]` | One show, every performance of it, and the venues a performance may be put in. |
+| `PUT /api/admin/shows/[id]` | Changes the copy, the address, the age guidance, the latecomer policy and the booking window default. It does not take the status. |
+| `POST /api/admin/shows/[id]/publish` | Publishes or unpublishes. `cascadePerformances` takes DRAFT performances on sale in the same batch; CANCELLED ones are skipped by predicate. |
+| `DELETE /api/admin/shows/[id]` | Deletes a show nothing has sold under, with its performances and prices. A show with sold tickets is a 409 naming unpublishing and cancelling as the way. |
+| `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. |
+| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, window and internal notes. It does not take the status. |
+| `POST /api/admin/performances/[id]/sale` | On sale or off sale, per performance. A cancelled or externally ticketed performance is a 409. |
+| `POST /api/admin/performances/[id]/cancel` | Cancels one, and answers with how many tickets are owed a refund. |
+| `DELETE /api/admin/performances/[id]` | Deletes a performance nothing has sold for. One that has is a 409 naming cancelling as the way. |
+| `GET /api/admin/venues` | The venues a performance may be put in. Venue administration has no MVP story. |
+
+**Unpublishing touches no performance and no ticket.** It moves `shows.status` alone; sales close
+because `saleRefusal()` refuses an unpublished show, so republishing restores the same programme.
+
+**"Has sold tickets" is a count over rows, never a column.** `PERFORMANCE_REFERENCES` in
+`server/utils/programme.ts` declares every table that points at `performances` and whether a row
+there means a seat is held. The price overrides are configuration and are not; `tickets`,
+`reservations` and `waiting_list` will be, when D-104 and D-113 build them. An integration test
+reads the live foreign keys and fails when a new referencing table is not classified.
+
+**The booking window resolves performance, then show, then curtain-up** (D-112 criterion 1), the
+same NULL-means-inherit rule the price overrides use, so an explicit nought at either level is
+that level saying curtain-up rather than an absent value. `resolveBookingClosesHours()`,
+`bookingClosesAt()` and `saleRefusal()` in `shared/utils/programme.ts` are the only readings of
+it. There is no configuration key beneath the show: two levels are what the story asks for.
 
 ## Ticketing (module D)
 
@@ -328,6 +364,9 @@ credential) · `performance_id` → performances restrict · `user_id` → users
 PENDING; the release sweep moves PENDING to EXPIRED and records it for no-show statistics) ·
 `cancelled_by` CHECK `CUSTOMER|STAFF` NULL · `customer_notes` scrub · `staff_notes` scrub ·
 `qr_token_hash` (the one stable QR credential, D-108) · timestamps.
+D-112 criterion 3 needs a column recording that a desk reservation bypassed the customer booking
+window; D-104 adds it when it builds this table, and `saleRefusal(..., 'DESK')` is the predicate
+that permits the bypass.
 Indexes: (`performance_id`, `status`), (`user_id`, `created_at`), `hold_expires_at`.
 
 ### tickets

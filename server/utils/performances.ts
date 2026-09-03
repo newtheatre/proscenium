@@ -1,13 +1,15 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { saleRefusal } from '#shared/utils/programme'
 import { showNightBounds, showNightOf } from '#shared/utils/show-night'
+import type { PerformanceSaleState, PerformanceStatus, SalesChannel, ShowStatus } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 
 // Reading the programme (build-order contract d). The show-night boundary is
 // `shared/utils/show-night.ts`'s alone; nothing here restates it (E-110, 0014).
 
-export type PerformanceStatus = 'DRAFT' | 'ON_SALE' | 'CANCELLED'
-export type ShowStatus = 'DRAFT' | 'PUBLISHED'
+// The programme's states and the sale predicate are declared once, with the rest of the domain
+// rules in `shared/utils/programme.ts`; nothing here holds a second copy of either.
 
 const seconds = (at: Date): number => Math.floor(at.getTime() / 1000)
 
@@ -33,6 +35,10 @@ export interface PerformanceOnNight {
   status: PerformanceStatus
   externalBookingUrl: string | null
   capacity: number | null
+  // Both levels of the booking window, so a caller answers `isOnSale` from this row alone and
+  // never has to read the show back (D-112).
+  bookingClosesHoursBefore: number | null
+  showBookingClosesHoursBefore: number | null
 }
 
 // Allow-listed and bound to a fixed two or three parameters however many performances the night
@@ -55,7 +61,9 @@ export function performancesOnNightQuery(night: string, venueId?: string): SQL {
            p.interval_count AS intervalCount,
            p.status AS status,
            p.external_booking_url AS externalBookingUrl,
-           coalesce(p.capacity_override, v.capacity) AS capacity
+           coalesce(p.capacity_override, v.capacity) AS capacity,
+           p.booking_closes_hours_before AS bookingClosesHoursBefore,
+           s.booking_closes_hours_before AS showBookingClosesHoursBefore
     FROM performances p
     JOIN shows s ON s.id = p.show_id
     JOIN venues v ON v.id = p.venue_id
@@ -77,20 +85,8 @@ export function effectiveCapacity(performance: { capacityOverride: number | null
   return performance.capacityOverride ?? performance.venueCapacity
 }
 
-export interface PerformanceSaleState {
-  status: PerformanceStatus
-  showStatus: ShowStatus
-  startsAt: number
-  bookingClosesHoursBefore: number | null
-  externalBookingUrl: string | null
-}
-
-// The one predicate every internal sales path asks: an unpublished show, a draft or cancelled
-// performance, an external link-out and a closed window each refuse (D-112, D-121, D-122).
-export function isOnSale(performance: PerformanceSaleState, at: Date = new Date()): boolean {
-  if (performance.status !== 'ON_SALE' || performance.showStatus !== 'PUBLISHED') return false
-  if (performance.externalBookingUrl) return false
-
-  const closes = performance.startsAt - (performance.bookingClosesHoursBefore ?? 0) * 3600
-  return seconds(at) < closes
+// The one predicate every internal sales path asks. `saleRefusal` is the same answer with the
+// reason attached, which is what a refusal quotes to a customer (D-112, D-121, D-122).
+export function isOnSale(performance: PerformanceSaleState, at: Date = new Date(), channel: SalesChannel = 'CUSTOMER'): boolean {
+  return saleRefusal(performance, at, channel) === null
 }

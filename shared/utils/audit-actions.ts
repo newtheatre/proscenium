@@ -120,6 +120,17 @@ const CATALOGUE = {
   'ticket-type.archived': { label: 'Ticket type archived', module: 'ticketing' },
   'ticket-type.restored': { label: 'Ticket type taken out of the archive', module: 'ticketing' },
   'ticket-type.deleted': { label: 'Ticket type deleted', module: 'ticketing' },
+  'show.created': { label: 'Show added', module: 'ticketing' },
+  'show.updated': { label: 'Show changed', module: 'ticketing' },
+  'show.published': { label: 'Show published', module: 'ticketing' },
+  'show.unpublished': { label: 'Show taken off the public site', module: 'ticketing' },
+  'show.deleted': { label: 'Show deleted', module: 'ticketing' },
+  'performance.created': { label: 'Performance added', module: 'ticketing' },
+  'performance.updated': { label: 'Performance changed', module: 'ticketing' },
+  'performance.on-sale': { label: 'Performance put on sale', module: 'ticketing' },
+  'performance.off-sale': { label: 'Performance taken off sale', module: 'ticketing' },
+  'performance.cancelled': { label: 'Performance cancelled', module: 'ticketing' },
+  'performance.deleted': { label: 'Performance deleted', module: 'ticketing' },
 
   // Module E: show night
 

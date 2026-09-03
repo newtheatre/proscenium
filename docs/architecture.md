@@ -308,12 +308,22 @@ to that room. Nothing else about a room is inferred from a venue or the reverse.
 | `performanceNight(curtain: Date \| number): string` | Which show night a performance belongs to. Derived from `showNightOf(curtain)`, so a curtain before 04:00 belongs to the night that began the London day before. A stored curtain is integer seconds; both spellings are accepted. |
 | `performancesOnNight(night, venueId?)` | Every performance whose curtain falls inside the night's bounds, across the whole estate, narrowed by venue only when asked. Ordered by curtain, then venue. Two venues may run at once and one venue may run a matinee and an evening. |
 | `effectiveCapacity(performance)` | The performance's `capacity_override` if it has one, otherwise the venue's capacity. Null is uncapped; an explicit nought is a closed house, so the resolution is by absence and never by falsiness. |
-| `isOnSale(performance, at?)` | Whether an internal sales path may sell this performance: it is `ON_SALE`, its show is `PUBLISHED`, it carries no external ticketing link, and its booking window has not closed. `booking_closes_hours_before` NULL and nought both mean curtain-up. |
+| `isOnSale(performance, at?, channel?)` | Whether an internal sales path may sell this performance. It is `saleRefusal()` with the reason dropped, so the two can never disagree. |
 
-Ticket types are administered at `/box-office/ticket-types` (D-119), which is where D-120's
-overrides, D-121's publish flow and D-123's pass products attach. What a type has ever been sold
-under is a query over the tables that point at it, declared in `server/utils/ticket-types.ts` and
-proved against the live foreign keys, never a column on the type itself.
+Ticket types are administered at `/box-office/ticket-types` (D-119) and the programme itself at
+`/box-office/shows` (D-121), which is where D-120's overrides and D-123's pass products attach.
+What a type has ever been sold under, and what a performance has sold, are queries over the tables
+that point at them, declared in `server/utils/ticket-types.ts` and `server/utils/programme.ts` and
+proved against the live foreign keys, never a column on the row itself.
+
+`shared/utils/programme.ts` holds the publish flow and the booking window as pure rules:
+
+| Function | Answers |
+| --- | --- |
+| `publicShow(show)` | The allow-listed columns a visitor may see, or null for a draft. Every public payload goes through it, so a draft show has no thin version to leak (D-121 criterion 1). |
+| `resolveBookingClosesHours(performance, show)` | The window in hours: the performance's own, then the show's default, then curtain-up. NULL means inherit and an explicit nought means this level says curtain-up (D-112 criterion 1). |
+| `bookingClosesAt(startsAt, hours)` | The closing instant, measured back from the curtain in seconds, so the clocks changing never moves it relative to the performance (0014). |
+| `saleRefusal(performance, at?, channel?)` | Why a sales path may not sell, or null. Cancelled, unpublished, off sale, externally ticketed and closed each name themselves; the closed one quotes the time in Europe/London and points at the door. `DESK` bypasses the customer window and nothing else (D-112 criteria 2 and 3). |
 
 A night is a window over the whole estate, not a venue and not a day: everything record-like keys
 to a performance (E-127 criterion 1). `performancesOnNightQuery()` is the statement

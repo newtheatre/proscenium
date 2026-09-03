@@ -44,6 +44,7 @@ export const runTrainingSessions = defineAbility((viewer: Viewer) => holds(viewe
 // The programme's configuration is sit-down work, so it is a standing permission like the
 // catalogue's, and nothing here opens a door or a till (0009, D-119).
 export const viewTicketTypes = defineAbility((viewer: Viewer) => holds(viewer, 'ticketing.read'))
+export const viewProgramme = defineAbility((viewer: Viewer) => holds(viewer, 'ticketing.read'))
 
 // Tonight is derived from a confirmed shift and expires at 04:00 with nothing to revoke (0014,
 // E-111), so it is read from the request rather than from anything the viewer holds.
@@ -69,4 +70,5 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewTrainingCatalogue: 'training.read',
   runTrainingSessions: 'training.write',
   viewTicketTypes: 'ticketing.read',
+  viewProgramme: 'ticketing.read',
 }

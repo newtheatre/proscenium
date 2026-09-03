@@ -1,0 +1,1 @@
+ALTER TABLE `shows` ADD `booking_closes_hours_before` integer;

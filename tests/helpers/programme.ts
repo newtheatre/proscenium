@@ -37,6 +37,25 @@ export interface AcceptsStatements {
   batch: (statements: BoundStatement[]) => void
 }
 
+export interface TestVenueOptions {
+  suffix?: string
+  name?: string
+  capacity?: number | null
+  roomId?: string | null
+}
+
+// A venue on its own, for a suite that needs somewhere to put a performance and nothing else.
+export function testVenue(into: AcceptsStatements, options: TestVenueOptions = {}): { id: string, capacity: number | null } {
+  const suffix = options.suffix ?? 'a'
+  const id = `venue-${suffix}`
+  const capacity = options.capacity === undefined ? 120 : options.capacity
+  into.batch([[
+    'INSERT INTO venues (id, name, capacity, room_id) VALUES (?, ?, ?, ?)',
+    id, options.name ?? `The Test House ${suffix}`, capacity, options.roomId ?? null,
+  ]])
+  return { id, capacity }
+}
+
 export function tonightsPerformance(into: AcceptsStatements, options: TonightsPerformanceOptions = {}): TonightsPerformance {
   const night = options.night ?? currentShowNight()
   const suffix = options.suffix ?? 'a'
@@ -53,13 +72,6 @@ export function tonightsPerformance(into: AcceptsStatements, options: TonightsPe
 
   const statements: BoundStatement[] = []
 
-  if (!options.venueId) {
-    statements.push([
-      'INSERT INTO venues (id, name, capacity, room_id) VALUES (?, ?, ?, ?)',
-      venueId, options.venueName ?? `The Test House ${suffix}`, venueCapacity, options.roomId ?? null,
-    ])
-  }
-
   statements.push(
     ['INSERT INTO shows (id, slug, title, status) VALUES (?, ?, ?, ?)',
       showId, `a-test-show-${suffix}`, 'A Test Show', options.showStatus ?? 'PUBLISHED'],
@@ -72,6 +84,9 @@ export function tonightsPerformance(into: AcceptsStatements, options: TonightsPe
     options.status ?? 'ON_SALE'],
   )
 
+  if (!options.venueId) {
+    testVenue(into, { suffix, name: options.venueName, capacity: venueCapacity, roomId: options.roomId })
+  }
   into.batch(statements)
 
   return { night, venueId, showId, performanceId, startsAt, venueCapacity, capacityOverride }
