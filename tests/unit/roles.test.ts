@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { committeeYearEnd, fromLondonWallClock } from '#shared/utils/london'
 import {
+  OPERATIONAL_PERMISSIONS,
   PERMISSIONS,
   PERMISSION_MAP,
   PROTECTED_ROLE,
@@ -10,7 +11,7 @@ import {
   isRole,
   permissionsFor,
 } from '#shared/utils/roles'
-import type { Grant } from '#shared/utils/roles'
+import type { Grant, Role } from '#shared/utils/roles'
 
 const seconds = (at: Date): number => Math.floor(at.getTime() / 1000)
 
@@ -115,11 +116,21 @@ describe('permissions come from live grants only', () => {
     }
   })
 
-  // The one named exception, and it stays one: an officer role opens tonight's screens and does
-  // nothing else, and every use of it is audited (0044).
-  test('an officer role carries the night bypass and nothing besides', () => {
-    expect([...permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now)].sort()).toEqual(['night.door', 'night.manage'])
-    expect([...permissionsFor([{ role: 'BAR_MANAGER', expiresAt: null }], now)]).toEqual(['night.till'])
+  // The one named exception, and it stays one: an officer role opens tonight's screens and every
+  // use of it is audited (0044). Administering the bar sitting down is not a bypass (F-111).
+  test('an officer role carries the night bypass, and its bypass alone', () => {
+    const bypass = (role: Role): string[] =>
+      [...permissionsFor([{ role, expiresAt: null }], now)].filter(held => OPERATIONAL_PERMISSIONS.includes(held)).sort()
+    expect(bypass('FOH_MANAGER')).toEqual(['night.door', 'night.manage'])
+    expect(bypass('BAR_MANAGER')).toEqual(['night.till'])
+  })
+
+  // The bar manager administers the catalogue and the stock register, as the box office does the
+  // programme. Selling over the bar is the till's and still derives from tonight (0009, F-111).
+  test('the bar manager holds the bar administration and nothing else standing', () => {
+    const held = [...permissionsFor([{ role: 'BAR_MANAGER', expiresAt: null }], now)]
+      .filter(permission => !OPERATIONAL_PERMISSIONS.includes(permission)).sort()
+    expect(held).toEqual(['bar.read', 'bar.write'])
   })
 
   // The box office administers the programme sitting down. Selling at the door and taking money

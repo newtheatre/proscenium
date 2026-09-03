@@ -6,6 +6,8 @@ import {
   signedIn,
   viewAccounts,
   viewAuditTrail,
+  viewBarCatalogue,
+  viewBarStock,
   viewFellows,
   viewMembers,
   viewProgramme,
@@ -65,7 +67,19 @@ export const CONSOLE_NAV: NavGroup[] = [
   },
 
   // Module F: bar
-  { key: 'bar', label: 'Bar', icon: 'i-lucide-beer', prefix: '/bar', items: [] },
+
+  {
+    key: 'bar',
+    label: 'Bar',
+    icon: 'i-lucide-beer',
+    prefix: '/bar',
+    items: [
+      { label: 'Products', icon: 'i-lucide-beer', to: '/bar/products', ability: viewBarCatalogue },
+      { label: 'Categories', icon: 'i-lucide-layout-grid', to: '/bar/categories', ability: viewBarCatalogue },
+      { label: 'Stocked items', icon: 'i-lucide-package', to: '/bar/stock', ability: viewBarStock, exact: true },
+      { label: 'Stock movements', icon: 'i-lucide-arrow-left-right', to: '/bar/stock/movements', ability: viewBarStock },
+    ],
+  },
 
   // Module C: spaces
   {

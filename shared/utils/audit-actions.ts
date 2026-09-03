@@ -140,6 +140,17 @@ const CATALOGUE = {
 
   // Module F: bar
 
+  'bar.category.created': { label: 'Bar category added', module: 'bar' },
+  'bar.category.updated': { label: 'Bar category changed', module: 'bar' },
+  'bar.product.created': { label: 'Bar product added', module: 'bar' },
+  'bar.product.updated': { label: 'Bar product changed', module: 'bar' },
+  'bar.product.status.changed': { label: 'Bar product put on or off the till', module: 'bar' },
+  'bar.product.deleted': { label: 'Bar product deleted', module: 'bar' },
+  'bar.item.created': { label: 'Stocked item added', module: 'bar' },
+  'bar.item.updated': { label: 'Stocked item changed', module: 'bar' },
+  'bar.item.status.changed': { label: 'Stocked item retired or put back', module: 'bar' },
+  'bar.item.deleted': { label: 'Stocked item deleted', module: 'bar' },
+
   // Module G: training
 
   'department.created': { label: 'Department added', module: 'training' },

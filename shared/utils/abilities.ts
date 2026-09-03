@@ -48,6 +48,11 @@ export const runTrainingSessions = defineAbility((viewer: Viewer) => holds(viewe
 export const viewTicketTypes = defineAbility((viewer: Viewer) => holds(viewer, 'ticketing.read'))
 export const viewProgramme = defineAbility((viewer: Viewer) => holds(viewer, 'ticketing.read'))
 
+// The bar's catalogue and its stock register, both sit-down work. Selling over the bar is the
+// till's, and the till derives from tonight rather than from either of these (0009, F-111).
+export const viewBarCatalogue = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read'))
+export const viewBarStock = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read'))
+
 // Tonight is derived from a confirmed shift and expires at 04:00 with nothing to revoke (0014,
 // E-111), so it is read from the request rather than from anything the viewer holds.
 export const workTonight = defineAbility((viewer: Viewer) => viewer.onShiftTonight)
@@ -79,6 +84,8 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   runTrainingSessions: 'training.write',
   viewTicketTypes: 'ticketing.read',
   viewProgramme: 'ticketing.read',
+  viewBarCatalogue: 'bar.read',
+  viewBarStock: 'bar.read',
   workTheDoor: 'night.door',
   workTheTill: 'night.till',
   manageTonight: 'night.manage',

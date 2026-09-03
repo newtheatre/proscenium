@@ -107,6 +107,7 @@ describe('entries sit under the banner of their own module', () => {
       'rooms': 'spaces',
       'dev': 'platform',
       'ticket-types': 'ticketing',
+      'bar': 'bar',
     }
     const lines = (await Bun.file('shared/utils/audit-coverage.ts').text()).split('\n')
     lines.forEach((text, index) => {

@@ -73,12 +73,12 @@ A prefix names the domain; the shell follows the posture of the work rather than
 | --- | --- | --- |
 | `/`, `/sign-in`, `/register`, `/verify`, `/reset`, `/magic` | `default` | Anybody |
 | `/rooms`, `/rooms/mine`, `/account/*` | `member` | A member, about themselves |
-| `/rooms/manage/*`, `/people/*`, `/box-office/*`, `/admin/*` | `console` | Somebody working for the theatre |
+| `/rooms/manage/*`, `/people/*`, `/box-office/*`, `/bar/*`, `/admin/*` | `console` | Somebody working for the theatre |
 | `/tonight/*` | `tonight` | Somebody on shift, on a phone |
 
 A domain with both audiences puts the member's screens at the top and the console's under `manage`
 (`/rooms` against `/rooms/manage/requests`). A domain with no member surface sits flat
-(`/people/accounts`, and `/bar/stock` when it lands). Every navigable destination is declared once
+(`/people/accounts`, `/bar/products` and `/bar/stock`). Every navigable destination is declared once
 in `shared/utils/site-nav.ts`, which the console sidebar renders and the console middleware guards
 from, so a deep link and the sidebar cannot disagree.
 

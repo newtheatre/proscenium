@@ -168,6 +168,25 @@ export const AUDIT_COVERAGE: Coverage[] = [
 
   // Module F: bar
 
+  { route: 'server/api/admin/bar/categories/index.get.ts', exempt: 'reads the till\'s layout' },
+  { route: 'server/api/admin/bar/categories/index.post.ts', actions: ['bar.category.created'] },
+  { route: 'server/api/admin/bar/categories/[id]/index.put.ts', actions: ['bar.category.updated'] },
+  { route: 'server/api/admin/bar/products/index.get.ts', exempt: 'reads the products, retired ones included' },
+  { route: 'server/api/admin/bar/products/index.post.ts', actions: ['bar.product.created'] },
+  { route: 'server/api/admin/bar/products/[id]/index.put.ts', actions: ['bar.product.updated'] },
+  { route: 'server/api/admin/bar/products/[id]/status.post.ts', actions: ['bar.product.status.changed'] },
+  { route: 'server/api/admin/bar/products/[id]/index.delete.ts', actions: ['bar.product.deleted'] },
+  { route: 'server/api/admin/bar/items/index.get.ts', exempt: 'reads the stocked items and what is on hand' },
+  { route: 'server/api/admin/bar/items/index.post.ts', actions: ['bar.item.created'] },
+  { route: 'server/api/admin/bar/items/[id]/index.put.ts', actions: ['bar.item.updated'] },
+  { route: 'server/api/admin/bar/items/[id]/status.post.ts', actions: ['bar.item.status.changed'] },
+  { route: 'server/api/admin/bar/items/[id]/index.delete.ts', actions: ['bar.item.deleted'] },
+  { route: 'server/api/admin/bar/movements/index.get.ts', exempt: 'reads the movement history' },
+  {
+    route: 'server/api/admin/bar/movements/index.post.ts',
+    exempt: 'the movement is the record: it stamps its own actor and time, cannot be edited or deleted, and a correction supersedes it (0010, F-114 criteria 4 and 5)',
+  },
+
   // Module G: training
 
   {

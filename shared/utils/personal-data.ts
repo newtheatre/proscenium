@@ -250,6 +250,17 @@ export const PERSONAL_TABLES: PersonalTable[] = [
 
   // Module F: bar
 
+  {
+    name: 'stock_movements',
+    column: 'actor_id',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Append-only, so nothing here could be rewritten anyway (0010). The reason is a vocabulary
+    // rather than free text, so no movement can name a person in the first place.
+    why: 'A stock movement is financial evidence. It stamps who moved the stock, and the tombstone still answers for it.',
+  },
+
   // Module G: training
 
   {
