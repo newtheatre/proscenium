@@ -1,5 +1,6 @@
 import { defineAbility } from 'nuxt-authorization/utils'
 import type { BouncerAbility } from 'nuxt-authorization/utils'
+import { OPERATIONAL_PERMISSIONS } from './roles'
 import type { Permission } from './roles'
 
 // Named views over the permission map, never a second vocabulary: an ability says which screen a
@@ -22,9 +23,10 @@ export const signedIn = defineAbility((_viewer: Viewer) => true)
 // A public page is reachable by anybody, signed in or not.
 export const anybody = defineAbility((_viewer: Viewer) => true)
 
-// Standing permissions are administrative only (0009), so holding any of them is what admits
-// somebody to the console at all.
-export const reachConsole = defineAbility((viewer: Viewer) => viewer.permissions.length > 0)
+// Standing permissions are administrative save for the night bypass (0009, 0044), so holding one
+// of the rest is what admits somebody to the console at all.
+export const reachConsole = defineAbility((viewer: Viewer) =>
+  viewer.permissions.some(permission => !OPERATIONAL_PERMISSIONS.includes(permission)))
 
 export const viewAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.read'))
 export const viewMembers = defineAbility((viewer: Viewer) => holds(viewer, 'members.read'))

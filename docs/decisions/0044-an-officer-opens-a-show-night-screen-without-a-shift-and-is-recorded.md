@@ -55,6 +55,16 @@ grant being used, so `PRIVILEGED_ROLES` applies to it exactly as it applies to `
 (A-112). A shift will not carry that gate when the shift branch lands, because a shift is not a
 grant.
 
+**A cancelled performance is not a night's work.** The house never opens, so nothing derives from
+it: a venue whose only performance tonight is cancelled resolves no authority and records no
+bypass. Every other status still counts, because a performance that is not on sale internally is
+still one somebody has to staff.
+
+**Holding the bypass does not admit anybody to the console.** `reachConsole` used to read "holds
+any standing permission", which was true while every standing permission was administrative. It now
+reads "holds a standing permission that is not one of these three", so an officer is not shown a
+console in which every screen would answer 403.
+
 **Hiding a link is never the enforcement.** The three abilities in `shared/utils/abilities.ts` are
 named views over these permissions and decide what the chrome shows; the guard on the route is what
 refuses (E-111 criterion 5, restated in 0040).
@@ -78,6 +88,8 @@ refuses (E-111 criterion 5, restated in 0040).
 - An officer who bypasses at two venues on one night is two rows, and an officer who opens the door
   screen at 18:00 and again at 21:00 is one. The second request is not refused; it simply records
   nothing new.
+- `OPERATIONAL_PERMISSIONS` in `roles.ts` lists the three, and it is what `reachConsole` reads. A
+  fourth permission of this kind joins that list, or it quietly becomes a console key.
 - Whether `BAR_MANAGER` belongs in `PRIVILEGED_ROLES` is a workshop question, not this record's:
   the till takes money, which 0009 says demands a second factor, and forcing an unenrolled bar
   manager to enrol at 19:25 is its own failure. The default is unchanged here.

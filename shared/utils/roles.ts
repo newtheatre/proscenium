@@ -55,6 +55,10 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number]
 
+// The exception's members, listed so "holds a standing permission" keeps meaning "does
+// administrative work": an officer bypass opens tonight's screens and never the console (0044).
+export const OPERATIONAL_PERMISSIONS: readonly Permission[] = ['night.door', 'night.till', 'night.manage']
+
 // Deliberately sparse: a role earns a permission when the thing it unlocks exists. Guessing
 // now would grant authority over features nobody has reviewed.
 export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {

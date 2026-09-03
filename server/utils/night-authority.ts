@@ -24,7 +24,9 @@ interface NightCoverage { venueId: string, performanceIds: string[], venuePerfor
 // What the scope resolves to on the programme. Authority derives from a performance, so a venue
 // with nothing on tonight resolves none of it (0009, E-127 criterion 1).
 async function coverage(night: string, scope: NightScope): Promise<NightCoverage> {
-  const running = await performancesOnNight(night, scope.venueId)
+  // A cancelled performance is not a night's work: the house never opens, so nothing derives from
+  // it and no bypass is recorded against it (D-121 criterion 5).
+  const running = (await performancesOnNight(night, scope.venueId)).filter(one => one.status !== 'CANCELLED')
 
   if (scope.performanceId) {
     const one = running.find(performance => performance.id === scope.performanceId)
@@ -63,6 +65,10 @@ async function recordOfficerBypass(actorId: string, night: string, covered: Nigh
 // Hiding a link is never the enforcement (E-111 criterion 5), and the night is `showNightOf`'s
 // alone, so authority expires at 04:00 with nothing to revoke and no second boundary anywhere.
 export async function requireNightAuthority(event: H3Event, role: NightRole, scope: NightScope = {}): Promise<NightAuthority> {
+  // Identity first, so a signed-out caller is told that and cannot read tonight's date off which
+  // refusal it gets back.
+  const resolved = await authority(event)
+
   const tonight = currentShowNight()
   if (scope.night !== undefined && !isShowNight(scope.night)) {
     throw createError({ statusCode: 400, statusMessage: 'That is not a show night' })
@@ -72,8 +78,6 @@ export async function requireNightAuthority(event: H3Event, role: NightRole, sco
   if (scope.night !== undefined && scope.night !== tonight) {
     throw createError({ statusCode: 403, statusMessage: 'Show-night tools open for tonight only, and that night has ended' })
   }
-
-  const resolved = await authority(event)
 
   const held = await shiftHeldTonight()
   if (held) {

@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
-import { ABILITY_PERMISSIONS, can, manageTonight, workTheDoor, workTheTill } from '#shared/utils/abilities'
+import { ABILITY_PERMISSIONS, can, manageTonight, reachConsole, workTheDoor, workTheTill } from '#shared/utils/abilities'
 import { isAuditAction } from '#shared/utils/audit-actions'
 import { AUDIT_COVERAGE } from '#shared/utils/audit-coverage'
-import { PERMISSION_MAP } from '#shared/utils/roles'
+import { OPERATIONAL_PERMISSIONS, PERMISSION_MAP } from '#shared/utils/roles'
 import {
   NIGHT_ROLES,
   NIGHT_ROLE_OFFICER,
@@ -122,6 +122,14 @@ describe('the abilities are a view over the permissions, never the enforcement (
 
   test('a signed-out viewer is refused before the body runs', () => {
     for (const ability of Object.values(ABILITIES)) expect(can(null, ability)).toBe(false)
+  })
+
+  // The console admits somebody who holds administrative standing, and the bypass is not that:
+  // an officer sent to `/admin` would find every screen on it answering 403 (0040, 0044).
+  test('an officer holding the bypass and nothing else does not reach the console', () => {
+    expect(can(viewer([...OPERATIONAL_PERMISSIONS]), reachConsole)).toBe(false)
+    expect(can(viewer(['night.door', 'audit.read']), reachConsole)).toBe(true)
+    expect(can(viewer([]), reachConsole)).toBe(false)
   })
 
   test('each is declared in the ability-to-permission map, so the nav test can check it', () => {

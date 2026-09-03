@@ -22,6 +22,7 @@ let bar: TestMember
 let member: TestMember
 let house: { venueId: string, performanceId: string }
 let studio: { venueId: string, performanceId: string }
+let cancelled: { venueId: string, performanceId: string }
 
 const night = currentShowNight()
 
@@ -38,6 +39,7 @@ beforeAll(async () => {
 
   house = programme('house')
   studio = programme('studio')
+  cancelled = programme('cancelled', 'CANCELLED')
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -45,14 +47,14 @@ afterAll(async () => {
 }, 30_000)
 
 // Seed changes closed after Wave 0, so a night to work comes from tests/helpers.
-function programme(suffix: string): { venueId: string, performanceId: string } {
+function programme(suffix: string, status: 'ON_SALE' | 'CANCELLED' = 'ON_SALE'): { venueId: string, performanceId: string } {
   const database = new Database(app.databaseFile)
   try {
     const made = tonightsPerformance({
       batch: statements => database.transaction(() => {
         for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
       })(),
-    }, { suffix })
+    }, { suffix, status })
     return { venueId: made.venueId, performanceId: made.performanceId }
   }
   finally {
@@ -145,6 +147,11 @@ describe.skipIf(skip !== null)('the guard is the enforcement, not the navigation
     expect((await ask(`role=DOOR&venueId=${house.venueId}`)).status).toBe(401)
   })
 
+  // Identity is resolved first, so which refusal comes back never says what tonight is.
+  test('a signed-out caller naming a night is told they are signed out, and nothing else', async () => {
+    expect((await ask(`role=DOOR&venueId=${house.venueId}&night=${daysAfter(night, -1)}`)).status).toBe(401)
+  })
+
   test('an unknown role is refused as a bad request, not resolved to nothing', async () => {
     expect((await ask(`role=USHER&venueId=${house.venueId}`, foh.cookie)).status).toBe(400)
   })
@@ -182,7 +189,19 @@ describe.skipIf(skip !== null)('authority keys to a performance, never to a day 
     expect(response.status).toBe(403)
   })
 
-  // Two venues run tonight, so an unnarrowed request cannot say which one it covers.
+  // The house never opens, so nothing derives from it and no bypass is recorded against it.
+  test('a cancelled performance is not a night to take charge of', async () => {
+    const response = await ask(`role=DOOR&venueId=${cancelled.venueId}`, foh.cookie)
+    expect(response.status).toBe(403)
+    expect(await message(response)).toContain('running')
+    expect(bypasses(foh.id).map(row => row.target)).not.toContain(`night:${night}:${cancelled.venueId}:DOOR`)
+  })
+
+  test('naming the cancelled performance itself resolves nothing either', async () => {
+    expect((await ask(`role=DOOR&performanceId=${cancelled.performanceId}`, foh.cookie)).status).toBe(403)
+  })
+
+  // Three venues run tonight, so an unnarrowed request cannot say which one it covers.
   test('an unnarrowed request on a two-venue night asks for the venue', async () => {
     const response = await ask('role=DOOR', foh.cookie)
     expect(response.status).toBe(400)
