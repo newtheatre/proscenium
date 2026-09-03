@@ -133,6 +133,7 @@ const columns: TableColumn<BarCategory>[] = [
     <AdminToolbar
       v-model:search="search"
       placeholder="A category"
+      :filterable="false"
       :active="activeFilters"
       :loading="status === 'pending'"
       @clear="search = ''"

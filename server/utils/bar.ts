@@ -281,6 +281,7 @@ export async function itemNamed(name: string, exceptId?: string): Promise<StockI
 export interface MovementFilters {
   itemId?: string
   kind?: string
+  search?: string
 }
 
 const MOVEMENT_COLUMNS = sql`
@@ -296,11 +297,18 @@ const MOVEMENT_COLUMNS = sql`
   m.ref_id AS refId,
   m.reverses_id AS reversesId,
   m.actor_id AS actorId,
-  m.created_at AS createdAt
+  m.created_at AS createdAt,
+  CASE WHEN EXISTS (SELECT 1 FROM stock_movements r WHERE r.reverses_id = m.id) THEN 1 ELSE 0 END AS reversed
 `
 
+interface MovementRow extends Omit<StockMovement, 'reversed'> {
+  reversed: number
+}
+
+const readMovement = (row: MovementRow): StockMovement => ({ ...row, reversed: row.reversed === 1 })
+
 function movementPredicate(filters: MovementFilters): SQL {
-  const terms: SQL[] = []
+  const terms: SQL[] = [...search(filters.search, 'i.name')]
   if (filters.itemId) terms.push(sql`m.item_id = ${filters.itemId}`)
   if (filters.kind) terms.push(sql`m.kind = ${filters.kind}`)
   return where(terms)
@@ -316,7 +324,7 @@ export function movementsQuery(filters: MovementFilters, limit: number, offset: 
 }
 
 export async function listMovements(filters: MovementFilters, limit: number, offset: number): Promise<StockMovement[]> {
-  return db.all<StockMovement>(movementsQuery(filters, limit, offset))
+  return (await db.all<MovementRow>(movementsQuery(filters, limit, offset))).map(readMovement)
 }
 
 export async function countMovements(filters: MovementFilters): Promise<number> {
@@ -327,8 +335,8 @@ export async function countMovements(filters: MovementFilters): Promise<number> 
 }
 
 export async function movementById(id: string): Promise<StockMovement | undefined> {
-  const [row] = await db.all<StockMovement>(sql`
+  const [row] = await db.all<MovementRow>(sql`
     SELECT ${MOVEMENT_COLUMNS} FROM stock_movements m JOIN bar_items i ON i.id = m.item_id WHERE m.id = ${id}
   `)
-  return row
+  return row ? readMovement(row) : undefined
 }

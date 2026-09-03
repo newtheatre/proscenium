@@ -45,13 +45,17 @@ export default defineEventHandler(async (event) => {
     actorId: resolved.account.id,
     action: 'bar.item.updated',
     target: `bar-item:${id}`,
-    detail: changes({
-      name: [held.name, input.name],
-      unit: [held.unit, input.unit],
-      containerMl: [held.containerMl, containerMl],
-      parQty: [held.parQty, input.parQty ?? null],
-      ageRestricted: [held.ageRestricted, input.ageRestricted],
-    }),
+    // The allergen notes are prose, so the trail records that they moved and never what they say.
+    detail: {
+      ...changes({
+        name: [held.name, input.name],
+        unit: [held.unit, input.unit],
+        containerMl: [held.containerMl, containerMl],
+        parQty: [held.parQty, input.parQty ?? null],
+        ageRestricted: [held.ageRestricted, input.ageRestricted],
+      }),
+      allergenNotesChanged: (input.allergenNotes ?? null) !== held.allergenNotes,
+    },
   }))
 
   return { ok: true }

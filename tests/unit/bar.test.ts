@@ -5,6 +5,7 @@ import {
   MOVEMENT_WRITERS,
   STOCK_MOVEMENT_KINDS,
   categoryForm,
+  movementEntryForm,
   movementForm,
   productForm,
   says,
@@ -70,6 +71,18 @@ describe('a movement is signed, explained and costed where it should be', () => 
     expect(aMovement({ unitCostPence: 4.8 }).success).toBe(false)
     expect(aMovement({ unitCostPence: 480 }).success).toBe(true)
   })
+
+  // A form validates its whole state, so a modal about one item cannot be held to the schema that
+  // names one: it would refuse before the handler ran, with no field to show the message against.
+  test('the stock screen validates the fields its modal actually holds', () => {
+    const entry = (over: Record<string, unknown> = {}) =>
+      movementEntryForm.safeParse({ kind: 'DELIVERY', qty: 750, ...over })
+
+    expect(entry().success).toBe(true)
+    expect(entry({ kind: 'WASTAGE', qty: -750 }).success).toBe(false)
+    expect(entry({ kind: 'WASTAGE', qty: -750, reason: 'BREAKAGE' }).success).toBe(true)
+    expect(movementForm.safeParse({ kind: 'DELIVERY', qty: 750 }).success).toBe(false)
+  })
 })
 
 describe('a product says what it is and what it contains (F-111 criterion 1)', () => {
@@ -97,6 +110,12 @@ describe('a category orders the till and a stocked item counts in its own unit',
   test('a colour is a hex value or nothing', () => {
     expect(categoryForm.safeParse({ name: 'Wine', colour: 'burgundy' }).success).toBe(false)
     expect(categoryForm.safeParse({ name: 'Wine', colour: '#8b1e3f' }).success).toBe(true)
+  })
+
+  // A cleared field arrives as an empty string, and refusing it would leave a colour unremovable.
+  test('a colour cleared out is no colour rather than a bad one', () => {
+    const parsed = categoryForm.safeParse({ name: 'Wine', colour: '  ' })
+    expect(parsed.success && parsed.data.colour).toBe(null)
   })
 
   test('a container size belongs to something measured', () => {

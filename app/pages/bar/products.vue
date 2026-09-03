@@ -37,7 +37,8 @@ const { data, status, error, refresh } = await useAsyncData(
   { watch: [page], default: noProducts },
 )
 
-// The form needs every category, not the page of them the categories screen shows.
+// The form needs the categories, not the page the categories screen shows. The page cap is the
+// ceiling, which no bar's category list comes near.
 const { data: categories } = await useAsyncData(
   'bar-products-categories',
   () => request<Listing<BarCategory>>('/api/admin/bar/categories', { query: { pageSize: 100 } }),
@@ -74,6 +75,12 @@ const state = reactive<FormState>({
   staffedOnly: false,
   ageRestricted: false,
   allergenState: 'UNKNOWN',
+})
+
+// The note field is hidden when nothing is recorded, so the value behind it goes too: otherwise
+// the form refuses over a field the reader cannot see.
+watch(() => state.allergenState, (chosen) => {
+  if (chosen === 'UNKNOWN') state.allergenNote = undefined
 })
 
 const categoryOptions = computed(() => categories.value.items.map(item => ({ label: item.name, value: item.id })))

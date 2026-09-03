@@ -4,7 +4,7 @@ import {
   HAND_ENTERED_KINDS,
   MOVEMENT_REASONS,
   STOCK_UNITS,
-  movementForm,
+  movementEntryForm,
   says,
   saysQuantity,
   stockItemForm,
@@ -69,22 +69,26 @@ interface MovementState {
   kind: HandEnteredKind
   qty: number
   reason?: MovementReason
-  cost: number
+  unitCostPence?: number
+  // An adjustment goes either way: stock is found as often as it is lost.
+  adds: boolean
 }
 
-const movement = reactive<MovementState>({ kind: 'DELIVERY', qty: 0, cost: 0 })
+const movement = reactive<MovementState>({ kind: 'DELIVERY', qty: 1, adds: true })
 
 const unitOptions = STOCK_UNITS.map(value => ({ label: says(value), value }))
 // A reversal is raised from the movement history, against the movement it cancels.
 const kindOptions = (HAND_ENTERED_KINDS.filter(kind => kind !== 'REVERSAL') as HandEnteredKind[])
   .map(value => ({ label: says(value), value }))
 const reasonOptions = MOVEMENT_REASONS.map(value => ({ label: says(value), value }))
+const directionOptions = [{ label: 'Add to stock', value: true }, { label: 'Take off stock', value: false }]
 
 // The field takes pounds and the request carries pence, converted here and nowhere else (0004).
+// Undefined stays undefined: a delivery whose cost nobody entered records none rather than nought.
 const pounds = computed({
-  get: () => movement.cost / 100,
-  set: (value: number) => {
-    movement.cost = Math.round((value ?? 0) * 100)
+  get: () => (movement.unitCostPence === undefined ? undefined : movement.unitCostPence / 100),
+  set: (value: number | undefined) => {
+    movement.unitCostPence = value === undefined ? undefined : Math.round(value * 100)
   },
 })
 
@@ -108,7 +112,7 @@ function edit(item: StockItem | null): void {
 
 function moveStock(item: StockItem): void {
   moving.value = item
-  Object.assign(movement, { kind: 'DELIVERY', qty: 0, reason: undefined, cost: 0 })
+  Object.assign(movement, { kind: 'DELIVERY', qty: 1, reason: undefined, unitCostPence: undefined, adds: true })
 }
 
 async function save(): Promise<void> {
@@ -142,9 +146,10 @@ async function save(): Promise<void> {
   }
 }
 
-// A delivery adds and everything else here takes away, so the screen states the sign the request
-// carries rather than leaving somebody to type a minus.
-const signedQty = computed(() => (movement.kind === 'DELIVERY' ? Math.abs(movement.qty) : -Math.abs(movement.qty)))
+// The screen states the sign rather than leaving somebody to type a minus. A delivery only adds,
+// wastage only takes away, and an adjustment is whichever the manager chose.
+const adding = computed(() => movement.kind === 'DELIVERY' || (movement.kind === 'ADJUST' && movement.adds))
+const signedQty = computed(() => (adding.value ? Math.abs(movement.qty) : -Math.abs(movement.qty)))
 
 async function record(): Promise<void> {
   const item = moving.value
@@ -160,7 +165,7 @@ async function record(): Promise<void> {
         kind: movement.kind,
         qty: signedQty.value,
         reason: movement.reason ?? null,
-        unitCostPence: movement.kind === 'DELIVERY' ? movement.cost : null,
+        unitCostPence: movement.kind === 'DELIVERY' ? movement.unitCostPence ?? null : null,
       },
     })
     toast.add({
@@ -518,7 +523,7 @@ const columns: TableColumn<StockItem>[] = [
     >
       <template #body>
         <UForm
-          :schema="movementForm"
+          :schema="movementEntryForm"
           :state="movement"
           class="space-y-4"
           data-test="movement-form"
@@ -546,10 +551,24 @@ const columns: TableColumn<StockItem>[] = [
           </UFormField>
 
           <UFormField
+            v-if="movement.kind === 'ADJUST'"
+            label="Which way"
+            name="adds"
+            description="Stock is found as often as it is lost, so an adjustment goes either way."
+          >
+            <USelect
+              v-model="movement.adds"
+              :items="directionOptions"
+              class="w-full"
+              data-test="movement-direction"
+            />
+          </UFormField>
+
+          <UFormField
             label="Quantity"
             name="qty"
             required
-            :description="`In ${moving ? says(moving.unit).toLowerCase() : 'the item\'s own unit'}. A delivery adds it and anything else takes it away.`"
+            :description="`In ${moving ? says(moving.unit).toLowerCase() : 'the item\'s own unit'}. This ${adding ? 'adds to' : 'comes off'} what is on hand.`"
           >
             <UInputNumber
               v-model="movement.qty"

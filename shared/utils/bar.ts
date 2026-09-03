@@ -77,10 +77,16 @@ const label = (what: string) => z.string().trim().min(1, `A ${what} needs a name
   // A name is a label, so it holds no address: the audit detail carries both names (0011).
   .refine(value => !value.includes('@'), 'A name is a label, so it holds no address')
 
+// A cleared field arrives as an empty string, which is a colour nobody chose rather than a
+// malformed one, so it becomes null instead of a refusal.
+const hexColour = z.string().trim()
+  .transform(value => value || null)
+  .refine(value => value === null || /^#[0-9a-f]{6}$/i.test(value), 'A colour is six hexadecimal characters after a hash')
+
 export const categoryForm = z.object({
   name: label('category'),
   sort: z.number().int().min(0).max(999).default(0),
-  colour: z.string().trim().regex(/^#[0-9a-f]{6}$/i, 'A colour is a hex value like #8b1e3f').nullish(),
+  colour: hexColour.nullish(),
 })
 
 export const productForm = z.object({
@@ -126,6 +132,13 @@ export const movementForm = z.object({
   unitCostPence: z.number().int().nonnegative().max(MAX_UNIT_COST_PENCE).nullish(),
   reversesId: z.string().trim().min(1).nullish(),
 })
+
+// What the stock screen's own modal holds. A form validates its whole state, so a screen that is
+// not about one stocked item cannot be validated against the schema that names one.
+export const movementEntryForm = movementForm.omit({ itemId: true, reversesId: true }).refine(
+  value => !KINDS_NEEDING_A_REASON.includes(value.kind) || Boolean(value.reason),
+  { message: 'That needs a reason', path: ['reason'] },
+)
 
 export type CategoryInput = z.output<typeof categoryForm>
 export type ProductInput = z.output<typeof productForm>
@@ -183,6 +196,8 @@ export interface StockMovement {
   reversesId: string | null
   actorId: string | null
   createdAt: number
+  // Whether a later movement cancels this one, so a screen does not offer to reverse it twice.
+  reversed: boolean
 }
 
 const WORDS: Record<string, string> = {

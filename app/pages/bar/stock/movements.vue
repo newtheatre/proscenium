@@ -11,6 +11,7 @@ const UBadge = resolveComponent('UBadge')
 
 const request = useRequestFetch()
 const toast = useToast()
+const search = ref('')
 const itemId = ref<string | undefined>(undefined)
 const kind = ref<StockMovementKind | undefined>(undefined)
 const page = ref(1)
@@ -27,7 +28,7 @@ const noItems = (): Listing<StockItem> => ({ items: [], total: 0, pageSize: 0, p
 const { data, status, error, refresh } = await useAsyncData(
   'bar-movements',
   () => request<Listing<StockMovement>>('/api/admin/bar/movements', {
-    query: { itemId: itemId.value, kind: kind.value, page: page.value },
+    query: { itemId: itemId.value, kind: kind.value, search: search.value.trim() || undefined, page: page.value },
   }),
   { watch: [page], default: noMovements },
 )
@@ -38,7 +39,7 @@ const { data: items } = await useAsyncData(
   { default: noItems },
 )
 
-watch([itemId, kind], () => {
+watch([search, itemId, kind], () => {
   if (page.value === 1) void refresh()
   else page.value = 1
 })
@@ -90,6 +91,11 @@ const listingFailure = computed(() => (error.value ? refusalText(error.value, 'T
 
 const activeFilters = computed<ActiveFilter[]>(() => {
   const active: ActiveFilter[] = []
+  if (search.value) {
+    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
+      search.value = ''
+    } })
+  }
   if (itemId.value) {
     const named = items.value.items.find(item => item.id === itemId.value)?.name ?? 'one item'
     active.push({ key: 'item', label: `For ${named}`, icon: 'i-lucide-package', clear: () => {
@@ -144,7 +150,7 @@ const columns: TableColumn<StockMovement>[] = [
     id: 'act',
     header: '',
     meta: { class: { td: 'text-right whitespace-nowrap' } },
-    cell: ({ row }) => (row.original.kind === 'REVERSAL' || row.original.reversesId
+    cell: ({ row }) => (row.original.kind === 'REVERSAL' || row.original.reversed
       ? null
       : h(resolveComponent('UButton'), {
           'size': 'sm',
@@ -180,11 +186,11 @@ const columns: TableColumn<StockMovement>[] = [
     />
 
     <AdminToolbar
-      placeholder="A movement"
-      :filterable="true"
+      v-model:search="search"
+      placeholder="A stocked item"
       :active="activeFilters"
       :loading="status === 'pending'"
-      @clear="itemId = undefined; kind = undefined"
+      @clear="search = ''; itemId = undefined; kind = undefined"
     >
       <template #filters>
         <UFormField label="Stocked item">

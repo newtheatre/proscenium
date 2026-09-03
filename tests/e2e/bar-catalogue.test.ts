@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -96,6 +96,7 @@ interface ListedMovement {
   reason: string | null
   unitCostPence: number | null
   actorId: string | null
+  reversed: boolean
 }
 
 // The whole list, not the first page: an absence assertion over one page passes for the wrong
@@ -385,6 +386,22 @@ describe.skipIf(skip !== null)('on hand is the sum of the movements (F-114 crite
     const id = await addItem()
     expect((await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'ADJUST', qty: 0, reason: 'OTHER' })).status).toBe(400)
   })
+
+  // Stock is found as often as it is lost, so an adjustment has to go both ways.
+  test('an adjustment can add as well as take away', async () => {
+    const id = await addItem()
+    await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'ADJUST', qty: 400, reason: 'OPENING_BALANCE' })
+    expect(await onHand(id)).toBe(400)
+
+    await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'ADJUST', qty: -150, reason: 'COUNT_CORRECTION' })
+    expect(await onHand(id)).toBe(250)
+  })
+
+  test('a delivery with no cost entered records none rather than nought', async () => {
+    const id = await addItem()
+    await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'DELIVERY', qty: 750 })
+    expect((await movements(`&itemId=${id}`))[0]?.unitCostPence).toBeNull()
+  })
 })
 
 describe.skipIf(skip !== null)('a correction supersedes, and stamps who made it (F-114 criteria 4 and 5)', () => {
@@ -446,6 +463,30 @@ describe.skipIf(skip !== null)('a correction supersedes, and stamps who made it 
     expect(await onHand(id)).toBe(0)
   })
 
+  test('a reversal is not itself reversed, and the listing says which rows are spent', async () => {
+    const id = await addItem()
+    const original = await created(await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'DELIVERY', qty: 750 }))
+    const reversal = await created(await send('POST', '/api/admin/bar/movements', {
+      itemId: id,
+      kind: 'REVERSAL',
+      qty: -750,
+      reason: 'OTHER',
+      reversesId: original,
+    }))
+
+    expect((await send('POST', '/api/admin/bar/movements', {
+      itemId: id,
+      kind: 'REVERSAL',
+      qty: 750,
+      reason: 'OTHER',
+      reversesId: reversal,
+    })).status).toBe(409)
+
+    const listed = await movements(`&itemId=${id}`)
+    expect(listed.find(movement => movement.id === original)?.reversed).toBe(true)
+    expect(listed.find(movement => movement.id === reversal)?.reversed).toBe(false)
+  })
+
   test('every movement stamps the person who made it', async () => {
     const id = await addItem()
     await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'DELIVERY', qty: 750 }, barManager.cookie)
@@ -501,6 +542,33 @@ describe.skipIf(skip !== null)('the screens', () => {
     const history = await textOf(view, '[data-test="bar-movements-table"]')
     expect(history).toContain('Delivery')
     expect(history).toContain('£4.80')
+    view.close()
+  }, 120_000)
+
+  // A form validates its whole state, so a modal held to the wrong schema throws before the
+  // handler runs and the button silently does nothing. Only driving it proves it works.
+  test('a wastage recorded through the modal reaches the register and moves on hand', async () => {
+    const itemName = named('Modal bottle')
+    const itemId = await addItem({ name: itemName })
+    await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 3000, unitCostPence: 480 })
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="move-${itemId}"]`)
+    await click(view, `[data-test="move-${itemId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
+
+    await fillNumber(view, '[data-test="movement-qty"]', '250')
+    await click(view, '[data-test="movement-submit"]')
+    await waitFor(view, `!document.querySelector('[data-test="movement-form"]')`)
+
+    // A delivery is the modal's default, so what the screen wrote adds to what the API delivered.
+    expect(await onHand(itemId)).toBe(3250)
     view.close()
   }, 120_000)
 })
