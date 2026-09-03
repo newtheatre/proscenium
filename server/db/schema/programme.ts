@@ -146,4 +146,7 @@ export const performances = sqliteTable('performances', {
   check('performances_status_values', sql`${table.status} IN ('DRAFT', 'ON_SALE', 'CANCELLED')`),
   check('performances_capacity_override', sql`${table.capacityOverride} IS NULL OR ${table.capacityOverride} >= 0`),
   check('performances_interval_count', sql`${table.intervalCount} >= 0`),
+  // Empty is not a link-out. Without this, clearing the field to '' would quietly reopen internal
+  // sales on an externally ticketed performance (D-122).
+  check('performances_external_url_not_empty', sql`${table.externalBookingUrl} IS NULL OR length(${table.externalBookingUrl}) > 0`),
 ])

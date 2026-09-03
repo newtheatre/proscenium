@@ -11,6 +11,8 @@ const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 const seeded: { email: string, password: string }[] = []
+// Read once, beside the seed run: recomputing it in a test would flake for the minute after 04:00.
+let seededNight = ''
 
 beforeAll(async () => {
   if (skip) return
@@ -28,6 +30,7 @@ beforeAll(async () => {
       seeded.push({ email: line, password: lines[index + 1]! })
     }
   }
+  seededNight = currentShowNight()
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -103,7 +106,7 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
     const performances = rows<{ starts_at: number }>('SELECT starts_at FROM performances ORDER BY starts_at')
     expect(performances).toHaveLength(2)
 
-    const tonight = showNightBounds(currentShowNight())
+    const tonight = showNightBounds(seededNight)
     expect(performances[0]!.starts_at * 1000).toBeGreaterThanOrEqual(tonight.from.getTime())
     expect(performances[0]!.starts_at * 1000).toBeLessThan(tonight.to.getTime())
     expect(performances[1]!.starts_at * 1000).toBeGreaterThan(tonight.to.getTime())

@@ -46,7 +46,9 @@ export function tonightsPerformance(into: AcceptsStatements, options: TonightsPe
   const venueId = options.venueId ?? `venue-${suffix}`
   const showId = `show-${suffix}`
   const performanceId = `performance-${suffix}`
-  const venueCapacity = options.venueCapacity === undefined ? 120 : options.venueCapacity
+  // A venue the caller supplied is a venue this does not write, so it reports no capacity for it
+  // rather than a default it never stored.
+  const venueCapacity = options.venueCapacity ?? (options.venueId ? null : 120)
   const capacityOverride = options.capacityOverride ?? null
 
   const statements: BoundStatement[] = []

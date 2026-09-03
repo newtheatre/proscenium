@@ -239,8 +239,8 @@ SQLite cannot state as a CHECK, so D-102's write path holds that half.
 `doors_at` · `duration_minutes` · `interval_count` (default nought) · `interval_minutes` ·
 `capacity_override` NULL = venue capacity · `booking_closes_hours_before` (NULL and 0 both
 mean curtain-up) · `hold_release_minutes_before` NULL = config default ·
-`external_booking_url` NULL · `status` CHECK `DRAFT|ON_SALE|CANCELLED` · `notes` (internal,
-safe) · timestamps.
+`external_booking_url` NULL, and CHECK non-empty because an empty string is not a link-out ·
+`status` CHECK `DRAFT|ON_SALE|CANCELLED` · `notes` (internal, safe) · timestamps.
 Sold-out and completed are derived, never stored. Indexes: `starts_at`, (`venue_id`,
 `starts_at`), `show_id`. A performance belongs to the show night of its curtain, and to no
 day and no venue: two venues may run at the same time, and one venue may run a matinee and an

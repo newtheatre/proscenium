@@ -46,7 +46,8 @@ CREATE TABLE `performances` (
 	FOREIGN KEY (`venue_id`) REFERENCES `venues`(`id`) ON UPDATE no action ON DELETE restrict,
 	CONSTRAINT "performances_status_values" CHECK("performances"."status" IN ('DRAFT', 'ON_SALE', 'CANCELLED')),
 	CONSTRAINT "performances_capacity_override" CHECK("performances"."capacity_override" IS NULL OR "performances"."capacity_override" >= 0),
-	CONSTRAINT "performances_interval_count" CHECK("performances"."interval_count" >= 0)
+	CONSTRAINT "performances_interval_count" CHECK("performances"."interval_count" >= 0),
+	CONSTRAINT "performances_external_url_not_empty" CHECK("performances"."external_booking_url" IS NULL OR length("performances"."external_booking_url") > 0)
 );
 --> statement-breakpoint
 CREATE INDEX `performances_starts_at` ON `performances` (`starts_at`);--> statement-breakpoint

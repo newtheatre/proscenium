@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d4570de2-9216-4097-8aa8-b564efba7df9",
+  "id": "6f09faa2-f5e6-4aaa-b01d-954afe89207f",
   "prevId": "552b01bf-a369-47ab-92f6-3cb7a8001c16",
   "tables": {
     "audit_log": {
@@ -2905,6 +2905,10 @@
         "performances_interval_count": {
           "name": "performances_interval_count",
           "value": "\"performances\".\"interval_count\" >= 0"
+        },
+        "performances_external_url_not_empty": {
+          "name": "performances_external_url_not_empty",
+          "value": "\"performances\".\"external_booking_url\" IS NULL OR length(\"performances\".\"external_booking_url\") > 0"
         }
       }
     },

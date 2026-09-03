@@ -312,7 +312,15 @@ function seedProgramme(rooms: { id: string, name: string }[], people: Seeded[]):
   const curtain = (night: string): number =>
     Math.floor(showNightBounds(night).from.getTime() / 1000) + Math.round(15.5 * 3600)
   const nextWeek = showNightOf(new Date(Date.now() + 7 * 86_400 * 1000))
-  const planned = [curtain(currentShowNight()), curtain(nextWeek)]
+
+  // Seeding after 19:30 would leave nothing sellable, so tonight's curtain moves forward, staying
+  // inside the night it belongs to.
+  const tonight = currentShowNight()
+  const lastMoment = Math.floor(showNightBounds(tonight).to.getTime() / 1000) - 1
+  const planned = [
+    Math.min(Math.max(curtain(tonight), now + 2 * 3600), lastMoment),
+    curtain(nextWeek),
+  ]
 
   // Re-runnable, and tonight has to stay tonight: an existing performance moves rather than a
   // second one appearing beside it.

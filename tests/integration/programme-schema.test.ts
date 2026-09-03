@@ -238,6 +238,15 @@ describe('performances key to a show and a venue (E-127 criterion 1)', () => {
     })
   })
 
+  // Empty is not a link-out: a cleared field would otherwise reopen internal sales (D-122).
+  test('an external ticketing link is a link or it is absent, never an empty string', async () => {
+    await withDatabase((database) => {
+      seedProgramme(database)
+      expect(() => insert(database, 'performances', { id: 'p1', show_id: 's1', venue_id: 'v1', starts_at: 1, external_booking_url: '' })).toThrow()
+      expect(() => insert(database, 'performances', { id: 'p2', show_id: 's1', venue_id: 'v1', starts_at: 1, external_booking_url: 'https://example.invalid/tickets' })).not.toThrow()
+    })
+  })
+
   test('sold-out and completed are derived, so no column holds either', async () => {
     await withDatabase((database) => {
       const columns = columnsOf(database, 'performances')
