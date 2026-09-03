@@ -91,9 +91,9 @@ namespace, and asks the owner for one anywhere else.
 | Stream | Routes and files owned |
 | --- | --- |
 | Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/` |
-| Show night | `/rota`, `/admin/rota`, `/admin/templates`, `/admin/venues/[id]/emergency`, the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board` |
-| Bar | `/tonight/till`, `/tonight/till/comps`, `/admin/bar/**`, `/admin/stock/**` |
-| Platform | `/account/notifications`, `/admin/notifications/**`, `/admin/config`, `/admin/docs`, `/policies/**`, `/admin/finance/**`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `tests/helpers/race.ts` |
+| Show night | `/rota`, `/admin/rota`, `/admin/templates`, `/admin/venues/[id]/emergency`, the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`. The console prefix for the first four is undecided and is not `/admin`; `build-order.md` says what it waits on. |
+| Bar | `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**` |
+| Platform | `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `tests/helpers/race.ts` |
 
 `/tonight` is the one prefix three streams write under, which is why the shell below is owned by
 one of them and settled before any of the screens are built. The hub page itself was written by

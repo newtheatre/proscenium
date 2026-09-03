@@ -121,7 +121,11 @@ means System and nothing else, and the sidebar's Box office group was declared w
 
 Routes owned: `/rota`, `/admin/rota`, `/admin/templates`, `/admin/venues/[id]/emergency`, the
 `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`,
-`/tonight/board`, `/tonight/close`, `/board`.
+`/tonight/board`, `/tonight/close`, `/board`. The console prefix for the first four is
+undecided and is not `/admin`, which means System and nothing else: there is no Show night
+console group, and the Tonight group's `/tonight` is the phone-first shell rather than a console
+one (0040). The likely shape is the `manage` convention a domain with both audiences uses,
+`/rota` against `/rota/manage`. Nobody builds against `/admin` for these until it is settled.
 
 ### Bar (module F)
 
@@ -135,7 +139,9 @@ Routes owned: `/rota`, `/admin/rota`, `/admin/templates`, `/admin/venues/[id]/em
 | 6 | F-109 · F-119 | |
 | 7 | F-118 | I-104 reads its close record when present and reconciles without it otherwise. |
 
-Routes owned: `/tonight/till`, `/tonight/till/comps`, `/admin/bar/**`, `/admin/stock/**`.
+Routes owned: `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**`. The console
+screens sit under `/bar`, not `/admin`: `/admin` means System and nothing else, 0040 names
+`/bar/stock` in as many words, and the sidebar's Bar group was declared with that prefix.
 
 ### Platform (modules A, H, I, J, K)
 
@@ -148,10 +154,12 @@ Routes owned: `/tonight/till`, `/tonight/till/comps`, `/admin/bar/**`, `/admin/s
 | 5 | I-103 + I-104 · I-105 · K-105 close | K-105 closes when the four racing tests (D-105, E-104, F-105, register marks) are in CI. |
 | 6 | I-107 + I-108 · K-119 | K-119 needs K-112, K-114, K-116. |
 
-Routes and files owned: `/account/notifications`, `/admin/notifications/**`, `/admin/config`,
-`/admin/docs`, `/policies/**`, `/admin/finance/**`, `/admin/backups`, `/admin/retention`,
-`migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`,
-`tests/helpers/race.ts`.
+Routes and files owned: `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`,
+`/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`,
+`app/components/Night*.vue`, `app/composables/useNightCache.ts`, `tests/helpers/race.ts`.
+The notification screens sit under `/comms` and the finance ones under `/money`, the prefixes
+their sidebar groups were declared with (0040). The four that stay under `/admin` are System,
+which is exactly what `/admin` means.
 
 If platform falls behind, split finance (module I with K-112 to K-119) into a fifth stream.
 Nothing else in platform is on the critical path.
