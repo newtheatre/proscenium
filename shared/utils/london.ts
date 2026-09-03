@@ -1,14 +1,10 @@
-// Every domain date is Europe/London, and the show night runs 04:00 to 04:00 (0014). The
-// runtime is UTC, so an unpinned date is wrong for half the year.
+// Every domain date is Europe/London (0014); the runtime is UTC, so an unpinned date is wrong
+// for half the year. The show-night boundary builds on this file and lives in show-night.ts.
 export const LONDON = 'Europe/London'
 
 // The committee year, the season and role expiry all end on 31 July (0009).
 export const COMMITTEE_YEAR_END_MONTH = 7
 export const COMMITTEE_YEAR_END_DAY = 31
-
-// The night belongs to the day it started on until 04:00, so a 01:00 bar sale is still
-// last night's takings.
-export const SHOW_NIGHT_START_HOUR = 4
 
 export interface LondonParts {
   year: number
@@ -98,23 +94,6 @@ export function committeeYearOf(at: Date): number {
 // What a grant made now expires at, unless it is permanent (0009).
 export function nextCommitteeYearEnd(at: Date): Date {
   return committeeYearEnd(committeeYearOf(at))
-}
-
-// The show night an instant belongs to, as a London calendar date.
-export function showNightOf(at: Date): { year: number, month: number, day: number } {
-  const parts = londonParts(at)
-  if (parts.hour >= SHOW_NIGHT_START_HOUR) return { year: parts.year, month: parts.month, day: parts.day }
-  const previous = londonParts(new Date(at.getTime() - 24 * 60 * 60 * 1000))
-  return { year: previous.year, month: previous.month, day: previous.day }
-}
-
-// The 04:00 to 04:00 window a night runs over.
-export function showNightBounds(at: Date): { from: Date, to: Date } {
-  const night = showNightOf(at)
-  const from = fromLondonWallClock(night.year, night.month, night.day, SHOW_NIGHT_START_HOUR)
-  const next = new Date(from.getTime() + 26 * 60 * 60 * 1000)
-  const after = londonParts(next)
-  return { from, to: fromLondonWallClock(after.year, after.month, after.day, SHOW_NIGHT_START_HOUR) }
 }
 
 // londonParts carries no weekday, and the opening-hours rule needs one. Derived from the London

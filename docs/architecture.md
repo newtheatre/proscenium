@@ -96,7 +96,7 @@ becomes interactive.
 - Authorisation resolves from three sources, in order:
   1. **Permissions** from held, unexpired roles via the static permission map in `shared/`.
      `server/utils/authorise.ts` owns this, and `requirePermission` is the guard.
-  2. **Derived authority**: tonight's confirmed shift (04:00 to 04:00 London), a currently
+  2. **Derived authority**: tonight's confirmed shift (04:00 to 04:00 London, `showNightOf`), a currently
      valid training record, department leadership. Computed by joins at request time, never
      cached beyond the request (0009). It resolves in the module utility that owns the fact it
      derives from, behind a guard of its own: `server/utils/training.ts` reads department
@@ -178,6 +178,24 @@ One centre (`server/utils/notify.ts`, decision 0013): per-topic preferences, tra
 always delivers, digest coalescing, full send log with retries, undeliverable and anonymised
 addresses dropped before the provider. Channels: email now, in-app inbox now, push when it
 actually delivers.
+
+## The show night (0014, E-110)
+
+The operational day runs 04:00 to 04:00 Europe/London, and `shared/utils/show-night.ts` is its
+only definition. A night is a label, `YYYY-MM-DD`, naming the London day it began; the 04:00
+boundary is a constant in that file, never a configuration key.
+
+| Function | Answers |
+| --- | --- |
+| `showNightOf(at: Date): string` | Which night an instant belongs to. A performance's night is `showNightOf(curtain)`, so a late show ending at 01:00 is one night. |
+| `showNightBounds(night: string): { from, to }` | The instants a night runs between: `from` inclusive, `to` exclusive, both 04:00 London. The night the clocks change is a real 23 or 25 hours. A malformed label throws. |
+| `currentShowNight(): string` | Tonight, from the runtime clock. The only place a night is read off the clock rather than off a stored instant. |
+| `isShowNight(value: string): boolean` | Whether a string is a real night label, for validating a `night` query parameter. |
+
+Shift authority, the door, the till, the tonight screens, board codes, night reports and the
+cache label must call these as they are built; a second implementation is a defect (0014), and
+`tests/unit/show-night.test.ts` fails on one. The financial day is not the show night: the
+ledger and the Z reconciliation group by London calendar day (I-104).
 
 ## Show-night resilience (module K)
 

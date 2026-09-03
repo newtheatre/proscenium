@@ -6,8 +6,6 @@ import {
   fromLondonWallClock,
   londonParts,
   nextCommitteeYearEnd,
-  showNightBounds,
-  showNightOf,
 } from '#shared/utils/london'
 
 // The named regression cases for time (K-121). The runtime is UTC, so every one of these is
@@ -68,32 +66,6 @@ describe('a record expiring on a transition day expires on its date', () => {
     const end = fromLondonWallClock(2026, 10, 25, 23, 59, 59, 999)
     expect(londonParts(end)).toMatchObject({ year: 2026, month: 10, day: 25 })
     expect((end.getTime() - start.getTime() + 1) / (60 * 60 * 1000)).toBe(25)
-  })
-})
-
-describe('the show night runs 04:00 to 04:00 (0014)', () => {
-  test('a sale at 01:00 belongs to the night before', () => {
-    expect(showNightOf(fromLondonWallClock(2026, 10, 17, 1, 30))).toEqual({ year: 2026, month: 10, day: 16 })
-  })
-
-  test('a sale at 04:00 belongs to the new night', () => {
-    expect(showNightOf(fromLondonWallClock(2026, 10, 17, 4, 0))).toEqual({ year: 2026, month: 10, day: 17 })
-  })
-
-  test('an ordinary night is 24 hours long', () => {
-    const { from, to } = showNightBounds(fromLondonWallClock(2026, 10, 17, 20, 0))
-    expect((to.getTime() - from.getTime()) / (60 * 60 * 1000)).toBe(24)
-  })
-
-  // The night the clocks go back is a real 25 hours, and the till has to agree.
-  test('the night the clocks go back is 25 hours long', () => {
-    const { from, to } = showNightBounds(fromLondonWallClock(2026, 10, 24, 22, 0))
-    expect((to.getTime() - from.getTime()) / (60 * 60 * 1000)).toBe(25)
-  })
-
-  test('the night the clocks go forward is 23 hours long', () => {
-    const { from, to } = showNightBounds(fromLondonWallClock(2026, 3, 28, 22, 0))
-    expect((to.getTime() - from.getTime()) / (60 * 60 * 1000)).toBe(23)
   })
 })
 
