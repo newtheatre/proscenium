@@ -80,6 +80,9 @@ action they take lands in the audit trail.**
   which is why this has a date and an owner rather than a good intention.
 - Migration rehearsals run weekly from fresh production exports, checksummed and reconciled by
   row counts and money totals.
+- The order the remaining stories are worked in, and how the slices run side by side without
+  colliding, is `build-order.md`. Rooms and training finished on 3 September, ahead of the
+  windows above; the dates here are the latest the gates tolerate, not the plan.
 
 **Gate: feature-complete MVP; every money, capacity, register and erasure invariant covered by
 automated tests; two consecutive green migration rehearsals.**

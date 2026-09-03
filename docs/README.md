@@ -9,6 +9,7 @@ application that replaces stage-door, proscenium, rooms and rehearsal. The gate 
 | File | What it is |
 | --- | --- |
 | `roadmap.md` | The compressed delivery plan: cutover by 31 October 2026, hardening to December, V2 from January. Phases, gates and the conditions the dates depend on. |
+| `build-order.md` | The order the remaining MVP stories are worked in: the shared contracts that go first, four streams with their waves, the critical path, the seams between streams and what to build against when a provider is late. |
 | `backlog/` | The full story backlog, one file per module, tracker-ready. Each story has a role, a testable acceptance list, a phase and its sources. |
 | `decisions/` | Foundational architecture decision records, all accepted at the gate on 26 August 2026. |
 | `workshops.md` | The configuration defaults register: every number that is currently folklore, with a proposed value for the committee to confirm, plus the workshop agenda. The proposed values are what the system ships until a workshop amends them (0019). |
