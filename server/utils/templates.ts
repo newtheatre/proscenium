@@ -310,6 +310,29 @@ ${String(context.sessionsUrl)}
 The Nottingham New Theatre`,
   }),
 
+  'training-session-cancelled': (context: TemplateContext): Rendered => ({
+    subject: `Cancelled: the session on ${String(context.heldOn)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>The session on ${context.heldOn} you were signed up for has been cancelled, so please do not
+come to it.</p>
+<p><strong>Why:</strong> ${context.reason}</p>
+<p>Nothing has changed on your training record, and you keep your place in the queue for this
+module. <a href="${String(context.sessionsUrl)}">The schedule</a> is where the next date will
+appear, and if there is not one yet you can ask for the module to be taught again.</p>`),
+    text: `Hello ${context.name},
+
+The session on ${context.heldOn} you were signed up for has been cancelled, so please do not come
+to it.
+
+Why: ${context.reason}
+
+Nothing has changed on your training record, and you keep your place in the queue for this module.
+The schedule is where the next date will appear:
+${String(context.sessionsUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
   'training-session-absent': (context: TemplateContext): Rendered => ({
     subject: 'Sorry we missed you',
     html: layout(`<p>Hello ${context.name},</p>

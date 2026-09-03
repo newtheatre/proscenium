@@ -569,6 +569,14 @@ export function registerOpenable(heldOn: string, today: string): boolean {
   return today >= heldOn
 }
 
+export const sessionCancelForm = z.object({
+  // Mandatory, because a cancellation with no reason is the locked door this story exists to
+  // prevent (G-113 criterion 1).
+  reason: z.string().trim().min(1).max(500),
+})
+
+export type SessionCancelInput = z.output<typeof sessionCancelForm>
+
 export const markForm = z.object({
   marks: z.array(z.object({
     userId: z.string().trim().min(1).max(64),
@@ -580,6 +588,14 @@ export const markForm = z.object({
 })
 
 export type MarkInput = z.output<typeof markForm>
+
+// A correction is the marks again, with a reason that goes onto every record it revokes so the
+// history says why it moved (G-114 criterion 2, G-122 criterion 2).
+export const correctionForm = markForm.extend({
+  reason: z.string().trim().min(1).max(500).default('The register was corrected inside its edit window'),
+})
+
+export type CorrectionInput = z.output<typeof correctionForm>
 
 // Criterion 1. The marks must cover the register exactly: no strangers, no duplicates, nobody
 // skipped. Returned as three lists so the refusal can say which of the three went wrong.

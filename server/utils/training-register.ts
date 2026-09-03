@@ -54,7 +54,7 @@ export async function modulesTaughtBy(sessionId: string): Promise<TaughtModule[]
 const RECORD_COLUMNS = 7
 const RECORDS_PER_STATEMENT = Math.floor(90 / RECORD_COLUMNS)
 
-interface MarkRun {
+export interface MarkRun {
   event: H3Event | undefined
   sessionId: string
   heldOn: string
@@ -121,6 +121,84 @@ export async function markRegister(run: MarkRun): Promise<{ won: boolean, awarde
 
   const won = after?.markedAt === now && after?.markedBy === run.markedBy
   return { won, awarded: won ? rows.length : 0 }
+}
+
+// The refusal names which of the three ways the cover failed, because "that did not work" is not
+// something a trainer on a door can act on.
+export function saysCoverage(
+  problem: { strangers: string[], duplicates: string[], missing: string[] },
+  onRegister: { userId: string, name: string }[],
+): string {
+  const named = (ids: string[]): string =>
+    ids.map(id => onRegister.find(row => row.userId === id)?.name ?? id).join(', ')
+
+  const parts: string[] = []
+  if (problem.missing.length > 0) parts.push(`not marked: ${named(problem.missing)}`)
+  if (problem.duplicates.length > 0) parts.push(`marked twice: ${named(problem.duplicates)}`)
+  if (problem.strangers.length > 0) parts.push(`not on this register: ${named(problem.strangers)}`)
+  return `The register has to be covered exactly. ${parts.join('; ')}`
+}
+
+export interface CorrectionRun extends MarkRun {
+  reason: string
+}
+
+// G-114 criterion 2. One batch: what was issued is revoked and the corrected set is issued beside
+// it, so nobody is ever readably without a record they are about to get back.
+export async function correctRegister(run: CorrectionRun): Promise<{ awarded: number, revoked: number }> {
+  const year = await academicYear(run.event as H3Event)
+  const present = run.marks.filter(mark => mark.mark === 'ATTENDED').map(mark => mark.userId)
+
+  // Criterion 5. The award is dated to the day the session was held, not the day it was put right.
+  const rows = present.flatMap(userId => run.modules.map(module => ({
+    id: newId(),
+    userId,
+    moduleId: module.id,
+    awardedOn: run.heldOn,
+    expiresOn: expiryFor({ expiryMode: module.expiryMode as never, expiryMonths: module.expiryMonths }, run.heldOn, year),
+    sessionId: run.sessionId,
+    grantedBy: run.markedBy,
+  })))
+
+  const now = Math.floor(Date.now() / 1000)
+  const living = await db.select({ id: schema.trainingRecords.id })
+    .from(schema.trainingRecords)
+    .where(and(eq(schema.trainingRecords.sessionId, run.sessionId), sql`revoked_at is null`))
+
+  await db.batch([
+    // Revoked first: the partial unique index counts only live rows, so the corrected set can
+    // carry the same person and module as the set it replaces.
+    db.run(sql`
+      update training_records
+      set revoked_at = ${now}, revoked_by = ${run.markedBy}, revoke_reason = ${run.reason}
+      where session_id = ${run.sessionId} and revoked_at is null
+    `),
+    ...run.marks.map(mark => db.run(sql`
+      update session_attendees
+      set status = ${mark.mark}, marked_at = ${now}, marked_by = ${run.markedBy}
+      where session_id = ${run.sessionId} and user_id = ${mark.userId}
+    `)),
+    ...chunk(rows, RECORDS_PER_STATEMENT).map(part => db.run(sql`
+      insert into training_records (id, user_id, module_id, awarded_on, expires_on, source, session_id, granted_by)
+      select value ->> 'id', value ->> 'userId', value ->> 'moduleId', value ->> 'awardedOn',
+        value ->> 'expiresOn', 'SESSION', value ->> 'sessionId', value ->> 'grantedBy'
+      from json_each(${JSON.stringify(part)})
+    `)),
+    // Criterion 6. The diff, and the actor, in the same batch as the writes it describes.
+    db.run(sql`
+      insert into audit_log (id, actor_id, action, target, detail)
+      values (${newId()}, ${run.markedBy}, 'register.corrected', ${`session:${run.sessionId}`},
+        ${JSON.stringify({
+          heldOn: run.heldOn,
+          present: present.length,
+          absent: run.marks.length - present.length,
+          revoked: living.length,
+          issued: rows.length,
+        })})
+    `),
+  ] as never)
+
+  return { awarded: rows.length, revoked: living.length }
 }
 
 function chunk<T>(items: T[], size: number): T[][] {

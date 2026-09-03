@@ -134,6 +134,26 @@ The ledger is pruned at `TRAINING_LEDGER_MONTHS` (24) in every mode, armed or no
 To run it by hand, `POST /_nitro/tasks/training:expiry-sweep`. The result reports `armed`, the
 counts for each window, `digests` and `pruned`.
 
+## Calling a session off, and correcting one that ran
+
+**Before the register opens**, a session is cancelled from its page in the console. The reason is
+mandatory and is emailed to everybody signed up, whether they held a place or were waiting, so
+write it for them. The email is transactional: somebody who has turned training email off still
+gets it, because the alternative is a locked door. A cancelled session awards nothing and its
+register can never be opened.
+
+**Once the register is open** the session happened, whatever went wrong on the night, so it cannot
+be cancelled. Correcting it is the edit window instead.
+
+**For 14 days after the day it was held** (`SESSION_EDIT_WINDOW_DAYS`), a marked register can be
+corrected from the register screen: **Correct it** brings the marks back as they were left. What
+was awarded before is revoked with a reason and the corrected set is issued in its place, in one
+write. Anybody dropped keeps their absence on the register as evidence and is emailed the same
+"sorry we missed you" note they would have had on the night.
+
+Past that window the screen says so, and the only correction left is an administrator revoking the
+record and granting it again.
+
 ## Logging training that was delivered off-system
 
 Teaching that happened without a scheduled session still ends in records.

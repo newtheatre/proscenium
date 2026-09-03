@@ -1026,6 +1026,22 @@ attaching training to a tombstone would write a person back onto the row erasure
 The same lookup serves the retrospective log, because teaching off-system is often taught to people
 who have not signed in.
 
+**A session is called off before its register opens** (G-113). `cancelled_at`, `cancelled_by` and
+`cancel_reason` are stamped by a conditional write predicated on the status not already being
+`CANCELLED`, so two people cancelling at once tell everybody once. The reason is kept on the
+session and emailed to everybody signed up, placed and waiting alike; it never reaches audit
+detail, which carries identifiers and not the words somebody wrote about a night (0011). It is
+scrubbed on erasure alongside `notes`.
+
+**A marked register is corrected inside the edit window** (G-114). The window is
+`SESSION_EDIT_WINDOW_DAYS` and is counted from the held-on day, so lengthening it is a settings
+change rather than a deploy. A correction is one batch: every live record the session issued is
+revoked with a reason, the marks are restated, and the corrected set is inserted beside them, so
+there is no readable moment in which somebody has lost a record they are about to get back. The
+revoke runs first because the partial unique index counts only live rows. Nothing is deleted, and
+somebody dropped by a correction keeps their attendee row marked `ABSENT` as evidence. Past the
+window the only correction is an administrator's revocation and a fresh grant (G-122).
+
 **The freeze is releasable by the session's own trainer while no marks exist** (open question 6,
 answered 2 September). The release is conditional on `marked_at IS NULL`, so a release racing a
 submission cannot change what a mark is about to award.

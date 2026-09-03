@@ -18,6 +18,7 @@ export default defineEventHandler(async (event) => {
     opensAt: schema.trainingSessions.opensAt,
     notes: schema.trainingSessions.notes,
     status: schema.trainingSessions.status,
+    cancelReason: schema.trainingSessions.cancelReason,
     trainerId: schema.trainingSessions.trainerId,
     registerOpenedAt: schema.trainingSessions.registerOpenedAt,
     markedAt: schema.trainingSessions.markedAt,

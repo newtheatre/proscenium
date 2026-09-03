@@ -78,19 +78,3 @@ export default defineEventHandler(async (event) => {
   await tellAbsentees(event, id, session.heldOn, input.marks)
   return { ok: true, awarded: marked.awarded, present: present.length, absent: input.marks.length - present.length }
 })
-
-// The refusal names which of the three ways the cover failed, because "that did not work" is not
-// something a trainer on a door can act on.
-function saysCoverage(
-  problem: { strangers: string[], duplicates: string[], missing: string[] },
-  onRegister: { userId: string, name: string }[],
-): string {
-  const named = (ids: string[]): string =>
-    ids.map(id => onRegister.find(row => row.userId === id)?.name ?? id).join(', ')
-
-  const parts: string[] = []
-  if (problem.missing.length > 0) parts.push(`not marked: ${named(problem.missing)}`)
-  if (problem.duplicates.length > 0) parts.push(`marked twice: ${named(problem.duplicates)}`)
-  if (problem.strangers.length > 0) parts.push(`not on this register: ${named(problem.strangers)}`)
-  return `The register has to be covered exactly. ${parts.join('; ')}`
-}

@@ -12,6 +12,8 @@ interface Attendee {
 }
 
 interface Register {
+  correctable: boolean
+  editWindowDays: number
   id: string
   heldOn: string
   startsAt: string
@@ -102,8 +104,18 @@ async function addSomeone(owningThem = false): Promise<void> {
   }
 }
 
+// A correction re-opens the marking it already did, so the screen is the same one: the marks come
+// back as they were left and go to the correction route instead (G-114).
+const correcting = ref(false)
+
+function beginCorrecting(): void {
+  present.value = new Set(attendees.value.filter(one => one.status === 'ATTENDED').map(one => one.userId))
+  failure.value = null
+  correcting.value = true
+}
+
 const open = computed(() => data.value?.registerOpenedAt !== null)
-const marked = computed(() => data.value?.markedAt !== null)
+const marked = computed(() => data.value?.markedAt !== null && !correcting.value)
 const attendees = computed(() => data.value?.attendees ?? [])
 const presentCount = computed(() => attendees.value.filter(one => present.value.has(one.userId)).length)
 const absentCount = computed(() => attendees.value.length - presentCount.value)
@@ -132,33 +144,36 @@ async function openRegister(): Promise<void> {
 }
 
 async function submit(): Promise<void> {
-  if (presentCount.value === 0 && !confirmingAllAbsent.value) {
+  if (presentCount.value === 0 && !correcting.value && !confirmingAllAbsent.value) {
     confirmingAllAbsent.value = true
     return
   }
   working.value = true
   failure.value = null
   try {
-    const answered = await $fetch<{ awarded: number }>(
-      `/api/admin/training/sessions/${route.params.id}/mark`,
-      {
-        method: 'POST',
-        body: {
-          marks: attendees.value.map(one => ({
-            userId: one.userId,
-            mark: present.value.has(one.userId) ? 'ATTENDED' : 'ABSENT',
-          })),
-          confirmedAllAbsent: confirmingAllAbsent.value,
-        },
-      },
-    )
+    const marks = attendees.value.map(one => ({
+      userId: one.userId,
+      mark: present.value.has(one.userId) ? 'ATTENDED' : 'ABSENT',
+    }))
+    const answered = correcting.value
+      ? await $fetch<{ awarded: number }>(`/api/admin/training/sessions/${route.params.id}/marks`, {
+          method: 'POST',
+          body: { marks },
+        })
+      : await $fetch<{ awarded: number }>(`/api/admin/training/sessions/${route.params.id}/mark`, {
+          method: 'POST',
+          body: { marks, confirmedAllAbsent: confirmingAllAbsent.value },
+        })
     toast.add({
       title: `${plural(answered.awarded, 'record')} awarded`,
-      description: 'Dated to the day of the session.',
+      description: correcting.value
+        ? 'What was issued before has been revoked, and this is what stands now.'
+        : 'Dated to the day of the session.',
       icon: 'i-lucide-check',
       color: 'success',
     })
     confirmingAllAbsent.value = false
+    correcting.value = false
     await refresh()
   }
   catch (caught) {
@@ -234,8 +249,23 @@ async function submit(): Promise<void> {
         icon="i-lucide-check"
         data-test="already-marked"
         title="This register has been marked"
-        description="The records are made. Correcting one now is a revocation and a re-grant, not a second mark."
+        :description="data.correctable
+          ? `The records are made. A mistake can still be put right for ${data.editWindowDays} days after the session.`
+          : 'The records are made, and the window for correcting them has closed. An administrator can revoke one and grant it again.'"
       />
+
+      <UButton
+        v-if="marked && data.correctable"
+        size="lg"
+        block
+        color="neutral"
+        variant="outline"
+        icon="i-lucide-pencil"
+        data-test="correct-register"
+        @click="beginCorrecting"
+      >
+        Correct it
+      </UButton>
 
       <template v-else-if="!open">
         <UAlert
@@ -261,8 +291,14 @@ async function submit(): Promise<void> {
           class="text-sm text-muted"
           data-test="marking-help"
         >
-          Everybody starts absent. Tap somebody to mark them present. Marking is what creates the
-          records, so nothing is awarded until you submit.
+          <template v-if="correcting">
+            This is how the register was left. Change what is wrong: what was awarded before is
+            revoked and the corrected set is issued in its place.
+          </template>
+          <template v-else>
+            Everybody starts absent. Tap somebody to mark them present. Marking is what creates the
+            records, so nothing is awarded until you submit.
+          </template>
         </p>
 
         <ul
@@ -437,7 +473,9 @@ async function submit(): Promise<void> {
           >
             {{ confirmingAllAbsent
               ? 'Submit with nobody present'
-              : `Submit: ${plural(presentCount, 'person', 'people')} present` }}
+              : correcting
+                ? `Correct it: ${plural(presentCount, 'person', 'people')} present`
+                : `Submit: ${plural(presentCount, 'person', 'people')} present` }}
           </UButton>
         </div>
       </template>

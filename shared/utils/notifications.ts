@@ -136,6 +136,14 @@ export const MESSAGE_TYPES = {
     template: 'training-session-promoted',
   },
 
+  // Transactional, so no preference can silence it: the alternative to hearing this is a locked
+  // door on the night (G-113 criterion 4).
+  'training.session.cancelled': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'training-session-cancelled',
+  },
+
   // Two warnings at different urgencies, neither suppressing the other (G-125 criterion 1).
   'training.expiry.window': {
     topic: 'TRAINING',
