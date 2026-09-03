@@ -91,7 +91,7 @@ namespace, and asks the owner for one anywhere else.
 | Stream | Routes and files owned |
 | --- | --- |
 | Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/` |
-| Show night | `/rota`, `/admin/rota`, `/admin/templates`, `/admin/venues/[id]/emergency`, the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**` and `server/utils/night-authority.ts`. The console prefix for the first four is undecided and is not `/admin`; `build-order.md` says what it waits on. |
+| Show night | `/rota` and `/rota/manage/**` (templates, rota administration and the venue emergency card at `/rota/manage/venues/[id]/emergency`), the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**`, `/api/admin/rota/**` and `server/utils/night-authority.ts`. The console screens sit under `/rota/manage`, never `/admin`: `/tonight` is the phone-first shell rather than a console prefix (0040, 0046). |
 | Bar | `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**` |
 | Platform | `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `tests/helpers/race.ts` |
 
@@ -318,7 +318,9 @@ filtered out, so a venue whose only performance tonight is cancelled resolves no
 
 Only the `OFFICER` branch resolves today. It stands on the permissions `night.door`, `night.till`
 and `night.manage`, held by `FOH_MANAGER` (door and manage) and `BAR_MANAGER` (till), which are the
-one named exception to standing permissions being administrative only (0009, 0044). Every officer
+one named exception to standing permissions being administrative only (0009, 0044). Planning the
+rota is not one of them: `rota.read` and `rota.write` are ordinary administrative permissions, held
+by `FOH_MANAGER` and `ADMIN`, and they are what open `/rota/manage/**` (0046). Every officer
 resolution writes `night.officer-bypass` once per account, night, venue and role, held by a partial
 unique index rather than by reading before writing; the row's detail carries every performance that
 venue ran that night. The `SHIFT` branch arrives in show night wave 3 and fills a case, with no
@@ -330,6 +332,30 @@ officer would be shown a sidebar in which every screen answers 403 (0040, 0044).
 returns the allow-listed shape above and is the pattern every other `/api/tonight/**` and
 `/api/till/**` route follows; `tests/unit/night-authority.test.ts` fails when a route under either
 namespace does not call the guard.
+
+## The rota (E-101, E-102, E-106, 0046)
+
+A venue's shift template is one row per role with a count, and stamping expands it into one open
+shift per slot on a performance. `shift_templates` and `shifts` are in `docs/data-model.md`;
+`server/utils/rota.ts` is how the rest of the system reads and writes them, and
+`shared/utils/rota.ts` holds the vocabulary and the rules with no database in them.
+
+| Function | Answers |
+| --- | --- |
+| `templateRefusal(slots)` | Why a template may not be saved, or null. A venue template names each role once and holds exactly one duty manager, which correlates rows and so cannot be a CHECK (E-101 criterion 1). |
+| `stampPerformanceStatement(performanceId)` | The stamp for one performance, batched with the INSERT that creates it, so a performance can never exist staffed by nothing (E-102 criterion 1). |
+| `backfillVenueStatement(venueId, from)` | The same stamp over every performance at a venue from a given instant. `ON CONFLICT DO NOTHING` against the slot uniqueness makes a second run a no-op (E-102 criterion 2). |
+| `cancelShiftsStatement(performanceId)` | Cancels a performance's shifts, batched with the cancellation itself (E-102 criterion 4). |
+| `shiftConstraintRefusal(error)` | A refused write as a 409 a volunteer can act on, or null for anything unrecognised, which the caller rethrows (E-106 criterion 3). |
+
+Neither statement binds per performance or per slot: the slot ordinals come from a recursive count
+over the templates rather than from a list built in the application, so the parameter count is
+fixed whatever the diary holds (0003, 0006). A shift belongs to exactly one performance, and the
+confirmed duty manager index is per performance, so two performances running at once need two
+confirmed duty managers and the same person may hold shifts on both (E-127 criterion 1).
+
+Templates are administered at `/rota/manage/templates` under `rota.read` and `rota.write`. A
+member's own `/rota` arrives with E-103.
 
 ## The programme (build-order contract d, 0043)
 

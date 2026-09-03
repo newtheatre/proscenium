@@ -119,13 +119,13 @@ means System and nothing else, and the sidebar's Box office group was declared w
 | 6 | E-123 · E-124 + E-125 | E-125 wakes `nights:close`. |
 | 7 | E-126 · E-127 | E-127 can start in wave 6 once E-113 is merged. |
 
-Routes owned: `/rota`, `/admin/rota`, `/admin/templates`, `/admin/venues/[id]/emergency`, the
-`/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`,
-`/tonight/board`, `/tonight/close`, `/board`. The console prefix for the first four is
-undecided and is not `/admin`, which means System and nothing else: there is no Show night
-console group, and the Tonight group's `/tonight` is the phone-first shell rather than a console
-one (0040). The likely shape is the `manage` convention a domain with both audiences uses,
-`/rota` against `/rota/manage`. Nobody builds against `/admin` for these until it is settled.
+Routes owned: `/rota`, `/rota/manage/**` (shift templates, rota administration and the venue
+emergency card at `/rota/manage/venues/[id]/emergency`), the `/tonight` hub,
+`/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`,
+`/tonight/close`, `/board`. The console screens sit under `/rota/manage`, never `/admin`, which
+means System and nothing else: `/tonight` is the phone-first shell rather than a console prefix,
+so the Tonight group's prefix is `/rota/manage` and 0040's nine groups stand (0046). Their API
+routes are `/api/admin/rota/**`, as every other console API is.
 
 ### Bar (module F)
 

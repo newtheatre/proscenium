@@ -24,6 +24,12 @@ export const PERFORMANCE_REFERENCES: PerformanceReference[] = [
     sold: false,
     why: 'a price this performance would charge: configuration, and nobody has bought anything',
   },
+  {
+    table: 'shifts',
+    column: 'performance_id',
+    sold: false,
+    why: 'a slot on the rota: who is working, and nobody has bought a seat (E-102)',
+  },
 ]
 
 export function soldReferences(references = PERFORMANCE_REFERENCES): PerformanceReference[] {

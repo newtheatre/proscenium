@@ -50,6 +50,10 @@ export const PERMISSIONS = [
   // administrator do. Selling over the bar is operational and derives from tonight (0009, F-111).
   'bar.read',
   'bar.write',
+  // The rota is planned days ahead at a desk, so administering it is a standing permission like
+  // the programme's. Working tonight is not, and derives from a shift (0009, 0046).
+  'rota.read',
+  'rota.write',
   // The one exception to the rule above, and it is named, bounded and audited: a designated
   // officer opens tonight's screens without a shift, and every use is recorded (0044, E-111).
   'night.door',
@@ -77,9 +81,9 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   // Owns the programme's configuration. Nothing operational is here: the door and the desk
   // derive from tonight's performance and shift (0009).
   BOX_OFFICE: ['ticketing.read', 'ticketing.write'],
-  // The officer bypass and nothing else: the door and the duty manager's screens open without a
-  // shift, the till does not, and every use is audited (0044, E-111 criterion 4).
-  FOH_MANAGER: ['night.door', 'night.manage'],
+  // Administers the rota in advance, and opens the door and duty manager screens without a shift
+  // tonight. The till is the bar manager's (0044, 0046, E-101 criterion 2).
+  FOH_MANAGER: ['night.door', 'night.manage', 'rota.read', 'rota.write'],
   FRONT_OF_HOUSE: [],
   // Owns the bar's catalogue and its stock, and opens the till without a bar shift. Nothing in
   // the old estate grants this role, so the import cannot reach it (0044, F-101 criterion 1).

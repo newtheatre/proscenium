@@ -265,6 +265,24 @@ The Nottingham New Theatre`,
     }
   },
 
+  // A shift on a performance that is no longer happening. The role is named because somebody
+  // holding two shifts on one day needs to know which one has gone (E-102 criterion 4).
+  'shift-performance-cancelled': (context: TemplateContext): Rendered => ({
+    subject: 'A performance you were working has been cancelled',
+    html: layout(`<p>Hello ${context.name},</p>
+<p>${context.show} at ${context.venue} on ${context.when} has been cancelled, so your
+${context.role} shift on it has gone with it.</p>
+<p>There is nothing for you to do. Other shifts you hold are unaffected.</p>`),
+    text: `Hello ${context.name},
+
+${context.show} at ${context.venue} on ${context.when} has been cancelled, so your
+${context.role} shift on it has gone with it.
+
+There is nothing for you to do. Other shifts you hold are unaffected.
+
+The Nottingham New Theatre`,
+  }),
+
   // Good news, so it leads with it. The way out is in the same breath as the place, because a
   // place nobody uses is one somebody else was waiting for.
   'training-session-promoted': (context: TemplateContext): Rendered => {

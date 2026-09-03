@@ -16,6 +16,16 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // A shift cascades at the foreign key, so deleting would take a volunteer's evening with it
+  // and tell nobody. Cancelling is what notifies them (E-102 criterion 4).
+  const staffed = await heldShiftCount(id)
+  if (staffed > 0) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `${plural(staffed, 'shift')} on this performance have been taken, so it can only be cancelled: everybody working it has to be told`,
+    })
+  }
+
   // The price overrides cascade at the foreign key, so the performance takes its own with it.
   await db.batch([
     db.delete(schema.performances).where(eq(schema.performances.id, id)),

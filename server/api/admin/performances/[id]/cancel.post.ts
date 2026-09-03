@@ -1,4 +1,6 @@
 import { sql } from 'drizzle-orm'
+import { formatLondon } from '#shared/utils/london'
+import { saysShiftRole } from '#shared/utils/rota'
 
 // Cancel a performance. This is the only way out for one that has sold seats, and the count it
 // returns is what the refund workflow (D-116) and the holder notification (D-107) will act on.
@@ -12,10 +14,15 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'This performance is already cancelled' })
   }
 
+  // Read before the write, because the cancellation is what takes the status away.
+  const staffing = await confirmedShiftHolders(id)
+
   // The predicate rides the UPDATE, so two officers cancelling at once write one cancellation and
   // one audit entry rather than two (0003).
   await db.batch([
     db.run(sql`UPDATE performances SET status = 'CANCELLED', updated_at = unixepoch() WHERE id = ${id} AND status <> 'CANCELLED'`),
+    // The rota goes with the performance, in the same batch (E-102 criterion 4).
+    db.run(cancelShiftsStatement(id)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'performance.cancelled',
@@ -26,9 +33,35 @@ export default defineEventHandler(async (event) => {
         // Counted from the tables that reference the performance, so it is nought only while no
         // such table exists (D-121 criterion 5).
         ticketsOwedARefund: held.soldTickets,
+        shiftsCancelled: staffing.length,
       },
     })),
   ])
 
-  return { ok: true, status: 'CANCELLED', ticketsOwedARefund: held.soldTickets }
+  // The show is off, so a shift preference cannot silence this: somebody would otherwise turn up.
+  const when = formatLondon(new Date(held.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
+  for (const holder of staffing) {
+    // The write is idempotent and the read before it is not, so two officers cancelling at once
+    // would otherwise tell every holder twice. The claim is what makes the send at most once.
+    const took = await claimNotification({
+      userId: holder.userId,
+      type: 'shift.performance-cancelled',
+      key: `shift.performance-cancelled:${holder.shiftId}`,
+    })
+    if (!took) continue
+
+    await notify(event, {
+      userId: holder.userId,
+      type: 'shift.performance-cancelled',
+      context: {
+        name: '',
+        show: held.showTitle,
+        venue: held.venueName,
+        when,
+        role: saysShiftRole(holder.role).toLowerCase(),
+      },
+    })
+  }
+
+  return { ok: true, status: 'CANCELLED', ticketsOwedARefund: held.soldTickets, shiftsCancelled: staffing.length }
 })
