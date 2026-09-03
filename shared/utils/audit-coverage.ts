@@ -22,6 +22,8 @@ export interface Exempt {
 export type Coverage = Covered | Exempt
 
 export const AUDIT_COVERAGE: Coverage[] = [
+  // Module A: identity
+
   { route: 'server/api/account/close.post.ts', actions: ['account.erased'], via: ['server/utils/erasure.ts'] },
   { route: 'server/api/account/export.get.ts', actions: ['account.exported'] },
   { route: 'server/api/account/mfa/confirm.post.ts', actions: ['mfa.confirmed', 'mfa.recovery-codes.minted'] },
@@ -41,12 +43,6 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['account.created.console', 'role.granted'],
     via: ['server/utils/accounts.ts'],
   },
-  { route: 'server/api/admin/audit/export.get.ts', actions: ['audit.exported'] },
-  {
-    route: 'server/api/admin/audit/index.post.ts',
-    actions: ['manual.role.granted', 'manual.role.revoked', 'manual.account.disabled', 'manual.account.enabled'],
-    via: ['shared/utils/audit-actions.ts'],
-  },
   { route: 'server/api/admin/memberships/[id]/confirm.post.ts', actions: ['membership.confirmed'] },
   { route: 'server/api/admin/memberships/export.get.ts', actions: ['membership.exported'] },
   {
@@ -54,9 +50,6 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['membership.granted', 'account.student-id.recorded'],
     via: ['server/utils/membership.ts'],
   },
-  { route: 'server/api/admin/fellowships/[id]/revoke.post.ts', actions: ['fellowship.revoked'] },
-  { route: 'server/api/admin/fellowships/index.post.ts', actions: ['fellowship.awarded'] },
-  { route: 'server/api/admin/config/[key].put.ts', actions: ['config.changed'] },
   { route: 'server/api/admin/roles/index.delete.ts', actions: ['role.revoked'] },
   { route: 'server/api/admin/roles/index.post.ts', actions: ['role.granted'] },
   { route: 'server/api/auth/magic-link/consume.post.ts', actions: ['session.started.magic-link', 'mfa.challenged'] },
@@ -83,13 +76,23 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/account/methods/index.get.ts', exempt: 'reads what the account signs in with' },
   { route: 'server/api/auth/passkey/register.post.ts', actions: ['account.method.added'] },
   { route: 'server/api/auth/passkey/authenticate.post.ts', actions: ['session.started.passkey'] },
+  { route: 'server/api/account/room-feed.get.ts', exempt: 'says whether your own feed exists' },
+  { route: 'server/api/account/room-feed.post.ts', actions: ['account.calendar-feed.issued'] },
+  { route: 'server/api/auth/sign-out.post.ts', exempt: 'ending your own session changes no record' },
+  { route: 'server/api/auth/verify/index.post.ts', actions: ['account.verified'] },
+  {
+    route: 'server/api/auth/verify/resend.post.ts',
+    exempt: 'issues a token and asks for a message; the send is recorded in notification_log',
+  },
+  { route: 'server/routes/auth/google.get.ts', actions: ['account.created.google', 'session.started.google'] },
+
+  // Module C: spaces
+
   { route: 'server/api/rooms/availability.get.ts', exempt: 'reads what is already taken' },
   { route: 'server/api/rooms/policy.get.ts', exempt: 'reads the published booking rules' },
   { route: 'server/api/rooms/bookings/index.get.ts', exempt: 'reads the bookings you hold' },
   { route: 'server/api/rooms/bookings/[id]/cancel.post.ts', actions: ['room.booking.cancelled'] },
   { route: 'server/api/rooms/bookings/[id]/ics.get.ts', exempt: 'downloads a booking you already hold' },
-  { route: 'server/api/account/room-feed.get.ts', exempt: 'says whether your own feed exists' },
-  { route: 'server/api/account/room-feed.post.ts', actions: ['account.calendar-feed.issued'] },
   {
     route: 'server/routes/rooms/feed/[token]/calendar.ics.get.ts',
     exempt: 'reads your own bookings; a fetch is recorded on the token, not in the trail',
@@ -134,8 +137,19 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/rooms/external-spaces/[id]/notes/[purpose].delete.ts', actions: ['external.space.note.removed'] },
   { route: 'server/api/admin/rooms/reports/utilisation.get.ts', exempt: 'reads booked hours against open hours' },
   { route: 'server/api/admin/rooms/reports/export.get.ts', exempt: 'the same figures as a file; no personal column is in it' },
-  { route: 'server/api/auth/sign-out.post.ts', exempt: 'ending your own session changes no record' },
 
+  // Module D: ticketing
+
+  // Module E: show night
+
+  // Module F: bar
+
+  // Module G: training
+
+  {
+    route: 'server/api/admin/training/external-certificates/index.post.ts',
+    actions: ['record.external-certificate'],
+  },
   { route: 'server/api/admin/training/departments/index.get.ts', exempt: 'reads the department vocabulary' },
   { route: 'server/api/admin/training/departments/index.post.ts', actions: ['department.created'] },
   { route: 'server/api/admin/training/departments/[code]/index.put.ts', actions: ['department.updated'] },
@@ -182,10 +196,6 @@ export const AUDIT_COVERAGE: Coverage[] = [
     route: 'server/api/admin/training/signoffs/index.post.ts',
     actions: ['record.signed-off', 'record.signoff.unbounded'],
   },
-  {
-    route: 'server/api/admin/training/external-certificates/index.post.ts',
-    actions: ['record.external-certificate'],
-  },
   { route: 'server/api/admin/training/records/[id]/revoke.post.ts', actions: ['record.revoked'] },
   { route: 'server/api/admin/training/sessions/index.post.ts', actions: ['session.scheduled'] },
   { route: 'server/api/admin/training/sessions/index.get.ts', exempt: 'reads the scheduled sessions' },
@@ -211,6 +221,26 @@ export const AUDIT_COVERAGE: Coverage[] = [
     exempt: 'leaves a queue you joined yourself, taking no authority with it',
   },
 
+  // Module H: communications
+
+  { route: 'server/api/admin/notifications/trouble.get.ts', exempt: 'reads the message log' },
+
+  // Module I: finance
+
+  // Module J: governance
+
+  { route: 'server/api/admin/audit/export.get.ts', actions: ['audit.exported'] },
+  {
+    route: 'server/api/admin/audit/index.post.ts',
+    actions: ['manual.role.granted', 'manual.role.revoked', 'manual.account.disabled', 'manual.account.enabled'],
+    via: ['shared/utils/audit-actions.ts'],
+  },
+  { route: 'server/api/admin/fellowships/[id]/revoke.post.ts', actions: ['fellowship.revoked'] },
+  { route: 'server/api/admin/fellowships/index.post.ts', actions: ['fellowship.awarded'] },
+  { route: 'server/api/admin/config/[key].put.ts', actions: ['config.changed'] },
+
+  // Module K: platform
+
   // Development only, and absent from a build: nuxt.config excludes both files (K-124).
   {
     route: 'server/api/dev/seed.post.ts',
@@ -219,12 +249,5 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/dev/sweep-requests.post.ts', actions: ['room.request.expired'], via: ['server/utils/room-requests.ts'] },
   { route: 'server/api/dev/remind-rooms.post.ts', exempt: 'sends a reminder; the send is recorded in notification_log' },
-  { route: 'server/api/admin/notifications/trouble.get.ts', exempt: 'reads the message log' },
   { route: 'server/api/dev/sign-in-as.post.ts', exempt: 'a development sign-in with no password, in no build' },
-  { route: 'server/api/auth/verify/index.post.ts', actions: ['account.verified'] },
-  {
-    route: 'server/api/auth/verify/resend.post.ts',
-    exempt: 'issues a token and asks for a message; the send is recorded in notification_log',
-  },
-  { route: 'server/routes/auth/google.get.ts', actions: ['account.created.google', 'session.started.google'] },
 ]

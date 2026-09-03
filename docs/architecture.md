@@ -52,6 +52,18 @@ migration/              the SP-3 tooling (standalone, never imported by the app)
 tests/                  unit / integration / e2e, bun test
 ```
 
+### The shared registries
+
+Eight files in `shared/utils/` are appended to by every module: `ledger.ts` (line kinds),
+`notifications.ts` (message types), `audit-actions.ts` and `audit-coverage.ts`, `config.ts`,
+`personal-data.ts`, `site-nav.ts` and `personas.ts`. Each is divided by one-line banners naming
+the backlog modules that have entries there or are expected to (`// Module F: bar`), and an
+addition goes inside its own module's section, so two branches adding at once land in different
+hunks instead of the same one. A banner with nothing under it is a section waiting for its module,
+not an oversight; a module with nothing to add to a registry has no banner in it, and adds one
+when it does. `tests/unit/registry-banners.test.ts` holds the banners to the module letters, and
+holds every audit action, ledger kind and module-named route to the section it belongs in.
+
 ## Routes and shells
 
 A prefix names the domain; the shell follows the posture of the work rather than the URL (0040).
@@ -139,6 +151,73 @@ flowchart TD
 Every monetary fact posts to `ledger_entries` (+ `ledger_lines`) in the same batch as its
 domain write (0004). `server/utils/ledger.ts` is the only writer. Reconciliation, dashboards
 and exports are queries over the ledger; no module keeps its own money totals.
+
+### The posting contract
+
+`postEntry(input, at?)` validates the entry, computes its total from its lines and **returns the
+statements the caller batches**. It performs no write of its own, because money and the thing it
+paid for commit together or not at all (0001, I-102 criterion 6), and only the caller knows what
+the other half of the batch is. Nothing else writes to the ledger tables: `check:ledger` fails the
+build on any file under `server/` other than `server/utils/ledger.ts` that does, and on any script
+that reaches the tables in raw SQL.
+
+Three rules follow, and every money path obeys them:
+
+- The entry's total is the sum of its lines, never supplied by the caller. A comp is zero with its
+  full price on the line, so foregone value is a figure rather than an absence (I-103).
+- A correction is a new entry naming what it corrects in `reversesEntryId`, with negative amounts.
+  Nothing is edited; the triggers refuse it (0010).
+- The screen sends its expected total in pence, and the route that takes the money refuses a
+  mismatch quoting both figures (0005). That check belongs to the money-taking route, not to
+  `postEntry`, which has no view of what the screen was showing.
+
+Two columns the entry form does not yet carry, because the module that fills them is not built:
+`void_of_entry_id`, which F-109 sets when it voids a tab charge, and the discount snapshots
+F-117 writes. Both are on `ledger_entries` already, so adding them is a change to the form and
+the helper, never to the table (0010).
+
+### The money paths
+
+The triple every path posts under. A module adding a money path adds a row here in the same pull
+request; a unit test reads this table, so a kind in the code and not in a row is drift. `source`
+and `tender` are database CHECKs and cannot be widened; `kind` is the enum in
+`shared/utils/ledger.ts` (0033). `SYSTEM` is reserved for an entry no person took: no MVP path
+posts one.
+
+**Every row below groups by the financial day, never by the show night.** `london_day` is the
+plain London calendar day of `happened_at`, written by `londonDayOf` in `shared/utils/ledger.ts`,
+because the reader's Z total is a calendar-day figure (I-104). A 01:00 bar sale is the previous
+night's takings and the new day's Z, and both readings are correct. A report that wants the night
+resolves it from the performance or from `showNightOf` (E-110) and never from `london_day`; the
+ledger holds no night column and gains none.
+
+| Money path | Posts when | Module | Source | Tender | Kind |
+| --- | --- | --- | --- | --- | --- |
+| Desk collection | The reader is paid at collection, never at reservation (D-114) | ticketing | `DESK` | `CARD` | `TICKET_COLLECTION` |
+| Comp admission | An approved comp is issued (D-117) | ticketing | `DESK` | `COMP` | `TICKET_COLLECTION` |
+| Walk-up sale | Reservation and payment in one desk flow (D-115) | ticketing | `DESK` | `CARD`, `COMP` | `WALK_UP` |
+| Refund | The money is handed back, one entry per ticket (D-116) | ticketing | `DESK` | `CARD` | `REFUND` |
+| Pass sale | A pass is issued and paid for at the desk (D-124) | ticketing | `DESK` | `CARD` | `PASS_SALE` |
+| Pass admission | A pass covers a seat, online or at the door (D-125, D-126) | ticketing | `SELF_SERVE`, `DESK` | `NONE` | `PASS_ADMISSION` |
+| Bar item | The sale, its lines and its stock movements commit together (F-105); a sale after midnight is the calendar day it happened on, not the night's | bar | `TILL` | `CARD`, `COMP`, `TAB` | `BAR_ITEM` |
+| Tab settlement | A tab is settled on the reader, bounded to the charges it covers (F-109); the settlement's own calendar day, not the charges' | bar | `TILL` | `CARD` | `TAB_SETTLEMENT` |
+| Void of a tab charge | An unsettled charge is voided with a reason (F-109); the calendar day of the void, not of the charge | bar | `TILL` | `TAB` | `BAR_ITEM` |
+| Imported history | Six years of the old estate load as opening history (I-109, K-114) | finance | `IMPORT` | `CARD`, `NONE` | `IMPORT` |
+
+Reading the table:
+
+- A refund, a void and any other correction carry negative amounts and set `reversesEntryId` to
+  the entry they correct. A void additionally names the tab charge in `void_of_entry_id`, which
+  no other path sets. Both rows stay, and what is owed is the sum across them.
+- A comp and a pass admission both total zero. The comp keeps the full price in
+  `unit_price_pence` so foregone revenue is queryable; the pass admission is genuinely free, and
+  its value is the pass sale that already posted.
+- The door is the desk: `source` names the surface money was taken on, and `DESK` covers both.
+  What tells a walk-up from a collection is the kind, and the reservation's own `DOOR` source.
+- `IMPORT` tenders `NONE` where the old estate recorded none. Imported history lands into closed
+  periods (I-109 criterion 3), keeping each entry's original calendar day.
+- The night a performance belongs to comes from the performance, and a till session's night comes
+  from `showNightOf` (E-110). Neither is read off `london_day`, and no path writes both.
 
 ## Concurrency on D1 (0003, 0006)
 

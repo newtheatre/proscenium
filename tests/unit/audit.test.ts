@@ -64,6 +64,20 @@ describe('detail refuses personal free text (0011)', () => {
   })
 })
 
+// Every stream writes audit entries, so every module that will has a name to write under before
+// its first route lands (build order, Wave 0 b).
+describe('the audit modules', () => {
+  test('every module with a privileged mutation in the MVP is named', () => {
+    expect([...AUDIT_MODULES].sort()).toEqual([
+      'bar', 'communications', 'finance', 'governance', 'identity', 'show-night', 'spaces', 'ticketing', 'training',
+    ])
+  })
+
+  test('a module name is a lowercase segment the query string can carry', () => {
+    for (const module of AUDIT_MODULES) expect(module).toMatch(/^[a-z]+(?:-[a-z]+)*$/)
+  })
+})
+
 describe('the action catalogue (J-101 criterion 5)', () => {
   test('an unregistered action cannot be written, however well formed', () => {
     expect(() => auditEntry({ ...ok, action: 'booking.refunded' })).toThrow(/not a registered audit action/)

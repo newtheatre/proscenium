@@ -27,6 +27,8 @@ export interface PersonalTable {
 }
 
 export const PERSONAL_TABLES: PersonalTable[] = [
+  // Module A: identity
+
   {
     name: 'users',
     column: 'id',
@@ -72,98 +74,6 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'scrub',
     scrub: ['note'],
     why: 'Who held which office in which year is governance history; the note about them is not.',
-  },
-  {
-    name: 'department_leads',
-    column: 'user_id',
-    section: 'training',
-    columns: ['department', 'granted_at', 'expires_at'],
-    // Nothing free-text is held: the assignment is a department and two dates, and who stewarded
-    // a department in a year is governance history the same way an office is (G-110).
-    erasure: 'keep',
-    why: 'Departments this person led. Stewardship history survives an erasure, and it names nobody else.',
-  },
-  {
-    name: 'training_records',
-    column: 'user_id',
-    // Its own section: `department_leads` already holds `training`, and the bundle keys by section.
-    section: 'training-records',
-    // The reason is exported as well as scrubbed: it is a thing written about them, the way a
-    // booking's rejection reason is, and a subject access request reaches it.
-    columns: ['module_id', 'awarded_on', 'expires_on', 'source', 'evidence_ref', 'revoked_at', 'revoke_reason', 'created_at'],
-    erasure: 'scrub',
-    // The append-only trigger names this clearing as one of its three sanctioned edits, so the
-    // generic statement runs here rather than a bespoke one (0010, 0011, G-122 criterion 6).
-    scrub: ['evidence_ref', 'revoke_reason'],
-    // `granted_by` and `revoked_by` hold the acting officer rather than the subject, so they are
-    // not scrubbed and resolve to the tombstone, as `config.updated_by` does.
-    why: 'Training this person held. Who was competent to do what is safety history; the evidence for it and the words written about them are not.',
-  },
-  {
-    name: 'module_requests',
-    column: 'user_id',
-    section: 'training-requests',
-    // The reply is exported as well as scrubbed: it is a thing written about them and shown to
-    // them, the way a booking's rejection reason is.
-    columns: ['module_id', 'note', 'status', 'reason', 'created_at'],
-    erasure: 'scrub',
-    scrub: ['note', 'reason'],
-    why: 'What this person asked to be taught. How much demand a module had is worth keeping; what they wrote about themselves, and what was written back, is not.',
-  },
-  {
-    name: 'training_sessions',
-    column: 'trainer_id',
-    section: 'training-sessions',
-    columns: ['held_on', 'starts_at', 'ends_at', 'place', 'capacity', 'status', 'created_at'],
-    erasure: 'scrub',
-    // `trainer_id` is NOT NULL and stays pointing at the tombstoned account, so what the session
-    // was survives the person who ran it.
-    scrub: ['notes', 'cancel_reason'],
-    why: 'Sessions this person ran. What training the theatre delivered is safety history; the trainer\'s notes on a night are not.',
-  },
-  {
-    name: 'session_attendees',
-    column: 'user_id',
-    section: 'training-attendance',
-    columns: ['session_id', 'status', 'source', 'signed_up_at', 'marked_at', 'created_at'],
-    // Nothing free-text is held: the row is a session, an order and a mark. Who was taught what
-    // on which night is the evidence a training record rests on, so it survives an erasure.
-    erasure: 'keep',
-    why: 'Sessions this person signed up to and was marked at. Attendance is safety history, and it names nobody else.',
-  },
-  {
-    name: 'notification_preferences',
-    column: 'user_id',
-    section: 'notification-preferences',
-    columns: ['topic', 'email', 'push'],
-    erasure: 'delete',
-    why: 'A choice about messages nobody will send.',
-  },
-  {
-    name: 'notification_log',
-    column: 'user_id',
-    section: 'messages',
-    columns: ['type', 'channel', 'subject', 'status', 'sent_at'],
-    erasure: 'scrub',
-    // The subject is rendered with the account name, so it carries one.
-    scrub: ['subject', 'error'],
-    why: 'What was sent and whether it arrived is an operational count; the subject line is not.',
-  },
-  {
-    name: 'inbox_items',
-    column: 'user_id',
-    section: 'inbox',
-    columns: ['type', 'title', 'body', 'created_at', 'read_at'],
-    erasure: 'delete',
-    why: 'Messages written to the person, and prose about them.',
-  },
-  {
-    name: 'audit_log',
-    column: 'actor_id',
-    section: 'activity',
-    columns: ['action', 'target', 'created_at'],
-    erasure: 'keep',
-    why: 'Append-only (0010). Erasure redacts identifying values in detail and rewrites nothing.',
   },
   {
     name: 'totp_secrets',
@@ -213,6 +123,9 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'delete',
     why: 'A password step waiting for its second factor, which expires anyway.',
   },
+
+  // Module C: spaces
+
   {
     name: 'room_bookings',
     column: 'user_id',
@@ -319,6 +232,105 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // The link is a credential. Left behind, an erased person's calendar would keep resolving.
     why: 'A calendar subscription the account holds. It ends with the account (C-104).',
   },
+
+  // Module D: ticketing
+
+  // Module E: show night
+
+  // Module F: bar
+
+  // Module G: training
+
+  {
+    name: 'department_leads',
+    column: 'user_id',
+    section: 'training',
+    columns: ['department', 'granted_at', 'expires_at'],
+    // Nothing free-text is held: the assignment is a department and two dates, and who stewarded
+    // a department in a year is governance history the same way an office is (G-110).
+    erasure: 'keep',
+    why: 'Departments this person led. Stewardship history survives an erasure, and it names nobody else.',
+  },
+  {
+    name: 'training_records',
+    column: 'user_id',
+    // Its own section: `department_leads` already holds `training`, and the bundle keys by section.
+    section: 'training-records',
+    // The reason is exported as well as scrubbed: it is a thing written about them, the way a
+    // booking's rejection reason is, and a subject access request reaches it.
+    columns: ['module_id', 'awarded_on', 'expires_on', 'source', 'evidence_ref', 'revoked_at', 'revoke_reason', 'created_at'],
+    erasure: 'scrub',
+    // The append-only trigger names this clearing as one of its three sanctioned edits, so the
+    // generic statement runs here rather than a bespoke one (0010, 0011, G-122 criterion 6).
+    scrub: ['evidence_ref', 'revoke_reason'],
+    // `granted_by` and `revoked_by` hold the acting officer rather than the subject, so they are
+    // not scrubbed and resolve to the tombstone, as `config.updated_by` does.
+    why: 'Training this person held. Who was competent to do what is safety history; the evidence for it and the words written about them are not.',
+  },
+  {
+    name: 'module_requests',
+    column: 'user_id',
+    section: 'training-requests',
+    // The reply is exported as well as scrubbed: it is a thing written about them and shown to
+    // them, the way a booking's rejection reason is.
+    columns: ['module_id', 'note', 'status', 'reason', 'created_at'],
+    erasure: 'scrub',
+    scrub: ['note', 'reason'],
+    why: 'What this person asked to be taught. How much demand a module had is worth keeping; what they wrote about themselves, and what was written back, is not.',
+  },
+  {
+    name: 'training_sessions',
+    column: 'trainer_id',
+    section: 'training-sessions',
+    columns: ['held_on', 'starts_at', 'ends_at', 'place', 'capacity', 'status', 'created_at'],
+    erasure: 'scrub',
+    // `trainer_id` is NOT NULL and stays pointing at the tombstoned account, so what the session
+    // was survives the person who ran it.
+    scrub: ['notes', 'cancel_reason'],
+    why: 'Sessions this person ran. What training the theatre delivered is safety history; the trainer\'s notes on a night are not.',
+  },
+  {
+    name: 'session_attendees',
+    column: 'user_id',
+    section: 'training-attendance',
+    columns: ['session_id', 'status', 'source', 'signed_up_at', 'marked_at', 'created_at'],
+    // Nothing free-text is held: the row is a session, an order and a mark. Who was taught what
+    // on which night is the evidence a training record rests on, so it survives an erasure.
+    erasure: 'keep',
+    why: 'Sessions this person signed up to and was marked at. Attendance is safety history, and it names nobody else.',
+  },
+
+  // Module H: communications
+
+  {
+    name: 'notification_preferences',
+    column: 'user_id',
+    section: 'notification-preferences',
+    columns: ['topic', 'email', 'push'],
+    erasure: 'delete',
+    why: 'A choice about messages nobody will send.',
+  },
+  {
+    name: 'notification_log',
+    column: 'user_id',
+    section: 'messages',
+    columns: ['type', 'channel', 'subject', 'status', 'sent_at'],
+    erasure: 'scrub',
+    // The subject is rendered with the account name, so it carries one.
+    scrub: ['subject', 'error'],
+    why: 'What was sent and whether it arrived is an operational count; the subject line is not.',
+  },
+  {
+    name: 'inbox_items',
+    column: 'user_id',
+    section: 'inbox',
+    columns: ['type', 'title', 'body', 'created_at', 'read_at'],
+    erasure: 'delete',
+    why: 'Messages written to the person, and prose about them.',
+  },
+
+  // Module I: finance
+
   {
     name: 'ledger_entries',
     column: 'actor_id',
@@ -328,6 +340,17 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // Nothing here needs scrubbing: the reference resolves to the tombstone the user row became.
     // Append-only does not forbid one, as audit_log shows (0004, 0010, 0011).
     why: 'Money the theatre took. Sales statistics survive an erasure; the person in them does not.',
+  },
+
+  // Module J: governance
+
+  {
+    name: 'audit_log',
+    column: 'actor_id',
+    section: 'activity',
+    columns: ['action', 'target', 'created_at'],
+    erasure: 'keep',
+    why: 'Append-only (0010). Erasure redacts identifying values in detail and rewrites nothing.',
   },
   {
     name: 'config',

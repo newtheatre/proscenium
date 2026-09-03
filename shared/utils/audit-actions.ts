@@ -3,7 +3,17 @@
 
 // The backlog module an action belongs to, declared rather than parsed out of the action's first
 // segment. `unknown` is what an unregistered action reads as, and nothing ever writes it.
-export const AUDIT_MODULES = ['identity', 'governance', 'spaces', 'training'] as const
+export const AUDIT_MODULES = [
+  'identity',
+  'spaces',
+  'ticketing',
+  'show-night',
+  'bar',
+  'training',
+  'communications',
+  'finance',
+  'governance',
+] as const
 export const UNKNOWN_MODULE = 'unknown'
 
 export type AuditModule = (typeof AUDIT_MODULES)[number]
@@ -25,6 +35,8 @@ export interface AuditActionType {
 }
 
 const CATALOGUE = {
+  // Module A: identity
+
   'account.registered': { label: 'Account registered', module: 'identity', self: true },
   'account.created.console': { label: 'Account created from the console', module: 'identity' },
   'account.created.google': { label: 'Account created by Google sign-in', module: 'identity', self: true },
@@ -60,13 +72,14 @@ const CATALOGUE = {
 
   'membership.granted': { label: 'Membership recorded', module: 'identity' },
   'membership.confirmed': { label: 'Membership confirmed', module: 'identity' },
-  'membership.exported': { label: 'Membership register exported', module: 'governance' },
   'account.method.added': { label: 'Sign-in method added', module: 'identity', self: true },
   'account.method.removed': { label: 'Sign-in method removed', module: 'identity', self: true },
   'account.email.changed': { label: 'Email address changed', module: 'identity', self: true },
   'account.email.changed.admin': { label: 'Email address changed by an officer', module: 'identity' },
   'account.profile.updated': { label: 'Profile updated', module: 'identity', self: true },
   'account.student-id.recorded': { label: 'Student number recorded', module: 'identity' },
+
+  // Module C: spaces
 
   'room.created': { label: 'Room added', module: 'spaces' },
   'room.updated': { label: 'Room changed', module: 'spaces' },
@@ -99,6 +112,14 @@ const CATALOGUE = {
   'room.request.unlisted': { label: 'Request moved to a room we do not manage', module: 'spaces' },
   'external.request.relisted': { label: 'Request moved into one of our rooms', module: 'spaces' },
 
+  // Module D: ticketing
+
+  // Module E: show night
+
+  // Module F: bar
+
+  // Module G: training
+
   'department.created': { label: 'Department added', module: 'training' },
   'department.updated': { label: 'Department changed', module: 'training' },
   'department.lead.assigned': { label: 'Department lead assigned', module: 'training' },
@@ -122,6 +143,14 @@ const CATALOGUE = {
   'register.marked': { label: 'Register marked', module: 'training' },
   'register.freeze.released': { label: 'Register module freeze released', module: 'training' },
   'session.modules.changed': { label: 'Session modules changed', module: 'training' },
+
+  // Module H: communications
+
+  // Module I: finance
+
+  // Module J: governance
+
+  'membership.exported': { label: 'Membership register exported', module: 'governance' },
 
   // An honour rather than authority, so it sits with governance and not with identity (0023).
   'fellowship.awarded': { label: 'Fellowship awarded', module: 'governance' },

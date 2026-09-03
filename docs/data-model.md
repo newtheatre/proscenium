@@ -342,10 +342,12 @@ money and the thing it paid for commit in one batch (0001, I-102 criterion 6).
 `id` PK · `entry_id` → ledger_entries cascade · `kind`, **no CHECK**, held as an enum in
 `shared/utils/ledger.ts` and enforced at the one write path, because a CHECK on an append-only
 table can never be widened (0033):
-`TICKET_COLLECTION|WALK_UP|BAR_ITEM|PASS_SALE|TAB_SETTLEMENT|REFUND|IMPORT` ·
+`TICKET_COLLECTION|WALK_UP|PASS_SALE|PASS_ADMISSION|BAR_ITEM|TAB_SETTLEMENT|REFUND|IMPORT` ·
 `amount_pence` gross · `reservation_id` NULL · `performance_id` NULL · `ticket_id` NULL ·
 `product_variant_id` NULL · `qty` · `unit_price_pence` · `price_ref` (which price row and
 level resolved, F-121) · `choices` JSON.
+Which source, tender and kind each money path posts under is the table in `architecture.md`
+under Money and the ledger. A path not in that table has not been agreed.
 
 ### z_readings
 `london_day` PK · `reader_pence` (typed from the SumUp display) · `expected_pence` (computed
@@ -1311,6 +1313,8 @@ was done, survives the redaction. A correction supersedes with a new entry.
 Two registries govern what may be written. `shared/utils/audit-actions.ts` is the closed catalogue
 of actions: each carries a label and the module it belongs to, and `auditEntry` refuses a name that
 is not in it, so a typo cannot create a category and the screen always has something to display.
+The modules are `identity`, `spaces`, `ticketing`, `show-night`, `bar`, `training`,
+`communications`, `finance` and `governance`, which is what the trail's module filter offers.
 `shared/utils/audit-coverage.ts` says which route answers for which entry, and `check:audit` fails
 the build when a mutating route is missing from it, claims an action it does not write, or is
 exempt without a reason (J-101 criterion 5). A state change records `changes: { field: { from, to } }`,

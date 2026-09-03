@@ -20,6 +20,8 @@ interface ConfigKeyDefinition {
 }
 
 export const CONFIG_KEYS = {
+  // Module D: ticketing
+
   HOLD_RELEASE_MINUTES_BEFORE: {
     schema: z.number().int().positive(),
     default: 15,
@@ -50,6 +52,9 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Minutes a comp request stays open before it lapses.',
   },
+
+  // Module F: bar
+
   BAR_TAB_CAP_PENCE: {
     schema: z.number().int().nonnegative(),
     default: 2000,
@@ -62,12 +67,17 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Whether a manager may raise the tab cap for one tab.',
   },
+
+  // Module I: finance
+
   DISCOUNT_CODES_ENABLED: {
     schema: z.boolean(),
     default: false,
     workshop: 'money-and-box-office',
     describes: 'Discount codes exist as a capability and stay off until the committee wants them.',
   },
+  // Module J: governance
+
   SEASON_START: {
     schema: z.string().regex(/^\d{2}-\d{2}$/),
     default: '08-01',
@@ -80,6 +90,8 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Month and day the season closes, London. Roles expire at the last London instant of it.',
   },
+
+  // Module C: spaces
 
   ROOM_MIN_BOOKING_MINUTES: {
     schema: z.number().int().positive(),
@@ -195,6 +207,9 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Booking priority, highest first. A higher tier bumps a lower one with notification.',
   },
+
+  // Module G: training
+
   TRAINING_EXPIRY_WARNING_DAYS: {
     schema: z.number().int().positive(),
     default: 60,
@@ -269,6 +284,8 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Days after a session that nagging stops.',
   },
+
+  // Module A: identity
 
   PASSWORD_MIN_LENGTH: {
     schema: z.number().int().min(8).max(64),
@@ -384,6 +401,10 @@ export const CONFIG_KEYS = {
     describes: 'The most accounts one unverified-expiry run may anonymise, so the first sweep after an import drains over days (0026).',
   },
 
+  // Module H: communications
+
+  // Module K: platform
+
   RETENTION_FULL_ACCOUNT_YEARS: {
     schema: z.number().int().positive(),
     default: 2,
@@ -402,6 +423,9 @@ export const CONFIG_KEYS = {
     workshop: 'people-and-communications',
     describes: 'Retention ships as a dry-run and is armed by typed confirmation, in December.',
   },
+
+  // Module E: show night
+
   NIGHT_REPORT_RECIPIENTS: {
     schema: z.array(z.string().email()),
     workshop: 'people-and-communications',

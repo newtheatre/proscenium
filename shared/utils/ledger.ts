@@ -10,12 +10,24 @@ export const TENDERS = ['CARD', 'COMP', 'TAB', 'NONE'] as const
 export type EntrySource = (typeof ENTRY_SOURCES)[number]
 export type Tender = (typeof TENDERS)[number]
 
+// The (source, tender, kind) triple each of these posts under is fixed in architecture.md, and a
+// unit test reads that table: a kind here and nowhere there is a path nobody agreed.
 export const LINE_KINDS = [
+  // Module D: ticketing
+
   { name: 'TICKET_COLLECTION', label: 'Ticket collection' },
   { name: 'WALK_UP', label: 'Walk-up sale' },
-  { name: 'BAR_ITEM', label: 'Bar item' },
   { name: 'PASS_SALE', label: 'Pass sale' },
+  // Zero-value: a pass admission is money that did not move, and still a fact (D-125, I-102).
+  { name: 'PASS_ADMISSION', label: 'Pass admission' },
+
+  // Module F: bar
+
+  { name: 'BAR_ITEM', label: 'Bar item' },
   { name: 'TAB_SETTLEMENT', label: 'Tab settlement' },
+
+  // Module I: finance
+
   { name: 'REFUND', label: 'Refund' },
   { name: 'IMPORT', label: 'Imported history' },
 ] as const
