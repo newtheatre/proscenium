@@ -565,16 +565,27 @@ erDiagram
 ```
 
 ### bar_items  (stocked things)
-`id` PK · `name` · `unit` CHECK `ML|ITEM` · `container_ml` NULL for whole items, **immutable
-once movements exist** · `par_qty` · `age_restricted` bool default true · `allergen_notes` ·
-`status` CHECK `ACTIVE|RETIRED` · `created_at`.
+`id` PK · `name` unique, case-insensitively · `unit` CHECK `ML|ITEM` · `container_ml` NULL for
+whole items, **immutable once movements exist**, as is `unit`, both by trigger · `par_qty` in the
+item's own unit (F-120) · `age_restricted` bool default true · `allergen_notes`, the reference a
+product's own note is written from · `status` CHECK `ACTIVE|RETIRED` · `created_at`. Retired, never
+deleted once anything has moved: every movement restricts on the foreign key.
 
 ### bar_categories
-`id` PK · `name` · `sort` · `colour`.
+`id` PK · `name` unique, case-insensitively · `sort`, which drives the till's layout and is read
+per request · `colour` CHECK six hexadecimal characters after a hash.
 
 ### bar_products  (sellable things)
-`id` PK · `category_id` → bar_categories restrict · `name` · `status` CHECK
-`ACTIVE|HIDDEN|RETIRED` · `staffed_only` bool (not on self-serve tabs) · `sort`.
+`id` PK · `category_id` → bar_categories restrict · `name` unique, case-insensitively · `status`
+CHECK `ACTIVE|HIDDEN|RETIRED`, default `HIDDEN` · `staffed_only` bool (not on self-serve tabs) ·
+`age_restricted` bool, what Challenge 25 prompts on (F-106) · `allergen_state` CHECK
+`UNKNOWN|NONE|RECORDED` · `allergen_note`, required by `RECORDED` and refused by `UNKNOWN` (F-107) ·
+`sort` · `created_at`.
+
+Nothing on the row says whether a product has ever sold, or whether it may go active. Both are
+queries over the tables referencing it, declared in `BAR_PRODUCT_REFERENCES`
+(`server/utils/bar.ts`); an unclassified referencing table fails
+`tests/integration/bar-catalogue.test.ts` (F-111 criteria 2 and 3).
 
 ### product_variants
 `id` PK · `product_id` → bar_products cascade · `serving_kind` (the price-resolution key:
@@ -607,10 +618,23 @@ One open session per venue per London night (partial UNIQUE (night, venue) WHERE
 `closed_at IS NULL`); may span a matinee and evening (E-127); checklist JSON on close.
 
 ### stock_movements  APPEND-ONLY
-`id` PK · `item_id` → bar_items restrict · `qty` signed, real units · `kind` CHECK
-`DELIVERY|SALE|COMP|STOCKTAKE|WASTAGE|TRANSFER|ADJUST|REVERSAL` · `ref_table` / `ref_id` ·
-`actor_id` · `created_at`. On-hand is always `SUM(qty)`. Partial UNIQUE (`ref_id`) WHERE
+`id` PK · `item_id` → bar_items restrict · `qty` signed integer, whole units of the item's own
+counting unit · `kind` CHECK `DELIVERY|SALE|COMP|STOCKTAKE|WASTAGE|TRANSFER|ADJUST|REVERSAL` ·
+`reason`, from `MOVEMENT_REASONS` in `shared/utils/bar.ts` rather than a CHECK, so a
+bar-manager-managed list (F-204) needs no rebuild · `unit_cost_pence`, delivery only (F-119's cost
+basis) · `ref_table` / `ref_id`, set together or not at all · `reverses_id` → stock_movements
+restrict · `actor_id` → users restrict, NULL being the system · `created_at`.
+
+On-hand is always `SUM(qty)`, computed where it is asked for; no column anywhere holds a balance,
+and a test over the live schema refuses one. Triggers refuse every UPDATE and DELETE, and refuse a
+reversal that does not name a movement of the same item and the opposite quantity. UNIQUE
+(`reverses_id`), so a movement is reversed once. Partial UNIQUE (`ref_id`) WHERE
 ref_table='stocktake_lines' (a duplicate finish rolls the batch back).
+
+The kind vocabulary is complete from the first migration because widening a CHECK is a table
+rebuild, and a rebuild of an append-only table is refused (0010). `MOVEMENT_WRITERS` says which
+path writes each: the stock screen writes `DELIVERY`, `WASTAGE`, `ADJUST` and `REVERSAL`, and
+refuses the rest by name.
 
 ### stock_deliveries / stock_delivery_lines / stocktakes / stocktake_lines
 As the estate's proven design: deliveries at cost; one open stocktake (partial unique);

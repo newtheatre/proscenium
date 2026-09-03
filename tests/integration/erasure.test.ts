@@ -63,6 +63,11 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
       VALUES (?, ?, ?, ?, ?, ?)`,
     `venue-${id}`, 'The car park behind the building', 'Two, both stage left',
     'The isolation point is behind the bar', id, now],
+    // Stock this person moved. The movement is financial evidence and holds no free text at all,
+    // which is why it survives an erasure with only the tombstone's reference in it (F-114).
+    ['INSERT INTO bar_items (id, name, unit) VALUES (?, ?, ?)', `bi-${id}`, 'House red', 'ML'],
+    [`INSERT INTO stock_movements (id, item_id, qty, kind, reason, actor_id, created_at)
+      VALUES (?, ?, -750, 'WASTAGE', 'BREAKAGE', ?, ?)`, `sm-${id}`, `bi-${id}`, id, now],
     ['INSERT INTO departments (code, name) VALUES (?, ?)', `dept-${id}`, 'Technical'],
     ['INSERT INTO department_leads (id, department, user_id) VALUES (?, ?, ?)', `dl-${id}`, `dept-${id}`, id],
     ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)',

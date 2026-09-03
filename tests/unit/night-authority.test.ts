@@ -47,9 +47,12 @@ describe('the night roles are the three the rota staffs (E-111 criterion 1)', ()
   })
 
   // F-101 criterion 2, and E-111 criterion 1's last sentence: the roles are not interchangeable.
-  test('the front of house officer does not open the till, and the bar manager opens nothing else', () => {
-    expect(PERMISSION_MAP.FOH_MANAGER).toEqual(['night.door', 'night.manage'])
-    expect(PERMISSION_MAP.BAR_MANAGER).toEqual(['night.till'])
+  // The bar manager also administers the bar sitting down (F-111), which opens no night screen.
+  test('the front of house officer does not open the till, and the bar manager does not open the door', () => {
+    const bypass = (role: 'FOH_MANAGER' | 'BAR_MANAGER'): string[] =>
+      PERMISSION_MAP[role].filter(permission => OPERATIONAL_PERMISSIONS.includes(permission))
+    expect(bypass('FOH_MANAGER')).toEqual(['night.door', 'night.manage'])
+    expect(bypass('BAR_MANAGER')).toEqual(['night.till'])
   })
 
   test('an ordinary front of house member holds no bypass at all (0009)', () => {
