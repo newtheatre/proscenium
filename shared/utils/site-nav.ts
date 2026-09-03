@@ -47,9 +47,16 @@ export const CONSOLE_HOME: NavEntry = {
 // A fixed order, the same for everybody, so the sidebar is stable enough to learn. A group with
 // nothing visible in it does not render; the empty ones are where the modules land (docs 0040).
 export const CONSOLE_NAV: NavGroup[] = [
+  // Module E: show night
   { key: 'tonight', label: 'Tonight', icon: 'i-lucide-moon-star', prefix: '/tonight', items: [] },
+
+  // Module D: ticketing
   { key: 'box-office', label: 'Box office', icon: 'i-lucide-ticket', prefix: '/box-office', items: [] },
+
+  // Module F: bar
   { key: 'bar', label: 'Bar', icon: 'i-lucide-beer', prefix: '/bar', items: [] },
+
+  // Module C: spaces
   {
     key: 'spaces',
     label: 'Spaces',
@@ -63,6 +70,8 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Utilisation', icon: 'i-lucide-chart-column', to: '/rooms/manage/utilisation', ability: viewRooms },
     ],
   },
+
+  // Module G: training
   {
     key: 'training',
     label: 'Training',
@@ -76,6 +85,8 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Requests', icon: 'i-lucide-hand', to: '/training/manage/requests', ability: viewTrainingCatalogue },
     ],
   },
+
+  // Module A: identity
   {
     key: 'people',
     label: 'People',
@@ -87,8 +98,14 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Fellows', icon: 'i-lucide-award', to: '/people/fellows', ability: viewFellows },
     ],
   },
+
+  // Module I: finance
   { key: 'money', label: 'Money', icon: 'i-lucide-banknote', prefix: '/money', items: [] },
+
+  // Module H: communications
   { key: 'comms', label: 'Communications', icon: 'i-lucide-send', prefix: '/comms', items: [] },
+
+  // Module J: governance
   {
     key: 'system',
     label: 'System',
@@ -97,6 +114,9 @@ export const CONSOLE_NAV: NavGroup[] = [
     items: [
       { label: 'Settings', icon: 'i-lucide-settings', to: '/admin/settings', ability: viewSettings },
       { label: 'Audit trail', icon: 'i-lucide-scroll-text', to: '/admin/audit', ability: viewAuditTrail },
+
+      // Module K: platform
+
     ],
   },
 ]
@@ -104,10 +124,18 @@ export const CONSOLE_NAV: NavGroup[] = [
 // The member's own screens. The footer shows these to everybody and sends a signed-out visitor
 // through /sign-in?next=, so somebody who followed a link still arrives where they meant to.
 export const MEMBER_NAV: NavEntry[] = [
+  // Module C: spaces
+
   { label: 'My bookings', icon: 'i-lucide-calendar-check', to: '/rooms/mine', ability: signedIn },
   { label: 'Book a room', icon: 'i-lucide-door-open', to: '/rooms', ability: signedIn, exact: true },
+
+  // Module G: training
+
   { label: 'My training', icon: 'i-lucide-graduation-cap', to: '/training', ability: signedIn, exact: true },
   { label: 'Training sessions', icon: 'i-lucide-calendar-days', to: '/training/sessions', ability: signedIn },
+
+  // Module A: identity
+
   { label: 'My profile', icon: 'i-lucide-user', to: '/account/profile', ability: signedIn },
   { label: 'Sign-in and security', icon: 'i-lucide-shield', to: '/account/security', ability: signedIn },
 ]
@@ -122,6 +150,8 @@ export const SHELL_NAV: NavEntry[] = [
 // The public half of the footer: pages a visitor reads before they are anybody here. The policy
 // pages J-110 writes join this list.
 export const PUBLIC_NAV: NavEntry[] = [
+  // Module G: training
+
   { label: 'What we teach', icon: 'i-lucide-graduation-cap', to: '/training/modules', ability: anybody },
 ]
 

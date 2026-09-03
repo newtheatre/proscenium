@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { AUDIT_MODULES } from '#shared/utils/audit-actions'
 import {
   LINE_KINDS,
   ENTRY_SOURCES,
@@ -107,9 +108,19 @@ describe('a day is a London day', () => {
 
 describe('the kind is a closed set held in code (0033)', () => {
   test('the kinds the estate posts are all registered', () => {
-    for (const kind of ['TICKET_COLLECTION', 'WALK_UP', 'BAR_ITEM', 'PASS_SALE', 'TAB_SETTLEMENT', 'REFUND', 'IMPORT']) {
+    for (const kind of ['TICKET_COLLECTION', 'WALK_UP', 'BAR_ITEM', 'PASS_SALE', 'PASS_ADMISSION', 'TAB_SETTLEMENT', 'REFUND', 'IMPORT']) {
       expect(isLineKind(kind)).toBe(true)
     }
+  })
+
+  // A pass admission is money that did not move, and it is still a fact the ledger carries
+  // (D-125 criterion 5, I-102 criterion 4).
+  test('a pass admission posts at zero rather than not at all', () => {
+    expect(entryForm.safeParse({
+      source: 'SELF_SERVE',
+      tender: 'NONE',
+      lines: [{ kind: 'PASS_ADMISSION', amountPence: 0, qty: 1, ticketId: 't-1', performanceId: 'p-1' }],
+    }).success).toBe(true)
   })
 
   test('one nobody registered is refused at the write path', () => {
@@ -131,5 +142,53 @@ describe('the kind is a closed set held in code (0033)', () => {
     expect([...ENTRY_SOURCES]).toEqual(['DESK', 'TILL', 'SELF_SERVE', 'IMPORT', 'SYSTEM'])
     expect([...TENDERS]).toEqual(['CARD', 'COMP', 'TAB', 'NONE'])
     expect(LINE_KINDS.length).toBeGreaterThan(0)
+  })
+})
+
+// The (source, tender, kind) triple for every money path is fixed in architecture.md, so the
+// table is read here: a row naming a value the code does not hold is drift, not documentation.
+describe('the money-path table agrees with the code (build order, Wave 0 b)', () => {
+  interface MoneyPath { path: string, module: string, sources: string[], tenders: string[], kinds: string[] }
+
+  const tokens = (cell: string): string[] => [...cell.matchAll(/`([A-Z_]+)`/g)].map(match => match[1]!)
+
+  async function moneyPaths(): Promise<MoneyPath[]> {
+    const source = await Bun.file('docs/architecture.md').text()
+    const section = source.split('\n## Money and the ledger\n')[1]?.split('\n## ')[0] ?? ''
+    return section.split('\n')
+      .filter(line => line.startsWith('| ') && !line.startsWith('| Money path') && !line.startsWith('| ---'))
+      .map((line) => {
+        const cells = line.split('|').slice(1, -1).map(cell => cell.trim())
+        const [path, , module, sources, tenders, kinds] = cells
+        return { path: path!, module: module!, sources: tokens(sources!), tenders: tokens(tenders!), kinds: tokens(kinds!) }
+      })
+  }
+
+  test('every path the build order names has a row', async () => {
+    const named = (await moneyPaths()).map(row => row.path.toLowerCase())
+    for (const path of ['desk collection', 'walk-up', 'refund', 'pass sale', 'pass admission', 'bar item', 'tab settlement', 'void', 'import']) {
+      expect(named.some(candidate => candidate.includes(path))).toBe(true)
+    }
+  })
+
+  test('every row uses a source, a tender and a kind the write path accepts', async () => {
+    for (const row of await moneyPaths()) {
+      expect(`${row.path}: ${row.sources.length > 0 && row.tenders.length > 0 && row.kinds.length > 0}`).toBe(`${row.path}: true`)
+      for (const source of row.sources) expect(`${row.path}: ${source}`).toBe(`${row.path}: ${ENTRY_SOURCES.find(s => s === source)}`)
+      for (const tender of row.tenders) expect(`${row.path}: ${tender}`).toBe(`${row.path}: ${TENDERS.find(t => t === tender)}`)
+      for (const kind of row.kinds) expect(`${row.path}: ${isLineKind(kind)}`).toBe(`${row.path}: true`)
+    }
+  })
+
+  test('every kind the code holds is posted by some path, so none is registered and never used', async () => {
+    const posted = new Set((await moneyPaths()).flatMap(row => row.kinds))
+    expect(LINE_KINDS.map(kind => kind.name).filter(kind => !posted.has(kind))).toEqual([])
+  })
+
+  // A money path is a privileged mutation, and its audit entries need a module to group under.
+  test('every module that posts money has an audit module to write under', async () => {
+    for (const row of await moneyPaths()) {
+      expect(`${row.path}: ${row.module}`).toBe(`${row.path}: ${AUDIT_MODULES.find(module => module === row.module)}`)
+    }
   })
 })
