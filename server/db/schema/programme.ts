@@ -77,6 +77,8 @@ export const shows = sqliteTable('shows', {
   // Distinct from having no warning rows: nobody having looked is not the same as nothing to say.
   warningsConfirmedNone: integer('warnings_confirmed_none', { mode: 'boolean' }).notNull().default(false),
   contentNotes: text('content_notes'),
+  // The default a performance inherits when it states none of its own; null here is curtain-up.
+  bookingClosesHoursBefore: integer('booking_closes_hours_before'),
   status: text('status').notNull().default('DRAFT'),
   // Reserved and unreferenced, so module B attaches here without rebuilding the table.
   productionId: text('production_id'),
@@ -129,7 +131,7 @@ export const performances = sqliteTable('performances', {
   intervalMinutes: integer('interval_minutes'),
   // Null takes the venue's capacity; an explicit nought is a closed house, not an absence.
   capacityOverride: integer('capacity_override'),
-  // Null and nought both mean curtain-up (D-112).
+  // Null inherits the show's default and nought is this performance saying curtain-up (D-112).
   bookingClosesHoursBefore: integer('booking_closes_hours_before'),
   holdReleaseMinutesBefore: integer('hold_release_minutes_before'),
   externalBookingUrl: text('external_booking_url'),

@@ -17,7 +17,7 @@ let member: TestMember
 
 // Asserted on hrefs rather than labels: a word like System appears in a stylesheet too, and a
 // test that passes for the wrong reason is worse than no test.
-const BOX_OFFICE = ['/box-office/ticket-types']
+const BOX_OFFICE = ['/box-office/shows', '/box-office/ticket-types']
 const SPACES = ['/rooms/manage', '/rooms/manage/requests', '/rooms/manage/closures', '/rooms/manage/other', '/rooms/manage/utilisation']
 const PEOPLE = ['/people/accounts', '/people/members', '/people/fellows']
 const SYSTEM = ['/admin/settings', '/admin/audit']

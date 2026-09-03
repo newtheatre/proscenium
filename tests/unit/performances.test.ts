@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import { fromLondonWallClock } from '#shared/utils/london'
+import { saleRefusal } from '#shared/utils/programme'
 import { showNightBounds } from '#shared/utils/show-night'
 import { effectiveCapacity, isOnSale, performanceNight } from '#server/utils/performances'
-import type { PerformanceSaleState } from '#server/utils/performances'
+import type { PerformanceSaleState } from '#shared/utils/programme'
 
 // The programme utilities every show-night and box-office screen reads a performance through
 // (build-order contract d). The boundary itself is show-night.ts's; nothing here restates it.
@@ -67,6 +68,7 @@ describe('isOnSale is the one predicate the internal sales paths ask (D-112, D-1
     showStatus: 'PUBLISHED',
     startsAt: seconds(curtain),
     bookingClosesHoursBefore: null,
+    showBookingClosesHoursBefore: null,
     externalBookingUrl: null,
     ...over,
   })
@@ -96,11 +98,25 @@ describe('isOnSale is the one predicate the internal sales paths ask (D-112, D-1
     expect(isOnSale(closes, new Date(curtain.getTime() - 1.5 * 3_600_000))).toBe(false)
   })
 
-  test('null and nought both mean curtain-up, which is the same window', () => {
+  test('an unstated window at both levels means curtain-up, as does an explicit nought', () => {
     const at = new Date(curtain.getTime() - 60_000)
     expect(isOnSale(performance({ bookingClosesHoursBefore: null }), at)).toBe(true)
     expect(isOnSale(performance({ bookingClosesHoursBefore: 0 }), at)).toBe(true)
     expect(isOnSale(performance({ bookingClosesHoursBefore: 0 }), curtain)).toBe(false)
+  })
+
+  // One answer to one question: the boolean is the refusal with its reason dropped, so a path
+  // that only needs a yes or no cannot drift from the one that quotes the reason.
+  test('the predicate is the refusal, so the two can never disagree', () => {
+    const cases: PerformanceSaleState[] = [
+      performance(),
+      performance({ status: 'CANCELLED' }),
+      performance({ showStatus: 'DRAFT' }),
+      performance({ externalBookingUrl: 'https://example.invalid/tickets' }),
+      performance({ showBookingClosesHoursBefore: 2 }),
+    ]
+    const at = new Date(curtain.getTime() - 3_600_000)
+    for (const one of cases) expect(isOnSale(one, at)).toBe(saleRefusal(one, at) === null)
   })
 })
 

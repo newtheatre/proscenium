@@ -11,6 +11,7 @@ const PAGES = 'app/pages'
 
 // A detail page is reached from its list, and the catch-all only forwards an old link.
 const NOT_IN_THE_NAV = new Set([
+  'app/pages/box-office/shows/[id].vue',
   'app/pages/people/accounts/[id].vue',
   'app/pages/training/manage/sessions/[id].vue',
   'app/pages/admin/[...legacy].vue',
