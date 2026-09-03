@@ -191,47 +191,60 @@ a documentation change here, not a migration.
 
 ## Programme (shared by ticketing and show night)
 
+Built by build-order Wave 0 contract (d). Every table below exists; the utilities that read
+them are `server/utils/performances.ts` (`architecture.md`).
+
 ### venues
 `id` PK · `name` UNIQUE · `address` · `capacity` int NULL = uncapped · `is_external` bool ·
 `image_key` (R2) · `description` · `room_id` → rooms set null · `created_at`. General admission
 only; no seat-map tables exist and nothing may assume them (constraint 4). A venue is its own
 row, never a flagged room: `room_id` says which rehearsal room the venue occupies, and its only
-effect is that the venue's performances apply blackouts to that room (`build-order.md`).
+effect is that the venue's performances apply blackouts to that room (0043).
 
 ### venue_features / venues_to_features
-Feature vocabulary and junction (both cascade).
+Feature vocabulary and junction (both cascade). Not yet built: no story reads them, and the
+Wave 0 contract does not list them.
 
 ### venue_emergency_info
-`venue_id` PK → venues cascade · assembly point, exits, isolation points, what3words, notes
-(free text, safe: describes the building, never a person) · `updated_by` · `updated_at`.
+`venue_id` PK → venues cascade · `assembly_point` · `exits` · `isolation_points` ·
+`what3words` · `notes` (free text, safe: describes the building, never a person) ·
+`updated_by` → users set null · `updated_at`.
 
 ### seasons
 `id` PK · `name` UNIQUE · `starts_on` · `ends_on` · `sort` · `archived` bool. The financial
-season is 1 August to 31 July.
+season is 1 August to 31 July. CHECK `ends_on` > `starts_on`.
 
 ### show_categories
 `id` PK · `name` UNIQUE · `sort`.
 
 ### shows
 `id` PK · `slug` UNIQUE · `title` · `subtitle` · `description` · `long_description` ·
-`poster_key` (R2) · `category_id` → show_categories restrict · `season_id` → seasons set
-null · `age_guidance` · `latecomer_policy` CHECK enum · `warnings_confirmed_none` bool
-(distinct from "no rows") · `content_notes` · `status` CHECK `DRAFT|PUBLISHED` · timestamps.
-`production_id` NULL, reserved: module B attaches here later without a rebuild (B preclusion).
+`poster_key` (R2) · `category_id` NULL → show_categories restrict · `season_id` → seasons set
+null · `age_guidance` · `latecomer_policy` CHECK `ADMITTED|AT_INTERVAL|NOT_ADMITTED`, NULL
+meaning not yet stated · `warnings_confirmed_none` bool (distinct from "no rows") ·
+`content_notes` · `status` CHECK `DRAFT|PUBLISHED` · timestamps.
+`production_id` NULL, reserved and unreferenced: module B attaches here later without a
+rebuild (B preclusion).
 
 ### content_warnings / show_content_warnings
 Vocabulary (`slug` UNIQUE, `title` UNIQUE, `kind` CHECK `TECHNICAL|GENERAL`, `category`,
-`description`, `icon`, `sort`, `archived`) and junction (UNIQUE pair, `level` CHECK
+`description`, `icon`, `sort`, `archived`) and junction (`show_id` → shows cascade,
+`warning_id` → content_warnings restrict, UNIQUE pair, `level` CHECK
 `MENTIONED|DISCUSSED|DEPICTED` NULL exactly when TECHNICAL).
+The enumerated values are a CHECK; "NULL exactly when TECHNICAL" correlates two tables, which
+SQLite cannot state as a CHECK, so D-102's write path holds that half.
 
 ### performances
 `id` PK · `show_id` → shows cascade · `venue_id` → venues restrict · `starts_at` ·
-`doors_at` · `duration_minutes` · `interval_count` · `interval_minutes` ·
+`doors_at` · `duration_minutes` · `interval_count` (default nought) · `interval_minutes` ·
 `capacity_override` NULL = venue capacity · `booking_closes_hours_before` (NULL and 0 both
 mean curtain-up) · `hold_release_minutes_before` NULL = config default ·
 `external_booking_url` NULL · `status` CHECK `DRAFT|ON_SALE|CANCELLED` · `notes` (internal,
 safe) · timestamps.
-Sold-out and completed are derived, never stored.
+Sold-out and completed are derived, never stored. Indexes: `starts_at`, (`venue_id`,
+`starts_at`), `show_id`. A performance belongs to the show night of its curtain, and to no
+day and no venue: two venues may run at the same time, and one venue may run a matinee and an
+evening on one night (E-127 criterion 1).
 
 ## Ticketing (module D)
 
@@ -269,11 +282,13 @@ stateDiagram-v2
 `id` PK · `name` UNIQUE global · `description` · `price` pence (base) · `kind` CHECK
 `SINGLE|PASS_ADMISSION` · `access_kind` CHECK `ACCESS|COMPANION` NULL · `archived` bool ·
 `active_by_default` bool.
-Archive, never delete, once sold (FK restrict from tickets).
+Archive, never delete, once sold (FK restrict from tickets). Built by Wave 0 contract (d) with
+the two override tables below; everything else in this module is unbuilt.
 
 ### show_ticket_overrides / performance_ticket_overrides
-UNIQUE (parent, ticket_type) · `price` NULL = inherit · `active` NULL = inherit. Resolution:
-performance, then show, then base.
+`id` PK · parent (`show_id` → shows cascade, or `performance_id` → performances cascade) ·
+`ticket_type_id` → ticket_types restrict · UNIQUE (parent, ticket_type) · `price` NULL =
+inherit · `active` NULL = inherit. Resolution: performance, then show, then base.
 
 ### reservations
 `id` PK · `reference` UNIQUE (6 chars, no-look-alike alphabet; a retrieval key, never a

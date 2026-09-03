@@ -293,6 +293,28 @@ cache label must call these as they are built; a second implementation is a defe
 `tests/unit/show-night.test.ts` fails on one. The financial day is not the show night: the
 ledger and the Z reconciliation group by London calendar day (I-104).
 
+## The programme (build-order contract d, 0043)
+
+Where we perform, what we perform and when. `venues`, `seasons`, `show_categories`, `shows`,
+`content_warnings`, `performances` and the ticket types and price overrides beside them are in
+`docs/data-model.md`; `server/utils/performances.ts` is how the rest of the system reads them.
+
+A venue is its own row, never a flagged room (0043). It may point at a room through a nullable
+`room_id`, and the only effect of that attachment is that the venue's performances apply blackouts
+to that room. Nothing else about a room is inferred from a venue or the reverse.
+
+| Function | Answers |
+| --- | --- |
+| `performanceNight(curtain: Date \| number): string` | Which show night a performance belongs to. Derived from `showNightOf(curtain)`, so a curtain before 04:00 belongs to the night that began the London day before. A stored curtain is integer seconds; both spellings are accepted. |
+| `performancesOnNight(night, venueId?)` | Every performance whose curtain falls inside the night's bounds, across the whole estate, narrowed by venue only when asked. Ordered by curtain, then venue. Two venues may run at once and one venue may run a matinee and an evening. |
+| `effectiveCapacity(performance)` | The performance's `capacity_override` if it has one, otherwise the venue's capacity. Null is uncapped; an explicit nought is a closed house, so the resolution is by absence and never by falsiness. |
+| `isOnSale(performance, at?)` | Whether an internal sales path may sell this performance: it is `ON_SALE`, its show is `PUBLISHED`, it carries no external ticketing link, and its booking window has not closed. `booking_closes_hours_before` NULL and nought both mean curtain-up. |
+
+A night is a window over the whole estate, not a venue and not a day: everything record-like keys
+to a performance (E-127 criterion 1). `performancesOnNightQuery()` is the statement
+`performancesOnNight()` runs, exported so an integration test executes the real SQL; it binds two
+parameters, or three when narrowed by venue, however many performances the night holds (0006).
+
 ## Show-night resilience (module K)
 
 Operational screens (door, till, registers, tonight view) are phone-first islands that cache

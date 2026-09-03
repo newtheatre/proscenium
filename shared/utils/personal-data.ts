@@ -235,6 +235,17 @@ export const PERSONAL_TABLES: PersonalTable[] = [
 
   // Module D: ticketing
 
+  {
+    name: 'venue_emergency_info',
+    column: 'updated_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Every column describes the building. The editor is a reference the tombstone still answers,
+    // as `config.updated_by` is.
+    why: 'A description of a building, not of a person. Front of house reads it in the dark, so nothing removes it.',
+  },
+
   // Module E: show night
 
   // Module F: bar

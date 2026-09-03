@@ -1,5 +1,15 @@
 {
   // https://nuxt.com/docs/guide/concepts/typescript
+  // The aliases are here as well as in each generated project so that a tool resolving a file by
+  // its nearest config, as Bun does, reads the same spellings server code uses.
+  "compilerOptions": {
+    "paths": {
+      "#shared": ["./shared"],
+      "#shared/*": ["./shared/*"],
+      "#server": ["./server"],
+      "#server/*": ["./server/*"]
+    }
+  },
   "files": [],
   "references": [
     {
