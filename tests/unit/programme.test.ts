@@ -92,7 +92,7 @@ describe('a show is draft until it is published, and a draft is invisible (D-121
     expect(projected?.bookingClosesAt).toBe(seconds(CURTAIN) - 7200)
     expect(Object.keys(projected ?? {}).sort()).toEqual([
       'bookingClosesAt', 'cancelled', 'doorsAt', 'durationMinutes', 'externalBookingUrl',
-      'id', 'intervalCount', 'startsAt', 'venueName',
+      'id', 'intervalCount', 'intervalMinutes', 'startsAt', 'venueName',
     ])
 
     expect(publicPerformance({ ...performance, status: 'DRAFT' })).toBeNull()

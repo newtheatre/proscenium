@@ -46,6 +46,12 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Whether refunding a paid booking needs manager approval. Money moves in person only (0005).',
   },
+  LISTING_LIMITED_THRESHOLD_PERCENT: {
+    schema: z.number().int().positive().max(100),
+    default: 10,
+    workshop: 'money-and-box-office',
+    describes: 'Share of a house left, as a percentage, at which the public listing says tickets are limited.',
+  },
   COMP_REQUEST_EXPIRY_MINUTES: {
     schema: z.number().int().positive(),
     default: 10,
@@ -446,6 +452,7 @@ export function isConfigKey(name: string): name is ConfigKey {
 // which the surface says plainly (0012). A test greps the server for the reads, so it cannot drift.
 export const ENFORCED_KEYS = [
   'ACADEMIC_YEAR_BOUNDARY',
+  'LISTING_LIMITED_THRESHOLD_PERCENT',
   'ADMIN_TOKEN_HOURS',
   'MAGIC_LINK_MINUTES',
   'MFA_ATTEMPT_MINUTES',

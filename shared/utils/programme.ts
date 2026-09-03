@@ -116,6 +116,10 @@ export interface AdminShow {
   performanceCount: number
   onSaleCount: number
   soldTickets: number
+  // Counted from the junction, so "confirmed clear" and "nobody has looked" stay distinct
+  // states rather than one empty list (D-102 criterion 2).
+  warningsConfirmedNone: boolean
+  warningCount: number
 }
 
 export interface AdminPerformance {
@@ -155,6 +159,7 @@ export interface PublicPerformance {
   doorsAt: number | null
   durationMinutes: number | null
   intervalCount: number
+  intervalMinutes: number | null
   venueName: string
   externalBookingUrl: string | null
   bookingClosesAt: number
@@ -316,6 +321,7 @@ export function publicPerformance(performance: PerformanceSaleState & {
   doorsAt: number | null
   durationMinutes: number | null
   intervalCount: number
+  intervalMinutes?: number | null
 }): PublicPerformance | null {
   if (!isPublicPerformance(performance)) return null
   return {
@@ -324,9 +330,63 @@ export function publicPerformance(performance: PerformanceSaleState & {
     doorsAt: performance.doorsAt,
     durationMinutes: performance.durationMinutes,
     intervalCount: performance.intervalCount,
+    intervalMinutes: performance.intervalMinutes ?? null,
     venueName: performance.venueName,
     externalBookingUrl: performance.externalBookingUrl,
     bookingClosesAt: performanceClosesAt(performance),
     cancelled: performance.status === 'CANCELLED',
   }
+}
+
+// What a visitor is told about a house, computed here so the listing and the show page cannot
+// disagree (D-101 criterion 2). Cancelled and external are carried by the projection beside it.
+export const AVAILABILITY_STATES = ['AVAILABLE', 'LIMITED', 'SOLD_OUT', 'BOOKING_CLOSED'] as const
+
+export type Availability = (typeof AVAILABILITY_STATES)[number]
+
+export interface PerformanceHouse {
+  // Null is an uncapped venue, which is never limited and never sold out.
+  capacity: number | null
+  sold: number
+}
+
+export function remainingSeats(house: PerformanceHouse): number | null {
+  if (house.capacity === null) return null
+  return Math.max(0, house.capacity - house.sold)
+}
+
+// A refusal comes first whatever the seats say: offering a button that would 409 is worse than
+// saying booking is closed. `saleRefusal` stays the only reading of on sale (D-112, D-121).
+export function performanceAvailability(
+  performance: PerformanceSaleState,
+  house: PerformanceHouse,
+  limitedAtOrBelowPercent: number,
+  at: Date = new Date(),
+): Availability {
+  if (saleRefusal(performance, at) !== null) return 'BOOKING_CLOSED'
+
+  const remaining = remainingSeats(house)
+  if (remaining === null) return 'AVAILABLE'
+  if (remaining === 0) return 'SOLD_OUT'
+  return remaining <= Math.ceil((house.capacity ?? 0) * limitedAtOrBelowPercent / 100) ? 'LIMITED' : 'AVAILABLE'
+}
+
+export function saysAvailability(state: Availability, remaining: number | null): string {
+  if (state === 'SOLD_OUT') return 'Sold out'
+  if (state === 'BOOKING_CLOSED') return 'Booking closed'
+  if (state === 'LIMITED' && remaining !== null) return `${remaining === 1 ? '1 ticket' : `${remaining} tickets`} left`
+  return 'Tickets available'
+}
+
+// The longest a public listing may be held anywhere, which is what the stated cache lifetime means
+// on the page and in docs/operations.md (0045).
+export const LISTED_CACHE_MAX_SECONDS = 300
+
+// A cached listing may not outlive the earliest moment one of its answers changes, so a window
+// closing in forty seconds caps the response at forty seconds (D-112 criterion 4, 0045).
+export function listingCacheSeconds(boundaries: number[], at: Date = new Date()): number {
+  const now = Math.floor(at.getTime() / 1000)
+  const soonest = boundaries.filter(boundary => boundary > now).sort((a, b) => a - b)[0]
+  if (soonest === undefined) return LISTED_CACHE_MAX_SECONDS
+  return Math.max(0, Math.min(LISTED_CACHE_MAX_SECONDS, soonest - now))
 }

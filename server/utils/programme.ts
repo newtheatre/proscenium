@@ -62,7 +62,15 @@ export function performanceSoldQuery(performanceId: string, references = soldRef
 export interface ShowFilters {
   status?: ShowStatus
   search?: string
+  // Published, warned about nothing and never confirmed clear: what D-102 criterion 2 flags.
+  unassessed?: boolean
 }
+
+interface ShowRow extends Omit<AdminShow, 'warningsConfirmedNone'> {
+  warningsConfirmedNone: number
+}
+
+const readShow = (row: ShowRow): AdminShow => ({ ...row, warningsConfirmedNone: row.warningsConfirmedNone === 1 })
 
 // A typed percent sign is a character somebody is looking for, not a wildcard.
 const contains = (term: string): string => `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
@@ -72,6 +80,7 @@ function predicate(filters: ShowFilters): SQL {
   const terms: SQL[] = []
   if (filters.status) terms.push(sql`s.status = ${filters.status}`)
   if (filters.search) terms.push(sql`(s.title LIKE ${contains(filters.search)} ESCAPE '\\' OR s.slug LIKE ${contains(filters.search)} ESCAPE '\\')`)
+  if (filters.unassessed) terms.push(sql`(${UNASSESSED})`)
   return terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``
 }
 
@@ -87,13 +96,23 @@ const SHOW_COLUMNS = sql`
   s.category_id AS categoryId,
   s.season_id AS seasonId,
   s.booking_closes_hours_before AS bookingClosesHoursBefore,
+  s.warnings_confirmed_none AS warningsConfirmedNone,
   s.status AS status
 `
 
 // Counted rather than stored, so the console cannot show a figure the rows disagree with.
 const SHOW_COUNTS = sql`
   (SELECT count(*) FROM performances p WHERE p.show_id = s.id) AS performanceCount,
-  (SELECT count(*) FROM performances p WHERE p.show_id = s.id AND p.status = 'ON_SALE') AS onSaleCount
+  (SELECT count(*) FROM performances p WHERE p.show_id = s.id AND p.status = 'ON_SALE') AS onSaleCount,
+  (SELECT count(*) FROM show_content_warnings w WHERE w.show_id = s.id) AS warningCount
+`
+
+// A published show nobody has assessed is what the overview flags, so the predicate is one
+// expression both the filter and that card read (D-102 criterion 2).
+const UNASSESSED = sql`
+  s.status = 'PUBLISHED'
+  AND s.warnings_confirmed_none = 0
+  AND NOT EXISTS (SELECT 1 FROM show_content_warnings w WHERE w.show_id = s.id)
 `
 
 export function showsQuery(filters: ShowFilters, limit: number, offset: number, references = soldReferences()): SQL {
@@ -106,7 +125,7 @@ export function showsQuery(filters: ShowFilters, limit: number, offset: number, 
 }
 
 export async function listShows(filters: ShowFilters, limit: number, offset: number): Promise<AdminShow[]> {
-  return db.all<AdminShow>(showsQuery(filters, limit, offset))
+  return (await db.all<ShowRow>(showsQuery(filters, limit, offset))).map(readShow)
 }
 
 export async function countShows(filters: ShowFilters): Promise<number> {
@@ -115,21 +134,21 @@ export async function countShows(filters: ShowFilters): Promise<number> {
 }
 
 export async function showById(id: string): Promise<AdminShow | undefined> {
-  const [row] = await db.all<AdminShow>(sql`
+  const [row] = await db.all<ShowRow>(sql`
     SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s')} AS soldTickets
     FROM shows s WHERE s.id = ${id}
   `)
-  return row
+  return row ? readShow(row) : undefined
 }
 
 // The slug is the public URL, so it is held once across draft and published shows alike.
 export async function showBySlug(slug: string, exceptId?: string): Promise<AdminShow | undefined> {
   const except = exceptId ? sql` AND s.id <> ${exceptId}` : sql``
-  const [row] = await db.all<AdminShow>(sql`
+  const [row] = await db.all<ShowRow>(sql`
     SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s')} AS soldTickets
     FROM shows s WHERE s.slug = ${slug}${except} LIMIT 1
   `)
-  return row
+  return row ? readShow(row) : undefined
 }
 
 const PERFORMANCE_COLUMNS = sql`

@@ -16,6 +16,7 @@ import {
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { AdminPerformance, AdminShow, LatecomerPolicy, PerformanceStatus } from '#shared/utils/programme'
+import type { ContentWarning, ShowContentWarning } from '#shared/utils/content-warnings'
 
 definePageMeta({ layout: 'console', title: 'Show', middleware: 'console' })
 
@@ -28,7 +29,13 @@ const toast = useToast()
 const id = computed(() => String(route.params.id))
 
 interface Venue { id: string, name: string, capacity: number | null }
-interface Detail { show: AdminShow, performances: AdminPerformance[], venues: Venue[] }
+interface Detail {
+  show: AdminShow
+  performances: AdminPerformance[]
+  venues: Venue[]
+  warnings: ShowContentWarning[]
+  vocabulary: ContentWarning[]
+}
 
 const failure = ref<string | null>(null)
 const saving = ref(false)
@@ -40,6 +47,8 @@ const { data, error, refresh } = await useAsyncData(
 
 const show = computed(() => data.value?.show ?? null)
 const venues = computed(() => data.value?.venues ?? [])
+const warnings = computed(() => data.value?.warnings ?? [])
+const vocabulary = computed(() => data.value?.vocabulary ?? [])
 
 const copy = reactive({
   title: '',
@@ -628,6 +637,14 @@ const columns: TableColumn<AdminPerformance>[] = [
           </UButton>
         </UForm>
       </UCard>
+
+      <ShowWarnings
+        :show-id="show.id"
+        :warnings="warnings"
+        :vocabulary="vocabulary"
+        :confirmed-none="show.warningsConfirmedNone"
+        @saved="refresh()"
+      />
 
       <AdminToolbar
         v-model:search="search"

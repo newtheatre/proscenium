@@ -13,6 +13,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Per-order seat cap (public) | 10 | 10 | Box office uncapped |
 | Refund policy | undocumented, ad hoc | free cancellation while unpaid; paid refunds in person, manager approval | Constraint: money moves in person only |
 | Comp authority | tonight's duty manager or staff | unchanged | Comp request expiry 10 minutes |
+| "Limited availability" threshold | none: the old listing said available or sold out | last 10 per cent of the house | What the public listing calls limited rather than available (D-101 criterion 2). Honest either way; the question is how early the theatre wants to create urgency |
 | Pass products for 2026/27 | set yearly | to be listed in session | Entered through the box office screens, not settings: prices are dated and append-only (0025, D-123) |
 | Bar tab cap | £20 soft nag | £20 hard cap, manager override | Old soft cap never blocked |
 | Discount codes | none | none at launch | Capability exists, unused until wanted |
