@@ -52,9 +52,12 @@ const COLOURS: Record<Availability, 'success' | 'warning' | 'neutral'> = {
   BOOKING_CLOSED: 'neutral',
 }
 
-// Every performance of one show may differ in running time, so the practical details are read
-// from the first one on offer rather than assumed to be the show's.
-const shape = computed(() => data.value?.performances[0] ?? null)
+// Every performance of one show may differ in running time, so the practical details come from the
+// first one actually on offer: a cancelled first night would otherwise describe the whole run.
+const shape = computed(() => {
+  const performances = data.value?.performances ?? []
+  return performances.find(one => !one.cancelled) ?? performances[0] ?? null
+})
 
 function saysInterval(performance: Listed): string {
   if (performance.intervalCount === 0) return 'Straight through, with no interval'
@@ -245,6 +248,16 @@ function saysInterval(performance: Listed): string {
               :data-test="`cancelled-${performance.id}`"
             >
               Cancelled
+            </UBadge>
+            <!-- saleRefusal refuses a link-out, so its availability reads booking closed; saying
+                 that beside a working link would be a contradiction. -->
+            <UBadge
+              v-else-if="performance.externalBookingUrl"
+              color="neutral"
+              variant="subtle"
+              :data-test="`availability-${performance.id}`"
+            >
+              Tickets sold elsewhere
             </UBadge>
             <UBadge
               v-else

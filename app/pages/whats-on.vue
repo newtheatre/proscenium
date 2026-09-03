@@ -146,6 +146,16 @@ function from(performance: Listed): string | null {
               >
                 Cancelled
               </UBadge>
+              <!-- saleRefusal refuses a link-out, so its availability reads booking closed;
+                   saying that beside a working link would be a contradiction. -->
+              <UBadge
+                v-else-if="performance.externalBookingUrl"
+                color="neutral"
+                variant="subtle"
+                :data-test="`availability-${performance.id}`"
+              >
+                Tickets sold elsewhere
+              </UBadge>
               <UBadge
                 v-else
                 :color="COLOURS[performance.availability]"

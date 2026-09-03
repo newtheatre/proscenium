@@ -325,7 +325,9 @@ externally ticketed, past its window) reads BOOKING_CLOSED rather than offering 
 409. Otherwise it is SOLD_OUT at nought seats left, LIMITED at or below
 `LISTING_LIMITED_THRESHOLD_PERCENT` of the house, and AVAILABLE above that. An uncapped venue is
 never limited and never sold out. The seats taken come from `PERFORMANCE_REFERENCES`, so the figure
-is nought until D-104 classifies `tickets` and begins counting real rows.
+is nought until D-104 classifies `tickets` and begins counting real rows. The number of seats left
+is carried only while the state is LIMITED, which is the one case a visitor is told a figure: an
+exact unsold count on every performance is the theatre's sales, readable by anybody.
 
 **A quoted price resolves performance, then show, then the type.** `resolvePrice()` in
 `shared/utils/ticket-types.ts` resolves the price and the active flag down that chain

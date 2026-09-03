@@ -47,20 +47,35 @@ export default defineEventHandler(async (event) => {
   }
 
   // The description is prose, so the trail records that it moved and never what it says (0011).
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: resolved.account.id,
-    action: 'content-warning.updated',
-    target: `content-warning:${id}`,
-    detail: {
-      ...changes({
-        slug: [held.slug, input.slug],
-        title: [held.title, input.title],
-        kind: [held.kind, input.kind],
-        archived: [held.archived, input.archived],
-      }),
-      descriptionChanged: (input.description ?? null) !== held.description,
-    },
-  }))
+  const descriptionChanged = (input.description ?? null) !== held.description
+
+  // A save that changed nothing is not an event. The append-only trail is evidence, and a year of
+  // empty entries is what makes somebody stop reading it.
+  const changed = input.slug !== held.slug
+    || input.title !== held.title
+    || input.kind !== held.kind
+    || input.archived !== held.archived
+    || input.sort !== held.sort
+    || (input.category ?? null) !== held.category
+    || (input.icon ?? null) !== held.icon
+    || descriptionChanged
+
+  if (changed) {
+    await db.insert(schema.auditLog).values(auditEntry({
+      actorId: resolved.account.id,
+      action: 'content-warning.updated',
+      target: `content-warning:${id}`,
+      detail: {
+        ...changes({
+          slug: [held.slug, input.slug],
+          title: [held.title, input.title],
+          kind: [held.kind, input.kind],
+          archived: [held.archived, input.archived],
+        }),
+        descriptionChanged,
+      },
+    }))
+  }
 
   return { ok: true }
 })

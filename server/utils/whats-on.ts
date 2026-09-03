@@ -152,7 +152,8 @@ export interface PublicPrice {
 
 export interface ListedPerformance extends PublicPerformance {
   availability: Availability
-  // Null is an uncapped venue, so a number here is a fact and its absence is not a nought.
+  // Only while the state is LIMITED, which is the one case a visitor is told a figure. An exact
+  // unsold count on every performance is this theatre's sales, readable by anybody.
   remaining: number | null
   says: string
   prices: PublicPrice[]
@@ -225,7 +226,7 @@ function assemble(
     held.push({
       ...projected,
       availability,
-      remaining,
+      remaining: availability === 'LIMITED' ? remaining : null,
       says: saysAvailability(availability, remaining),
       prices: (pricesFor.get(row.id) ?? []).sort((a, b) => a.price - b.price),
     })

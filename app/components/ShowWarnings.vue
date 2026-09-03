@@ -33,10 +33,12 @@ const failure = ref<string | null>(null)
 const chosen = ref(new Map<string, ContentWarningLevel | null>())
 const assessedClear = ref(false)
 
-watchEffect(() => {
+// Seeded per show, not per refresh: the screen above reloads on every other save, and a watch on
+// the rows themselves would throw away ticks nobody had pressed Save on yet.
+watch(() => props.showId, () => {
   chosen.value = new Map(props.warnings.map(warning => [warning.warningId, warning.level]))
   assessedClear.value = props.confirmedNone
-})
+}, { immediate: true })
 
 const levelOptions = CONTENT_WARNING_LEVELS.map(level => ({ label: saysWarningLevel(level) ?? level, value: level }))
 

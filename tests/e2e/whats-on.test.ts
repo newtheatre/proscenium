@@ -179,7 +179,16 @@ describe.skipIf(skip !== null)('every performance states its availability, compu
     const show = await publishedShow({}, { capacityOverride: 0 })
     const [performance] = (await publicShow(show.slug)).performances
     expect(performance?.availability).toBe('SOLD_OUT')
-    expect(performance?.remaining).toBe(0)
+    expect(performance?.says).toBe('Sold out')
+  })
+
+  // An exact unsold count on every performance is this theatre's sales, readable by anybody, so
+  // the figure is carried only where the visitor is told it.
+  test('the seats left are stated only while availability is limited', async () => {
+    const show = await publishedShow()
+    const [performance] = (await publicShow(show.slug)).performances
+    expect(performance?.availability).toBe('AVAILABLE')
+    expect(performance?.remaining).toBeNull()
   })
 
   test('a cancelled performance stays visible so a ticket holder is told', async () => {
