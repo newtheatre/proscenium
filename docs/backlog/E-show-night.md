@@ -23,8 +23,9 @@ Counts: 27 MVP stories (E-101 to E-127), 4 V2 stories (E-201 to E-204), 1 Later 
 4. What are the retention periods for frozen night reports and the Challenge 25 register? Both are
    licensing evidence and must outlive ordinary retention automation; the number needs writing
    down.
-5. Does the old estate's officer bypass of the rota (box office seniority opening every show-night
-   screen) carry, and is flagging its use on the night report sufficient accountability?
+5. Answered 3 September: the bypass carries. Designated officer roles open show-night screens
+   without a shift; every use is audited and flagged in the night report's staffing section
+   (E-111, `../build-order.md`). A decision record lands with E-111's first pull request.
 6. Backstage board acknowledgements attach to anonymous devices with self-chosen labels. Is a
    device-level acknowledgement operationally meaningful for clearance calls, or does clearance
    need a named confirmer?

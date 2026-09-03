@@ -187,8 +187,10 @@ a documentation change here, not a migration.
 
 ### venues
 `id` PK · `name` UNIQUE · `address` · `capacity` int NULL = uncapped · `is_external` bool ·
-`image_key` (R2) · `description` · `created_at`. General admission only; no seat-map tables
-exist and nothing may assume them (constraint 4).
+`image_key` (R2) · `description` · `room_id` → rooms set null · `created_at`. General admission
+only; no seat-map tables exist and nothing may assume them (constraint 4). A venue is its own
+row, never a flagged room: `room_id` says which rehearsal room the venue occupies, and its only
+effect is that the venue's performances apply blackouts to that room (`build-order.md`).
 
 ### venue_features / venues_to_features
 Feature vocabulary and junction (both cascade).
