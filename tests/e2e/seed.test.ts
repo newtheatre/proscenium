@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
@@ -10,6 +11,8 @@ const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 const seeded: { email: string, password: string }[] = []
+// Read once, beside the seed run: recomputing it in a test would flake for the minute after 04:00.
+let seededNight = ''
 
 beforeAll(async () => {
   if (skip) return
@@ -27,6 +30,7 @@ beforeAll(async () => {
       seeded.push({ email: line, password: lines[index + 1]! })
     }
   }
+  seededNight = currentShowNight()
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -92,6 +96,31 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
       .toBeGreaterThan(0)
   })
 
+  // Wave 0 contract (d): every show-night and box-office screen needs a night to open on.
+  test('there is a venue, a show, and a performance tonight', () => {
+    expect(read<{ n: number }>('SELECT count(*) n FROM venues')?.n).toBe(1)
+    expect(read<{ n: number }>('SELECT count(*) n FROM venue_emergency_info')?.n).toBe(1)
+    expect(read<{ n: number }>(`SELECT count(*) n FROM shows WHERE status = 'PUBLISHED'`)?.n).toBe(1)
+    expect(read<{ n: number }>('SELECT count(*) n FROM ticket_types')?.n).toBeGreaterThan(0)
+
+    const performances = rows<{ starts_at: number }>('SELECT starts_at FROM performances ORDER BY starts_at')
+    expect(performances).toHaveLength(2)
+
+    const tonight = showNightBounds(seededNight)
+    expect(performances[0]!.starts_at * 1000).toBeGreaterThanOrEqual(tonight.from.getTime())
+    expect(performances[0]!.starts_at * 1000).toBeLessThan(tonight.to.getTime())
+    expect(performances[1]!.starts_at * 1000).toBeGreaterThan(tonight.to.getTime())
+  })
+
+  // The venue points at the auditorium, and that attachment is all a room ever knows of a venue.
+  test('the venue names a room, and no room names a venue (0043)', () => {
+    const venue = read<{ room_id: string | null }>('SELECT room_id FROM venues')
+    expect(venue?.room_id).not.toBeNull()
+    expect(read<{ n: number }>('SELECT count(*) n FROM rooms WHERE id = ?', venue!.room_id)?.n).toBe(1)
+    expect(rows<{ name: string }>(`SELECT name FROM pragma_table_info('rooms')`).map(column => column.name))
+      .not.toContain('venue_id')
+  })
+
   // Criterion 3: seeded people can never be mistaken for, or mailed to, a real person.
   test('every seeded person is obviously not a real one', () => {
     const names = rows<{ name: string, email: string }>(
@@ -108,5 +137,8 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
 
     expect(ran.exitCode).toBe(0)
     expect(read<{ n: number }>('SELECT count(*) n FROM rooms')?.n).toBe(before)
+    // Tonight has to stay tonight, so a second run moves the performances rather than adding two.
+    expect(read<{ n: number }>('SELECT count(*) n FROM venues')?.n).toBe(1)
+    expect(read<{ n: number }>('SELECT count(*) n FROM performances')?.n).toBe(2)
   })
 })

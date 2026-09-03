@@ -48,3 +48,4 @@ afterwards, only superseded.
 | 0040 | Navigation is shaped by posture, and filtered by ability | the four shells, where a screen's URL comes from, and why the sidebar hides what it hides |
 | 0041 | A material change invalidates training, rather than restating an expiry | why a stamped expiry never moves, and what replaces recalculation |
 | 0042 | Practice mode is entered from the tool, not granted by a register | why practice windows were withdrawn, and how a member reaches a sandbox instead |
+| 0043 | A venue is its own row, never a flagged room | what a venue is, and the one thing attaching it to a room does |

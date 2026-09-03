@@ -56,6 +56,13 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
       VALUES (?, ?, ?, ?, ?, ?, 'REJECTED', ?, ?, ?)`,
     `b-${id}`, `room-${id}`, id, `${NAME}'s read-through`, now + 3600, now + 7200,
     `${NAME} has a key`, `${NAME} needs it for a deadline`, `Told ${NAME} the room is in a get-in`],
+    // The card this person last edited. It describes the building, so an erasure leaves all of
+    // it, including the reference to the tombstone the account became.
+    ['INSERT INTO venues (id, name, room_id) VALUES (?, ?, ?)', `venue-${id}`, 'The Theatre', `room-${id}`],
+    [`INSERT INTO venue_emergency_info (venue_id, assembly_point, exits, notes, updated_by, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)`,
+    `venue-${id}`, 'The car park behind the building', 'Two, both stage left',
+    'The isolation point is behind the bar', id, now],
     ['INSERT INTO departments (code, name) VALUES (?, ?)', `dept-${id}`, 'Technical'],
     ['INSERT INTO department_leads (id, department, user_id) VALUES (?, ?, ?)', `dl-${id}`, `dept-${id}`, id],
     ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)',
@@ -166,6 +173,13 @@ describe('erasure (K-109, 0011)', () => {
       // The calendar link is a credential, so it goes rather than being scrubbed: left behind, an
       // erased person's phone would keep resolving their bookings (C-104).
       expect(rows(database, 'SELECT id FROM room_feed_tokens WHERE user_id = ?', id)).toHaveLength(0)
+
+      // A card describes a building, so erasing the officer who wrote it changes nothing: front
+      // of house must still find the assembly point in the dark.
+      const card = rows<{ assembly_point: string | null, updated_by: string | null }>(database,
+        'SELECT assembly_point, updated_by FROM venue_emergency_info WHERE updated_by = ?', id)
+      expect(card).toHaveLength(1)
+      expect(card[0]).toMatchObject({ assembly_point: 'The car park behind the building', updated_by: id })
 
       // The row itself is still there for everything referring to it.
       expect(rows(database, 'SELECT id FROM users WHERE id = ?', id)).toHaveLength(1)

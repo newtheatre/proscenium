@@ -344,6 +344,13 @@
       "when": 1788389034207,
       "tag": "0048_a_session_says_why_it_was_called_off",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1788454526105,
+      "tag": "0049_the_programme_and_what_it_sells",
+      "breakpoints": true
     }
   ]
 }

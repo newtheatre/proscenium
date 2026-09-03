@@ -6,6 +6,7 @@ import { Database } from 'bun:sqlite'
 import { Hash } from '@adonisjs/hash'
 import { Scrypt } from '@adonisjs/hash/drivers/scrypt'
 import { assertLocalTarget, assertNotProduction, generatePassword, registrableAddress } from '../tests/helpers/seed'
+import { currentShowNight, showNightBounds, showNightOf } from '../shared/utils/show-night'
 import { DEPARTMENTS, readCatalogue } from './lib/catalogue'
 
 const DEFAULT_TARGET = '.data/db/sqlite.db'
@@ -214,6 +215,134 @@ function seedExternalSpaces(): number {
   return spaces.length
 }
 
+// Re-runnable like the rooms above: a row already there is reused rather than duplicated.
+function keyed(table: string, column: string, value: string, create: () => string): string {
+  const held = db.query(`SELECT id FROM ${table} WHERE ${column} = ?`).get(value) as { id: string } | null
+  return held ? held.id : create()
+}
+
+// The prices the box office actually sells at. Access and companion never appear in a public
+// payload (D-128), which is what the access kind marks them for.
+const TICKET_TYPES = [
+  { name: 'Standard', description: 'The full price.', price: 700, kind: 'SINGLE', accessKind: null },
+  { name: 'Concession', description: 'Students, over-65s, and anybody on benefits.', price: 500, kind: 'SINGLE', accessKind: null },
+  { name: 'Access', description: 'For a patron whose access needs bring a companion.', price: 700, kind: 'SINGLE', accessKind: 'ACCESS' },
+  { name: 'Companion', description: 'The companion seat, free.', price: 0, kind: 'SINGLE', accessKind: 'COMPANION' },
+]
+
+// A technical warning carries no level; a general one always does (D-102).
+const CONTENT_WARNINGS = [
+  { slug: 'strobe-lighting', title: 'Strobe lighting', kind: 'TECHNICAL', category: 'Lighting', sort: 0, level: null },
+  { slug: 'suicide', title: 'Suicide', kind: 'GENERAL', category: 'Themes', sort: 1, level: 'DEPICTED' },
+  { slug: 'firearms', title: 'Firearms', kind: 'GENERAL', category: 'Violence', sort: 2, level: 'DEPICTED' },
+]
+
+// A venue, a show and two performances, so every show-night and box-office screen has a night to
+// open. The venue points at the auditorium, which is the only effect that attachment has (0043).
+function seedProgramme(rooms: { id: string, name: string }[], people: Seeded[]): { performances: number } {
+  const auditorium = rooms.find(room => room.name === 'The Auditorium')
+
+  const venueId = keyed('venues', 'name', 'The Nottingham New Theatre', () => {
+    const id_ = id()
+    db.query(`INSERT INTO venues (id, name, address, capacity, is_external, description, room_id)
+              VALUES (?, ?, ?, 120, 0, ?, ?)`)
+      .run(id_, 'The Nottingham New Theatre', 'Nottingham University Students Union, University Park',
+        'The house. General admission, no seat map, because we have never had one.',
+        auditorium?.id ?? null)
+    return id_
+  })
+
+  // The card front of house reads in the dark (E-113). It describes the building and nobody else.
+  db.query(`INSERT INTO venue_emergency_info (venue_id, assembly_point, exits, isolation_points, what3words, notes, updated_by, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (venue_id) DO NOTHING`)
+    .run(venueId, 'The car park behind the Portland Building',
+      'Two: stage left to the alley, and the foyer to Portland Hill.',
+      'Lighting isolation is in the box; gas is in the workshop corridor.',
+      'towns.match.press', 'The nearest defibrillator is inside the Portland Building foyer.',
+      people[0]?.id ?? null, now)
+
+  const seasonId = keyed('seasons', 'name', '2026/27', () => {
+    const id_ = id()
+    db.query('INSERT INTO seasons (id, name, starts_on, ends_on, sort) VALUES (?, ?, ?, ?, 0)')
+      .run(id_, '2026/27', '2026-08-01', '2027-07-31')
+    return id_
+  })
+
+  const categoryId = keyed('show_categories', 'name', 'In-house', () => {
+    const id_ = id()
+    db.query('INSERT INTO show_categories (id, name, sort) VALUES (?, ?, 0)').run(id_, 'In-house')
+    return id_
+  })
+
+  for (const type of TICKET_TYPES) {
+    keyed('ticket_types', 'name', type.name, () => {
+      const id_ = id()
+      db.query('INSERT INTO ticket_types (id, name, description, price, kind, access_kind) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(id_, type.name, type.description, type.price, type.kind, type.accessKind)
+      return id_
+    })
+  }
+
+  const showId = keyed('shows', 'slug', 'the-seagull', () => {
+    const id_ = id()
+    db.query(`INSERT INTO shows (id, slug, title, subtitle, description, category_id, season_id,
+                                age_guidance, latecomer_policy, status)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'AT_INTERVAL', 'PUBLISHED')`)
+      .run(id_, 'the-seagull', 'The Seagull', 'Chekhov, in a new translation',
+        'Four acts, one lake, and nobody gets what they came for.', categoryId, seasonId,
+        'Recommended 14 and over')
+    return id_
+  })
+
+  for (const warning of CONTENT_WARNINGS) {
+    const warningId = keyed('content_warnings', 'slug', warning.slug, () => {
+      const id_ = id()
+      db.query('INSERT INTO content_warnings (id, slug, title, kind, category, sort) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(id_, warning.slug, warning.title, warning.kind, warning.category, warning.sort)
+      return id_
+    })
+    db.query(`INSERT INTO show_content_warnings (id, show_id, warning_id, level) VALUES (?, ?, ?, ?)
+              ON CONFLICT (show_id, warning_id) DO NOTHING`)
+      .run(id(), showId, warningId, warning.level)
+  }
+
+  // 19:30 London on each night, which is 15.5 hours after the night's 04:00 start whatever the
+  // clocks did in between (0014, E-110).
+  const curtain = (night: string): number =>
+    Math.floor(showNightBounds(night).from.getTime() / 1000) + Math.round(15.5 * 3600)
+  const nextWeek = showNightOf(new Date(Date.now() + 7 * 86_400 * 1000))
+
+  // Seeding after 19:30 would leave nothing sellable, so tonight's curtain moves forward, staying
+  // inside the night it belongs to.
+  const tonight = currentShowNight()
+  const lastMoment = Math.floor(showNightBounds(tonight).to.getTime() / 1000) - 1
+  const planned = [
+    Math.min(Math.max(curtain(tonight), now + 2 * 3600), lastMoment),
+    curtain(nextWeek),
+  ]
+
+  // Re-runnable, and tonight has to stay tonight: an existing performance moves rather than a
+  // second one appearing beside it.
+  const held = db.query('SELECT id FROM performances WHERE show_id = ? ORDER BY starts_at')
+    .all(showId) as { id: string }[]
+
+  for (const [index, startsAt] of planned.entries()) {
+    const existing = held[index]
+    if (existing) {
+      db.query('UPDATE performances SET starts_at = ?, doors_at = ? WHERE id = ?')
+        .run(startsAt, startsAt - 1800, existing.id)
+      continue
+    }
+    db.query(`INSERT INTO performances (id, show_id, venue_id, starts_at, doors_at, duration_minutes,
+                                        interval_count, interval_minutes, status)
+              VALUES (?, ?, ?, ?, ?, 150, 1, 15, 'ON_SALE')`)
+      .run(id(), showId, venueId, startsAt, startsAt - 1800)
+  }
+
+  return { performances: planned.length }
+}
+
 // The subcommittee's draft catalogue, so a development database looks like the real thing rather
 // than like three modules somebody invented. The real one is migrated from the old database.
 async function seedCatalogue(): Promise<{ departments: number, modules: number, prerequisites: number }> {
@@ -275,6 +404,7 @@ const spaces = seedExternalSpaces()
 const catalogue = await seedCatalogue()
 const people = await seedPeople()
 const bookings = seedBookings(rooms, people)
+const programme = seedProgramme(rooms, people)
 db.close()
 
 // Printed once, and nowhere else. Nothing here is committed and there is no way to read a
@@ -282,7 +412,8 @@ db.close()
 console.info(`\nSeeded ${target}\n`)
 console.info(`  ${rooms.length} rooms, ${spaces} SU rooms, ${people.length} people, ${bookings} bookings`)
 console.info(`  ${catalogue.modules} training modules across ${catalogue.departments} departments, `
-  + `${catalogue.prerequisites} prerequisites\n`)
+  + `${catalogue.prerequisites} prerequisites`)
+console.info(`  1 venue and 1 show, with ${programme.performances} performances: one tonight, one next week\n`)
 console.info('  Every module is a DRAFT, as the subcommittee draft has them, so members see none of')
 console.info('  them until somebody publishes one.\n')
 console.info('  Sign in as any of these. The passwords are shown here and nowhere else:\n')
