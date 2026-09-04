@@ -212,6 +212,13 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'shift-performance-cancelled',
   },
+  // Transactional: an officer administering the rota must not be able to mute the one warning
+  // that a duty manager gap makes the night unable to run legally (E-108 criterion 2).
+  'shift.rota-unstaffed': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'shift-rota-unstaffed',
+  },
 
   // Module F: bar
 

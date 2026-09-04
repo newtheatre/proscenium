@@ -107,6 +107,7 @@ export default defineNuxtConfig({
     scheduledTasks: {
       '*/10 * * * *': ['holds:release'],
       '0 6 * * *': ['training:expiry-sweep'],
+      '0 7 * * *': ['shifts:escalate'],
       '0 8 * * *': ['rooms:sweep'],
       '0 9 * * *': ['sessions:sweep'],
       '0 10 * * *': ['shifts:remind'],
@@ -138,7 +139,7 @@ export default defineNuxtConfig({
           },
         },
         triggers: {
-          crons: ['*/10 * * * *', '0 4 * * *', '0 5 * * 1', '0 6 * * *', '0 8 * * *', '0 9 * * *', '0 10 * * *', '0 17 * * *', '12 0 * * *', '0 4 1 * *'],
+          crons: ['*/10 * * * *', '0 4 * * *', '0 5 * * 1', '0 6 * * *', '0 7 * * *', '0 8 * * *', '0 9 * * *', '0 10 * * *', '0 17 * * *', '12 0 * * *', '0 4 1 * *'],
         },
       },
     },
