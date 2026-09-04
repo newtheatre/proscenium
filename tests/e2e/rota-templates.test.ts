@@ -76,12 +76,30 @@ function shiftsOn(performanceId: string): { role: string, slot: number, status: 
 
 // A confirmed shift, which is the state E-104 will reach through the claim path in wave 2.
 function claim(performanceId: string, userId: string): void {
+  assign(performanceId, 'DUTY_MANAGER', userId, 'CONFIRMED')
+}
+
+// Any role in any of the states E-104 and E-107 will reach through the claim and confirm paths.
+// Slot 1 only: a role with more than one slot must not name the same person on both.
+function assign(performanceId: string, role: string, userId: string, status: string): void {
   const database = new Database(app.databaseFile)
   try {
     database
-      .query(`UPDATE shifts SET user_id = ?, status = 'CONFIRMED', confirmed_at = unixepoch()
-              WHERE performance_id = ? AND role = 'DUTY_MANAGER'`)
-      .run(userId, performanceId)
+      .query(`UPDATE shifts SET user_id = ?, status = ?, claimed_at = unixepoch()
+              WHERE performance_id = ? AND role = ? AND slot = 1`)
+      .run(userId, status, performanceId, role)
+  }
+  finally {
+    database.close()
+  }
+}
+
+function notified(userId: string, type: string): number {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return (database
+      .query('SELECT count(*) AS n FROM notification_log WHERE user_id = ? AND type = ?')
+      .get(userId, type) as { n: number }).n
   }
   finally {
     database.close()
@@ -196,6 +214,21 @@ describe.skipIf(skip !== null)('a performance is stamped from its venue\'s templ
     expect(shiftsOn(doomed.performanceId).every(shift => shift.status === 'CANCELLED')).toBe(true)
   })
 
+  // A claim awaiting approval is owed the same count and the same word a confirmed shift is,
+  // matching what the delete route's own refusal already promises.
+  test('a cancellation counts and tells every claimed or confirmed holder, not only confirmed ones', async () => {
+    const doomed = programme('claimed-doomed')
+    await send('PUT', `/api/admin/rota/templates/${doomed.venueId}`, { slots: HOUSE_SLOTS }, foh.cookie)
+    await send('POST', `/api/admin/rota/templates/${doomed.venueId}/stamp`, {}, foh.cookie)
+    assign(doomed.performanceId, 'DOOR', member.id, 'CLAIMED')
+
+    const before = notified(member.id, 'shift.performance-cancelled')
+    const cancelled = await send('POST', `/api/admin/performances/${doomed.performanceId}/cancel`)
+    expect(cancelled.status).toBe(200)
+    expect((await cancelled.json() as { shiftsCancelled: number }).shiftsCancelled).toBe(4)
+    expect(notified(member.id, 'shift.performance-cancelled')).toBeGreaterThan(before)
+  })
+
   // The invariant is "a performance is never staffed by nothing while its venue has a template",
   // and moving a house is the other way into that state.
   test('moving a performance to another venue restamps it from the new house', async () => {
@@ -213,6 +246,52 @@ describe.skipIf(skip !== null)('a performance is stamped from its venue\'s templ
     })
     expect(moved.status).toBe(200)
     expect(shiftsOn(from.performanceId).map(shift => shift.role).sort()).toEqual(['DOOR', 'DUTY_MANAGER'])
+  })
+
+  // Matt, 4 September 2026: the shifts move, and the holder is told with a way out, rather than
+  // being cancelled or left stranded on the old venue's slot.
+  test('a held shift moves with the performance when the new house still staffs its role', async () => {
+    const from = programme('holds-from')
+    const to = programme('holds-to')
+    await send('PUT', `/api/admin/rota/templates/${from.venueId}`, { slots: HOUSE_SLOTS }, foh.cookie)
+    await send('PUT', `/api/admin/rota/templates/${to.venueId}`, { slots: HOUSE_SLOTS }, foh.cookie)
+    await send('POST', `/api/admin/rota/templates/${from.venueId}/stamp`, {}, foh.cookie)
+    claim(from.performanceId, member.id)
+
+    const before = notified(member.id, 'shift.venue-changed')
+    const moved = await send('PUT', `/api/admin/performances/${from.performanceId}`, {
+      venueId: to.venueId,
+      startsAt: Math.floor(Date.now() / 1000) + 22 * 86_400,
+      intervalCount: 0,
+    })
+    expect(moved.status).toBe(200)
+
+    const dutyManager = shiftsOn(from.performanceId).find(shift => shift.role === 'DUTY_MANAGER')
+    expect(dutyManager).toMatchObject({ status: 'CONFIRMED', user_id: member.id })
+    expect(notified(member.id, 'shift.venue-changed')).toBeGreaterThan(before)
+  })
+
+  test('a held shift is cancelled, and its holder told, when the new house does not staff its role at all', async () => {
+    const from = programme('orphan-from')
+    const to = programme('orphan-to')
+    await send('PUT', `/api/admin/rota/templates/${from.venueId}`, { slots: HOUSE_SLOTS }, foh.cookie)
+    await send('PUT', `/api/admin/rota/templates/${to.venueId}`, {
+      slots: [{ role: 'DUTY_MANAGER', count: 1 }],
+    }, foh.cookie)
+    await send('POST', `/api/admin/rota/templates/${from.venueId}/stamp`, {}, foh.cookie)
+    assign(from.performanceId, 'BAR', member.id, 'CONFIRMED')
+
+    const before = notified(member.id, 'shift.role-not-needed')
+    const moved = await send('PUT', `/api/admin/performances/${from.performanceId}`, {
+      venueId: to.venueId,
+      startsAt: Math.floor(Date.now() / 1000) + 23 * 86_400,
+      intervalCount: 0,
+    })
+    expect(moved.status).toBe(200)
+
+    const bar = shiftsOn(from.performanceId).find(shift => shift.role === 'BAR')
+    expect(bar).toMatchObject({ status: 'CANCELLED', user_id: member.id })
+    expect(notified(member.id, 'shift.role-not-needed')).toBeGreaterThan(before)
   })
 
   test('a performance whose shifts have been taken is cancelled, never deleted', async () => {

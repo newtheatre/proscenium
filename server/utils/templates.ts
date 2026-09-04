@@ -283,6 +283,44 @@ There is nothing for you to do. Other shifts you hold are unaffected.
 The Nottingham New Theatre`,
   }),
 
+  // The performance still runs; only the house changed, and the shift moved with it. The way
+  // out is in the same breath, because a venue that does not suit is exactly why it exists.
+  'shift-venue-changed': (context: TemplateContext): Rendered => ({
+    subject: `${context.show} has moved venue`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>${context.show} on ${context.when} has moved from ${context.oldVenue} to
+${context.newVenue}. Your ${context.role} shift has moved with it.</p>
+<p>If the new venue does not work for you, release the shift from your rota and it goes back
+to the open list for somebody else to take.</p>`),
+    text: `Hello ${context.name},
+
+${context.show} on ${context.when} has moved from ${context.oldVenue} to ${context.newVenue}.
+Your ${context.role} shift has moved with it.
+
+If the new venue does not work for you, release the shift from your rota and it goes back
+to the open list for somebody else to take.
+
+The Nottingham New Theatre`,
+  }),
+
+  // The venue moved to a house that does not staff this role at all, so the shift could not
+  // travel with the performance and was cancelled rather than left stranded (E-102).
+  'shift-role-not-needed': (context: TemplateContext): Rendered => ({
+    subject: `Your ${context.role} shift on ${context.show} has gone`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>${context.show} on ${context.when} has moved to ${context.newVenue}, which does not
+staff ${context.role}. Your shift there has been cancelled.</p>
+<p>There is nothing for you to do. Other shifts you hold are unaffected.</p>`),
+    text: `Hello ${context.name},
+
+${context.show} on ${context.when} has moved to ${context.newVenue}, which does not
+staff ${context.role}. Your shift there has been cancelled.
+
+There is nothing for you to do. Other shifts you hold are unaffected.
+
+The Nottingham New Theatre`,
+  }),
+
   // Good news, so it leads with it. The way out is in the same breath as the place, because a
   // place nobody uses is one somebody else was waiting for.
   'training-session-promoted': (context: TemplateContext): Rendered => {
