@@ -386,6 +386,13 @@
       "when": 1788474491910,
       "tag": "0054_the_rota_a_venue_stamps_onto_a_performance",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "6",
+      "when": 1788532704730,
+      "tag": "0055_one_till_session_open_per_venue_per_night",
+      "breakpoints": true
     }
   ]
 }

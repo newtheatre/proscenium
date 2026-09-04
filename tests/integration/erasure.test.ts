@@ -68,6 +68,9 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
     ['INSERT INTO bar_items (id, name, unit) VALUES (?, ?, ?)', `bi-${id}`, 'House red', 'ML'],
     [`INSERT INTO stock_movements (id, item_id, qty, kind, reason, actor_id, created_at)
       VALUES (?, ?, -750, 'WASTAGE', 'BREAKAGE', ?, ?)`, `sm-${id}`, `bi-${id}`, id, now],
+    // Who opened and closed a night's till. Holds no free text, so it survives untouched too.
+    [`INSERT INTO till_sessions (id, venue_id, night, opened_by, closed_by, closed_at)
+      VALUES (?, ?, '2026-09-01', ?, ?, ?)`, `till-${id}`, `venue-${id}`, id, id, now],
     // A shift somebody worked, and the template the venue stamps. Who staffed a performance is
     // the staffing record; the note written on the slot is not (E-102, E-106).
     ['INSERT INTO shows (id, slug, title) VALUES (?, ?, ?)', `show-${id}`, `a-show-${id}`, 'A Show'],

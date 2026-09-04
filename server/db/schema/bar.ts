@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { check, index, integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { users } from './identity'
+import { venues } from './programme'
 
 const now = sql`(unixepoch())`
 const id = () => text('id').primaryKey()
@@ -103,4 +104,21 @@ export const stockMovements = sqliteTable('stock_movements', {
   check('stock_movements_cost_is_a_delivery_fact', sql`${table.unitCostPence} IS NULL OR (${table.kind} = 'DELIVERY' AND ${table.unitCostPence} >= 0)`),
   check('stock_movements_reversal_names_what_it_reverses', sql`(${table.reversesId} IS NOT NULL) = (${table.kind} = 'REVERSAL')`),
   check('stock_movements_source_document_is_whole', sql`(${table.refTable} IS NULL) = (${table.refId} IS NULL)`),
+])
+
+// At most one open session per venue per night, the same key 0044 uses for a bypass (F-102). The
+// index covers open rows only, so a session once closed stays closed and a later one is a new row.
+export const tillSessions = sqliteTable('till_sessions', {
+  id: id(),
+  venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),
+  night: text('night').notNull(),
+  openedBy: text('opened_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  openedAt: integer('opened_at').notNull().default(now),
+  closedBy: text('closed_by').references(() => users.id, { onDelete: 'restrict' }),
+  closedAt: integer('closed_at'),
+}, table => [
+  uniqueIndex('till_sessions_one_open_per_venue_night').on(table.venueId, table.night).where(sql`closed_at IS NULL`),
+  index('till_sessions_unclosed').on(table.night).where(sql`closed_at IS NULL`),
+  check('till_sessions_close_is_whole', sql`(${table.closedAt} IS NULL) = (${table.closedBy} IS NULL)`),
+  check('till_sessions_closes_after_it_opens', sql`${table.closedAt} IS NULL OR ${table.closedAt} >= ${table.openedAt}`),
 ])

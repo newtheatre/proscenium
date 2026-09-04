@@ -627,9 +627,17 @@ refuse-to-sell if neither (0017, F-121).
 ### bar_discounts
 `id` PK · `name` · `percent` 1..100 · `status`. Snapshotted onto entries; bar lines only.
 
-### bar_sessions / bar_session_performances
-One open session per venue per London night (partial UNIQUE (night, venue) WHERE
-`closed_at IS NULL`); may span a matinee and evening (E-127); checklist JSON on close.
+### till_sessions
+`id` PK · `venue_id` → venues restrict · `night` civil date, the show night it belongs to ·
+`opened_by` → users restrict · `opened_at` · `closed_by` NULL → users restrict · `closed_at` NULL,
+set with `closed_by` together or not at all, never before `opened_at` (F-102). Partial UNIQUE
+(`venue_id`, `night`) WHERE `closed_at IS NULL`: at most one *open* session per venue per night,
+so a session once closed stays closed and a fresh one opening later that night is a row of its
+own rather than a reuse. Keys to the night rather than a performance, so one session covers a
+matinee and an evening at the same venue (E-127), the same choice 0044 makes for an officer
+bypass. The expected reconciliation figure at close is F-118's, which needs sales that do not
+exist yet; a close-night checklist for a session left open past its night is F-102's own query
+(`staleUnclosedSessionsQuery`), with no screen reading it until E-114's checklist exists.
 
 ### stock_movements  APPEND-ONLY
 `id` PK · `item_id` → bar_items restrict · `qty` signed integer, whole units of the item's own
