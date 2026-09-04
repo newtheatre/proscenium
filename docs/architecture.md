@@ -264,6 +264,7 @@ waiting for and do nothing else; only `daily:sweeps` does work today.
 | --- | --- | --- |
 | `*/10 * * * *` | `holds:release` | Releases expired reservation holds, cascades waiting-list offers, sends pre-expiry reminders. The one task that changes booking state, and only ever in the direction the customer was warned about. |
 | `0 6 * * *` | `training:expiry-sweep` | Expiry warnings and digests (dry-run gated). |
+| `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or an unconfirmed duty manager, the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |
 | `0 9 * * *` | `sessions:sweep` | Session reminders and unmarked-register nags (G-119, not yet built). |
 | `0 10 * * *` | `shifts:remind` | Tomorrow's rota with calendar attachments. |
@@ -369,6 +370,15 @@ tells them (E-101, E-102, committee direction 4 September 2026).
 
 Templates are administered at `/rota/manage/templates` under `rota.read` and `rota.write`. A
 member's own `/rota` arrives with E-103.
+
+`server/utils/rota-escalation.ts` is `shifts:escalate`'s query: every performance inside seven
+days of a run with an open shift or a `DUTY_MANAGER` shift that is not `CONFIRMED`, the second
+counted whether or not it is also `CLAIMED`, because only a confirmed one satisfies the legal
+requirement (E-108 criteria 1 and 2). `rotaOfficers()` reads the same permission `rota.write`
+templates are administered under, rather than a named role, so an administrator is chased
+alongside the FOH officer. One digest per officer per London day, read from `notification_log`
+rather than a column, the same idempotency `remindTomorrow` uses for room bookings (E-108
+criterion 4 read together with C-113).
 
 ## The programme (build-order contract d, 0043)
 

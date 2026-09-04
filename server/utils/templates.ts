@@ -321,6 +321,42 @@ There is nothing for you to do. Other shifts you hold are unaffected.
 The Nottingham New Theatre`,
   }),
 
+  // One digest, however many performances are short. A duty manager gap is called out on its own
+  // line, because it is the one that stops the night running at all (E-108 criteria 1 and 2).
+  'shift-rota-unstaffed': (context: TemplateContext): Rendered => {
+    const performances = context.performances as {
+      show: string
+      venue: string
+      when: string
+      noTemplate: boolean
+      missingRoles: string
+      dutyManagerGap: boolean
+    }[]
+    const say = (row: (typeof performances)[number]): string => {
+      const roles = row.noTemplate
+        ? 'The venue has no template, so nothing is staffed at all.'
+        : (row.missingRoles ? `Missing: ${row.missingRoles}.` : '')
+      const gap = row.dutyManagerGap ? ' No confirmed duty manager: the night cannot run without one.' : ''
+      return `${row.show} at ${row.venue}, ${row.when}. ${roles}${gap}`.trim()
+    }
+
+    return {
+      subject: `${plural(performances.length, 'performance')} unstaffed inside seven days`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>These performances inside the next seven days still have an open shift or an unconfirmed
+duty manager:</p>
+<ul>${performances.map(row => `<li>${say(row)}</li>`).join('')}</ul>`),
+      text: `Hello ${context.name},
+
+These performances inside the next seven days still have an open shift or an unconfirmed
+duty manager:
+
+${performances.map(row => `- ${say(row)}`).join('\n')}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   // Good news, so it leads with it. The way out is in the same breath as the place, because a
   // place nobody uses is one somebody else was waiting for.
   'training-session-promoted': (context: TemplateContext): Rendered => {

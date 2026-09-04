@@ -308,5 +308,6 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/dev/sweep-requests.post.ts', actions: ['room.request.expired'], via: ['server/utils/room-requests.ts'] },
   { route: 'server/api/dev/remind-rooms.post.ts', exempt: 'sends a reminder; the send is recorded in notification_log' },
+  { route: 'server/api/dev/escalate-rota.post.ts', exempt: 'sends a digest; the send is recorded in notification_log' },
   { route: 'server/api/dev/sign-in-as.post.ts', exempt: 'a development sign-in with no password, in no build' },
 ]
