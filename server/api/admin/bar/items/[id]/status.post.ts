@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { stockItemStatusForm } from '#shared/utils/bar'
 
@@ -26,14 +26,22 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: 'bar.item.status.changed',
+    target: `bar-item:${id}`,
+    detail: changes({ status: [held.status, status] }),
+  })
+
+  // The audit insert reads `changes()`, this connection's own UPDATE row count, not the
+  // resulting state: a losing request's UPDATE touches nothing, whatever the winner did (0003).
   await db.batch([
-    db.update(schema.barItems).set({ status }).where(eq(schema.barItems.id, id)),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'bar.item.status.changed',
-      target: `bar-item:${id}`,
-      detail: changes({ status: [held.status, status] }),
-    })),
+    db.run(sql`UPDATE bar_items SET status = ${status} WHERE id = ${id} AND status = ${held.status}`),
+    db.run(sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
+      WHERE changes() = 1
+    `),
   ])
 
   return { ok: true, status }
