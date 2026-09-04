@@ -246,6 +246,10 @@ Reading the table:
 - Parameter discipline: chunk at 90, scope by subquery, never an IN list from a result set.
   Compound SELECTs also cap low on D1; use scalar subqueries for multi-count reads.
 - Each claim has a racing test in CI (0016).
+- A constraint violation is refused, not rethrown as a 500: `shared/utils/constraint-refusal.ts`
+  exports `constraintRefusal(table, error)`, anchored to the two real D1 error shapes. Each
+  module keeps its own `ConstraintRefusal[]` table beside the write path it guards, and calls the
+  shared function; there is no central list to append to (0047).
 
 ## Scheduled tasks
 
