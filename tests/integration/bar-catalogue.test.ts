@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { BAR_PRODUCT_REFERENCES, productActivationReferences, productEverSoldQuery, missingBeforeActiveQuery, productSaleReferences } from '#server/utils/bar'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { BarProductReference } from '#server/utils/bar'
-import type { TestDatabase } from '#tests/helpers/database'
+import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
 
 // F-111 on the real migrations. What a product needs before it may be sold, and whether it ever
 // has been, are questions about rows in other tables rather than flags on this one.
@@ -236,6 +236,47 @@ describe('the till layout is read, never compiled (criterion 4)', () => {
 
       database.batch([['UPDATE bar_categories SET sort = 5 WHERE id = \'cat-1\'']])
       expect(order()).toEqual(['Wine', 'Soft drinks'])
+    })
+  })
+})
+
+// `changes()` names the row count of the statement just before it on this connection, so an
+// audit insert can read whether *this* UPDATE changed anything, not the resulting state (0049).
+describe('changes() after a conditional UPDATE names that UPDATE\'s own effect', () => {
+  const statusChange = (from: string, to: string, auditId: string): BoundStatement[] => [
+    ['UPDATE bar_products SET status = ? WHERE id = ? AND status = ?', to, 'prod-1', from],
+    [`INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ?, NULL, 'bar.product.status.changed', 'bar-product:prod-1', '{}'
+      WHERE changes() = 1`, auditId],
+  ]
+
+  test('a matching predicate changes the row and writes exactly one audit entry', async () => {
+    await withDatabase((database) => {
+      category(database)
+      product(database, { status: 'ACTIVE' })
+
+      database.batch(statusChange('ACTIVE', 'RETIRED', 'a1'))
+
+      expect(rows<{ status: string }>(database, 'SELECT status FROM bar_products WHERE id = \'prod-1\'')[0]!.status)
+        .toBe('RETIRED')
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(1)
+    })
+  })
+
+  // The loser's own predicate matches nothing even though the row now reads RETIRED, which a
+  // predicate over the resulting state rather than `changes()` could not tell from a win.
+  test('a predicate that already lost the race changes nothing and writes no audit entry', async () => {
+    await withDatabase((database) => {
+      category(database)
+      product(database, { status: 'ACTIVE' })
+
+      database.batch(statusChange('ACTIVE', 'RETIRED', 'a1'))
+      // The loser still believes the product was ACTIVE when it read it.
+      database.batch(statusChange('ACTIVE', 'RETIRED', 'a2'))
+
+      expect(rows<{ status: string }>(database, 'SELECT status FROM bar_products WHERE id = \'prod-1\'')[0]!.status)
+        .toBe('RETIRED')
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(1)
     })
   })
 })

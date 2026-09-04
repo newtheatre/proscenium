@@ -34,15 +34,30 @@ export default defineEventHandler(async (event) => {
   })
 
   // The audit insert reads `changes()`, this connection's own UPDATE row count, not the
-  // resulting state: a losing request's UPDATE touches nothing, whatever the winner did (0003).
-  await db.batch([
-    db.run(sql`UPDATE bar_items SET status = ${status} WHERE id = ${id} AND status = ${held.status}`),
+  // resulting state: a losing request's UPDATE touches nothing, whatever the winner did (0049).
+  const [updated] = await db.batch([
+    db.all<{ id: string }>(sql`
+      UPDATE bar_items SET status = ${status} WHERE id = ${id} AND status = ${held.status} RETURNING id
+    `),
     db.run(sql`
       INSERT INTO audit_log (id, actor_id, action, target, detail)
       SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
       WHERE changes() = 1
     `),
   ])
+
+  // A losing racer is refused, not told it succeeded: the audit stayed silent, so the caller
+  // must too (0049).
+  if (updated.length === 0) {
+    const now = await itemById(id)
+    if (!now) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+    throw createError({
+      statusCode: 409,
+      statusMessage: now.status === status
+        ? (status === 'RETIRED' ? `${now.name} is already retired` : `${now.name} is not retired`)
+        : `${now.name} changed while you were editing it`,
+    })
+  }
 
   return { ok: true, status }
 })

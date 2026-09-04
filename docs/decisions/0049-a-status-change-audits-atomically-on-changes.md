@@ -1,4 +1,4 @@
-# 0049: A status change audits itself atomically, the predicate on the write and the log on `changes()`
+# 0049: A status change audits itself atomically, the predicate on the write, the log and the caller both on `changes()`
 
 - Status: Accepted
 - Date: 2026-09-04
@@ -65,11 +65,39 @@ and the real D1 binding, with exact counts rather than a lower bound. A test tha
 "at least one audit row" would not catch the predicate-never-matches failure this paragraph
 describes.
 
-**No helper.** The four lines above are the whole pattern, and every call site's audit `detail`
-differs in shape, so a wrapper would need to take the table name, the id, the two predicate
-values, the audit action, the target string and the detail object, which is not shorter or
-clearer to read at the call site than writing the two statements. A written pattern, cited from
-this record, is what every future status-change route copies.
+**The pattern is two halves, not one: the audit is suppressed and the caller is refused, both
+from the same `changes()`.** Suppressing the audit insert is not the whole fix if the route still
+tells a losing racer it succeeded. The `UPDATE` carries `RETURNING id`, the batch's first result
+is captured, and an empty result throws a 409, re-reading current state to build an honest
+message, exactly as `server/api/admin/performances/[id]/index.put.ts` already does for its own
+capacity race:
+
+```sql
+UPDATE <table> SET status = ? WHERE id = ? AND status = ? RETURNING id
+```
+
+**The refusal is a thrown HTTP status, not a field in the response body, and that is not a style
+choice.** `app/pages/bar/stock/index.vue`, `app/pages/bar/products/index.vue` and
+`app/pages/bar/products/[id].vue` all call the status route with `$fetch` and branch only on a
+thrown non-2xx via `refusalText`; none of them reads `ok` or `status` out of a successful body.
+Returning `{ ok: false }` with a 200 would change nothing on screen: the toast would still say
+success and the row would still reload as if the write had applied. The route has to throw.
+
+**A `changes() = 0` batch is a clean no-op against the audit trail's own guard, not a trapped
+error.** `0001_audit_log_append_only.sql` puts `BEFORE UPDATE` and `BEFORE DELETE` triggers on
+`audit_log`, nothing on `INSERT`. A suppressed insert that matches zero rows never reaches a
+trigger at all; it simply inserts nothing.
+
+**No helper**, on the same reasoning as before, now covering the refusal as well as the audit.
+The four lines of the batch differ only in table and column names across the three status
+routes; the refusal message differs in wording between "already retired", "not retired", "already
+active", and what each route says once state has moved out from under the caller. A narrower
+helper, `statusChangeBatch(table, id, from, to, entry)`, returning only whether the write applied
+and leaving the message to the caller, was considered once the response half doubled the
+boilerplate at three call sites. Deferred for the reason the original decision already gives: this
+is still three call sites away from the fourth that would make the generalisation argument, and
+inlining keeps each route's own wording next to the check it answers rather than behind a
+parameter.
 
 ## Consequences
 
@@ -78,12 +106,16 @@ this record, is what every future status-change route copies.
   this shape in the same pull request as this record, sweeping bar's two routes built before the
   pattern was settled. Both files are bar's by ownership; the fix is not a comment on bar's work,
   it is applying a pattern F-112 (also bar's) proved first.
-- `server/api/admin/bar/variants/[id]/status.post.ts` and
-  `server/api/admin/performances/[id]/index.put.ts` already match this shape and need no change;
-  they are cited above as the live examples because they are what F-112 and D-121 already got
-  right.
+- `server/api/admin/bar/variants/[id]/status.post.ts` matched only the audit half: its `UPDATE`
+  already carried the predicate and its audit insert was already conditional on `changes() = 1`,
+  but it discarded the batch's result and returned `{ ok: true, status }` unconditionally, telling
+  a losing racer it had succeeded. This pull request adds the response half here too, so it is no
+  longer cited as a route needing no change.
+- `server/api/admin/performances/[id]/index.put.ts` already matches both halves and needs no
+  change; it is the live example the response half above is copied from.
 - Any future route that changes a status (or any other contended field) and audits the change
-  copies this shape rather than inventing a fourth one.
+  copies both halves of this shape rather than inventing a fourth one, or fixing only the audit
+  half and leaving the caller misinformed.
 
 ## Options considered
 
@@ -93,9 +125,13 @@ this record, is what every future status-change route copies.
 - **A shared `auditedStatusChange()` helper taking the table, predicate and audit entry.**
   Rejected for now (see Decision); revisit if a fourth call site's shape turns out to want
   exactly the same parameters, at which point three real examples make the generalisation
-  argument for it.
+  argument for it. A narrower variant scoped to the batch and the refusal check alone,
+  `statusChangeBatch()`, was considered separately once the response half was added; see Decision.
 - **Trigger-enforce the audit write, the way append-only tables are trigger-enforced (0010).**
   Rejected: these tables are not append-only registers, the audit obligation is specific to
   certain columns changing rather than every write, and a trigger would hide the write path from
   a reader of the route file, which is the opposite of what an audited privileged mutation should
   do.
+- **Return `{ ok: false }` with a 200 instead of throwing.** Rejected: every console screen that
+  calls one of these routes branches on a thrown non-2xx and never reads the body, so a falsey
+  body would be silently ignored and the screen would keep reporting success.

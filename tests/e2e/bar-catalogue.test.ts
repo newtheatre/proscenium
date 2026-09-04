@@ -52,6 +52,19 @@ function trail<T>(action: string, target: string): T | undefined {
   }
 }
 
+function auditCount(action: string, target: string): number {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    const row = database
+      .query('SELECT count(*) AS total FROM audit_log WHERE action = ? AND target = ?')
+      .get(action, target) as { total: number }
+    return row.total
+  }
+  finally {
+    database.close()
+  }
+}
+
 const named = (prefix: string): string => `${prefix} ${crypto.randomUUID().slice(0, 8)}`
 
 const created = async (answered: Response): Promise<string> => {
@@ -193,6 +206,23 @@ describe.skipIf(skip !== null)('a product is retired, never destroyed (F-111 cri
     expect((await send('POST', `/api/admin/bar/products/${id}/status`, { status: 'HIDDEN' })).status).toBe(409)
   })
 
+  // The predicate rides the UPDATE and the audit reads its own changes(); the loser's write
+  // touches nothing, so it is refused rather than told it succeeded (0049).
+  test('two people activating the same product at once write one audit entry, and the loser is refused', async () => {
+    const id = await addProduct(await addCategory())
+    await addVariant(id)
+
+    const raced = await Promise.all([
+      send('POST', `/api/admin/bar/products/${id}/status`, { status: 'ACTIVE' }),
+      send('POST', `/api/admin/bar/products/${id}/status`, { status: 'ACTIVE' }, barManager.cookie),
+    ])
+
+    expect(raced.filter(answered => answered.status === 200).length).toBe(1)
+    expect(raced.filter(answered => answered.status === 409).length).toBe(1)
+    expect((await products()).find(product => product.id === id)?.status).toBe('ACTIVE')
+    expect(auditCount('bar.product.status.changed', `bar-product:${id}`)).toBe(1)
+  })
+
   test('a retired product leaves the list the till reads and stays in the console', async () => {
     const id = await addProduct(await addCategory())
     expect((await send('POST', `/api/admin/bar/products/${id}/status`, { status: 'RETIRED' })).status).toBe(200)
@@ -319,6 +349,22 @@ describe.skipIf(skip !== null)('a stocked item is counted in its own unit (F-114
     expect((await send('POST', `/api/admin/bar/items/${id}/status`, { status: 'RETIRED' })).status).toBe(409)
     await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'ADJUST', qty: -750, reason: 'COUNT_CORRECTION' })
     expect((await send('POST', `/api/admin/bar/items/${id}/status`, { status: 'RETIRED' })).status).toBe(200)
+  })
+
+  // The predicate rides the UPDATE and the audit reads its own changes(); the loser's write
+  // touches nothing, so it is refused rather than told it succeeded (0049).
+  test('two people retiring the same item at once write one audit entry, and the loser is refused', async () => {
+    const id = await addItem()
+
+    const raced = await Promise.all([
+      send('POST', `/api/admin/bar/items/${id}/status`, { status: 'RETIRED' }),
+      send('POST', `/api/admin/bar/items/${id}/status`, { status: 'RETIRED' }, barManager.cookie),
+    ])
+
+    expect(raced.filter(answered => answered.status === 200).length).toBe(1)
+    expect(raced.filter(answered => answered.status === 409).length).toBe(1)
+    expect((await items()).find(item => item.id === id)?.status).toBe('RETIRED')
+    expect(auditCount('bar.item.status.changed', `bar-item:${id}`)).toBe(1)
   })
 
   test('the unit and container size are fixed once stock has moved', async () => {

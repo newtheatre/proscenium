@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { onHandColumn, onHandOf } from '#server/utils/bar'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import type { TestDatabase } from '#tests/helpers/database'
+import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
 
 // F-114 on the real migrations. On-hand is the sum of movements and nothing else, so the guards
 // that keep the sum honest are the database's rather than a handler's (0010).
@@ -278,6 +278,45 @@ describe('a movement stamps who, when and what document (criterion 5)', () => {
       move(database, { qty: 750, kind: 'DELIVERY' })
       const [row] = rows<{ createdAt: number }>(database, 'SELECT created_at AS createdAt FROM stock_movements')
       expect(row!.createdAt).toBeGreaterThan(1_700_000_000)
+    })
+  })
+})
+
+// `changes()` names the row count of the statement just before it on this connection, so an
+// audit insert can read whether *this* UPDATE changed anything, not the resulting state (0049).
+describe('changes() after a conditional UPDATE names that UPDATE\'s own effect', () => {
+  const statusChange = (from: string, to: string, auditId: string): BoundStatement[] => [
+    ['UPDATE bar_items SET status = ? WHERE id = ? AND status = ?', to, 'item-1', from],
+    [`INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ?, NULL, 'bar.item.status.changed', 'bar-item:item-1', '{}'
+      WHERE changes() = 1`, auditId],
+  ]
+
+  test('a matching predicate changes the row and writes exactly one audit entry', async () => {
+    await withDatabase((database) => {
+      bottle(database, { status: 'ACTIVE' })
+
+      database.batch(statusChange('ACTIVE', 'RETIRED', 'a1'))
+
+      expect(rows<{ status: string }>(database, 'SELECT status FROM bar_items WHERE id = \'item-1\'')[0]!.status)
+        .toBe('RETIRED')
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(1)
+    })
+  })
+
+  // The loser's own predicate matches nothing even though the row now reads RETIRED, which a
+  // predicate over the resulting state rather than `changes()` could not tell from a win.
+  test('a predicate that already lost the race changes nothing and writes no audit entry', async () => {
+    await withDatabase((database) => {
+      bottle(database, { status: 'ACTIVE' })
+
+      database.batch(statusChange('ACTIVE', 'RETIRED', 'a1'))
+      // The loser still believes the item was ACTIVE when it read it.
+      database.batch(statusChange('ACTIVE', 'RETIRED', 'a2'))
+
+      expect(rows<{ status: string }>(database, 'SELECT status FROM bar_items WHERE id = \'item-1\'')[0]!.status)
+        .toBe('RETIRED')
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(1)
     })
   })
 })
