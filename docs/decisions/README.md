@@ -52,3 +52,4 @@ afterwards, only superseded.
 | 0044 | An officer opens a show-night screen without a shift, and is recorded | the one exception to derived authority, and what the record keys to |
 | 0045 | A public listing caches until the next thing that changes it | how an edge-cacheable listing still closes booking on the minute |
 | 0046 | The rota is planned at a desk and worked on a phone | where show night's console screens live, and what opens them |
+| 0047 | A constraint violation is refused by a shared helper, each module keeping its own table | the anchored match against a D1 error, and why the table is not centralised |

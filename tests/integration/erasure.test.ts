@@ -81,6 +81,14 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
     [`INSERT INTO shifts (id, performance_id, role, slot, user_id, status, notes, assigned_by)
       VALUES (?, ?, ?, 1, ?, 'CONFIRMED', ?, ?)`,
     `sh-${id}`, `perf-${id}`, 'DUTY_MANAGER', id, `${NAME} has the keys`, id],
+    // A price this person set. Append-only and free of anything but a figure and a date, which is
+    // why an erasure leaves it with only the tombstone's reference in it (F-116).
+    ['INSERT INTO bar_categories (id, name) VALUES (?, ?)', `bc-${id}`, 'Wine'],
+    ['INSERT INTO bar_products (id, category_id, name) VALUES (?, ?, ?)', `bp-${id}`, `bc-${id}`, 'House red'],
+    [`INSERT INTO product_variants (id, product_id, serving_kind, label) VALUES (?, ?, 'bottle', 'Bottle')`,
+      `pv-${id}`, `bp-${id}`],
+    [`INSERT INTO variant_prices (id, variant_id, price_pence, effective_from, created_at, created_by)
+      VALUES (?, ?, 1800, '2026-09-14', ?, ?)`, `vp-${id}`, `pv-${id}`, now, id],
     ['INSERT INTO departments (code, name) VALUES (?, ?)', `dept-${id}`, 'Technical'],
     ['INSERT INTO department_leads (id, department, user_id) VALUES (?, ?, ?)', `dl-${id}`, `dept-${id}`, id],
     ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)',
@@ -210,6 +218,13 @@ describe('erasure (K-109, 0011)', () => {
       const staffing = rows<{ role: string, updated_by: string | null }>(database,
         'SELECT role, updated_by FROM shift_templates WHERE updated_by = ?', id)
       expect(staffing).toHaveLength(1)
+
+      // A price is a figure and a date, nothing about a person beyond who set it, and a past
+      // sale resolved against it: the row survives whole (F-116).
+      const priced = rows<{ price_pence: number, created_by: string | null }>(database,
+        'SELECT price_pence, created_by FROM variant_prices WHERE created_by = ?', id)
+      expect(priced).toHaveLength(1)
+      expect(priced[0]).toMatchObject({ price_pence: 1800, created_by: id })
 
       // The row itself is still there for everything referring to it.
       expect(rows(database, 'SELECT id FROM users WHERE id = ?', id)).toHaveLength(1)

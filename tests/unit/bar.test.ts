@@ -5,13 +5,18 @@ import {
   MOVEMENT_WRITERS,
   STOCK_MOVEMENT_KINDS,
   categoryForm,
+  componentsForm,
+  effectivePriceRow,
   movementEntryForm,
   movementForm,
   productForm,
   says,
   saysMoney,
   saysQuantity,
+  priceForm,
   stockItemForm,
+  variantEditForm,
+  variantForm,
 } from '#shared/utils/bar'
 
 // F-111 and F-114's write-path rules, which the database CHECKs mirror rather than replace: a
@@ -125,6 +130,82 @@ describe('a category orders the till and a stocked item counts in its own unit',
 
   test('a quantity is whole units of the item\'s own unit', () => {
     expect(stockItemForm.safeParse({ name: 'House red', unit: 'ML', parQty: 12.5 }).success).toBe(false)
+  })
+})
+
+describe('a serving size is a row, priced by a dated series (F-112, F-116)', () => {
+  const aVariant = (over: Record<string, unknown> = {}) =>
+    variantForm.safeParse({ productId: 'prod-1', servingKind: 'bottle', label: 'Bottle', ...over })
+
+  test('a serving kind comes from the vocabulary a category default resolves on', () => {
+    expect(aVariant({ servingKind: 'schooner' }).success).toBe(false)
+    for (const kind of ['bottle', '125ml', '175ml', '250ml', 'single', 'double', 'pint', 'half', 'item']) {
+      expect(`${kind}: ${aVariant({ servingKind: kind }).success}`).toBe(`${kind}: true`)
+    }
+  })
+
+  // A price series and a sale both belong to the product a size was sold under.
+  test('an edit does not move a size between products', () => {
+    expect(Object.keys(variantEditForm.shape)).not.toContain('productId')
+  })
+
+  test('a depletion is positive and independent of price', () => {
+    const set = (components: unknown[]) => componentsForm.safeParse({ components })
+    expect(set([{ itemId: 'item-1', qty: 0 }]).success).toBe(false)
+    expect(set([{ itemId: 'item-1', qty: -175 }]).success).toBe(false)
+    expect(set([{ itemId: 'item-1', qty: 175 }]).success).toBe(true)
+    // Twice the depletion at nothing like twice the price is exactly the point (0017).
+    expect(set([{ itemId: 'item-1', qty: 50 }, { itemId: 'item-2', qty: 200 }]).success).toBe(true)
+  })
+
+  test('a stocked item appears once in a recipe', () => {
+    expect(componentsForm.safeParse({
+      components: [{ itemId: 'item-1', qty: 25 }, { itemId: 'item-1', qty: 50 }],
+    }).success).toBe(false)
+  })
+
+  test('a price is whole pence on a civil date', () => {
+    expect(priceForm.safeParse({ pricePence: 18.5, effectiveFrom: '2026-09-14' }).success).toBe(false)
+    expect(priceForm.safeParse({ pricePence: -100, effectiveFrom: '2026-09-14' }).success).toBe(false)
+    expect(priceForm.safeParse({ pricePence: 1800, effectiveFrom: '14/09/2026' }).success).toBe(false)
+    expect(priceForm.safeParse({ pricePence: 1800, effectiveFrom: '2026-09-14' }).success).toBe(true)
+  })
+})
+
+describe('which dated row the till reads today (F-116 criteria 1, 3 and 5)', () => {
+  // `seq` stands in for `rowid`: insertion order, independent of `id`, which is a random UUID
+  // and no guide to which row came later (F-116, 0010).
+  const row = (id: string, effectiveFrom: string, createdAt: number, seq: number) => ({ id, effectiveFrom, createdAt, seq })
+
+  test('the latest row dated on or before the day wins', () => {
+    const series = [row('a', '2026-09-01', 1000, 1), row('b', '2026-10-01', 2000, 2)]
+    expect(effectivePriceRow(series, '2026-08-31')).toBeNull()
+    expect(effectivePriceRow(series, '2026-09-30')?.id).toBe('a')
+    expect(effectivePriceRow(series, '2026-10-01')?.id).toBe('b')
+  })
+
+  // The old estate held one row per day, which made a same-day mistake uncorrectable.
+  test('two rows on one date resolve by which was written last', () => {
+    const series = [row('a', '2026-09-01', 1000, 1), row('b', '2026-09-01', 2000, 2)]
+    expect(effectivePriceRow(series, '2026-09-01')?.id).toBe('b')
+  })
+
+  // Two rows written in the same second still have to resolve to one, and to the same one twice.
+  // `id` cannot be the tiebreak: two random UUIDs sort no more predictably than a coin toss.
+  test('a tie in the same second still resolves, and resolves the same way every time', () => {
+    const series = [row('z', '2026-09-01', 1000, 1), row('a', '2026-09-01', 1000, 2)]
+    expect(effectivePriceRow(series, '2026-09-01')?.id).toBe('a')
+    expect(effectivePriceRow([...series].reverse(), '2026-09-01')?.id).toBe('a')
+  })
+
+  test('a future row waits for its date', () => {
+    const series = [row('a', '2026-09-01', 1000, 1), row('b', '2027-01-01', 2000, 2)]
+    expect(effectivePriceRow(series, '2026-12-31')?.id).toBe('a')
+    expect(effectivePriceRow(series, '2027-01-01')?.id).toBe('b')
+  })
+
+  test('a size nothing has priced resolves to nothing rather than to nought', () => {
+    expect(effectivePriceRow([], '2026-09-01')).toBeNull()
   })
 })
 

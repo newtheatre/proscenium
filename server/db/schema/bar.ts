@@ -106,6 +106,77 @@ export const stockMovements = sqliteTable('stock_movements', {
   check('stock_movements_source_document_is_whole', sql`(${table.refTable} IS NULL) = (${table.refId} IS NULL)`),
 ])
 
+// A size is a row, never a duplicate product (0017). The serving kind keys a category default
+// (F-121), so its vocabulary is in `shared/utils/bar.ts` rather than a CHECK a new size rebuilds.
+export const productVariants = sqliteTable('product_variants', {
+  id: id(),
+  productId: text('product_id').notNull().references(() => barProducts.id, { onDelete: 'cascade' }),
+  servingKind: text('serving_kind').notNull(),
+  label: text('label').notNull(),
+  status: text('status').notNull().default('ACTIVE'),
+  sort: integer('sort').notNull().default(0),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  unique('product_variants_kind').on(table.productId, table.servingKind),
+  index('product_variants_product').on(table.productId, table.sort),
+  check('product_variants_status_values', sql`${table.status} IN ('ACTIVE', 'RETIRED')`),
+])
+
+// A choice a variant offers, such as the mixer with a spirit. Its options are stocked items, so a
+// chosen one depletes at its own quantity (0017, F-113 criterion 2).
+export const choiceGroups = sqliteTable('choice_groups', {
+  id: id(),
+  name: text('name').notNull(),
+}, table => [
+  // NOCASE alone is stricter than a plain UNIQUE, so a second index would only duplicate it.
+  uniqueIndex('choice_groups_name_nocase').on(sql`${table.name} COLLATE NOCASE`),
+])
+
+export const choiceGroupItems = sqliteTable('choice_group_items', {
+  id: id(),
+  choiceGroupId: text('choice_group_id').notNull().references(() => choiceGroups.id, { onDelete: 'cascade' }),
+  itemId: text('item_id').notNull().references(() => barItems.id, { onDelete: 'restrict' }),
+  qty: integer('qty').notNull(),
+  sort: integer('sort').notNull().default(0),
+}, table => [
+  unique('choice_group_items_option').on(table.choiceGroupId, table.itemId),
+  check('choice_group_items_qty_positive', sql`${table.qty} > 0`),
+])
+
+// What pouring one of these consumes. One level deep by construction: a component names a stocked
+// item or a choice of them, and never another product (F-113 criterion 1).
+export const variantComponents = sqliteTable('variant_components', {
+  id: id(),
+  variantId: text('variant_id').notNull().references(() => productVariants.id, { onDelete: 'cascade' }),
+  itemId: text('item_id').references(() => barItems.id, { onDelete: 'restrict' }),
+  choiceGroupId: text('choice_group_id').references(() => choiceGroups.id, { onDelete: 'restrict' }),
+  // In the item's own counting unit, and independent of price: a double may deplete twice a
+  // single without costing twice as much (F-112 criterion 2).
+  qty: integer('qty').notNull(),
+  includedInPrice: integer('included_in_price', { mode: 'boolean' }).notNull().default(false),
+}, table => [
+  uniqueIndex('variant_components_item').on(table.variantId, table.itemId),
+  uniqueIndex('variant_components_choice').on(table.variantId, table.choiceGroupId),
+  check('variant_components_one_source', sql`(${table.itemId} IS NULL) <> (${table.choiceGroupId} IS NULL)`),
+  check('variant_components_qty_positive', sql`${table.qty} > 0`),
+])
+
+// APPEND-ONLY (0010), with its triggers hand-authored after this generated CREATE. The latest row
+// dated on or before today wins, and same-day rows resolve by `created_at` (F-116).
+export const variantPrices = sqliteTable('variant_prices', {
+  id: id(),
+  variantId: text('variant_id').notNull().references(() => productVariants.id, { onDelete: 'cascade' }),
+  pricePence: integer('price_pence').notNull(),
+  // A civil date, the Europe/London day it takes effect on. A future one is allowed and waits.
+  effectiveFrom: text('effective_from').notNull(),
+  createdAt: integer('created_at').notNull().default(now),
+  createdBy: text('created_by').references(() => users.id, { onDelete: 'restrict' }),
+}, table => [
+  index('variant_prices_resolution').on(table.variantId, table.effectiveFrom, table.createdAt),
+  check('variant_prices_pence', sql`${table.pricePence} >= 0`),
+  check('variant_prices_effective_from_is_a_date', sql`${table.effectiveFrom} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`),
+])
+
 // At most one open session per venue per night, the same key 0044 uses for a bypass (F-102). The
 // index covers open rows only, so a session once closed stays closed and a later one is a new row.
 export const tillSessions = sqliteTable('till_sessions', {

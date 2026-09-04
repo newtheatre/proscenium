@@ -390,8 +390,8 @@
     {
       "idx": 55,
       "version": "6",
-      "when": 1788532704730,
-      "tag": "0055_one_till_session_open_per_venue_per_night",
+      "when": 1788517472520,
+      "tag": "0055_a_serving_size_is_a_row_and_its_price_is_dated",
       "breakpoints": true
     }
   ]
