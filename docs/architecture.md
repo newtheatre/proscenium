@@ -416,8 +416,42 @@ the door, the till and the registers inherit the conditions rather than each rem
 
 `shared/utils/night-shell.ts` holds `NIGHT_VIEWPORT_PX`, `NIGHT_TAP_TARGET_PX` and
 `lastSyncedLabel()`, so the tests and the components read the same numbers. A screen shows its own
-age by passing `stale` the instant its data came from, which is what `useNightCache` (K-103) will
-hand it.
+age by passing `stale` the instant its data came from, which is what `useNightCache` (K-103)
+hands it.
+
+### The night cache (K-103)
+
+`app/composables/useNightCache.ts` is how a show-night screen keeps its night on the device.
+`shared/utils/night-cache.ts` holds the rules, so they are testable without a browser and a
+server utility can build the same key.
+
+```ts
+const cache = useNightCache(
+  () => nightCacheKey({ screen: 'door', night, venueId }),
+  () => $fetch('/api/tonight/...', { query: { night, venueId } }),
+)
+```
+
+The loader belongs to the screen: this owns what is kept, where it is kept and what may be
+claimed about it, never what a screen fetches. `cache.data` is what the device held before the
+network was asked, `cache.cachedAt` is what `NightStale` labels, `cache.live` says the last load
+answered, and `cache.error` is the failure that left the screen stale rather than blank.
+
+| Rule | Why |
+| --- | --- |
+| A key names a venue or a performance, or says `wholeNight` in as many words. | Two venues run one night and one venue runs a matinee and an evening, so a key of the night alone serves a duty manager the other house's screen. Forgetting throws; meaning it is spelled differently. |
+| The key is stamped inside the entry as well as outside it. | An entry copied or renamed under another key reads as nothing cached rather than as another venue's night. |
+| A failed load never overwrites what the screen is showing. | A dropped connection is a stale screen, never a blank one (criterion 2). |
+| A successful load sweeps every other night's entries. | A night ends at 04:00 and takes its cache with it; nothing else on the device is touched. |
+| Unreadable, foreign-version or foreign-key entries read as nothing cached. | A screen that throws on an entry an older build wrote is worse than one that reloads. |
+| `primeNightCache(key, load)` caches what another screen will need. | The emergency card is cached from the start of the shift rather than from the first visit to it (criterion 3, E-113 criterion 2). |
+| The store is `localStorage`, falling back to memory when a device refuses it. | A screen that cannot cache still has to render, and the fallback lives as long as the tab. |
+
+The version is in the key (`nnt.night.1:...`), so changing the envelope retires every entry an
+older build wrote instead of reading it wrongly. Nothing else in `app/` touches the device store,
+which a test enforces: the old estate mirrored the emergency card to `localStorage` from the
+screen that displayed it, and that is why the card survived a dropped connection but not a first
+load.
 
 ## Environments
 
