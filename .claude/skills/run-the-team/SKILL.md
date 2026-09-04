@@ -22,7 +22,7 @@ brief you fill in is `stream-brief.md` beside this file.
 
 ## 2. Wave 0
 
-Wave 0 is serial. For each contract in `docs/build-order.md` in its merge order, spawn one agent
+Wave 0 is serial. For each contract in `docs/build-order.md` in its merge order, spawn one sonnet agent
 (`subagent_type: general-purpose`, `isolation: worktree`, `run_in_background: true`, named after
 the contract) with the stream brief for the owning stream and the single instruction to deliver
 that contract as one PR. Wait for its STATUS. Do not start the next contract until Matt has
@@ -36,7 +36,7 @@ When contract (g) merges, Wave 0 is done: update the board and fan out.
 
 ## 3. Fan out
 
-Spawn four agents in one message, named `box-office`, `show-night`, `bar` and `platform`, each
+Spawn four sonnet agents in one message, named `box-office`, `show-night`, `bar` and `platform`, each
 with `isolation: worktree`, `run_in_background: true`, and the brief from `stream-brief.md`
 filled in with that stream's wave 1 table, ports and route namespaces. The brief tells the
 agent to work the wave's PR groups in order, to stop when the wave is exhausted, a dependency
