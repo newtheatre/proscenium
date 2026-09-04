@@ -22,6 +22,9 @@
       "#server": ["./server"],
       "#server/*": ["./server/*"],
       "#migration/*": ["./migration/*"],
+      // A composable a test drives directly. It pays for that by importing Vue rather than
+      // leaning on Nuxt's auto-imports, which do not exist outside the application.
+      "#composables/*": ["./app/composables/*"],
       "#tests/*": ["./tests/*"]
     }
   }
