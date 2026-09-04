@@ -38,8 +38,12 @@ performs itself: the `Notification` interface gains an optional `claim?: string`
 every outcome branch that currently inserts through `record()` updates the row at that claim
 instead; when absent, `notify()` inserts a fresh row exactly as it does today, which is every call
 that never claimed in the first place (account and booking notifications, for instance). A call
-site that claims and then sends passes the same key it claimed with; the seven existing call
-sites each already hold that key in scope, so the change at each is one line.
+site that claims and then sends passes the same key it claimed with; six of the seven existing
+call sites each already hold that one key in scope, so the change at each is one line. The
+expiry sweep's window and final warnings are the exception: several rows, one per expiring
+record, can each be claimed for the same user before a single digest-style message covers all of
+them, so `claim` also accepts an array and the update matches every key in it. Every branch still
+moves together to the same outcome, because they were sent, or not, as one message.
 
 **No trigger and no rebuild.** `notification_log` carries no trigger and is not one of 0010's
 append-only registers (the ledger, stock, incidents, age checks, prices, records and the audit

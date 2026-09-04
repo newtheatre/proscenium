@@ -75,10 +75,11 @@ export default defineEventHandler(async (event) => {
   // Claimed before it is sent, so a retry of this request cannot tell the same person twice.
   let told = 0
   for (const attendee of signedUp) {
+    const key = `training.session.cancelled:${id}:${attendee.userId}`
     const took = await claimNotification({
       userId: attendee.userId,
       type: 'training.session.cancelled',
-      key: `training.session.cancelled:${id}:${attendee.userId}`,
+      key,
       sessionId: id,
     })
     if (!took) continue
@@ -86,6 +87,7 @@ export default defineEventHandler(async (event) => {
     await notify(event, {
       type: 'training.session.cancelled',
       userId: attendee.userId,
+      claim: key,
       context: {
         // The recipient's own name is filled in by notify.
         name: '',

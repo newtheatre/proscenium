@@ -407,6 +407,13 @@
       "when": 1788539821646,
       "tag": "0057_one_till_session_open_per_venue_per_night",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1788540611253,
+      "tag": "0058_notification_log_status_gains_pending",
+      "breakpoints": true
     }
   ]
 }
