@@ -3,12 +3,16 @@ import {
   backfillVenueStatement,
   cancelOrphanedShiftsStatement,
   cancelShiftsStatement,
+  countOpenShiftsQuery,
+  myShiftsQuery,
+  openShiftsQuery,
   replaceTemplateStatements,
   stampPerformanceStatement,
 } from '#server/utils/rota'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
+import type { OpenShiftRow } from '#server/utils/rota'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
@@ -513,6 +517,119 @@ describe('a shift goes when its performance does', () => {
         'shift-one', tonight.performanceId, 'DOOR', who, 'CONFIRMED']])
 
       expect(() => database.batch([['DELETE FROM users WHERE id = ?', who]])).toThrow()
+    })
+  })
+})
+
+// The open-shift list pages in SQL and returns only what a member could actually claim right now
+// (E-103 criterion 5).
+describe('the open-shift list (E-103)', () => {
+  function stampOpen(database: TestDatabase, performanceId: string, role: string, slot: number, status = 'OPEN', userId: string | null = null): void {
+    database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)',
+      `${performanceId}-${role}-${slot}`, performanceId, role, slot, userId, status]])
+  }
+
+  test('lists only OPEN shifts on performances that are not cancelled and have not started', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      stampOpen(database, tonight.performanceId, 'DOOR', 1)
+      stampOpen(database, tonight.performanceId, 'BAR', 1, 'CLAIMED', person(database, 'holder'))
+
+      const past = tonightsPerformance(database, { suffix: 'b', curtainHoursAfterNightStart: -100 })
+      stampOpen(database, past.performanceId, 'DOOR', 1)
+
+      const cancelled = tonightsPerformance(database, { suffix: 'c', status: 'CANCELLED' })
+      stampOpen(database, cancelled.performanceId, 'DOOR', 1)
+
+      const now = tonight.startsAt - 3600
+      const items = rows<OpenShiftRow>(database, ...boundStatement(database, openShiftsQuery({}, now, 25, 0)))
+      expect(items.map(item => item.shiftId)).toEqual([`${tonight.performanceId}-DOOR-1`])
+
+      const [total] = rows<{ total: number }>(database, ...boundStatement(database, countOpenShiftsQuery({}, now)))
+      expect(total?.total).toBe(1)
+    })
+  })
+
+  test('a role filter narrows both the list and the count', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      stampOpen(database, tonight.performanceId, 'DOOR', 1)
+      stampOpen(database, tonight.performanceId, 'BAR', 1)
+
+      const now = tonight.startsAt - 3600
+      const items = rows<OpenShiftRow>(database, ...boundStatement(database, openShiftsQuery({ role: 'BAR' }, now, 25, 0)))
+      expect(items.map(item => item.role)).toEqual(['BAR'])
+
+      const [total] = rows<{ total: number }>(database, ...boundStatement(database, countOpenShiftsQuery({ role: 'BAR' }, now)))
+      expect(total?.total).toBe(1)
+    })
+  })
+
+  test('a date range excludes a shift on a performance outside it', async () => {
+    await withDatabase(async (database) => {
+      const near = tonightsPerformance(database, { suffix: 'a' })
+      const far = tonightsPerformance(database, { suffix: 'b', curtainHoursAfterNightStart: 15.5 + 30 * 24 })
+      stampOpen(database, near.performanceId, 'DOOR', 1)
+      stampOpen(database, far.performanceId, 'DOOR', 1)
+
+      const now = near.startsAt - 3600
+      const items = rows<OpenShiftRow>(database, ...boundStatement(database,
+        openShiftsQuery({ to: near.startsAt + 3600 }, now, 25, 0)))
+      expect(items.map(item => item.shiftId)).toEqual([`${near.performanceId}-DOOR-1`])
+    })
+  })
+
+  test('the page size limits what comes back, and the offset moves the window', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      for (let slot = 1; slot <= 5; slot += 1) stampOpen(database, tonight.performanceId, 'DOOR', slot)
+
+      const now = tonight.startsAt - 3600
+      const firstPage = rows<OpenShiftRow>(database, ...boundStatement(database, openShiftsQuery({}, now, 2, 0)))
+      const secondPage = rows<OpenShiftRow>(database, ...boundStatement(database, openShiftsQuery({}, now, 2, 2)))
+      expect(firstPage.length).toBe(2)
+      expect(secondPage.length).toBe(2)
+      expect(firstPage.map(item => item.shiftId)).not.toEqual(secondPage.map(item => item.shiftId))
+    })
+  })
+
+  // Nothing here may bind per shift or per performance, whatever the page holds (0003, 0006).
+  test('the bound parameter count does not grow with how many shifts are open', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      for (let slot = 1; slot <= 40; slot += 1) stampOpen(database, tonight.performanceId, 'DOOR', slot)
+
+      const now = tonight.startsAt - 3600
+      const [, ...listParameters] = boundStatement(database, openShiftsQuery({ role: 'DOOR', to: now + 100_000 }, now, 25, 0))
+      const [, ...countParameters] = boundStatement(database, countOpenShiftsQuery({ role: 'DOOR', to: now + 100_000 }, now))
+      expect(listParameters.length).toBeLessThan(MAX_BOUND_PARAMETERS)
+      expect(countParameters.length).toBeLessThan(MAX_BOUND_PARAMETERS)
+    })
+  })
+})
+
+describe('a member\'s own shifts (E-103)', () => {
+  test('only that member\'s upcoming, non-cancelled shifts come back, soonest first', async () => {
+    await withDatabase(async (database) => {
+      const mine = tonightsPerformance(database, { suffix: 'a' })
+      const later = tonightsPerformance(database, { suffix: 'b', curtainHoursAfterNightStart: 15.5 + 24 })
+      const who = person(database, 'holder')
+      const someoneElse = person(database, 'other')
+
+      database.batch([
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+          'shift-later', later.performanceId, 'DOOR', who, 'CONFIRMED'],
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+          'shift-mine', mine.performanceId, 'DUTY_MANAGER', who, 'CLAIMED'],
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 2, ?, ?)',
+          'shift-other', mine.performanceId, 'DOOR', someoneElse, 'CONFIRMED'],
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 3, ?, ?)',
+          'shift-cancelled', mine.performanceId, 'BAR', who, 'CANCELLED'],
+      ])
+
+      const now = mine.startsAt - 3600
+      const items = rows<{ shiftId: string }>(database, ...boundStatement(database, myShiftsQuery(who, now)))
+      expect(items.map(item => item.shiftId)).toEqual(['shift-mine', 'shift-later'])
     })
   })
 })
