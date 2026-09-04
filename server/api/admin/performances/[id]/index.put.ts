@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { performanceForm } from '#shared/utils/programme'
 
@@ -18,14 +18,37 @@ export default defineEventHandler(async (event) => {
   // The capacity that will apply, so clearing the override or moving to a smaller venue is checked
   // as well as lowering the number. Refusing quotes both figures (D-105 criterion 4).
   const capacity = input.capacityOverride ?? venue.capacity
-  if (capacity !== null && capacity < held.soldTickets) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: `${plural(held.soldTickets, 'ticket')} are already held on this performance, so its capacity cannot be ${capacity}`,
-    })
-  }
+  const refusal = loweringRefusal(capacity, held.soldTickets)
+  if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
   const window = input.bookingClosesHoursBefore ?? null
+
+  // The same check rides the UPDATE, so a booking landing between the read above and this
+  // statement cannot slip under the new capacity (D-105 criterion 2).
+  const updated = await db.all<{ id: string }>(sql`
+    UPDATE performances
+    SET venue_id = ${input.venueId},
+        starts_at = ${input.startsAt},
+        doors_at = ${input.doorsAt ?? null},
+        duration_minutes = ${input.durationMinutes ?? null},
+        interval_count = ${input.intervalCount},
+        interval_minutes = ${input.intervalMinutes ?? null},
+        capacity_override = ${input.capacityOverride ?? null},
+        booking_closes_hours_before = ${window},
+        notes = ${input.notes ?? null},
+        updated_at = unixepoch()
+    WHERE id = ${id} AND ${loweringPredicate(id, capacity)}
+    RETURNING id
+  `)
+
+  if (updated.length === 0) {
+    const now = await performanceById(id)
+    if (!now) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+    throw createError({
+      statusCode: 409,
+      statusMessage: loweringRefusal(capacity, now.soldTickets) ?? 'That performance changed while you were editing it',
+    })
+  }
 
   // Moving a house means moving the rota: the open shifts were stamped from the old venue's
   // template, and the new venue's is what this performance is staffed from now (E-102).
@@ -33,19 +56,6 @@ export default defineEventHandler(async (event) => {
   const restamp = moved ? [db.run(clearOpenShiftsStatement(id)), db.run(stampPerformanceStatement(id))] : []
 
   await db.batch([
-    db.update(schema.performances).set({
-      venueId: input.venueId,
-      startsAt: input.startsAt,
-      doorsAt: input.doorsAt ?? null,
-      durationMinutes: input.durationMinutes ?? null,
-      intervalCount: input.intervalCount,
-      intervalMinutes: input.intervalMinutes ?? null,
-      capacityOverride: input.capacityOverride ?? null,
-      bookingClosesHoursBefore: window,
-      notes: input.notes ?? null,
-      updatedAt: Math.floor(Date.now() / 1000),
-    }).where(eq(schema.performances.id, id)),
-    ...restamp,
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'performance.updated',
@@ -63,6 +73,7 @@ export default defineEventHandler(async (event) => {
         notesChanged: (input.notes ?? null) !== held.notes,
       },
     })),
+    ...restamp,
   ])
 
   return { ok: true }

@@ -132,6 +132,8 @@ const CATALOGUE = {
   'performance.cancelled': { label: 'Performance cancelled', module: 'ticketing' },
   'performance.deleted': { label: 'Performance deleted', module: 'ticketing' },
   'show.warnings.set': { label: 'Show content warnings set', module: 'ticketing' },
+  'show.prices.set': { label: 'Show price overrides set', module: 'ticketing' },
+  'performance.prices.set': { label: 'Performance price overrides set', module: 'ticketing' },
   'content-warning.created': { label: 'Content warning added to the vocabulary', module: 'ticketing' },
   'content-warning.updated': { label: 'Content warning changed', module: 'ticketing' },
   'content-warning.deleted': { label: 'Content warning deleted', module: 'ticketing' },
