@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
-import type { ShiftRole, TemplateSlot } from '#shared/utils/rota'
+import type { ShiftRole, ShiftStatus, TemplateSlot } from '#shared/utils/rota'
 import type { SQL } from 'drizzle-orm'
 
 // Reading and writing the rota (E-101, E-102, E-106). Every statement here binds a fixed number
@@ -111,17 +111,28 @@ export async function heldShiftCount(performanceId: string): Promise<number> {
   return row?.n ?? 0
 }
 
-export interface ShiftHolder { shiftId: string, userId: string, role: ShiftRole }
+export interface RotaShift { shiftId: string, userId: string | null, role: ShiftRole, status: ShiftStatus }
 
-// Who is owed a message when a performance goes. Only a confirmed holder committed to the night;
-// a claim awaiting approval has not been promised anything (E-102 criterion 4).
-export async function confirmedShiftHolders(performanceId: string): Promise<ShiftHolder[]> {
-  return await db.all<ShiftHolder>(sql`
-    SELECT id AS shiftId, user_id AS userId, role
+// Everything a cancellation or a move has to reckon with: an open slot has nobody to tell, a
+// claimed or confirmed one does, whatever stage it is at (E-102 criterion 4).
+export async function activeShifts(performanceId: string): Promise<RotaShift[]> {
+  return await db.all<RotaShift>(sql`
+    SELECT id AS shiftId, user_id AS userId, role, status
     FROM shifts
-    WHERE performance_id = ${performanceId} AND status = 'CONFIRMED' AND user_id IS NOT NULL
+    WHERE performance_id = ${performanceId} AND status <> 'CANCELLED'
     ORDER BY role, slot
   `)
+}
+
+// A held shift whose role the new venue's template does not staff at all: kept only by accident
+// otherwise, so a move takes it too rather than stranding it at a house that never asks for it.
+export function cancelOrphanedShiftsStatement(performanceId: string, newVenueId: string): SQL {
+  return sql`
+    UPDATE shifts SET status = 'CANCELLED'
+    WHERE performance_id = ${performanceId}
+      AND status IN ('CLAIMED', 'CONFIRMED')
+      AND role NOT IN (SELECT role FROM shift_templates WHERE venue_id = ${newVenueId})
+  `
 }
 
 // A raw constraint failure is never what a caller reads back; anything unrecognised is rethrown,

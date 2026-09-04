@@ -246,6 +246,10 @@ Reading the table:
 - Parameter discipline: chunk at 90, scope by subquery, never an IN list from a result set.
   Compound SELECTs also cap low on D1; use scalar subqueries for multi-count reads.
 - Each claim has a racing test in CI (0016).
+- A constraint violation is refused, not rethrown as a 500: `shared/utils/constraint-refusal.ts`
+  exports `constraintRefusal(table, error)`, anchored to the two real D1 error shapes. Each
+  module keeps its own `ConstraintRefusal[]` table beside the write path it guards, and calls the
+  shared function; there is no central list to append to (0047).
 
 ## Scheduled tasks
 
@@ -260,6 +264,7 @@ waiting for and do nothing else; only `daily:sweeps` does work today.
 | --- | --- | --- |
 | `*/10 * * * *` | `holds:release` | Releases expired reservation holds, cascades waiting-list offers, sends pre-expiry reminders. The one task that changes booking state, and only ever in the direction the customer was warned about. |
 | `0 6 * * *` | `training:expiry-sweep` | Expiry warnings and digests (dry-run gated). |
+| `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or an unconfirmed duty manager, the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |
 | `0 9 * * *` | `sessions:sweep` | Session reminders and unmarked-register nags (G-119, not yet built). |
 | `0 10 * * *` | `shifts:remind` | Tomorrow's rota with calendar attachments. |
@@ -346,7 +351,9 @@ shift per slot on a performance. `shift_templates` and `shifts` are in `docs/dat
 | `stampPerformanceStatement(performanceId)` | The stamp for one performance, batched with the INSERT that creates it, so a performance can never exist staffed by nothing (E-102 criterion 1). |
 | `backfillVenueStatement(venueId, from)` | The same stamp over every performance at a venue from a given instant. `ON CONFLICT DO NOTHING` against the slot uniqueness makes a second run a no-op (E-102 criterion 2). |
 | `cancelShiftsStatement(performanceId)` | Cancels a performance's shifts, batched with the cancellation itself (E-102 criterion 4). |
-| `shiftConstraintRefusal(error)` | A refused write as a 409 a volunteer can act on, or null for anything unrecognised, which the caller rethrows (E-106 criterion 3). |
+| `cancelOrphanedShiftsStatement(performanceId, newVenueId)` | On a venue move, cancels only the held shifts whose role the new venue's template does not staff at all; a role it staffs with fewer slots than before still carries over (E-101, E-102, committee direction 4 September 2026). |
+| `activeShifts(performanceId)` | Every shift not already cancelled, open or held: what a cancellation or a move has to notify or count, in one query (E-102 criterion 4). |
+| `shiftConstraintRefusal(error)` | A refused write as a 409 a volunteer can act on, or null for anything unrecognised, which the caller rethrows (E-106 criterion 3). Rota-specific for now; platform's wave 1 generic `constraintRefusal(table, error)` is what a follow-up pull request adopts this into. |
 
 Neither statement binds per performance or per slot: the slot ordinals come from a recursive count
 over the templates rather than from a list built in the application, so the parameter count is
@@ -354,8 +361,24 @@ fixed whatever the diary holds (0003, 0006). A shift belongs to exactly one perf
 confirmed duty manager index is per performance, so two performances running at once need two
 confirmed duty managers and the same person may hold shifts on both (E-127 criterion 1).
 
+Moving a performance to another venue carries a claimed or confirmed shift with it: the holder is
+told the venue changed and pointed at their rota to release it if it does not suit, though nothing
+can yet act on that link until E-103 builds `/rota` and E-104 or E-105 build the release itself
+(`docs/known-issues.md`). A held shift in a role the new venue's template does not staff at all
+cannot travel, so it is cancelled and its holder told instead, the same way a cancelled performance
+tells them (E-101, E-102, committee direction 4 September 2026).
+
 Templates are administered at `/rota/manage/templates` under `rota.read` and `rota.write`. A
 member's own `/rota` arrives with E-103.
+
+`server/utils/rota-escalation.ts` is `shifts:escalate`'s query: every performance inside seven
+days of a run with an open shift or a `DUTY_MANAGER` shift that is not `CONFIRMED`, the second
+counted whether or not it is also `CLAIMED`, because only a confirmed one satisfies the legal
+requirement (E-108 criteria 1 and 2). `rotaOfficers()` reads the same permission `rota.write`
+templates are administered under, rather than a named role, so an administrator is chased
+alongside the FOH officer. One digest per officer per London day, read from `notification_log`
+rather than a column, the same idempotency `remindTomorrow` uses for room bookings (E-108
+criterion 4 read together with C-113).
 
 ## The programme (build-order contract d, 0043)
 
@@ -490,7 +513,10 @@ the other. `test:e2e` is **not** a gate: it runs nightly and on demand (0029).
 `bun test` throughout. Unit tests for the pure logic in `shared/`; integration tests run
 routes against a real local database and carry the racing tests; end-to-end tests drive the
 critical journeys (booking, door, till, register, room request) in a browser. The named
-regression suite (K-121) is seeded before feature work and grows monotonically.
+regression suite (K-121) is seeded before feature work and grows monotonically. The racing
+cases are split one file per invariant under `tests/integration/races-*.test.ts`, so two
+streams filling different todos never edit the same file; `tests/helpers/race.ts` fires
+concurrent attempts and asserts exactly one winner (K-105).
 
 A browser test drives the real screen, so it must wait for the page to become interactive and not
 merely to render: until Nuxt's Suspense resolves, the markup is server-rendered and a click does

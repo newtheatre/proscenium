@@ -283,6 +283,80 @@ There is nothing for you to do. Other shifts you hold are unaffected.
 The Nottingham New Theatre`,
   }),
 
+  // The performance still runs; only the house changed, and the shift moved with it. The way
+  // out is in the same breath, because a venue that does not suit is exactly why it exists.
+  'shift-venue-changed': (context: TemplateContext): Rendered => ({
+    subject: `${context.show} has moved venue`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>${context.show} on ${context.when} has moved from ${context.oldVenue} to
+${context.newVenue}. Your ${context.role} shift has moved with it.</p>
+<p>If the new venue does not work for you, release the shift from your rota and it goes back
+to the open list for somebody else to take.</p>`),
+    text: `Hello ${context.name},
+
+${context.show} on ${context.when} has moved from ${context.oldVenue} to ${context.newVenue}.
+Your ${context.role} shift has moved with it.
+
+If the new venue does not work for you, release the shift from your rota and it goes back
+to the open list for somebody else to take.
+
+The Nottingham New Theatre`,
+  }),
+
+  // The venue moved to a house that does not staff this role at all, so the shift could not
+  // travel with the performance and was cancelled rather than left stranded (E-102).
+  'shift-role-not-needed': (context: TemplateContext): Rendered => ({
+    subject: `Your ${context.role} shift on ${context.show} has gone`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>${context.show} on ${context.when} has moved to ${context.newVenue}, which does not
+staff ${context.role}. Your shift there has been cancelled.</p>
+<p>There is nothing for you to do. Other shifts you hold are unaffected.</p>`),
+    text: `Hello ${context.name},
+
+${context.show} on ${context.when} has moved to ${context.newVenue}, which does not
+staff ${context.role}. Your shift there has been cancelled.
+
+There is nothing for you to do. Other shifts you hold are unaffected.
+
+The Nottingham New Theatre`,
+  }),
+
+  // One digest, however many performances are short. A duty manager gap is called out on its own
+  // line, because it is the one that stops the night running at all (E-108 criteria 1 and 2).
+  'shift-rota-unstaffed': (context: TemplateContext): Rendered => {
+    const performances = context.performances as {
+      show: string
+      venue: string
+      when: string
+      noTemplate: boolean
+      missingRoles: string
+      dutyManagerGap: boolean
+    }[]
+    const say = (row: (typeof performances)[number]): string => {
+      const roles = row.noTemplate
+        ? 'The venue has no template, so nothing is staffed at all.'
+        : (row.missingRoles ? `Missing: ${row.missingRoles}.` : '')
+      const gap = row.dutyManagerGap ? ' No confirmed duty manager: the night cannot run without one.' : ''
+      return `${row.show} at ${row.venue}, ${row.when}. ${roles}${gap}`.trim()
+    }
+
+    return {
+      subject: `${plural(performances.length, 'performance')} unstaffed inside seven days`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>These performances inside the next seven days still have an open shift or an unconfirmed
+duty manager:</p>
+<ul>${performances.map(row => `<li>${say(row)}</li>`).join('')}</ul>`),
+      text: `Hello ${context.name},
+
+These performances inside the next seven days still have an open shift or an unconfirmed
+duty manager:
+
+${performances.map(row => `- ${say(row)}`).join('\n')}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   // Good news, so it leads with it. The way out is in the same breath as the place, because a
   // place nobody uses is one somebody else was waiting for.
   'training-session-promoted': (context: TemplateContext): Rendered => {
