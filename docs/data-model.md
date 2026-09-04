@@ -418,6 +418,21 @@ drops archived types and every flagged one, and allow-lists `id`, `name`, `descr
 `ticket_type_id` → ticket_types restrict · UNIQUE (parent, ticket_type) · `price` NULL =
 inherit · `active` NULL = inherit. Resolution: performance, then show, then base.
 
+**Administration (D-120).** Two levels, each read and set the same way, gated on `ticketing.read`
+for the listing and `ticketing.write` for the rest:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/admin/shows/[id]/prices` | Every ticket type against this show: base price, this show's override, and what they resolve to. |
+| `PUT /api/admin/shows/[id]/prices` | Replaces this show's overrides in one batch. Both fields null at a level is no override, so that row is deleted rather than left saying nothing. |
+| `GET /api/admin/performances/[id]/prices` | The same, with the performance's own override alongside the show's. |
+| `PUT /api/admin/performances/[id]/prices` | Replaces this performance's overrides in one batch. |
+
+An override change is audited (`show.prices.set`, `performance.prices.set`) with both the old and
+new price and active flag per ticket type, because prices are not personal data (0011). It takes
+effect for new reservations only: `tickets.price_paid` and `tickets.price_source` are the
+snapshot, taken once at reservation, so a later override never reprices a ticket already sold.
+
 ### reservations
 `id` PK · `reference` UNIQUE (6 chars, no-look-alike alphabet; a retrieval key, never a
 credential) · `performance_id` → performances restrict · `user_id` → users restrict ·
@@ -434,10 +449,15 @@ Indexes: (`performance_id`, `status`), (`user_id`, `created_at`), `hold_expires_
 ### tickets
 `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances
 restrict · `ticket_type_id` → ticket_types restrict · `price_paid` pence snapshot ·
-`price_source` CHECK `VARIANT|OVERRIDE|BASE|IMPORT` · `refunded_at` NULL.
-**The capacity rule** (0006): a ticket counts toward capacity while its reservation status is
-`PENDING|COLLECTED|DOOR` and `refunded_at IS NULL`; inserts carry the capacity predicate on
-the statement. Index (`performance_id`, `refunded_at`).
+`price_source` CHECK `PERFORMANCE|SHOW|BASE|IMPORT` (D-120; `IMPORT` is the one value
+resolution never produces itself, reserved for a migrated ticket priced by the old estate) ·
+`refunded_at` NULL.
+**The capacity rule** (0006, D-105): a ticket counts toward capacity while its reservation status
+is `PENDING|COLLECTED|DOOR` and `refunded_at IS NULL`; every insert carries the capacity
+predicate on its own statement, `capacityAllows()` in `server/utils/capacity.ts`, never a count
+read beforehand and written after. Lowering a performance's capacity rides the same predicate on
+the UPDATE that lowers it (`loweringPredicate()`), so a booking landing mid-request cannot slip
+under the new figure. Index (`performance_id`, `refunded_at`).
 
 ### waiting_list
 `id` PK · `performance_id` → performances cascade · `user_id` NULL → users · `email`
@@ -550,6 +570,11 @@ a 409 through `shiftConstraintRefusal()`, never as a raw database error (E-106 c
 SQLite names the columns for a unique index and the constraint name for a CHECK, so the
 mapping carries both spellings.
 
+Moving a performance to another venue carries a claimed or confirmed shift with it and
+restamps the open ones from the new venue's template; a held shift in a role the new venue's
+template does not staff at all is cancelled rather than left stranded, and its holder is
+told either way (E-101, E-102, committee direction 4 September 2026).
+
 ### incidents  APPEND-ONLY
 `id` PK · `performance_id` restrict · `reported_by` restrict · `body` (operational free
 text; people by role, never diagnosis) · `severity` CHECK `NOTE|NEAR_MISS|INCIDENT|SERIOUS` ·
@@ -619,22 +644,39 @@ queries over the tables referencing it, declared in `BAR_PRODUCT_REFERENCES`
 `tests/integration/bar-catalogue.test.ts` (F-111 criteria 2 and 3).
 
 ### product_variants
-`id` PK · `product_id` → bar_products cascade · `serving_kind` (the price-resolution key:
-`bottle`, `125ml`, `175ml`, `250ml`, `single`, `double`, `pint`, `half`, `item`…) · `label` ·
-`sort`. UNIQUE (`product_id`, `serving_kind`).
+`id` PK · `product_id` → bar_products cascade · `serving_kind`, the price-resolution key
+(`SERVING_KINDS` in `shared/utils/bar.ts`, not a CHECK: a new size must not rebuild a table an
+append-only one points at) · `label` · `status` CHECK `ACTIVE|RETIRED` · `sort` · `created_at`.
+UNIQUE (`product_id`, `serving_kind`). Retired, never deleted, once it has sold or been priced; a
+sold variant also keeps the serving kind it sold under.
+
+Whether a variant has sold is a query over `VARIANT_REFERENCES` (`server/utils/bar.ts`), the same
+rule `BAR_PRODUCT_REFERENCES` follows: an unclassified table with a foreign key to
+`product_variants` fails `tests/integration/bar-variants.test.ts`. That test cannot see
+`ledger_lines.product_variant_id`, which carries no foreign key by design (it is append-only, so
+one could never be added later); F-105 must add its `sale: true` entry there by hand.
 
 ### variant_components
 `id` PK · `variant_id` → product_variants cascade · `item_id` NULL → bar_items restrict ·
-`choice_group_id` NULL (exactly one of the two) · `qty` in the item's real units ·
-`included_in_price` bool (the free mixer, 0017).
+`choice_group_id` NULL (CHECK: exactly one of the two) · `qty` in the item's own counting unit,
+CHECK positive · `included_in_price` bool (the free mixer, 0017). UNIQUE (`variant_id`, `item_id`)
+and UNIQUE (`variant_id`, `choice_group_id`). One level deep by construction: no column here can
+name another product (F-113 criterion 1).
 
 ### choice_groups / choice_group_items
-`id` PK · `name` (e.g. Mixers); members reference bar_items.
+`id` PK · `name` unique, case-insensitively (Mixers). An option is `choice_group_id` cascade ·
+`item_id` → bar_items restrict · `qty` CHECK positive · `sort`, UNIQUE per group and item.
 
 ### variant_prices  APPEND-ONLY
-`id` PK · `variant_id` cascade · `price_pence` · `effective_from` civil date · `created_at` ·
-`created_by`. Latest row on or before today wins; same-day rows resolve by `created_at`
-(fixing the old one-row-per-day trap).
+`id` PK · `variant_id` cascade · `price_pence` CHECK not negative · `effective_from` civil date,
+CHECK `YYYY-MM-DD` · `created_at` · `created_by` → users restrict. Latest row on or before today
+wins; same-day rows resolve by `created_at`, then by `rowid` (insertion order; `id` is a random
+UUID and no guide to which row came later) so two written in one second still resolve the same way
+twice (fixing the old one-row-per-day trap). Triggers refuse every UPDATE and DELETE, so the
+cascade from a variant cannot fire either: a priced variant is retired, not deleted.
+`effectivePriceRow` in `shared/utils/bar.ts` (ordering on the API's `seq`, the row's `rowid`) and
+`effectivePriceColumn` in `server/utils/bar.ts` order identically, and a test holds the two
+together.
 
 ### category_prices  APPEND-ONLY
 `id` PK · `category_id` cascade · `serving_kind` · `price_pence` · `effective_from` ·

@@ -14,6 +14,9 @@ export interface PerformanceReference {
   // True when a row here means somebody holds a seat, so the performance may be cancelled but
   // never deleted, and cancelling it owes that person a refund and a message.
   sold: boolean
+  // How to count this table's held rows, where a bare row count would be wrong. `tickets` needs
+  // one: an expired hold is a row and is not a seat (D-105).
+  heldBy?: (performanceId: SQL) => SQL
   why: string
 }
 
@@ -36,33 +39,38 @@ export function soldReferences(references = PERFORMANCE_REFERENCES): Performance
   return references.filter(reference => reference.sold)
 }
 
+// How one reference counts the seats a performance holds. A table saying so itself wins, because
+// a bare row count over `tickets` would call an expired hold a sold seat (D-105).
+function heldTerm(reference: PerformanceReference, performanceId: SQL): SQL {
+  if (reference.heldBy) return reference.heldBy(performanceId)
+  return sql`(SELECT count(*) FROM ${sql.raw(reference.table)} WHERE ${sql.raw(reference.column)} = ${performanceId})`
+}
+
 // A correlated count per sold table, binding nothing: the parameter count is fixed however many
 // performances or tickets exist (0003, 0006).
 export function performanceSoldColumn(alias: string, references = soldReferences()): SQL {
   if (references.length === 0) return sql`0`
-  const terms = references.map(reference =>
-    sql`(SELECT count(*) FROM ${sql.raw(reference.table)} WHERE ${sql.raw(reference.column)} = ${sql.raw(alias)}.id)`)
-  return sql.join(terms, sql` + `)
+  return sql.join(references.map(reference => heldTerm(reference, sql`${sql.raw(alias)}.id`)), sql` + `)
 }
 
 // The same count for a whole show, scoped through its performances by subquery rather than by an
 // id list read back from a result set (0006).
 export function showSoldColumn(alias: string, references = soldReferences()): SQL {
   if (references.length === 0) return sql`0`
+  // Its own alias, never the caller's: a caller passing `sp` for the show would otherwise
+  // collide with this subquery's own performances row.
   const terms = references.map(reference => sql`(
-    SELECT count(*) FROM ${sql.raw(reference.table)} r
-    JOIN performances p ON p.id = r.${sql.raw(reference.column)}
-    WHERE p.show_id = ${sql.raw(alias)}.id
+    SELECT coalesce(sum(${heldTerm(reference, sql`sp.id`)}), 0)
+    FROM performances sp WHERE sp.show_id = ${sql.raw(alias)}.id
   )`)
   return sql.join(terms, sql` + `)
 }
 
-// One parameter, whatever the registry holds, so a caller can ask about a single performance.
+// One parameter per sold table, whatever the registry holds, so a caller can ask about a single
+// performance without an id list.
 export function performanceSoldQuery(performanceId: string, references = soldReferences()): SQL {
   if (references.length === 0) return sql`SELECT 0 AS sold`
-  const terms = references.map(reference =>
-    sql`(SELECT count(*) FROM ${sql.raw(reference.table)} WHERE ${sql.raw(reference.column)} = ${performanceId})`)
-  return sql`SELECT ${sql.join(terms, sql` + `)} AS sold`
+  return sql`SELECT ${sql.join(references.map(reference => heldTerm(reference, sql`${performanceId}`)), sql` + `)} AS sold`
 }
 
 export interface ShowFilters {

@@ -287,6 +287,7 @@ async function setOnSale(one: AdminPerformance, onSale: boolean): Promise<void> 
 
 const cancelling = ref<AdminPerformance | null>(null)
 const removing = ref<AdminPerformance | null>(null)
+const pricing = ref<AdminPerformance | null>(null)
 
 async function cancelPerformance(): Promise<void> {
   const one = cancelling.value
@@ -428,6 +429,16 @@ const columns: TableColumn<AdminPerformance>[] = [
         'data-test': `edit-performance-${row.original.id}`,
         'onClick': () => editPerformance(row.original),
       }, () => 'Edit'),
+      h(UButton, {
+        'size': 'sm',
+        'color': 'neutral',
+        'variant': 'ghost',
+        'data-test': `prices-${row.original.id}`,
+        'onClick': () => {
+          failure.value = null
+          pricing.value = row.original
+        },
+      }, () => 'Prices'),
       row.original.status === 'CANCELLED'
         ? null
         : h(UButton, {
@@ -658,6 +669,11 @@ const columns: TableColumn<AdminPerformance>[] = [
         :vocabulary="vocabulary"
         :confirmed-none="show.warningsConfirmedNone"
         @saved="refresh()"
+      />
+
+      <TicketPrices
+        level="show"
+        :endpoint="`/api/admin/shows/${show.id}/prices`"
       />
 
       <AdminToolbar
@@ -981,6 +997,22 @@ const columns: TableColumn<AdminPerformance>[] = [
         >
           Back
         </UButton>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="pricing !== null"
+      title="Prices for this performance"
+      description="What this performance charges, and what it inherits from the show and the ticket type. A change takes effect for new reservations only."
+      @update:open="value => { if (!value) pricing = null }"
+    >
+      <template #body>
+        <TicketPrices
+          v-if="pricing"
+          :key="pricing.id"
+          level="performance"
+          :endpoint="`/api/admin/performances/${pricing.id}/prices`"
+        />
       </template>
     </UModal>
 

@@ -17,6 +17,10 @@ export type ShiftStatus = (typeof SHIFT_STATUSES)[number]
 // `tests/unit/rota.test.ts` fails when the two stop agreeing (E-106 criterion 2).
 export const ASSIGNED_SHIFT_STATUSES: readonly ShiftStatus[] = ['CLAIMED', 'CONFIRMED', 'DECLINED']
 
+// A person is committed to a shift once it is claimed or confirmed; a decline keeps their name on
+// the record but takes them off it, so a cancellation or a venue move leaves it alone (E-102).
+export const COMMITTED_SHIFT_STATUSES: readonly ShiftStatus[] = ['CLAIMED', 'CONFIRMED']
+
 // A cancelled shift keeps whoever held it, and holds nobody when it was open, so it is the one
 // status that says nothing about the person column.
 export function shiftNamesAPerson(status: ShiftStatus): boolean | null {

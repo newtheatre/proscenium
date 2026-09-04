@@ -93,15 +93,44 @@ export function saysPrice(price: number): string {
   return `£${(price / 100).toFixed(2)}`
 }
 
-// Which level of the chain answered, which is what `tickets.price_source` records (D-120).
+// Which level of the chain answered. The story's vocabulary is base, show and performance, which
+// is what an operator is shown beside a price (D-120 criterion 2).
 export const PRICE_SOURCES = ['PERFORMANCE', 'SHOW', 'BASE'] as const
 
+// What `tickets.price_source` stores: the three above, plus the one a resolution can never
+// produce, because a migrated ticket's price was resolved by the old estate (D-120 criterion 3).
+export const TICKET_PRICE_SOURCES = [...PRICE_SOURCES, 'IMPORT'] as const
+
 export type PriceSource = (typeof PRICE_SOURCES)[number]
+export type TicketPriceSource = (typeof TICKET_PRICE_SOURCES)[number]
+
+export function saysPriceSource(source: string): string {
+  if (source === 'PERFORMANCE') return 'This performance'
+  if (source === 'SHOW') return 'This show'
+  if (source === 'IMPORT') return 'Imported'
+  return 'The ticket type'
+}
 
 export interface PriceOverride {
   price: number | null
   active: boolean | null
 }
+
+// What one level of the chain sets. Null at either field means inherit, so clearing an override is
+// sending null rather than deleting a row by hand (D-120 criterion 1).
+export const priceOverridesForm = z.object({
+  overrides: z.array(z.strictObject({
+    ticketTypeId: z.string().trim().min(1),
+    price: pence.nullable(),
+    active: z.boolean().nullable(),
+  })).max(100)
+    .refine(
+      given => new Set(given.map(one => one.ticketTypeId)).size === given.length,
+      'A level prices a ticket type once',
+    ),
+}).strict()
+
+export type PriceOverridesInput = z.output<typeof priceOverridesForm>
 
 export interface ResolvedPrice {
   price: number

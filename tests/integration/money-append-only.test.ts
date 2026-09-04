@@ -1,10 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { londonDayOf, netPence, totalOf } from '#shared/utils/ledger'
 import { createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
-// Named regression cases (K-121). Money is integer pence in one append-only ledger (0004), and
-// these run the real migrations, so the triggers are the ones production has.
+// I-101 criterion 2: the ledger accepts inserts only, refused at the database layer by trigger.
+// Split by invariant from money.test.ts (K-105).
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()
@@ -110,85 +109,5 @@ describe('the ledger is append-only, and the database is what says so (I-101 cri
       postEntry(database, 'e-4', 500, { lines: [{ kind: 'MEMBERSHIP', amountPence: 500 }] })
       expect(rows(database, 'SELECT kind FROM ledger_lines WHERE entry_id = ?', 'e-4')).toHaveLength(1)
     })
-  })
-})
-
-describe('a correction supersedes and nets (I-101 criterion 3)', () => {
-  test('the double refund: two reversals of one entry are two facts, and the net is right', async () => {
-    await withDatabase((database) => {
-      seedActor(database)
-      postEntry(database, 'e-take', 1000)
-      postEntry(database, 'e-back-1', -500, { reverses: 'e-take', lines: [{ kind: 'REFUND', amountPence: -500 }] })
-      postEntry(database, 'e-back-2', -500, { reverses: 'e-take', lines: [{ kind: 'REFUND', amountPence: -500 }] })
-
-      const chain = rows<{ id: string, totalPence: number, reversesEntryId: string | null }>(database, `
-        SELECT id, total_pence AS totalPence, reverses_entry_id AS reversesEntryId
-        FROM ledger_entries WHERE id = ? OR reverses_entry_id = ?`, 'e-take', 'e-take')
-
-      expect(chain).toHaveLength(3)
-      expect(netPence(chain)).toBe(0)
-    })
-  })
-
-  test('a partial refund leaves what was kept, and both rows remain', async () => {
-    await withDatabase((database) => {
-      seedActor(database)
-      postEntry(database, 'e-part', 1000)
-      postEntry(database, 'e-part-back', -250, { reverses: 'e-part', lines: [{ kind: 'REFUND', amountPence: -250 }] })
-
-      const chain = rows<{ id: string, totalPence: number, reversesEntryId: string | null }>(database, `
-        SELECT id, total_pence AS totalPence, reverses_entry_id AS reversesEntryId
-        FROM ledger_entries WHERE id = ? OR reverses_entry_id = ?`, 'e-part', 'e-part')
-
-      expect(netPence(chain)).toBe(750)
-      expect(chain).toHaveLength(2)
-    })
-  })
-})
-
-describe('a total is a query, never a stored figure (I-101 criterion 4)', () => {
-  test('a day comes to the sum of its entries, read from the rows', async () => {
-    await withDatabase((database) => {
-      seedActor(database)
-      postEntry(database, 'e-d1', 750, { day: '2026-09-15' })
-      postEntry(database, 'e-d2', 1200, { day: '2026-09-15' })
-      postEntry(database, 'e-d3', 400, { day: '2026-09-16' })
-
-      const [day] = rows<{ total: number }>(database,
-        'SELECT sum(total_pence) AS total FROM ledger_entries WHERE london_day = ?', '2026-09-15')
-      expect(day?.total).toBe(1950)
-    })
-  })
-
-  test('an entry carries no total its lines do not justify', async () => {
-    expect(totalOf([
-      { kind: 'BAR_ITEM', amountPence: 350 },
-      { kind: 'BAR_ITEM', amountPence: 350 },
-    ])).toBe(700)
-  })
-})
-
-// Criterion 5, and the reason londonDayOf exists rather than a UTC date being good enough.
-describe('a day is the London day, on both sides of a transition', () => {
-  test('a show that ends after midnight UTC in summer still belongs to its own evening', async () => {
-    await withDatabase((database) => {
-      seedActor(database)
-      // 22:30 UTC on 15 June is 23:30 in London: the same evening.
-      const evening = new Date('2026-06-15T22:30:00Z')
-      postEntry(database, 'e-bst', 750, { day: londonDayOf(evening) })
-
-      const [row] = rows<{ day: string }>(database, 'SELECT london_day AS day FROM ledger_entries WHERE id = ?', 'e-bst')
-      expect(row?.day).toBe('2026-06-15')
-    })
-  })
-
-  test('and half an hour later it belongs to the next one', () => {
-    expect(londonDayOf(new Date('2026-06-15T23:30:00Z'))).toBe('2026-06-16')
-  })
-
-  test('the autumn transition does not repeat a day', () => {
-    // 2026-10-25 00:30 and 01:30 UTC are 01:30 BST and 01:30 GMT: the same London day, once.
-    expect(londonDayOf(new Date('2026-10-25T00:30:00Z'))).toBe('2026-10-25')
-    expect(londonDayOf(new Date('2026-10-25T01:30:00Z'))).toBe('2026-10-25')
   })
 })

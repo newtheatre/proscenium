@@ -37,6 +37,41 @@ export interface AcceptsStatements {
   batch: (statements: BoundStatement[]) => void
 }
 
+export interface AcceptsSchema extends AcceptsStatements {
+  raw: { exec: (sql: string) => void }
+}
+
+// `reservations` and `tickets` as `docs/data-model.md` specifies them. D-104 migrates them for
+// real and deletes this; until then it is what D-105's capacity rule is proved against.
+export function ticketFixtures(into: AcceptsSchema): void {
+  into.raw.exec(`
+    CREATE TABLE reservations (
+      id text PRIMARY KEY,
+      reference text NOT NULL UNIQUE,
+      performance_id text NOT NULL REFERENCES performances(id),
+      user_id text REFERENCES users(id),
+      status text NOT NULL CHECK (status IN ('PENDING', 'COLLECTED', 'DOOR', 'EXPIRED', 'CANCELLED', 'NO_SHOW')),
+      source text NOT NULL CHECK (source IN ('WEB', 'DESK', 'DOOR')),
+      hold_expires_at integer,
+      created_at integer NOT NULL DEFAULT (unixepoch())
+    );
+    CREATE TABLE tickets (
+      id text PRIMARY KEY,
+      reservation_id text NOT NULL REFERENCES reservations(id),
+      performance_id text NOT NULL REFERENCES performances(id),
+      ticket_type_id text NOT NULL REFERENCES ticket_types(id),
+      price_paid integer NOT NULL,
+      price_source text NOT NULL CHECK (price_source IN ('PERFORMANCE', 'SHOW', 'BASE', 'IMPORT')),
+      refunded_at integer
+    );
+    CREATE INDEX tickets_performance_refunded ON tickets (performance_id, refunded_at);
+  `)
+  into.batch([[
+    'INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)',
+    'tt-standard', 'Standard', 900, 'SINGLE',
+  ]])
+}
+
 export interface TestVenueOptions {
   suffix?: string
   name?: string

@@ -118,13 +118,31 @@ describe('a product carries what the till has to show (criterion 1)', () => {
 })
 
 describe('a product cannot go active until it has what a sale needs (criterion 2)', () => {
-  test('nothing is required yet, because the tables that supply it are not built', async () => {
+  test('a product with no serving size cannot go on the till, and the refusal names it', async () => {
     await withDatabase((database) => {
       category(database)
       const id = product(database)
-      expect(productActivationReferences()).toEqual([])
+      expect(productActivationReferences().map(reference => reference.table)).toEqual(['product_variants'])
+      expect(missing(database, id)).toEqual(['a serving size'])
+
+      insert(database, 'product_variants', { id: 'var-1', product_id: id, serving_kind: 'bottle', label: 'Bottle' })
       expect(missing(database, id)).toEqual([])
     })
+  })
+
+  // A retired size is not one the till can draw, so it does not keep a product active on its own.
+  test('a size that has been retired does not count towards the requirement', async () => {
+    await withDatabase((database) => {
+      category(database)
+      const id = product(database)
+      insert(database, 'product_variants', { id: 'var-1', product_id: id, serving_kind: 'bottle', label: 'Bottle', status: 'RETIRED' })
+      expect(missing(database, id)).toEqual(['a serving size'])
+    })
+  })
+
+  // The recipe requirement is F-113's to add; until it does, a size is the whole of it.
+  test('nothing else is required yet, because the table that supplies it is not built', async () => {
+    expect(productActivationReferences().map(reference => reference.requiredToActivate)).toEqual(['a serving size'])
   })
 
   test('a requirement with no row refuses activation and names what is missing', async () => {
