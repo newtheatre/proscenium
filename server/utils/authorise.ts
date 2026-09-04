@@ -60,6 +60,19 @@ export async function requirePermission(event: H3Event, permission: Permission):
   return resolved
 }
 
+// For a route two narrow roles reach by different doors, neither of which should have to hold
+// the other's whole grant (D-123 criterion 4).
+export async function requireAnyPermission(event: H3Event, permissions: Permission[]): Promise<Authority> {
+  const resolved = await authority(event)
+
+  if (!permissions.some(permission => resolved.permissions.has(permission))) {
+    throw createError({ statusCode: 403, statusMessage: 'You do not have permission to do that' })
+  }
+
+  await requireSecondFactorIfPrivileged(event, resolved)
+  return resolved
+}
+
 export function owns(resolved: Authority, userId: string): boolean {
   return resolved.account.id === userId
 }

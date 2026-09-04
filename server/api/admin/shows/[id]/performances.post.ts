@@ -29,6 +29,7 @@ export default defineEventHandler(async (event) => {
       intervalMinutes: input.intervalMinutes ?? null,
       capacityOverride: input.capacityOverride ?? null,
       bookingClosesHoursBefore: input.bookingClosesHoursBefore ?? null,
+      externalBookingUrl: input.externalBookingUrl ?? null,
       notes: input.notes ?? null,
       status: 'DRAFT',
     }),

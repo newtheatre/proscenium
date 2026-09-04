@@ -181,6 +181,38 @@ describe('the booking window inherits performance, then show, then curtain-up (D
   })
 })
 
+describe('an external booking URL is a URL or nothing (D-122)', () => {
+  const base = { venueId: 'v1', startsAt: seconds(CURTAIN) }
+
+  test('a real URL is accepted', () => {
+    expect(performanceForm.safeParse({ ...base, externalBookingUrl: 'https://tickets.example.org/seagull' }).success)
+      .toBe(true)
+  })
+
+  test('leaving it out, sending null, or a blank field, all mean no external link', () => {
+    expect(performanceForm.safeParse(base).success).toBe(true)
+    expect(performanceForm.safeParse({ ...base, externalBookingUrl: null }).success).toBe(true)
+    // The screen's untouched state is an empty string, and the same schema validates it
+    // directly (the modal binds `performanceScreenForm` to that state, not to the request body).
+    expect(performanceScreenForm.safeParse({
+      venueId: 'v1', day: '2026-10-17', clock: '19:30', doorsClock: '', externalBookingUrl: '',
+    }).success).toBe(true)
+  })
+
+  test('text that is not a URL is refused', () => {
+    expect(performanceForm.safeParse({ ...base, externalBookingUrl: 'the box office' }).success).toBe(false)
+  })
+
+  // Rendered as a public href, so a scheme that would run script or embed data is refused rather
+  // than merely a string that is not shaped like a web address.
+  test('only http and https are a link, whatever else parses as a URL', () => {
+    expect(performanceForm.safeParse({ ...base, externalBookingUrl: 'javascript:alert(1)' }).success).toBe(false)
+    expect(performanceForm.safeParse({ ...base, externalBookingUrl: 'data:text/html,hi' }).success).toBe(false)
+    expect(performanceForm.safeParse({ ...base, externalBookingUrl: 'ftp://tickets.example.org' }).success).toBe(false)
+    expect(performanceForm.safeParse({ ...base, externalBookingUrl: 'http://tickets.example.org' }).success).toBe(true)
+  })
+})
+
 describe('a closed window refuses quoting the time it closed (D-112 criterion 2)', () => {
   const performance = (over: Partial<PerformanceSaleState> = {}): PerformanceSaleState => ({
     status: 'ON_SALE',

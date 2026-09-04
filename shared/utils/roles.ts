@@ -46,6 +46,9 @@ export const PERMISSIONS = [
   // over them. Selling a ticket is operational and derives from tonight (0009).
   'ticketing.read',
   'ticketing.write',
+  // Narrowing what a pass product already covers once it has live passes against it: general
+  // box office is not enough, echoing D-117's comp approval (D-123 criterion 4).
+  'ticketing.manage',
   // The bar's catalogue and its stock register: sit-down work the bar manager and an
   // administrator do. Selling over the bar is operational and derives from tonight (0009, F-111).
   'bar.read',
@@ -71,7 +74,7 @@ export const OPERATIONAL_PERMISSIONS: readonly Permission[] = ['night.door', 'ni
 // now would grant authority over features nobody has reviewed.
 export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   ADMIN: PERMISSIONS,
-  MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'fellowships.write', 'members.read', 'members.write', 'rooms.read', 'rooms.write', 'training.read', 'training.write'],
+  MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'fellowships.write', 'members.read', 'members.write', 'rooms.read', 'rooms.write', 'ticketing.manage', 'training.read', 'training.write'],
   // J-103's story is the Theatre Manager's: they are who searches the trail and records what
   // happened outside the system.
   THEATRE_MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'members.read', 'rooms.read', 'rooms.write', 'training.read'],
