@@ -56,16 +56,20 @@ export default defineEventHandler(async (event) => {
       actorId: resolved.account.id,
       action: 'pass-type.updated',
       target: `pass-type:${id}`,
-      detail: changes({
-        slug: [held.slug, input.slug],
-        name: [held.name, input.name],
-        status: [held.status, input.status],
-        validFrom: [held.validFrom, input.validFrom],
-        validUntil: [held.validUntil, input.validUntil],
-        salesOpenAt: [held.salesOpenAt, salesOpenAt],
-        salesCloseAt: [held.salesCloseAt, salesCloseAt],
-        maxIssued: [held.maxIssued, maxIssued],
-      }),
+      detail: {
+        ...changes({
+          slug: [held.slug, input.slug],
+          name: [held.name, input.name],
+          status: [held.status, input.status],
+          validFrom: [held.validFrom, input.validFrom],
+          validUntil: [held.validUntil, input.validUntil],
+          salesOpenAt: [held.salesOpenAt, salesOpenAt],
+          salesCloseAt: [held.salesCloseAt, salesCloseAt],
+          maxIssued: [held.maxIssued, maxIssued],
+        }),
+        // Prose stays on the record; the trail records only that it moved (0011).
+        descriptionChanged: description !== held.description,
+      },
     })),
   ])
 

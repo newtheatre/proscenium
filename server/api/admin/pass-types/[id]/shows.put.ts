@@ -2,10 +2,10 @@ import { and, eq } from 'drizzle-orm'
 import { passTypeShowsForm } from '#shared/utils/pass-types'
 
 // Replace the full set of shows a pass covers. Extending is ordinary box office work; dropping a
-// show that still has a live pass against it needs the manager permission (D-123 criterion 4).
+// live-covered show needs the manager permission, which carries no `ticketing.write` of its own.
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
-  const resolved = await requirePermission(event, 'ticketing.write')
+  const resolved = await requireAnyPermission(event, ['ticketing.write', 'ticketing.manage'])
 
   const held = await passTypeById(id)
   if (!held) throw createError({ statusCode: 404, statusMessage: 'No such pass' })

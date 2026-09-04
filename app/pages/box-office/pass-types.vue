@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { formatLondon, fromLondonWallClock, londonParts } from '#shared/utils/london'
+import { endOfLondonDay, formatLondon, londonParts, startOfLondonDay } from '#shared/utils/london'
 import {
   PASS_TYPE_STATUSES,
   newPassTypeScreenForm,
@@ -70,10 +70,12 @@ function isoDate(at: number | null): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
-function dateSeconds(iso: string): number | null {
-  if (!iso) return null
-  const [year, month, day] = iso.split('-').map(Number)
-  return Math.floor(fromLondonWallClock(year!, month!, day!).getTime() / 1000)
+function startOfDay(iso: string): number | null {
+  return iso ? Math.floor(startOfLondonDay(iso).getTime() / 1000) : null
+}
+
+function endOfDay(iso: string): number | null {
+  return iso ? Math.floor(endOfLondonDay(iso).getTime() / 1000) : null
 }
 
 interface PriceRow { label: string, pounds: number }
@@ -144,10 +146,10 @@ async function save(): Promise<void> {
     name: state.name.trim(),
     slug: state.slug.trim(),
     description: state.description.trim() || null,
-    validFrom: dateSeconds(state.validFrom),
-    validUntil: dateSeconds(state.validUntil),
-    salesOpenAt: dateSeconds(state.salesOpenAt),
-    salesCloseAt: dateSeconds(state.salesCloseAt),
+    validFrom: startOfDay(state.validFrom),
+    validUntil: endOfDay(state.validUntil),
+    salesOpenAt: startOfDay(state.salesOpenAt),
+    salesCloseAt: endOfDay(state.salesCloseAt),
     maxIssued: state.maxIssued,
     prices,
   }

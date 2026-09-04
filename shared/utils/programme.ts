@@ -38,10 +38,11 @@ const hoursBefore = z.number().int().nonnegative().max(MAX_BOOKING_CLOSES_HOURS)
 
 const optionalText = (max: number) => z.string().trim().max(max).nullish()
 
-// A blank field means no link, same as the screen's other optional fields; a filled one has to
-// look like a URL (D-122).
+// A blank field means no link, same as the screen's other optional fields; a filled one has to be
+// http or https, never `javascript:` or `data:`, because it is rendered as a public href (D-122).
+const EXTERNAL_URL_SCHEME = /^https?$/
 const optionalUrl = (max: number) => z.string().trim().max(max)
-  .refine(value => value === '' || z.url().safeParse(value).success, 'That does not look like a web address')
+  .refine(value => value === '' || z.url({ protocol: EXTERNAL_URL_SCHEME }).safeParse(value).success, 'That does not look like a web address')
   .nullish()
 
 export const showForm = z.object({

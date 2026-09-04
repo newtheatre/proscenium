@@ -202,6 +202,15 @@ describe('an external booking URL is a URL or nothing (D-122)', () => {
   test('text that is not a URL is refused', () => {
     expect(performanceForm.safeParse({ ...base, externalBookingUrl: 'the box office' }).success).toBe(false)
   })
+
+  // Rendered as a public href, so a scheme that would run script or embed data is refused rather
+  // than merely a string that is not shaped like a web address.
+  test('only http and https are a link, whatever else parses as a URL', () => {
+    expect(performanceForm.safeParse({ ...base, externalBookingUrl: 'javascript:alert(1)' }).success).toBe(false)
+    expect(performanceForm.safeParse({ ...base, externalBookingUrl: 'data:text/html,hi' }).success).toBe(false)
+    expect(performanceForm.safeParse({ ...base, externalBookingUrl: 'ftp://tickets.example.org' }).success).toBe(false)
+    expect(performanceForm.safeParse({ ...base, externalBookingUrl: 'http://tickets.example.org' }).success).toBe(true)
+  })
 })
 
 describe('a closed window refuses quoting the time it closed (D-112 criterion 2)', () => {

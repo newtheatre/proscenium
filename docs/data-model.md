@@ -452,8 +452,7 @@ sales windows, `max_issued`), price points (UNIQUE (type, label)), covered shows
 pair). Desk-sold only (0005).
 
 **Administration (D-123).** `/box-office/pass-types` over six routes, `ticketing.read` for the
-two that read and `ticketing.write` for the rest; removing a covered show additionally needs
-`ticketing.manage` once a live pass covers it:
+two that read and `ticketing.write` for the rest:
 
 | Route | What it does |
 | --- | --- |
@@ -461,7 +460,7 @@ two that read and `ticketing.write` for the rest; removing a covered show additi
 | `POST /api/admin/pass-types` | Adds one, always DRAFT, with its price points and covered shows in one batch. |
 | `GET /api/admin/pass-types/[id]` | One pass product and every show it may be extended to cover. |
 | `PUT /api/admin/pass-types/[id]` | Changes name, address, description, windows, price points (whole-set replace) and status. It does not take covered shows. |
-| `PUT /api/admin/pass-types/[id]/shows` | Replaces the covered set. Extending is `ticketing.write`; dropping a show with a live pass against it also needs `ticketing.manage`. |
+| `PUT /api/admin/pass-types/[id]/shows` | Replaces the covered set. Reachable by `ticketing.write` or `ticketing.manage`, since MANAGER carries the second and not the first (0009); dropping a show with a live pass against it needs `ticketing.manage` specifically, whichever door was used to reach the route. |
 | `DELETE /api/admin/pass-types/[id]` | Deletes one nothing has ever been issued under. An issued one is a 409 naming closing as the way. |
 
 **"Ever issued" and "live coverage" are queries over rows, never columns.** `PASS_TYPE_REFERENCES`

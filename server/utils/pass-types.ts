@@ -56,6 +56,7 @@ export interface PassCoverageReference {
   why: string
 }
 
+// Genuinely empty, not a stand-in: D-124 has not landed a row here yet.
 export const PASS_COVERAGE_REFERENCES: PassCoverageReference[] = []
 
 // How many live passes of this type cover this one show, bound by two parameters whatever the

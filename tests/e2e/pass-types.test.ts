@@ -15,6 +15,7 @@ const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 let officer: TestMember
 let boxOffice: TestMember
+let manager: TestMember
 let member: TestMember
 const boxOfficePassword = generatePassword()
 
@@ -26,6 +27,10 @@ beforeAll(async () => {
 
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
   await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, officer.cookie)
+
+  // MANAGER carries `ticketing.manage` and neither `ticketing.read` nor `ticketing.write` (0009).
+  manager = await registerMember(app, 'manager', generatePassword())
+  await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'MANAGER' }, officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -136,6 +141,24 @@ describe.skipIf(skip !== null)('a pass has a window, price points and covered sh
     expect(found?.prices).toMatchObject([{ label: 'Standard', price: 4500 }])
   })
 
+  // The list carries what its own table needs; a single pass and every show it may be extended
+  // to cover is a question of its own, for whatever screen asks it next.
+  test('one pass reads back with the shows it may be extended to cover', async () => {
+    const { id, showId } = await newPassType()
+    const uncovered = await newShow()
+
+    const answered = await send('GET', `/api/admin/pass-types/${id}`)
+    expect(answered.status).toBe(200)
+    const body = await answered.json() as { passType: { id: string, showIds: string[] }, shows: { id: string }[] }
+    expect(body.passType.id).toBe(id)
+    expect(body.passType.showIds).toEqual([showId])
+    expect(body.shows.map(one => one.id)).toEqual(expect.arrayContaining([showId, uncovered]))
+  })
+
+  test('an unknown pass is a 404', async () => {
+    expect((await send('GET', '/api/admin/pass-types/no-such-pass')).status).toBe(404)
+  })
+
   test('the address is held once, and the refusal names the holder', async () => {
     const showId = await newShow()
     const name = named('Concession pass')
@@ -240,6 +263,22 @@ describe.skipIf(skip !== null)('covered shows extend freely; a removal is what a
     const { id } = await newPassType()
     expect((await send('PUT', `/api/admin/pass-types/${id}/shows`, { showIds: [] })).status).toBe(400)
   })
+
+  // MANAGER holds `ticketing.manage` and no `ticketing.write` (0009); PRIVILEGED_ROLES is
+  // narrowed for the request since this account carries no authenticator and A-112 is not what this proves.
+  test('a manager reaches the route on `ticketing.manage` alone', async () => {
+    const { id, showId } = await newPassType()
+    const second = await newShow()
+
+    await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: ['ADMIN'] })
+    try {
+      const answered = await send('PUT', `/api/admin/pass-types/${id}/shows`, { showIds: [showId, second] }, manager.cookie)
+      expect(answered.status).toBe(200)
+    }
+    finally {
+      await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER'] })
+    }
+  })
 })
 
 describe.skipIf(skip !== null)('creation and changes are audited (criterion 5)', () => {
@@ -268,6 +307,17 @@ describe.skipIf(skip !== null)('creation and changes are audited (criterion 5)',
     expect(entry?.detail.changes.maxIssued).toEqual({ from: null, to: 80 })
   })
 
+  // The prose itself never reaches the trail (0011), but a description-only edit still has to
+  // read as a change rather than as nothing having happened.
+  test('a description-only edit still records that something moved', async () => {
+    const { id, showId } = await newPassType()
+    const body = editBody('Described', showId, { description: 'Covers every mainstage show this season' })
+    expect((await send('PUT', `/api/admin/pass-types/${id}`, body)).status).toBe(200)
+
+    const entry = trail<{ detail: { descriptionChanged: boolean } }>('pass-type.updated', `pass-type:${id}`)
+    expect(entry?.detail.descriptionChanged).toBe(true)
+  })
+
   test('a covered-shows change records what was added and what was removed', async () => {
     const { id, showId } = await newPassType()
     const second = await newShow()
@@ -290,6 +340,12 @@ describe.skipIf(skip !== null)('who may administer the passes', () => {
   test('an ordinary member reads nothing and writes nothing', async () => {
     expect((await send('GET', '/api/admin/pass-types', undefined, member.cookie)).status).toBe(403)
     expect((await addPassType(named('Sneaked'), 'no-such-show', {}, member.cookie)).status).toBe(403)
+  })
+
+  // The narrow grant stays narrow: it opens the one route it names, not the whole console (0009).
+  test('a manager alone still cannot read the listing or create one', async () => {
+    expect((await send('GET', '/api/admin/pass-types', undefined, manager.cookie)).status).toBe(403)
+    expect((await addPassType(named('Overreach'), 'no-such-show', {}, manager.cookie)).status).toBe(403)
   })
 
   test('a signed-out caller is refused', async () => {
