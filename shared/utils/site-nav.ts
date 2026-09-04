@@ -12,6 +12,7 @@ import {
   viewMembers,
   viewProgramme,
   viewRooms,
+  viewRota,
   viewSettings,
   viewTicketTypes,
   viewTrainingCatalogue,
@@ -51,8 +52,17 @@ export const CONSOLE_HOME: NavEntry = {
 // A fixed order, the same for everybody, so the sidebar is stable enough to learn. A group with
 // nothing visible in it does not render; the empty ones are where the modules land (docs 0040).
 export const CONSOLE_NAV: NavGroup[] = [
-  // Module E: show night
-  { key: 'tonight', label: 'Tonight', icon: 'i-lucide-moon-star', prefix: '/tonight', items: [] },
+  // Module E: show night. `/tonight` is the phone-first shell rather than a console prefix, so
+  // the console screens sit under `/rota/manage` as Spaces and Training do (0040, 0046).
+  {
+    key: 'tonight',
+    label: 'Tonight',
+    icon: 'i-lucide-moon-star',
+    prefix: '/rota/manage',
+    items: [
+      { label: 'Shift templates', icon: 'i-lucide-clipboard-list', to: '/rota/manage/templates', ability: viewRota },
+    ],
+  },
 
   // Module D: ticketing
   {

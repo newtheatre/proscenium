@@ -170,6 +170,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['night.officer-bypass'],
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
+  { route: 'server/api/admin/rota/templates/index.get.ts', exempt: 'reads every venue\'s template, including the venues that have none' },
+  {
+    route: 'server/api/admin/rota/templates/[venueId]/index.put.ts',
+    actions: ['shift-template.created', 'shift-template.updated'],
+  },
+  { route: 'server/api/admin/rota/templates/[venueId]/index.delete.ts', actions: ['shift-template.removed'] },
+  { route: 'server/api/admin/rota/templates/[venueId]/stamp.post.ts', actions: ['shift.stamped'] },
 
   // Module F: bar
 

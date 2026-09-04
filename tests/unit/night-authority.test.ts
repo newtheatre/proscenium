@@ -46,8 +46,8 @@ describe('the night roles are the three the rota staffs (E-111 criterion 1)', ()
     }
   })
 
-  // F-101 criterion 2, and E-111 criterion 1's last sentence: the roles are not interchangeable.
-  // The bar manager also administers the bar sitting down (F-111), which opens no night screen.
+  // F-101 criterion 2: the roles are not interchangeable, and the desk work each also does
+  // (the bar's catalogue, the rota) is not a bypass, so it is not counted here.
   test('the front of house officer does not open the till, and the bar manager does not open the door', () => {
     const bypass = (role: 'FOH_MANAGER' | 'BAR_MANAGER'): string[] =>
       PERMISSION_MAP[role].filter(permission => OPERATIONAL_PERMISSIONS.includes(permission))

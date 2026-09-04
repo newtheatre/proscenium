@@ -142,6 +142,13 @@ const CATALOGUE = {
   // a standing grant (0044, E-111 criterion 4).
   'night.officer-bypass': { label: 'Show-night screen opened by an officer without a shift', module: 'show-night' },
 
+  'shift-template.created': { label: 'Shift template set up', module: 'show-night' },
+  'shift-template.updated': { label: 'Shift template changed', module: 'show-night' },
+  'shift-template.removed': { label: 'Shift template removed', module: 'show-night' },
+  // One entry for the whole backfill: it is one action over a venue, and the rows it added carry
+  // their own `created_at` (E-102 criterion 2).
+  'shift.stamped': { label: 'Shifts stamped onto performances', module: 'show-night' },
+
   // Module F: bar
 
   'bar.category.created': { label: 'Bar category added', module: 'bar' },

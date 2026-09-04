@@ -68,6 +68,16 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
     ['INSERT INTO bar_items (id, name, unit) VALUES (?, ?, ?)', `bi-${id}`, 'House red', 'ML'],
     [`INSERT INTO stock_movements (id, item_id, qty, kind, reason, actor_id, created_at)
       VALUES (?, ?, -750, 'WASTAGE', 'BREAKAGE', ?, ?)`, `sm-${id}`, `bi-${id}`, id, now],
+    // A shift somebody worked, and the template the venue stamps. Who staffed a performance is
+    // the staffing record; the note written on the slot is not (E-102, E-106).
+    ['INSERT INTO shows (id, slug, title) VALUES (?, ?, ?)', `show-${id}`, `a-show-${id}`, 'A Show'],
+    ['INSERT INTO performances (id, show_id, venue_id, starts_at) VALUES (?, ?, ?, ?)',
+      `perf-${id}`, `show-${id}`, `venue-${id}`, now + 3600],
+    ['INSERT INTO shift_templates (id, venue_id, role, "count", updated_by) VALUES (?, ?, ?, 1, ?)',
+      `st-${id}`, `venue-${id}`, 'DUTY_MANAGER', id],
+    [`INSERT INTO shifts (id, performance_id, role, slot, user_id, status, notes, assigned_by)
+      VALUES (?, ?, ?, 1, ?, 'CONFIRMED', ?, ?)`,
+    `sh-${id}`, `perf-${id}`, 'DUTY_MANAGER', id, `${NAME} has the keys`, id],
     ['INSERT INTO departments (code, name) VALUES (?, ?)', `dept-${id}`, 'Technical'],
     ['INSERT INTO department_leads (id, department, user_id) VALUES (?, ?, ?)', `dl-${id}`, `dept-${id}`, id],
     ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)',
@@ -185,6 +195,18 @@ describe('erasure (K-109, 0011)', () => {
         'SELECT assembly_point, updated_by FROM venue_emergency_info WHERE updated_by = ?', id)
       expect(card).toHaveLength(1)
       expect(card[0]).toMatchObject({ assembly_point: 'The car park behind the building', updated_by: id })
+
+      // Who staffed a performance survives, because the night report and the staffing record
+      // read it. What was written on the slot about them does not (E-102).
+      const worked = rows<{ role: string, status: string, notes: string | null }>(database,
+        'SELECT role, status, notes FROM shifts WHERE user_id = ?', id)
+      expect(worked).toHaveLength(1)
+      expect(worked[0]).toMatchObject({ role: 'DUTY_MANAGER', status: 'CONFIRMED', notes: null })
+
+      // How a venue is staffed describes the house, so the template is left exactly as it was.
+      const staffing = rows<{ role: string, updated_by: string | null }>(database,
+        'SELECT role, updated_by FROM shift_templates WHERE updated_by = ?', id)
+      expect(staffing).toHaveLength(1)
 
       // The row itself is still there for everything referring to it.
       expect(rows(database, 'SELECT id FROM users WHERE id = ?', id)).toHaveLength(1)

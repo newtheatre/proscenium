@@ -507,17 +507,31 @@ reconciliation record (I-104); a variance is a fact to explain, not an error to 
 ## Show night (module E)
 
 ### shift_templates
-`id` PK · `venue_id` NULL = fallback · `role` CHECK `DUTY_MANAGER|DOOR|BAR` · `count`.
-UNIQUE (`venue_id`, `role`).
+`id` PK · `venue_id` → venues cascade, **NOT NULL, no fallback row** · `role` CHECK
+`DUTY_MANAGER|DOOR|BAR` · `count` · `updated_by` NULL → users set null · `updated_at`.
+UNIQUE (`venue_id`, `role`). CHECK: a `DUTY_MANAGER` row has `count` 1.
+There is no venue-wide fallback template. A venue with no rows has no template and its
+performances stamp nothing, which is what E-101 criterion 4 asks to be visible rather than
+silent; a nullable `venue_id` would have made that state unreachable. That the duty manager
+slot is present at all correlates rows, so it is refused at the write path (E-101 criterion 1).
 
 ### shifts
-`id` PK · `performance_id` → performances cascade · `role` CHECK as above · `user_id` NULL →
-users restrict · `status` CHECK `OPEN|CLAIMED|CONFIRMED|DECLINED` · `needs_review` bool
-(training gate could not be evaluated) · `assigned_by` · `claimed_at` · `confirmed_at` ·
-`notes` (describes the slot, safe).
-CHECK: OPEN implies `user_id` NULL, non-OPEN implies NOT NULL. Partial UNIQUE
-(`performance_id`) WHERE role='DUTY_MANAGER' AND status='CONFIRMED'. Claims are conditional
-writes gated live on training records (E-1).
+`id` PK · `performance_id` → performances cascade · `role` CHECK as above · `slot` (the
+ordinal within its role on this performance, from 1) · `user_id` NULL → users restrict ·
+`status` CHECK `OPEN|CLAIMED|CONFIRMED|DECLINED|CANCELLED` · `needs_review` bool (training
+gate could not be evaluated) · `assigned_by` NULL → users set null · `claimed_at` ·
+`confirmed_at` · `notes` (describes the slot, safe).
+CHECK `shifts_open_names_nobody`: OPEN implies `user_id` NULL, `CLAIMED|CONFIRMED|DECLINED`
+implies NOT NULL, and CANCELLED says neither, because it keeps whoever held it and held
+nobody when it was open. Partial UNIQUE (`performance_id`) WHERE role='DUTY_MANAGER' AND
+status='CONFIRMED', which is per performance: two performances running at once need two
+confirmed duty managers. UNIQUE (`performance_id`, `role`, `slot`) is what makes stamping
+idempotent (E-102 criterion 2). Claims are conditional writes gated live on training records
+(E-1).
+Cancelling a performance cancels its shifts in the same batch. A refused write reads back as
+a 409 through `shiftConstraintRefusal()`, never as a raw database error (E-106 criterion 3);
+SQLite names the columns for a unique index and the constraint name for a CHECK, so the
+mapping carries both spellings.
 
 ### incidents  APPEND-ONLY
 `id` PK · `performance_id` restrict · `reported_by` restrict · `body` (operational free

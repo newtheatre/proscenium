@@ -248,6 +248,28 @@ export const PERSONAL_TABLES: PersonalTable[] = [
 
   // Module E: show night
 
+  {
+    name: 'shift_templates',
+    column: 'updated_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // How a venue is staffed is a fact about the house. The officer who last typed it is a
+    // reference the tombstone still answers, as `venue_emergency_info.updated_by` is.
+    why: 'How many of each role a venue needs. It describes the house, not the person who set it up.',
+  },
+  {
+    name: 'shifts',
+    column: 'user_id',
+    section: 'shifts',
+    columns: ['performance_id', 'role', 'slot', 'status', 'claimed_at', 'confirmed_at'],
+    erasure: 'scrub',
+    scrub: ['notes'],
+    // Who staffed which performance is the staffing record the night report and E-123 read; a
+    // note written on the slot is not.
+    why: 'Which performances somebody worked. The staffing record survives; a note on the slot does not.',
+  },
+
   // Module F: bar
 
   {

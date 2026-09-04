@@ -27,6 +27,11 @@ export default defineEventHandler(async (event) => {
 
   const window = input.bookingClosesHoursBefore ?? null
 
+  // Moving a house means moving the rota: the open shifts were stamped from the old venue's
+  // template, and the new venue's is what this performance is staffed from now (E-102).
+  const moved = input.venueId !== held.venueId
+  const restamp = moved ? [db.run(clearOpenShiftsStatement(id)), db.run(stampPerformanceStatement(id))] : []
+
   await db.batch([
     db.update(schema.performances).set({
       venueId: input.venueId,
@@ -40,6 +45,7 @@ export default defineEventHandler(async (event) => {
       notes: input.notes ?? null,
       updatedAt: Math.floor(Date.now() / 1000),
     }).where(eq(schema.performances.id, id)),
+    ...restamp,
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'performance.updated',

@@ -53,6 +53,11 @@ export const viewProgramme = defineAbility((viewer: Viewer) => holds(viewer, 'ti
 export const viewBarCatalogue = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read'))
 export const viewBarStock = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read'))
 
+// Planning the rota is sit-down work done days ahead, so it is a standing permission and the
+// officer bypass is not what opens it (0009, 0046, E-101 criterion 2).
+export const viewRota = defineAbility((viewer: Viewer) => holds(viewer, 'rota.read'))
+export const manageRota = defineAbility((viewer: Viewer) => holds(viewer, 'rota.write'))
+
 // Tonight is derived from a confirmed shift and expires at 04:00 with nothing to revoke (0014,
 // E-111), so it is read from the request rather than from anything the viewer holds.
 export const workTonight = defineAbility((viewer: Viewer) => viewer.onShiftTonight)
@@ -86,6 +91,8 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewProgramme: 'ticketing.read',
   viewBarCatalogue: 'bar.read',
   viewBarStock: 'bar.read',
+  viewRota: 'rota.read',
+  manageRota: 'rota.write',
   workTheDoor: 'night.door',
   workTheTill: 'night.till',
   manageTonight: 'night.manage',

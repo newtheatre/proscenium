@@ -239,7 +239,7 @@ const CONTENT_WARNINGS = [
 
 // A venue, a show and two performances, so every show-night and box-office screen has a night to
 // open. The venue points at the auditorium, which is the only effect that attachment has (0043).
-function seedProgramme(rooms: { id: string, name: string }[], people: Seeded[]): { performances: number } {
+function seedProgramme(rooms: { id: string, name: string }[], people: Seeded[]): { performances: number, shifts: number } {
   const auditorium = rooms.find(room => room.name === 'The Auditorium')
 
   const venueId = keyed('venues', 'name', 'The Nottingham New Theatre', () => {
@@ -340,7 +340,35 @@ function seedProgramme(rooms: { id: string, name: string }[], people: Seeded[]):
       .run(id(), showId, venueId, startsAt, startsAt - 1800)
   }
 
-  return { performances: planned.length }
+  // A house template, and the rota stamped onto both performances. Re-runnable: the template
+  // rows conflict on (venue, role) and the shifts on (performance, role, slot).
+  const slots: [string, number][] = [['DUTY_MANAGER', 1], ['DOOR', 2], ['BAR', 1]]
+  for (const [role, count] of slots) {
+    db.query(`INSERT INTO shift_templates (id, venue_id, role, "count", updated_by, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?)
+              ON CONFLICT (venue_id, role) DO NOTHING`)
+      .run(id(), venueId, role, count, people[0]?.id ?? null, now)
+  }
+
+  // Scoped to the venue this seeded, so a development database holding other venues is left
+  // alone. The shape is `stampStatement` in `server/utils/rota.ts`, which a worker cannot reach.
+  db.query(`
+    WITH RECURSIVE slot(i) AS (
+      SELECT 1 UNION ALL SELECT i + 1 FROM slot WHERE i < (SELECT coalesce(max("count"), 0) FROM shift_templates)
+    )
+    INSERT INTO shifts (id, performance_id, role, slot, status)
+    SELECT lower(hex(randomblob(16))), p.id, t.role, slot.i, 'OPEN'
+    FROM performances p
+    JOIN shift_templates t ON t.venue_id = p.venue_id
+    JOIN slot ON slot.i <= t."count"
+    WHERE p.status <> 'CANCELLED' AND p.venue_id = ?
+    ON CONFLICT DO NOTHING
+  `).run(venueId)
+
+  const shifts = (db.query(`
+    SELECT count(*) AS n FROM shifts s JOIN performances p ON p.id = s.performance_id WHERE p.venue_id = ?
+  `).get(venueId) as { n: number }).n
+  return { performances: planned.length, shifts }
 }
 
 // The subcommittee's draft catalogue, so a development database looks like the real thing rather
@@ -413,7 +441,8 @@ console.info(`\nSeeded ${target}\n`)
 console.info(`  ${rooms.length} rooms, ${spaces} SU rooms, ${people.length} people, ${bookings} bookings`)
 console.info(`  ${catalogue.modules} training modules across ${catalogue.departments} departments, `
   + `${catalogue.prerequisites} prerequisites`)
-console.info(`  1 venue and 1 show, with ${programme.performances} performances: one tonight, one next week\n`)
+console.info(`  1 venue and 1 show, with ${programme.performances} performances: one tonight, one next week`)
+console.info(`  1 venue shift template, stamped as ${programme.shifts} open shifts across them\n`)
 console.info('  Every module is a DRAFT, as the subcommittee draft has them, so members see none of')
 console.info('  them until somebody publishes one.\n')
 console.info('  Sign in as any of these. The passwords are shown here and nowhere else:\n')

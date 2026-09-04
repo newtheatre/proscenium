@@ -15,6 +15,8 @@ export default defineEventHandler(async (event) => {
 
   const id = newId()
 
+  // The rota exists the moment the performance does: one open shift per template slot, in the
+  // same batch, so a performance can never exist staffed by nothing (E-102 criterion 1).
   await db.batch([
     db.insert(schema.performances).values({
       id,
@@ -30,6 +32,7 @@ export default defineEventHandler(async (event) => {
       notes: input.notes ?? null,
       status: 'DRAFT',
     }),
+    db.run(stampPerformanceStatement(id)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'performance.created',

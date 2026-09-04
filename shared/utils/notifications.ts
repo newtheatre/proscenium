@@ -205,6 +205,14 @@ export const MESSAGE_TYPES = {
 
   // Module E: show night
 
+  // Transactional, so no rota preference can silence it: somebody who turned shift email off
+  // would otherwise turn up to a performance that is not happening (E-102 criterion 4).
+  'shift.performance-cancelled': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'shift-performance-cancelled',
+  },
+
   // Module F: bar
 
   // Module G: training
