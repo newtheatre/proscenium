@@ -490,7 +490,10 @@ the other. `test:e2e` is **not** a gate: it runs nightly and on demand (0029).
 `bun test` throughout. Unit tests for the pure logic in `shared/`; integration tests run
 routes against a real local database and carry the racing tests; end-to-end tests drive the
 critical journeys (booking, door, till, register, room request) in a browser. The named
-regression suite (K-121) is seeded before feature work and grows monotonically.
+regression suite (K-121) is seeded before feature work and grows monotonically. The racing
+cases are split one file per invariant under `tests/integration/races-*.test.ts`, so two
+streams filling different todos never edit the same file; `tests/helpers/race.ts` fires
+concurrent attempts and asserts exactly one winner (K-105).
 
 A browser test drives the real screen, so it must wait for the page to become interactive and not
 merely to render: until Nuxt's Suspense resolves, the markup is server-rendered and a click does
