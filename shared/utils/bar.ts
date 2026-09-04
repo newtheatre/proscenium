@@ -65,8 +65,31 @@ export type MovementReason = (typeof MOVEMENT_REASONS)[number]
 // The kinds a person types in and therefore has to explain. A delivery explains itself.
 export const KINDS_NEEDING_A_REASON: readonly StockMovementKind[] = ['WASTAGE', 'ADJUST', 'REVERSAL']
 
+// The size a variant sells at, and the key a category default resolves on (F-121). A list rather
+// than a CHECK: a new size must not need a rebuild of a table an append-only one points at.
+export const SERVING_KINDS = [
+  'item',
+  'bottle',
+  'can',
+  'pint',
+  'half',
+  '125ml',
+  '175ml',
+  '250ml',
+  'single',
+  'double',
+] as const
+export type ServingKind = (typeof SERVING_KINDS)[number]
+
+export const VARIANT_STATUSES = ['ACTIVE', 'RETIRED'] as const
+export type VariantStatus = (typeof VARIANT_STATUSES)[number]
+
 export const MAX_BAR_NAME = 80
 export const MAX_ALLERGEN_NOTE = 500
+
+// A pint is pounds, not thousands, so this is what catches pounds typed into a field that takes
+// pence.
+export const MAX_VARIANT_PRICE_PENCE = 100_000
 
 // A crate of mixers is hundreds, not millions, so this is what catches a quantity typed into the
 // wrong field.
@@ -140,6 +163,42 @@ export const movementEntryForm = movementForm.omit({ itemId: true, reversesId: t
   { message: 'That needs a reason', path: ['reason'] },
 )
 
+export const variantForm = z.object({
+  productId: z.string().trim().min(1, 'A serving size belongs to a product'),
+  servingKind: z.enum(SERVING_KINDS),
+  label: z.string().trim().min(1, 'A serving size needs a label').max(MAX_BAR_NAME),
+  sort: z.number().int().min(0).max(999).default(0),
+})
+
+// An edit does not move a variant between products: its price series and its sales belong to the
+// product it was sold under (F-112 criterion 5).
+export const variantEditForm = variantForm.omit({ productId: true })
+
+export const variantStatusForm = z.object({ status: z.enum(VARIANT_STATUSES) })
+
+// What pouring one of these consumes, stated in the stocked item's own units and validated
+// positive. Quantity is independent of price (F-112 criterion 2).
+export const componentForm = z.object({
+  itemId: z.string().trim().min(1),
+  qty: z.number().int().positive('A depletion is a quantity of something').max(MAX_MOVEMENT_QTY),
+})
+
+export const componentsForm = z.object({
+  components: z.array(componentForm).max(20),
+}).refine(
+  value => new Set(value.components.map(component => component.itemId)).size === value.components.length,
+  { message: 'A stocked item appears once in a recipe, at the quantity a serving uses', path: ['components'] },
+)
+
+// A civil date, the Europe/London day a price takes effect on. A past one is allowed and already
+// applies; a future one waits (F-116 criterion 5).
+const civilDate = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'A date reads as YYYY-MM-DD')
+
+export const priceForm = z.object({
+  pricePence: z.number().int().nonnegative().max(MAX_VARIANT_PRICE_PENCE),
+  effectiveFrom: civilDate,
+})
+
 export type CategoryInput = z.output<typeof categoryForm>
 export type ProductInput = z.output<typeof productForm>
 export type StockItemInput = z.output<typeof stockItemForm>
@@ -167,6 +226,46 @@ export interface BarProduct {
   allergenState: AllergenState
   allergenNote: string | null
   everSold: boolean
+}
+
+export interface VariantComponent {
+  id: string
+  itemId: string | null
+  itemName: string | null
+  unit: StockUnit | null
+  choiceGroupId: string | null
+  choiceGroupName: string | null
+  qty: number
+  includedInPrice: boolean
+}
+
+export interface ProductVariant {
+  id: string
+  productId: string
+  servingKind: ServingKind
+  label: string
+  status: VariantStatus
+  sort: number
+  // The latest price dated on or before today, or null when nothing prices it yet (F-116).
+  pricePence: number | null
+  // A future-dated row makes this true while `pricePence` still reads null: append-only, so it
+  // can only be retired (F-112 criterion 5).
+  everPriced: boolean
+  everSold: boolean
+  components: VariantComponent[]
+}
+
+export interface VariantPrice {
+  id: string
+  variantId: string
+  pricePence: number
+  effectiveFrom: string
+  createdAt: number
+  createdBy: string | null
+  // Insertion order (the row's `rowid`), the tiebreak when two share a `createdAt` second.
+  seq: number
+  // True for the row that wins today, so the history says which one the till is reading.
+  effective: boolean
 }
 
 export interface StockItem {
@@ -201,31 +300,56 @@ export interface StockMovement {
 }
 
 const WORDS: Record<string, string> = {
-  ML: 'Millilitres',
-  ITEM: 'Whole items',
-  ACTIVE: 'On the till',
-  HIDDEN: 'Hidden',
-  RETIRED: 'Retired',
-  UNKNOWN: 'No information recorded',
-  NONE: 'Confirmed no allergens',
-  RECORDED: 'Allergens recorded',
-  DELIVERY: 'Delivery',
-  SALE: 'Sale',
-  COMP: 'Comp',
-  STOCKTAKE: 'Stocktake adjustment',
-  WASTAGE: 'Wastage',
-  TRANSFER: 'Transfer',
-  ADJUST: 'Adjustment',
-  REVERSAL: 'Reversal',
-  BREAKAGE: 'Breakage',
-  SPILLAGE: 'Spillage',
-  OUT_OF_DATE: 'Out of date',
-  LINE_CLEANING: 'Line cleaning',
-  QUALITY: 'Quality',
-  TRAINING: 'Training',
-  COUNT_CORRECTION: 'Count correction',
-  OPENING_BALANCE: 'Opening balance',
-  OTHER: 'Other',
+  'ML': 'Millilitres',
+  'ITEM': 'Whole items',
+  'ACTIVE': 'On the till',
+  'HIDDEN': 'Hidden',
+  'RETIRED': 'Retired',
+  'UNKNOWN': 'No information recorded',
+  'NONE': 'Confirmed no allergens',
+  'RECORDED': 'Allergens recorded',
+  'DELIVERY': 'Delivery',
+  'SALE': 'Sale',
+  'COMP': 'Comp',
+  'STOCKTAKE': 'Stocktake adjustment',
+  'WASTAGE': 'Wastage',
+  'TRANSFER': 'Transfer',
+  'ADJUST': 'Adjustment',
+  'REVERSAL': 'Reversal',
+  'BREAKAGE': 'Breakage',
+  'SPILLAGE': 'Spillage',
+  'OUT_OF_DATE': 'Out of date',
+  'LINE_CLEANING': 'Line cleaning',
+  'QUALITY': 'Quality',
+  'TRAINING': 'Training',
+  'COUNT_CORRECTION': 'Count correction',
+  'OPENING_BALANCE': 'Opening balance',
+  'OTHER': 'Other',
+  'item': 'Each',
+  'bottle': 'Bottle',
+  'can': 'Can',
+  'pint': 'Pint',
+  'half': 'Half',
+  '125ml': '125ml',
+  '175ml': '175ml',
+  '250ml': '250ml',
+  'single': 'Single',
+  'double': 'Double',
+}
+
+// The latest row on or before the day; `seq` (insertion order) breaks a tie within one second.
+// `effectivePriceColumn` orders identically (F-116 criteria 1 and 3).
+export function effectivePriceRow<T extends { effectiveFrom: string, createdAt: number, seq: number }>(
+  prices: T[],
+  on: string,
+): T | null {
+  const eligible = prices.filter(price => price.effectiveFrom <= on)
+  if (eligible.length === 0) return null
+  return eligible.reduce((winner, price) => {
+    if (price.effectiveFrom !== winner.effectiveFrom) return price.effectiveFrom > winner.effectiveFrom ? price : winner
+    if (price.createdAt !== winner.createdAt) return price.createdAt > winner.createdAt ? price : winner
+    return price.seq > winner.seq ? price : winner
+  })
 }
 
 export function says(value: string | null): string {

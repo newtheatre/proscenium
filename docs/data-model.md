@@ -602,22 +602,39 @@ queries over the tables referencing it, declared in `BAR_PRODUCT_REFERENCES`
 `tests/integration/bar-catalogue.test.ts` (F-111 criteria 2 and 3).
 
 ### product_variants
-`id` PK · `product_id` → bar_products cascade · `serving_kind` (the price-resolution key:
-`bottle`, `125ml`, `175ml`, `250ml`, `single`, `double`, `pint`, `half`, `item`…) · `label` ·
-`sort`. UNIQUE (`product_id`, `serving_kind`).
+`id` PK · `product_id` → bar_products cascade · `serving_kind`, the price-resolution key
+(`SERVING_KINDS` in `shared/utils/bar.ts`, not a CHECK: a new size must not rebuild a table an
+append-only one points at) · `label` · `status` CHECK `ACTIVE|RETIRED` · `sort` · `created_at`.
+UNIQUE (`product_id`, `serving_kind`). Retired, never deleted, once it has sold or been priced; a
+sold variant also keeps the serving kind it sold under.
+
+Whether a variant has sold is a query over `VARIANT_REFERENCES` (`server/utils/bar.ts`), the same
+rule `BAR_PRODUCT_REFERENCES` follows: an unclassified table with a foreign key to
+`product_variants` fails `tests/integration/bar-variants.test.ts`. That test cannot see
+`ledger_lines.product_variant_id`, which carries no foreign key by design (it is append-only, so
+one could never be added later); F-105 must add its `sale: true` entry there by hand.
 
 ### variant_components
 `id` PK · `variant_id` → product_variants cascade · `item_id` NULL → bar_items restrict ·
-`choice_group_id` NULL (exactly one of the two) · `qty` in the item's real units ·
-`included_in_price` bool (the free mixer, 0017).
+`choice_group_id` NULL (CHECK: exactly one of the two) · `qty` in the item's own counting unit,
+CHECK positive · `included_in_price` bool (the free mixer, 0017). UNIQUE (`variant_id`, `item_id`)
+and UNIQUE (`variant_id`, `choice_group_id`). One level deep by construction: no column here can
+name another product (F-113 criterion 1).
 
 ### choice_groups / choice_group_items
-`id` PK · `name` (e.g. Mixers); members reference bar_items.
+`id` PK · `name` unique, case-insensitively (Mixers). An option is `choice_group_id` cascade ·
+`item_id` → bar_items restrict · `qty` CHECK positive · `sort`, UNIQUE per group and item.
 
 ### variant_prices  APPEND-ONLY
-`id` PK · `variant_id` cascade · `price_pence` · `effective_from` civil date · `created_at` ·
-`created_by`. Latest row on or before today wins; same-day rows resolve by `created_at`
-(fixing the old one-row-per-day trap).
+`id` PK · `variant_id` cascade · `price_pence` CHECK not negative · `effective_from` civil date,
+CHECK `YYYY-MM-DD` · `created_at` · `created_by` → users restrict. Latest row on or before today
+wins; same-day rows resolve by `created_at`, then by `rowid` (insertion order; `id` is a random
+UUID and no guide to which row came later) so two written in one second still resolve the same way
+twice (fixing the old one-row-per-day trap). Triggers refuse every UPDATE and DELETE, so the
+cascade from a variant cannot fire either: a priced variant is retired, not deleted.
+`effectivePriceRow` in `shared/utils/bar.ts` (ordering on the API's `seq`, the row's `rowid`) and
+`effectivePriceColumn` in `server/utils/bar.ts` order identically, and a test holds the two
+together.
 
 ### category_prices  APPEND-ONLY
 `id` PK · `category_id` cascade · `serving_kind` · `price_pence` · `effective_from` ·
