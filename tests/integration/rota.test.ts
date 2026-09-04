@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   backfillVenueStatement,
+  cancelOrphanedShiftsStatement,
   cancelShiftsStatement,
   replaceTemplateStatements,
   stampPerformanceStatement,
@@ -342,6 +343,65 @@ describe('cancelling a performance cancels its shifts (E-102 criterion 4)', () =
       run(database, backfillVenueStatement(tonight.venueId, 0))
 
       expect(shiftsOn(database, tonight.performanceId).every(shift => shift.status === 'CANCELLED')).toBe(true)
+    })
+  })
+})
+
+describe('a venue move cancels only a held shift the new house does not staff at all', () => {
+  test('a role the new venue still staffs is left alone', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      template(database, tonight.venueId)
+      testVenue(database, { suffix: 'b' })
+      template(database, 'venue-b')
+      run(database, stampPerformanceStatement(tonight.performanceId))
+      const who = person(database, 'holder')
+      database.batch([['UPDATE shifts SET user_id = ?, status = \'CONFIRMED\' WHERE performance_id = ? AND role = \'DUTY_MANAGER\'',
+        who, tonight.performanceId]])
+
+      run(database, cancelOrphanedShiftsStatement(tonight.performanceId, 'venue-b'))
+
+      const dutyManager = shiftsOn(database, tonight.performanceId).find(shift => shift.role === 'DUTY_MANAGER')
+      expect(dutyManager).toMatchObject({ status: 'CONFIRMED', user_id: who })
+    })
+  })
+
+  test('a role the new venue does not staff at all is cancelled, and the holder is kept', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      template(database, tonight.venueId)
+      testVenue(database, { suffix: 'b' })
+      for (const statement of replaceTemplateStatements('venue-b', [{ role: 'DUTY_MANAGER', count: 1 }], 'actor')) {
+        run(database, statement)
+      }
+      run(database, stampPerformanceStatement(tonight.performanceId))
+      const who = person(database, 'holder')
+      database.batch([['UPDATE shifts SET user_id = ?, status = \'CONFIRMED\' WHERE performance_id = ? AND role = \'BAR\'',
+        who, tonight.performanceId]])
+
+      run(database, cancelOrphanedShiftsStatement(tonight.performanceId, 'venue-b'))
+
+      const bar = shiftsOn(database, tonight.performanceId).find(shift => shift.role === 'BAR')
+      expect(bar).toMatchObject({ status: 'CANCELLED', user_id: who })
+      const dutyManager = shiftsOn(database, tonight.performanceId).find(shift => shift.role === 'DUTY_MANAGER')
+      expect(dutyManager?.status).toBe('OPEN')
+    })
+  })
+
+  test('an open shift is untouched: it is restamped away separately, never cancelled', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      template(database, tonight.venueId)
+      testVenue(database, { suffix: 'b' })
+      for (const statement of replaceTemplateStatements('venue-b', [{ role: 'DUTY_MANAGER', count: 1 }], 'actor')) {
+        run(database, statement)
+      }
+      run(database, stampPerformanceStatement(tonight.performanceId))
+
+      run(database, cancelOrphanedShiftsStatement(tonight.performanceId, 'venue-b'))
+
+      const bar = shiftsOn(database, tonight.performanceId).find(shift => shift.role === 'BAR')
+      expect(bar?.status).toBe('OPEN')
     })
   })
 })
