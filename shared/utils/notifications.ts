@@ -212,6 +212,19 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'shift-performance-cancelled',
   },
+  // Transactional for the same reason: a held shift moved with the performance, and the holder
+  // needs to know before the night rather than at the door (E-102, venue move interpretation).
+  'shift.venue-changed': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'shift-venue-changed',
+  },
+  // The new venue does not staff this role at all, so the shift went rather than moved.
+  'shift.role-not-needed': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'shift-role-not-needed',
+  },
 
   // Module F: bar
 

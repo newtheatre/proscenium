@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
 import {
   ASSIGNED_SHIFT_STATUSES,
+  COMMITTED_SHIFT_STATUSES,
   MAX_SLOT_COUNT,
   SHIFT_CONSTRAINT_REFUSALS,
   SHIFT_ROLES,
@@ -111,6 +112,14 @@ describe('an open shift names nobody (E-106 criterion 2)', () => {
 
   test('every status is one of the three answers', () => {
     expect(SHIFT_STATUSES.map(shiftNamesAPerson)).toEqual([false, true, true, true, null])
+  })
+})
+
+// A cancellation or a venue move has to reckon with a claim awaiting approval the same way it
+// reckons with a confirmed one; a decline is excluded because the person is already off the shift.
+describe('a person is committed to a shift once claimed, not only once confirmed', () => {
+  test('exactly claimed and confirmed, and neither open, declined nor cancelled', () => {
+    expect([...COMMITTED_SHIFT_STATUSES].sort()).toEqual(['CLAIMED', 'CONFIRMED'])
   })
 })
 
