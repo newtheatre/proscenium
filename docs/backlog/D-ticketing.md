@@ -672,7 +672,8 @@ Open questions:
   3. Show categories can be created, edited and retired.
   4. Nothing here is ever destroyed while it is in use: a venue with performances, a season with
      shows or a category with shows refuses deletion and offers retirement instead, and a
-     retired row keeps serving the records that already point at it (0050).
+     retired row keeps serving the records that already point at it, as D-119 does for ticket
+     types.
   5. A retired venue, season or category cannot be chosen for new work, and the publish flow
      refuses a show whose category or season was retired after it was drafted.
   6. Every create, edit and retire is audited.
