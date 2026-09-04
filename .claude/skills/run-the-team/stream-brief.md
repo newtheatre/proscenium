@@ -64,6 +64,9 @@ question; record the interpretation in the PR that applies it.
 
 ## Things that will cost you an evening if forgotten
 
+- A background command never wakes an agent that has already ended its turn. Run a long
+  command in the foreground, or poll it (`while kill -0 <pid>; do sleep 20; done`), and stop
+  only once you hold its result. Ending a turn to wait costs the lead a restart.
 - Two runs on one port kill each other; a leaked dev server from another worktree is accepted
   by the test runner and every new route then 404s. Use your ports and nothing else.
 - `bun run build` while `bun run dev` runs breaks dev unless `NUXT_HUB_DIR` is set.
