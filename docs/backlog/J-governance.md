@@ -116,8 +116,8 @@ Stories: 13 (9 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
 - Acceptance criteria:
   1. Point-in-time restore is available for the production database, and a restore point is taken automatically before every migration apply.
   2. A full export runs weekly to storage independent of the primary database, and a failed export alerts rather than vanishing.
-  3. A restore drill runs each term: restore into an isolated environment and reconcile row counts and money totals against production; the outcome (date, operator, result) is recorded in the audit trail.
-  4. The operations dashboard shows the date of the last successful drill and flags it when a term has passed without one.
+  3. A restore drill runs on a configured interval (a number of days, not a term: no term dates exist anywhere in the system, 0034): restore into an isolated environment and reconcile row counts and money totals against production; the outcome (date, operator, result) is recorded in the audit trail.
+  4. The operations dashboard shows the date of the last successful drill and flags it when the configured interval has passed without one.
   5. The drill procedure lives in the in-app operator documentation (J-109), current enough that a successor can run it cold.
 - Source: Prompt Book K-1 (tested restore each term), P7; audit EW-3 (Time Travel restore points, weekly exports); Get-In part 6 (one blast radius)
 

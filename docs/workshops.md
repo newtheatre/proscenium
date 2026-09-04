@@ -59,6 +59,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Membership grace window | none: nobody tracked an expiry | 14 days past expiry still counts | Owner: IT Manager. A renewal in hand should not be a refusal at the desk (0031) |
 | Membership renewal notice | none | remind 21 days before a person's own expiry | Owner: IT Manager. Each membership has its own date, so this is not a year-end chase |
 | Retention periods | 2 years full accounts, 3 years guests (dry-run) | unchanged, armed in December | |
+| Backup restore drill interval | none: never run | 120 days | New setting. K-108 and J-107 ask for the drill "each term"; no term dates exist anywhere in the system (0034), so the cadence is a configured interval, in the `ROOM_BOOKING_HORIZON_WEEKS` shape, rather than a calendar the theatre's own year does not keep in code. 120 days approximates three terms a year without claiming to track them, and reads as overdue from the first deploy, which is what puts the first drill before the December break (K-108 criterion 4) without a separate rule for it. Owner: IT Manager |
 | Unverified account expiry | none: an unproven address held an account forever | 30 days, then anonymised, capped at 200 a run | Owner: IT Manager. An account that never proved its address cannot sign in and expires on its own rule (0026) |
 | Night report recipients | configured list | confirm the list | |
 | Role vocabulary mapping | four namespaces | one officer model, mapping table agreed in session | Needed by the Phase 1 import |

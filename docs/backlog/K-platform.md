@@ -178,7 +178,8 @@ Stories: 24. Phases: 21 MVP, 0 V2, 0 Later, 3 resolved.
 - Acceptance criteria:
   1. Automated database exports run on a schedule, and point-in-time restore is available and
      documented in operations.
-  2. Once per term, a drill restores a backup into a scratch environment and verifies it by row
+  2. On a configured interval (a number of days, not a term: no term dates exist anywhere in the
+     system, 0034), a drill restores a backup into a scratch environment and verifies it by row
      counts, money totals and register checksums against the source.
   3. Each drill is recorded with date, operator, outcome and time-to-restore; a missed or failed
      drill stays on the committee dashboard until resolved.
