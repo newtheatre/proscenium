@@ -319,4 +319,20 @@ describe('changes() after a conditional UPDATE names that UPDATE\'s own effect',
       expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(1)
     })
   })
+
+  // The route reads this same RETURNING clause to tell a win from a loss (0049); `batch()`
+  // discards it, so this goes through `raw` to prove the value the route's own check relies on.
+  test('a losing predicate\'s RETURNING is empty, which is what the route refuses on', async () => {
+    await withDatabase((database) => {
+      bottle(database, { status: 'ACTIVE' })
+
+      const attempt = (): { id: string }[] => database.raw.prepare(
+        'UPDATE bar_items SET status = ? WHERE id = ? AND status = ? RETURNING id',
+      ).all('RETIRED', 'item-1', 'ACTIVE') as { id: string }[]
+
+      expect(attempt()).toHaveLength(1)
+      // The loser's predicate still asks for status = 'ACTIVE', which is no longer true.
+      expect(attempt()).toHaveLength(0)
+    })
+  })
 })
