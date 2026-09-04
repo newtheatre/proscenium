@@ -418,6 +418,21 @@ drops archived types and every flagged one, and allow-lists `id`, `name`, `descr
 `ticket_type_id` → ticket_types restrict · UNIQUE (parent, ticket_type) · `price` NULL =
 inherit · `active` NULL = inherit. Resolution: performance, then show, then base.
 
+**Administration (D-120).** Two levels, each read and set the same way, gated on `ticketing.read`
+for the listing and `ticketing.write` for the rest:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/admin/shows/[id]/prices` | Every ticket type against this show: base price, this show's override, and what they resolve to. |
+| `PUT /api/admin/shows/[id]/prices` | Replaces this show's overrides in one batch. Both fields null at a level is no override, so that row is deleted rather than left saying nothing. |
+| `GET /api/admin/performances/[id]/prices` | The same, with the performance's own override alongside the show's. |
+| `PUT /api/admin/performances/[id]/prices` | Replaces this performance's overrides in one batch. |
+
+An override change is audited (`show.prices.set`, `performance.prices.set`) with both the old and
+new price and active flag per ticket type, because prices are not personal data (0011). It takes
+effect for new reservations only: `tickets.price_paid` and `tickets.price_source` are the
+snapshot, taken once at reservation, so a later override never reprices a ticket already sold.
+
 ### reservations
 `id` PK · `reference` UNIQUE (6 chars, no-look-alike alphabet; a retrieval key, never a
 credential) · `performance_id` → performances restrict · `user_id` → users restrict ·
@@ -434,10 +449,15 @@ Indexes: (`performance_id`, `status`), (`user_id`, `created_at`), `hold_expires_
 ### tickets
 `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances
 restrict · `ticket_type_id` → ticket_types restrict · `price_paid` pence snapshot ·
-`price_source` CHECK `VARIANT|OVERRIDE|BASE|IMPORT` · `refunded_at` NULL.
-**The capacity rule** (0006): a ticket counts toward capacity while its reservation status is
-`PENDING|COLLECTED|DOOR` and `refunded_at IS NULL`; inserts carry the capacity predicate on
-the statement. Index (`performance_id`, `refunded_at`).
+`price_source` CHECK `PERFORMANCE|SHOW|BASE|IMPORT` (D-120; `IMPORT` is the one value
+resolution never produces itself, reserved for a migrated ticket priced by the old estate) ·
+`refunded_at` NULL.
+**The capacity rule** (0006, D-105): a ticket counts toward capacity while its reservation status
+is `PENDING|COLLECTED|DOOR` and `refunded_at IS NULL`; every insert carries the capacity
+predicate on its own statement, `capacityAllows()` in `server/utils/capacity.ts`, never a count
+read beforehand and written after. Lowering a performance's capacity rides the same predicate on
+the UPDATE that lowers it (`loweringPredicate()`), so a booking landing mid-request cannot slip
+under the new figure. Index (`performance_id`, `refunded_at`).
 
 ### waiting_list
 `id` PK · `performance_id` → performances cascade · `user_id` NULL → users · `email`

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { formatLondon } from '#shared/utils/london'
 import { performanceForm } from '#shared/utils/programme'
@@ -21,12 +21,8 @@ export default defineEventHandler(async (event) => {
   // The capacity that will apply, so clearing the override or moving to a smaller venue is checked
   // as well as lowering the number. Refusing quotes both figures (D-105 criterion 4).
   const capacity = input.capacityOverride ?? venue.capacity
-  if (capacity !== null && capacity < held.soldTickets) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: `${plural(held.soldTickets, 'ticket')} are already held on this performance, so its capacity cannot be ${capacity}`,
-    })
-  }
+  const refusal = loweringRefusal(capacity, held.soldTickets)
+  if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
   const window = input.bookingClosesHoursBefore ?? null
 
@@ -39,47 +35,68 @@ export default defineEventHandler(async (event) => {
   const orphaned = heldShifts.filter(shift => !newRoles.has(shift.role))
   const carried = heldShifts.filter(shift => newRoles.has(shift.role))
 
-  const restamp = moved
-    ? [
-        db.run(cancelOrphanedShiftsStatement(id, input.venueId)),
-        db.run(clearOpenShiftsStatement(id)),
-        db.run(stampPerformanceStatement(id)),
-      ]
-    : []
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: 'performance.updated',
+    target: `performance:${id}`,
+    detail: {
+      ...changes({
+        venueId: [held.venueId, input.venueId],
+        night: [performanceNight(held.startsAt), performanceNight(input.startsAt)],
+        startsAt: [held.startsAt, input.startsAt],
+        capacityOverride: [held.capacityOverride, input.capacityOverride ?? null],
+        effectiveCapacity: [effectiveCapacity(held), capacity],
+        bookingClosesHoursBefore: [held.bookingClosesHoursBefore, window],
+      }),
+      // Internal prose stays on the record; the trail records only that it moved (0011).
+      notesChanged: (input.notes ?? null) !== held.notes,
+      ...(moved ? { shiftsMoved: carried.length, shiftsDropped: orphaned.length } : {}),
+    },
+  })
 
-  await db.batch([
-    db.update(schema.performances).set({
-      venueId: input.venueId,
-      startsAt: input.startsAt,
-      doorsAt: input.doorsAt ?? null,
-      durationMinutes: input.durationMinutes ?? null,
-      intervalCount: input.intervalCount,
-      intervalMinutes: input.intervalMinutes ?? null,
-      capacityOverride: input.capacityOverride ?? null,
-      bookingClosesHoursBefore: window,
-      notes: input.notes ?? null,
-      updatedAt: Math.floor(Date.now() / 1000),
-    }).where(eq(schema.performances.id, id)),
-    ...restamp,
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'performance.updated',
-      target: `performance:${id}`,
-      detail: {
-        ...changes({
-          venueId: [held.venueId, input.venueId],
-          night: [performanceNight(held.startsAt), performanceNight(input.startsAt)],
-          startsAt: [held.startsAt, input.startsAt],
-          capacityOverride: [held.capacityOverride, input.capacityOverride ?? null],
-          effectiveCapacity: [effectiveCapacity(held), capacity],
-          bookingClosesHoursBefore: [held.bookingClosesHoursBefore, window],
-        }),
-        // Internal prose stays on the record; the trail records only that it moved (0011).
-        notesChanged: (input.notes ?? null) !== held.notes,
-        ...(moved ? { shiftsMoved: carried.length, shiftsDropped: orphaned.length } : {}),
-      },
-    })),
+  // The capacity check rides the UPDATE, so a booking landing after the read above cannot slip
+  // under the new capacity; the audit reads `changes()`, so a refused edit writes no trail (0003).
+  const [updated] = await db.batch([
+    db.all<{ id: string }>(sql`
+      UPDATE performances
+      SET venue_id = ${input.venueId},
+          starts_at = ${input.startsAt},
+          doors_at = ${input.doorsAt ?? null},
+          duration_minutes = ${input.durationMinutes ?? null},
+          interval_count = ${input.intervalCount},
+          interval_minutes = ${input.intervalMinutes ?? null},
+          capacity_override = ${input.capacityOverride ?? null},
+          booking_closes_hours_before = ${window},
+          notes = ${input.notes ?? null},
+          updated_at = unixepoch()
+      WHERE id = ${id} AND ${loweringPredicate(id, capacity)}
+      RETURNING id
+    `),
+    db.run(sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
+      WHERE changes() = 1
+    `),
   ])
+
+  if (updated.length === 0) {
+    const now = await performanceById(id)
+    if (!now) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+    throw createError({
+      statusCode: 409,
+      statusMessage: loweringRefusal(capacity, now.soldTickets) ?? 'That performance changed while you were editing it',
+    })
+  }
+
+  // Only once the move is real: restamping a rota for an edit that was refused would cancel held
+  // shifts against a venue the performance never went to.
+  if (moved) {
+    await db.batch([
+      db.run(cancelOrphanedShiftsStatement(id, input.venueId)),
+      db.run(clearOpenShiftsStatement(id)),
+      db.run(stampPerformanceStatement(id)),
+    ])
+  }
 
   // The batch committed, so every holder below is real: tell them after, never before (0003).
   if (moved) {
