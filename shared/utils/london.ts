@@ -69,6 +69,19 @@ export function fromLondonWallClock(year: number, month: number, day: number, ho
   return new Date(wall - offsetMs(new Date(once)))
 }
 
+// A YYYY-MM-DD screen field turned into the instant its day begins, London time.
+export function startOfLondonDay(day: string): Date {
+  const [year, month, date] = day.split('-').map(Number)
+  return fromLondonWallClock(year!, month!, date!)
+}
+
+// A window ending on this date still covers the whole of it, the way `committeeYearEnd` treats
+// 31 July: the last millisecond, never midnight (0014).
+export function endOfLondonDay(day: string): Date {
+  const [year, month, date] = day.split('-').map(Number)
+  return fromLondonWallClock(year!, month!, date!, 23, 59, 59, 999)
+}
+
 // A recurring London day of the year, written MM-DD. Judged against a common year, because a
 // boundary that only exists in a leap year would read as NaN in three years out of four.
 export function isMonthDay(value: string): boolean {

@@ -2,10 +2,12 @@ import { describe, expect, test } from 'bun:test'
 import {
   committeeYearEnd,
   committeeYearOf,
+  endOfLondonDay,
   formatLondon,
   fromLondonWallClock,
   londonParts,
   nextCommitteeYearEnd,
+  startOfLondonDay,
 } from '#shared/utils/london'
 
 // The named regression cases for time (K-121). The runtime is UTC, so every one of these is
@@ -66,6 +68,25 @@ describe('a record expiring on a transition day expires on its date', () => {
     const end = fromLondonWallClock(2026, 10, 25, 23, 59, 59, 999)
     expect(londonParts(end)).toMatchObject({ year: 2026, month: 10, day: 25 })
     expect((end.getTime() - start.getTime() + 1) / (60 * 60 * 1000)).toBe(25)
+  })
+})
+
+describe('a screen field names a whole day, not a moment in it (D-123)', () => {
+  test('the start of the day is midnight London', () => {
+    expect(startOfLondonDay('2026-08-31').toISOString()).toBe('2026-08-30T23:00:00.000Z')
+  })
+
+  // The bug this guards: a window "until 31 August" that reads as expired from midnight that
+  // morning, because it was stored as the day's first instant rather than its last.
+  test('the end of the day is its last millisecond, not its first', () => {
+    expect(endOfLondonDay('2026-08-31').toISOString()).toBe('2026-08-31T22:59:59.999Z')
+  })
+
+  test('a one-day window still covers the whole day', () => {
+    const start = startOfLondonDay('2026-08-31').getTime()
+    const end = endOfLondonDay('2026-08-31').getTime()
+    expect(end).toBeGreaterThan(start)
+    expect(londonParts(new Date(end))).toMatchObject({ year: 2026, month: 8, day: 31 })
   })
 })
 

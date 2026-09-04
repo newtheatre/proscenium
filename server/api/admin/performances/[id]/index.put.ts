@@ -25,6 +25,9 @@ export default defineEventHandler(async (event) => {
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
   const window = input.bookingClosesHoursBefore ?? null
+  // Clearing this never touches status: sales stay off until an explicit on-sale action
+  // (D-122 criterion 3).
+  const externalBookingUrl = input.externalBookingUrl ?? null
 
   // Moving a house means moving the rota: a held shift travels, an open one is restamped fresh.
   // A held shift in a role the new venue does not staff at all cannot travel, so it is cancelled.
@@ -47,6 +50,7 @@ export default defineEventHandler(async (event) => {
         capacityOverride: [held.capacityOverride, input.capacityOverride ?? null],
         effectiveCapacity: [effectiveCapacity(held), capacity],
         bookingClosesHoursBefore: [held.bookingClosesHoursBefore, window],
+        externalBookingUrl: [held.externalBookingUrl, externalBookingUrl],
       }),
       // Internal prose stays on the record; the trail records only that it moved (0011).
       notesChanged: (input.notes ?? null) !== held.notes,
@@ -67,6 +71,7 @@ export default defineEventHandler(async (event) => {
           interval_minutes = ${input.intervalMinutes ?? null},
           capacity_override = ${input.capacityOverride ?? null},
           booking_closes_hours_before = ${window},
+          external_booking_url = ${externalBookingUrl},
           notes = ${input.notes ?? null},
           updated_at = unixepoch()
       WHERE id = ${id} AND ${loweringPredicate(id, capacity)}
