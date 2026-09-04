@@ -553,6 +553,11 @@ a 409 through `shiftConstraintRefusal()`, never as a raw database error (E-106 c
 SQLite names the columns for a unique index and the constraint name for a CHECK, so the
 mapping carries both spellings.
 
+Moving a performance to another venue carries a claimed or confirmed shift with it and
+restamps the open ones from the new venue's template; a held shift in a role the new venue's
+template does not staff at all is cancelled rather than left stranded, and its holder is
+told either way (E-101, E-102, committee direction 4 September 2026).
+
 ### incidents  APPEND-ONLY
 `id` PK · `performance_id` restrict · `reported_by` restrict · `body` (operational free
 text; people by role, never diagnosis) · `severity` CHECK `NOTE|NEAR_MISS|INCIDENT|SERIOUS` ·
