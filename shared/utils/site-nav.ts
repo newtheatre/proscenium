@@ -10,6 +10,7 @@ import {
   viewBarStock,
   viewFellows,
   viewMembers,
+  viewPassTypes,
   viewProgramme,
   viewRooms,
   viewRota,
@@ -73,6 +74,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     items: [
       { label: 'Shows', icon: 'i-lucide-drama', to: '/box-office/shows', ability: viewProgramme },
       { label: 'Ticket types', icon: 'i-lucide-tag', to: '/box-office/ticket-types', ability: viewTicketTypes },
+      { label: 'Passes', icon: 'i-lucide-wallet-cards', to: '/box-office/pass-types', ability: viewPassTypes },
       { label: 'Content warnings', icon: 'i-lucide-triangle-alert', to: '/box-office/content-warnings', ability: viewProgramme },
     ],
   },

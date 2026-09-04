@@ -374,11 +374,13 @@ to that room. Nothing else about a room is inferred from a venue or the reverse.
 | `effectiveCapacity(performance)` | The performance's `capacity_override` if it has one, otherwise the venue's capacity. Null is uncapped; an explicit nought is a closed house, so the resolution is by absence and never by falsiness. |
 | `isOnSale(performance, at?, channel?)` | Whether an internal sales path may sell this performance. It is `saleRefusal()` with the reason dropped, so the two can never disagree. |
 
-Ticket types are administered at `/box-office/ticket-types` (D-119) and the programme itself at
-`/box-office/shows` (D-121), which is where D-120's overrides and D-123's pass products attach.
+Ticket types are administered at `/box-office/ticket-types` (D-119), the programme itself at
+`/box-office/shows` (D-121), where D-120's overrides attach, and pass products at
+`/box-office/pass-types` (D-123), which reads the same show picker to say what a pass covers.
 What a type has ever been sold under, and what a performance has sold, are queries over the tables
 that point at them, declared in `server/utils/ticket-types.ts` and `server/utils/programme.ts` and
-proved against the live foreign keys, never a column on the row itself.
+proved against the live foreign keys, never a column on the row itself. A pass product's "ever
+issued" and "live coverage" are the same shape, declared in `server/utils/pass-types.ts`.
 
 `shared/utils/programme.ts` holds the publish flow and the booking window as pure rules:
 

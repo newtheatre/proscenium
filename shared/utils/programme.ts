@@ -23,6 +23,9 @@ export const MAX_BOOKING_CLOSES_HOURS = 720
 // A ten hour show is Wagner, and this is not that theatre.
 export const MAX_PERFORMANCE_MINUTES = 600
 
+// Long enough for a ticketing platform's query string, short enough to catch a pasted essay.
+export const MAX_EXTERNAL_BOOKING_URL = 500
+
 // Lowercase words joined by single hyphens. The public URL is the slug, so it is stated once here
 // and never derived twice (D-101).
 export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -34,6 +37,12 @@ export function toSlug(title: string): string {
 const hoursBefore = z.number().int().nonnegative().max(MAX_BOOKING_CLOSES_HOURS)
 
 const optionalText = (max: number) => z.string().trim().max(max).nullish()
+
+// A blank field means no link, same as the screen's other optional fields; a filled one has to
+// look like a URL (D-122).
+const optionalUrl = (max: number) => z.string().trim().max(max)
+  .refine(value => value === '' || z.url().safeParse(value).success, 'That does not look like a web address')
+  .nullish()
 
 export const showForm = z.object({
   title: z.string().trim().min(1, 'A show needs a title').max(MAX_SHOW_TITLE),
@@ -66,6 +75,9 @@ const performanceFields = {
   intervalMinutes: z.number().int().nonnegative().max(120).nullish(),
   capacityOverride: z.number().int().nonnegative().nullish(),
   bookingClosesHoursBefore: hoursBefore.nullish(),
+  // Set: every internal sales path refuses, quoting it. Cleared: sales stay off until an
+  // explicit on-sale action, never automatically (D-122 criteria 1 and 3).
+  externalBookingUrl: optionalUrl(MAX_EXTERNAL_BOOKING_URL),
   notes: optionalText(2000),
 }
 
@@ -79,7 +91,9 @@ export const performanceForm = z.object({
   path: ['doorsAt'],
 })
 
-const CIVIL_DAY = /^\d{4}-\d{2}-\d{2}$/
+// Exported for other screens that hold a London day as a plain string before turning it into an
+// instant, such as a pass's validity window (D-123).
+export const CIVIL_DAY = /^\d{4}-\d{2}-\d{2}$/
 const CLOCK = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 
 // What the screen holds: a London day and wall clocks, which it turns into instants before it

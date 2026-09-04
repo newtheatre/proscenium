@@ -230,3 +230,15 @@ export interface ProgrammeVenue {
 export async function listVenues(): Promise<ProgrammeVenue[]> {
   return db.all<ProgrammeVenue>(sql`SELECT id, name, capacity FROM venues ORDER BY name COLLATE NOCASE`)
 }
+
+export interface ShowOption {
+  id: string
+  title: string
+  status: ShowStatus
+}
+
+// Every show, for a picker rather than a browse: a draft show can be covered by a pass ahead of
+// its own publication, so nothing here is filtered by status (D-123).
+export async function listShowOptions(): Promise<ShowOption[]> {
+  return db.all<ShowOption>(sql`SELECT id, title, status FROM shows ORDER BY title COLLATE NOCASE`)
+}

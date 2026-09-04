@@ -184,6 +184,7 @@ const form = reactive({
   intervalMinutes: null as number | null,
   capacityOverride: null as number | null,
   bookingClosesHoursBefore: null as number | null,
+  externalBookingUrl: '',
   notes: '',
 })
 
@@ -226,6 +227,7 @@ function editPerformance(one: AdminPerformance | null): void {
     intervalMinutes: one?.intervalMinutes ?? null,
     capacityOverride: one?.capacityOverride ?? null,
     bookingClosesHoursBefore: one?.bookingClosesHoursBefore ?? null,
+    externalBookingUrl: one?.externalBookingUrl ?? '',
     notes: one?.notes ?? '',
   })
   performanceOpen.value = true
@@ -244,6 +246,7 @@ async function savePerformance(): Promise<void> {
     intervalMinutes: form.intervalMinutes,
     capacityOverride: form.capacityOverride,
     bookingClosesHoursBefore: form.bookingClosesHoursBefore,
+    externalBookingUrl: blank(form.externalBookingUrl),
     notes: blank(form.notes),
   }
   try {
@@ -378,6 +381,9 @@ const columns: TableColumn<AdminPerformance>[] = [
           variant: 'subtle',
           size: 'sm',
         }, () => saysPerformanceStatus(row.original.status)),
+        row.original.externalBookingUrl
+          ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => 'Externally ticketed')
+          : null,
       ]),
       h('div', { class: 'text-xs text-muted' }, row.original.venueName),
     ]),
@@ -392,6 +398,9 @@ const columns: TableColumn<AdminPerformance>[] = [
     header: 'Capacity',
     meta: { class: { td: 'whitespace-nowrap' } },
     cell: ({ row }) => {
+      // Tickets for this performance are sold elsewhere, so a house figure would answer a
+      // question nobody asked here (D-122 criterion 2).
+      if (row.original.externalBookingUrl) return h('span', { class: 'text-sm text-muted' }, 'Externally ticketed')
       const capacity = row.original.capacityOverride ?? row.original.venueCapacity
       return h('span', { class: 'text-sm' }, capacity === null ? 'Uncapped' : `${capacity}`)
     },
@@ -400,7 +409,12 @@ const columns: TableColumn<AdminPerformance>[] = [
     id: 'sold',
     header: 'Sold',
     meta: { class: { td: 'whitespace-nowrap' } },
-    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, `${row.original.soldTickets}`),
+    cell: ({ row }) => {
+      // Nought here would read as nobody has bought a ticket, when nobody sells one internally
+      // to count (D-122 criterion 2).
+      if (row.original.externalBookingUrl) return h('span', { class: 'text-sm text-muted' }, 'n/a')
+      return h('span', { class: 'text-sm text-muted' }, `${row.original.soldTickets}`)
+    },
   },
   {
     id: 'act',
@@ -857,6 +871,21 @@ const columns: TableColumn<AdminPerformance>[] = [
               />
             </UFormField>
           </div>
+
+          <UFormField
+            label="External ticketing"
+            name="externalBookingUrl"
+            hint="Optional"
+            description="Set a link and every internal sales path refuses, pointing here instead. Clearing it does not put the performance back on sale; use On sale for that."
+          >
+            <UInput
+              v-model="form.externalBookingUrl"
+              type="url"
+              placeholder="https://"
+              class="w-full"
+              data-test="performance-external-url"
+            />
+          </UFormField>
 
           <UFormField
             label="Internal notes"

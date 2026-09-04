@@ -451,6 +451,24 @@ As the old model: product (`slug` UNIQUE, `status` CHECK `DRAFT|ON_SALE|CLOSED`,
 sales windows, `max_issued`), price points (UNIQUE (type, label)), covered shows (UNIQUE
 pair). Desk-sold only (0005).
 
+**Administration (D-123).** `/box-office/pass-types` over six routes, `ticketing.read` for the
+two that read and `ticketing.write` for the rest; removing a covered show additionally needs
+`ticketing.manage` once a live pass covers it:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/admin/pass-types` | The paged envelope, every status included, each row carrying whether it has ever been issued and the shows it covers. |
+| `POST /api/admin/pass-types` | Adds one, always DRAFT, with its price points and covered shows in one batch. |
+| `GET /api/admin/pass-types/[id]` | One pass product and every show it may be extended to cover. |
+| `PUT /api/admin/pass-types/[id]` | Changes name, address, description, windows, price points (whole-set replace) and status. It does not take covered shows. |
+| `PUT /api/admin/pass-types/[id]/shows` | Replaces the covered set. Extending is `ticketing.write`; dropping a show with a live pass against it also needs `ticketing.manage`. |
+| `DELETE /api/admin/pass-types/[id]` | Deletes one nothing has ever been issued under. An issued one is a 409 naming closing as the way. |
+
+**"Ever issued" and "live coverage" are queries over rows, never columns.** `PASS_TYPE_REFERENCES`
+and `PASS_COVERAGE_REFERENCES` in `server/utils/pass-types.ts` declare the tables the predicates
+read; both are empty and so both read as "never" until D-124 builds `passes`. An integration test
+proves the query shape against a stand-in table so the predicates are not decorative.
+
 ### passes
 `id` PK · `reference` UNIQUE · `pass_type_id` restrict · `pass_type_price_id` restrict ·
 `user_id` → users restrict · `price_paid` snapshot · `status` CHECK

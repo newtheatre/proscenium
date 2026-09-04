@@ -90,6 +90,7 @@ interface ListedPerformance {
   startsAt: number
   status: string
   bookingClosesHoursBefore: number | null
+  externalBookingUrl: string | null
   soldTickets: number
 }
 
@@ -354,6 +355,70 @@ describe.skipIf(skip !== null)('the booking window is per performance and inheri
   })
 })
 
+describe.skipIf(skip !== null)('a performance may hand its ticketing to an external provider (D-122)', () => {
+  test('setting the URL is recorded with its old and new value', async () => {
+    const id = await newShow()
+    const performance = await addPerformance(id)
+
+    expect((await send('PUT', `/api/admin/performances/${performance}`, {
+      venueId,
+      startsAt: nextWeek(),
+      externalBookingUrl: 'https://tickets.example.org/seagull',
+    })).status).toBe(200)
+
+    expect((await detail(id)).performances.find(one => one.id === performance)?.externalBookingUrl)
+      .toBe('https://tickets.example.org/seagull')
+
+    const entry = trail<{ detail: { changes: { externalBookingUrl: { from: null, to: string } } } }>(
+      'performance.updated',
+      `performance:${performance}`,
+    )
+    expect(entry?.detail.changes.externalBookingUrl).toEqual({ from: null, to: 'https://tickets.example.org/seagull' })
+  })
+
+  // Criterion 1: an internal path this story does not itself build (D-104, D-114, D-124) is
+  // covered by its own suite; the desk sale path exists today and is proved here.
+  test('the desk cannot put an externally ticketed performance on sale, and the link is quoted', async () => {
+    const id = await newShow()
+    const performance = await addPerformance(id, { externalBookingUrl: 'https://tickets.example.org/seagull' })
+
+    const answered = await send('POST', `/api/admin/performances/${performance}/sale`, { onSale: true })
+    expect(answered.status).toBe(409)
+    expect(await answered.text()).toContain('https://tickets.example.org/seagull')
+  })
+
+  // Criterion 3: clearing it is only ever a configuration change, never a sale.
+  test('clearing the URL does not put the performance back on sale', async () => {
+    const id = await newShow()
+    const performance = await addPerformance(id, { externalBookingUrl: 'https://tickets.example.org/seagull' })
+
+    expect((await send('PUT', `/api/admin/performances/${performance}`, {
+      venueId,
+      startsAt: nextWeek(),
+      externalBookingUrl: null,
+    })).status).toBe(200)
+
+    const found = (await detail(id)).performances.find(one => one.id === performance)
+    expect(found?.externalBookingUrl).toBeNull()
+    expect(found?.status).toBe('DRAFT')
+
+    const onSale = await send('POST', `/api/admin/performances/${performance}/sale`, { onSale: true })
+    expect(onSale.status).toBe(200)
+  })
+
+  test('text that is not a URL is refused', async () => {
+    const id = await newShow()
+    const performance = await addPerformance(id)
+
+    const answered = await send('PUT', `/api/admin/performances/${performance}`, {
+      venueId,
+      startsAt: nextWeek(),
+      externalBookingUrl: 'the box office',
+    })
+    expect(answered.status).toBe(400)
+  })
+})
+
 describe.skipIf(skip !== null)('who may administer the programme', () => {
   test('the box office officer may, and it is their screen', async () => {
     const title = named('Officer made')
@@ -414,6 +479,37 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('4 Mar 2027')`)
     expect(await textOf(view, '[data-test="performances-table"]')).toContain('20:15')
     expect((await detail(id)).performances.length).toBe(1)
+    view.close()
+  }, 120_000)
+
+  // Criterion 2: an externally ticketed performance states so plainly rather than showing a
+  // house figure or a nought that reads as nobody has bought a ticket.
+  test('an externally ticketed performance names itself rather than a capacity or a sold figure', async () => {
+    const id = await newShow({ title: named('Sold elsewhere') })
+    await addPerformance(id, { externalBookingUrl: 'https://tickets.example.org/seagull' })
+
+    const view = await signedIn()
+    await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="performances-table"]')
+
+    const text = await textOf(view, '[data-test="performances-table"]')
+    expect(text).toContain('Externally ticketed')
+    expect(text).toContain('n/a')
+    view.close()
+  }, 120_000)
+
+  test('setting and clearing the link from the screen', async () => {
+    const id = await newShow({ title: named('Link out') })
+    await addPerformance(id)
+
+    const view = await signedIn()
+    await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="performances-table"]')
+
+    await click(view, '[data-test^="edit-performance-"]')
+    await waitFor(view, `document.querySelector('[data-test="performance-form"]')`)
+    await fill(view, '[data-test="performance-external-url"]', 'https://tickets.example.org/seagull')
+    await click(view, '[data-test="performance-submit"]')
+
+    await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('Externally ticketed')`)
     view.close()
   }, 120_000)
 })

@@ -135,6 +135,10 @@ const CATALOGUE = {
   'content-warning.created': { label: 'Content warning added to the vocabulary', module: 'ticketing' },
   'content-warning.updated': { label: 'Content warning changed', module: 'ticketing' },
   'content-warning.deleted': { label: 'Content warning deleted', module: 'ticketing' },
+  'pass-type.created': { label: 'Pass added', module: 'ticketing' },
+  'pass-type.updated': { label: 'Pass changed', module: 'ticketing' },
+  'pass-type.shows.updated': { label: 'Pass covered shows changed', module: 'ticketing' },
+  'pass-type.deleted': { label: 'Pass deleted', module: 'ticketing' },
 
   // Module E: show night
 

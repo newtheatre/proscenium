@@ -26,6 +26,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const window = input.bookingClosesHoursBefore ?? null
+  const externalBookingUrl = input.externalBookingUrl ?? null
 
   // Moving a house means moving the rota: the open shifts were stamped from the old venue's
   // template, and the new venue's is what this performance is staffed from now (E-102).
@@ -42,6 +43,9 @@ export default defineEventHandler(async (event) => {
       intervalMinutes: input.intervalMinutes ?? null,
       capacityOverride: input.capacityOverride ?? null,
       bookingClosesHoursBefore: window,
+      // Clearing this never touches status: sales stay off until an explicit on-sale action
+      // (D-122 criterion 3).
+      externalBookingUrl,
       notes: input.notes ?? null,
       updatedAt: Math.floor(Date.now() / 1000),
     }).where(eq(schema.performances.id, id)),
@@ -58,6 +62,7 @@ export default defineEventHandler(async (event) => {
           capacityOverride: [held.capacityOverride, input.capacityOverride ?? null],
           effectiveCapacity: [effectiveCapacity(held), capacity],
           bookingClosesHoursBefore: [held.bookingClosesHoursBefore, window],
+          externalBookingUrl: [held.externalBookingUrl, externalBookingUrl],
         }),
         // Internal prose stays on the record; the trail records only that it moved (0011).
         notesChanged: (input.notes ?? null) !== held.notes,
