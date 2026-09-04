@@ -217,6 +217,9 @@ export const AUDIT_COVERAGE: Coverage[] = [
     route: 'server/api/admin/bar/movements/index.post.ts',
     exempt: 'the movement is the record: it stamps its own actor and time, cannot be edited or deleted, and a correction supersedes it (0010, F-114 criteria 4 and 5)',
   },
+  { route: 'server/api/till/index.get.ts', exempt: 'reads tonight\'s session for a venue, opening nothing' },
+  { route: 'server/api/till/index.post.ts', actions: ['bar.till.opened'] },
+  { route: 'server/api/till/close.post.ts', actions: ['bar.till.closed'] },
 
   // Module G: training
 

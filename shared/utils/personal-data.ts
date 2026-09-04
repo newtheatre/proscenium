@@ -292,6 +292,15 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // rather than free text, so no movement can name a person in the first place.
     why: 'A stock movement is financial evidence. It stamps who moved the stock, and the tombstone still answers for it.',
   },
+  {
+    name: 'till_sessions',
+    column: 'opened_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Holds no free text at all: an opener and a closer, a venue and a night, both timestamps.
+    why: 'Who opened and closed a night\'s till is the accountable record the reconciliation reads (F-118); the tombstone still answers for it.',
+  },
 
   // Module G: training
 

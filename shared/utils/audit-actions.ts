@@ -173,6 +173,8 @@ const CATALOGUE = {
   'bar.item.updated': { label: 'Stocked item changed', module: 'bar' },
   'bar.item.status.changed': { label: 'Stocked item retired or put back', module: 'bar' },
   'bar.item.deleted': { label: 'Stocked item deleted', module: 'bar' },
+  'bar.till.opened': { label: 'Till session opened', module: 'bar' },
+  'bar.till.closed': { label: 'Till session closed', module: 'bar' },
 
   // Module G: training
 
