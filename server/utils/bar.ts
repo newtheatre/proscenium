@@ -1,7 +1,8 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
-import type { BarCategory, BarProduct, StockItem, StockMovement } from '#shared/utils/bar'
+import { effectivePriceRow } from '#shared/utils/bar'
+import type { BarCategory, BarProduct, ProductVariant, StockItem, StockMovement, VariantComponent, VariantPrice } from '#shared/utils/bar'
 
 // Reading the bar's catalogue and its stock. Two questions the module leans on live here: what a
 // product needs before it may be sold, and what is on hand. Neither is a column.
@@ -15,12 +16,24 @@ export interface BarProductReference {
   sale: boolean
   // What the product gains by having a row here, or null when it is not needed to go active.
   requiredToActivate: string | null
+  // Which rows count towards that requirement, as SQL over the referencing table. Written here
+  // and never taken from a request, which is what makes raw interpolation of it safe.
+  countingOnly?: string
   why: string
 }
 
-// Empty until F-112 adds serving sizes and F-113 adds recipes. A product with no requirements
-// may go active, which is the honest answer while nothing can be sold at all.
-export const BAR_PRODUCT_REFERENCES: BarProductReference[] = []
+// F-113 adds the recipe requirement. Until it does, a product with a serving size may go active,
+// which is the honest answer while a sale cannot resolve an ingredient anyway.
+export const BAR_PRODUCT_REFERENCES: BarProductReference[] = [
+  {
+    table: 'product_variants',
+    column: 'product_id',
+    sale: false,
+    requiredToActivate: 'a serving size',
+    countingOnly: `status = 'ACTIVE'`,
+    why: 'the sizes it sells at: a product with none has no button for the till to draw (F-112)',
+  },
+]
 
 export function productSaleReferences(references = BAR_PRODUCT_REFERENCES): BarProductReference[] {
   return references.filter(reference => reference.sale)
@@ -53,7 +66,10 @@ export function missingBeforeActiveQuery(productId: string, references = product
   if (references.length === 0) return sql`SELECT NULL AS needs WHERE 0`
   const terms = references.map(reference => sql`
     SELECT ${reference.requiredToActivate} AS needs
-    WHERE NOT EXISTS (SELECT 1 FROM ${sql.raw(reference.table)} WHERE ${sql.raw(reference.column)} = ${productId})
+    WHERE NOT EXISTS (
+      SELECT 1 FROM ${sql.raw(reference.table)} WHERE ${sql.raw(reference.column)} = ${productId}
+      ${reference.countingOnly ? sql`AND ${sql.raw(reference.countingOnly)}` : sql``}
+    )
   `)
   return sql.join(terms, sql` UNION ALL `)
 }
@@ -61,6 +77,54 @@ export function missingBeforeActiveQuery(productId: string, references = product
 export async function missingBeforeActive(productId: string): Promise<string[]> {
   if (productActivationReferences().length === 0) return []
   return (await db.all<{ needs: string }>(missingBeforeActiveQuery(productId))).map(row => row.needs)
+}
+
+// Every FK to `product_variants` is classified here or the build fails (bar-variants.test.ts,
+// F-111's rule). `ledger_lines.product_variant_id` has no FK, so F-105's sale row is by hand.
+export const VARIANT_REFERENCES: BarProductReference[] = [
+  {
+    table: 'variant_prices',
+    column: 'variant_id',
+    sale: false,
+    requiredToActivate: null,
+    why: 'what this size costs from a date: configuration, and nobody has bought anything',
+  },
+  {
+    table: 'variant_components',
+    column: 'variant_id',
+    sale: false,
+    requiredToActivate: null,
+    why: 'what pouring one consumes: a recipe, not a sale',
+  },
+]
+
+export function variantSaleReferences(references = VARIANT_REFERENCES): BarProductReference[] {
+  return references.filter(reference => reference.sale)
+}
+
+export function variantEverSoldColumn(alias: string, references = variantSaleReferences()): SQL {
+  if (references.length === 0) return sql`0`
+  const terms = references.map(reference =>
+    sql`EXISTS (SELECT 1 FROM ${sql.raw(reference.table)} WHERE ${sql.raw(reference.column)} = ${sql.raw(alias)}.id)`)
+  return sql`CASE WHEN ${sql.join(terms, sql` OR `)} THEN 1 ELSE 0 END`
+}
+
+export function variantEverSoldQuery(variantId: string, references = variantSaleReferences()): SQL {
+  if (references.length === 0) return sql`SELECT 0 AS sold`
+  const terms = references.map(reference =>
+    sql`EXISTS (SELECT 1 FROM ${sql.raw(reference.table)} WHERE ${sql.raw(reference.column)} = ${variantId})`)
+  return sql`SELECT CASE WHEN ${sql.join(terms, sql` OR `)} THEN 1 ELSE 0 END AS sold`
+}
+
+// The latest row on or before the day, ties broken by `rowid`: `created_at` is second precision
+// and `id` a random UUID, but this table never deletes, so `rowid` is insertion order (F-116).
+export function effectivePriceColumn(alias: string, on: string): SQL {
+  return sql`(
+    SELECT p.price_pence FROM variant_prices p
+    WHERE p.variant_id = ${sql.raw(alias)}.id AND p.effective_from <= ${on}
+    ORDER BY p.effective_from DESC, p.created_at DESC, p.rowid DESC
+    LIMIT 1
+  )`
 }
 
 // On-hand is the sum of an item's movements, computed where it is asked for and stored nowhere
@@ -276,6 +340,104 @@ export async function itemNamed(name: string, exceptId?: string): Promise<StockI
     FROM bar_items i WHERE i.name = ${name} COLLATE NOCASE${except} LIMIT 1
   `)
   return row ? readItem(row) : undefined
+}
+
+interface VariantRow extends Omit<ProductVariant, 'everSold' | 'everPriced' | 'components'> {
+  everSold: number
+  everPriced: number
+}
+
+// Whether anything has priced this size, past, today or future: append-only, so this is what
+// gates deletion rather than `pricePence`, which only answers for today (F-116).
+export function everPricedColumn(alias: string): SQL {
+  return sql`(SELECT EXISTS (SELECT 1 FROM variant_prices WHERE variant_id = ${sql.raw(alias)}.id))`
+}
+
+interface ComponentRow extends Omit<VariantComponent, 'includedInPrice'> {
+  variantId: string
+  includedInPrice: number
+}
+
+const VARIANT_COLUMNS = sql`
+  v.id AS id,
+  v.product_id AS productId,
+  v.serving_kind AS servingKind,
+  v.label AS label,
+  v.status AS status,
+  v.sort AS sort
+`
+
+// Scoped by subquery rather than by an id list read out of the variants: a bound-parameter count
+// must not grow with the rows it covers (0003, 0006).
+function componentsQuery(scope: SQL): SQL {
+  return sql`
+    SELECT c.id AS id, c.variant_id AS variantId, c.item_id AS itemId, i.name AS itemName, i.unit AS unit,
+           c.choice_group_id AS choiceGroupId, g.name AS choiceGroupName,
+           c.qty AS qty, c.included_in_price AS includedInPrice
+    FROM variant_components c
+    LEFT JOIN bar_items i ON i.id = c.item_id
+    LEFT JOIN choice_groups g ON g.id = c.choice_group_id
+    WHERE c.variant_id IN (${scope})
+    ORDER BY i.name COLLATE NOCASE, g.name COLLATE NOCASE
+  `
+}
+
+const readComponent = (row: ComponentRow): VariantComponent => ({
+  id: row.id,
+  itemId: row.itemId,
+  itemName: row.itemName,
+  unit: row.unit,
+  choiceGroupId: row.choiceGroupId,
+  choiceGroupName: row.choiceGroupName,
+  qty: row.qty,
+  includedInPrice: row.includedInPrice === 1,
+})
+
+function withComponents(variants: VariantRow[], components: ComponentRow[]): ProductVariant[] {
+  return variants.map(variant => ({
+    ...variant,
+    pricePence: variant.pricePence === null ? null : Number(variant.pricePence),
+    everSold: variant.everSold === 1,
+    everPriced: variant.everPriced === 1,
+    components: components.filter(component => component.variantId === variant.id).map(readComponent),
+  }))
+}
+
+// Every size a product sells at, each with what it depletes and what it costs today.
+export async function variantsOf(productId: string, on: string, includeRetired = true): Promise<ProductVariant[]> {
+  const retired = includeRetired ? sql`` : sql` AND v.status = 'ACTIVE'`
+  const variants = await db.all<VariantRow>(sql`
+    SELECT ${VARIANT_COLUMNS}, ${effectivePriceColumn('v', on)} AS pricePence, ${variantEverSoldColumn('v')} AS everSold,
+           ${everPricedColumn('v')} AS everPriced
+    FROM product_variants v WHERE v.product_id = ${productId}${retired}
+    ORDER BY v.status, v.sort, v.label COLLATE NOCASE
+  `)
+  const components = await db.all<ComponentRow>(componentsQuery(sql`SELECT id FROM product_variants WHERE product_id = ${productId}`))
+  return withComponents(variants, components)
+}
+
+export async function variantById(id: string, on: string): Promise<ProductVariant | undefined> {
+  const [row] = await db.all<VariantRow>(sql`
+    SELECT ${VARIANT_COLUMNS}, ${effectivePriceColumn('v', on)} AS pricePence, ${variantEverSoldColumn('v')} AS everSold,
+           ${everPricedColumn('v')} AS everPriced
+    FROM product_variants v WHERE v.id = ${id}
+  `)
+  if (!row) return undefined
+  const components = await db.all<ComponentRow>(componentsQuery(sql`SELECT id FROM product_variants WHERE id = ${id}`))
+  return withComponents([row], components)[0]
+}
+
+// The whole series, newest first, with the row today resolves to marked (F-116 criterion 5).
+export async function priceHistory(variantId: string, on: string): Promise<VariantPrice[]> {
+  const history = await db.all<Omit<VariantPrice, 'effective'>>(sql`
+    SELECT p.id AS id, p.variant_id AS variantId, p.price_pence AS pricePence,
+           p.effective_from AS effectiveFrom, p.created_at AS createdAt, p.created_by AS createdBy,
+           p.rowid AS seq
+    FROM variant_prices p WHERE p.variant_id = ${variantId}
+    ORDER BY p.effective_from DESC, p.created_at DESC, p.rowid DESC
+  `)
+  const winner = effectivePriceRow(history, on)
+  return history.map(price => ({ ...price, effective: price.id === winner?.id }))
 }
 
 export interface MovementFilters {

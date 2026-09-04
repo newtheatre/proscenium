@@ -232,6 +232,13 @@ const columns: TableColumn<BarProduct>[] = [
         'size': 'sm',
         'color': 'neutral',
         'variant': 'ghost',
+        'to': `/bar/products/${row.original.id}`,
+        'data-test': `sizes-${row.original.id}`,
+      }, () => 'Serving sizes'),
+      h(UButton, {
+        'size': 'sm',
+        'color': 'neutral',
+        'variant': 'ghost',
         'data-test': `edit-${row.original.id}`,
         'onClick': () => edit(row.original),
       }, () => 'Edit'),

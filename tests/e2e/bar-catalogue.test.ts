@@ -68,6 +68,10 @@ const addProduct = async (categoryId: string, over: Record<string, unknown> = {}
 const addItem = async (over: Record<string, unknown> = {}): Promise<string> =>
   created(await send('POST', '/api/admin/bar/items', { name: named('Bottle'), unit: 'ML', containerMl: 750, ...over }))
 
+// A product needs a serving size before it may go active (F-112 criterion 2).
+const addVariant = async (productId: string, over: Record<string, unknown> = {}): Promise<string> =>
+  created(await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'bottle', label: 'Bottle', ...over }))
+
 interface ListedProduct {
   id: string
   name: string
@@ -178,6 +182,8 @@ describe.skipIf(skip !== null)('a product is retired, never destroyed (F-111 cri
     const id = await addProduct(categoryId)
     expect((await products()).find(product => product.id === id)?.status).toBe('HIDDEN')
 
+    expect((await send('POST', `/api/admin/bar/products/${id}/status`, { status: 'ACTIVE' })).status).toBe(409)
+    await addVariant(id)
     expect((await send('POST', `/api/admin/bar/products/${id}/status`, { status: 'ACTIVE' })).status).toBe(200)
     expect((await products()).find(product => product.id === id)?.status).toBe('ACTIVE')
   })
@@ -279,6 +285,7 @@ describe.skipIf(skip !== null)('every change is audited with a from and a to (F-
 
   test('a status change records the state it moved between', async () => {
     const id = await addProduct(await addCategory())
+    await addVariant(id)
     await send('POST', `/api/admin/bar/products/${id}/status`, { status: 'ACTIVE' })
 
     const entry = trail<{ detail: { changes: { status: { from: string, to: string } } } }>(
