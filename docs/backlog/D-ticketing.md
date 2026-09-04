@@ -7,7 +7,7 @@ half of this module reserves and the desk takes payment (Get-In constraint 1). G
 the core model; capacity is a count enforced by the database, and seat maps are deliberately Later
 (Get-In constraint 4).
 
-Stories: 38 total. 30 MVP (D-101 to D-130), 5 V2 (D-201 to D-206, with D-205 resolved as
+Stories: 39 total. 31 MVP (D-101 to D-131), 5 V2 (D-201 to D-206, with D-205 resolved as
 won't-build), 2 Later epics (D-301, D-302).
 
 Open questions:
@@ -653,6 +653,35 @@ Open questions:
   committee decides; and whether it covers external hires, which ships as our own productions
   only, because an external hire's house is not ours to give away.
 - Source: Committee direction, 26 August 2026; decision 0023.
+
+## D-131: Administer the programme's reference data
+
+- Role: Box Office officer
+- Phase: MVP
+- Story: As the box office manager, I want to administer venues, seasons and show categories so
+  that the vocabulary a show is published against is maintained in the console rather than seeded
+  once and edited in the database.
+- Depends on: D-121
+- Acceptance criteria:
+  1. Venues can be created, edited and retired, with the columns the data model gives them. A
+     venue may point at a room and need not; the only effect of the attachment is that the
+     venue's performances apply blackouts to that room, and nothing else about a room is
+     inferred from a venue or the reverse (0043).
+  2. Seasons can be created, edited and retired, and carry the order they are presented in. A
+     show belongs to at most one season.
+  3. Show categories can be created, edited and retired.
+  4. Nothing here is ever destroyed while it is in use: a venue with performances, a season with
+     shows or a category with shows refuses deletion and offers retirement instead, and a
+     retired row keeps serving the records that already point at it (0050).
+  5. A retired venue, season or category cannot be chosen for new work, and the publish flow
+     refuses a show whose category or season was retired after it was drafted.
+  6. Every create, edit and retire is audited.
+  7. The screens sit under `/box-office`, never `/admin`, which means System and nothing else
+     (0040), and their API routes stay under `/api/admin/**`. The venue emergency card is show
+     night's screen at `/rota/manage/venues/[id]/emergency` (E-113): this story administers the
+     venue row and links to that card rather than building it.
+- Source: Committee direction, 4 September 2026. The programme schema shipped these tables as
+  Wave 0 contract (d) with no screen over them, and the build order recorded the gap.
 
 ## D-201: Named allocations reserve capacity without tickets
 
