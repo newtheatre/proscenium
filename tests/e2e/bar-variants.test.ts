@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -92,6 +93,19 @@ async function prices(variantId: string): Promise<ListedPrice[]> {
 
 const priceOf = async (productId: string, variantId: string): Promise<number | null> =>
   (await variants(productId)).find(variant => variant.id === variantId)?.pricePence ?? null
+
+function auditCount(action: string, target: string): number {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    const row = database
+      .query('SELECT count(*) AS total FROM audit_log WHERE action = ? AND target = ?')
+      .get(action, target) as { total: number }
+    return row.total
+  }
+  finally {
+    database.close()
+  }
+}
 
 describe.skipIf(skip !== null)('one stocked thing sells at many sizes (F-112 criteria 1, 2 and 4)', () => {
   test('a bottle sells four ways, each depleting the same stocked item differently', async () => {
@@ -212,6 +226,22 @@ describe.skipIf(skip !== null)('a size is retired, never destroyed (F-112 criter
     const id = await addVariant(productId)
     expect((await send('DELETE', `/api/admin/bar/variants/${id}`)).status).toBe(200)
     expect((await send('DELETE', `/api/admin/bar/variants/${id}`)).status).toBe(404)
+  })
+
+  // The status write batches a conditional UPDATE with an audit insert that reads `changes()`,
+  // the row count of that same UPDATE, so a losing race writes neither (0001, 0003).
+  test('two people retiring the same size at once write one audit entry between them', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId)
+
+    const raced = await Promise.all([
+      send('POST', `/api/admin/bar/variants/${id}/status`, { status: 'RETIRED' }),
+      send('POST', `/api/admin/bar/variants/${id}/status`, { status: 'RETIRED' }, barManager.cookie),
+    ])
+
+    expect(raced.filter(answered => answered.status === 200).length).toBe(1)
+    expect((await variants(productId)).find(variant => variant.id === id)?.status).toBe('RETIRED')
+    expect(auditCount('bar.variant.status.changed', `bar-variant:${id}`)).toBe(1)
   })
 
   test('a size does not move between products', async () => {

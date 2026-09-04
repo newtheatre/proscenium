@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { VARIANT_REFERENCES, effectivePriceColumn, everPricedColumn, variantEverSoldQuery } from '#server/utils/bar'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import type { TestDatabase } from '#tests/helpers/database'
+import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
 
 // F-112 and F-116 on the real migrations. A size is a row, its depletion is stated in the stocked
 // item's own units, and its price is an append-only dated series (0017, 0010).
@@ -304,6 +304,47 @@ describe('a price is a dated append-only row (F-116 criteria 1, 2 and 3)', () =>
       insert(database, 'users', { id: 'u1', email: 'bar@example.invalid', name: 'A Manager', verified: 1 })
       price(database, { created_by: 'u1' })
       expect(() => database.batch([['DELETE FROM users WHERE id = \'u1\'']])).toThrow()
+    })
+  })
+})
+
+// `changes()` names the row count of the statement just before it on this connection, so an
+// audit insert can read whether *this* UPDATE changed anything, not the resulting state (0003).
+describe('changes() after a conditional UPDATE names that UPDATE\'s own effect', () => {
+  const statusChange = (from: string, to: string, auditId: string): BoundStatement[] => [
+    ['UPDATE product_variants SET status = ? WHERE id = ? AND status = ?', to, 'var-1', from],
+    [`INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ?, NULL, 'bar.variant.status.changed', 'bar-variant:var-1', '{}'
+      WHERE changes() = 1`, auditId],
+  ]
+
+  test('a matching predicate changes the row and writes exactly one audit entry', async () => {
+    await withDatabase((database) => {
+      wine(database)
+      variant(database, { status: 'ACTIVE' })
+
+      database.batch(statusChange('ACTIVE', 'RETIRED', 'a1'))
+
+      expect(rows<{ status: string }>(database, 'SELECT status FROM product_variants WHERE id = \'var-1\'')[0]!.status)
+        .toBe('RETIRED')
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(1)
+    })
+  })
+
+  // The loser's own predicate matches nothing even though the row now reads RETIRED, which a
+  // predicate over the resulting state rather than `changes()` could not tell from a win.
+  test('a predicate that already lost the race changes nothing and writes no audit entry', async () => {
+    await withDatabase((database) => {
+      wine(database)
+      variant(database, { status: 'ACTIVE' })
+
+      database.batch(statusChange('ACTIVE', 'RETIRED', 'a1'))
+      // The loser still believes the variant was ACTIVE when it read it.
+      database.batch(statusChange('ACTIVE', 'RETIRED', 'a2'))
+
+      expect(rows<{ status: string }>(database, 'SELECT status FROM product_variants WHERE id = \'var-1\'')[0]!.status)
+        .toBe('RETIRED')
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(1)
     })
   })
 })

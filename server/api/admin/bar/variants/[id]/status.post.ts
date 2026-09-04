@@ -20,25 +20,23 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // The predicate rides the write, so a second request racing the same change finds nothing
-  // left to change rather than writing a second audit entry for one transition (0003).
-  const updated = await db.all<{ id: string }>(sql`
-    UPDATE product_variants SET status = ${status} WHERE id = ${id} AND status = ${held.status}
-    RETURNING id
-  `)
-  if (updated.length === 0) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: status === 'RETIRED' ? `${held.label} is already retired` : `${held.label} is not retired`,
-    })
-  }
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  const entry = auditEntry({
     actorId: resolved.account.id,
     action: 'bar.variant.status.changed',
     target: `bar-variant:${id}`,
     detail: changes({ status: [held.status, status] }),
-  }))
+  })
+
+  // The audit insert reads `changes()`, this connection's own UPDATE row count, not the
+  // resulting state: a losing request's UPDATE touches nothing, whatever the winner did (0003).
+  await db.batch([
+    db.run(sql`UPDATE product_variants SET status = ${status} WHERE id = ${id} AND status = ${held.status}`),
+    db.run(sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
+      WHERE changes() = 1
+    `),
+  ])
 
   return { ok: true, status }
 })
