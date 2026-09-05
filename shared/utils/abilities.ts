@@ -53,6 +53,10 @@ export const viewPassTypes = defineAbility((viewer: Viewer) => holds(viewer, 'ti
 // dropped (D-123 criterion 4).
 export const managePassTypes = defineAbility((viewer: Viewer) => holds(viewer, 'ticketing.manage'))
 
+// Sighting evidence and deciding an access profile declaration, held by a named accessibility
+// officer and never by general box office (D-127 criterion 2).
+export const verifyAccessProfiles = defineAbility((viewer: Viewer) => holds(viewer, 'access.verify'))
+
 // The bar's catalogue and its stock register, both sit-down work. Selling over the bar is the
 // till's, and the till derives from tonight rather than from either of these (0009, F-111).
 export const viewBarCatalogue = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read'))
@@ -98,6 +102,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   managePassTypes: 'ticketing.manage',
   viewBarCatalogue: 'bar.read',
   viewBarStock: 'bar.read',
+  verifyAccessProfiles: 'access.verify',
   viewRota: 'rota.read',
   manageRota: 'rota.write',
   workTheDoor: 'night.door',

@@ -407,6 +407,13 @@
       "when": 1788539821646,
       "tag": "0057_one_till_session_open_per_venue_per_night",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1788564745778,
+      "tag": "0058_add_access_profiles_for_the_special_category_declaration",
+      "breakpoints": true
     }
   ]
 }

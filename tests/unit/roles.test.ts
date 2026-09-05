@@ -44,9 +44,9 @@ describe('the role vocabulary', () => {
     for (const target of targets) {
       expect(`${target}: ${isRole(target)}`).toBe(`${target}: true`)
     }
-    // Every role should be reachable by import, save the one the old estate never had: the bar
-    // was run on paper and a card reader, so there is no old row to map (0044).
-    expect([...ROLES].filter(role => !targets.has(role))).toEqual(['BAR_MANAGER'])
+    // Every role should be reachable by import, save the two the old estate never had: no card
+    // reader (0044) and no access profiles to verify (D-127), so neither has an old row to map.
+    expect([...ROLES].filter(role => !targets.has(role))).toEqual(['BAR_MANAGER', 'ACCESSIBILITY_OFFICER'])
   })
 
   // Questions 7 and 8, answered 2 September. Pinned because a role widening is a governance
@@ -151,5 +151,16 @@ describe('permissions come from live grants only', () => {
   test('the box office holds the programme configuration and nothing operational', () => {
     const held = permissionsFor([{ role: 'BOX_OFFICE', expiresAt: null }], now)
     expect([...held].sort()).toEqual(['ticketing.read', 'ticketing.write'])
+  })
+
+  // The whole point of the role: a named accessibility officer, never general box office
+  // (D-127 criterion 2).
+  test('only the accessibility officer holds access.verify, and the box office does not', () => {
+    expect([...permissionsFor([{ role: 'ACCESSIBILITY_OFFICER', expiresAt: null }], now)]).toEqual(['access.verify'])
+    expect(permissionsFor([{ role: 'BOX_OFFICE', expiresAt: null }], now).has('access.verify')).toBe(false)
+    for (const [role, held] of Object.entries(PERMISSION_MAP)) {
+      if (role === 'ADMIN' || role === 'ACCESSIBILITY_OFFICER') continue
+      expect(`${role}: ${held.includes('access.verify')}`).toBe(`${role}: false`)
+    }
   })
 })
