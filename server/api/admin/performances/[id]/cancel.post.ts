@@ -46,16 +46,18 @@ export default defineEventHandler(async (event) => {
   for (const holder of holders) {
     // The write is idempotent and the read before it is not, so two officers cancelling at once
     // would otherwise tell every holder twice. The claim is what makes the send at most once.
+    const key = `shift.performance-cancelled:${holder.shiftId}`
     const took = await claimNotification({
       userId: holder.userId!,
       type: 'shift.performance-cancelled',
-      key: `shift.performance-cancelled:${holder.shiftId}`,
+      key,
     })
     if (!took) continue
 
     await notify(event, {
       userId: holder.userId!,
       type: 'shift.performance-cancelled',
+      claim: key,
       context: {
         name: '',
         show: held.showTitle,

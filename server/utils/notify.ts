@@ -1,6 +1,6 @@
 import { consola } from 'consola'
 import type { H3Event } from 'h3'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { undeliverableReason } from '#shared/utils/deliverability'
 import { deliversOn, messageType } from '#shared/utils/notifications'
 import type { Channel, Preference } from '#shared/utils/notifications'
@@ -93,11 +93,21 @@ export interface Notification {
   // Built by the caller, because what a message carries is the caller's business rather than the
   // template's. A transport that cannot attach still sends the message (C-104 criterion 1).
   attachments?: Attachment[]
+  // The key(s) claimNotification() was called with. Present, notify() updates that row (or, for
+  // a digest, every claimed row) to its outcome instead of inserting a second one (0048).
+  claim?: string | string[]
 }
 
 type Status = 'SENT' | 'FAILED' | 'SKIPPED_UNDELIVERABLE'
 
-async function record(userId: string | null, type: string, channel: Channel, status: Status, subject: string | null, error: string | null): Promise<void> {
+// A claim updates in place; an unclaimed send inserts fresh, exactly as before claims existed.
+async function record(userId: string | null, type: string, channel: Channel, status: Status, subject: string | null, error: string | null, claim?: string | string[]): Promise<void> {
+  const sentAt = status === 'SENT' ? Math.floor(Date.now() / 1000) : null
+  if (claim) {
+    const matches = Array.isArray(claim) ? inArray(schema.notificationLog.claim, claim) : eq(schema.notificationLog.claim, claim)
+    await db.update(schema.notificationLog).set({ status, subject, sentAt, error }).where(matches)
+    return
+  }
   await db.insert(schema.notificationLog).values({
     id: crypto.randomUUID().replaceAll('-', ''),
     userId,
@@ -105,13 +115,13 @@ async function record(userId: string | null, type: string, channel: Channel, sta
     channel,
     subject,
     status,
-    sentAt: status === 'SENT' ? Math.floor(Date.now() / 1000) : null,
+    sentAt,
     error,
   })
 }
 
-// A claim on the ledger: it writes the row and the unique index refuses the second attempt, so a
-// caller that must not repeat itself never reads before writing (0006, G-125 criterion 1).
+// The row and the unique index refuse a second attempt, so a caller never reads before writing
+// (0006, G-125). Written PENDING: notify() updates this row to its outcome, one row per send (0048).
 export async function claimNotification(claim: {
   userId: string
   type: string
@@ -124,11 +134,10 @@ export async function claimNotification(claim: {
     userId: claim.userId,
     type: claim.type,
     channel: 'EMAIL',
-    status: 'SENT',
+    status: 'PENDING',
     recordId: claim.recordId,
     sessionId: claim.sessionId,
     claim: claim.key,
-    sentAt: Math.floor(Date.now() / 1000),
   }).onConflictDoNothing().returning({ id: schema.notificationLog.id })
 
   return taken.length > 0
@@ -152,19 +161,19 @@ export async function notify(event: H3Event | undefined, notification: Notificat
   // (H-101 criterion 5).
   const account = await findById(notification.userId)
   if (!account) {
-    await record(null, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, 'no-account')
+    await record(null, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, 'no-account', notification.claim)
     return 'SKIPPED_UNDELIVERABLE'
   }
 
   const undeliverable = undeliverableReason({ email: account.email, anonymisedAt: account.anonymisedAt })
   if (undeliverable) {
-    await record(account.id, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, undeliverable)
+    await record(account.id, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, undeliverable, notification.claim)
     return 'SKIPPED_UNDELIVERABLE'
   }
 
   // Only verification, claim and reset may reach an address nobody has proven (A-102).
   if (!account.verified && !type.reachesUnverified) {
-    await record(account.id, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, 'unverified-address')
+    await record(account.id, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, 'unverified-address', notification.claim)
     return 'SKIPPED_UNDELIVERABLE'
   }
 
@@ -175,7 +184,7 @@ export async function notify(event: H3Event | undefined, notification: Notificat
   }).from(schema.notificationPreferences).where(eq(schema.notificationPreferences.userId, account.id))
 
   if (!deliversOn(type, 'EMAIL', preferences as Preference[])) {
-    await record(account.id, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, 'preference')
+    await record(account.id, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, 'preference', notification.claim)
     return 'SKIPPED_UNDELIVERABLE'
   }
 
@@ -191,12 +200,12 @@ export async function notify(event: H3Event | undefined, notification: Notificat
       text: rendered.text,
       ...(notification.attachments?.length ? { attachments: notification.attachments } : {}),
     })
-    await record(account.id, notification.type, 'EMAIL', 'SENT', rendered.subject, null)
+    await record(account.id, notification.type, 'EMAIL', 'SENT', rendered.subject, null, notification.claim)
     return 'SENT'
   }
   catch (error) {
     // The message is not lost: the log carries it, and retries are H-105's job.
-    await record(account.id, notification.type, 'EMAIL', 'FAILED', rendered.subject, error instanceof Error ? error.message : String(error))
+    await record(account.id, notification.type, 'EMAIL', 'FAILED', rendered.subject, error instanceof Error ? error.message : String(error), notification.claim)
     return 'FAILED'
   }
 }

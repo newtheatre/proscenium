@@ -832,10 +832,11 @@ export async function resolveRequestsFor(
 
   let told = 0
   for (const row of waiting) {
+    const key = `training.request.scheduled:${row.id}`
     const took = await claimNotification({
       userId: row.userId,
       type: 'training.request.scheduled',
-      key: `training.request.scheduled:${row.id}`,
+      key,
       sessionId,
     })
     if (!took) continue
@@ -843,6 +844,7 @@ export async function resolveRequestsFor(
     await notify(event, {
       type: 'training.request.scheduled',
       userId: row.userId,
+      claim: key,
       context: {
         name: '',
         moduleName: row.moduleName,
