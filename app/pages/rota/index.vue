@@ -28,18 +28,44 @@ interface OpenShift {
   unlockedBy: { moduleId: string, moduleName: string } | null
 }
 
-const { data: mine } = await useFetch<{ items: MyShift[] }>('/api/rota/mine', {
+const toast = useToast()
+
+const { data: mine, refresh: refreshMine } = await useFetch<{ items: MyShift[] }>('/api/rota/mine', {
   default: (): { items: MyShift[] } => ({ items: [] }),
 })
 
 const role = ref<ShiftRole | undefined>(undefined)
 const page = ref(1)
 
-const { data, status } = await useFetch<Page<OpenShift>>('/api/rota/shifts', {
+const { data, status, refresh } = await useFetch<Page<OpenShift>>('/api/rota/shifts', {
   query: computed(() => ({ role: role.value, page: page.value })),
   watch: [role, page],
   default: (): Page<OpenShift> => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1 }),
 })
+
+const claiming = ref<string | null>(null)
+
+async function claim(shift: OpenShift): Promise<void> {
+  claiming.value = shift.shiftId
+  try {
+    const answer = await $fetch<{ status: 'CLAIMED' | 'CONFIRMED' }>(`/api/rota/shifts/${shift.shiftId}/claim`, { method: 'POST' })
+    toast.add({
+      title: answer.status === 'CONFIRMED' ? 'Shift confirmed' : 'Claim sent for approval',
+      description: answer.status === 'CONFIRMED'
+        ? `${saysShiftRole(shift.role)} at ${shift.venueName} is yours.`
+        : 'The FOH officer will confirm or decline it; you will be told either way.',
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    await Promise.all([refresh(), refreshMine()])
+  }
+  catch (error) {
+    toast.add({ title: 'Could not claim that', description: refusalText(error), icon: 'i-lucide-x', color: 'error' })
+  }
+  finally {
+    claiming.value = null
+  }
+}
 
 function spanOf(startsAt: number): string {
   return formatLondon(new Date(startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
@@ -79,7 +105,7 @@ useSeoMeta({ title: 'My rota' })
             <p class="flex flex-wrap items-center gap-2 font-medium">
               {{ saysShiftRole(shift.role) }}, {{ shift.venueName }}
               <UBadge
-                :color="shift.status === 'CONFIRMED' ? 'success' : 'warning'"
+                :color="shift.status === 'CONFIRMED' ? 'success' : shift.status === 'DECLINED' ? 'error' : 'warning'"
                 variant="subtle"
                 size="sm"
               >
@@ -189,6 +215,15 @@ useSeoMeta({ title: 'My rota' })
               Not open for claiming yet: the committee has not named what unlocks this role.
             </p>
           </div>
+          <UButton
+            v-if="shift.eligible"
+            size="sm"
+            :loading="claiming === shift.shiftId"
+            :data-test="`claim-${shift.shiftId}`"
+            @click="claim(shift)"
+          >
+            Claim
+          </UButton>
         </li>
       </ul>
 

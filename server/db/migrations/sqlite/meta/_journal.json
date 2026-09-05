@@ -435,6 +435,13 @@
       "when": 1788645680407,
       "tag": "0061_stocktakes_and_stocked_item_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "6",
+      "when": 1788646069465,
+      "tag": "0062_shifts_carry_a_decline_reason",
+      "breakpoints": true
     }
   ]
 }

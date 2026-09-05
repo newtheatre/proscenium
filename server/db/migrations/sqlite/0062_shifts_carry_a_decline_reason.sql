@@ -1,0 +1,1 @@
+ALTER TABLE `shifts` ADD `decline_reason` text;

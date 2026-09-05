@@ -285,7 +285,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     section: 'shifts',
     columns: ['performance_id', 'role', 'slot', 'status', 'claimed_at', 'confirmed_at'],
     erasure: 'scrub',
-    scrub: ['notes'],
+    scrub: ['notes', 'decline_reason'],
     // Who staffed which performance is the staffing record the night report and E-123 read; a
     // note written on the slot is not.
     why: 'Which performances somebody worked. The staffing record survives; a note on the slot does not.',

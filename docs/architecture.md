@@ -376,7 +376,7 @@ confirmed duty managers and the same person may hold shifts on both (E-127 crite
 
 Moving a performance to another venue carries a claimed or confirmed shift with it: the holder is
 told the venue changed and pointed at their rota to release it if it does not suit, though nothing
-can yet act on that link until E-104 and E-105 build the release itself (`docs/known-issues.md`).
+can yet act on that link until E-107 builds the release itself (`docs/known-issues.md`).
 A held shift in a role the new venue's template does not staff at all cannot travel, so it is
 cancelled and its holder told instead, the same way a cancelled performance tells them (E-101,
 E-102, committee direction 4 September 2026).
@@ -384,6 +384,30 @@ E-102, committee direction 4 September 2026).
 Templates are administered at `/rota/manage/templates` under `rota.read` and `rota.write`. A
 member's own `/rota` (E-103) shows what they already hold and the open shifts on the diary, each
 carrying live eligibility rather than a cached one.
+
+### Claiming, confirming and declining (E-104, E-105)
+
+`claimShiftStatement(shiftId, userId, status)` is the whole of E-104's race safety: the UPDATE's
+own WHERE clause asserts both that the shift is still `OPEN` and, by a correlated `NOT EXISTS`
+against the shift's own `performance_id`, that this member holds no other claimed or confirmed
+shift on that performance, so two simultaneous claims settle to exactly one winner and a double
+booking is refused the same way (criteria 1 to 3). Neither predicate is a read followed by a
+write. The `status` written, `CLAIMED` or `CONFIRMED`, comes from
+`SHIFT_CLAIM_AUTO_CONFIRM` (E-105 criterion 1), read fresh on every claim, never cached.
+
+Winner or loser is read from the write's own `RETURNING`, never by comparing the caller against a
+stored actor: that comparison cannot tell a losing racer from the winner when both are the same
+account, which is exactly what a retried claim looks like. A losing write's audit insert is
+suppressed by predicating on `changes() = 1`, this connection's own preceding row count, not on
+the row's resulting state, which a winner has already set, the same shape `performances/[id]/index.put.ts` uses.
+
+`GET /api/admin/rota/approvals`, `POST /api/admin/rota/approvals/[id]/approve` and
+`.../decline` are E-105's queue, gated on `rota.write`, the audience E-101 already gave the
+templates to (module E open question 1). Approving and declining both ride the same
+`changes() = 1` shape; a decline's reason lands on `shifts.decline_reason`, which the claimant is
+emailed, never in the audit trail, which keeps only that the status changed (0011). A declined
+shift stays off the open list rather than reopening itself: reassigning it is E-107's, not built
+yet (`docs/known-issues.md`).
 
 ### Eligibility (E-103)
 

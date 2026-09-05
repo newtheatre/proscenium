@@ -466,6 +466,13 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Training module a member must hold to claim a bar shift.',
   },
+  // Module E open question 1: proposed rather than confirmed in session (docs/workshops.md).
+  SHIFT_CLAIM_AUTO_CONFIRM: {
+    schema: z.boolean(),
+    default: true,
+    workshop: 'spaces-and-training',
+    describes: 'Whether claiming an open shift confirms it immediately or queues it for FOH officer approval.',
+  },
 } as const satisfies Record<string, ConfigKeyDefinition>
 
 export type ConfigKey = keyof typeof CONFIG_KEYS
@@ -515,6 +522,7 @@ export const ENFORCED_KEYS = [
   'SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE',
   'SHIFT_ELIGIBILITY_DOOR_MODULE',
   'SHIFT_ELIGIBILITY_BAR_MODULE',
+  'SHIFT_CLAIM_AUTO_CONFIRM',
   // Read by the directory to count the accounts a sweep would warn, which is the whole of its
   // effect until K-111 builds the sweep itself.
   'RETENTION_FULL_ACCOUNT_YEARS',

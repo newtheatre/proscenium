@@ -357,6 +357,42 @@ The Nottingham New Theatre`,
     }
   },
 
+  // The queue held it, and now it is real: the same information the open-shift list showed
+  // before it was claimed (E-105 criterion 3).
+  'shift-approved': (context: TemplateContext): Rendered => ({
+    subject: `Your ${context.role} shift on ${context.show} is confirmed`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Your ${context.role} shift on ${context.show} at ${context.venue}, ${context.when}, is
+now confirmed.</p>`),
+    text: `Hello ${context.name},
+
+Your ${context.role} shift on ${context.show} at ${context.venue}, ${context.when}, is
+now confirmed.
+
+The Nottingham New Theatre`,
+  }),
+
+  // The reason is theirs to see: it is why a claim that looked settled did not become a shift
+  // (E-105 criterion 3).
+  'shift-declined': (context: TemplateContext): Rendered => ({
+    subject: `Your ${context.role} shift on ${context.show} was declined`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Your claim on the ${context.role} shift for ${context.show} at ${context.venue},
+${context.when}, was declined.</p>
+<p>Why: ${context.reason}</p>
+<p>The shift is not yours to hold; you are welcome to claim something else on the open list.</p>`),
+    text: `Hello ${context.name},
+
+Your claim on the ${context.role} shift for ${context.show} at ${context.venue},
+${context.when}, was declined.
+
+Why: ${context.reason}
+
+The shift is not yours to hold; you are welcome to claim something else on the open list.
+
+The Nottingham New Theatre`,
+  }),
+
   // Good news, so it leads with it. The way out is in the same breath as the place, because a
   // place nobody uses is one somebody else was waiting for.
   'training-session-promoted': (context: TemplateContext): Rendered => {

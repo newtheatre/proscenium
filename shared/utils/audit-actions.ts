@@ -159,6 +159,9 @@ const CATALOGUE = {
   // One entry for the whole backfill: it is one action over a venue, and the rows it added carry
   // their own `created_at` (E-102 criterion 2).
   'shift.stamped': { label: 'Shifts stamped onto performances', module: 'show-night' },
+  'shift.claimed': { label: 'Open shift claimed', module: 'show-night' },
+  'shift.confirmed': { label: 'Claimed shift approved', module: 'show-night' },
+  'shift.declined': { label: 'Claimed shift declined', module: 'show-night' },
 
   // Module F: bar
 

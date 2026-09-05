@@ -43,6 +43,8 @@ export const shifts = sqliteTable('shifts', {
   confirmedAt: integer('confirmed_at'),
   // Describes the slot, never the person in it.
   notes: text('notes'),
+  // Set on a decline; the claimant is shown it, the audit trail is not (E-105 criterion 3, 0011).
+  declineReason: text('decline_reason'),
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
   unique('shifts_performance_slot').on(table.performanceId, table.role, table.slot),

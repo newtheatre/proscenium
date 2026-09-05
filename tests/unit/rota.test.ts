@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
 import {
+  approvalRefusal,
   ASSIGNED_SHIFT_STATUSES,
   COMMITTED_SHIFT_STATUSES,
   MAX_SLOT_COUNT,
@@ -9,6 +10,7 @@ import {
   SHIFT_STATUSES,
   orderedSlots,
   shiftConstraintRefusal,
+  shiftDeclineForm,
   shiftNamesAPerson,
   shiftTemplateForm,
   stampedSlots,
@@ -159,5 +161,28 @@ describe('a constraint violation is a handled refusal (E-106 criterion 3)', () =
   test('no two refusals answer to the same violation', () => {
     const violated = SHIFT_CONSTRAINT_REFUSALS.map(refusal => refusal.violated)
     expect(violated.length).toBe(new Set(violated).size)
+  })
+})
+
+describe('a decline needs a reason the claimant is shown (E-105 criterion 3)', () => {
+  test('an empty reason is refused', () => {
+    expect(shiftDeclineForm.safeParse({ reason: '' }).success).toBe(false)
+    expect(shiftDeclineForm.safeParse({ reason: '   ' }).success).toBe(false)
+  })
+
+  test('a reason is trimmed and kept', () => {
+    const parsed = shiftDeclineForm.parse({ reason: '  Already double-booked  ' })
+    expect(parsed.reason).toBe('Already double-booked')
+  })
+})
+
+describe('why an approval or a decline did not apply (E-105 criterion 2)', () => {
+  test('every non-claimed status says something distinct', () => {
+    const said = SHIFT_STATUSES.filter(status => status !== 'CLAIMED').map(approvalRefusal)
+    expect(new Set(said).size).toBe(said.length)
+  })
+
+  test('an already-confirmed shift says so', () => {
+    expect(approvalRefusal('CONFIRMED')).toContain('already confirmed')
   })
 })

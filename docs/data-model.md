@@ -561,14 +561,18 @@ slot is present at all correlates rows, so it is refused at the write path (E-10
 ordinal within its role on this performance, from 1) · `user_id` NULL → users restrict ·
 `status` CHECK `OPEN|CLAIMED|CONFIRMED|DECLINED|CANCELLED` · `needs_review` bool (training
 gate could not be evaluated) · `assigned_by` NULL → users set null · `claimed_at` ·
-`confirmed_at` · `notes` (describes the slot, safe).
+`confirmed_at` · `notes` (describes the slot, safe) · `decline_reason` NULL (set on a decline,
+shown to the claimant, scrubbed on erasure like `notes`, never carried into the audit trail).
 CHECK `shifts_open_names_nobody`: OPEN implies `user_id` NULL, `CLAIMED|CONFIRMED|DECLINED`
 implies NOT NULL, and CANCELLED says neither, because it keeps whoever held it and held
 nobody when it was open. Partial UNIQUE (`performance_id`) WHERE role='DUTY_MANAGER' AND
 status='CONFIRMED', which is per performance: two performances running at once need two
 confirmed duty managers. UNIQUE (`performance_id`, `role`, `slot`) is what makes stamping
 idempotent (E-102 criterion 2). Claims are conditional writes gated live on training records
-(E-1).
+(E-1), and the same UPDATE's `NOT EXISTS` refuses a second shift on one performance for the
+same member (E-104). `SHIFT_CLAIM_AUTO_CONFIRM` decides whether a claim writes `CONFIRMED` or
+the queued `CLAIMED`; a queued claim is answered at `/rota/manage/approvals` under `rota.write`
+(E-105).
 Cancelling a performance cancels its shifts in the same batch. A refused write reads back as
 a 409 through `shiftConstraintRefusal()`, never as a raw database error (E-106 criterion 3);
 SQLite names the columns for a unique index and the constraint name for a CHECK, so the

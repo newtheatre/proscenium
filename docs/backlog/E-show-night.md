@@ -12,9 +12,10 @@ Counts: 27 MVP stories (E-101 to E-127), 4 V2 stories (E-201 to E-204), 1 Later 
 
 ## Open questions
 
-1. Should claims auto-confirm or queue for approval by default, and in queue mode may any officer
-   confirm or only the FOH officer? The old estate had the toggle; the default needs the Phase 0
-   workshop.
+1. Answered by E-105's pull request: claims auto-confirm by default (`docs/workshops.md`), a
+   proposed value rather than a workshop decision, so it remains a settings change to reverse. In
+   queue mode only `rota.write` holders (the FOH officer and administrators) may confirm or
+   decline, the same audience E-101 gave the templates to.
 2. Which training modules gate which shift roles at launch (duty manager, door, bar), and is any
    time-boxed officer override permitted on a safety-gated role, as stage-door's 90-day eligibility
    overrides once allowed? The catalogue mapping is committee work.

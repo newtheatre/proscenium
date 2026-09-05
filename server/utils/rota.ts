@@ -229,3 +229,107 @@ export function myShiftsQuery(userId: string, now: number): SQL {
     LIMIT 100
   `
 }
+
+// Claiming and approving (E-104, E-105). Every write here binds a fixed number of parameters,
+// never one that grows with how many shifts or performances exist (0003, 0006).
+
+export interface ShiftDetail {
+  shiftId: string
+  performanceId: string
+  role: ShiftRole
+  status: ShiftStatus
+  userId: string | null
+  startsAt: number
+  venueId: string
+  venueName: string
+  showTitle: string
+}
+
+// What every claim, approval and decline reads before it writes: enough to 404, to build the
+// refusal on a losing write, and to notify without a second query.
+export async function shiftDetail(id: string): Promise<ShiftDetail | null> {
+  const [row] = await db.all<ShiftDetail>(sql`
+    SELECT s.id AS shiftId, s.performance_id AS performanceId, s.role AS role, s.status AS status,
+           s.user_id AS userId, p.starts_at AS startsAt,
+           v.id AS venueId, v.name AS venueName, sh.title AS showTitle
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    JOIN venues v ON v.id = p.venue_id
+    JOIN shows sh ON sh.id = p.show_id
+    WHERE s.id = ${id}
+  `)
+  return row ?? null
+}
+
+// Availability and one-shift-per-performance both ride the UPDATE, so two simultaneous claims
+// resolve to exactly one winner (E-104). A duty manager's own uniqueness is the schema's (E-106).
+export function claimShiftStatement(shiftId: string, userId: string, status: ShiftStatus): SQL {
+  return sql`
+    UPDATE shifts AS target
+    SET user_id = ${userId}, status = ${status}, claimed_at = unixepoch(),
+        confirmed_at = ${status === 'CONFIRMED' ? sql`unixepoch()` : sql`NULL`}
+    WHERE target.id = ${shiftId}
+      AND target.status = 'OPEN'
+      AND NOT EXISTS (
+        SELECT 1 FROM shifts AS other
+        WHERE other.performance_id = target.performance_id
+          AND other.user_id = ${userId}
+          AND other.status IN ('CLAIMED', 'CONFIRMED')
+      )
+    RETURNING id
+  `
+}
+
+// Answering a queued claim (E-105 criteria 2 and 3). Both read only `status = 'CLAIMED'` on the
+// write, so two officers deciding at once settle it once between them (0003).
+export function approveShiftStatement(shiftId: string): SQL {
+  return sql`
+    UPDATE shifts SET status = 'CONFIRMED', confirmed_at = unixepoch()
+    WHERE id = ${shiftId} AND status = 'CLAIMED'
+    RETURNING id
+  `
+}
+
+// The reason lands on the row, never in the audit trail, which keeps only that the status
+// changed (0011).
+export function declineShiftStatement(shiftId: string, reason: string): SQL {
+  return sql`
+    UPDATE shifts SET status = 'DECLINED', decline_reason = ${reason}
+    WHERE id = ${shiftId} AND status = 'CLAIMED'
+    RETURNING id
+  `
+}
+
+export interface PendingApprovalRow {
+  shiftId: string
+  role: ShiftRole
+  performanceId: string
+  venueName: string
+  showTitle: string
+  startsAt: number
+  userId: string
+  claimantName: string
+  claimedAt: number | null
+}
+
+// The FOH officer's approval list: every claim waiting on a decision, oldest performance first
+// (E-105 criterion 2).
+export function pendingApprovalsQuery(limit: number, offset: number): SQL {
+  return sql`
+    SELECT s.id AS shiftId, s.role AS role, p.id AS performanceId, p.starts_at AS startsAt,
+           v.name AS venueName, sh.title AS showTitle,
+           s.user_id AS userId, u.name AS claimantName, s.claimed_at AS claimedAt
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    JOIN venues v ON v.id = p.venue_id
+    JOIN shows sh ON sh.id = p.show_id
+    JOIN users u ON u.id = s.user_id
+    WHERE s.status = 'CLAIMED'
+    ORDER BY p.starts_at, s.role, s.slot
+    LIMIT ${limit} OFFSET ${offset}
+  `
+}
+
+export function countPendingApprovalsQuery(): SQL {
+  return sql`SELECT count(*) AS total FROM shifts WHERE status = 'CLAIMED'`
+}
