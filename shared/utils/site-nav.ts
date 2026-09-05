@@ -62,6 +62,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     prefix: '/rota/manage',
     items: [
       { label: 'Shift templates', icon: 'i-lucide-clipboard-list', to: '/rota/manage/templates', ability: viewRota },
+      { label: 'Approvals', icon: 'i-lucide-check-check', to: '/rota/manage/approvals', ability: viewRota },
     ],
   },
 

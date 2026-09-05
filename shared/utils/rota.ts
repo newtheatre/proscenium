@@ -96,6 +96,23 @@ export function saysShiftStatus(status: ShiftStatus): string {
   return 'Cancelled'
 }
 
+// A decline reason the claimant is shown, on the row rather than the audit trail (E-105
+// criterion 3, 0011).
+export const SHIFT_DECLINE_REASON_LIMIT = 1000
+
+export const shiftDeclineForm = z.object({
+  reason: z.string().trim().min(1, 'Say why, because the claimant is shown it').max(SHIFT_DECLINE_REASON_LIMIT),
+})
+
+// Why an approval or a decline did not apply: the predicate rides the write, so this is read
+// only to explain a refusal, never to decide one (E-105 criterion 2).
+export function approvalRefusal(status: ShiftStatus): string {
+  if (status === 'OPEN') return 'Nobody has claimed this shift'
+  if (status === 'CONFIRMED') return 'This shift is already confirmed'
+  if (status === 'DECLINED') return 'This shift was already declined'
+  return 'This shift has been cancelled'
+}
+
 // What a refused write reads as. SQLite names the columns for a unique index and the constraint
 // name for a CHECK, so both spellings appear here (E-106 criterion 3).
 export const SHIFT_CONSTRAINT_REFUSALS: { violated: string, says: string }[] = [

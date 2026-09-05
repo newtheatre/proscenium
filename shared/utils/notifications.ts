@@ -232,6 +232,18 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'shift-rota-unstaffed',
   },
+  // Transactional: the claim was theirs, so the decision is not a preference to silence
+  // (E-105 criterion 3).
+  'shift.approved': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'shift-approved',
+  },
+  'shift.declined': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'shift-declined',
+  },
 
   // Module F: bar
 
