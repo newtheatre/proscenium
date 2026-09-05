@@ -74,3 +74,16 @@ Three rows are decisions the committee still makes and settings the system does 
 products and the per-room opening hours are records rather than rules, entered through the screens
 that own them, and the notification topics are fixed in the schema (0025). The role vocabulary
 mapping is the migration's, in `migration/role-map.json`, and is not a runtime setting either.
+
+## Editorial copy the committee must supply
+
+Not a setting: prose, not a number, and there is no default to propose (D-103). Each page ships
+marked `placeholder: true` until its copy lands, and clearing the flag is then a content edit,
+not a release.
+
+| Page | What is needed |
+| --- | --- |
+| `content/technical-specification.md` | Venue capacities, stage and wing dimensions, rigging, power and access, checked against the building rather than the old estate's copy, which may no longer be accurate. |
+| `content/history.md` | The theatre's founding, and which productions and seasons the committee wants remembered. |
+| `content/get-involved.md` | How joining, auditioning and the technical and production roles actually work this year. |
+| `content/about.md` | Its "Who we are" and "What we do" sections are folklore already stated informally; a proposed default is safe here, but the committee's own wording is what should ship. |

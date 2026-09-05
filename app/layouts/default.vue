@@ -2,8 +2,8 @@
 // Public surfaces get the expressive kit; the chrome is stage black in both colour modes.
 // That is one `dark` class on the subtree, never an override of slot classes.
 
-// What's on is the one public destination that exists, so everybody gets it; the rest of the
-// marketing pages are J-110's and a link to a route that 404s is worse than no nav at all.
+// The header stays to one clear action per audience; the full public nav, editorial pages
+// included, lives in the footer via PUBLIC_NAV (D-103).
 const { account } = useAccount()
 const links = computed(() => (account.value.signedIn
   ? [{ label: 'What\'s on', to: '/whats-on' }, { label: 'Rooms', to: '/rooms' }, { label: 'My bookings', to: '/rooms/mine' }]
