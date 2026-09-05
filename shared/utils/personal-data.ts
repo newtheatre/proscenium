@@ -245,6 +245,27 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // as `config.updated_by` is.
     why: 'A description of a building, not of a person. Front of house reads it in the dark, so nothing removes it.',
   },
+  {
+    name: 'access_profiles',
+    column: 'user_id',
+    // buildBundle is always scoped to one account, so this is the person's own export only;
+    // export-bundle.ts decrypts the payload rather than returning ciphertext (D-127 criterion 4).
+    section: 'access',
+    columns: ['status', 'companions', 'encrypted_payload', 'encryption_iv', 'consent_foh_at', 'verified_at', 'expires_at', 'created_at'],
+    // Deletion is what a GDPR erasure gives it, immediately (D-127 criterion 5); withdrawal by the
+    // owner is the other, slower route to the same end, run by its own 30-day sweep.
+    erasure: 'delete',
+    why: 'Special category data. Erasure removes the row outright rather than anonymising it (D-127).',
+  },
+  {
+    name: 'access_profiles',
+    column: 'verified_by',
+    section: null,
+    columns: null,
+    erasure: 'scrub',
+    scrub: ['verified_by'],
+    why: 'Which officer sighted the evidence and agreed the wording. The decision survives; the officer does not.',
+  },
 
   // Module E: show night
 
@@ -300,6 +321,15 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'keep',
     // Holds no free text at all: an opener and a closer, a venue and a night, both timestamps.
     why: 'Who opened and closed a night\'s till is the accountable record the reconciliation reads (F-118); the tombstone still answers for it.',
+  },
+  {
+    name: 'stocktakes',
+    column: 'opened_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Holds no free text: an opener and an applier, both timestamps, and a status.
+    why: 'Who opened and applied a stocktake is what any on-hand figure audits to (F-115); the tombstone still answers for it.',
   },
 
   // Module G: training

@@ -11,6 +11,7 @@ export const ROLES = [
   'FOH_MANAGER',
   'FRONT_OF_HOUSE',
   'BAR_MANAGER',
+  'ACCESSIBILITY_OFFICER',
   'COMMITTEE',
 ] as const
 
@@ -49,6 +50,9 @@ export const PERMISSIONS = [
   // Narrowing what a pass product already covers once it has live passes against it: general
   // box office is not enough, echoing D-117's comp approval (D-123 criterion 4).
   'ticketing.manage',
+  // Deciding an access profile declaration: sighting evidence, agreeing the door's wording. A
+  // named accessibility officer's, never general box office's (D-127 criterion 2).
+  'access.verify',
   // The bar's catalogue and its stock register: sit-down work the bar manager and an
   // administrator do. Selling over the bar is operational and derives from tonight (0009, F-111).
   'bar.read',
@@ -91,6 +95,9 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   // Owns the bar's catalogue and its stock, and opens the till without a bar shift. Nothing in
   // the old estate grants this role, so the import cannot reach it (0044, F-101 criterion 1).
   BAR_MANAGER: ['bar.read', 'bar.write', 'night.till'],
+  // Verifies access profile declarations and nothing else: sighting evidence and agreeing the
+  // door's wording is the whole of the job (D-127 criterion 2).
+  ACCESSIBILITY_OFFICER: ['access.verify'],
   COMMITTEE: [],
 }
 

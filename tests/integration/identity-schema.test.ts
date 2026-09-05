@@ -139,9 +139,44 @@ describe('auth tokens and access profiles', () => {
     })
   })
 
-  // access_profiles waits for D-127, which owns the encryption at rest and the consent path.
-  // Its nine flags are settled: the Nimbus Access Card categories (docs/data-model.md).
-  test.todo('companions are capped at two (D-127)', () => {})
+  // The nine need flags are settled: the Nimbus Access Card categories (docs/data-model.md).
+  // They live inside the encrypted payload, so nothing here can see them (D-127, 0050).
+  test('companions are capped at two (D-127 criterion 1)', async () => {
+    await withDatabase((database) => {
+      insertUser(database, 'patron@example.invalid')
+      const [{ id }] = rows<{ id: string }>(database, 'SELECT id FROM users')
+      expect(() => database.batch([[
+        'INSERT INTO access_profiles (user_id, companions) VALUES (?, ?)', id, 3,
+      ]])).toThrow()
+      expect(() => database.batch([[
+        'INSERT INTO access_profiles (user_id, companions) VALUES (?, ?)', id, -1,
+      ]])).toThrow()
+      // Neither bad attempt left a row behind, so the boundary itself still inserts cleanly.
+      expect(() => database.batch([[
+        'INSERT INTO access_profiles (user_id, companions) VALUES (?, ?)', id, 2,
+      ]])).not.toThrow()
+    })
+  })
+
+  test('status is one of the five (D-127)', async () => {
+    await withDatabase((database) => {
+      insertUser(database, 'patron2@example.invalid')
+      const [{ id }] = rows<{ id: string }>(database, 'SELECT id FROM users')
+      expect(() => database.batch([[
+        'INSERT INTO access_profiles (user_id, status) VALUES (?, ?)', id, 'SOMETHING_ELSE',
+      ]])).toThrow()
+    })
+  })
+
+  test('the encrypted payload and its nonce arrive and leave together', async () => {
+    await withDatabase((database) => {
+      insertUser(database, 'patron3@example.invalid')
+      const [{ id }] = rows<{ id: string }>(database, 'SELECT id FROM users')
+      expect(() => database.batch([[
+        'INSERT INTO access_profiles (user_id, encrypted_payload) VALUES (?, ?)', id, 'ciphertext-without-a-nonce',
+      ]])).toThrow()
+    })
+  })
 })
 
 describe('the audit writer against the real table (0010, 0011)', () => {

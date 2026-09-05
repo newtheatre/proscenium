@@ -141,6 +141,11 @@ const CATALOGUE = {
   'pass-type.updated': { label: 'Pass changed', module: 'ticketing' },
   'pass-type.shows.updated': { label: 'Pass covered shows changed', module: 'ticketing' },
   'pass-type.deleted': { label: 'Pass deleted', module: 'ticketing' },
+  'access-profile.updated': { label: 'Access profile declared or changed', module: 'ticketing', self: true },
+  'access-profile.withdrawn': { label: 'Access profile withdrawn', module: 'ticketing', self: true },
+  'access-profile.verified': { label: 'Access profile verified', module: 'ticketing' },
+  'access-profile.declined': { label: 'Access profile declined', module: 'ticketing' },
+  'access-profile.tombstone.purged': { label: 'Withdrawn access profile deleted after its tombstone', module: 'ticketing' },
 
   // Module E: show night
 
@@ -171,13 +176,18 @@ const CATALOGUE = {
   'bar.variant.status.changed': { label: 'Serving size retired or put back', module: 'bar' },
   'bar.variant.deleted': { label: 'Serving size deleted', module: 'bar' },
   'bar.variant.recipe.changed': { label: 'What a serving size depletes changed', module: 'bar' },
+  'bar.variant.choice.changed': { label: 'A serving size choice group attached or cleared', module: 'bar' },
   'bar.variant.price.set': { label: 'Serving size priced from a date', module: 'bar' },
+  'bar.choice-group.created': { label: 'Choice group added', module: 'bar' },
   'bar.item.created': { label: 'Stocked item added', module: 'bar' },
   'bar.item.updated': { label: 'Stocked item changed', module: 'bar' },
   'bar.item.status.changed': { label: 'Stocked item retired or put back', module: 'bar' },
   'bar.item.deleted': { label: 'Stocked item deleted', module: 'bar' },
   'bar.till.opened': { label: 'Till session opened', module: 'bar' },
   'bar.till.closed': { label: 'Till session closed', module: 'bar' },
+  'bar.stocktake.opened': { label: 'Stocktake opened', module: 'bar' },
+  'bar.stocktake.counted': { label: 'Stocktake counts recorded', module: 'bar' },
+  'bar.stocktake.applied': { label: 'Stocktake applied', module: 'bar' },
 
   // Module G: training
 

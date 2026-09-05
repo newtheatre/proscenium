@@ -59,6 +59,12 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Minutes a comp request stays open before it lapses.',
   },
+  ACCESS_PROFILE_VALIDITY_MONTHS: {
+    schema: z.number().int().positive().max(60),
+    default: 24,
+    workshop: 'money-and-box-office',
+    describes: 'Months a verified access profile stays current before the door stops seeing it and re-verification is needed (D-127).',
+  },
 
   // Module F: bar
 
@@ -352,7 +358,7 @@ export const CONFIG_KEYS = {
   },
   PRIVILEGED_ROLES: {
     schema: z.array(z.string()),
-    default: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER'],
+    default: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER'],
     workshop: 'people-and-communications',
     describes: 'Roles that require a second factor: any role touching money, personal data or safety records (A-112). Changing this is audited.',
   },
@@ -481,6 +487,7 @@ export function isConfigKey(name: string): name is ConfigKey {
 // which the surface says plainly (0012). A test greps the server for the reads, so it cannot drift.
 export const ENFORCED_KEYS = [
   'ACADEMIC_YEAR_BOUNDARY',
+  'ACCESS_PROFILE_VALIDITY_MONTHS',
   'LISTING_LIMITED_THRESHOLD_PERCENT',
   'ADMIN_TOKEN_HOURS',
   'MAGIC_LINK_MINUTES',

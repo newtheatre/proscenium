@@ -157,12 +157,16 @@ delete-as-claim on redemption. Transient: never migrated, swept when expired.
 
 ### access_profiles
 `user_id` PK → users cascade · `status` CHECK `PENDING|VERIFIED|EXPIRED|DECLINED|WITHDRAWN` ·
-the nine need flags below · `companions` int 0..2 · `access_card_number` (evidence sighted,
-value not retained beyond the reference) · `requester_note` scrub, never shown to the door ·
-`foh_note` (agreed operational wording, shown to the holder) · `consent_foh_at` NULL = the
-door sees nothing · `verified_by` · `verified_at` · `expires_at`.
-Special category data: encrypted at rest, deleted outright on erasure and 30 days after
-withdrawal (D-6).
+`companions` int 0..2 · `consent_foh_at` NULL = the door sees nothing · `verified_by` · `verified_at`
+· `expires_at` · `withdrawn_at`.
+Everything else, special category, lives in `encrypted_payload` and `encryption_iv`: an
+AES-256-GCM blob carrying the nine need flags below, the requester's own note (never shown to the
+door), the officer's agreed operational wording (shown to the holder once verified), and the
+self-declared evidence reference, cleared the moment an officer has sighted it, verified or
+declined (0050). `status` and `companions` stay plain columns because the database enforces them
+directly; nothing else does, and D1 has no column-level encryption to enforce it on ciphertext
+regardless. Deleted outright on erasure and 30 days after withdrawal (D-6, D-127 criterion 5);
+`expires_at` is enforced at read time, the same rule 0009 gives a role grant.
 
 The nine flags follow the Access Card categories run by Nimbus Disability, so a patron who
 already carries one recognises our questions and we recognise their card:
@@ -627,9 +631,12 @@ erDiagram
 ### bar_items  (stocked things)
 `id` PK · `name` unique, case-insensitively · `unit` CHECK `ML|ITEM` · `container_ml` NULL for
 whole items, **immutable once movements exist**, as is `unit`, both by trigger · `par_qty` in the
-item's own unit (F-120) · `age_restricted` bool default true · `allergen_notes`, the reference a
-product's own note is written from · `status` CHECK `ACTIVE|RETIRED` · `created_at`. Retired, never
-deleted once anything has moved: every movement restricts on the foreign key.
+item's own unit (F-120) · `category` free text, for grouping the order list; not a foreign key to
+`bar_categories`, because a stocked ingredient can feed several sold products across several till
+categories and has no one sale category to inherit · `age_restricted` bool default true ·
+`allergen_notes`, the reference a product's own note is written from · `status` CHECK
+`ACTIVE|RETIRED` · `created_at`. Retired, never deleted once anything has moved: every movement
+restricts on the foreign key.
 
 ### bar_categories
 `id` PK · `name` unique, case-insensitively · `sort`, which drives the till's layout and is read
@@ -645,7 +652,10 @@ CHECK `ACTIVE|HIDDEN|RETIRED`, default `HIDDEN` · `staffed_only` bool (not on s
 Nothing on the row says whether a product has ever sold, or whether it may go active. Both are
 queries over the tables referencing it, declared in `BAR_PRODUCT_REFERENCES`
 (`server/utils/bar.ts`); an unclassified referencing table fails
-`tests/integration/bar-catalogue.test.ts` (F-111 criteria 2 and 3).
+`tests/integration/bar-catalogue.test.ts` (F-111 criteria 2 and 3). Activation also refuses while
+any `ACTIVE` variant's recipe, directly or through an attached choice group, still calls for a
+stocked item that has since been retired; the refusal names it (`retiredIngredientsOf`,
+`server/utils/bar.ts`, F-113 criterion 5).
 
 ### product_variants
 `id` PK · `product_id` → bar_products cascade · `serving_kind`, the price-resolution key
@@ -663,13 +673,18 @@ one could never be added later); F-105 must add its `sale: true` entry there by 
 ### variant_components
 `id` PK · `variant_id` → product_variants cascade · `item_id` NULL → bar_items restrict ·
 `choice_group_id` NULL (CHECK: exactly one of the two) · `qty` in the item's own counting unit,
-CHECK positive · `included_in_price` bool (the free mixer, 0017). UNIQUE (`variant_id`, `item_id`)
-and UNIQUE (`variant_id`, `choice_group_id`). One level deep by construction: no column here can
-name another product (F-113 criterion 1).
+CHECK positive · `included_in_price` bool (the free mixer, 0017). UNIQUE (`variant_id`, `item_id`);
+a partial UNIQUE on `variant_id` where `choice_group_id IS NOT NULL` holds a variant to at most
+one choice group (F-113 criterion 2). One level deep by construction: no column here can name
+another product (F-113 criterion 1).
 
 ### choice_groups / choice_group_items
 `id` PK · `name` unique, case-insensitively (Mixers). An option is `choice_group_id` cascade ·
 `item_id` → bar_items restrict · `qty` CHECK positive · `sort`, UNIQUE per group and item.
+`POST /api/admin/bar/choice-groups` creates a group with its options in one batch, refusing a
+retired item; `PUT /api/admin/bar/variants/[id]/choice` attaches one to a variant with its own
+`qty` and `included_in_price`, or clears it, replacing rather than adding a second (F-113
+criterion 2).
 
 ### variant_prices  APPEND-ONLY
 `id` PK · `variant_id` cascade · `price_pence` CHECK not negative · `effective_from` civil date,
@@ -721,9 +736,33 @@ rebuild, and a rebuild of an append-only table is refused (0010). `MOVEMENT_WRIT
 path writes each: the stock screen writes `DELIVERY`, `WASTAGE`, `ADJUST` and `REVERSAL`, and
 refuses the rest by name.
 
-### stock_deliveries / stock_delivery_lines / stocktakes / stocktake_lines
-As the estate's proven design: deliveries at cost; one open stocktake (partial unique);
-counted NULL distinct from counted zero; finishing posts movements atomically.
+### stocktakes / stocktake_lines
+A delivery is a `stock_movements` row on its own (`DELIVERY`, with `unit_cost_pence`); there is no
+separate `stock_deliveries` header table, so what follows is stocktakes alone (F-115).
+
+`stocktakes`: `id` PK · `status` CHECK `OPEN|APPLIED`, default `OPEN` · `opened_by` / `opened_at` ·
+`applied_by` / `applied_at`, both null until applied, both set together (CHECK) and never before
+`opened_at`. Partial UNIQUE on `status` WHERE `status = 'OPEN'`: the indexed value is always
+`'OPEN'`, so at most one row can ever hold it, an estate-wide singleton rather than one scoped to
+a venue or night.
+
+`stocktake_lines`: `id` PK · `stocktake_id` → stocktakes cascade · `item_id` → bar_items restrict ·
+`expected_qty`, the item's on-hand at the moment the stocktake opened · `counted_qty` NULL,
+distinct from an entered zero throughout (criterion 2); CHECK not negative. UNIQUE
+(`stocktake_id`, `item_id`).
+
+Opening captures one line per `ACTIVE` item in a single `INSERT ... SELECT`, so later sales cannot
+muddy the comparison (criterion 1). Applying is one `db.batch`: an `UPDATE` on `stocktakes` carries
+the only predicate (`status = 'OPEN'`), the audit row rides `changes() = 1` from it, and the
+adjustment movements ride `changes() = 1` from the audit row in turn, since a single `changes()`
+reports only the statement immediately before it and there are several line rows to guard, not
+one. One `STOCKTAKE` movement is posted per line whose count differs from what was expected
+(`ref_table = 'stocktake_lines'`, `ref_id` the line); a blank line, or one that matches, posts
+nothing, which is what closes the old estate's blank-recorded-as-zero regression (criterion 6).
+The partial UNIQUE on `stock_movements(ref_id)` WHERE `ref_table = 'stocktake_lines'` (F-114)
+rolls a duplicate finish back as a whole. A frozen (`APPLIED`) stocktake is immutable at the write
+path: the counts route re-reads the stocktake's own status after its batch, since status only ever
+moves `OPEN` to `APPLIED`, never back, and refuses if it is no longer open.
 
 ### comp_requests
 `id` PK · lines JSON snapshot · `gross_pence` · `status` CHECK
@@ -1523,8 +1562,12 @@ yet open resolves nothing, because there is nothing for a member to sign up to.
 ### notification_log
 `id` PK · `user_id` NULL = set null on erasure · `type` · `channel` CHECK `EMAIL|INBOX|PUSH` ·
 `subject` · `record_id` · `session_id` · `claim` · `status` CHECK
-`SENT|FAILED|RETRYING|SKIPPED_UNDELIVERABLE` · `sent_at` · `error` · `created_at`.
+`PENDING|SENT|FAILED|RETRYING|SKIPPED_UNDELIVERABLE` · `sent_at` · `error` · `created_at`.
 Indexed on user, type, status, `record_id` and `created_at`.
+
+**A claimed send is one row, not two (0048).** `claimNotification()` writes `PENDING`; `notify()`
+updates that same row, matched on `claim`, to its outcome. No trigger sits on this table, so the
+update needs no exception to 0010.
 
 **`claim` is the idempotency, and it is a partial UNIQUE index rather than a read.** A sender that
 must not repeat itself writes the claim and lets the index refuse the second attempt, so two sweeps

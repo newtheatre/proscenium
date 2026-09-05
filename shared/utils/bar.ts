@@ -135,6 +135,7 @@ export const stockItemForm = z.object({
   unit: z.enum(STOCK_UNITS),
   containerMl: z.number().int().positive().max(100_000).nullish(),
   parQty: z.number().int().nonnegative().max(MAX_MOVEMENT_QTY).nullish(),
+  category: z.string().trim().max(MAX_BAR_NAME).nullish(),
   ageRestricted: z.boolean().default(true),
   allergenNotes: z.string().trim().max(MAX_ALLERGEN_NOTE).nullish(),
 }).refine(
@@ -190,6 +191,29 @@ export const componentsForm = z.object({
   { message: 'A stocked item appears once in a recipe, at the quantity a serving uses', path: ['components'] },
 )
 
+// A choice's own option: a stocked item at its own quantity, same shape as a recipe line
+// (F-113 criterion 2).
+export const choiceGroupOptionForm = z.object({
+  itemId: z.string().trim().min(1),
+  qty: z.number().int().positive('An option is a quantity of something').max(MAX_MOVEMENT_QTY),
+})
+
+export const choiceGroupForm = z.object({
+  name: label('choice group'),
+  options: z.array(choiceGroupOptionForm).min(1, 'A choice group needs at least one option').max(20),
+}).refine(
+  value => new Set(value.options.map(option => option.itemId)).size === value.options.length,
+  { message: 'A stocked item appears once per choice group, at the quantity a choice uses', path: ['options'] },
+)
+
+// Attaches or clears a variant's one choice group. `includedInPrice` is the free mixer (0017):
+// meaningless with no group attached, so it is dropped rather than validated when clearing.
+export const variantChoiceForm = z.object({
+  choiceGroupId: z.string().trim().min(1).nullable(),
+  qty: z.number().int().positive('A depletion is a quantity of something').max(MAX_MOVEMENT_QTY).default(1),
+  includedInPrice: z.boolean().default(false),
+})
+
 // A civil date, the Europe/London day a price takes effect on. A past one is allowed and already
 // applies; a future one waits (F-116 criterion 5).
 const civilDate = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'A date reads as YYYY-MM-DD')
@@ -239,6 +263,23 @@ export interface VariantComponent {
   includedInPrice: boolean
 }
 
+export interface ChoiceGroupOption {
+  id: string
+  itemId: string
+  itemName: string
+  unit: StockUnit
+  qty: number
+  sort: number
+}
+
+// A choice a variant can offer, such as a spirit's mixer (0017). Options are stocked items, so a
+// chosen one depletes at its own quantity (F-113 criterion 2).
+export interface ChoiceGroup {
+  id: string
+  name: string
+  options: ChoiceGroupOption[]
+}
+
 export interface ProductVariant {
   id: string
   productId: string
@@ -274,6 +315,7 @@ export interface StockItem {
   unit: StockUnit
   containerMl: number | null
   parQty: number | null
+  category: string | null
   ageRestricted: boolean
   allergenNotes: string | null
   status: StockItemStatus

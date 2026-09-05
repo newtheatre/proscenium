@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "249e5a59-947f-46a6-acbd-f2299412907e",
+  "id": "a0991637-90b0-4018-97f7-59f63c5e8947",
   "prevId": "8c4096e5-c31f-47cc-8c84-5c399361a324",
   "tables": {
     "audit_log": {
@@ -2819,7 +2819,7 @@
       "checkConstraints": {
         "notification_log_status": {
           "name": "notification_log_status",
-          "value": "\"notification_log\".\"status\" IN ('SENT', 'FAILED', 'RETRYING', 'SKIPPED_UNDELIVERABLE')"
+          "value": "\"notification_log\".\"status\" IN ('PENDING', 'SENT', 'FAILED', 'RETRYING', 'SKIPPED_UNDELIVERABLE')"
         },
         "notification_log_channel": {
           "name": "notification_log_channel",
@@ -5336,13 +5336,6 @@
         },
         "notes": {
           "name": "notes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "decline_reason": {
-          "name": "decline_reason",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

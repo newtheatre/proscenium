@@ -2,7 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { effectivePriceRow } from '#shared/utils/bar'
-import type { BarCategory, BarProduct, ProductVariant, StockItem, StockMovement, VariantComponent, VariantPrice } from '#shared/utils/bar'
+import type { BarCategory, BarProduct, ChoiceGroup, ProductVariant, StockItem, StockMovement, VariantComponent, VariantPrice } from '#shared/utils/bar'
 
 // Reading the bar's catalogue and its stock. Two questions the module leans on live here: what a
 // product needs before it may be sold, and what is on hand. Neither is a column.
@@ -22,8 +22,8 @@ export interface BarProductReference {
   why: string
 }
 
-// F-113 adds the recipe requirement. Until it does, a product with a serving size may go active,
-// which is the honest answer while a sale cannot resolve an ingredient anyway.
+// A product with a serving size may go active with no recipe line at all; F-113 only refuses one
+// that already calls for a retired ingredient (known-issues.md).
 export const BAR_PRODUCT_REFERENCES: BarProductReference[] = [
   {
     table: 'product_variants',
@@ -77,6 +77,32 @@ export function missingBeforeActiveQuery(productId: string, references = product
 export async function missingBeforeActive(productId: string): Promise<string[]> {
   if (productActivationReferences().length === 0) return []
   return (await db.all<{ needs: string }>(missingBeforeActiveQuery(productId))).map(row => row.needs)
+}
+
+// An item an active variant's recipe still calls for, directly or via a choice group, that has
+// since been retired: a recipe set while active can go stale under it (F-113 criterion 5).
+export function retiredIngredientsQuery(productId: string): SQL {
+  return sql`
+    SELECT name FROM (
+      SELECT i.name AS name
+      FROM product_variants v
+      JOIN variant_components c ON c.variant_id = v.id
+      JOIN bar_items i ON i.id = c.item_id
+      WHERE v.product_id = ${productId} AND v.status = 'ACTIVE' AND i.status = 'RETIRED'
+      UNION
+      SELECT gi.name AS name
+      FROM product_variants v
+      JOIN variant_components c ON c.variant_id = v.id
+      JOIN choice_group_items g ON g.choice_group_id = c.choice_group_id
+      JOIN bar_items gi ON gi.id = g.item_id
+      WHERE v.product_id = ${productId} AND v.status = 'ACTIVE' AND gi.status = 'RETIRED'
+    )
+    ORDER BY name COLLATE NOCASE
+  `
+}
+
+export async function retiredIngredientsOf(productId: string): Promise<string[]> {
+  return (await db.all<{ name: string }>(retiredIngredientsQuery(productId))).map(row => row.name)
 }
 
 // Every FK to `product_variants` is classified here or the build fails (bar-variants.test.ts,
@@ -295,6 +321,7 @@ const ITEM_COLUMNS = sql`
   i.unit AS unit,
   i.container_ml AS containerMl,
   i.par_qty AS parQty,
+  i.category AS category,
   i.age_restricted AS ageRestricted,
   i.allergen_notes AS allergenNotes,
   i.status AS status
@@ -425,6 +452,59 @@ export async function variantById(id: string, on: string): Promise<ProductVarian
   if (!row) return undefined
   const components = await db.all<ComponentRow>(componentsQuery(sql`SELECT id FROM product_variants WHERE id = ${id}`))
   return withComponents([row], components)[0]
+}
+
+interface ChoiceGroupOptionRow {
+  id: string
+  choiceGroupId: string
+  itemId: string
+  itemName: string
+  unit: string
+  qty: number
+  sort: number
+}
+
+function choiceGroupOptionsQuery(scope: SQL): SQL {
+  return sql`
+    SELECT o.id AS id, o.choice_group_id AS choiceGroupId, o.item_id AS itemId, i.name AS itemName,
+           i.unit AS unit, o.qty AS qty, o.sort AS sort
+    FROM choice_group_items o JOIN bar_items i ON i.id = o.item_id
+    WHERE o.choice_group_id IN (${scope})
+    ORDER BY o.sort, i.name COLLATE NOCASE
+  `
+}
+
+function withOptions(groups: { id: string, name: string }[], options: ChoiceGroupOptionRow[]): ChoiceGroup[] {
+  return groups.map(group => ({
+    ...group,
+    options: options
+      .filter(option => option.choiceGroupId === group.id)
+      .map(({ id, itemId, itemName, unit, qty, sort }) => ({ id, itemId, itemName, unit: unit as StockItem['unit'], qty, sort })),
+  }))
+}
+
+export async function listChoiceGroups(): Promise<ChoiceGroup[]> {
+  const groups = await db.all<{ id: string, name: string }>(sql`SELECT id, name FROM choice_groups ORDER BY name COLLATE NOCASE`)
+  const options = await db.all<ChoiceGroupOptionRow>(choiceGroupOptionsQuery(sql`SELECT id FROM choice_groups`))
+  return withOptions(groups, options)
+}
+
+export async function choiceGroupById(id: string): Promise<ChoiceGroup | undefined> {
+  const [group] = await db.all<{ id: string, name: string }>(sql`SELECT id, name FROM choice_groups WHERE id = ${id}`)
+  if (!group) return undefined
+  const options = await db.all<ChoiceGroupOptionRow>(choiceGroupOptionsQuery(sql`SELECT id FROM choice_groups WHERE id = ${id}`))
+  return withOptions([group], options)[0]
+}
+
+// A group's options can go stale after it is attached somewhere, the same way a direct recipe
+// line can: an item retired later, not one refused when it was added.
+export async function retiredOptionsOf(choiceGroupId: string): Promise<string[]> {
+  const rows = await db.all<{ name: string }>(sql`
+    SELECT i.name AS name FROM choice_group_items g JOIN bar_items i ON i.id = g.item_id
+    WHERE g.choice_group_id = ${choiceGroupId} AND i.status = 'RETIRED'
+    ORDER BY i.name COLLATE NOCASE
+  `)
+  return rows.map(row => row.name)
 }
 
 // The whole series, newest first, with the row today resolves to marked (F-116 criterion 5).

@@ -108,16 +108,18 @@ export default defineEventHandler(async (event) => {
     const when = formatLondon(new Date(input.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
 
     for (const shift of carried) {
+      const key = `shift.venue-changed:${shift.shiftId}:${input.venueId}`
       const took = await claimNotification({
         userId: shift.userId!,
         type: 'shift.venue-changed',
-        key: `shift.venue-changed:${shift.shiftId}:${input.venueId}`,
+        key,
       })
       if (!took) continue
 
       await notify(event, {
         userId: shift.userId!,
         type: 'shift.venue-changed',
+        claim: key,
         context: {
           name: '',
           show: held.showTitle,
@@ -130,16 +132,18 @@ export default defineEventHandler(async (event) => {
     }
 
     for (const shift of orphaned) {
+      const key = `shift.role-not-needed:${shift.shiftId}:${input.venueId}`
       const took = await claimNotification({
         userId: shift.userId!,
         type: 'shift.role-not-needed',
-        key: `shift.role-not-needed:${shift.shiftId}:${input.venueId}`,
+        key,
       })
       if (!took) continue
 
       await notify(event, {
         userId: shift.userId!,
         type: 'shift.role-not-needed',
+        claim: key,
         context: {
           name: '',
           show: held.showTitle,

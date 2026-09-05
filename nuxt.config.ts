@@ -69,6 +69,9 @@ export default defineNuxtConfig({
       password: '',
       maxAge: 60 * 60 * 24 * 30,
     },
+    // Base64 AES-256 key sealing access_profiles.encrypted_payload (D-127, 0050). A worker
+    // secret, not a Secrets Store one: nothing outside this app ever reads this column.
+    accessProfileEncryptionKey: '',
     public: {
       // Every emailed link is built from this. NUXT_PUBLIC_BASE_URL overrides it, and development
       // points at the local port so a verification link in .data/mail is one that works.
