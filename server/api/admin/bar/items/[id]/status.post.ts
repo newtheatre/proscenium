@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { stockItemStatusForm } from '#shared/utils/bar'
 
@@ -26,15 +26,38 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await db.batch([
-    db.update(schema.barItems).set({ status }).where(eq(schema.barItems.id, id)),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'bar.item.status.changed',
-      target: `bar-item:${id}`,
-      detail: changes({ status: [held.status, status] }),
-    })),
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: 'bar.item.status.changed',
+    target: `bar-item:${id}`,
+    detail: changes({ status: [held.status, status] }),
+  })
+
+  // The audit insert reads `changes()`, this connection's own UPDATE row count, not the
+  // resulting state: a losing request's UPDATE touches nothing, whatever the winner did (0049).
+  const [updated] = await db.batch([
+    db.all<{ id: string }>(sql`
+      UPDATE bar_items SET status = ${status} WHERE id = ${id} AND status = ${held.status} RETURNING id
+    `),
+    db.run(sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
+      WHERE changes() = 1
+    `),
   ])
+
+  // A losing racer is refused, not told it succeeded: the audit stayed silent, so the caller
+  // must too (0049).
+  if (updated.length === 0) {
+    const now = await itemById(id)
+    if (!now) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+    throw createError({
+      statusCode: 409,
+      statusMessage: now.status === status
+        ? (status === 'RETIRED' ? `${now.name} is already retired` : `${now.name} is not retired`)
+        : `${now.name} changed while you were editing it`,
+    })
+  }
 
   return { ok: true, status }
 })
