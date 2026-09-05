@@ -58,7 +58,14 @@ interface ListedVariant {
   status: string
   pricePence: number | null
   everSold: boolean
-  components: { itemId: string | null, itemName: string | null, qty: number }[]
+  components: {
+    itemId: string | null
+    itemName: string | null
+    qty: number
+    choiceGroupId: string | null
+    choiceGroupName: string | null
+    includedInPrice: boolean
+  }[]
 }
 
 interface ListedPrice {
@@ -66,6 +73,12 @@ interface ListedPrice {
   pricePence: number
   effectiveFrom: string
   effective: boolean
+}
+
+interface ListedChoiceGroup {
+  id: string
+  name: string
+  options: { id: string, itemId: string, itemName: string, unit: string, qty: number, sort: number }[]
 }
 
 async function aProduct(): Promise<string> {
@@ -89,6 +102,15 @@ async function prices(variantId: string): Promise<ListedPrice[]> {
   const answered = await send('GET', `/api/admin/bar/variants/${variantId}/prices`)
   expect(answered.status).toBe(200)
   return (await answered.json() as { prices: ListedPrice[] }).prices
+}
+
+const addChoiceGroup = async (options: { itemId: string, qty: number }[], over: Record<string, unknown> = {}): Promise<string> =>
+  created(await send('POST', '/api/admin/bar/choice-groups', { name: named('Mixers'), options, ...over }))
+
+async function choiceGroups(): Promise<ListedChoiceGroup[]> {
+  const answered = await send('GET', '/api/admin/bar/choice-groups')
+  expect(answered.status).toBe(200)
+  return (await answered.json() as { groups: ListedChoiceGroup[] }).groups
 }
 
 const priceOf = async (productId: string, variantId: string): Promise<number | null> =>
@@ -309,6 +331,164 @@ describe.skipIf(skip !== null)('a price is a dated append-only row (F-116)', () 
     const productId = await aProduct()
     const id = await addVariant(productId)
     expect((await send('POST', `/api/admin/bar/variants/${id}/prices`, { pricePence: 1800, effectiveFrom: '14/09/2026' })).status).toBe(400)
+  })
+})
+
+describe.skipIf(skip !== null)('a choice group offers stocked items, at their own quantities (F-113 criterion 2)', () => {
+  test('a choice group is created with its options and listed for attaching', async () => {
+    const itemId = await anItem({ name: named('Tonic') })
+    const groupId = await addChoiceGroup([{ itemId, qty: 200 }])
+
+    const listed = (await choiceGroups()).find(group => group.id === groupId)
+    expect(listed?.options).toEqual([{ id: expect.any(String), itemId, itemName: expect.any(String), unit: expect.any(String), qty: 200, sort: 0 }])
+  })
+
+  test('a stocked item appears once per choice group', async () => {
+    const itemId = await anItem()
+    const answered = await send('POST', '/api/admin/bar/choice-groups', {
+      name: named('Mixers'),
+      options: [{ itemId, qty: 200 }, { itemId, qty: 100 }],
+    })
+    expect(answered.status).toBe(400)
+  })
+
+  test('nothing can be offered from a retired stocked item', async () => {
+    const itemId = await anItem()
+    await send('POST', `/api/admin/bar/items/${itemId}/status`, { status: 'RETIRED' })
+
+    const refused = await send('POST', '/api/admin/bar/choice-groups', {
+      name: named('Mixers'),
+      options: [{ itemId, qty: 200 }],
+    })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message?: string }).message).toContain('retired')
+  })
+
+  test('a choice group name is held once, whatever the capitals', async () => {
+    const itemId = await anItem()
+    const name = named('Mixers')
+    await addChoiceGroup([{ itemId, qty: 200 }], { name })
+
+    const again = await send('POST', '/api/admin/bar/choice-groups', {
+      name: name.toUpperCase(),
+      options: [{ itemId, qty: 100 }],
+    })
+    expect(again.status).toBe(409)
+  })
+
+  test('an ordinary member may not create one', async () => {
+    const itemId = await anItem()
+    const refused = await send('POST', '/api/admin/bar/choice-groups', {
+      name: named('Mixers'),
+      options: [{ itemId, qty: 200 }],
+    }, member.cookie)
+    expect(refused.status).toBe(403)
+  })
+})
+
+describe.skipIf(skip !== null)('a variant attaches at most one choice group, with the free mixer flag (0017, F-113 criterion 2)', () => {
+  test('attaching sets the choice, including the price it covers', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId, { servingKind: 'double', label: 'Double' })
+    const itemId = await anItem({ name: named('Tonic') })
+    const groupId = await addChoiceGroup([{ itemId, qty: 200 }])
+
+    const attached = await send('PUT', `/api/admin/bar/variants/${id}/choice`, {
+      choiceGroupId: groupId,
+      qty: 1,
+      includedInPrice: true,
+    })
+    expect(attached.status).toBe(200)
+
+    const line = (await variants(productId)).find(variant => variant.id === id)?.components.find(component => component.choiceGroupId === groupId)
+    expect(line?.includedInPrice).toBe(true)
+  })
+
+  test('attaching a second group replaces the first rather than adding to it', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId, { servingKind: 'double', label: 'Double' })
+    const itemId = await anItem()
+    const first = await addChoiceGroup([{ itemId, qty: 200 }])
+    const second = await addChoiceGroup([{ itemId, qty: 100 }])
+
+    await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: first, qty: 1, includedInPrice: false })
+    await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: second, qty: 1, includedInPrice: false })
+
+    const choices = (await variants(productId)).find(variant => variant.id === id)?.components.filter(component => component.choiceGroupId !== null)
+    expect(choices?.map(component => component.choiceGroupId)).toEqual([second])
+  })
+
+  test('a variant\'s own recipe items are untouched by attaching a choice', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId)
+    const spirit = await anItem({ name: named('Gin') })
+    const mixer = await anItem({ name: named('Tonic') })
+    const groupId = await addChoiceGroup([{ itemId: mixer, qty: 200 }])
+
+    await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [{ itemId: spirit, qty: 25 }] })
+    await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: false })
+
+    const components = (await variants(productId)).find(variant => variant.id === id)?.components ?? []
+    expect(components.find(component => component.itemId === spirit)).toBeTruthy()
+    expect(components.find(component => component.choiceGroupId === groupId)).toBeTruthy()
+  })
+
+  test('clearing sets it back to none', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId)
+    const itemId = await anItem()
+    const groupId = await addChoiceGroup([{ itemId, qty: 200 }])
+
+    await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: false })
+    await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: null })
+
+    const choices = (await variants(productId)).find(variant => variant.id === id)?.components.filter(component => component.choiceGroupId !== null)
+    expect(choices).toEqual([])
+  })
+
+  test('a group offering a retired option cannot be attached', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId)
+    const itemId = await anItem()
+    const groupId = await addChoiceGroup([{ itemId, qty: 200 }])
+    await send('POST', `/api/admin/bar/items/${itemId}/status`, { status: 'RETIRED' })
+
+    const refused = await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: false })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message?: string }).message).toContain('retired')
+  })
+})
+
+describe.skipIf(skip !== null)('a product cannot go active while its recipe calls for something retired (F-113 criterion 5)', () => {
+  test('a retired direct ingredient names itself in the refusal', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId)
+    const itemId = await anItem({ name: named('Gin') })
+    await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [{ itemId, qty: 25 }] })
+    expect((await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })).status).toBe(200)
+
+    await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'HIDDEN' })
+    await send('POST', `/api/admin/bar/items/${itemId}/status`, { status: 'RETIRED' })
+
+    const refused = await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message?: string }).message).toContain('retired')
+  })
+
+  test('a retired option behind an attached choice group refuses activation the same way', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId)
+    const mixer = await anItem({ name: named('Tonic') })
+    const groupId = await addChoiceGroup([{ itemId: mixer, qty: 200 }])
+    await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: false })
+    expect((await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })).status).toBe(200)
+
+    await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'HIDDEN' })
+    await send('POST', `/api/admin/bar/items/${mixer}/status`, { status: 'RETIRED' })
+
+    const refused = await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message?: string }).message).toContain('retired')
   })
 })
 

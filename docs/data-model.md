@@ -641,7 +641,10 @@ CHECK `ACTIVE|HIDDEN|RETIRED`, default `HIDDEN` · `staffed_only` bool (not on s
 Nothing on the row says whether a product has ever sold, or whether it may go active. Both are
 queries over the tables referencing it, declared in `BAR_PRODUCT_REFERENCES`
 (`server/utils/bar.ts`); an unclassified referencing table fails
-`tests/integration/bar-catalogue.test.ts` (F-111 criteria 2 and 3).
+`tests/integration/bar-catalogue.test.ts` (F-111 criteria 2 and 3). Activation also refuses while
+any `ACTIVE` variant's recipe, directly or through an attached choice group, still calls for a
+stocked item that has since been retired; the refusal names it (`retiredIngredientsOf`,
+`server/utils/bar.ts`, F-113 criterion 5).
 
 ### product_variants
 `id` PK · `product_id` → bar_products cascade · `serving_kind`, the price-resolution key
@@ -659,13 +662,18 @@ one could never be added later); F-105 must add its `sale: true` entry there by 
 ### variant_components
 `id` PK · `variant_id` → product_variants cascade · `item_id` NULL → bar_items restrict ·
 `choice_group_id` NULL (CHECK: exactly one of the two) · `qty` in the item's own counting unit,
-CHECK positive · `included_in_price` bool (the free mixer, 0017). UNIQUE (`variant_id`, `item_id`)
-and UNIQUE (`variant_id`, `choice_group_id`). One level deep by construction: no column here can
-name another product (F-113 criterion 1).
+CHECK positive · `included_in_price` bool (the free mixer, 0017). UNIQUE (`variant_id`, `item_id`);
+a partial UNIQUE on `variant_id` where `choice_group_id IS NOT NULL` holds a variant to at most
+one choice group (F-113 criterion 2). One level deep by construction: no column here can name
+another product (F-113 criterion 1).
 
 ### choice_groups / choice_group_items
 `id` PK · `name` unique, case-insensitively (Mixers). An option is `choice_group_id` cascade ·
 `item_id` → bar_items restrict · `qty` CHECK positive · `sort`, UNIQUE per group and item.
+`POST /api/admin/bar/choice-groups` creates a group with its options in one batch, refusing a
+retired item; `PUT /api/admin/bar/variants/[id]/choice` attaches one to a variant with its own
+`qty` and `included_in_price`, or clears it, replacing rather than adding a second (F-113
+criterion 2).
 
 ### variant_prices  APPEND-ONLY
 `id` PK · `variant_id` cascade · `price_pence` CHECK not negative · `effective_from` civil date,

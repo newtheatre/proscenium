@@ -1,0 +1,2 @@
+DROP INDEX `variant_components_choice`;--> statement-breakpoint
+CREATE UNIQUE INDEX `variant_components_one_choice_per_variant` ON `variant_components` (`variant_id`) WHERE "variant_components"."choice_group_id" IS NOT NULL;

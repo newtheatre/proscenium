@@ -31,6 +31,14 @@ export default defineEventHandler(async (event) => {
         statusMessage: `${held.name} cannot go on the till until it has ${missing.join(' and ')}`,
       })
     }
+
+    const retired = await retiredIngredientsOf(id)
+    if (retired.length > 0) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `${held.name} cannot go on the till while its recipe calls for ${retired.join(' and ')}, which ${retired.length > 1 ? 'are' : 'is'} retired: change the recipe or bring it back`,
+      })
+    }
   }
 
   await db.batch([
