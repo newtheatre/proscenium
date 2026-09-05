@@ -171,3 +171,29 @@ describe.skipIf(skip !== null)('the last seat cannot be sold twice (D-105 criter
     expect(statuses).toEqual([200, 409])
   })
 })
+
+describe.skipIf(skip !== null)('two guest checkouts for the same address mint one account', () => {
+  test('a shared email resolves to exactly one user row, whichever request wins the insert', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow({ capacityOverride: 2 })
+    const email = `shared-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+
+    const order = () => send('POST', '/api/reservations', {
+      performanceId,
+      lines: [{ ticketTypeId, quantity: 1 }],
+      guest: { name: 'Shared Guest', email },
+    }, '')
+
+    const [first, second] = await Promise.all([order(), order()])
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(200)
+
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const rows = database.query('SELECT id FROM users WHERE email = ?').all(email) as { id: string }[]
+      expect(rows).toHaveLength(1)
+    }
+    finally {
+      database.close()
+    }
+  })
+})

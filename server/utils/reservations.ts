@@ -119,11 +119,27 @@ export async function guestAccount(email: string, name: string): Promise<GuestAc
 
   const id = newId()
   const entry = auditEntry({ actorId: null, action: 'account.created.guest', target: `user:${id}` })
-  await db.batch([
-    db.insert(schema.users).values({ id, email: normalised, name: name.trim() }),
-    db.insert(schema.auditLog).values(entry),
+
+  // Two concurrent checkouts can both pass the read above, so the insert itself carries the
+  // conflict guard, and the audit rides `changes()` rather than trusting the read (0006, 0049).
+  const [inserted] = await db.batch([
+    db.all<{ id: string }>(sql`
+      INSERT INTO users (id, email, name) VALUES (${id}, ${normalised}, ${name.trim()})
+      ON CONFLICT (email) DO NOTHING
+      RETURNING id
+    `),
+    db.run(sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, NULL
+      WHERE changes() = 1
+    `),
   ])
-  return { id, created: true }
+  if (inserted.length > 0) return { id, created: true }
+
+  // Lost the race: somebody else's checkout won between the read above and this insert.
+  const [winner] = await db.select({ id: schema.users.id }).from(schema.users)
+    .where(eq(schema.users.email, normalised)).limit(1)
+  return { id: winner!.id, created: false }
 }
 
 // Every ticket statement carries the identical capacity condition: all match or none does
@@ -158,6 +174,12 @@ export async function writeReservation(input: WriteReservationInput): Promise<Wr
       const ticket = tickets[index]!
       written.push({ id: rows[0]!.id, ticketTypeId: ticket.ticketTypeId, pricePaid: ticket.pricePaid })
     }
+  }
+
+  // A refused order holds nothing, so the row it left behind says so rather than sitting as an
+  // indefinite PENDING hold that no sweep, present or future, has any reason to ever touch.
+  if (written.length < tickets.length) {
+    await db.run(sql`UPDATE reservations SET status = 'CANCELLED', updated_at = unixepoch() WHERE id = ${id} AND status = 'PENDING'`)
   }
 
   return { reference, tickets: written, requested: tickets.length }
