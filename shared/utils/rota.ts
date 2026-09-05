@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { constraintRefusal } from './constraint-refusal'
 import { NIGHT_ROLES } from './night-authority'
 import type { NightRole } from './night-authority'
 
@@ -120,15 +121,8 @@ export const SHIFT_CONSTRAINT_REFUSALS: { violated: string, says: string }[] = [
   },
 ]
 
-// Stops at the colon a wrapped error appends, so the same message is matched whether it came
-// back from SQLite directly or through D1.
-const VIOLATED = /constraint failed:\s*([a-z0-9_. ,]+)/i
-
-// A raw constraint failure is never what a caller reads back. Anything unrecognised returns null
-// and is rethrown by the caller, because a 409 would hide a defect nobody then investigates.
+// The rota's own table beside the shared match (0047): a raw constraint failure is never what a
+// caller reads back, and anything unrecognised is rethrown rather than hidden behind a 409.
 export function shiftConstraintRefusal(error: unknown): { statusCode: 409, statusMessage: string } | null {
-  const said = error instanceof Error ? error.message : String(error)
-  const violated = VIOLATED.exec(said)?.[1]?.trim()
-  const matched = SHIFT_CONSTRAINT_REFUSALS.find(refusal => refusal.violated === violated)
-  return matched ? { statusCode: 409, statusMessage: matched.says } : null
+  return constraintRefusal(SHIFT_CONSTRAINT_REFUSALS, error)
 }

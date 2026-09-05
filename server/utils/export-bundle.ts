@@ -22,6 +22,15 @@ function readable(value: unknown, column: string): unknown {
   return formatLondon(new Date(value * 1000), { dateStyle: 'full', timeStyle: 'short' })
 }
 
+// The one table in the registry holding ciphertext: its two encrypted columns are swapped for
+// the decrypted answers before anything is formatted (D-127 criterion 4).
+async function decryptAccessProfileRow(row: Record<string, unknown>, userId: string): Promise<Record<string, unknown>> {
+  const { encrypted_payload: ciphertext, encryption_iv: iv, ...rest } = row
+  if (typeof ciphertext !== 'string' || typeof iv !== 'string') return { ...rest, flags: null, requester_note: null, foh_note: null }
+  const payload = await decryptAccessProfilePayload({ ciphertext, iv }, userId)
+  return { ...rest, flags: payload.flags, requester_note: payload.requesterNote, foh_note: payload.fohNote }
+}
+
 export async function buildBundle(account: AccountRow): Promise<Bundle> {
   const sections: Record<string, Record<string, unknown>[]> = {}
 
@@ -32,7 +41,9 @@ export async function buildBundle(account: AccountRow): Promise<Bundle> {
       where ${sql.identifier(entry.column)} = ${account.id}
     `)
 
-    sections[entry.section!] = rows.map(row =>
+    const readableRows = entry.name === 'access_profiles' ? await Promise.all(rows.map(row => decryptAccessProfileRow(row, account.id))) : rows
+
+    sections[entry.section!] = readableRows.map(row =>
       Object.fromEntries(Object.entries(row).map(([column, value]) => [column, readable(value, column)])))
   }
 

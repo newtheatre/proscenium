@@ -218,10 +218,11 @@ export async function tellAbsentees(
   let told = 0
   for (const mark of marks) {
     if (mark.mark !== 'ABSENT') continue
+    const key = `training.session.absent:${sessionId}:${mark.userId}`
     const took = await claimNotification({
       userId: mark.userId,
       type: 'training.session.absent',
-      key: `training.session.absent:${sessionId}:${mark.userId}`,
+      key,
       sessionId,
     })
     if (!took) continue
@@ -229,6 +230,7 @@ export async function tellAbsentees(
     await notify(event, {
       type: 'training.session.absent',
       userId: mark.userId,
+      claim: key,
       context: {
         name: '',
         heldOn,

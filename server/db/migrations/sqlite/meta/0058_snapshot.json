@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "49854470-088e-4c81-88c2-25d524efe31f",
+  "id": "a0991637-90b0-4018-97f7-59f63c5e8947",
   "prevId": "8c4096e5-c31f-47cc-8c84-5c399361a324",
   "tables": {
     "audit_log": {
@@ -283,13 +283,6 @@
         "par_qty": {
           "name": "par_qty",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "category": {
-          "name": "category",
-          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2826,7 +2819,7 @@
       "checkConstraints": {
         "notification_log_status": {
           "name": "notification_log_status",
-          "value": "\"notification_log\".\"status\" IN ('SENT', 'FAILED', 'RETRYING', 'SKIPPED_UNDELIVERABLE')"
+          "value": "\"notification_log\".\"status\" IN ('PENDING', 'SENT', 'FAILED', 'RETRYING', 'SKIPPED_UNDELIVERABLE')"
         },
         "notification_log_channel": {
           "name": "notification_log_channel",
@@ -6048,195 +6041,6 @@
         "stock_movements_source_document_is_whole": {
           "name": "stock_movements_source_document_is_whole",
           "value": "(\"stock_movements\".\"ref_table\" IS NULL) = (\"stock_movements\".\"ref_id\" IS NULL)"
-        }
-      }
-    },
-    "stocktake_lines": {
-      "name": "stocktake_lines",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "stocktake_id": {
-          "name": "stocktake_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "item_id": {
-          "name": "item_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "expected_qty": {
-          "name": "expected_qty",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "counted_qty": {
-          "name": "counted_qty",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "stocktake_lines_item": {
-          "name": "stocktake_lines_item",
-          "columns": [
-            "stocktake_id",
-            "item_id"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "stocktake_lines_stocktake_id_stocktakes_id_fk": {
-          "name": "stocktake_lines_stocktake_id_stocktakes_id_fk",
-          "tableFrom": "stocktake_lines",
-          "tableTo": "stocktakes",
-          "columnsFrom": [
-            "stocktake_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "stocktake_lines_item_id_bar_items_id_fk": {
-          "name": "stocktake_lines_item_id_bar_items_id_fk",
-          "tableFrom": "stocktake_lines",
-          "tableTo": "bar_items",
-          "columnsFrom": [
-            "item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "stocktake_lines_counted_not_negative": {
-          "name": "stocktake_lines_counted_not_negative",
-          "value": "\"stocktake_lines\".\"counted_qty\" IS NULL OR \"stocktake_lines\".\"counted_qty\" >= 0"
-        }
-      }
-    },
-    "stocktakes": {
-      "name": "stocktakes",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'OPEN'"
-        },
-        "opened_by": {
-          "name": "opened_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "opened_at": {
-          "name": "opened_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        },
-        "applied_by": {
-          "name": "applied_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "applied_at": {
-          "name": "applied_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "stocktakes_one_open": {
-          "name": "stocktakes_one_open",
-          "columns": [
-            "status"
-          ],
-          "isUnique": true,
-          "where": "status = 'OPEN'"
-        }
-      },
-      "foreignKeys": {
-        "stocktakes_opened_by_users_id_fk": {
-          "name": "stocktakes_opened_by_users_id_fk",
-          "tableFrom": "stocktakes",
-          "tableTo": "users",
-          "columnsFrom": [
-            "opened_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "stocktakes_applied_by_users_id_fk": {
-          "name": "stocktakes_applied_by_users_id_fk",
-          "tableFrom": "stocktakes",
-          "tableTo": "users",
-          "columnsFrom": [
-            "applied_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "stocktakes_status_values": {
-          "name": "stocktakes_status_values",
-          "value": "\"stocktakes\".\"status\" IN ('OPEN', 'APPLIED')"
-        },
-        "stocktakes_apply_is_whole": {
-          "name": "stocktakes_apply_is_whole",
-          "value": "(\"stocktakes\".\"applied_at\" IS NULL) = (\"stocktakes\".\"applied_by\" IS NULL)"
-        },
-        "stocktakes_applies_after_it_opens": {
-          "name": "stocktakes_applies_after_it_opens",
-          "value": "\"stocktakes\".\"applied_at\" IS NULL OR \"stocktakes\".\"applied_at\" >= \"stocktakes\".\"opened_at\""
         }
       }
     },

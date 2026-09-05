@@ -159,7 +159,9 @@ export const variantComponents = sqliteTable('variant_components', {
   includedInPrice: integer('included_in_price', { mode: 'boolean' }).notNull().default(false),
 }, table => [
   uniqueIndex('variant_components_item').on(table.variantId, table.itemId),
-  uniqueIndex('variant_components_choice').on(table.variantId, table.choiceGroupId),
+  // A variant holds at most one choice group; scoping on `variant_id` alone rather than the pair
+  // is what carries "at most one" rather than merely "not the same one twice" (F-113 criterion 2).
+  uniqueIndex('variant_components_one_choice_per_variant').on(table.variantId).where(sql`${table.choiceGroupId} IS NOT NULL`),
   check('variant_components_one_source', sql`(${table.itemId} IS NULL) <> (${table.choiceGroupId} IS NULL)`),
   check('variant_components_qty_positive', sql`${table.qty} > 0`),
 ])

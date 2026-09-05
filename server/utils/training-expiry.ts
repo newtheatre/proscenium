@@ -97,6 +97,8 @@ export async function sweepExpiries(event: H3Event | undefined, at = new Date())
         await notify(event, {
           type: kind === 'final' ? 'training.expiry.final' : 'training.expiry.window',
           userId,
+          // One message covers every row claimed above; all of their claim rows move together.
+          claim: claimed.map(row => claimFor(kind, row.recordId)),
           context: {
             name: '',
             modules: claimed.map(row => ({
@@ -146,6 +148,7 @@ async function sendDigests(event: H3Event | undefined, at: Date, armed: boolean)
     await notify(event, {
       type: 'training.expiry.digest',
       userId: person.userId,
+      claim: key,
       context: {
         name: '',
         period,
@@ -291,6 +294,7 @@ async function nagUnmarkedRegisters(
     await notify(event, {
       type: 'training.register.unmarked',
       userId: row.trainerId,
+      claim: key,
       context: {
         name: '',
         heldOn: row.heldOn,

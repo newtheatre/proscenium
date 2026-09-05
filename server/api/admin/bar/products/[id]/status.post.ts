@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { productStatusForm, says } from '#shared/utils/bar'
 
@@ -31,17 +31,48 @@ export default defineEventHandler(async (event) => {
         statusMessage: `${held.name} cannot go on the till until it has ${missing.join(' and ')}`,
       })
     }
+
+    const retired = await retiredIngredientsOf(id)
+    if (retired.length > 0) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `${held.name} cannot go on the till while its recipe calls for ${retired.join(' and ')}, which ${retired.length > 1 ? 'are' : 'is'} retired: change the recipe or bring it back`,
+      })
+    }
   }
 
-  await db.batch([
-    db.update(schema.barProducts).set({ status }).where(eq(schema.barProducts.id, id)),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'bar.product.status.changed',
-      target: `bar-product:${id}`,
-      detail: changes({ status: [held.status, status] }),
-    })),
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: 'bar.product.status.changed',
+    target: `bar-product:${id}`,
+    detail: changes({ status: [held.status, status] }),
+  })
+
+  // The audit insert reads `changes()`, this connection's own UPDATE row count, not the
+  // resulting state: a losing request's UPDATE touches nothing, whatever the winner did (0049).
+  const [updated] = await db.batch([
+    db.all<{ id: string }>(sql`
+      UPDATE bar_products SET status = ${status} WHERE id = ${id} AND status = ${held.status} RETURNING id
+    `),
+    db.run(sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
+      WHERE changes() = 1
+    `),
   ])
+
+  // A losing racer is refused, not told it succeeded: the audit stayed silent, so the caller
+  // must too (0049).
+  if (updated.length === 0) {
+    const now = await productById(id)
+    if (!now) throw createError({ statusCode: 404, statusMessage: 'No such product' })
+    throw createError({
+      statusCode: 409,
+      statusMessage: now.status === status
+        ? `${now.name} is already ${says(status).toLowerCase()}`
+        : `${now.name} changed while you were editing it`,
+    })
+  }
 
   return { ok: true, status }
 })

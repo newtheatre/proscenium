@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { VARIANT_REFERENCES, effectivePriceColumn, everPricedColumn, variantEverSoldQuery } from '#server/utils/bar'
+import { VARIANT_REFERENCES, effectivePriceColumn, everPricedColumn, retiredIngredientsQuery, variantEverSoldQuery } from '#server/utils/bar'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
 
@@ -50,6 +50,50 @@ function effectiveOn(database: TestDatabase, day: string): (number | null)[] {
     `SELECT ${statement} AS price FROM product_variants v ORDER BY v.sort, v.id`, ...parameters)
     .map(row => row.price)
 }
+
+function retired(database: TestDatabase, productId: string): string[] {
+  const [statement, ...parameters] = boundStatement(database, retiredIngredientsQuery(productId))
+  return rows<{ name: string }>(database, statement, ...parameters).map(row => row.name)
+}
+
+describe('a recipe cannot go active while it still calls for something retired (F-113 criterion 5)', () => {
+  test('a retired direct ingredient is named', async () => {
+    await withDatabase((database) => {
+      wine(database)
+      variant(database, { status: 'ACTIVE' })
+      insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', item_id: 'item-1', qty: 750 })
+      expect(retired(database, 'prod-1')).toEqual([])
+
+      database.batch([['UPDATE bar_items SET status = \'RETIRED\' WHERE id = \'item-1\'']])
+      expect(retired(database, 'prod-1')).toEqual(['House red'])
+    })
+  })
+
+  // A retired variant is not one the till can draw, so what it calls for cannot block the product.
+  test('a retired ingredient behind a retired variant does not count', async () => {
+    await withDatabase((database) => {
+      wine(database)
+      variant(database, { status: 'RETIRED' })
+      insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', item_id: 'item-1', qty: 750 })
+      database.batch([['UPDATE bar_items SET status = \'RETIRED\' WHERE id = \'item-1\'']])
+      expect(retired(database, 'prod-1')).toEqual([])
+    })
+  })
+
+  test('a retired option behind an attached choice group is named the same way', async () => {
+    await withDatabase((database) => {
+      wine(database)
+      variant(database, { status: 'ACTIVE' })
+      insert(database, 'choice_groups', { id: 'cg-1', name: 'Mixers' })
+      insert(database, 'choice_group_items', { id: 'cgi-1', choice_group_id: 'cg-1', item_id: 'item-2', qty: 200 })
+      insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', choice_group_id: 'cg-1', qty: 25 })
+      expect(retired(database, 'prod-1')).toEqual([])
+
+      database.batch([['UPDATE bar_items SET status = \'RETIRED\' WHERE id = \'item-2\'']])
+      expect(retired(database, 'prod-1')).toEqual(['Tonic'])
+    })
+  })
+})
 
 describe('a size is a row against one stocked thing (F-112 criteria 1 and 4)', () => {
   test('one stocked bottle sells four ways, each with its own depletion', async () => {
@@ -123,6 +167,18 @@ describe('a size is a row against one stocked thing (F-112 criteria 1 and 4)', (
       expect(() => insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', qty: 200 })).toThrow()
       expect(() => insert(database, 'variant_components', { id: 'c-2', variant_id: 'var-1', item_id: 'item-1', choice_group_id: 'cg-1', qty: 200 })).toThrow()
       insert(database, 'variant_components', { id: 'c-3', variant_id: 'var-1', choice_group_id: 'cg-1', qty: 200 })
+    })
+  })
+
+  // The pair-unique index on (variant, group) alone would allow this; only the partial index stops it.
+  test('a variant holds at most one choice group, database-enforced', async () => {
+    await withDatabase((database) => {
+      wine(database)
+      variant(database)
+      insert(database, 'choice_groups', { id: 'cg-1', name: 'Mixers' })
+      insert(database, 'choice_groups', { id: 'cg-2', name: 'Garnishes' })
+      insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', choice_group_id: 'cg-1', qty: 1 })
+      expect(() => insert(database, 'variant_components', { id: 'c-2', variant_id: 'var-1', choice_group_id: 'cg-2', qty: 1 })).toThrow()
     })
   })
 
@@ -345,6 +401,23 @@ describe('changes() after a conditional UPDATE names that UPDATE\'s own effect',
       expect(rows<{ status: string }>(database, 'SELECT status FROM product_variants WHERE id = \'var-1\'')[0]!.status)
         .toBe('RETIRED')
       expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(1)
+    })
+  })
+
+  // The route reads this same RETURNING clause to tell a win from a loss (0049); `batch()`
+  // discards it, so this goes through `raw` to prove the value the route's own check relies on.
+  test('a losing predicate\'s RETURNING is empty, which is what the route refuses on', async () => {
+    await withDatabase((database) => {
+      wine(database)
+      variant(database, { status: 'ACTIVE' })
+
+      const attempt = (): { id: string }[] => database.raw.prepare(
+        'UPDATE product_variants SET status = ? WHERE id = ? AND status = ? RETURNING id',
+      ).all('RETIRED', 'var-1', 'ACTIVE') as { id: string }[]
+
+      expect(attempt()).toHaveLength(1)
+      // The loser's predicate still asks for status = 'ACTIVE', which is no longer true.
+      expect(attempt()).toHaveLength(0)
     })
   })
 })

@@ -147,3 +147,85 @@ export async function withShiftConstraints<T>(write: () => Promise<T>): Promise<
     throw createError(refusal)
   }
 }
+
+// The open-shift list (E-103). Two bound parameters at most beyond the filters themselves,
+// whatever the page holds: nothing here binds per shift or per performance (0003, 0006).
+const where = (terms: SQL[]): SQL => (terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``)
+
+export interface OpenShiftFilters {
+  role?: ShiftRole
+  // Inclusive unix-second bounds. Absent means no further narrowing beyond `now`.
+  from?: number
+  to?: number
+}
+
+function openShiftTerms(filters: OpenShiftFilters, now: number): SQL[] {
+  const terms: SQL[] = [
+    sql`s.status = 'OPEN'`,
+    sql`p.status <> 'CANCELLED'`,
+    // A shift already past cannot be claimed, whatever range was asked for.
+    sql`p.starts_at >= ${Math.max(now, filters.from ?? now)}`,
+  ]
+  if (filters.role) terms.push(sql`s.role = ${filters.role}`)
+  if (filters.to !== undefined) terms.push(sql`p.starts_at <= ${filters.to}`)
+  return terms
+}
+
+export interface OpenShiftRow {
+  shiftId: string
+  role: ShiftRole
+  performanceId: string
+  venueId: string
+  venueName: string
+  showTitle: string
+  startsAt: number
+}
+
+export function openShiftsQuery(filters: OpenShiftFilters, now: number, limit: number, offset: number): SQL {
+  return sql`
+    SELECT s.id AS shiftId, s.role AS role, p.id AS performanceId, p.starts_at AS startsAt,
+           v.id AS venueId, v.name AS venueName, sh.title AS showTitle
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    JOIN venues v ON v.id = p.venue_id
+    JOIN shows sh ON sh.id = p.show_id
+    ${where(openShiftTerms(filters, now))}
+    ORDER BY p.starts_at, s.role, s.slot
+    LIMIT ${limit} OFFSET ${offset}
+  `
+}
+
+export function countOpenShiftsQuery(filters: OpenShiftFilters, now: number): SQL {
+  return sql`
+    SELECT count(*) AS total
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    ${where(openShiftTerms(filters, now))}
+  `
+}
+
+export interface MyShiftRow {
+  shiftId: string
+  role: ShiftRole
+  status: ShiftStatus
+  performanceId: string
+  venueName: string
+  showTitle: string
+  startsAt: number
+}
+
+// A member's own shifts, upcoming and not cancelled. Bounded by LIMIT rather than paged: nobody
+// holds enough shifts at once to need a second page (E-103).
+export function myShiftsQuery(userId: string, now: number): SQL {
+  return sql`
+    SELECT s.id AS shiftId, s.role AS role, s.status AS status, p.id AS performanceId,
+           v.name AS venueName, sh.title AS showTitle, p.starts_at AS startsAt
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    JOIN venues v ON v.id = p.venue_id
+    JOIN shows sh ON sh.id = p.show_id
+    WHERE s.user_id = ${userId} AND s.status <> 'CANCELLED' AND p.starts_at >= ${now}
+    ORDER BY p.starts_at, s.role, s.slot
+    LIMIT 100
+  `
+}
