@@ -428,6 +428,13 @@
       "when": 1788645269921,
       "tag": "0060_a_variant_offers_at_most_one_choice_group",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "6",
+      "when": 1788645680407,
+      "tag": "0061_stocktakes_and_stocked_item_categories",
+      "breakpoints": true
     }
   ]
 }

@@ -224,6 +224,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/bar/items/[id]/index.put.ts', actions: ['bar.item.updated'] },
   { route: 'server/api/admin/bar/items/[id]/status.post.ts', actions: ['bar.item.status.changed'] },
   { route: 'server/api/admin/bar/items/[id]/index.delete.ts', actions: ['bar.item.deleted'] },
+  { route: 'server/api/admin/bar/stocktakes/index.get.ts', exempt: 'reads stocktake history' },
+  { route: 'server/api/admin/bar/stocktakes/index.post.ts', actions: ['bar.stocktake.opened'] },
+  { route: 'server/api/admin/bar/stocktakes/[id]/index.get.ts', exempt: 'reads one stocktake and its lines' },
+  { route: 'server/api/admin/bar/stocktakes/[id]/counts.put.ts', actions: ['bar.stocktake.counted'] },
+  { route: 'server/api/admin/bar/stocktakes/[id]/apply.post.ts', actions: ['bar.stocktake.applied'] },
+  { route: 'server/api/admin/bar/order-list/index.get.ts', exempt: 'reads shortfalls against par, advisory only' },
+  { route: 'server/api/admin/bar/order-list/export.get.ts', exempt: 'reads the same shortfalls as CSV' },
   { route: 'server/api/admin/bar/movements/index.get.ts', exempt: 'reads the movement history' },
   {
     route: 'server/api/admin/bar/movements/index.post.ts',

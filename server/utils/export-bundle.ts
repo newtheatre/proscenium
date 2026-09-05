@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm'
+import { toCsv } from '#server/utils/csv'
 import { EXPORTED_TABLES } from '#shared/utils/personal-data'
 
 // Everything the theatre holds about one person, built in one pass from the registry, so a module
@@ -28,22 +29,6 @@ async function decryptAccessProfileRow(row: Record<string, unknown>, userId: str
   if (typeof ciphertext !== 'string' || typeof iv !== 'string') return { ...rest, flags: null, requester_note: null, foh_note: null }
   const payload = await decryptAccessProfilePayload({ ciphertext, iv }, userId)
   return { ...rest, flags: payload.flags, requester_note: payload.requesterNote, foh_note: payload.fohNote }
-}
-
-// RFC 4180: every field quoted, inner quotes doubled, so a comma or a newline cannot end a row
-// early. A leading =, +, - or @ is prefixed, because a spreadsheet reads one as a formula (D-129).
-function csvField(value: unknown): string {
-  const text = value === null || value === undefined ? '' : String(value)
-  const guarded = /^[=+\-@]/.test(text) ? `'${text}` : text
-  return `"${guarded.replaceAll('"', '""')}"`
-}
-
-function toCsv(rows: Record<string, unknown>[]): string {
-  if (rows.length === 0) return ''
-  const columns = Object.keys(rows[0]!)
-  const lines = [columns.map(csvField).join(',')]
-  for (const row of rows) lines.push(columns.map(column => csvField(row[column])).join(','))
-  return `${lines.join('\r\n')}\r\n`
 }
 
 export async function buildBundle(account: AccountRow): Promise<Bundle> {

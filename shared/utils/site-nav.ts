@@ -93,6 +93,8 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Categories', icon: 'i-lucide-layout-grid', to: '/bar/categories', ability: viewBarCatalogue },
       { label: 'Stocked items', icon: 'i-lucide-package', to: '/bar/stock', ability: viewBarStock, exact: true },
       { label: 'Stock movements', icon: 'i-lucide-arrow-left-right', to: '/bar/stock/movements', ability: viewBarStock },
+      { label: 'Stocktakes', icon: 'i-lucide-clipboard-list', to: '/bar/stock/stocktakes', ability: viewBarStock },
+      { label: 'Order list', icon: 'i-lucide-truck', to: '/bar/stock/order-list', ability: viewBarStock },
     ],
   },
 

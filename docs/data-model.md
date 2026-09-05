@@ -627,9 +627,12 @@ erDiagram
 ### bar_items  (stocked things)
 `id` PK · `name` unique, case-insensitively · `unit` CHECK `ML|ITEM` · `container_ml` NULL for
 whole items, **immutable once movements exist**, as is `unit`, both by trigger · `par_qty` in the
-item's own unit (F-120) · `age_restricted` bool default true · `allergen_notes`, the reference a
-product's own note is written from · `status` CHECK `ACTIVE|RETIRED` · `created_at`. Retired, never
-deleted once anything has moved: every movement restricts on the foreign key.
+item's own unit (F-120) · `category` free text, for grouping the order list; not a foreign key to
+`bar_categories`, because a stocked ingredient can feed several sold products across several till
+categories and has no one sale category to inherit · `age_restricted` bool default true ·
+`allergen_notes`, the reference a product's own note is written from · `status` CHECK
+`ACTIVE|RETIRED` · `created_at`. Retired, never deleted once anything has moved: every movement
+restricts on the foreign key.
 
 ### bar_categories
 `id` PK · `name` unique, case-insensitively · `sort`, which drives the till's layout and is read
@@ -729,9 +732,33 @@ rebuild, and a rebuild of an append-only table is refused (0010). `MOVEMENT_WRIT
 path writes each: the stock screen writes `DELIVERY`, `WASTAGE`, `ADJUST` and `REVERSAL`, and
 refuses the rest by name.
 
-### stock_deliveries / stock_delivery_lines / stocktakes / stocktake_lines
-As the estate's proven design: deliveries at cost; one open stocktake (partial unique);
-counted NULL distinct from counted zero; finishing posts movements atomically.
+### stocktakes / stocktake_lines
+A delivery is a `stock_movements` row on its own (`DELIVERY`, with `unit_cost_pence`); there is no
+separate `stock_deliveries` header table, so what follows is stocktakes alone (F-115).
+
+`stocktakes`: `id` PK · `status` CHECK `OPEN|APPLIED`, default `OPEN` · `opened_by` / `opened_at` ·
+`applied_by` / `applied_at`, both null until applied, both set together (CHECK) and never before
+`opened_at`. Partial UNIQUE on `status` WHERE `status = 'OPEN'`: the indexed value is always
+`'OPEN'`, so at most one row can ever hold it, an estate-wide singleton rather than one scoped to
+a venue or night.
+
+`stocktake_lines`: `id` PK · `stocktake_id` → stocktakes cascade · `item_id` → bar_items restrict ·
+`expected_qty`, the item's on-hand at the moment the stocktake opened · `counted_qty` NULL,
+distinct from an entered zero throughout (criterion 2); CHECK not negative. UNIQUE
+(`stocktake_id`, `item_id`).
+
+Opening captures one line per `ACTIVE` item in a single `INSERT ... SELECT`, so later sales cannot
+muddy the comparison (criterion 1). Applying is one `db.batch`: an `UPDATE` on `stocktakes` carries
+the only predicate (`status = 'OPEN'`), the audit row rides `changes() = 1` from it, and the
+adjustment movements ride `changes() = 1` from the audit row in turn, since a single `changes()`
+reports only the statement immediately before it and there are several line rows to guard, not
+one. One `STOCKTAKE` movement is posted per line whose count differs from what was expected
+(`ref_table = 'stocktake_lines'`, `ref_id` the line); a blank line, or one that matches, posts
+nothing, which is what closes the old estate's blank-recorded-as-zero regression (criterion 6).
+The partial UNIQUE on `stock_movements(ref_id)` WHERE `ref_table = 'stocktake_lines'` (F-114)
+rolls a duplicate finish back as a whole. A frozen (`APPLIED`) stocktake is immutable at the write
+path: the counts route re-reads the stocktake's own status after its batch, since status only ever
+moves `OPEN` to `APPLIED`, never back, and refuses if it is no longer open.
 
 ### comp_requests
 `id` PK · lines JSON snapshot · `gross_pence` · `status` CHECK

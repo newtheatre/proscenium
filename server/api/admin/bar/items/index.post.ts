@@ -10,8 +10,8 @@ export default defineEventHandler(async (event) => {
   // The predicate rides the write, so two managers naming the same thing at once produce one
   // item and a refusal rather than a constraint error (0003, 0006).
   const created = await db.all<{ id: string }>(sql`
-    INSERT INTO bar_items (id, name, unit, container_ml, par_qty, age_restricted, allergen_notes, status)
-    SELECT ${id}, ${input.name}, ${input.unit}, ${input.containerMl ?? null}, ${input.parQty ?? null},
+    INSERT INTO bar_items (id, name, unit, container_ml, par_qty, category, age_restricted, allergen_notes, status)
+    SELECT ${id}, ${input.name}, ${input.unit}, ${input.containerMl ?? null}, ${input.parQty ?? null}, ${input.category ?? null},
            ${input.ageRestricted ? 1 : 0}, ${input.allergenNotes ?? null}, 'ACTIVE'
     WHERE NOT EXISTS (SELECT 1 FROM bar_items WHERE name = ${input.name} COLLATE NOCASE)
     RETURNING id

@@ -182,6 +182,9 @@ const CATALOGUE = {
   'bar.item.deleted': { label: 'Stocked item deleted', module: 'bar' },
   'bar.till.opened': { label: 'Till session opened', module: 'bar' },
   'bar.till.closed': { label: 'Till session closed', module: 'bar' },
+  'bar.stocktake.opened': { label: 'Stocktake opened', module: 'bar' },
+  'bar.stocktake.counted': { label: 'Stocktake counts recorded', module: 'bar' },
+  'bar.stocktake.applied': { label: 'Stocktake applied', module: 'bar' },
 
   // Module G: training
 

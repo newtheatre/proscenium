@@ -28,6 +28,7 @@ export default defineEventHandler(async (event) => {
         unit = ${input.unit},
         container_ml = ${containerMl},
         par_qty = ${input.parQty ?? null},
+        category = ${input.category ?? null},
         age_restricted = ${input.ageRestricted ? 1 : 0},
         allergen_notes = ${input.allergenNotes ?? null}
     WHERE id = ${id}
@@ -52,6 +53,7 @@ export default defineEventHandler(async (event) => {
         unit: [held.unit, input.unit],
         containerMl: [held.containerMl, containerMl],
         parQty: [held.parQty, input.parQty ?? null],
+        category: [held.category, input.category ?? null],
         ageRestricted: [held.ageRestricted, input.ageRestricted],
       }),
       allergenNotesChanged: (input.allergenNotes ?? null) !== held.allergenNotes,
