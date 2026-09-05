@@ -46,6 +46,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Register nag cadence | from day 2, weekly, stop at 60 days | unchanged | |
 | Expiry sweep armed | none: the old app sent from day one | **off**, armed deliberately | New setting. The sweep computes and reports what it would send until somebody turns it on, so arming it later still warns everybody who was due. Turning it on is a settings change and is audited. Owner: IT Manager |
 | Notification ledger retention | none: the old app kept everything | 24 months | New setting. The ledger holds the claims that stop a warning being sent twice, so it is evidence rather than logging; pruned in every mode, armed or not |
+| Shift eligibility mapping | none: the old estate faked this with a 45-second cached call to stage-door and admitted everyone on failure | none confirmed; ships refusing every role until named | Three settings, one per shift role (duty manager, door, bar), each naming the training module that gates it. Until the session names them, the shift list refuses eligibility rather than admitting everyone, which is the safer failure (E-103 criterion 4, module E open question 2) |
 
 ## Session 3: people, communications and cutover (60 minutes)
 
@@ -67,8 +68,10 @@ Any value not settled in a session gets the proposed default and a named owner; 
 decision does not block the gate, it ships the default.
 
 The proposed values are shipped in `shared/utils/config.ts`, one validated key each, and a workshop
-amending one is a settings change rather than a release (0012, 0019). One row above has no proposed
-value, the night report recipients, and ships unset until a session confirms it.
+amending one is a settings change rather than a release (0012, 0019). Two rows above have no
+proposed value: the night report recipients, which ships unset until a session confirms it, and
+the shift eligibility mapping, which ships a default of null per role, refusing rather than
+guessing until a session names each module (0019, E-103).
 
 Three rows are decisions the committee still makes and settings the system does not hold: the pass
 products and the per-room opening hours are records rather than rules, entered through the screens
