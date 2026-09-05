@@ -116,6 +116,17 @@ parameter.
 - Any future route that changes a status (or any other contended field) and audits the change
   copies both halves of this shape rather than inventing a fourth one, or fixing only the audit
   half and leaving the caller misinformed.
+- **Two more routes run the shape this record rejects, and neither is swept by this pull
+  request.** `server/api/admin/training/sessions/[id]/cancel.post.ts` awaits a conditional
+  `db.update(...).returning({ id })`, throws 409 when it matched nothing, then writes its audit
+  entry with a separate, unbatched `db.insert(schema.auditLog)`. `server/api/admin/rooms/
+  external-requests/[id]/reject.post.ts` does the same through `moveRequest()`, which is itself a
+  conditional `UPDATE ... RETURNING id`, followed by the same unbatched insert on rejection. Both
+  are the awaited-conditional-write-then-separate-insert shape the Decision section calls wrong,
+  on a cancelled training session and a rejected external request rather than a status column.
+  This record applies to both; the sweep is a later pull request. `docs/known-issues.md` carries a
+  row for each so the gap is visible until then rather than only implied by this record's own
+  survey being incomplete.
 
 ## Options considered
 
