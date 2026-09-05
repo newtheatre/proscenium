@@ -4,6 +4,7 @@ import {
   reachConsole,
   runTrainingSessions,
   signedIn,
+  verifyAccessProfiles,
   viewAccounts,
   viewAuditTrail,
   viewBarCatalogue,
@@ -76,6 +77,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Ticket types', icon: 'i-lucide-tag', to: '/box-office/ticket-types', ability: viewTicketTypes },
       { label: 'Passes', icon: 'i-lucide-wallet-cards', to: '/box-office/pass-types', ability: viewPassTypes },
       { label: 'Content warnings', icon: 'i-lucide-triangle-alert', to: '/box-office/content-warnings', ability: viewProgramme },
+      { label: 'Access profiles', icon: 'i-lucide-accessibility', to: '/box-office/access-profiles', ability: verifyAccessProfiles },
     ],
   },
 
@@ -162,6 +164,10 @@ export const CONSOLE_NAV: NavGroup[] = [
 // The member's own screens. The footer shows these to everybody and sends a signed-out visitor
 // through /sign-in?next=, so somebody who followed a link still arrives where they meant to.
 export const MEMBER_NAV: NavEntry[] = [
+  // Module D: ticketing
+
+  { label: 'Access requirements', icon: 'i-lucide-accessibility', to: '/account/access', ability: signedIn },
+
   // Module C: spaces
 
   { label: 'My bookings', icon: 'i-lucide-calendar-check', to: '/rooms/mine', ability: signedIn },

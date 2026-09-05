@@ -141,6 +141,11 @@ const CATALOGUE = {
   'pass-type.updated': { label: 'Pass changed', module: 'ticketing' },
   'pass-type.shows.updated': { label: 'Pass covered shows changed', module: 'ticketing' },
   'pass-type.deleted': { label: 'Pass deleted', module: 'ticketing' },
+  'access-profile.updated': { label: 'Access profile declared or changed', module: 'ticketing', self: true },
+  'access-profile.withdrawn': { label: 'Access profile withdrawn', module: 'ticketing', self: true },
+  'access-profile.verified': { label: 'Access profile verified', module: 'ticketing' },
+  'access-profile.declined': { label: 'Access profile declined', module: 'ticketing' },
+  'access-profile.tombstone.purged': { label: 'Withdrawn access profile deleted after its tombstone', module: 'ticketing' },
 
   // Module E: show night
 

@@ -157,12 +157,16 @@ delete-as-claim on redemption. Transient: never migrated, swept when expired.
 
 ### access_profiles
 `user_id` PK → users cascade · `status` CHECK `PENDING|VERIFIED|EXPIRED|DECLINED|WITHDRAWN` ·
-the nine need flags below · `companions` int 0..2 · `access_card_number` (evidence sighted,
-value not retained beyond the reference) · `requester_note` scrub, never shown to the door ·
-`foh_note` (agreed operational wording, shown to the holder) · `consent_foh_at` NULL = the
-door sees nothing · `verified_by` · `verified_at` · `expires_at`.
-Special category data: encrypted at rest, deleted outright on erasure and 30 days after
-withdrawal (D-6).
+`companions` int 0..2 · `consent_foh_at` NULL = the door sees nothing · `verified_by` · `verified_at`
+· `expires_at` · `withdrawn_at`.
+Everything else, special category, lives in `encrypted_payload` and `encryption_iv`: an
+AES-256-GCM blob carrying the nine need flags below, the requester's own note (never shown to the
+door), the officer's agreed operational wording (shown to the holder once verified), and the
+self-declared evidence reference, cleared the moment an officer has sighted it, verified or
+declined (0050). `status` and `companions` stay plain columns because the database enforces them
+directly; nothing else does, and D1 has no column-level encryption to enforce it on ciphertext
+regardless. Deleted outright on erasure and 30 days after withdrawal (D-6, D-127 criterion 5);
+`expires_at` is enforced at read time, the same rule 0009 gives a role grant.
 
 The nine flags follow the Access Card categories run by Nimbus Disability, so a patron who
 already carries one recognises our questions and we recognise their card:

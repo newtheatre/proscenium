@@ -438,6 +438,13 @@ that point at them, declared in `server/utils/ticket-types.ts` and `server/utils
 proved against the live foreign keys, never a column on the row itself. A pass product's "ever
 issued" and "live coverage" are the same shape, declared in `server/utils/pass-types.ts`.
 
+Access profiles are declared at `/account/access` and verified at `/box-office/access-profiles`
+(D-127), the one screen `access.verify` gates rather than any of the box office's ordinary
+permissions: an accessibility officer, never general box office. The special-category payload is
+one AES-256-GCM blob per row, `server/utils/access-profile-crypto.ts` the only place that touches
+the key (0050); `server/utils/access-profiles.ts` is where declaring, verifying, declining,
+withdrawing and the door's read all live.
+
 `shared/utils/programme.ts` holds the publish flow and the booking window as pure rules:
 
 | Function | Answers |

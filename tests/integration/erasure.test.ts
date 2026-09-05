@@ -44,6 +44,11 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
       `n-${id}`, id, 'account.verify', 'EMAIL', `${NAME}, confirm your address`, 'SENT'],
     ['INSERT INTO inbox_items (id, user_id, type, title, body) VALUES (?, ?, ?, ?, ?)',
       `i-${id}`, id, 'note', `A message for ${NAME}`, `about ${EMAIL}`],
+    // Special category data, deleted outright rather than anonymised (D-127 criterion 5). Self
+    // verified here only so one fixture id exercises both the subject row and the officer column.
+    [`INSERT INTO access_profiles (user_id, status, companions, encrypted_payload, encryption_iv, consent_foh_at, verified_by, verified_at)
+      VALUES (?, 'VERIFIED', 1, ?, ?, ?, ?, ?)`,
+    id, `ciphertext-for-${NAME}`, 'iv-placeholder', now, id, now],
     // An entry that picked up an identifying value despite the write-time guard: the case the
     // redaction exists for (0011, "aim is not guarantee").
     ['INSERT INTO audit_log (id, actor_id, action, target, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)',
@@ -228,6 +233,19 @@ describe('erasure (K-109, 0011)', () => {
 
       // The row itself is still there for everything referring to it.
       expect(rows(database, 'SELECT id FROM users WHERE id = ?', id)).toHaveLength(1)
+    })
+  })
+
+  // Special category data, so this is the one table that does not survive an erasure: deleted
+  // outright and immediately, rather than waiting on the 30-day withdrawal tombstone (D-127, 0050).
+  test('the access profile is deleted outright, not anonymised', async () => {
+    await withDatabase(async (database) => {
+      const id = seedPerson(database)
+      expect(rows(database, 'SELECT user_id FROM access_profiles WHERE user_id = ?', id)).toHaveLength(1)
+
+      await erase(database, id)
+
+      expect(rows(database, 'SELECT user_id FROM access_profiles WHERE user_id = ?', id)).toHaveLength(0)
     })
   })
 

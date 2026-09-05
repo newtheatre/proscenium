@@ -25,6 +25,7 @@ export const PERSONAS: Persona[] = [
   // Module D: ticketing
 
   { email: 'dev-boxoffice@e2e.newtheatre.org.uk', name: 'Bo Boxoffice (dev)', role: 'BOX_OFFICE', shape: 'full', describes: 'Adds, prices and archives ticket types. Nothing operational: the door derives from tonight.' },
+  { email: 'dev-access@e2e.newtheatre.org.uk', name: 'Ash Access (dev)', role: 'ACCESSIBILITY_OFFICER', shape: 'full', describes: 'Sights evidence and verifies access profile declarations. Nothing else: not general box office (D-127).' },
 
   // Module E: show night
 
