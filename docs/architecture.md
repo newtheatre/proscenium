@@ -268,8 +268,9 @@ All Nitro scheduled tasks mirrored in wrangler cron triggers. The system notices
 decide (principle P6): no task ever awards a record, approves a request or takes money.
 
 Every name in the table has a handler under `server/tasks/`, because a cron pointing at one that
-does not exist errors on every firing. Seven of them are stubs that report the story they are
-waiting for and do nothing else; only `daily:sweeps` does work today.
+does not exist errors on every firing. `holds:release`, `sessions:sweep`, `shifts:remind`,
+`nights:close` and `retention:sweep` are stubs that report the story they are waiting for and do
+nothing else; the rest do their work, `backup` from K-108 and J-107.
 
 | Cron (UTC) | Task | Does |
 | --- | --- | --- |
@@ -282,7 +283,7 @@ waiting for and do nothing else; only `daily:sweeps` does work today.
 | `0 17 * * *` | `rooms:remind` | Tomorrow's room bookings, one message per member however many they hold, with the calendar file attached (C-113). Idempotent: a second run the same London day sends nothing, read from `notification_log` rather than a column. |
 | `12 0 * * *` | `nights:close` | Auto-closes unsigned night reports inside 24 hours, retries unsent report emails. |
 | `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, notification retries, unverified account expiry (0026). |
-| `0 5 * * 1` | `backup` | Weekly export to R2 (plus provider Time Travel). |
+| `0 5 * * 1` | `backup` | A row-count and ledger-total manifest to R2 (the `BLOB` binding), independent of D1. A failure audits `backup.export-failed` rather than only logging. Point-in-time restore is D1 Time Travel, already automatic; the restore drill and its cadence are administered at `/admin/backups` (K-108, J-107). |
 | `0 4 1 * *` | `retention:sweep` | Inactivity warnings and anonymisation (ships dry-run, armed by config with typed confirmation). |
 
 ## Notifications

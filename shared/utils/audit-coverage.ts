@@ -341,6 +341,10 @@ export const AUDIT_COVERAGE: Coverage[] = [
 
   // Module K: platform
 
+  { route: 'server/api/admin/backups/index.get.ts', exempt: 'reads drill status for the dashboard' },
+  { route: 'server/api/admin/backups/drills/index.get.ts', exempt: 'reads recorded drills' },
+  { route: 'server/api/admin/backups/drills/index.post.ts', actions: ['backup.drill-recorded'] },
+
   // Development only, and absent from a build: nuxt.config excludes both files (K-124).
   {
     route: 'server/api/dev/seed.post.ts',

@@ -36,6 +36,10 @@ export const decideRoomRequests = defineAbility((viewer: Viewer) => holds(viewer
 export const viewAuditTrail = defineAbility((viewer: Viewer) => holds(viewer, 'audit.read'))
 export const viewSettings = defineAbility((viewer: Viewer) => holds(viewer, 'config.read'))
 
+// The restore drill record: read alongside settings, recorded by whoever ran it (K-108, J-107).
+export const viewBackups = defineAbility((viewer: Viewer) => holds(viewer, 'backups.read'))
+export const recordBackupDrills = defineAbility((viewer: Viewer) => holds(viewer, 'backups.write'))
+
 // The catalogue admits a lead who holds no standing permission, so the sidebar has to admit them
 // too or it would hide a screen they can open (requireCatalogueReader, G-110).
 export const viewTrainingCatalogue = defineAbility((viewer: Viewer) => holds(viewer, 'training.read') || viewer.leadsDepartment)
@@ -94,6 +98,8 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   decideRoomRequests: 'rooms.write',
   viewAuditTrail: 'audit.read',
   viewSettings: 'config.read',
+  viewBackups: 'backups.read',
+  recordBackupDrills: 'backups.write',
   viewTrainingCatalogue: 'training.read',
   runTrainingSessions: 'training.write',
   viewTicketTypes: 'ticketing.read',

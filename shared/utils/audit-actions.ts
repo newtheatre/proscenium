@@ -230,6 +230,9 @@ const CATALOGUE = {
   'config.changed': { label: 'Setting changed', module: 'governance' },
   'audit.exported': { label: 'Audit trail exported', module: 'governance' },
 
+  'backup.drill-recorded': { label: 'Restore drill recorded', module: 'governance' },
+  'backup.export-failed': { label: 'Weekly export failed', module: 'governance' },
+
   // Recorded after the fact, for a decision taken outside the system. The vocabulary grows with
   // the modules: there is no general-purpose manual action, because that is a note (J-103).
   'manual.role.granted': { label: 'Role granted outside the system', module: 'governance', manual: true },
