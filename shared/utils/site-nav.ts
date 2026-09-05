@@ -195,6 +195,10 @@ export const PUBLIC_NAV: NavEntry[] = [
   // Module D: ticketing
 
   { label: 'What\'s on', icon: 'i-lucide-drama', to: '/whats-on', ability: anybody },
+  { label: 'About us', icon: 'i-lucide-info', to: '/about', ability: anybody },
+  { label: 'Our history', icon: 'i-lucide-history', to: '/history', ability: anybody },
+  { label: 'Get involved', icon: 'i-lucide-heart-handshake', to: '/get-involved', ability: anybody },
+  { label: 'Technical specification', icon: 'i-lucide-wrench', to: '/technical-specification', ability: anybody },
 
   // Module G: training
 

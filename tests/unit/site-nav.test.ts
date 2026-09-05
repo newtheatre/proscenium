@@ -31,6 +31,16 @@ async function pages(): Promise<{ path: string, source: string }[]> {
 const consolePages = async (): Promise<string[]> =>
   (await pages()).filter(page => page.source.includes('layout: \'console\'')).map(page => page.path)
 
+// A route with no page file of its own may still resolve through the site-wide content catch-all
+// (`app/pages/[...slug].vue`, D-103), provided a markdown page exists for it at that path.
+async function contentRoutes(): Promise<Set<string>> {
+  const found = new Set<string>()
+  for (const entry of new Bun.Glob('**/*.md').scanSync({ cwd: 'content', onlyFiles: true })) {
+    found.add(`/${entry.replace(/\.md$/, '')}`)
+  }
+  return found
+}
+
 // The route a page file serves, by Nuxt's own conventions.
 function routeOf(path: string): string {
   const route = path.replace(`${PAGES}/`, '').replace(/\.vue$/, '').replace(/\/index$/, '')
@@ -56,8 +66,9 @@ describe('every console screen is in the navigation (0040)', () => {
   // A link to a route that 404s is worse than no navigation at all, so it is a test and not care.
   test('every destination anywhere resolves to a page that exists', async () => {
     const routes = new Set((await pages()).map(page => routeOf(page.path)))
+    const content = await contentRoutes()
     // Tonight is named before it is built, and its shell has one page under it already.
-    const dangling = everyEntry.map(entry => entry.to).filter(to => !routes.has(to))
+    const dangling = everyEntry.map(entry => entry.to).filter(to => !routes.has(to) && !content.has(to))
     expect(dangling).toEqual([])
   })
 })

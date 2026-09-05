@@ -55,3 +55,4 @@ afterwards, only superseded.
 | 0047 | A constraint violation is refused by a shared helper, each module keeping its own table | the anchored match against a D1 error, and why the table is not centralised |
 | 0048 | A notification is one claimed row, updated to its outcome rather than joined by a second | why the claim writes PENDING, and why no trigger or rebuild is needed |
 | 0049 | A status change audits itself atomically, the predicate on the write, the log and the caller both on `changes()` | why a losing racer's audit stays silent and its caller is refused, not told it succeeded |
+| 0051 | Editorial content ships as markdown, and copy the committee has not supplied is marked as a placeholder | the deferred editing surface, and why nothing invented reaches the public site |
