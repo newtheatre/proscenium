@@ -1,11 +1,11 @@
-// Registered so its cron trigger has a handler; the work arrives with E-109. It reports what it
-// is waiting for rather than a count it did not produce.
+// The day before, once per confirmed shift, carrying an ICS to add it to the rest of the
+// evening's plans (E-109 criterion 1).
 export default defineTask({
   meta: {
     name: 'shifts:remind',
-    description: 'The next day rota with calendar attachments (E-109, not built)',
+    description: 'Remind tomorrow\'s confirmed shift holders, with a calendar attachment',
   },
-  run() {
-    return { result: { awaiting: 'E-109' } }
+  async run() {
+    return { result: await remindShiftsTomorrow(undefined, new Date()) }
   },
 })

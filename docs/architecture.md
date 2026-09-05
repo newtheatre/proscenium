@@ -268,8 +268,8 @@ All Nitro scheduled tasks mirrored in wrangler cron triggers. The system notices
 decide (principle P6): no task ever awards a record, approves a request or takes money.
 
 Every name in the table has a handler under `server/tasks/`, because a cron pointing at one that
-does not exist errors on every firing. Seven of them are stubs that report the story they are
-waiting for and do nothing else; only `daily:sweeps` does work today.
+does not exist errors on every firing. Five of them are still stubs that report the story they
+are waiting for and do nothing else (`docs/known-issues.md`).
 
 | Cron (UTC) | Task | Does |
 | --- | --- | --- |
@@ -278,7 +278,7 @@ waiting for and do nothing else; only `daily:sweeps` does work today.
 | `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or an unconfirmed duty manager, the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |
 | `0 9 * * *` | `sessions:sweep` | Session reminders and unmarked-register nags (G-119, not yet built). |
-| `0 10 * * *` | `shifts:remind` | Tomorrow's rota with calendar attachments. |
+| `0 10 * * *` | `shifts:remind` | Tomorrow's confirmed shift holders, one message per shift with a calendar attachment carrying the call time (E-109). Idempotent per shift, read from `notification_log`'s claim column rather than a column on `shifts`. |
 | `0 17 * * *` | `rooms:remind` | Tomorrow's room bookings, one message per member however many they hold, with the calendar file attached (C-113). Idempotent: a second run the same London day sends nothing, read from `notification_log` rather than a column. |
 | `12 0 * * *` | `nights:close` | Auto-closes unsigned night reports inside 24 hours, retries unsent report emails. |
 | `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, notification retries, unverified account expiry (0026). |
@@ -436,6 +436,21 @@ templates are administered under, rather than a named role, so an administrator 
 alongside the FOH officer. One digest per officer per London day, read from `notification_log`
 rather than a column, the same idempotency `remindTomorrow` uses for room bookings (E-108
 criterion 4 read together with C-113).
+
+### The day-before reminder (E-109)
+
+`shared/utils/shift-reminders.ts` holds `tomorrowsShiftNight(at)`, the pure half: the show night
+after the one `at` falls in, never the calendar day, so it agrees with `showNightOf` on both
+sides of a clock change (criterion 2). `server/utils/shift-reminders.ts` reads every `CONFIRMED`
+shift on that night and sends one reminder per shift, not one per holder: a member working a
+matinee and an evening tomorrow gets two mails, each with its own idempotency, because criterion
+3 asks for one send per shift rather than per person per day (unlike `remindTomorrow`'s own
+per-day claim for rooms). Idempotency rides `claimNotification()`'s `claim` column keyed
+`shift.reminder:<shiftId>`, the same primitive `shift.venue-changed` claims by, rather than a
+read-then-write. `shift.reminder` is its own message type, carrying the `SHIFTS` topic rather
+than going out transactionally: it is the first shift message that is a courtesy and not an
+outcome, so a preference may govern it (criterion 4). The call time is the venue's `doors_at`
+where one is set, curtain otherwise: nothing else records a time distinct from either.
 
 ## The programme (build-order contract d, 0043)
 
