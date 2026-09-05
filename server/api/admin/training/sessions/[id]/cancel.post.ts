@@ -47,30 +47,36 @@ export default defineEventHandler(async (event) => {
     .where(sql`${schema.sessionAttendees.sessionId} = ${id} and ${ne(schema.sessionAttendees.status, 'CANCELLED')}`)
 
   const now = Math.floor(Date.now() / 1000)
-  // Stamped by a conditional write, so two people cancelling at once tell everybody once.
-  const cancelled = await db.update(schema.trainingSessions)
-    .set({
-      status: 'CANCELLED',
-      cancelledAt: now,
-      cancelledBy: resolved.account.id,
-      cancelReason: input.reason,
-      updatedAt: now,
-    })
-    .where(sql`${schema.trainingSessions.id} = ${id} and ${ne(schema.trainingSessions.status, 'CANCELLED')}`)
-    .returning({ id: schema.trainingSessions.id })
-
-  if (cancelled.length === 0) {
-    throw createError({ statusCode: 409, statusMessage: 'That session is already cancelled' })
-  }
 
   // The reason is on the session and in the email, and not here: audit detail carries identifiers
   // and never the words somebody wrote about a night (0011).
-  await db.insert(schema.auditLog).values(auditEntry({
+  const entry = auditEntry({
     actorId: resolved.account.id,
     action: 'session.cancelled',
     target: `session:${id}`,
     detail: { heldOn: session.heldOn, told: signedUp.length },
-  }))
+  })
+
+  // The audit insert reads `changes()`, this connection's own UPDATE row count, not the
+  // resulting state: a losing request's UPDATE touches nothing, whatever the winner did (0049).
+  const [cancelled] = await db.batch([
+    db.all<{ id: string }>(sql`
+      UPDATE training_sessions SET status = 'CANCELLED', cancelled_at = ${now}, cancelled_by = ${resolved.account.id},
+        cancel_reason = ${input.reason}, updated_at = ${now}
+      WHERE id = ${id} AND status <> 'CANCELLED' RETURNING id
+    `),
+    db.run(sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
+      WHERE changes() = 1
+    `),
+  ])
+
+  // A losing racer is refused, not told it succeeded: the audit stayed silent, so the caller
+  // must too (0049).
+  if (cancelled.length === 0) {
+    throw createError({ statusCode: 409, statusMessage: 'That session is already cancelled' })
+  }
 
   // Claimed before it is sent, so a retry of this request cannot tell the same person twice.
   let told = 0
