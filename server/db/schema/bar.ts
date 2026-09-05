@@ -58,6 +58,9 @@ export const barItems = sqliteTable('bar_items', {
   unit: text('unit').notNull(),
   containerMl: integer('container_ml'),
   parQty: integer('par_qty'),
+  // Free text, not a foreign key to bar_categories: a stocked ingredient can feed several sold
+  // products across several till categories, so it has no one sale category to inherit (F-120).
+  category: text('category'),
   ageRestricted: integer('age_restricted', { mode: 'boolean' }).notNull().default(true),
   allergenNotes: text('allergen_notes'),
   status: text('status').notNull().default('ACTIVE'),
@@ -192,4 +195,33 @@ export const tillSessions = sqliteTable('till_sessions', {
   index('till_sessions_unclosed').on(table.night).where(sql`closed_at IS NULL`),
   check('till_sessions_close_is_whole', sql`(${table.closedAt} IS NULL) = (${table.closedBy} IS NULL)`),
   check('till_sessions_closes_after_it_opens', sql`${table.closedAt} IS NULL OR ${table.closedAt} >= ${table.openedAt}`),
+])
+
+// At most one open stocktake estate-wide: the unique value the partial index covers is always
+// 'OPEN', so a second one attempting to open collides with the first (F-115 criterion 1).
+export const stocktakes = sqliteTable('stocktakes', {
+  id: id(),
+  status: text('status').notNull().default('OPEN'),
+  openedBy: text('opened_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  openedAt: integer('opened_at').notNull().default(now),
+  appliedBy: text('applied_by').references(() => users.id, { onDelete: 'restrict' }),
+  appliedAt: integer('applied_at'),
+}, table => [
+  uniqueIndex('stocktakes_one_open').on(table.status).where(sql`status = 'OPEN'`),
+  check('stocktakes_status_values', sql`${table.status} IN ('OPEN', 'APPLIED')`),
+  check('stocktakes_apply_is_whole', sql`(${table.appliedAt} IS NULL) = (${table.appliedBy} IS NULL)`),
+  check('stocktakes_applies_after_it_opens', sql`${table.appliedAt} IS NULL OR ${table.appliedAt} >= ${table.openedAt}`),
+])
+
+// One line per stocked item, captured when the stocktake opens so later sales cannot muddy the
+// comparison. `countedQty` NULL is "not counted", distinct from an entered zero (F-115 criterion 2).
+export const stocktakeLines = sqliteTable('stocktake_lines', {
+  id: id(),
+  stocktakeId: text('stocktake_id').notNull().references(() => stocktakes.id, { onDelete: 'cascade' }),
+  itemId: text('item_id').notNull().references(() => barItems.id, { onDelete: 'restrict' }),
+  expectedQty: integer('expected_qty').notNull(),
+  countedQty: integer('counted_qty'),
+}, table => [
+  unique('stocktake_lines_item').on(table.stocktakeId, table.itemId),
+  check('stocktake_lines_counted_not_negative', sql`${table.countedQty} IS NULL OR ${table.countedQty} >= 0`),
 ])

@@ -301,6 +301,15 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // Holds no free text at all: an opener and a closer, a venue and a night, both timestamps.
     why: 'Who opened and closed a night\'s till is the accountable record the reconciliation reads (F-118); the tombstone still answers for it.',
   },
+  {
+    name: 'stocktakes',
+    column: 'opened_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Holds no free text: an opener and an applier, both timestamps, and a status.
+    why: 'Who opened and applied a stocktake is what any on-hand figure audits to (F-115); the tombstone still answers for it.',
+  },
 
   // Module G: training
 

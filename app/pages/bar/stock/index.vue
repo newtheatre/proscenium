@@ -57,6 +57,7 @@ interface ItemState {
   unit: StockUnit
   containerMl?: number
   parQty?: number
+  category?: string
   ageRestricted: boolean
   allergenNotes?: string
 }
@@ -104,6 +105,7 @@ function edit(item: StockItem | null): void {
     unit: item?.unit ?? 'ML',
     containerMl: item?.containerMl ?? undefined,
     parQty: item?.parQty ?? undefined,
+    category: item?.category ?? undefined,
     ageRestricted: item?.ageRestricted ?? true,
     allergenNotes: item?.allergenNotes ?? undefined,
   })
@@ -123,6 +125,7 @@ async function save(): Promise<void> {
     unit: state.unit,
     containerMl: state.unit === 'ML' ? state.containerMl ?? null : null,
     parQty: state.parQty ?? null,
+    category: state.category?.trim() || null,
     ageRestricted: state.ageRestricted,
     allergenNotes: state.allergenNotes?.trim() || null,
   }
@@ -267,6 +270,11 @@ const columns: TableColumn<StockItem>[] = [
     id: 'par',
     header: 'Par level',
     cell: ({ row }) => (row.original.parQty === null ? 'Not set' : saysQuantity(row.original.parQty, row.original.unit)),
+  },
+  {
+    id: 'category',
+    header: 'Category',
+    cell: ({ row }) => row.original.category ?? '',
   },
   {
     id: 'act',
@@ -471,6 +479,19 @@ const columns: TableColumn<StockItem>[] = [
               :min="0"
               class="w-full"
               data-test="item-par"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Category"
+            name="category"
+            hint="Optional"
+            description="Free text, for grouping the order list; not the till's own categories."
+          >
+            <UInput
+              v-model="state.category"
+              class="w-full"
+              data-test="item-category"
             />
           </UFormField>
 

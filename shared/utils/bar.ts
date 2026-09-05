@@ -135,6 +135,7 @@ export const stockItemForm = z.object({
   unit: z.enum(STOCK_UNITS),
   containerMl: z.number().int().positive().max(100_000).nullish(),
   parQty: z.number().int().nonnegative().max(MAX_MOVEMENT_QTY).nullish(),
+  category: z.string().trim().max(MAX_BAR_NAME).nullish(),
   ageRestricted: z.boolean().default(true),
   allergenNotes: z.string().trim().max(MAX_ALLERGEN_NOTE).nullish(),
 }).refine(
@@ -274,6 +275,7 @@ export interface StockItem {
   unit: StockUnit
   containerMl: number | null
   parQty: number | null
+  category: string | null
   ageRestricted: boolean
   allergenNotes: string | null
   status: StockItemStatus

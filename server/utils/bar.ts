@@ -295,6 +295,7 @@ const ITEM_COLUMNS = sql`
   i.unit AS unit,
   i.container_ml AS containerMl,
   i.par_qty AS parQty,
+  i.category AS category,
   i.age_restricted AS ageRestricted,
   i.allergen_notes AS allergenNotes,
   i.status AS status
