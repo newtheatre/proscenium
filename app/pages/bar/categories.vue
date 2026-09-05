@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { h } from 'vue'
-import { categoryForm } from '#shared/utils/bar'
+import { SERVING_KINDS, categoryForm, categoryPriceForm, says, saysMoney } from '#shared/utils/bar'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
-import type { BarCategory } from '#shared/utils/bar'
+import type { BarCategory, CategoryPrice, ServingKind } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Bar categories', middleware: 'console' })
@@ -76,6 +76,79 @@ async function save(): Promise<void> {
   }
 }
 
+const pricing = ref<BarCategory | null>(null)
+const history = ref<CategoryPrice[]>([])
+const kindOptions = SERVING_KINDS.map(value => ({ label: says(value), value }))
+const price = reactive({ servingKind: 'single' as ServingKind, pricePence: 0, effectiveFrom: '' })
+
+// The field takes pounds and the request carries pence, converted here and nowhere else (0004).
+const pounds = computed({
+  get: () => price.pricePence / 100,
+  set: (value: number) => {
+    price.pricePence = Math.round((value ?? 0) * 100)
+  },
+})
+
+async function editPrices(category: BarCategory): Promise<void> {
+  pricing.value = category
+  failure.value = null
+  history.value = []
+  try {
+    const answered = await request<{ prices: CategoryPrice[], on: string }>(`/api/admin/bar/categories/${category.id}/prices`)
+    history.value = answered.prices
+    Object.assign(price, { servingKind: 'single', pricePence: 0, effectiveFrom: answered.on })
+  }
+  catch (refused) {
+    failure.value = refusalText(refused)
+  }
+}
+
+async function savePrice(): Promise<void> {
+  const category = pricing.value
+  if (!category) return
+
+  saving.value = true
+  failure.value = null
+  try {
+    const answered = await $fetch<{ effectiveNow: boolean }>(`/api/admin/bar/categories/${category.id}/prices`, {
+      method: 'POST',
+      body: { servingKind: price.servingKind, pricePence: price.pricePence, effectiveFrom: price.effectiveFrom },
+    })
+    toast.add({
+      title: answered.effectiveNow ? 'Default set, and in force now' : 'Default set, and waiting for its date',
+      description: 'Nothing was overwritten: this is a new row, and the ones before it stay.',
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    await editPrices(category)
+  }
+  catch (refused) {
+    failure.value = refusalText(refused)
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+const priceColumns: TableColumn<CategoryPrice>[] = [
+  {
+    id: 'kind',
+    header: 'Serving kind',
+    cell: ({ row }) => says(row.original.servingKind),
+  },
+  {
+    id: 'from',
+    header: 'From',
+    cell: ({ row }) => h('div', { class: 'flex items-center gap-2' }, [
+      h('span', {}, row.original.effectiveFrom),
+      row.original.effective
+        ? h(resolveComponent('UBadge'), { color: 'success', variant: 'subtle', size: 'sm' }, () => 'In force today')
+        : null,
+    ]),
+  },
+  { id: 'price', header: 'Price', cell: ({ row }) => saysMoney(row.original.pricePence) },
+]
+
 const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The categories could not be read.') : null))
 
 const activeFilters = computed<ActiveFilter[]>(() => (search.value
@@ -101,13 +174,22 @@ const columns: TableColumn<BarCategory>[] = [
     id: 'act',
     header: '',
     meta: { class: { td: 'text-right whitespace-nowrap' } },
-    cell: ({ row }) => h(resolveComponent('UButton'), {
-      'size': 'sm',
-      'color': 'neutral',
-      'variant': 'ghost',
-      'data-test': `edit-${row.original.id}`,
-      'onClick': () => edit(row.original),
-    }, () => 'Edit'),
+    cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
+      h(resolveComponent('UButton'), {
+        'size': 'sm',
+        'color': 'neutral',
+        'variant': 'ghost',
+        'data-test': `prices-${row.original.id}`,
+        'onClick': () => editPrices(row.original),
+      }, () => 'Default prices'),
+      h(resolveComponent('UButton'), {
+        'size': 'sm',
+        'color': 'neutral',
+        'variant': 'ghost',
+        'data-test': `edit-${row.original.id}`,
+        'onClick': () => edit(row.original),
+      }, () => 'Edit'),
+    ]),
   },
 ]
 </script>
@@ -255,6 +337,104 @@ const columns: TableColumn<BarCategory>[] = [
             </UButton>
           </div>
         </UForm>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="pricing !== null"
+      :title="pricing ? `Default prices for ${pricing.name}` : ''"
+      description="A variant with no price of its own resolves here, by serving kind. An explicit variant price always wins; prices are dated rows and nothing is ever overwritten."
+      @update:open="pricing = null; failure = null"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UForm
+            :schema="categoryPriceForm"
+            :state="price"
+            class="space-y-4"
+            data-test="category-price-form"
+            @submit="savePrice"
+          >
+            <UAlert
+              v-if="failure"
+              data-test="category-price-failure"
+              color="error"
+              variant="subtle"
+              :description="failure"
+            />
+
+            <UFormField
+              label="Serving kind"
+              name="servingKind"
+              required
+              description="Which of a product's sizes this default applies to."
+            >
+              <USelect
+                v-model="price.servingKind"
+                :items="kindOptions"
+                class="w-full"
+                data-test="category-price-kind"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Price"
+              name="pricePence"
+              required
+              description="In pounds. It is held in pence and formatted only when it is shown."
+            >
+              <UInputNumber
+                v-model="pounds"
+                :min="0"
+                :step="0.1"
+                :format-options="{ style: 'currency', currency: 'GBP' }"
+                class="w-full"
+                data-test="category-price-amount"
+              />
+            </UFormField>
+
+            <UFormField
+              label="In force from"
+              name="effectiveFrom"
+              required
+              description="Today for a correction that applies now, or a future date for one that waits."
+            >
+              <DateField
+                v-model="price.effectiveFrom"
+                data-test="category-price-from"
+              />
+            </UFormField>
+
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                type="submit"
+                :loading="saving"
+                data-test="category-price-submit"
+              >
+                Set this default
+              </UButton>
+              <UButton
+                color="neutral"
+                variant="ghost"
+                @click="pricing = null"
+              >
+                Back
+              </UButton>
+            </div>
+          </UForm>
+
+          <UTable
+            :data="history"
+            :columns="priceColumns"
+            data-test="category-price-history"
+          >
+            <template #empty>
+              <p class="py-6 text-center text-sm text-muted">
+                No default set yet. A variant with no price of its own has nothing to fall back on.
+              </p>
+            </template>
+          </UTable>
+        </div>
       </template>
     </UModal>
   </div>

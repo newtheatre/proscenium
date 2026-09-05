@@ -167,6 +167,7 @@ const CATALOGUE = {
 
   'bar.category.created': { label: 'Bar category added', module: 'bar' },
   'bar.category.updated': { label: 'Bar category changed', module: 'bar' },
+  'bar.category.price.set': { label: 'Category default price set from a date', module: 'bar' },
   'bar.product.created': { label: 'Bar product added', module: 'bar' },
   'bar.product.updated': { label: 'Bar product changed', module: 'bar' },
   'bar.product.status.changed': { label: 'Bar product put on or off the till', module: 'bar' },

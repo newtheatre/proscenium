@@ -698,9 +698,24 @@ cascade from a variant cannot fire either: a priced variant is retired, not dele
 together.
 
 ### category_prices  APPEND-ONLY
-`id` PK · `category_id` cascade · `serving_kind` · `price_pence` · `effective_from` ·
-`created_at` · `created_by`. Resolution: variant price first, category default second,
-refuse-to-sell if neither (0017, F-121).
+`id` PK · `category_id` → bar_categories cascade · `serving_kind`, the same vocabulary
+`product_variants.serving_kind` resolves on · `price_pence` CHECK not negative · `effective_from`
+civil date, CHECK `YYYY-MM-DD` · `created_at` · `created_by` → users restrict. Same shape and
+tie-break as `variant_prices`, grouped per serving kind: a spirit's single and double default
+resolve independently. Triggers refuse every UPDATE and DELETE (0010).
+
+Resolution (0017, F-121 criterion 2): a variant's own `variant_prices` row wins when one is
+effective; otherwise the category default for the variant's serving kind; a variant answered by
+neither refuses to sell rather than guessing. `resolvedPriceColumns` in `server/utils/bar.ts`
+builds both `pricePence` and `priceSource` (`'variant' | 'category' | null`) from the same two
+column-builders (`effectivePriceColumn`, `effectiveCategoryPriceColumn`), read by
+`variantsOf`/`variantById` and shown on the catalogue screen so a stray variant override hiding a
+category change is visible at a glance (criterion 5). `GET`/`POST
+/api/admin/bar/categories/[id]/prices` list and set a default, one serving kind at a time.
+
+`ledger_lines.price_ref` (F-105, not yet built) is `` `${source}:${priceRowId}` ``, produced by
+`priceRef()` in `shared/utils/bar.ts`: the row a sale line resolved against, so a later default
+change never restates a past sale (criterion 4).
 
 ### bar_discounts
 `id` PK · `name` · `percent` 1..100 · `status`. Snapshotted onto entries; bar lines only.

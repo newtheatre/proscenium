@@ -1,8 +1,8 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
-import { effectivePriceRow } from '#shared/utils/bar'
-import type { BarCategory, BarProduct, ChoiceGroup, ProductVariant, StockItem, StockMovement, VariantComponent, VariantPrice } from '#shared/utils/bar'
+import { SERVING_KINDS, effectivePriceRow } from '#shared/utils/bar'
+import type { BarCategory, BarProduct, CategoryPrice, ChoiceGroup, ProductVariant, StockItem, StockMovement, VariantComponent, VariantPrice } from '#shared/utils/bar'
 
 // Reading the bar's catalogue and its stock. Two questions the module leans on live here: what a
 // product needs before it may be sold, and what is on hand. Neither is a column.
@@ -151,6 +151,28 @@ export function effectivePriceColumn(alias: string, on: string): SQL {
     ORDER BY p.effective_from DESC, p.created_at DESC, p.rowid DESC
     LIMIT 1
   )`
+}
+
+// The category's own default for the variant's serving kind, read only when the variant has none
+// of its own: the caller decides precedence, this only answers one level (0017, F-121 criterion 2).
+export function effectiveCategoryPriceColumn(categoryId: SQL, servingKind: SQL, on: string): SQL {
+  return sql`(
+    SELECT cp.price_pence FROM category_prices cp
+    WHERE cp.category_id = ${categoryId} AND cp.serving_kind = ${servingKind} AND cp.effective_from <= ${on}
+    ORDER BY cp.effective_from DESC, cp.created_at DESC, cp.rowid DESC
+    LIMIT 1
+  )`
+}
+
+// Variant price first, category default second, null when neither prices it (0017, F-121
+// criterion 2). `priceSource` names which level answered, so a stray override is visible (criterion 5).
+export function resolvedPriceColumns(categoryId: SQL, variantAlias: string, on: string): { pricePence: SQL, priceSource: SQL } {
+  const variantPrice = effectivePriceColumn(variantAlias, on)
+  const categoryPrice = effectiveCategoryPriceColumn(categoryId, sql`${sql.raw(variantAlias)}.serving_kind`, on)
+  return {
+    pricePence: sql`COALESCE(${variantPrice}, ${categoryPrice})`,
+    priceSource: sql`CASE WHEN ${variantPrice} IS NOT NULL THEN 'variant' WHEN ${categoryPrice} IS NOT NULL THEN 'category' ELSE NULL END`,
+  }
 }
 
 // On-hand is the sum of an item's movements, computed where it is asked for and stored nowhere
@@ -433,10 +455,12 @@ function withComponents(variants: VariantRow[], components: ComponentRow[]): Pro
 // Every size a product sells at, each with what it depletes and what it costs today.
 export async function variantsOf(productId: string, on: string, includeRetired = true): Promise<ProductVariant[]> {
   const retired = includeRetired ? sql`` : sql` AND v.status = 'ACTIVE'`
+  const { pricePence, priceSource } = resolvedPriceColumns(sql`p.category_id`, 'v', on)
   const variants = await db.all<VariantRow>(sql`
-    SELECT ${VARIANT_COLUMNS}, ${effectivePriceColumn('v', on)} AS pricePence, ${variantEverSoldColumn('v')} AS everSold,
-           ${everPricedColumn('v')} AS everPriced
-    FROM product_variants v WHERE v.product_id = ${productId}${retired}
+    SELECT ${VARIANT_COLUMNS}, ${pricePence} AS pricePence, ${priceSource} AS priceSource,
+           ${variantEverSoldColumn('v')} AS everSold, ${everPricedColumn('v')} AS everPriced
+    FROM product_variants v JOIN bar_products p ON p.id = v.product_id
+    WHERE v.product_id = ${productId}${retired}
     ORDER BY v.status, v.sort, v.label COLLATE NOCASE
   `)
   const components = await db.all<ComponentRow>(componentsQuery(sql`SELECT id FROM product_variants WHERE product_id = ${productId}`))
@@ -444,10 +468,12 @@ export async function variantsOf(productId: string, on: string, includeRetired =
 }
 
 export async function variantById(id: string, on: string): Promise<ProductVariant | undefined> {
+  const { pricePence, priceSource } = resolvedPriceColumns(sql`p.category_id`, 'v', on)
   const [row] = await db.all<VariantRow>(sql`
-    SELECT ${VARIANT_COLUMNS}, ${effectivePriceColumn('v', on)} AS pricePence, ${variantEverSoldColumn('v')} AS everSold,
-           ${everPricedColumn('v')} AS everPriced
-    FROM product_variants v WHERE v.id = ${id}
+    SELECT ${VARIANT_COLUMNS}, ${pricePence} AS pricePence, ${priceSource} AS priceSource,
+           ${variantEverSoldColumn('v')} AS everSold, ${everPricedColumn('v')} AS everPriced
+    FROM product_variants v JOIN bar_products p ON p.id = v.product_id
+    WHERE v.id = ${id}
   `)
   if (!row) return undefined
   const components = await db.all<ComponentRow>(componentsQuery(sql`SELECT id FROM product_variants WHERE id = ${id}`))
@@ -518,6 +544,21 @@ export async function priceHistory(variantId: string, on: string): Promise<Varia
   `)
   const winner = effectivePriceRow(history, on)
   return history.map(price => ({ ...price, effective: price.id === winner?.id }))
+}
+
+// The whole series across every serving kind, each kind's winner marked within its own group: a
+// spirit's single and double default resolve independently (F-121 criterion 1).
+export async function categoryPriceHistory(categoryId: string, on: string): Promise<CategoryPrice[]> {
+  const history = await db.all<Omit<CategoryPrice, 'effective'>>(sql`
+    SELECT cp.id AS id, cp.category_id AS categoryId, cp.serving_kind AS servingKind,
+           cp.price_pence AS pricePence, cp.effective_from AS effectiveFrom,
+           cp.created_at AS createdAt, cp.created_by AS createdBy, cp.rowid AS seq
+    FROM category_prices cp WHERE cp.category_id = ${categoryId}
+    ORDER BY cp.serving_kind, cp.effective_from DESC, cp.created_at DESC, cp.rowid DESC
+  `)
+  const winners = new Map(SERVING_KINDS.map(kind =>
+    [kind, effectivePriceRow(history.filter(row => row.servingKind === kind), on)?.id]))
+  return history.map(price => ({ ...price, effective: price.id === winners.get(price.servingKind) }))
 }
 
 export interface MovementFilters {
