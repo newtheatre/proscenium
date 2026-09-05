@@ -4,6 +4,7 @@ import {
   reachConsole,
   runTrainingSessions,
   signedIn,
+  verifyAccessProfiles,
   viewAccounts,
   viewAuditTrail,
   viewBarCatalogue,
@@ -76,6 +77,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Ticket types', icon: 'i-lucide-tag', to: '/box-office/ticket-types', ability: viewTicketTypes },
       { label: 'Passes', icon: 'i-lucide-wallet-cards', to: '/box-office/pass-types', ability: viewPassTypes },
       { label: 'Content warnings', icon: 'i-lucide-triangle-alert', to: '/box-office/content-warnings', ability: viewProgramme },
+      { label: 'Access profiles', icon: 'i-lucide-accessibility', to: '/box-office/access-profiles', ability: verifyAccessProfiles },
     ],
   },
 
@@ -162,10 +164,18 @@ export const CONSOLE_NAV: NavGroup[] = [
 // The member's own screens. The footer shows these to everybody and sends a signed-out visitor
 // through /sign-in?next=, so somebody who followed a link still arrives where they meant to.
 export const MEMBER_NAV: NavEntry[] = [
+  // Module D: ticketing
+
+  { label: 'Access requirements', icon: 'i-lucide-accessibility', to: '/account/access', ability: signedIn },
+
   // Module C: spaces
 
   { label: 'My bookings', icon: 'i-lucide-calendar-check', to: '/rooms/mine', ability: signedIn },
   { label: 'Book a room', icon: 'i-lucide-door-open', to: '/rooms', ability: signedIn, exact: true },
+
+  // Module E: show night
+
+  { label: 'My rota', icon: 'i-lucide-clipboard-list', to: '/rota', ability: signedIn, exact: true },
 
   // Module G: training
 
@@ -191,6 +201,10 @@ export const PUBLIC_NAV: NavEntry[] = [
   // Module D: ticketing
 
   { label: 'What\'s on', icon: 'i-lucide-drama', to: '/whats-on', ability: anybody },
+  { label: 'About us', icon: 'i-lucide-info', to: '/about', ability: anybody },
+  { label: 'Our history', icon: 'i-lucide-history', to: '/history', ability: anybody },
+  { label: 'Get involved', icon: 'i-lucide-heart-handshake', to: '/get-involved', ability: anybody },
+  { label: 'Technical specification', icon: 'i-lucide-wrench', to: '/technical-specification', ability: anybody },
 
   // Module G: training
 

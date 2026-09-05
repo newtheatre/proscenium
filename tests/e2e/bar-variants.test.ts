@@ -252,7 +252,7 @@ describe.skipIf(skip !== null)('a size is retired, never destroyed (F-112 criter
 
   // The status write batches a conditional UPDATE with an audit insert that reads `changes()`,
   // the row count of that same UPDATE, so a losing race writes neither (0001, 0003).
-  test('two people retiring the same size at once write one audit entry between them', async () => {
+  test('two people retiring the same size at once write one audit entry, and the loser is refused', async () => {
     const productId = await aProduct()
     const id = await addVariant(productId)
 
@@ -262,6 +262,7 @@ describe.skipIf(skip !== null)('a size is retired, never destroyed (F-112 criter
     ])
 
     expect(raced.filter(answered => answered.status === 200).length).toBe(1)
+    expect(raced.filter(answered => answered.status === 409).length).toBe(1)
     expect((await variants(productId)).find(variant => variant.id === id)?.status).toBe('RETIRED')
     expect(auditCount('bar.variant.status.changed', `bar-variant:${id}`)).toBe(1)
   })

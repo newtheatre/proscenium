@@ -411,8 +411,22 @@
     {
       "idx": 58,
       "version": "6",
-      "when": 1788565842087,
-      "tag": "0058_a_variant_offers_at_most_one_choice_group",
+      "when": 1788540611253,
+      "tag": "0058_notification_log_status_gains_pending",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1788644915663,
+      "tag": "0059_add_access_profiles_for_the_special_category_declaration",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "6",
+      "when": 1788645269921,
+      "tag": "0060_a_variant_offers_at_most_one_choice_group",
       "breakpoints": true
     }
   ]

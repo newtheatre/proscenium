@@ -12,6 +12,7 @@ export default defineTask({
     const tokens = await sweepExpiredTokens(before)
     const unverified = await expireUnverifiedAccounts(before)
     const renewals = await remindExpiringMemberships(undefined, before)
-    return { result: { attempts, tokens, unverified, renewals } }
+    const withdrawnAccessProfiles = await sweepWithdrawnAccessProfiles(before)
+    return { result: { attempts, tokens, unverified, renewals, withdrawnAccessProfiles } }
   },
 })

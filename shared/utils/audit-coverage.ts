@@ -173,6 +173,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/content-warnings/index.post.ts', actions: ['content-warning.created'] },
   { route: 'server/api/admin/content-warnings/[id]/index.put.ts', actions: ['content-warning.updated'] },
   { route: 'server/api/admin/content-warnings/[id]/index.delete.ts', actions: ['content-warning.deleted'] },
+  { route: 'server/api/admin/access-profiles/index.get.ts', exempt: 'reads declarations without the encrypted payload' },
+  { route: 'server/api/admin/access-profiles/[userId]/index.get.ts', exempt: 'reads one declaration in full, for the officer deciding it' },
+  { route: 'server/api/admin/access-profiles/[userId]/verify.post.ts', actions: ['access-profile.verified'], via: ['server/utils/access-profiles.ts'] },
+  { route: 'server/api/admin/access-profiles/[userId]/decline.post.ts', actions: ['access-profile.declined'], via: ['server/utils/access-profiles.ts'] },
+  { route: 'server/api/account/access-profile.get.ts', exempt: 'reads the caller\'s own declaration' },
+  { route: 'server/api/account/access-profile.put.ts', actions: ['access-profile.updated'], via: ['server/utils/access-profiles.ts'] },
+  { route: 'server/api/account/access-profile/withdraw.post.ts', actions: ['access-profile.withdrawn'], via: ['server/utils/access-profiles.ts'] },
 
   // Module E: show night
 
@@ -188,6 +195,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/admin/rota/templates/[venueId]/index.delete.ts', actions: ['shift-template.removed'] },
   { route: 'server/api/admin/rota/templates/[venueId]/stamp.post.ts', actions: ['shift.stamped'] },
+  { route: 'server/api/rota/shifts.get.ts', exempt: 'reads the open-shift list, gated live against your own training records' },
+  { route: 'server/api/rota/mine.get.ts', exempt: 'reads your own shifts' },
 
   // Module F: bar
 

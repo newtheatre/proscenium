@@ -246,10 +246,11 @@ export async function notifyPromotions(
   for (const place of promoted) {
     // The claim is written before the message is composed, so a second process finds it and
     // sends nothing rather than reading a ledger another one is still writing (0006).
+    const key = promotionClaimFor(sessionId, place.userId, place.signedUpAt)
     const took = await claimNotification({
       userId: place.userId,
       type: 'training.session.promoted',
-      key: promotionClaimFor(sessionId, place.userId, place.signedUpAt),
+      key,
       sessionId,
     })
     if (!took) continue
@@ -257,6 +258,7 @@ export async function notifyPromotions(
     await notify(event, {
       type: 'training.session.promoted',
       userId: place.userId,
+      claim: key,
       context: {
         name: '',
         heldOn: session.heldOn,

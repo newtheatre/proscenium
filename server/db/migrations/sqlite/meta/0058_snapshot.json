@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2c426726-ab9e-4460-8630-3454443fe429",
+  "id": "a0991637-90b0-4018-97f7-59f63c5e8947",
   "prevId": "8c4096e5-c31f-47cc-8c84-5c399361a324",
   "tables": {
     "audit_log": {
@@ -2819,7 +2819,7 @@
       "checkConstraints": {
         "notification_log_status": {
           "name": "notification_log_status",
-          "value": "\"notification_log\".\"status\" IN ('SENT', 'FAILED', 'RETRYING', 'SKIPPED_UNDELIVERABLE')"
+          "value": "\"notification_log\".\"status\" IN ('PENDING', 'SENT', 'FAILED', 'RETRYING', 'SKIPPED_UNDELIVERABLE')"
         },
         "notification_log_channel": {
           "name": "notification_log_channel",
@@ -7289,13 +7289,13 @@
           ],
           "isUnique": true
         },
-        "variant_components_one_choice_per_variant": {
-          "name": "variant_components_one_choice_per_variant",
+        "variant_components_choice": {
+          "name": "variant_components_choice",
           "columns": [
-            "variant_id"
+            "variant_id",
+            "choice_group_id"
           ],
-          "isUnique": true,
-          "where": "\"variant_components\".\"choice_group_id\" IS NOT NULL"
+          "isUnique": true
         }
       },
       "foreignKeys": {

@@ -10,8 +10,8 @@ useSeoMeta({ title: 'The Nottingham New Theatre' })
     description="The country's only entirely student-run theatre."
   >
     <template #links>
-      <!-- The one CTA of the view: the budget is one marquee per view. The marketing pages are
-           J-110's, so these point at what a member can actually do. -->
+      <!-- The one CTA of the view: the budget is one marquee per view. These point at what a
+           member can actually do; the editorial pages are reachable from the footer. -->
       <UButton
         v-if="account.signedIn"
         variant="marquee"
