@@ -2,8 +2,8 @@ import type { H3Event } from 'h3'
 import type { AccountRow } from '#server/utils/accounts'
 import type { NightAuthorityVia, NightRole, NightScope } from '#shared/utils/night-authority'
 
-// Shift-scoped authority, the guard every show-night route calls (E-111). Only the officer branch
-// resolves today; the shift branch fills a case in show night wave 3 without changing this (0044).
+// Shift-scoped authority, the guard every show-night route calls (E-111). A confirmed shift is
+// tried first and the officer bypass falls through only when no shift covers the request (0044).
 
 // The vocabulary it resolves against is `shared/utils/night-authority.ts`, which is where a
 // consumer imports `NightRole` and `NightScope` from.
@@ -49,10 +49,31 @@ async function coverage(night: string, scope: NightScope): Promise<NightCoverage
   return { venueId: venues[0]!, performanceIds: ids, venuePerformanceIds: ids }
 }
 
-// The shift branch, which arrives in show night wave 3 (0044). `shifts` does not exist yet, so
-// nothing resolves this way and every caller falls through to the officer check below.
-async function shiftHeldTonight(): Promise<{ shiftId: string, coverage: NightCoverage } | null> {
-  return await Promise.resolve(null)
+// The shift branch (0044): a confirmed shift of this role, held by this account, on one of
+// tonight's performances, refusing the same ambiguity the officer branch does (E-127 criterion 1).
+async function shiftHeldTonight(
+  accountId: string,
+  role: NightRole,
+  night: string,
+  scope: NightScope,
+): Promise<{ shiftId: string, coverage: NightCoverage } | null> {
+  const { from, to } = showNightBounds(night)
+  const rows = await confirmedShiftsTonight(
+    accountId, role, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000),
+    { venueId: scope.venueId, performanceId: scope.performanceId },
+  )
+  if (rows.length === 0) return null
+
+  const venues = [...new Set(rows.map(row => row.venueId))]
+  if (venues.length > 1) {
+    throw createError({ statusCode: 400, statusMessage: 'More than one venue is running tonight: name the venue or the performance' })
+  }
+
+  const performanceIds = rows.map(row => row.performanceId)
+  return {
+    shiftId: rows[0]!.shiftId,
+    coverage: { venueId: venues[0]!, performanceIds, venuePerformanceIds: performanceIds },
+  }
 }
 
 // Tolerates the conflict rather than reading first: the partial unique index is what holds "once
@@ -79,7 +100,7 @@ export async function requireNightAuthority(event: H3Event, role: NightRole, sco
     throw createError({ statusCode: 403, statusMessage: 'Show-night tools open for tonight only, and that night has ended' })
   }
 
-  const held = await shiftHeldTonight()
+  const held = await shiftHeldTonight(resolved.account.id, role, tonight, scope)
   if (held) {
     return {
       account: resolved.account,

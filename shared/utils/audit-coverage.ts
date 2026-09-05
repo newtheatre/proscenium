@@ -198,9 +198,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/rota/shifts.get.ts', exempt: 'reads the open-shift list, gated live against your own training records' },
   { route: 'server/api/rota/mine.get.ts', exempt: 'reads your own shifts' },
   { route: 'server/api/rota/shifts/[id]/claim.post.ts', actions: ['shift.claimed'] },
+  { route: 'server/api/rota/shifts/[id]/release.post.ts', actions: ['shift.released'] },
   { route: 'server/api/admin/rota/approvals/index.get.ts', exempt: 'reads the queued claims waiting on a decision' },
   { route: 'server/api/admin/rota/approvals/[id]/approve.post.ts', actions: ['shift.confirmed'] },
   { route: 'server/api/admin/rota/approvals/[id]/decline.post.ts', actions: ['shift.declined'] },
+  { route: 'server/api/admin/rota/shifts.get.ts', exempt: 'reads the open and declined shifts an officer has to fill by hand' },
+  { route: 'server/api/admin/rota/shifts/[id]/assign.post.ts', actions: ['shift.reassigned'] },
+  { route: 'server/api/admin/rota/shifts/[id]/candidates.get.ts', exempt: 'reads who might be assigned, scoped to rota.write' },
 
   // Module F: bar
 
