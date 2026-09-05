@@ -1523,8 +1523,12 @@ yet open resolves nothing, because there is nothing for a member to sign up to.
 ### notification_log
 `id` PK · `user_id` NULL = set null on erasure · `type` · `channel` CHECK `EMAIL|INBOX|PUSH` ·
 `subject` · `record_id` · `session_id` · `claim` · `status` CHECK
-`SENT|FAILED|RETRYING|SKIPPED_UNDELIVERABLE` · `sent_at` · `error` · `created_at`.
+`PENDING|SENT|FAILED|RETRYING|SKIPPED_UNDELIVERABLE` · `sent_at` · `error` · `created_at`.
 Indexed on user, type, status, `record_id` and `created_at`.
+
+**A claimed send is one row, not two (0048).** `claimNotification()` writes `PENDING`; `notify()`
+updates that same row, matched on `claim`, to its outcome. No trigger sits on this table, so the
+update needs no exception to 0010.
 
 **`claim` is the idempotency, and it is a partial UNIQUE index rather than a read.** A sender that
 must not repeat itself writes the claim and lets the index refuse the second attempt, so two sweeps

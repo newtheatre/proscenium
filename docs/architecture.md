@@ -71,7 +71,7 @@ A prefix names the domain; the shell follows the posture of the work rather than
 
 | Prefix | Shell | Who |
 | --- | --- | --- |
-| `/`, `/sign-in`, `/register`, `/verify`, `/reset`, `/magic` | `default` | Anybody |
+| `/`, `/sign-in`, `/register`, `/verify`, `/reset`, `/magic`, every `content/*.md` path | `default` | Anybody |
 | `/rooms`, `/rooms/mine`, `/account/*` | `member` | A member, about themselves |
 | `/rooms/manage/*`, `/people/*`, `/box-office/*`, `/bar/*`, `/admin/*` | `console` | Somebody working for the theatre |
 | `/tonight/*` | `tonight` | Somebody on shift, on a phone |
@@ -90,7 +90,7 @@ namespace, and asks the owner for one anywhere else.
 
 | Stream | Routes and files owned |
 | --- | --- |
-| Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/` |
+| Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/`, `app/pages/[...slug].vue` (the content catch-all, D-103) |
 | Show night | `/rota` and `/rota/manage/**` (templates, rota administration and the venue emergency card at `/rota/manage/venues/[id]/emergency`), the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**`, `/api/admin/rota/**` and `server/utils/night-authority.ts`. The console screens sit under `/rota/manage`, never `/admin`: `/tonight` is the phone-first shell rather than a console prefix (0040, 0046). |
 | Bar | `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**` |
 | Platform | `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `tests/helpers/race.ts` |
@@ -98,6 +98,17 @@ namespace, and asks the owner for one anywhere else.
 `/tonight` is the one prefix three streams write under, which is why the shell below is owned by
 one of them and settled before any of the screens are built. The hub page itself was written by
 platform far enough to exercise the shell, and its content belongs to show night from E-112.
+
+### The content catch-all
+
+One page, `app/pages/[...slug].vue`, renders every markdown file under `content/`: a page's route
+is its path under `content/` (`content/about.md` is `/about`), found through the `content`
+collection declared in `content.config.ts` and rendered with `ContentRenderer`. A path with no
+matching file is a 404, never a blank screen. This is the pipeline D-103's editorial pages and
+J-110's policy pages share: J-110 adds files under `content/`, not a second route.
+
+A page carrying `placeholder: true` in its frontmatter renders a banner saying so (D-103); it is
+how copy the committee has not yet supplied reaches the site honestly rather than not at all.
 
 ## The identity screens
 
@@ -353,7 +364,9 @@ shift per slot on a performance. `shift_templates` and `shifts` are in `docs/dat
 | `cancelShiftsStatement(performanceId)` | Cancels a performance's shifts, batched with the cancellation itself (E-102 criterion 4). |
 | `cancelOrphanedShiftsStatement(performanceId, newVenueId)` | On a venue move, cancels only the held shifts whose role the new venue's template does not staff at all; a role it staffs with fewer slots than before still carries over (E-101, E-102, committee direction 4 September 2026). |
 | `activeShifts(performanceId)` | Every shift not already cancelled, open or held: what a cancellation or a move has to notify or count, in one query (E-102 criterion 4). |
-| `shiftConstraintRefusal(error)` | A refused write as a 409 a volunteer can act on, or null for anything unrecognised, which the caller rethrows (E-106 criterion 3). Rota-specific for now; platform's wave 1 generic `constraintRefusal(table, error)` is what a follow-up pull request adopts this into. |
+| `shiftConstraintRefusal(error)` | A refused write as a 409 a volunteer can act on, or null for anything unrecognised, which the caller rethrows (E-106 criterion 3). The rota's own table of refusals, matched by platform's shared `constraintRefusal(table, error)` (0047). |
+| `openShiftsQuery(filters, now, limit, offset)` / `countOpenShiftsQuery(filters, now)` | The open-shift list a member reads at `/rota`, paged in SQL and filterable by role and date range (E-103 criterion 5). Neither shift nor performance count grows the bound parameter list: the filters and the page bounds are the only parameters, whatever the diary holds. |
+| `myShiftsQuery(userId, now)` | A member's own upcoming, uncancelled shifts. Bounded by `LIMIT 100` rather than paged: nobody holds enough shifts at once to need a second page. |
 
 Neither statement binds per performance or per slot: the slot ordinals come from a recursive count
 over the templates rather than from a list built in the application, so the parameter count is
@@ -363,13 +376,33 @@ confirmed duty managers and the same person may hold shifts on both (E-127 crite
 
 Moving a performance to another venue carries a claimed or confirmed shift with it: the holder is
 told the venue changed and pointed at their rota to release it if it does not suit, though nothing
-can yet act on that link until E-103 builds `/rota` and E-104 or E-105 build the release itself
-(`docs/known-issues.md`). A held shift in a role the new venue's template does not staff at all
-cannot travel, so it is cancelled and its holder told instead, the same way a cancelled performance
-tells them (E-101, E-102, committee direction 4 September 2026).
+can yet act on that link until E-104 and E-105 build the release itself (`docs/known-issues.md`).
+A held shift in a role the new venue's template does not staff at all cannot travel, so it is
+cancelled and its holder told instead, the same way a cancelled performance tells them (E-101,
+E-102, committee direction 4 September 2026).
 
 Templates are administered at `/rota/manage/templates` under `rota.read` and `rota.write`. A
-member's own `/rota` arrives with E-103.
+member's own `/rota` (E-103) shows what they already hold and the open shifts on the diary, each
+carrying live eligibility rather than a cached one.
+
+### Eligibility (E-103)
+
+`server/utils/rota-eligibility.ts` and its pure twin `shared/utils/rota-eligibility.ts` decide
+whether a member currently qualifies for a shift role, recomputed on every request against
+`modulesHeldBy()`, the training module's own derived-validity query, never a copy of it (criterion
+3). There is no cache and no network seam: the old estate's 45-second cached call to stage-door,
+falling open on failure, is exactly what this replaces (criterion 1).
+
+Which training module gates which role is committee configuration, three keys,
+`SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE`, `SHIFT_ELIGIBILITY_DOOR_MODULE` and
+`SHIFT_ELIGIBILITY_BAR_MODULE`, each nullable and shipping null (`docs/workshops.md`). Reading
+`eligibilityRefusal(requiredModuleId, held)` against a null rule refuses eligibility rather than
+granting it to everyone: an unnamed or unreadable rule is the safer failure (criterion 4).
+
+`GET /api/rota/shifts?role=&from=&to=&page=` is the open-shift list, paged in SQL and gated live;
+each locked row carries the module id and name that would unlock it, or neither when the
+committee has not named one yet (criterion 2). `GET /api/rota/mine` is a member's own shifts. Both
+are member-facing reads with no write and so carry no audit row (`shared/utils/audit-coverage.ts`).
 
 `server/utils/rota-escalation.ts` is `shifts:escalate`'s query: every performance inside seven
 days of a run with an open shift or a `DUTY_MANAGER` shift that is not `CONFIRMED`, the second

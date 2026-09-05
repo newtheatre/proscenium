@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MODULE_ID } from './training'
 
 // Every operational rule with a number in it is a validated key enforced at the write path
 // (0012). Defaults live here; a missing `config` row means the default.
@@ -444,6 +445,27 @@ export const CONFIG_KEYS = {
     sensitive: true,
     describes: 'Standing recipients of the end-of-night report. The list is confirmed in the workshop.',
   },
+
+  // Which training module gates each shift role. Null is the honest starting state and refuses
+  // eligibility rather than granting it to everyone; setting it back to null restores that (E-103 criterion 4).
+  SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE: {
+    schema: z.string().regex(MODULE_ID).nullable(),
+    default: null,
+    workshop: 'spaces-and-training',
+    describes: 'Training module a member must hold to claim a duty manager shift.',
+  },
+  SHIFT_ELIGIBILITY_DOOR_MODULE: {
+    schema: z.string().regex(MODULE_ID).nullable(),
+    default: null,
+    workshop: 'spaces-and-training',
+    describes: 'Training module a member must hold to claim a door shift.',
+  },
+  SHIFT_ELIGIBILITY_BAR_MODULE: {
+    schema: z.string().regex(MODULE_ID).nullable(),
+    default: null,
+    workshop: 'spaces-and-training',
+    describes: 'Training module a member must hold to claim a bar shift.',
+  },
 } as const satisfies Record<string, ConfigKeyDefinition>
 
 export type ConfigKey = keyof typeof CONFIG_KEYS
@@ -490,6 +512,9 @@ export const ENFORCED_KEYS = [
   'ROOM_NO_SHOW_PREAPPROVAL_AT',
   'MEMBERSHIP_RENEWAL_NOTICE_DAYS',
   'PRIVILEGED_ROLES',
+  'SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE',
+  'SHIFT_ELIGIBILITY_DOOR_MODULE',
+  'SHIFT_ELIGIBILITY_BAR_MODULE',
   // Read by the directory to count the accounts a sweep would warn, which is the whole of its
   // effect until K-111 builds the sweep itself.
   'RETENTION_FULL_ACCOUNT_YEARS',

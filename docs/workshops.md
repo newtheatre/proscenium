@@ -47,6 +47,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Register nag cadence | from day 2, weekly, stop at 60 days | unchanged | |
 | Expiry sweep armed | none: the old app sent from day one | **off**, armed deliberately | New setting. The sweep computes and reports what it would send until somebody turns it on, so arming it later still warns everybody who was due. Turning it on is a settings change and is audited. Owner: IT Manager |
 | Notification ledger retention | none: the old app kept everything | 24 months | New setting. The ledger holds the claims that stop a warning being sent twice, so it is evidence rather than logging; pruned in every mode, armed or not |
+| Shift eligibility mapping | none: the old estate faked this with a 45-second cached call to stage-door and admitted everyone on failure | none confirmed; ships refusing every role until named | Three settings, one per shift role (duty manager, door, bar), each naming the training module that gates it. Until the session names them, the shift list refuses eligibility rather than admitting everyone, which is the safer failure (E-103 criterion 4, module E open question 2) |
 
 ## Session 3: people, communications and cutover (60 minutes)
 
@@ -68,10 +69,25 @@ Any value not settled in a session gets the proposed default and a named owner; 
 decision does not block the gate, it ships the default.
 
 The proposed values are shipped in `shared/utils/config.ts`, one validated key each, and a workshop
-amending one is a settings change rather than a release (0012, 0019). One row above has no proposed
-value, the night report recipients, and ships unset until a session confirms it.
+amending one is a settings change rather than a release (0012, 0019). Two rows above have no
+proposed value: the night report recipients, which ships unset until a session confirms it, and
+the shift eligibility mapping, which ships a default of null per role, refusing rather than
+guessing until a session names each module (0019, E-103).
 
 Three rows are decisions the committee still makes and settings the system does not hold: the pass
 products and the per-room opening hours are records rather than rules, entered through the screens
 that own them, and the notification topics are fixed in the schema (0025). The role vocabulary
 mapping is the migration's, in `migration/role-map.json`, and is not a runtime setting either.
+
+## Editorial copy the committee must supply
+
+Not a setting: prose, not a number, and there is no default to propose (D-103). Each page ships
+marked `placeholder: true` until its copy lands, and clearing the flag is then a content edit,
+not a release.
+
+| Page | What is needed |
+| --- | --- |
+| `content/technical-specification.md` | Venue capacities, stage and wing dimensions, rigging, power and access, checked against the building rather than the old estate's copy, which may no longer be accurate. |
+| `content/history.md` | The theatre's founding, and which productions and seasons the committee wants remembered. |
+| `content/get-involved.md` | How joining, auditioning and the technical and production roles actually work this year. |
+| `content/about.md` | Its "Who we are" and "What we do" sections are folklore already stated informally; a proposed default is safe here, but the committee's own wording is what should ship. |

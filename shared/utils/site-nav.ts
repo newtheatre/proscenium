@@ -173,6 +173,10 @@ export const MEMBER_NAV: NavEntry[] = [
   { label: 'My bookings', icon: 'i-lucide-calendar-check', to: '/rooms/mine', ability: signedIn },
   { label: 'Book a room', icon: 'i-lucide-door-open', to: '/rooms', ability: signedIn, exact: true },
 
+  // Module E: show night
+
+  { label: 'My rota', icon: 'i-lucide-clipboard-list', to: '/rota', ability: signedIn, exact: true },
+
   // Module G: training
 
   { label: 'My training', icon: 'i-lucide-graduation-cap', to: '/training', ability: signedIn, exact: true },
@@ -197,6 +201,10 @@ export const PUBLIC_NAV: NavEntry[] = [
   // Module D: ticketing
 
   { label: 'What\'s on', icon: 'i-lucide-drama', to: '/whats-on', ability: anybody },
+  { label: 'About us', icon: 'i-lucide-info', to: '/about', ability: anybody },
+  { label: 'Our history', icon: 'i-lucide-history', to: '/history', ability: anybody },
+  { label: 'Get involved', icon: 'i-lucide-heart-handshake', to: '/get-involved', ability: anybody },
+  { label: 'Technical specification', icon: 'i-lucide-wrench', to: '/technical-specification', ability: anybody },
 
   // Module G: training
 

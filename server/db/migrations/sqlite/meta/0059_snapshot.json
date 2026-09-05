@@ -1,9 +1,162 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a0991637-90b0-4018-97f7-59f63c5e8947",
-  "prevId": "8c4096e5-c31f-47cc-8c84-5c399361a324",
+  "id": "82e01555-481a-4e39-8b3f-56347c1507c5",
+  "prevId": "a0991637-90b0-4018-97f7-59f63c5e8947",
   "tables": {
+    "access_profiles": {
+      "name": "access_profiles",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'PENDING'"
+        },
+        "companions": {
+          "name": "companions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "encrypted_payload": {
+          "name": "encrypted_payload",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "encryption_iv": {
+          "name": "encryption_iv",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "consent_foh_at": {
+          "name": "consent_foh_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verified_by": {
+          "name": "verified_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "withdrawn_at": {
+          "name": "withdrawn_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "access_profiles_status": {
+          "name": "access_profiles_status",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        },
+        "access_profiles_withdrawn_at": {
+          "name": "access_profiles_withdrawn_at",
+          "columns": [
+            "withdrawn_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "access_profiles_user_id_users_id_fk": {
+          "name": "access_profiles_user_id_users_id_fk",
+          "tableFrom": "access_profiles",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "access_profiles_verified_by_users_id_fk": {
+          "name": "access_profiles_verified_by_users_id_fk",
+          "tableFrom": "access_profiles",
+          "tableTo": "users",
+          "columnsFrom": [
+            "verified_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "access_profiles_status_values": {
+          "name": "access_profiles_status_values",
+          "value": "\"access_profiles\".\"status\" IN ('PENDING', 'VERIFIED', 'EXPIRED', 'DECLINED', 'WITHDRAWN')"
+        },
+        "access_profiles_companions_range": {
+          "name": "access_profiles_companions_range",
+          "value": "\"access_profiles\".\"companions\" BETWEEN 0 AND 2"
+        },
+        "access_profiles_payload_pair": {
+          "name": "access_profiles_payload_pair",
+          "value": "(\"access_profiles\".\"encrypted_payload\" IS NULL) = (\"access_profiles\".\"encryption_iv\" IS NULL)"
+        }
+      }
+    },
     "audit_log": {
       "name": "audit_log",
       "columns": {

@@ -411,8 +411,15 @@
     {
       "idx": 58,
       "version": "6",
-      "when": 1788564745778,
-      "tag": "0058_add_access_profiles_for_the_special_category_declaration",
+      "when": 1788540611253,
+      "tag": "0058_notification_log_status_gains_pending",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1788644915663,
+      "tag": "0059_add_access_profiles_for_the_special_category_declaration",
       "breakpoints": true
     }
   ]
