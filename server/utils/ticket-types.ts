@@ -1,5 +1,8 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+// Safe to import at runtime: `capacity.ts` only imports types from this file, so no cycle exists
+// the way one would if this pulled a constant back from `programme.ts` (see that file's note).
+import { TICKETS_ARE_A_SALE } from './capacity'
 import type { SQL } from 'drizzle-orm'
 import type { TicketType } from '#shared/utils/ticket-types'
 
@@ -29,6 +32,7 @@ export const TICKET_TYPE_REFERENCES: TicketTypeReference[] = [
     sale: false,
     why: 'a price this type would take on one performance: configuration, not a sale',
   },
+  TICKETS_ARE_A_SALE,
 ]
 
 export function saleReferences(references = TICKET_TYPE_REFERENCES): TicketTypeReference[] {

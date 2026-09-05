@@ -43,9 +43,9 @@ describe('nothing writes a ticket except the capacity builder (D-105 criterion 2
   })
 })
 
-// The two rows D-104 pushes when it migrates the tables. Written now so classifying `tickets` is
-// adding a constant rather than deciding the rule a second time.
-describe('the registry rows D-104 will add are already decided (D-105)', () => {
+// The two rows D-105 wrote so classifying `tickets` was pushing a constant rather than deciding
+// the rule a second time; D-104 pushed them into both live registries when it built the table.
+describe('the registry rows D-105 wrote are now live (D-104)', () => {
   test('tickets hold seats, and the count is the capacity rule rather than a row count', () => {
     expect(TICKETS_HOLD_SEATS.table).toBe('tickets')
     expect(TICKETS_HOLD_SEATS.sold).toBe(true)
@@ -59,8 +59,8 @@ describe('the registry rows D-104 will add are already decided (D-105)', () => {
     expect(TICKETS_ARE_A_SALE.sale).toBe(true)
   })
 
-  test('neither row is in its registry yet, because D-104 has not built the table', () => {
-    expect(PERFORMANCE_REFERENCES.map(one => one.table)).not.toContain('tickets')
-    expect(TICKET_TYPE_REFERENCES.map(one => one.table)).not.toContain('tickets')
+  test('both rows are in their live registry, now that the table is built', () => {
+    expect(PERFORMANCE_REFERENCES.map(one => one.table)).toContain('tickets')
+    expect(TICKET_TYPE_REFERENCES.map(one => one.table)).toContain('tickets')
   })
 })

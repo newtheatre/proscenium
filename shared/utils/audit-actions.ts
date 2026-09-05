@@ -39,6 +39,7 @@ const CATALOGUE = {
 
   'account.registered': { label: 'Account registered', module: 'identity', self: true },
   'account.created.console': { label: 'Account created from the console', module: 'identity' },
+  'account.created.guest': { label: 'Guest account opened by a booking', module: 'identity' },
   'account.created.google': { label: 'Account created by Google sign-in', module: 'identity', self: true },
   'account.verified': { label: 'Address confirmed', module: 'identity', self: true },
   'account.disabled': { label: 'Account disabled', module: 'identity' },

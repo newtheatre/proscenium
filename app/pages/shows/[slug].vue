@@ -278,6 +278,14 @@ function saysInterval(performance: Listed): string {
             >
               Book elsewhere
             </UButton>
+            <UButton
+              v-else-if="performance.availability === 'AVAILABLE' || performance.availability === 'LIMITED'"
+              :to="`/book/${performance.id}`"
+              size="sm"
+              :data-test="`book-${performance.id}`"
+            >
+              Book
+            </UButton>
           </div>
         </div>
 
@@ -294,14 +302,13 @@ function saysInterval(performance: Listed): string {
       </li>
     </ul>
 
-    <!-- D-104 builds the reservation flow; until then the page says how a seat is actually held. -->
     <UAlert
       class="mt-10"
       color="neutral"
       variant="subtle"
       icon="i-lucide-ticket"
       title="How booking works"
-      description="Online booking holds your seats and the box office takes payment at the theatre, in person, on the night. Booking online is not open yet; ring or email the box office to hold seats in the meantime."
+      description="Booking online holds your seats. The box office takes payment at the theatre, in person, on the night."
     />
   </UContainer>
 </template>

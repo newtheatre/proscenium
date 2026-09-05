@@ -180,7 +180,7 @@ function from(performance: Listed): string | null {
               </UButton>
               <UButton
                 v-else-if="performance.availability === 'AVAILABLE' || performance.availability === 'LIMITED'"
-                :to="`/shows/${listed.show.slug}`"
+                :to="`/book/${performance.id}`"
                 size="sm"
                 :data-test="`book-${performance.id}`"
               >

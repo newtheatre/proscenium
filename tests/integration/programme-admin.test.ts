@@ -5,7 +5,6 @@ import {
   performanceSoldQuery,
   showPerformancesQuery,
   showsQuery,
-  soldReferences,
 } from '#server/utils/programme'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -187,7 +186,7 @@ describe('"has sold tickets" is a count over rows, never a flag (D-121 criterion
           'o1', seeded.performanceId, 'tt-1', 500],
       ])
 
-      expect(soldReferences()).toEqual([])
+      // A price override is not a sale, whatever else the registry now classifies (D-104).
       const [counted] = read<{ sold: number }>(database, performanceSoldQuery(seeded.performanceId))
       expect(counted?.sold).toBe(0)
     })
@@ -221,7 +220,9 @@ describe('"has sold tickets" is a count over rows, never a flag (D-121 criterion
 
       const [statement, ...parameters] = boundStatement(database, showsQuery({}, 25, 0))
       expect(parameters).toEqual([25, 0])
-      expect(statement).not.toContain(' IN (')
+      // 0006 forbids an IN list built from a result set; `tickets`' own fixed, literal status
+      // enum is not one, so the check is for a bound-parameter IN list specifically (0003).
+      expect(statement).not.toContain(' IN (?')
 
       const counted = read<{ id: string, soldTickets: number }>(database, showsQuery({}, 25, 0, [FUTURE_TICKETS]))
       expect(counted.find(row => row.id === seeded.showId)?.soldTickets).toBe(1)
