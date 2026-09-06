@@ -94,12 +94,3 @@ not a release.
 | `content/history.md` | The theatre's founding, and which productions and seasons the committee wants remembered. |
 | `content/get-involved.md` | How joining, auditioning and the technical and production roles actually work this year. |
 | `content/about.md` | Its "Who we are" and "What we do" sections are folklore already stated informally; a proposed default is safe here, but the committee's own wording is what should ship. |
-
-## Access the committee must arrange
-
-Not a setting and not copy: neither a number nor prose, but something nobody here can supply
-for itself.
-
-| What | Why it is needed |
-| --- | --- |
-| The old bar app's real database schema | K-116 re-expresses old products as serving-size variants and imports the historical stock ledger as opening history, and cannot be built against a schema nobody has read. `docs/backlog/F-bar.md` cites a narrative audit ("PR-12") for the container-damage story, not a schema; building a transform against a guessed shape risks getting the documented repairs wrong rather than importing them. Blocks K-116 entirely (`docs/known-issues.md`). |
