@@ -217,6 +217,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/bar/categories/index.get.ts', exempt: 'reads the till\'s layout' },
   { route: 'server/api/admin/bar/categories/index.post.ts', actions: ['bar.category.created'] },
   { route: 'server/api/admin/bar/categories/[id]/index.put.ts', actions: ['bar.category.updated'] },
+  { route: 'server/api/admin/bar/categories/[id]/prices.post.ts', actions: ['bar.category.price.set'] },
   { route: 'server/api/admin/bar/products/index.get.ts', exempt: 'reads the products, retired ones included' },
   { route: 'server/api/admin/bar/products/index.post.ts', actions: ['bar.product.created'] },
   { route: 'server/api/admin/bar/products/[id]/index.put.ts', actions: ['bar.product.updated'] },

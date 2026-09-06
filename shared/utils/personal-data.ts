@@ -313,6 +313,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'What the bar charged from a date. It is what a past sale resolved against, so nothing removes it.',
   },
   {
+    name: 'category_prices',
+    column: 'created_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Append-only, so nothing here could be rewritten anyway (0010). Every column is a price and
+    // a date; the only thing about a person is which account set it.
+    why: 'What a category charges by default from a date. Past sales resolved against it, so nothing removes it.',
+  },
+  {
     name: 'stock_movements',
     column: 'actor_id',
     section: null,

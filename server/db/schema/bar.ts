@@ -182,6 +182,22 @@ export const variantPrices = sqliteTable('variant_prices', {
   check('variant_prices_effective_from_is_a_date', sql`${table.effectiveFrom} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`),
 ])
 
+// APPEND-ONLY (0010), same shape and tie-break as variant_prices. A variant with no price of its
+// own resolves here by (category, serving kind); neither existing refuses the sale (0017, F-121).
+export const categoryPrices = sqliteTable('category_prices', {
+  id: id(),
+  categoryId: text('category_id').notNull().references(() => barCategories.id, { onDelete: 'cascade' }),
+  servingKind: text('serving_kind').notNull(),
+  pricePence: integer('price_pence').notNull(),
+  effectiveFrom: text('effective_from').notNull(),
+  createdAt: integer('created_at').notNull().default(now),
+  createdBy: text('created_by').references(() => users.id, { onDelete: 'restrict' }),
+}, table => [
+  index('category_prices_resolution').on(table.categoryId, table.servingKind, table.effectiveFrom, table.createdAt),
+  check('category_prices_pence', sql`${table.pricePence} >= 0`),
+  check('category_prices_effective_from_is_a_date', sql`${table.effectiveFrom} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`),
+])
+
 // At most one open session per venue per night, the same key 0044 uses for a bypass (F-102). The
 // index covers open rows only, so a session once closed stays closed and a later one is a new row.
 export const tillSessions = sqliteTable('till_sessions', {
