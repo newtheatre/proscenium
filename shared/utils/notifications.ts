@@ -337,6 +337,15 @@ export const MESSAGE_TYPES = {
 
   // Module I: finance
 
+  // Module J: governance
+
+  // No topic: a deploy nobody can turn off must still reach the IT Manager (J-106 criterion 5).
+  'health.alert': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'health-alert',
+  },
+
 } as const satisfies Record<string, MessageType>
 
 export type MessageTypeName = keyof typeof MESSAGE_TYPES
