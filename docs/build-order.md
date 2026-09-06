@@ -149,10 +149,10 @@ screens sit under `/bar`, not `/admin`: `/admin` means System and nothing else, 
 | --- | --- | --- |
 | 1 | K-103 · K-105 harness + J-106 · K-108 + J-107 · K-112 · K-111 + A-126 | K-103 builds `useNightCache(key, loader)` against the placeholder and a seeded performance; show night and bar adopt it. K-105 here is only `tests/helpers/race.ts` and splitting `races.test.ts` and `money.test.ts` into per-invariant files, before D-105 and F-105 both try to fill the same file. J-106: verify the existing endpoint against its criteria and close. K-108 wakes `backup`; K-111 wakes `retention:sweep`. |
 | 2 | H-102 + H-104 · H-105 + H-106 · J-109 + J-110 · K-113 · I-106 | H-105's retries are what `nights:close` and D-107 lean on. J-110 makes `check:content-tokens` real: keep it small and early. I-106 needs D Wave 0 only and uses `IMPORT` rows until D-114 posts real ones. |
-| 3 | A-119 · H-108 · K-114 + I-109 · K-116 · J-105 | K-116 needs F-115 (bar wave 2). |
+| 3 | A-119 · H-108 · K-114 + I-109 · J-105 | K-114 and I-109 import from `tickets` and `reservations`, not the old estate's near-empty `transactions` table (verified against production, 6 September 2026). K-116 no longer needs a wave: it resolved without a pull request, on the same verification finding no stock-movement history to transform (`docs/backlog/K-platform.md`). |
 | 4 | A-123 · I-102 · K-104 | I-102 closes when D-114, D-116, D-124, F-105 and F-108 have each added their row to the checklist test, each in its own pull request; I-102's own pull request asserts the list is complete. K-104 needs a real door write and a real till write to reconcile against. |
 | 5 | I-103 + I-104 · I-105 · K-105 close | K-105 closes when the four racing tests (D-105, E-104, F-105, register marks) are in CI. |
-| 6 | I-107 + I-108 · K-119 | K-119 needs K-112, K-114, K-116. |
+| 6 | I-107 + I-108 · K-119 | K-119 needs K-112 (closed), K-114 (this wave) and K-115 (resolved, nothing to import). K-116 no longer gates it either: resolved without a build. |
 
 Routes and files owned: `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`,
 `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`,
@@ -201,7 +201,7 @@ Provider first, consumer second. "If late" is what the consumer builds against m
 | D-114, D-116, D-124, F-105, F-108, F-109; I-102 | One ledger row per kind | Each provider adds its row to the checklist test in its own pull request. |
 | F-117; I-103 | `discount_id` and `discount_percent` on entries | The columns exist; I-103 tolerates zero rows. |
 | F-118; I-104 | A bar session close carrying the SumUp Z | I-104 reconciles from ledger rows alone and reports "no bar session closed". |
-| F-115; K-116 | Stocktake apply | Hard dependency; two waves apart. |
+| F-115; K-116 | Stocktake apply | Resolved rather than built: production holds no stock-movement history, so F-115's apply route already covers K-116 whole, and no pull request opens against this seam (`backlog/K-platform.md`). |
 | H-105; D-107, E-109, E-124, E-125 | Retries | `notify()` already writes `notification_log`; consumers send once. |
 | D-114 and F-105; K-104 | Idempotent write endpoints | The queue is tested against a fake endpoint; the reconciliation test waits for the real invariants. |
 
