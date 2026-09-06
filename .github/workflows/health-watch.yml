@@ -1,0 +1,30 @@
+# Workers Builds deploys on every push to the branch that currently deploys, independent of
+# whether the push touches a migration, and its own completion cannot be hooked from here
+# (docs/operations.md). This is the "after every deploy" half of J-106 criterion 3: it does not
+# know a deploy just happened, so it polls on a schedule instead and fails loudly when unhealthy.
+# The notification-centre alert on sustained unhealthiness is a separate mechanism, the
+# `health:watch` scheduled task inside the application (J-106 criterion 5).
+name: Health watch
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: health-watch
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the live health endpoint
+        run: |
+          if status=$(curl -fsS -o /tmp/health.json -w '%{http_code}' https://newtheatre.org.uk/api/health) && [ "$status" = "200" ]; then
+            echo "Health endpoint reports ok."
+            exit 0
+          fi
+          echo "::error::/api/health did not report ok. Response:"
+          cat /tmp/health.json 2>/dev/null || echo "(no response body)"
+          exit 1

@@ -444,6 +444,14 @@ export const CONFIG_KEYS = {
     workshop: 'people-and-communications',
     describes: 'Days between restore drills before the operations dashboard flags one overdue (K-108, J-107).',
   },
+  // A deploy and its migration job can legitimately race for a few minutes, so the alert waits
+  // out this window rather than firing on the first unhealthy check (J-106 criterion 5).
+  HEALTH_ALERT_WINDOW_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 30,
+    workshop: 'people-and-communications',
+    describes: 'Minutes /api/health may read unhealthy before the notification centre tells the IT Manager.',
+  },
 
   // Module E: show night
 
@@ -504,6 +512,7 @@ export const ENFORCED_KEYS = [
   'ACADEMIC_YEAR_BOUNDARY',
   'ACCESS_PROFILE_VALIDITY_MONTHS',
   'BACKUP_DRILL_INTERVAL_DAYS',
+  'HEALTH_ALERT_WINDOW_MINUTES',
   'LISTING_LIMITED_THRESHOLD_PERCENT',
   'ADMIN_TOKEN_HOURS',
   'MAGIC_LINK_MINUTES',

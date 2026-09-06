@@ -121,15 +121,34 @@ longer exists, and it goes with the archive rather than staying on anybody's lap
 
 A 503 naming migrations means the deploy won the race. Run the migrate workflow by hand.
 
+**Nothing watches it from outside on its own** (J-106 criterion 3): `.github/workflows/migrate.yml`
+polls it once, with retries, right after applying migrations, and `.github/workflows/health-watch.yml`
+polls it on a schedule so a Workers Builds deploy that touches no migration is still caught. Neither
+can be sequenced against the other pipeline's completion; both fail the GitHub Actions run loudly
+rather than passing silently. The `health:watch` task below is the third leg, for sustained
+unhealthiness reaching the IT Manager rather than a CI log.
+
 ## Scheduled tasks
 
 Registered in `nuxt.config.ts` and mirrored in the wrangler cron triggers; the two lists must
 agree, and `tests/unit/tasks.test.ts` fails if they drift or if a name has no handler.
 
-**`daily:sweeps`, `training:expiry-sweep` and `backup` do work today.** The other five
-(`holds:release`, `sessions:sweep`, `shifts:remind`, `nights:close`, `retention:sweep`) are stubs
-that report the story they are waiting for, and exist so their cron trigger has something to call:
-a cron pointing at a missing handler errors on every firing.
+**`daily:sweeps`, `training:expiry-sweep`, `shifts:escalate`, `rooms:sweep`, `rooms:remind`,
+`shifts:remind`, `backup` and `health:watch` do work today.** The other four (`holds:release`,
+`sessions:sweep`, `nights:close`, `retention:sweep`) are stubs that report the story they are
+waiting for, and exist so their cron trigger has something to call: a cron pointing at a missing
+handler errors on every firing.
+
+### health:watch (every 10 minutes)
+
+Runs the same check `/api/health` answers. The first unhealthy result opens a `health_incidents`
+row; a check that recovers closes it, so the next failure alerts again from cold rather than a
+single old notification silencing every future one. While one stays open past
+`HEALTH_ALERT_WINDOW_MINUTES` (30), the IT Manager (every live `ADMIN` grant) is told once through
+the notification centre, claimed exactly like any other send (0048): a run that finds the window
+already passed and the claim already taken sends nothing further. A deploy and its migration job
+can legitimately race for a few minutes, which is why this waits out a window instead of alerting
+on the first failed check (J-106 criterion 5).
 
 `daily:sweeps` (04:00 London) removes lapsed rate-limit windows, lapsed MFA attempts and unclaimed
 sign-in tokens. Everything it touches is already spent by claim, so what it finds was never used.

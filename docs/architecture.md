@@ -267,16 +267,14 @@ Reading the table:
 All Nitro scheduled tasks mirrored in wrangler cron triggers. The system notices, humans
 decide (principle P6): no task ever awards a record, approves a request or takes money.
 
-Every name in the table has a handler under `server/tasks/`, because a cron pointing at one that
-does not exist errors on every firing. Five of them are still stubs that report the story they
-are waiting for and do nothing else (`docs/known-issues.md`).
-does not exist errors on every firing. `holds:release`, `sessions:sweep`, `shifts:remind`,
-`nights:close` and `retention:sweep` are stubs that report the story they are waiting for and do
-nothing else; the rest do their work, `backup` from K-108 and J-107.
+does not exist errors on every firing. `holds:release`, `sessions:sweep`, `nights:close` and
+`retention:sweep` are stubs that report the story they are waiting for and do nothing else; the
+rest do their work, `backup` from K-108 and J-107 and `health:watch` from J-106.
 
 | Cron (UTC) | Task | Does |
 | --- | --- | --- |
 | `*/10 * * * *` | `holds:release` | Releases expired reservation holds, cascades waiting-list offers, sends pre-expiry reminders. The one task that changes booking state, and only ever in the direction the customer was warned about. |
+| `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). The CI-side "after every deploy" half of criterion 3 is `.github/workflows/health-watch.yml` and a step at the end of `migrate.yml`, both outside the application. |
 | `0 6 * * *` | `training:expiry-sweep` | Expiry warnings and digests (dry-run gated). |
 | `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or an unconfirmed duty manager, the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |

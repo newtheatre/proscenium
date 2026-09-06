@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "df15a09e-a95a-409b-b317-07d617743f55",
-  "prevId": "7e6ddab5-9b7f-4666-a8d5-4fc636f96a42",
+  "id": "61e64762-c6c4-435a-bf3a-5a6ea7274a3d",
+  "prevId": "c42748cc-8545-4d03-92af-cc2d79b546c0",
   "tables": {
     "access_profiles": {
       "name": "access_profiles",
@@ -343,6 +343,111 @@
         }
       }
     },
+    "backup_drills": {
+      "name": "backup_drills",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ran_on": {
+          "name": "ran_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "operator_id": {
+          "name": "operator_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "time_to_restore_minutes": {
+          "name": "time_to_restore_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "row_counts_match": {
+          "name": "row_counts_match",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "money_totals_match": {
+          "name": "money_totals_match",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "backup_drills_ran_on": {
+          "name": "backup_drills_ran_on",
+          "columns": [
+            "ran_on"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "backup_drills_operator_id_users_id_fk": {
+          "name": "backup_drills_operator_id_users_id_fk",
+          "tableFrom": "backup_drills",
+          "tableTo": "users",
+          "columnsFrom": [
+            "operator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "backup_drills_outcome_values": {
+          "name": "backup_drills_outcome_values",
+          "value": "\"backup_drills\".\"outcome\" IN ('PASS', 'FAIL')"
+        },
+        "backup_drills_time_positive": {
+          "name": "backup_drills_time_positive",
+          "value": "\"backup_drills\".\"time_to_restore_minutes\" > 0"
+        }
+      }
+    },
     "bar_categories": {
       "name": "bar_categories",
       "columns": {
@@ -654,6 +759,113 @@
         "bar_products_unknown_allergens_have_no_note": {
           "name": "bar_products_unknown_allergens_have_no_note",
           "value": "\"bar_products\".\"allergen_state\" <> 'UNKNOWN' OR \"bar_products\".\"allergen_note\" IS NULL"
+        }
+      }
+    },
+    "category_prices": {
+      "name": "category_prices",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "serving_kind": {
+          "name": "serving_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "price_pence": {
+          "name": "price_pence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "category_prices_resolution": {
+          "name": "category_prices_resolution",
+          "columns": [
+            "category_id",
+            "serving_kind",
+            "effective_from",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "category_prices_category_id_bar_categories_id_fk": {
+          "name": "category_prices_category_id_bar_categories_id_fk",
+          "tableFrom": "category_prices",
+          "tableTo": "bar_categories",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "category_prices_created_by_users_id_fk": {
+          "name": "category_prices_created_by_users_id_fk",
+          "tableFrom": "category_prices",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "category_prices_pence": {
+          "name": "category_prices_pence",
+          "value": "\"category_prices\".\"price_pence\" >= 0"
+        },
+        "category_prices_effective_from_is_a_date": {
+          "name": "category_prices_effective_from_is_a_date",
+          "value": "\"category_prices\".\"effective_from\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"
         }
       }
     },
@@ -1888,6 +2100,64 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
+    },
+    "health_incidents": {
+      "name": "health_incidents",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'OPEN'"
+        },
+        "opened_at": {
+          "name": "opened_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "health_incidents_one_open": {
+          "name": "health_incidents_one_open",
+          "columns": [
+            "status"
+          ],
+          "isUnique": true,
+          "where": "status = 'OPEN'"
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "health_incidents_status_values": {
+          "name": "health_incidents_status_values",
+          "value": "\"health_incidents\".\"status\" IN ('OPEN', 'CLOSED')"
+        },
+        "health_incidents_close_is_whole": {
+          "name": "health_incidents_close_is_whole",
+          "value": "(\"health_incidents\".\"status\" = 'OPEN') = (\"health_incidents\".\"closed_at\" IS NULL)"
+        }
+      }
     },
     "inbox_items": {
       "name": "inbox_items",
