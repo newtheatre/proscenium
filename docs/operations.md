@@ -95,6 +95,13 @@ A rehearsal, which is what `bun run migration:dry-run` does after `bun run migra
 The load upserts on identity and **never deletes**: a person or a grant that disappeared upstream
 stays until somebody decides what should happen to them.
 
+**What a green rehearsal is actually proving.** In the 6 September 2026 export, 8,268 of 9,974
+`auth.users` are already anonymised and 8,274 are disabled: about five in six of what the identity
+rehearsal imports is a tombstone or a disabled account, not a live one. A rehearsal proving "an
+active account with roles and a second factor carries across" is exercising roughly one row in
+six; the tombstone-and-disabled path is the dominant case, not the edge case, whatever two
+consecutive green runs are read to demonstrate for the Phase 2 gate (`docs/roadmap.md`).
+
 ### At cutover
 
 Applied by hand, like everything else destructive, and only after a green reconciliation:
