@@ -1,19 +1,24 @@
 #!/usr/bin/env bun
-// The rehearsal's booking step: the old rooms history, keyed to the accounts the identity
-// transform minted. The transform itself is in bookings.ts, so it is testable without a dump.
+// The old rooms history, keyed to the accounts identity minted. Targets a database with the
+// real schema, not out/unified.sqlite: room_bookings references real rooms (docs/known-issues.md).
 import { Database } from 'bun:sqlite'
 import { join } from 'node:path'
+import { assertLocalTarget, assertNotProduction } from '../tests/helpers/seed'
 import { OUT, ensureOut, latestStamp, loadDump } from './lib'
 import { reconcile, transformBookings } from './bookings'
 
 const stamp = await latestStamp()
 ensureOut()
 
-const targetPath = join(OUT, 'unified.sqlite')
-if (!await Bun.file(targetPath).exists()) {
-  console.error('No out/unified.sqlite: run transform-identity.ts first, because bookings key to its accounts.')
+const applyTo = process.argv.slice(2).find(argument => !argument.startsWith('-'))
+if (!applyTo) {
+  console.error('Usage: bun migration/transform-bookings.ts <target-database>')
+  console.error('The target must already carry the application schema and this week\'s load.ts')
+  console.error('output: room_bookings and external_requests reference real rooms and real users.')
   process.exit(1)
 }
+assertNotProduction()
+assertLocalTarget(applyTo)
 
 // Read back before anything is minted, so a rehearsal updates last week's rows rather than
 // writing a second copy of the history (C-118 criterion 5).
@@ -38,7 +43,7 @@ const seriesIds = await readMap('series-id-map.tsv')
 const externalIds = await readMap('external-id-map.tsv')
 
 const source = await loadDump('rooms', stamp)
-const target = new Database(targetPath)
+const target = new Database(applyTo)
 
 // Written by hand for a rehearsal rather than guessed, because a wrong room silently rewrites
 // years of utilisation. Two files now: a venue is a union room, not a room we control (C-120).
@@ -71,7 +76,11 @@ if (exceptions.length) console.log(`exceptions: ${exceptions.length}, in out/boo
 if (!check.ok) {
   console.error('\nreconciliation failed:')
   for (const problem of check.problems) console.error(`  ${problem}`)
+  target.close()
+  source.close()
   process.exit(1)
 }
 
 console.log('reconciled.')
+target.close()
+source.close()
