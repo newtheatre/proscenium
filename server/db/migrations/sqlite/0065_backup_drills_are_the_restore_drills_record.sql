@@ -13,10 +13,7 @@ CREATE TABLE `backup_drills` (
 	CONSTRAINT "backup_drills_time_positive" CHECK("backup_drills"."time_to_restore_minutes" > 0)
 );
 --> statement-breakpoint
-CREATE INDEX `backup_drills_ran_on` ON `backup_drills` (`ran_on`);
---> statement-breakpoint
--- Append-only is trigger-enforced (0010): a wrong figure is superseded by a further drill, never
--- corrected in place.
+CREATE INDEX `backup_drills_ran_on` ON `backup_drills` (`ran_on`);--> statement-breakpoint
 CREATE TRIGGER backup_drills_no_update
 BEFORE UPDATE ON backup_drills
 BEGIN

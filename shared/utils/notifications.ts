@@ -244,6 +244,32 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'shift-declined',
   },
+  // Transactional: chasing an unstaffed slot ahead of the night is operational, not a
+  // preference an officer administering the rota can switch off (E-107 criterion 2).
+  'shift.released': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'shift-released',
+  },
+  // The officer's assignment is confirmed by definition, so it reads exactly like an approval
+  // to the person it lands on (E-107 criterion 3).
+  'shift.assigned': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'shift-assigned',
+  },
+  'shift.removed': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'shift-removed',
+  },
+  // The one shift message that is a courtesy rather than an outcome, so it carries the shifts
+  // topic rather than going out regardless of preference (E-109 criterion 4).
+  'shift.reminder': {
+    topic: 'SHIFTS',
+    channels: ['EMAIL'],
+    template: 'shift-reminder',
+  },
 
   // Module F: bar
 

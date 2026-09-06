@@ -305,9 +305,10 @@ because `saleRefusal()` refuses an unpublished show, so republishing restores th
 
 **"Has sold tickets" is a count over rows, never a column.** `PERFORMANCE_REFERENCES` in
 `server/utils/programme.ts` declares every table that points at `performances` and whether a row
-there means a seat is held. The price overrides are configuration and are not; `tickets`,
-`reservations` and `waiting_list` will be, when D-104 and D-113 build them. An integration test
-reads the live foreign keys and fails when a new referencing table is not classified.
+there means a seat is held. The price overrides are configuration and are not; `reservations`
+holds nothing itself, and `tickets` is the one classified `sold: true` (D-104). `waiting_list`
+will be, when D-113 builds it. An integration test reads the live foreign keys and fails when a
+new referencing table is not classified.
 
 **The public programme (D-101).** `/whats-on` is the listing and `/shows/[slug]` is one show, over
 two routes that take no session at all:
@@ -328,9 +329,9 @@ finished run drops off the listing with nothing to sweep.
 externally ticketed, past its window) reads BOOKING_CLOSED rather than offering a button that would
 409. Otherwise it is SOLD_OUT at nought seats left, LIMITED at or below
 `LISTING_LIMITED_THRESHOLD_PERCENT` of the house, and AVAILABLE above that. An uncapped venue is
-never limited and never sold out. The seats taken come from `PERFORMANCE_REFERENCES`, so the figure
-is nought until D-104 classifies `tickets` and begins counting real rows. The number of seats left
-is carried only while the state is LIMITED, which is the one case a visitor is told a figure: an
+never limited and never sold out. The seats taken come from `PERFORMANCE_REFERENCES`, which counts
+real rows in `tickets` now that D-104 has classified it. The number of seats left is carried only
+while the state is LIMITED, which is the one case a visitor is told a figure: an
 exact unsold count on every performance is the theatre's sales, readable by anybody.
 
 **A quoted price resolves performance, then show, then the type.** `resolvePrice()` in
@@ -400,8 +401,8 @@ the two override tables below; everything else in this module is unbuilt.
 
 **"Has ever been sold" is a query over rows, never a column.** `TICKET_TYPE_REFERENCES` in
 `server/utils/ticket-types.ts` declares every table that points at `ticket_types` and whether a
-row there is a sale. The overrides are configuration and are not; `tickets` and
-`pass_admissions` will be, when D-104 and D-123 build them. An integration test reads the live
+row there is a sale. The overrides are configuration and are not; `tickets` is, now that D-104 has
+classified it. `pass_admissions` will be, when D-124 builds it. An integration test reads the live
 foreign keys and fails when a new referencing table is not classified, so the predicate cannot
 quietly stop covering a table.
 
@@ -444,11 +445,22 @@ credential) · `performance_id` → performances restrict · `user_id` → users
 `WEB|DESK|DOOR` (the door writes DOOR, fixing the old blur) · `hold_expires_at` (set while
 PENDING; the release sweep moves PENDING to EXPIRED and records it for no-show statistics) ·
 `cancelled_by` CHECK `CUSTOMER|STAFF` NULL · `customer_notes` scrub · `staff_notes` scrub ·
-`qr_token_hash` (the one stable QR credential, D-108) · timestamps.
-D-112 criterion 3 needs a column recording that a desk reservation bypassed the customer booking
-window; D-104 adds it when it builds this table, and `saleRefusal(..., 'DESK')` is the predicate
-that permits the bypass.
+`qr_token_hash` (the one stable QR credential, D-108) · `window_bypassed` bool, true only for a
+desk reservation made after the customer window had already closed (D-112 criterion 3; nothing
+yet writes DESK, so this stays false until a desk-side creation route does) · timestamps.
 Indexes: (`performance_id`, `status`), (`user_id`, `created_at`), `hold_expires_at`.
+
+**Booking (D-104).** `POST /api/reservations` is the one write path, deliberately public: a
+signed-in caller attaches to their own account, and a guest supplies a name and an email, which
+resolves to an existing account or mints a claimable one (`guestAccount()` in
+`server/utils/reservations.ts`), the row A-116's registration flow later converts. The reservation
+and its price-snapshotted tickets write in one `db.batch`, status `PENDING`, source `WEB`, and no
+ledger entry, because no money has moved (0005). `saleRefusal(..., 'CUSTOMER')` refuses a closed
+window, an unpublished show, an off-sale or externally ticketed performance, each with the reason
+named; `PUBLIC_ORDER_SEAT_CAP` (10 by default) is checked per line and against the order total.
+Reservation endpoints are rate limited by IP (`server/utils/request-ip.ts`, reading
+`CF-Connecting-IP`) and by email address, and every refusal is enumeration-safe: nothing in the
+response distinguishes an address that already held an account from one that did not.
 
 ### tickets
 `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances
@@ -698,9 +710,24 @@ cascade from a variant cannot fire either: a priced variant is retired, not dele
 together.
 
 ### category_prices  APPEND-ONLY
-`id` PK · `category_id` cascade · `serving_kind` · `price_pence` · `effective_from` ·
-`created_at` · `created_by`. Resolution: variant price first, category default second,
-refuse-to-sell if neither (0017, F-121).
+`id` PK · `category_id` → bar_categories cascade · `serving_kind`, the same vocabulary
+`product_variants.serving_kind` resolves on · `price_pence` CHECK not negative · `effective_from`
+civil date, CHECK `YYYY-MM-DD` · `created_at` · `created_by` → users restrict. Same shape and
+tie-break as `variant_prices`, grouped per serving kind: a spirit's single and double default
+resolve independently. Triggers refuse every UPDATE and DELETE (0010).
+
+Resolution (0017, F-121 criterion 2): a variant's own `variant_prices` row wins when one is
+effective; otherwise the category default for the variant's serving kind; a variant answered by
+neither refuses to sell rather than guessing. `resolvedPriceColumns` in `server/utils/bar.ts`
+builds both `pricePence` and `priceSource` (`'variant' | 'category' | null`) from the same two
+column-builders (`effectivePriceColumn`, `effectiveCategoryPriceColumn`), read by
+`variantsOf`/`variantById` and shown on the catalogue screen so a stray variant override hiding a
+category change is visible at a glance (criterion 5). `GET`/`POST
+/api/admin/bar/categories/[id]/prices` list and set a default, one serving kind at a time.
+
+`ledger_lines.price_ref` (F-105, not yet built) is `` `${source}:${priceRowId}` ``, produced by
+`priceRef()` in `shared/utils/bar.ts`: the row a sale line resolved against, so a later default
+change never restates a past sale (criterion 4).
 
 ### bar_discounts
 `id` PK · `name` · `percent` 1..100 · `status`. Snapshotted onto entries; bar lines only.

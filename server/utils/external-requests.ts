@@ -143,6 +143,26 @@ async function assignmentRows(requestIds: string[]): Promise<(AssignmentRow & { 
     .orderBy(asc(schema.externalAssignments.recordedAt))
 }
 
+// The bare statement, unawaited: a caller that audits the write batches this with its own
+// conditional `INSERT ... WHERE changes() = 1` rather than a second round trip after (0049).
+export function moveRequestStatement(
+  id: string,
+  from: readonly ExternalStatus[],
+  set: Record<string, unknown>,
+) {
+  const assignments = sql.join(
+    Object.entries(set).map(([column, value]) => sql`${sql.identifier(column)} = ${value}`),
+    sql`, `,
+  )
+  const states = from.map(status => sql`${status}`)
+
+  return db.all<{ id: string }>(sql`
+    UPDATE external_requests SET ${assignments}
+    WHERE id = ${id} AND status IN (${sql.join(states, sql`, `)})
+    RETURNING id
+  `)
+}
+
 // Guarded on the status it read, and on nothing else: a route decides what may follow what, and
 // the statement makes sure two officers cannot both act on the same step (0006).
 export async function moveRequest(
@@ -150,17 +170,6 @@ export async function moveRequest(
   from: readonly ExternalStatus[],
   set: Record<string, unknown>,
 ): Promise<boolean> {
-  const assignments = sql.join(
-    Object.entries(set).map(([column, value]) => sql`${sql.identifier(column)} = ${value}`),
-    sql`, `,
-  )
-  const states = from.map(status => sql`${status}`)
-
-  const moved = await db.all<{ id: string }>(sql`
-    UPDATE external_requests SET ${assignments}
-    WHERE id = ${id} AND status IN (${sql.join(states, sql`, `)})
-    RETURNING id
-  `)
-
+  const moved = await moveRequestStatement(id, from, set)
   return moved.length > 0
 }

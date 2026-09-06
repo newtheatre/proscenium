@@ -266,6 +266,15 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     scrub: ['verified_by'],
     why: 'Which officer sighted the evidence and agreed the wording. The decision survives; the officer does not.',
   },
+  {
+    name: 'reservations',
+    column: 'user_id',
+    section: 'bookings',
+    columns: ['reference', 'performance_id', 'status', 'source', 'created_at'],
+    erasure: 'scrub',
+    scrub: ['customer_notes', 'staff_notes'],
+    why: 'Booking and sales statistics must survive erasure; free text about the booker need not (D-104).',
+  },
 
   // Module E: show night
 
@@ -302,6 +311,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // Append-only, so nothing here could be rewritten anyway (0010). Every column is a price and
     // a date; the only thing about a person is which account set it.
     why: 'What the bar charged from a date. It is what a past sale resolved against, so nothing removes it.',
+  },
+  {
+    name: 'category_prices',
+    column: 'created_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Append-only, so nothing here could be rewritten anyway (0010). Every column is a price and
+    // a date; the only thing about a person is which account set it.
+    why: 'What a category charges by default from a date. Past sales resolved against it, so nothing removes it.',
   },
   {
     name: 'stock_movements',

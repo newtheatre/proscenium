@@ -300,6 +300,38 @@ export function declineShiftStatement(shiftId: string, reason: string): SQL {
   `
 }
 
+// Release and reassignment (E-107). Both ride their own UPDATE, exactly as claiming does.
+
+// The holder's own release: it returns to OPEN naming nobody, the same shape a fresh stamp
+// leaves, so a released shift is indistinguishable from one nobody has ever claimed (criterion 1).
+export function releaseShiftStatement(shiftId: string, userId: string): SQL {
+  return sql`
+    UPDATE shifts SET status = 'OPEN', user_id = NULL, claimed_at = NULL, confirmed_at = NULL
+    WHERE id = ${shiftId} AND user_id = ${userId} AND status IN ('CLAIMED', 'CONFIRMED')
+    RETURNING id
+  `
+}
+
+// An officer's assignment, onto an open shift or over an existing holder: confirmed by
+// definition, one UPDATE on the row that already exists, never a delete and an insert (criteria 3, 4).
+export function assignShiftStatement(shiftId: string, userId: string, actorId: string): SQL {
+  return sql`
+    UPDATE shifts AS target
+    SET user_id = ${userId}, status = 'CONFIRMED', assigned_by = ${actorId},
+        claimed_at = unixepoch(), confirmed_at = unixepoch(), decline_reason = NULL
+    WHERE target.id = ${shiftId}
+      AND target.status <> 'CANCELLED'
+      AND NOT EXISTS (
+        SELECT 1 FROM shifts AS other
+        WHERE other.performance_id = target.performance_id
+          AND other.id <> target.id
+          AND other.user_id = ${userId}
+          AND other.status IN ('CLAIMED', 'CONFIRMED')
+      )
+    RETURNING id
+  `
+}
+
 export interface PendingApprovalRow {
   shiftId: string
   role: ShiftRole
@@ -332,4 +364,84 @@ export function pendingApprovalsQuery(limit: number, offset: number): SQL {
 
 export function countPendingApprovalsQuery(): SQL {
   return sql`SELECT count(*) AS total FROM shifts WHERE status = 'CLAIMED'`
+}
+
+// What shift-scoped authority resolves against (E-111 criterion 1, 0044). Bound at five or seven
+// parameters however many shifts a night holds, never one per row (0003, 0006).
+
+export interface ConfirmedShiftTonight {
+  shiftId: string
+  performanceId: string
+  venueId: string
+}
+
+export interface ConfirmedShiftScope {
+  venueId?: string
+  performanceId?: string
+}
+
+// A confirmed shift of this role, held by this account, on a performance running inside the
+// night's own bounds; a cancelled performance's shift is cancelled with it (E-102 criterion 4).
+export async function confirmedShiftsTonight(
+  userId: string,
+  role: ShiftRole,
+  from: number,
+  to: number,
+  scope: ConfirmedShiftScope,
+): Promise<ConfirmedShiftTonight[]> {
+  const terms: SQL[] = [
+    sql`s.user_id = ${userId}`,
+    sql`s.role = ${role}`,
+    sql`s.status = 'CONFIRMED'`,
+    sql`p.status <> 'CANCELLED'`,
+    sql`p.starts_at >= ${from} AND p.starts_at < ${to}`,
+  ]
+  if (scope.venueId) terms.push(sql`p.venue_id = ${scope.venueId}`)
+  if (scope.performanceId) terms.push(sql`p.id = ${scope.performanceId}`)
+
+  return await db.all<ConfirmedShiftTonight>(sql`
+    SELECT s.id AS shiftId, s.performance_id AS performanceId, p.venue_id AS venueId
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    ${where(terms)}
+    ORDER BY p.starts_at
+  `)
+}
+
+export interface UnfilledShiftRow {
+  shiftId: string
+  role: ShiftRole
+  status: ShiftStatus
+  performanceId: string
+  venueId: string
+  venueName: string
+  showTitle: string
+  startsAt: number
+  declineReason: string | null
+}
+
+// Everything an officer might fill by hand: open because nobody has claimed it, or declined
+// because a claim did not work out. Neither reopens itself (E-107 criterion 3).
+export function unfilledShiftsQuery(now: number, limit: number, offset: number): SQL {
+  return sql`
+    SELECT s.id AS shiftId, s.role AS role, s.status AS status, p.id AS performanceId,
+           v.id AS venueId, v.name AS venueName, sh.title AS showTitle, p.starts_at AS startsAt,
+           s.decline_reason AS declineReason
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    JOIN venues v ON v.id = p.venue_id
+    JOIN shows sh ON sh.id = p.show_id
+    WHERE s.status IN ('OPEN', 'DECLINED') AND p.status <> 'CANCELLED' AND p.starts_at >= ${now}
+    ORDER BY p.starts_at, s.role, s.slot
+    LIMIT ${limit} OFFSET ${offset}
+  `
+}
+
+export function countUnfilledShiftsQuery(now: number): SQL {
+  return sql`
+    SELECT count(*) AS total
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    WHERE s.status IN ('OPEN', 'DECLINED') AND p.status <> 'CANCELLED' AND p.starts_at >= ${now}
+  `
 }

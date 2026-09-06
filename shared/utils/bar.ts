@@ -223,6 +223,14 @@ export const priceForm = z.object({
   effectiveFrom: civilDate,
 })
 
+// A category's own default, per serving kind, dated and append-only the same way (0017, F-121
+// criterion 1). Resolution reads it only when the variant has no price row of its own.
+export const categoryPriceForm = z.object({
+  servingKind: z.enum(SERVING_KINDS),
+  pricePence: z.number().int().nonnegative().max(MAX_VARIANT_PRICE_PENCE),
+  effectiveFrom: civilDate,
+})
+
 export type CategoryInput = z.output<typeof categoryForm>
 export type ProductInput = z.output<typeof productForm>
 export type StockItemInput = z.output<typeof stockItemForm>
@@ -280,6 +288,10 @@ export interface ChoiceGroup {
   options: ChoiceGroupOption[]
 }
 
+// Which level supplied a variant's resolved price, so a stray variant override hiding a category
+// change is visible at a glance (F-121 criterion 5). Null means neither prices it: refuse to sell.
+export type BarPriceSource = 'variant' | 'category' | null
+
 export interface ProductVariant {
   id: string
   productId: string
@@ -287,8 +299,10 @@ export interface ProductVariant {
   label: string
   status: VariantStatus
   sort: number
-  // The latest price dated on or before today, or null when nothing prices it yet (F-116).
+  // Variant price first, category default second: an explicit variant price always wins, and null
+  // means neither prices it, so the till has nothing to charge (0017, F-121 criterion 2).
   pricePence: number | null
+  priceSource: BarPriceSource
   // A future-dated row makes this true while `pricePence` still reads null: append-only, so it
   // can only be retired (F-112 criterion 5).
   everPriced: boolean
@@ -307,6 +321,25 @@ export interface VariantPrice {
   seq: number
   // True for the row that wins today, so the history says which one the till is reading.
   effective: boolean
+}
+
+export interface CategoryPrice {
+  id: string
+  categoryId: string
+  servingKind: ServingKind
+  pricePence: number
+  effectiveFrom: string
+  createdAt: number
+  createdBy: string | null
+  seq: number
+  // True for the row that wins today, grouped within its own serving kind (F-121 criterion 1).
+  effective: boolean
+}
+
+// The contract `ledger_lines.price_ref` is written under: which row resolved a sale line's price,
+// so a later default change never restates it (F-121 criterion 4, consumed by F-105).
+export function priceRef(source: Exclude<BarPriceSource, null>, priceId: string): string {
+  return `${source}:${priceId}`
 }
 
 export interface StockItem {

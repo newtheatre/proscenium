@@ -286,7 +286,17 @@ const columns: TableColumn<ProductVariant>[] = [
     id: 'price',
     header: 'Price today',
     meta: { class: { td: 'whitespace-nowrap' } },
-    cell: ({ row }) => (row.original.pricePence === null ? 'Not priced' : saysMoney(row.original.pricePence)),
+    cell: ({ row }) => (row.original.pricePence === null
+      ? 'Not priced'
+      : h('div', { class: 'flex items-center gap-2' }, [
+          h('span', {}, saysMoney(row.original.pricePence)),
+          h(UBadge, {
+            'color': row.original.priceSource === 'variant' ? 'primary' : 'neutral',
+            'variant': 'subtle',
+            'size': 'sm',
+            'data-test': `price-source-${row.original.id}`,
+          }, () => (row.original.priceSource === 'variant' ? 'Own price' : 'Category default')),
+        ])),
   },
   {
     id: 'act',

@@ -5,10 +5,12 @@ import {
   MOVEMENT_WRITERS,
   STOCK_MOVEMENT_KINDS,
   categoryForm,
+  categoryPriceForm,
   componentsForm,
   effectivePriceRow,
   movementEntryForm,
   movementForm,
+  priceRef,
   productForm,
   says,
   saysMoney,
@@ -169,6 +171,19 @@ describe('a serving size is a row, priced by a dated series (F-112, F-116)', () 
     expect(priceForm.safeParse({ pricePence: -100, effectiveFrom: '2026-09-14' }).success).toBe(false)
     expect(priceForm.safeParse({ pricePence: 1800, effectiveFrom: '14/09/2026' }).success).toBe(false)
     expect(priceForm.safeParse({ pricePence: 1800, effectiveFrom: '2026-09-14' }).success).toBe(true)
+  })
+
+  test('a category default names the serving kind it prices (F-121 criterion 1)', () => {
+    expect(categoryPriceForm.safeParse({ servingKind: 'single', pricePence: 250, effectiveFrom: '2026-09-14' }).success).toBe(true)
+    expect(categoryPriceForm.safeParse({ servingKind: 'not-a-kind', pricePence: 250, effectiveFrom: '2026-09-14' }).success).toBe(false)
+    expect(categoryPriceForm.safeParse({ servingKind: 'single', pricePence: -1, effectiveFrom: '2026-09-14' }).success).toBe(false)
+  })
+})
+
+describe('the ledger reference a sale line snapshots (F-121 criterion 4)', () => {
+  test('names the level and the row, so a later default change never restates a past sale', () => {
+    expect(priceRef('variant', 'vp-1')).toBe('variant:vp-1')
+    expect(priceRef('category', 'cp-1')).toBe('category:cp-1')
   })
 })
 
