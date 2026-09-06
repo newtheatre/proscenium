@@ -263,6 +263,13 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'shift-removed',
   },
+  // The one shift message that is a courtesy rather than an outcome, so it carries the shifts
+  // topic rather than going out regardless of preference (E-109 criterion 4).
+  'shift.reminder': {
+    topic: 'SHIFTS',
+    channels: ['EMAIL'],
+    template: 'shift-reminder',
+  },
 
   // Module F: bar
 

@@ -444,6 +444,26 @@ There is nothing for you to do. Other shifts you hold are unaffected.
 The Nottingham New Theatre`,
   }),
 
+  // The attachment is what actually gets it into a calendar; the body just says why one arrived
+  // (E-109 criterion 1).
+  'shift-reminder': (context: TemplateContext): Rendered => ({
+    subject: `Tomorrow: ${context.role} on ${context.show}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>A reminder that you are on ${context.role} for ${context.show} at ${context.venue},
+call time ${context.when}.</p>
+<p>Attached is a calendar file: add it and the evening is in your diary wherever the rest of
+it lives.</p>`),
+    text: `Hello ${context.name},
+
+A reminder that you are on ${context.role} for ${context.show} at ${context.venue},
+call time ${context.when}.
+
+Attached is a calendar file: add it and the evening is in your diary wherever the rest of
+it lives.
+
+The Nottingham New Theatre`,
+  }),
+
   // Good news, so it leads with it. The way out is in the same breath as the place, because a
   // place nobody uses is one somebody else was waiting for.
   'training-session-promoted': (context: TemplateContext): Rendered => {
