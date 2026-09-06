@@ -436,6 +436,14 @@ export const CONFIG_KEYS = {
     workshop: 'people-and-communications',
     describes: 'Retention ships as a dry-run and is armed by typed confirmation, in December.',
   },
+  // A number of days, not a term: no term dates exist anywhere in the system (0034). Reads as
+  // overdue from the first deploy, which is what puts the first drill before December.
+  BACKUP_DRILL_INTERVAL_DAYS: {
+    schema: z.number().int().positive(),
+    default: 120,
+    workshop: 'people-and-communications',
+    describes: 'Days between restore drills before the operations dashboard flags one overdue (K-108, J-107).',
+  },
 
   // Module E: show night
 
@@ -495,6 +503,7 @@ export function isConfigKey(name: string): name is ConfigKey {
 export const ENFORCED_KEYS = [
   'ACADEMIC_YEAR_BOUNDARY',
   'ACCESS_PROFILE_VALIDITY_MONTHS',
+  'BACKUP_DRILL_INTERVAL_DAYS',
   'LISTING_LIMITED_THRESHOLD_PERCENT',
   'ADMIN_TOKEN_HOURS',
   'MAGIC_LINK_MINUTES',

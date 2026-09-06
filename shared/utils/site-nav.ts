@@ -7,6 +7,7 @@ import {
   verifyAccessProfiles,
   viewAccounts,
   viewAuditTrail,
+  viewBackups,
   viewBarCatalogue,
   viewBarStock,
   viewFellows,
@@ -160,6 +161,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Audit trail', icon: 'i-lucide-scroll-text', to: '/admin/audit', ability: viewAuditTrail },
 
       // Module K: platform
+      { label: 'Backups', icon: 'i-lucide-database-backup', to: '/admin/backups', ability: viewBackups },
 
     ],
   },

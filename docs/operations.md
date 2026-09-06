@@ -126,9 +126,10 @@ A 503 naming migrations means the deploy won the race. Run the migrate workflow 
 Registered in `nuxt.config.ts` and mirrored in the wrangler cron triggers; the two lists must
 agree, and `tests/unit/tasks.test.ts` fails if they drift or if a name has no handler.
 
-**`daily:sweeps` and `training:expiry-sweep` do work today.** The other six are stubs that report
-the story they are waiting for, and exist so their cron trigger has something to call: a cron
-pointing at a missing handler errors on every firing.
+**`daily:sweeps`, `training:expiry-sweep` and `backup` do work today.** The other five
+(`holds:release`, `sessions:sweep`, `shifts:remind`, `nights:close`, `retention:sweep`) are stubs
+that report the story they are waiting for, and exist so their cron trigger has something to call:
+a cron pointing at a missing handler errors on every firing.
 
 `daily:sweeps` (04:00 London) removes lapsed rate-limit windows, lapsed MFA attempts and unclaimed
 sign-in tokens. Everything it touches is already spent by claim, so what it finds was never used.
@@ -158,6 +159,31 @@ The ledger is pruned at `TRAINING_LEDGER_MONTHS` (24) in every mode, armed or no
 
 To run it by hand, `POST /_nitro/tasks/training:expiry-sweep`. The result reports `armed`, the
 counts for each window, `digests` and `pruned`.
+
+### backup (05:00 Monday) and the restore drill (K-108, J-107)
+
+Point-in-time restore is D1 Time Travel, already automatic and already used by the migrate
+workflow; nothing here changes that. What `backup` adds is a **weekly export independent of D1**:
+a row count per table and the ledger's total pence, written as JSON to the `BLOB` binding (R2) at
+`backups/<date>.json`. It is a reconciliation manifest, not a copy of the data itself, deliberately:
+a second copy of personal data sitting outside D1's erasure path is not something this task takes
+on quietly, and row counts and money totals are exactly what the drill below reconciles against.
+
+**A failed export audits `backup.export-failed` with the error message**, actor `NULL`, so it
+reaches the trail rather than only a cron log nobody reads. To run it by hand,
+`POST /_nitro/tasks/backup`.
+
+**The restore drill itself is a manual exercise**, run by the IT Manager: restore a Time Travel
+bookmark into a scratch D1 database and reconcile its row counts and ledger total against the
+manifest for that week (or against production directly). Record the outcome at `/admin/backups`
+(`backups.write`): the date, the outcome, minutes to restore, and whether row counts and money
+totals reconciled. A failed drill is still recorded, not omitted; the finding is the point of it.
+
+The same screen (`backups.read`) shows the last drill that **passed** and flags it overdue once
+`BACKUP_DRILL_INTERVAL_DAYS` (proposed 120, `docs/workshops.md`) has elapsed since. A drill that
+failed does not clear the flag: it is not evidence the backup restores. No drill ever recorded
+reads as overdue from the first deploy, which is what puts the first one before the December break
+without a separate rule for it (K-108 criterion 4).
 
 ## Calling a session off, and correcting one that ran
 
@@ -270,6 +296,6 @@ worker secret without it is silently ignored.
 
 ## Not built yet
 
-Named here so nobody looks for them: backups and the restore drill (K-108, J-107), the retention
-sweep (K-111), and the operator documentation published in-app (J-109). The stubs above are the
-placeholders for the first two.
+Named here so nobody looks for them: the retention sweep (K-111), and the operator documentation
+published in-app (J-109), which is where the restore drill procedure belongs once it exists
+(J-107 criterion 5). The stub above is the placeholder for the first.

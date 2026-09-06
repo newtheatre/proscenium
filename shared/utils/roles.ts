@@ -33,6 +33,9 @@ export const PERMISSIONS = [
   'members.write',
   'config.read',
   'config.write',
+  // Recording and reading restore drills: the IT Manager's, alongside the settings they gate (K-108, J-107).
+  'backups.read',
+  'backups.write',
   'rooms.read',
   'rooms.write',
   'training.read',

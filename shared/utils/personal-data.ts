@@ -472,6 +472,17 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'keep',
     why: 'A setting, not personal data. The editor is a reference the tombstone still answers.',
   },
+
+  // Module K: platform
+
+  {
+    name: 'backup_drills',
+    column: 'operator_id',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    why: 'Append-only (0010). The operator is a reference the tombstone still answers, as config\'s editor is.',
+  },
 ]
 
 export const EXPORTED_TABLES = PERSONAL_TABLES.filter(entry => entry.section !== null)

@@ -1663,6 +1663,14 @@ password step. Swept on a schedule; an expired attempt returns the user to the f
 ### rate_limits
 `key` PK · `window_start` · `count`. Fixed-window, swept daily.
 
+### backup_drills  APPEND-ONLY
+`id` PK · `ran_on` (London civil date) · `operator_id` → users restrict · `outcome` CHECK
+`PASS|FAIL` · `time_to_restore_minutes` CHECK `> 0` · `row_counts_match` bool ·
+`money_totals_match` bool · `notes` · `created_at`. Trigger-enforced: a correction is a further
+drill, never an edit. `/admin/backups` (`backups.read`/`backups.write`) reads the last drill that
+**passed** and flags it overdue past `BACKUP_DRILL_INTERVAL_DAYS` (`isDrillOverdue`,
+`shared/utils/backup.ts`); a failed drill does not clear the flag (K-108, J-107).
+
 ## The conditional-write claims (0006), in one place
 
 | Claim | Mechanism |
