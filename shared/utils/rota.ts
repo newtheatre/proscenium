@@ -113,6 +113,27 @@ export function approvalRefusal(status: ShiftStatus): string {
   return 'This shift has been cancelled'
 }
 
+// Why a self-release did not apply, checked before the write so the message names the real
+// reason rather than the generic race the predicate itself guards (E-107 criterion 1).
+export function releaseRefusal(status: ShiftStatus): string {
+  if (status === 'OPEN') return 'Nobody holds this shift, so there is nothing to release'
+  if (status === 'DECLINED') return 'This shift was declined, not held, so there is nothing to release'
+  return 'This shift has been cancelled'
+}
+
+// Why an officer's assignment did not apply: cancelled, or the member already committed
+// elsewhere on the same performance, the only two ways the predicate refuses (E-107 criterion 3).
+export function reassignRefusal(status: ShiftStatus): string {
+  if (status === 'CANCELLED') return 'This shift has been cancelled'
+  return 'That member already holds a shift on this performance'
+}
+
+// What an officer's assignment names: the shift is theirs to pick, the member is the input
+// (E-107 criterion 3).
+export const shiftAssignForm = z.object({
+  userId: z.string().min(1).max(64),
+})
+
 // What a refused write reads as. SQLite names the columns for a unique index and the constraint
 // name for a CHECK, so both spellings appear here (E-106 criterion 3).
 export const SHIFT_CONSTRAINT_REFUSALS: { violated: string, says: string }[] = [

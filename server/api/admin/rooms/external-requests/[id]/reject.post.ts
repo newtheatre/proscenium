@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { refusalToAct, rejectExternalForm } from '#shared/utils/external-requests'
 import { formatLondon } from '#shared/utils/london'
 
@@ -15,23 +16,35 @@ export default defineEventHandler(async (event) => {
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
   const now = Math.floor(Date.now() / 1000)
-  const moved = await moveRequest(id, ['REQUESTED', 'AWAITING_EXTERNAL'], {
-    status: 'REJECTED',
-    rejection_reason: input.reason,
-    decided_at: now,
-    decided_by: account.id,
-    updated_at: now,
-  })
 
-  if (!moved) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  const entry = auditEntry({
     actorId: account.id,
     action: 'external.request.rejected',
     target: `external:${id}`,
     // The reason is the member's to read, not the trail's to keep (0011).
     detail: { was: request.status },
-  }))
+  })
+
+  // The audit insert reads `changes()`, this connection's own UPDATE row count, not the
+  // resulting state: a losing request's UPDATE touches nothing, whatever the winner did (0049).
+  const [moved] = await db.batch([
+    moveRequestStatement(id, ['REQUESTED', 'AWAITING_EXTERNAL'], {
+      status: 'REJECTED',
+      rejection_reason: input.reason,
+      decided_at: now,
+      decided_by: account.id,
+      updated_at: now,
+    }),
+    db.run(sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
+      WHERE changes() = 1
+    `),
+  ])
+
+  // A losing racer is refused, not told it succeeded: the audit stayed silent, so the caller
+  // must too (0049).
+  if (moved.length === 0) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
 
   await notify(event, {
     type: 'external.request.rejected',

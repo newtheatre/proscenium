@@ -473,6 +473,13 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Whether claiming an open shift confirms it immediately or queues it for FOH officer approval.',
   },
+  // How close to the night a release stops being routine (E-107 criterion 2).
+  SHIFT_RELEASE_NOTICE_HOURS: {
+    schema: z.number().int().positive(),
+    default: 48,
+    workshop: 'spaces-and-training',
+    describes: 'How far ahead of a performance a released shift notifies the FOH officer immediately rather than waiting for the daily digest. A released duty-manager shift always notifies immediately.',
+  },
 } as const satisfies Record<string, ConfigKeyDefinition>
 
 export type ConfigKey = keyof typeof CONFIG_KEYS
@@ -523,6 +530,7 @@ export const ENFORCED_KEYS = [
   'SHIFT_ELIGIBILITY_DOOR_MODULE',
   'SHIFT_ELIGIBILITY_BAR_MODULE',
   'SHIFT_CLAIM_AUTO_CONFIRM',
+  'SHIFT_RELEASE_NOTICE_HOURS',
   // Read by the directory to count the accounts a sweep would warn, which is the whole of its
   // effect until K-111 builds the sweep itself.
   'RETENTION_FULL_ACCOUNT_YEARS',

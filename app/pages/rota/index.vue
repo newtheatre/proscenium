@@ -44,6 +44,31 @@ const { data, status, refresh } = await useFetch<Page<OpenShift>>('/api/rota/shi
 })
 
 const claiming = ref<string | null>(null)
+const releasing = ref<string | null>(null)
+
+function releasable(shift: MyShift): boolean {
+  return shift.status === 'CLAIMED' || shift.status === 'CONFIRMED'
+}
+
+async function release(shift: MyShift): Promise<void> {
+  releasing.value = shift.shiftId
+  try {
+    await $fetch(`/api/rota/shifts/${shift.shiftId}/release`, { method: 'POST' })
+    toast.add({
+      title: 'Released',
+      description: `${saysShiftRole(shift.role)} at ${shift.venueName} is back on the open list.`,
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    await Promise.all([refresh(), refreshMine()])
+  }
+  catch (error) {
+    toast.add({ title: 'Could not release that', description: refusalText(error), icon: 'i-lucide-x', color: 'error' })
+  }
+  finally {
+    releasing.value = null
+  }
+}
 
 async function claim(shift: OpenShift): Promise<void> {
   claiming.value = shift.shiftId
@@ -119,6 +144,17 @@ useSeoMeta({ title: 'My rota' })
               {{ shift.showTitle }}
             </p>
           </div>
+          <UButton
+            v-if="releasable(shift)"
+            size="sm"
+            color="neutral"
+            variant="subtle"
+            :loading="releasing === shift.shiftId"
+            :data-test="`release-${shift.shiftId}`"
+            @click="release(shift)"
+          >
+            Release
+          </UButton>
         </li>
       </ul>
     </section>
