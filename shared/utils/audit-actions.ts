@@ -163,6 +163,8 @@ const CATALOGUE = {
   'shift.claimed': { label: 'Open shift claimed', module: 'show-night' },
   'shift.confirmed': { label: 'Claimed shift approved', module: 'show-night' },
   'shift.declined': { label: 'Claimed shift declined', module: 'show-night' },
+  'shift.released': { label: 'Held shift released back to open', module: 'show-night' },
+  'shift.reassigned': { label: 'Shift assigned or reassigned by an officer', module: 'show-night' },
 
   // Module F: bar
 

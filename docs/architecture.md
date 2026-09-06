@@ -268,8 +268,8 @@ All Nitro scheduled tasks mirrored in wrangler cron triggers. The system notices
 decide (principle P6): no task ever awards a record, approves a request or takes money.
 
 Every name in the table has a handler under `server/tasks/`, because a cron pointing at one that
-does not exist errors on every firing. Seven of them are stubs that report the story they are
-waiting for and do nothing else; only `daily:sweeps` does work today.
+does not exist errors on every firing. Five of them are still stubs that report the story they
+are waiting for and do nothing else (`docs/known-issues.md`).
 
 | Cron (UTC) | Task | Does |
 | --- | --- | --- |
@@ -278,7 +278,7 @@ waiting for and do nothing else; only `daily:sweeps` does work today.
 | `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or an unconfirmed duty manager, the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |
 | `0 9 * * *` | `sessions:sweep` | Session reminders and unmarked-register nags (G-119, not yet built). |
-| `0 10 * * *` | `shifts:remind` | Tomorrow's rota with calendar attachments. |
+| `0 10 * * *` | `shifts:remind` | Tomorrow's confirmed shift holders, one message per shift with a calendar attachment carrying the call time (E-109). Idempotent per shift, read from `notification_log`'s claim column rather than a column on `shifts`. |
 | `0 17 * * *` | `rooms:remind` | Tomorrow's room bookings, one message per member however many they hold, with the calendar file attached (C-113). Idempotent: a second run the same London day sends nothing, read from `notification_log` rather than a column. |
 | `12 0 * * *` | `nights:close` | Auto-closes unsigned night reports inside 24 hours, retries unsent report emails. |
 | `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, notification retries, unverified account expiry (0026). |
@@ -332,17 +332,32 @@ asking for the venue, because an officer covering two houses at once is not a th
 `performanceIds` is what the request covers, and it is never empty: a cancelled performance is
 filtered out, so a venue whose only performance tonight is cancelled resolves no authority at all.
 
-Only the `OFFICER` branch resolves today. It stands on the permissions `night.door`, `night.till`
-and `night.manage`, held by `FOH_MANAGER` (door and manage) and `BAR_MANAGER` (till), which are the
-one named exception to standing permissions being administrative only (0009, 0044). Planning the
-rota is not one of them: `rota.read` and `rota.write` are ordinary administrative permissions, held
-by `FOH_MANAGER` and `ADMIN`, and they are what open `/rota/manage/**` (0046). Every officer
-resolution writes `night.officer-bypass` once per account, night, venue and role, held by a partial
-unique index rather than by reading before writing; the row's detail carries every performance that
-venue ran that night. The `SHIFT` branch arrives in show night wave 3 and fills a case, with no
-change to anything above. Holding one of the three does not admit anybody to the console:
-`reachConsole` reads the standing permissions that are not in `OPERATIONAL_PERMISSIONS`, or an
-officer would be shown a sidebar in which every screen answers 403 (0040, 0044).
+`SHIFT` is tried first: `confirmedShiftsTonight()` in `server/utils/rota.ts` reads a confirmed
+shift of the asked-for role, held by the caller, on a performance inside the night's own bounds
+(`showNightBounds`), narrowed by `venueId` or `performanceId` when the caller names one. A shift
+never needs the second-factor gate the officer branch carries, because a shift is not a standing
+grant to begin with (0044); it also writes no audit row of its own, because the rota's own
+`shift.claimed` and `shift.confirmed` entries are already the record of how the account came to
+hold it. Only when no shift covers the request does the guard fall through to `OFFICER`, which
+stands on the permissions `night.door`, `night.till` and `night.manage`, held by `FOH_MANAGER`
+(door and manage) and `BAR_MANAGER` (till), the one named exception to standing permissions being
+administrative only (0009, 0044). Planning the rota is not one of them: `rota.read` and
+`rota.write` are ordinary administrative permissions, held by `FOH_MANAGER` and `ADMIN`, and they
+are what open `/rota/manage/**` (0046). Every officer resolution writes `night.officer-bypass`
+once per account, night, venue and role, held by a partial unique index rather than by reading
+before writing; the row's detail carries every performance that venue ran that night. Holding one
+of the three does not admit anybody to the console: `reachConsole` reads the standing permissions
+that are not in `OPERATIONAL_PERMISSIONS`, or an officer would be shown a sidebar in which every
+screen answers 403 (0040, 0044).
+
+A shift's own coverage is never widened to the venue's whole night the way an unnarrowed officer
+request is: the shift already names its one performance (or, when the same account holds a second
+confirmed shift of the same role at the same venue that night, both), so `performanceIds` is what
+the shift covers and nothing wider. An account holding confirmed shifts at two different venues on
+one night with nothing to narrow the request is refused the same 400 an officer covering two
+houses gets, because resolving both at once would be inventing authority nobody asked for. A
+released or reassigned shift stops resolving on its very next request, because the query reads
+`shifts.status` live rather than a snapshot taken at sign-in (E-111 criterion 3).
 
 `GET /api/tonight/authority?role=&night=&venueId=&performanceId=` is that resolution as a route. It
 returns the allow-listed shape above and is the pattern every other `/api/tonight/**` and
@@ -375,11 +390,10 @@ confirmed duty manager index is per performance, so two performances running at 
 confirmed duty managers and the same person may hold shifts on both (E-127 criterion 1).
 
 Moving a performance to another venue carries a claimed or confirmed shift with it: the holder is
-told the venue changed and pointed at their rota to release it if it does not suit, though nothing
-can yet act on that link until E-107 builds the release itself (`docs/known-issues.md`).
-A held shift in a role the new venue's template does not staff at all cannot travel, so it is
-cancelled and its holder told instead, the same way a cancelled performance tells them (E-101,
-E-102, committee direction 4 September 2026).
+told the venue changed and pointed at their rota to release it if it does not suit, which `/rota`'s
+release action now does (E-107 criterion 1). A held shift in a role the new venue's template does
+not staff at all cannot travel, so it is cancelled and its holder told instead, the same way a
+cancelled performance tells them (E-101, E-102, committee direction 4 September 2026).
 
 Templates are administered at `/rota/manage/templates` under `rota.read` and `rota.write`. A
 member's own `/rota` (E-103) shows what they already hold and the open shifts on the diary, each
@@ -406,8 +420,32 @@ the row's resulting state, which a winner has already set, the same shape `perfo
 templates to (module E open question 1). Approving and declining both ride the same
 `changes() = 1` shape; a decline's reason lands on `shifts.decline_reason`, which the claimant is
 emailed, never in the audit trail, which keeps only that the status changed (0011). A declined
-shift stays off the open list rather than reopening itself: reassigning it is E-107's, not built
-yet (`docs/known-issues.md`).
+shift still stays off the open list rather than reopening itself, but it is no longer invisible:
+`GET /api/admin/rota/shifts` (`/rota/manage/shifts`) lists every `OPEN` or `DECLINED` shift on a
+performance still to come, which is what an officer now reassigns from (E-107 criterion 3).
+
+### Release and reassignment (E-107)
+
+`POST /api/rota/shifts/[id]/release` is a holder's own release, up to the start of the shift's
+show night rather than up to its curtain: the boundary is E-111's, because release is exactly the
+window authority itself is not gone yet. `releaseShiftStatement` rides the same predicated-UPDATE
+shape as claiming, returning the row to `OPEN` with nobody named. A release inside
+`SHIFT_RELEASE_NOTICE_HOURS` of the performance, or of a `DUTY_MANAGER` shift at any distance,
+emails every `rota.write` holder immediately; further out it is left for E-108's own seven-day
+query to pick up, because a fully-staffed week still sends nothing (E-107 criterion 2).
+
+`POST /api/admin/rota/shifts/[id]/assign` is the officer's side: `assignShiftStatement` is one
+UPDATE on the row that already exists, whether it was `OPEN`, `CLAIMED` or `DECLINED`, setting the
+new holder and `CONFIRMED` in the same statement. Replacing a confirmed duty manager is therefore
+atomic for free: the partial unique index that allows only one `CONFIRMED` `DUTY_MANAGER` row per
+performance never sees a second row appear, because there was never a second row to begin with
+(E-107 criterion 4). The predicate is the same `NOT EXISTS` claiming uses, so a member cannot be
+assigned onto a second shift on a performance they already hold one on; the assignment re-checks
+the same live eligibility gate self-claiming does, and refuses the same way a self-claim would.
+Both the outgoing and the incoming holder are emailed (`shift.removed`, `shift.assigned`), and
+`GET /api/admin/rota/shifts/[id]/candidates?search=` is the narrow, `rota.write`-scoped member
+search the assignment screen picks a name from, distinct from the account directory that
+`accounts.read` gates (E-107 criterion 5).
 
 ### Eligibility (E-103)
 
@@ -436,6 +474,21 @@ templates are administered under, rather than a named role, so an administrator 
 alongside the FOH officer. One digest per officer per London day, read from `notification_log`
 rather than a column, the same idempotency `remindTomorrow` uses for room bookings (E-108
 criterion 4 read together with C-113).
+
+### The day-before reminder (E-109)
+
+`shared/utils/shift-reminders.ts` holds `tomorrowsShiftNight(at)`, the pure half: the show night
+after the one `at` falls in, never the calendar day, so it agrees with `showNightOf` on both
+sides of a clock change (criterion 2). `server/utils/shift-reminders.ts` reads every `CONFIRMED`
+shift on that night and sends one reminder per shift, not one per holder: a member working a
+matinee and an evening tomorrow gets two mails, each with its own idempotency, because criterion
+3 asks for one send per shift rather than per person per day (unlike `remindTomorrow`'s own
+per-day claim for rooms). Idempotency rides `claimNotification()`'s `claim` column keyed
+`shift.reminder:<shiftId>`, the same primitive `shift.venue-changed` claims by, rather than a
+read-then-write. `shift.reminder` is its own message type, carrying the `SHIFTS` topic rather
+than going out transactionally: it is the first shift message that is a courtesy and not an
+outcome, so a preference may govern it (criterion 4). The call time is the venue's `doors_at`
+where one is set, curtain otherwise: nothing else records a time distinct from either.
 
 ## The programme (build-order contract d, 0043)
 

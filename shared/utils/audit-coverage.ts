@@ -204,9 +204,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/rota/shifts.get.ts', exempt: 'reads the open-shift list, gated live against your own training records' },
   { route: 'server/api/rota/mine.get.ts', exempt: 'reads your own shifts' },
   { route: 'server/api/rota/shifts/[id]/claim.post.ts', actions: ['shift.claimed'] },
+  { route: 'server/api/rota/shifts/[id]/release.post.ts', actions: ['shift.released'] },
   { route: 'server/api/admin/rota/approvals/index.get.ts', exempt: 'reads the queued claims waiting on a decision' },
   { route: 'server/api/admin/rota/approvals/[id]/approve.post.ts', actions: ['shift.confirmed'] },
   { route: 'server/api/admin/rota/approvals/[id]/decline.post.ts', actions: ['shift.declined'] },
+  { route: 'server/api/admin/rota/shifts.get.ts', exempt: 'reads the open and declined shifts an officer has to fill by hand' },
+  { route: 'server/api/admin/rota/shifts/[id]/assign.post.ts', actions: ['shift.reassigned'] },
+  { route: 'server/api/admin/rota/shifts/[id]/candidates.get.ts', exempt: 'reads who might be assigned, scoped to rota.write' },
 
   // Module F: bar
 
@@ -355,6 +359,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/dev/sweep-requests.post.ts', actions: ['room.request.expired'], via: ['server/utils/room-requests.ts'] },
   { route: 'server/api/dev/remind-rooms.post.ts', exempt: 'sends a reminder; the send is recorded in notification_log' },
+  { route: 'server/api/dev/remind-shifts.post.ts', exempt: 'sends a reminder; the send is recorded in notification_log' },
   { route: 'server/api/dev/escalate-rota.post.ts', exempt: 'sends a digest; the send is recorded in notification_log' },
   { route: 'server/api/dev/sign-in-as.post.ts', exempt: 'a development sign-in with no password, in no build' },
 ]
