@@ -191,8 +191,7 @@ Provider first, consumer second. "If late" is what the consumer builds against m
 | --- | --- | --- |
 | D Wave 0; E-102, E-108, E-113, F-102, I-106, K-103 | `venues`, `performances`, `performancesOnNight()` | Nothing: Wave 0 gates the fan-out. |
 | E-110; everything nightly | `showNightOf()` | Nothing: it merges first. |
-| E-111 officer branch; F-101, D-126, every E screen | `requireNightAuthority()` | The officer branch is the provision; officer personas until the shift branch lands. |
-| E-111 shift branch; F-101's end-to-end test | A confirmed BAR shift opening the till | F-101 asserts the refusal wording only until show night wave 3. |
+| E-111 officer branch; F-101, D-126, every E screen | `requireNightAuthority()` | Spent: both branches are live, so a consumer resolves a confirmed shift first and the officer role as fallback, with nothing further to wait on. |
 | E-112; F-110 | The duty manager's approvals link | F-110 ships under `night:manage`; E-112 adds the link afterwards. |
 | E-118; F-106 | `age_checks` and `recordAgeCheck()` | Hard dependency; scheduled a wave apart. |
 | K-102; the door, the till, every E screen | `NightScreen`, `NightAction`, `NightStale` | Nothing: Wave 0. |
