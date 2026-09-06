@@ -21,6 +21,14 @@ export interface NightAuthority {
 // which is what the audit row carries because it is written once (0044).
 interface NightCoverage { venueId: string, performanceIds: string[], venuePerformanceIds: string[] }
 
+// Narrowing is the caller's to do: resolving two venues at once hands out authority over a house
+// nobody asked about. Shared, so both branches refuse it the same way (E-127 criterion 1).
+function refuseAmbiguousVenue(venues: string[]): void {
+  if (venues.length > 1) {
+    throw createError({ statusCode: 400, statusMessage: 'More than one venue is running tonight: name the venue or the performance' })
+  }
+}
+
 // What the scope resolves to on the programme. Authority derives from a performance, so a venue
 // with nothing on tonight resolves none of it (0009, E-127 criterion 1).
 async function coverage(night: string, scope: NightScope): Promise<NightCoverage> {
@@ -39,11 +47,7 @@ async function coverage(night: string, scope: NightScope): Promise<NightCoverage
   if (venues.length === 0) {
     throw createError({ statusCode: 403, statusMessage: 'Nothing is running tonight, so there is nothing to take charge of' })
   }
-  // Narrowing is the caller's to do: resolving both venues at once would give an officer authority
-  // over a house they are not in, and record one row for the pair.
-  if (venues.length > 1) {
-    throw createError({ statusCode: 400, statusMessage: 'More than one venue is running tonight: name the venue or the performance' })
-  }
+  refuseAmbiguousVenue(venues)
 
   const ids = running.map(performance => performance.id)
   return { venueId: venues[0]!, performanceIds: ids, venuePerformanceIds: ids }
@@ -65,9 +69,7 @@ async function shiftHeldTonight(
   if (rows.length === 0) return null
 
   const venues = [...new Set(rows.map(row => row.venueId))]
-  if (venues.length > 1) {
-    throw createError({ statusCode: 400, statusMessage: 'More than one venue is running tonight: name the venue or the performance' })
-  }
+  refuseAmbiguousVenue(venues)
 
   const performanceIds = rows.map(row => row.performanceId)
   return {

@@ -366,7 +366,7 @@ export function countPendingApprovalsQuery(): SQL {
   return sql`SELECT count(*) AS total FROM shifts WHERE status = 'CLAIMED'`
 }
 
-// What shift-scoped authority resolves against (E-111 criterion 1, 0044). Bound at five or seven
+// What shift-scoped authority resolves against (E-111 criterion 1, 0044). A fixed number of
 // parameters however many shifts a night holds, never one per row (0003, 0006).
 
 export interface ConfirmedShiftTonight {
@@ -380,8 +380,37 @@ export interface ConfirmedShiftScope {
   performanceId?: string
 }
 
-// A confirmed shift of this role, held by this account, on a performance running inside the
-// night's own bounds; a cancelled performance's shift is cancelled with it (E-102 criterion 4).
+// A confirmed shift of this role, held by this current account, on a performance inside the
+// night's own bounds (E-102 criterion 4); disabled and anonymised are re-checked, not trusted.
+export function confirmedShiftsTonightQuery(
+  userId: string,
+  role: ShiftRole,
+  from: number,
+  to: number,
+  scope: ConfirmedShiftScope,
+): SQL {
+  const terms: SQL[] = [
+    sql`s.user_id = ${userId}`,
+    sql`s.role = ${role}`,
+    sql`s.status = 'CONFIRMED'`,
+    sql`p.status <> 'CANCELLED'`,
+    sql`p.starts_at >= ${from} AND p.starts_at < ${to}`,
+    sql`u.disabled = 0`,
+    sql`u.anonymised_at IS NULL`,
+  ]
+  if (scope.venueId) terms.push(sql`p.venue_id = ${scope.venueId}`)
+  if (scope.performanceId) terms.push(sql`p.id = ${scope.performanceId}`)
+
+  return sql`
+    SELECT s.id AS shiftId, s.performance_id AS performanceId, p.venue_id AS venueId
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    JOIN users u ON u.id = s.user_id
+    ${where(terms)}
+    ORDER BY p.starts_at
+  `
+}
+
 export async function confirmedShiftsTonight(
   userId: string,
   role: ShiftRole,
@@ -389,23 +418,7 @@ export async function confirmedShiftsTonight(
   to: number,
   scope: ConfirmedShiftScope,
 ): Promise<ConfirmedShiftTonight[]> {
-  const terms: SQL[] = [
-    sql`s.user_id = ${userId}`,
-    sql`s.role = ${role}`,
-    sql`s.status = 'CONFIRMED'`,
-    sql`p.status <> 'CANCELLED'`,
-    sql`p.starts_at >= ${from} AND p.starts_at < ${to}`,
-  ]
-  if (scope.venueId) terms.push(sql`p.venue_id = ${scope.venueId}`)
-  if (scope.performanceId) terms.push(sql`p.id = ${scope.performanceId}`)
-
-  return await db.all<ConfirmedShiftTonight>(sql`
-    SELECT s.id AS shiftId, s.performance_id AS performanceId, p.venue_id AS venueId
-    FROM shifts s
-    JOIN performances p ON p.id = s.performance_id
-    ${where(terms)}
-    ORDER BY p.starts_at
-  `)
+  return await db.all<ConfirmedShiftTonight>(confirmedShiftsTonightQuery(userId, role, from, to, scope))
 }
 
 export interface UnfilledShiftRow {

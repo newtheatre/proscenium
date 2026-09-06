@@ -337,9 +337,12 @@ filtered out, so a venue whose only performance tonight is cancelled resolves no
 
 `SHIFT` is tried first: `confirmedShiftsTonight()` in `server/utils/rota.ts` reads a confirmed
 shift of the asked-for role, held by the caller, on a performance inside the night's own bounds
-(`showNightBounds`), narrowed by `venueId` or `performanceId` when the caller names one. A shift
-never needs the second-factor gate the officer branch carries, because a shift is not a standing
-grant to begin with (0044); it also writes no audit row of its own, because the rota's own
+(`showNightBounds`), narrowed by `venueId` or `performanceId` when the caller names one. Its query
+re-checks the holder's own `disabled` and `anonymised_at` rather than trusting the shift row: a
+disabled account's session already ends on its next request (`sessionIsCurrent`, 0007), but
+authority built on a shift should not depend on a reader tracing that path to believe it (0009).
+A shift never needs the second-factor gate the officer branch carries, because a shift is not a
+standing grant to begin with (0044); it also writes no audit row of its own, because the rota's own
 `shift.claimed` and `shift.confirmed` entries are already the record of how the account came to
 hold it. Only when no shift covers the request does the guard fall through to `OFFICER`, which
 stands on the permissions `night.door`, `night.till` and `night.manage`, held by `FOH_MANAGER`
@@ -445,10 +448,13 @@ performance never sees a second row appear, because there was never a second row
 (E-107 criterion 4). The predicate is the same `NOT EXISTS` claiming uses, so a member cannot be
 assigned onto a second shift on a performance they already hold one on; the assignment re-checks
 the same live eligibility gate self-claiming does, and refuses the same way a self-claim would.
-Both the outgoing and the incoming holder are emailed (`shift.removed`, `shift.assigned`), and
+A disabled account is refused before either check runs: a training gap and a disabled account are
+different reasons, and the route names the one that actually applies (0009). Both the outgoing and
+the incoming holder are emailed (`shift.removed`, `shift.assigned`), and
 `GET /api/admin/rota/shifts/[id]/candidates?search=` is the narrow, `rota.write`-scoped member
 search the assignment screen picks a name from, distinct from the account directory that
-`accounts.read` gates (E-107 criterion 5).
+`accounts.read` gates (E-107 criterion 5); its search term is escaped against `%` and `_` before
+it reaches `LIKE`, the same guard every other search route in the app applies.
 
 ### Eligibility (E-103)
 
