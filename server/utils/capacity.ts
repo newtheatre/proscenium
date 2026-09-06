@@ -97,10 +97,13 @@ export function ticketInsertQueries(tickets: TicketToWrite[], capacity: number |
     throw new Error('one order is one performance: capacity is a fact about one house (E-127)')
   }
 
+  // RETURNING id is what lets a caller decide the winner from the write itself: a row present
+  // means this statement's own predicate matched, never a stored actor compared after the fact.
   return tickets.map(ticket => sql`
     INSERT INTO ${sql.raw(TICKETS)} (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source)
     SELECT ${ticket.id}, ${ticket.reservationId}, ${ticket.performanceId}, ${ticket.ticketTypeId},
            ${ticket.pricePaid}, ${ticket.priceSource}
     WHERE ${capacityAllows(ticket.performanceId, capacity, tickets.length, ticket.reservationId)}
+    RETURNING id
   `)
 }

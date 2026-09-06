@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { TICKET_TYPE_REFERENCES, everSoldColumn, everSoldQuery, saleReferences, ticketTypesQuery } from '#server/utils/ticket-types'
+import { TICKET_TYPE_REFERENCES, everSoldColumn, everSoldQuery, ticketTypesQuery } from '#server/utils/ticket-types'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TicketTypeReference } from '#server/utils/ticket-types'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -172,7 +172,7 @@ describe('"has ever been sold" is a query over rows, never a flag (criterion 2)'
       insert(database, 'shows', { id: 's1', slug: 'the-seagull', title: 'The Seagull' })
       insert(database, 'show_ticket_overrides', { id: 'o1', show_id: 's1', ticket_type_id: id, price: 500 })
 
-      expect(saleReferences()).toEqual([])
+      // A price override is not a sale, whatever else the registry now classifies (D-104).
       expect(sold(database, everSoldQuery(id))).toBe(false)
     })
   })

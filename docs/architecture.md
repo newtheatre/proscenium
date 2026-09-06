@@ -531,6 +531,13 @@ withdrawing and the door's read all live.
 | `bookingClosesAt(startsAt, hours)` | The closing instant, measured back from the curtain in seconds, so the clocks changing never moves it relative to the performance (0014). |
 | `saleRefusal(performance, at?, channel?)` | Why a sales path may not sell, or null. Cancelled, unpublished, off sale, externally ticketed and closed each name themselves; the closed one quotes the time in Europe/London and points at the door. `DESK` bypasses the customer window and nothing else (D-112 criteria 2 and 3). |
 
+Booking (D-104) is `POST /api/reservations`, `/book/[performanceId]` its one screen.
+`server/utils/reservations.ts` holds the write path: `bookableTicketTypes()` resolves prices the
+same way the public listing does, `guestAccount()` finds or mints the account a guest attaches to,
+and `writeReservation()` is one `db.batch` carrying `ticketInsertQueries()` from
+`server/utils/capacity.ts`, so a refused order writes no partial rows. Nothing here posts to the
+ledger; no money has moved (0005).
+
 A night is a window over the whole estate, not a venue and not a day: everything record-like keys
 to a performance (E-127 criterion 1). `performancesOnNightQuery()` is the statement
 `performancesOnNight()` runs, exported so an integration test executes the real SQL; it binds two

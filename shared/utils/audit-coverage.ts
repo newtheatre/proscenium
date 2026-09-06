@@ -180,6 +180,12 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/account/access-profile.get.ts', exempt: 'reads the caller\'s own declaration' },
   { route: 'server/api/account/access-profile.put.ts', actions: ['access-profile.updated'], via: ['server/utils/access-profiles.ts'] },
   { route: 'server/api/account/access-profile/withdraw.post.ts', actions: ['access-profile.withdrawn'], via: ['server/utils/access-profiles.ts'] },
+  {
+    route: 'server/api/reservations.post.ts',
+    actions: ['account.created.guest'],
+    via: ['server/utils/reservations.ts'],
+  },
+  { route: 'server/api/performances/[id]/booking.get.ts', exempt: 'reads what the booking form needs; nothing is written' },
 
   // Module E: show night
 

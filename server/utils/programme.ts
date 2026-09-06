@@ -1,5 +1,8 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+// A function import only: `capacity.ts` imports `soldReferences` from this file, and importing a
+// constant back would be a circular value that is not there yet the first time either module runs.
+import { heldSeatsSubquery } from './capacity'
 import type { AdminPerformance, AdminShow, ShowStatus } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 
@@ -32,6 +35,21 @@ export const PERFORMANCE_REFERENCES: PerformanceReference[] = [
     column: 'performance_id',
     sold: false,
     why: 'a slot on the rota: who is working, and nobody has bought a seat (E-102)',
+  },
+  {
+    table: 'reservations',
+    column: 'performance_id',
+    sold: false,
+    why: 'a hold on a seat: the seats it holds are tickets, which classify themselves below (D-104)',
+  },
+  {
+    table: 'tickets',
+    column: 'performance_id',
+    sold: true,
+    // A bare row count would call an expired hold a sold seat, which is what closes a house that
+    // is in fact empty (D-105).
+    heldBy: performanceId => heldSeatsSubquery(performanceId),
+    why: 'a seat somebody holds: the performance may be cancelled and refunded, never deleted',
   },
 ]
 

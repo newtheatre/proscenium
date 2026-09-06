@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { ticketInsertQueries } from '#server/utils/capacity'
+import { expectOneWinner, race } from '#tests/helpers/race'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { ticketFixtures, tonightsPerformance } from '#tests/helpers/programme'
+import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 
 // K-105 criterion 1: capacity is a database constraint or an atomic conditional write, never an
 // application read-then-write. Split from races.test.ts so D-105 fills this on its own file.
@@ -11,7 +12,7 @@ describe('contended invariants (K-105)', () => {
   test('the capacity race: concurrent claims on the last seat leave exactly one ticket', async () => {
     const database = await createTestDatabase()
     try {
-      ticketFixtures(database)
+      ticketTypeFixture(database)
       const seeded = tonightsPerformance(database, { capacityOverride: 1 })
 
       // Two orders for the one seat left, each shaped exactly as D-104 will batch it: the
@@ -59,7 +60,7 @@ describe('contended invariants (K-105)', () => {
   test('the capacity race: an order that will not fit writes none of its tickets', async () => {
     const database = await createTestDatabase()
     try {
-      ticketFixtures(database)
+      ticketTypeFixture(database)
       const seeded = tonightsPerformance(database, { capacityOverride: 2 })
 
       database.batch([
@@ -79,6 +80,40 @@ describe('contended invariants (K-105)', () => {
       ])
 
       expect(rows<{ id: string }>(database, 'SELECT id FROM tickets')).toEqual([])
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  // D-104 criterion 3 and D-105 criterion 1: two guest orders for the last seat, fired at the
+  // database directly rather than over `$fetch`, which an in-process SQLite would serialise (0022).
+  test('the capacity race: two guest orders for the last seat leave exactly one winner', async () => {
+    const database = await createTestDatabase()
+    try {
+      ticketTypeFixture(database)
+      const seeded = tonightsPerformance(database, { capacityOverride: 1 })
+
+      const answers = await race(2, async (index) => {
+        const id = `r-guest-${index}`
+        database.batch([
+          ['INSERT INTO reservations (id, reference, performance_id, status, source) VALUES (?, ?, ?, ?, ?)',
+            id, `GUEST${index}`, seeded.performanceId, 'PENDING', 'WEB'],
+          ...ticketInsertQueries([{
+            id: `${id}-t0`,
+            reservationId: id,
+            performanceId: seeded.performanceId,
+            ticketTypeId: 'tt-standard',
+            pricePaid: 900,
+            priceSource: 'BASE' as const,
+          }], 1).map(statement => boundStatement(database, statement)),
+        ])
+        const written = rows<{ n: number }>(database, 'SELECT count(*) n FROM tickets WHERE reservation_id = ?', id)[0]?.n ?? 0
+        return { status: written === 1 ? 200 : 409 }
+      })
+
+      expectOneWinner(answers)
+      expect(rows<{ id: string }>(database, 'SELECT id FROM tickets')).toHaveLength(1)
     }
     finally {
       database.close()
