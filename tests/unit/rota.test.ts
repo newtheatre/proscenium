@@ -5,10 +5,13 @@ import {
   ASSIGNED_SHIFT_STATUSES,
   COMMITTED_SHIFT_STATUSES,
   MAX_SLOT_COUNT,
+  reassignRefusal,
+  releaseRefusal,
   SHIFT_CONSTRAINT_REFUSALS,
   SHIFT_ROLES,
   SHIFT_STATUSES,
   orderedSlots,
+  shiftAssignForm,
   shiftConstraintRefusal,
   shiftDeclineForm,
   shiftNamesAPerson,
@@ -184,5 +187,48 @@ describe('why an approval or a decline did not apply (E-105 criterion 2)', () =>
 
   test('an already-confirmed shift says so', () => {
     expect(approvalRefusal('CONFIRMED')).toContain('already confirmed')
+  })
+})
+
+describe('why a self-release did not apply (E-107 criterion 1)', () => {
+  test('every non-held status says something distinct', () => {
+    const held: string[] = ['CLAIMED', 'CONFIRMED']
+    const said = SHIFT_STATUSES.filter(status => !held.includes(status)).map(releaseRefusal)
+    expect(new Set(said).size).toBe(said.length)
+  })
+
+  test('open and declined both say there is nothing to release', () => {
+    expect(releaseRefusal('OPEN')).toContain('nothing to release')
+    expect(releaseRefusal('DECLINED')).toContain('nothing to release')
+  })
+
+  test('a cancelled shift says so', () => {
+    expect(releaseRefusal('CANCELLED')).toContain('cancelled')
+  })
+})
+
+describe('why an officer\'s assignment did not apply (E-107 criterion 3)', () => {
+  test('a cancelled shift says so, and nothing else does', () => {
+    expect(reassignRefusal('CANCELLED')).toContain('cancelled')
+    for (const status of SHIFT_STATUSES.filter(one => one !== 'CANCELLED')) {
+      expect(reassignRefusal(status)).not.toContain('cancelled')
+    }
+  })
+
+  test('anything else reads as the member already being committed elsewhere', () => {
+    for (const status of ['OPEN', 'CLAIMED', 'CONFIRMED', 'DECLINED'] as const) {
+      expect(reassignRefusal(status)).toContain('already holds a shift')
+    }
+  })
+})
+
+describe('what an assignment names (E-107 criterion 3)', () => {
+  test('a member id is required', () => {
+    expect(shiftAssignForm.safeParse({}).success).toBe(false)
+    expect(shiftAssignForm.safeParse({ userId: '' }).success).toBe(false)
+  })
+
+  test('a member id is accepted', () => {
+    expect(shiftAssignForm.parse({ userId: 'member-1' })).toEqual({ userId: 'member-1' })
   })
 })

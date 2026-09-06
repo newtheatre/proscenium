@@ -25,12 +25,12 @@ function escalationWindow(at: Date): { from: number, to: number } {
   return { from, to: from + 7 * 86_400 }
 }
 
-// An open shift, an unconfirmed duty manager, or no shifts at all: `shiftCount = 0` catches a
-// template-less venue, which stamps no OPEN row for E-101 criterion 4 to be found by.
+// An open or declined shift (nobody is committed to either), an unconfirmed duty manager, or no
+// shifts at all: `shiftCount = 0` catches a template-less venue (E-101 criterion 4, E-107).
 async function unstaffedPerformances(from: number, to: number): Promise<UnstaffedRow[]> {
   return db.all<UnstaffedRow>(sql`
     SELECT s.title AS showTitle, v.name AS venueName, p.starts_at AS startsAt,
-           group_concat(DISTINCT CASE WHEN sh.status = 'OPEN' THEN sh.role END) AS openRoles,
+           group_concat(DISTINCT CASE WHEN sh.status IN ('OPEN', 'DECLINED') THEN sh.role END) AS openRoles,
            max(CASE WHEN sh.role = 'DUTY_MANAGER' AND sh.status NOT IN ('CONFIRMED', 'CANCELLED')
                     THEN 1 ELSE 0 END) AS dutyManagerGap,
            count(sh.id) AS shiftCount
@@ -45,9 +45,9 @@ async function unstaffedPerformances(from: number, to: number): Promise<Unstaffe
   `)
 }
 
-// Whoever administers the rota, the same audience E-101 criterion 2 lets edit a template. There
-// is no separate approver role, as C-109's queue reads the same way for rooms (0046).
-async function rotaOfficers(): Promise<{ id: string }[]> {
+// Whoever administers the rota, the same audience E-101 criterion 2 lets edit a template (0046).
+// Exported for E-107's release notice, which chases the same audience outside the daily digest.
+export async function rotaOfficers(): Promise<{ id: string }[]> {
   const roles = ROLES.filter(role => PERMISSION_MAP[role].includes('rota.write'))
   if (roles.length === 0) return []
 

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8218740a-880d-496d-9c12-9ccdc93b91ef",
+  "id": "df15a09e-a95a-409b-b317-07d617743f55",
   "prevId": "7e6ddab5-9b7f-4666-a8d5-4fc636f96a42",
   "tables": {
     "access_profiles": {
@@ -654,113 +654,6 @@
         "bar_products_unknown_allergens_have_no_note": {
           "name": "bar_products_unknown_allergens_have_no_note",
           "value": "\"bar_products\".\"allergen_state\" <> 'UNKNOWN' OR \"bar_products\".\"allergen_note\" IS NULL"
-        }
-      }
-    },
-    "category_prices": {
-      "name": "category_prices",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "category_id": {
-          "name": "category_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "serving_kind": {
-          "name": "serving_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "price_pence": {
-          "name": "price_pence",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "effective_from": {
-          "name": "effective_from",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "category_prices_resolution": {
-          "name": "category_prices_resolution",
-          "columns": [
-            "category_id",
-            "serving_kind",
-            "effective_from",
-            "created_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "category_prices_category_id_bar_categories_id_fk": {
-          "name": "category_prices_category_id_bar_categories_id_fk",
-          "tableFrom": "category_prices",
-          "tableTo": "bar_categories",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "category_prices_created_by_users_id_fk": {
-          "name": "category_prices_created_by_users_id_fk",
-          "tableFrom": "category_prices",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "category_prices_pence": {
-          "name": "category_prices_pence",
-          "value": "\"category_prices\".\"price_pence\" >= 0"
-        },
-        "category_prices_effective_from_is_a_date": {
-          "name": "category_prices_effective_from_is_a_date",
-          "value": "\"category_prices\".\"effective_from\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"
         }
       }
     },
@@ -4059,6 +3952,188 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "reservations": {
+      "name": "reservations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reference": {
+          "name": "reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "performance_id": {
+          "name": "performance_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "hold_expires_at": {
+          "name": "hold_expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cancelled_by": {
+          "name": "cancelled_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "customer_notes": {
+          "name": "customer_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "staff_notes": {
+          "name": "staff_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "qr_token_hash": {
+          "name": "qr_token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "window_bypassed": {
+          "name": "window_bypassed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "reservations_performance_status": {
+          "name": "reservations_performance_status",
+          "columns": [
+            "performance_id",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "reservations_user_created": {
+          "name": "reservations_user_created",
+          "columns": [
+            "user_id",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "reservations_hold_expires_at": {
+          "name": "reservations_hold_expires_at",
+          "columns": [
+            "hold_expires_at"
+          ],
+          "isUnique": false
+        },
+        "reservations_reference": {
+          "name": "reservations_reference",
+          "columns": [
+            "reference"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "reservations_performance_id_performances_id_fk": {
+          "name": "reservations_performance_id_performances_id_fk",
+          "tableFrom": "reservations",
+          "tableTo": "performances",
+          "columnsFrom": [
+            "performance_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "reservations_user_id_users_id_fk": {
+          "name": "reservations_user_id_users_id_fk",
+          "tableFrom": "reservations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "reservations_status_values": {
+          "name": "reservations_status_values",
+          "value": "\"reservations\".\"status\" IN ('PENDING', 'COLLECTED', 'DOOR', 'EXPIRED', 'CANCELLED', 'NO_SHOW')"
+        },
+        "reservations_source_values": {
+          "name": "reservations_source_values",
+          "value": "\"reservations\".\"source\" IN ('WEB', 'DESK', 'DOOR')"
+        },
+        "reservations_cancelled_by_values": {
+          "name": "reservations_cancelled_by_values",
+          "value": "\"reservations\".\"cancelled_by\" IS NULL OR \"reservations\".\"cancelled_by\" IN ('CUSTOMER', 'STAFF')"
+        }
+      }
+    },
     "role_grants": {
       "name": "role_grants",
       "columns": {
@@ -6600,6 +6675,130 @@
         "ticket_types_price_pence": {
           "name": "ticket_types_price_pence",
           "value": "\"ticket_types\".\"price\" >= 0"
+        }
+      }
+    },
+    "tickets": {
+      "name": "tickets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reservation_id": {
+          "name": "reservation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "performance_id": {
+          "name": "performance_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ticket_type_id": {
+          "name": "ticket_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "price_paid": {
+          "name": "price_paid",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "price_source": {
+          "name": "price_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "refunded_at": {
+          "name": "refunded_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "tickets_performance_refunded": {
+          "name": "tickets_performance_refunded",
+          "columns": [
+            "performance_id",
+            "refunded_at"
+          ],
+          "isUnique": false
+        },
+        "tickets_reservation": {
+          "name": "tickets_reservation",
+          "columns": [
+            "reservation_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "tickets_reservation_id_reservations_id_fk": {
+          "name": "tickets_reservation_id_reservations_id_fk",
+          "tableFrom": "tickets",
+          "tableTo": "reservations",
+          "columnsFrom": [
+            "reservation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "tickets_performance_id_performances_id_fk": {
+          "name": "tickets_performance_id_performances_id_fk",
+          "tableFrom": "tickets",
+          "tableTo": "performances",
+          "columnsFrom": [
+            "performance_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "tickets_ticket_type_id_ticket_types_id_fk": {
+          "name": "tickets_ticket_type_id_ticket_types_id_fk",
+          "tableFrom": "tickets",
+          "tableTo": "ticket_types",
+          "columnsFrom": [
+            "ticket_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "tickets_price_paid_pence": {
+          "name": "tickets_price_paid_pence",
+          "value": "\"tickets\".\"price_paid\" >= 0"
+        },
+        "tickets_price_source_values": {
+          "name": "tickets_price_source_values",
+          "value": "\"tickets\".\"price_source\" IN ('PERFORMANCE', 'SHOW', 'BASE', 'IMPORT')"
         }
       }
     },

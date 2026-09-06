@@ -53,6 +53,56 @@ export const performanceTicketOverrides = sqliteTable('performance_ticket_overri
   check('performance_ticket_overrides_price_pence', sql`${table.price} IS NULL OR ${table.price} >= 0`),
 ])
 
+// One hold, web, desk or door; the seats it holds are `tickets`, which classify themselves for
+// capacity (0006, D-105). `user_id` is nullable so an import row can carry none.
+export const reservations = sqliteTable('reservations', {
+  id: id(),
+  reference: text('reference').notNull(),
+  performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),
+  userId: text('user_id').references(() => users.id, { onDelete: 'restrict' }),
+  status: text('status').notNull(),
+  source: text('source').notNull(),
+  // Set while PENDING; the release sweep moves PENDING to EXPIRED and clears it (D-106).
+  holdExpiresAt: integer('hold_expires_at'),
+  cancelledBy: text('cancelled_by'),
+  customerNotes: text('customer_notes'),
+  staffNotes: text('staff_notes'),
+  // The stable QR credential, minted once at reservation and never reissued (D-108).
+  qrTokenHash: text('qr_token_hash'),
+  // True only for a desk booking past the customer window (D-112 criterion 3); a web
+  // reservation is always false, since `saleRefusal` already refused a closed one.
+  windowBypassed: integer('window_bypassed', { mode: 'boolean' }).notNull().default(false),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  unique('reservations_reference').on(table.reference),
+  index('reservations_performance_status').on(table.performanceId, table.status),
+  index('reservations_user_created').on(table.userId, table.createdAt),
+  index('reservations_hold_expires_at').on(table.holdExpiresAt),
+  check('reservations_status_values', sql`${table.status} IN ('PENDING', 'COLLECTED', 'DOOR', 'EXPIRED', 'CANCELLED', 'NO_SHOW')`),
+  check('reservations_source_values', sql`${table.source} IN ('WEB', 'DESK', 'DOOR')`),
+  check('reservations_cancelled_by_values', sql`${table.cancelledBy} IS NULL OR ${table.cancelledBy} IN ('CUSTOMER', 'STAFF')`),
+])
+
+// One row per seat. Capacity is counted from these, never stored: `server/utils/capacity.ts` is
+// the only reading of what is held (0006, D-105).
+export const tickets = sqliteTable('tickets', {
+  id: id(),
+  reservationId: text('reservation_id').notNull().references(() => reservations.id, { onDelete: 'restrict' }),
+  performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),
+  ticketTypeId: text('ticket_type_id').notNull().references(() => ticketTypes.id, { onDelete: 'restrict' }),
+  // Snapshotted at reservation, integer pence: a later price override never reprices this row
+  // (D-120 criterion 3).
+  pricePaid: integer('price_paid').notNull(),
+  priceSource: text('price_source').notNull(),
+  refundedAt: integer('refunded_at'),
+}, table => [
+  index('tickets_performance_refunded').on(table.performanceId, table.refundedAt),
+  index('tickets_reservation').on(table.reservationId),
+  check('tickets_price_paid_pence', sql`${table.pricePaid} >= 0`),
+  check('tickets_price_source_values', sql`${table.priceSource} IN ('PERFORMANCE', 'SHOW', 'BASE', 'IMPORT')`),
+])
+
 // One row per account. Everything special category lives inside `encrypted_payload` (0050);
 // `status` and `companions` stay plain, because the database enforces them (D-127 criterion 1).
 export const accessProfiles = sqliteTable('access_profiles', {

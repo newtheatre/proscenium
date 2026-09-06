@@ -10,18 +10,18 @@ import {
 } from '#server/utils/capacity'
 import { performanceSoldColumn, performanceSoldQuery, showSoldColumn } from '#server/utils/programme'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { ticketFixtures, tonightsPerformance } from '#tests/helpers/programme'
+import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import type { TicketToWrite } from '#server/utils/capacity'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// D-105 against the real rule. The tables it counts are D-104's, stood up here as
-// `docs/data-model.md` specifies them; the contended case is the named race in races.test.ts.
+// D-105 against the real rule, over the real `tickets` and `reservations` tables D-104 migrated.
+// The contended case is the named race in races-capacity.test.ts.
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()
   try {
-    ticketFixtures(database)
+    ticketTypeFixture(database)
     await fn(database)
   }
   finally {
@@ -257,9 +257,9 @@ describe('a status change back into the house is checked too (D-105 criterion 3,
   })
 })
 
-// The point of writing the registry row now: D-104 pushes a constant and the counts are already
-// right, rather than deciding the rule a second time under time pressure.
-describe('the row D-104 will push already counts seats correctly (D-105)', () => {
+// The registry row D-104 pushed: `TICKETS_HOLD_SEATS` passed explicitly here proves the shape
+// regardless of whatever else the live `PERFORMANCE_REFERENCES` default carries.
+describe('the row D-104 pushed already counts seats correctly (D-105)', () => {
   test('a performance holds the seats its live reservations hold, and no expired ones', async () => {
     await withDatabase((database) => {
       const seeded = tonightsPerformance(database, { capacityOverride: 10 })
@@ -331,9 +331,9 @@ describe('lowering capacity rides the update that lowers it (D-105 criterion 4)'
     })
   })
 
-  // The live route calls this with no third argument, and `tickets` is not a table yet: the
-  // default must stay registry-gated, or every performance edit 500s until D-104 lands.
-  test('against the live schema, with neither tickets nor reservations built, the default still runs', async () => {
+  // The live route calls this with no third argument: the default now reads the live registry,
+  // which D-104 classified, and against an empty house correctly finds nothing held.
+  test('against the live schema, with tickets and reservations built and nothing sold, the default still runs', async () => {
     const database = await createTestDatabase()
     try {
       const seeded = tonightsPerformance(database, { capacityOverride: 10 })

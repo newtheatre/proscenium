@@ -12,11 +12,7 @@ CREATE TABLE `category_prices` (
 	CONSTRAINT "category_prices_effective_from_is_a_date" CHECK("category_prices"."effective_from" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')
 );
 --> statement-breakpoint
-CREATE INDEX `category_prices_resolution` ON `category_prices` (`category_id`,`serving_kind`,`effective_from`,`created_at`);
---> statement-breakpoint
--- Append-only is trigger-enforced, not a convention (decision 0010). A sale resolves against
--- whichever row is effective, so an edit here would restate history a correcting row supersedes.
-
+CREATE INDEX `category_prices_resolution` ON `category_prices` (`category_id`,`serving_kind`,`effective_from`,`created_at`);--> statement-breakpoint
 CREATE TRIGGER category_prices_no_update
 BEFORE UPDATE ON category_prices
 BEGIN

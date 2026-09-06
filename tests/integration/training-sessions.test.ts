@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { fromLondonWallClock, londonClock, londonParts } from '#shared/utils/london'
 import { createTestDatabase, rows } from '#tests/helpers/database'
-import type { TestDatabase } from '#tests/helpers/database'
+import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
 
 // A session is a wall clock on a London day, not an instant. That is the whole of why the times
 // are stored as text, and the DST case below is the reason the story asks for it (0014, G-112).
@@ -137,5 +137,60 @@ describe('a session survives a clock change (G-112 criterion 5)', () => {
     expect(bst.toISOString()).not.toBe('2026-10-24T19:00:00.000Z')
     expect(gmt.toISOString()).toBe('2026-10-26T19:00:00.000Z')
     expect(londonParts(gmt).hour).toBe(19)
+  })
+})
+
+// `changes()` names the row count of the statement just before it on this connection, so the
+// cancel route's audit insert can read whether *this* UPDATE changed anything (0049).
+describe('cancelling a session batches its audit entry, predicated on changes() (0049)', () => {
+  const cancel = (auditId: string): BoundStatement[] => [
+    [`UPDATE training_sessions SET status = 'CANCELLED', cancelled_at = 1, cancelled_by = 'u1',
+        cancel_reason = 'x', updated_at = 1
+      WHERE id = 's1' AND status <> 'CANCELLED'`],
+    [`INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ?, 'u1', 'session.cancelled', 'session:s1', '{}'
+      WHERE changes() = 1`, auditId],
+  ]
+
+  test('the first cancellation writes exactly one audit entry', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      schedule(database)
+
+      database.batch(cancel('a1'))
+
+      expect(rows<{ status: string }>(database, 'SELECT status FROM training_sessions WHERE id = \'s1\'')[0]!.status)
+        .toBe('CANCELLED')
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(1)
+    })
+  })
+
+  // The loser's own predicate matches nothing even though the row now reads CANCELLED, which a
+  // predicate over the resulting state rather than changes() could not tell from a win.
+  test('a second attempt on an already-cancelled session writes no further audit entry', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      schedule(database)
+
+      database.batch(cancel('a1'))
+      database.batch(cancel('a2'))
+
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(1)
+    })
+  })
+
+  // The route reads this same RETURNING clause to tell a win from a loss (0049).
+  test('a losing predicate\'s RETURNING is empty, which is what the route refuses on', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      schedule(database)
+
+      const attempt = (): { id: string }[] => database.raw.prepare(
+        `UPDATE training_sessions SET status = 'CANCELLED' WHERE id = 's1' AND status <> 'CANCELLED' RETURNING id`,
+      ).all() as { id: string }[]
+
+      expect(attempt()).toHaveLength(1)
+      expect(attempt()).toHaveLength(0)
+    })
   })
 })
