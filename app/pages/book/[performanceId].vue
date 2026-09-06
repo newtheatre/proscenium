@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { overCapReason } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 
 // The reservation flow (D-104): a guest or a signed-in account holds seats online; the box
@@ -43,8 +44,7 @@ const lines = computed(() => Object.entries(quantities)
   .filter(([, quantity]) => quantity > 0)
   .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity })))
 
-const totalTickets = computed(() => lines.value.reduce((total, line) => total + line.quantity, 0))
-const overCap = computed(() => data.value != null && totalTickets.value > data.value.cap)
+const capReason = computed(() => (data.value ? overCapReason(lines.value, data.value.cap) : null))
 
 const totalPence = computed(() => lines.value.reduce((total, line) => {
   const type = data.value?.ticketTypes.find(one => one.id === line.ticketTypeId)
@@ -215,10 +215,10 @@ useSeoMeta({ title: 'Book tickets' })
       </UCard>
 
       <UAlert
-        v-if="overCap"
+        v-if="capReason"
         color="warning"
         variant="subtle"
-        :description="`Online orders are capped at ${data!.cap} tickets; for a larger party, contact the box office directly.`"
+        :description="capReason"
         data-test="booking-over-cap"
       />
 
@@ -265,7 +265,7 @@ useSeoMeta({ title: 'Book tickets' })
         </p>
         <UButton
           :loading="submitting"
-          :disabled="lines.length === 0 || overCap"
+          :disabled="lines.length === 0 || capReason !== null"
           data-test="booking-submit"
           @click="book"
         >

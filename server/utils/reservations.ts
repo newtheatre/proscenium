@@ -1,6 +1,6 @@
-import { db, schema } from '@nuxthub/db'
-import { eq, sql } from 'drizzle-orm'
-import { newId } from './accounts'
+import { db } from '@nuxthub/db'
+import { sql } from 'drizzle-orm'
+import { findByEmail, newId } from './accounts'
 import { heldSeatsQuery, ticketInsertQueries } from './capacity'
 import { auditEntry } from '#shared/utils/audit'
 import { normaliseEmail } from '#shared/utils/auth'
@@ -112,11 +112,10 @@ export interface GuestAccountResult {
 // An existing address, guest or full, is reused as it stands; a new one is a claimable guest
 // account (D-104 criteria 1, 6). The reservation succeeds identically either way (enumeration-safe).
 export async function guestAccount(email: string, name: string): Promise<GuestAccountResult> {
-  const normalised = normaliseEmail(email)
-  const [existing] = await db.select({ id: schema.users.id }).from(schema.users)
-    .where(eq(schema.users.email, normalised)).limit(1)
+  const existing = await findByEmail(email)
   if (existing) return { id: existing.id, created: false }
 
+  const normalised = normaliseEmail(email)
   const id = newId()
   const entry = auditEntry({ actorId: null, action: 'account.created.guest', target: `user:${id}` })
 
@@ -137,8 +136,7 @@ export async function guestAccount(email: string, name: string): Promise<GuestAc
   if (inserted.length > 0) return { id, created: true }
 
   // Lost the race: somebody else's checkout won between the read above and this insert.
-  const [winner] = await db.select({ id: schema.users.id }).from(schema.users)
-    .where(eq(schema.users.email, normalised)).limit(1)
+  const winner = await findByEmail(email)
   return { id: winner!.id, created: false }
 }
 
