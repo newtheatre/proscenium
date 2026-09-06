@@ -209,6 +209,124 @@ describe.skipIf(skip !== null)('authority keys to a performance, never to a day 
   })
 })
 
+let nextSlot = 100
+
+function shiftFor(performanceId: string, role: string, userId: string, status = 'CONFIRMED'): string {
+  const database = new Database(app.databaseFile)
+  try {
+    const id = `${performanceId}-${role}-${(nextSlot += 1)}`
+    database.query('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(id, performanceId, role, nextSlot, userId, status)
+    return id
+  }
+  finally {
+    database.close()
+  }
+}
+
+function setShiftStatus(shiftId: string, status: string, userId: string | null): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query('UPDATE shifts SET status = ?, user_id = ? WHERE id = ?').run(status, userId, shiftId)
+  }
+  finally {
+    database.close()
+  }
+}
+
+describe.skipIf(skip !== null)('a confirmed shift is tonight\'s authority, tried before the officer bypass (E-111 criterion 1, 0044)', () => {
+  test('the shift holder resolves the door with no officer role at all', async () => {
+    const holder = await registerMember(app, 'door-shift', generatePassword())
+    const shiftId = shiftFor(house.performanceId, 'DOOR', holder.id)
+
+    const response = await ask(`role=DOOR&performanceId=${house.performanceId}`, holder.cookie)
+    expect(response.status).toBe(200)
+    const resolved = await response.json() as Resolved & { shiftId: string }
+    expect(resolved).toMatchObject({ night, role: 'DOOR', venueId: house.venueId, via: 'SHIFT', shiftId })
+    expect(resolved.performanceIds).toEqual([house.performanceId])
+  })
+
+  // A DOOR shift is not authority over the till, so it falls through to the officer check, and
+  // an ordinary member holds none of those either (E-111 criterion 1, F-101 criterion 2).
+  test('a door shift does not open the till', async () => {
+    const holder = await registerMember(app, 'door-not-bar', generatePassword())
+    shiftFor(house.performanceId, 'DOOR', holder.id)
+
+    const response = await ask(`role=BAR&performanceId=${house.performanceId}`, holder.cookie)
+    expect(response.status).toBe(403)
+  })
+
+  // The shift covers one performance, so naming a different one it does not name is a request
+  // the shift cannot answer, and there is no officer role to fall back to either.
+  test('a shift does not open a performance it was never confirmed on', async () => {
+    const holder = await registerMember(app, 'door-elsewhere', generatePassword())
+    shiftFor(house.performanceId, 'DOOR', holder.id)
+
+    const response = await ask(`role=DOOR&performanceId=${studio.performanceId}`, holder.cookie)
+    expect(response.status).toBe(403)
+  })
+
+  test('a claimed but unconfirmed shift is not yet authority', async () => {
+    const claimant = await registerMember(app, 'door-claimed', generatePassword())
+    shiftFor(house.performanceId, 'DOOR', claimant.id, 'CLAIMED')
+
+    expect((await ask(`role=DOOR&performanceId=${house.performanceId}`, claimant.cookie)).status).toBe(403)
+  })
+
+  // Losing the shift loses the authority on the very next request, not at next login
+  // (E-111 criterion 3).
+  test('a released shift stops resolving on the next request', async () => {
+    const holder = await registerMember(app, 'door-released', generatePassword())
+    const shiftId = shiftFor(house.performanceId, 'DOOR', holder.id)
+
+    expect((await ask(`role=DOOR&performanceId=${house.performanceId}`, holder.cookie)).status).toBe(200)
+    setShiftStatus(shiftId, 'OPEN', null)
+    expect((await ask(`role=DOOR&performanceId=${house.performanceId}`, holder.cookie)).status).toBe(403)
+  })
+
+  test('a reassigned shift resolves for its new holder and not its old one', async () => {
+    const outgoing = await registerMember(app, 'door-outgoing', generatePassword())
+    const incoming = await registerMember(app, 'door-incoming', generatePassword())
+    const shiftId = shiftFor(house.performanceId, 'DOOR', outgoing.id)
+
+    setShiftStatus(shiftId, 'CONFIRMED', incoming.id)
+    expect((await ask(`role=DOOR&performanceId=${house.performanceId}`, outgoing.cookie)).status).toBe(403)
+    expect((await ask(`role=DOOR&performanceId=${house.performanceId}`, incoming.cookie)).status).toBe(200)
+  })
+
+  // A shift resolution writes no bypass row: the rota's own `shift.claimed` and `shift.confirmed`
+  // entries are already the record of how the account came to hold it (0044).
+  test('a shift resolution is not recorded as an officer bypass', async () => {
+    const holder = await registerMember(app, 'door-no-bypass', generatePassword())
+    shiftFor(house.performanceId, 'DOOR', holder.id)
+
+    await ask(`role=DOOR&performanceId=${house.performanceId}`, holder.cookie)
+    expect(bypasses(holder.id)).toEqual([])
+  })
+
+  // Two confirmed shifts of the same role on the same night, at two different venues, is exactly
+  // the ambiguity an unnarrowed officer request refuses (E-127 criterion 1).
+  test('two confirmed shifts at two venues with nothing to narrow it asks for the venue', async () => {
+    const holder = await registerMember(app, 'door-both-venues', generatePassword())
+    shiftFor(house.performanceId, 'DOOR', holder.id)
+    shiftFor(studio.performanceId, 'DOOR', holder.id)
+
+    const response = await ask('role=DOOR', holder.cookie)
+    expect(response.status).toBe(400)
+    expect(await message(response)).toContain('venue')
+  })
+
+  test('naming the venue resolves the one shift that covers it', async () => {
+    const holder = await registerMember(app, 'door-narrowed', generatePassword())
+    shiftFor(house.performanceId, 'DOOR', holder.id)
+    shiftFor(studio.performanceId, 'DOOR', holder.id)
+
+    const resolved = await (await ask(`role=DOOR&venueId=${house.venueId}`, holder.cookie)).json() as Resolved
+    expect(resolved).toMatchObject({ via: 'SHIFT', venueId: house.venueId })
+    expect(resolved.performanceIds).toEqual([house.performanceId])
+  })
+})
+
 async function message(response: Response): Promise<string> {
   const body = await response.json() as { statusMessage?: string, message?: string }
   return body.statusMessage ?? body.message ?? ''

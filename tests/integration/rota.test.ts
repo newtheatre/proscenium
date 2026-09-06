@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   approveShiftStatement,
+  assignShiftStatement,
   backfillVenueStatement,
   cancelOrphanedShiftsStatement,
   cancelShiftsStatement,
@@ -9,6 +10,7 @@ import {
   declineShiftStatement,
   myShiftsQuery,
   openShiftsQuery,
+  releaseShiftStatement,
   replaceTemplateStatements,
   stampPerformanceStatement,
 } from '#server/utils/rota'
@@ -792,6 +794,161 @@ describe('answering a queued claim (E-105)', () => {
         'shift-confirmed', tonight.performanceId, 'DOOR', who, 'CONFIRMED']])
 
       expect(run(database, declineShiftStatement('shift-confirmed', 'Too late'))).toHaveLength(0)
+    })
+  })
+})
+
+describe('releasing a held shift (E-107 criterion 1)', () => {
+  test('a confirmed shift returns to open, naming nobody', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'holder')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status, claimed_at, confirmed_at) VALUES (?, ?, ?, 1, ?, ?, unixepoch(), unixepoch())',
+        'shift-held', tonight.performanceId, 'DOOR', who, 'CONFIRMED']])
+
+      expect(run(database, releaseShiftStatement('shift-held', who))).toHaveLength(1)
+
+      const shift = rows<{ status: string, user_id: string | null, claimed_at: number | null, confirmed_at: number | null }>(database,
+        'SELECT status, user_id, claimed_at, confirmed_at FROM shifts WHERE id = ?', 'shift-held')[0]!
+      expect(shift).toMatchObject({ status: 'OPEN', user_id: null, claimed_at: null, confirmed_at: null })
+    })
+  })
+
+  test('a claimed (unconfirmed) shift releases the same way', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'claimant')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+        'shift-claimed', tonight.performanceId, 'DOOR', who, 'CLAIMED']])
+
+      expect(run(database, releaseShiftStatement('shift-claimed', who))).toHaveLength(1)
+      expect(shiftsOn(database, tonight.performanceId)[0]).toMatchObject({ status: 'OPEN', user_id: null })
+    })
+  })
+
+  test('somebody else releasing the shift matches nothing', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const holder = person(database, 'holder')
+      const other = person(database, 'other')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+        'shift-held', tonight.performanceId, 'DOOR', holder, 'CONFIRMED']])
+
+      expect(run(database, releaseShiftStatement('shift-held', other))).toHaveLength(0)
+      expect(shiftsOn(database, tonight.performanceId)[0]).toMatchObject({ status: 'CONFIRMED', user_id: holder })
+    })
+  })
+
+  test('an open or declined shift has nothing to release', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'somebody')
+      database.batch([
+        ['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)',
+          'shift-open', tonight.performanceId, 'DOOR', 'OPEN'],
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 2, ?, ?)',
+          'shift-declined', tonight.performanceId, 'BAR', who, 'DECLINED'],
+      ])
+
+      expect(run(database, releaseShiftStatement('shift-open', who))).toHaveLength(0)
+      expect(run(database, releaseShiftStatement('shift-declined', who))).toHaveLength(0)
+    })
+  })
+})
+
+describe('an officer assigning or reassigning a shift (E-107 criteria 3 and 4)', () => {
+  test('assigning fills an open shift, confirmed by definition', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const officer = person(database, 'officer')
+      const member = person(database, 'member')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)',
+        'shift-open', tonight.performanceId, 'DOOR', 'OPEN']])
+
+      expect(run(database, assignShiftStatement('shift-open', member, officer))).toHaveLength(1)
+
+      const shift = rows<{ status: string, user_id: string, assigned_by: string, confirmed_at: number | null }>(database,
+        'SELECT status, user_id, assigned_by, confirmed_at FROM shifts WHERE id = ?', 'shift-open')[0]!
+      expect(shift).toMatchObject({ status: 'CONFIRMED', user_id: member, assigned_by: officer })
+      expect(shift.confirmed_at).not.toBeNull()
+    })
+  })
+
+  test('assigning replaces a declined shift\'s decline reason with nothing', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const officer = person(database, 'officer')
+      const previous = person(database, 'previous')
+      const member = person(database, 'member')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status, decline_reason) VALUES (?, ?, ?, 1, ?, ?, ?)',
+        'shift-declined', tonight.performanceId, 'DOOR', previous, 'DECLINED', 'Double-booked']])
+
+      expect(run(database, assignShiftStatement('shift-declined', member, officer))).toHaveLength(1)
+
+      const shift = rows<{ status: string, user_id: string, decline_reason: string | null }>(database,
+        'SELECT status, user_id, decline_reason FROM shifts WHERE id = ?', 'shift-declined')[0]!
+      expect(shift).toMatchObject({ status: 'CONFIRMED', user_id: member, decline_reason: null })
+    })
+  })
+
+  // One UPDATE on the row that already exists: the partial unique index never has to arbitrate
+  // between two CONFIRMED duty managers, because there was only ever the one row (criterion 4).
+  test('replacing a confirmed duty manager is one write and never trips the one-per-performance index', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const officer = person(database, 'officer')
+      const outgoing = person(database, 'outgoing')
+      const incoming = person(database, 'incoming')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+        'shift-dm', tonight.performanceId, 'DUTY_MANAGER', outgoing, 'CONFIRMED']])
+
+      expect(run(database, assignShiftStatement('shift-dm', incoming, officer))).toHaveLength(1)
+
+      const rowsFound = rows<{ user_id: string, status: string }>(database,
+        `SELECT user_id, status FROM shifts WHERE performance_id = ? AND role = 'DUTY_MANAGER' AND status = 'CONFIRMED'`,
+        tonight.performanceId)
+      expect(rowsFound).toEqual([{ user_id: incoming, status: 'CONFIRMED' }])
+    })
+  })
+
+  test('assigning onto a cancelled shift matches nothing', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const officer = person(database, 'officer')
+      const member = person(database, 'member')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)',
+        'shift-cancelled', tonight.performanceId, 'DOOR', 'CANCELLED']])
+
+      expect(run(database, assignShiftStatement('shift-cancelled', member, officer))).toHaveLength(0)
+    })
+  })
+
+  test('a member already committed elsewhere on the performance cannot be assigned a second shift', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const officer = person(database, 'officer')
+      const member = person(database, 'member')
+      database.batch([
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+          'shift-held', tonight.performanceId, 'BAR', member, 'CONFIRMED'],
+        ['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 2, ?)',
+          'shift-open', tonight.performanceId, 'DOOR', 'OPEN'],
+      ])
+
+      expect(run(database, assignShiftStatement('shift-open', member, officer))).toHaveLength(0)
+      expect(shiftsOn(database, tonight.performanceId).find(shift => shift.id === 'shift-open')!.status).toBe('OPEN')
+    })
+  })
+
+  test('reassigning a shift to the member who already holds it is not blocked by its own row', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const officer = person(database, 'officer')
+      const member = person(database, 'member')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+        'shift-held', tonight.performanceId, 'DOOR', member, 'CLAIMED']])
+
+      expect(run(database, assignShiftStatement('shift-held', member, officer))).toHaveLength(1)
     })
   })
 })

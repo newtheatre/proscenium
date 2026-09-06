@@ -393,6 +393,57 @@ The shift is not yours to hold; you are welcome to claim something else on the o
 The Nottingham New Theatre`,
   }),
 
+  // Sent to the FOH officer, either because the night is close or because the role can never go
+  // unstaffed at all; a release further out only shows up in the seven-day digest (E-107 criterion 2).
+  'shift-released': (context: TemplateContext): Rendered => ({
+    subject: `A ${context.role} shift on ${context.show} has been released`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>The ${context.role} shift on ${context.show} at ${context.venue}, ${context.when}, has been
+released and is back on the open list.</p>
+<p>Assign somebody from the rota, or leave it for a member to claim.</p>`),
+    text: `Hello ${context.name},
+
+The ${context.role} shift on ${context.show} at ${context.venue}, ${context.when}, has been
+released and is back on the open list.
+
+Assign somebody from the rota, or leave it for a member to claim.
+
+The Nottingham New Theatre`,
+  }),
+
+  // An officer's assignment is confirmed by definition, so it reads exactly like an approval
+  // (E-107 criterion 3).
+  'shift-assigned': (context: TemplateContext): Rendered => ({
+    subject: `You have been assigned a ${context.role} shift on ${context.show}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>You have been assigned the ${context.role} shift on ${context.show} at ${context.venue},
+${context.when}.</p>`),
+    text: `Hello ${context.name},
+
+You have been assigned the ${context.role} shift on ${context.show} at ${context.venue},
+${context.when}.
+
+The Nottingham New Theatre`,
+  }),
+
+  // The other side of a replacement: nothing was declined and nothing was their doing, so the
+  // wording says only that the shift has gone (E-107 criterion 5).
+  'shift-removed': (context: TemplateContext): Rendered => ({
+    subject: `Your ${context.role} shift on ${context.show} has been reassigned`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>The FOH officer has reassigned your ${context.role} shift on ${context.show} at
+${context.venue}, ${context.when}, to somebody else.</p>
+<p>There is nothing for you to do. Other shifts you hold are unaffected.</p>`),
+    text: `Hello ${context.name},
+
+The FOH officer has reassigned your ${context.role} shift on ${context.show} at
+${context.venue}, ${context.when}, to somebody else.
+
+There is nothing for you to do. Other shifts you hold are unaffected.
+
+The Nottingham New Theatre`,
+  }),
+
   // Good news, so it leads with it. The way out is in the same breath as the place, because a
   // place nobody uses is one somebody else was waiting for.
   'training-session-promoted': (context: TemplateContext): Rendered => {

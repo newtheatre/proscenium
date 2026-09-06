@@ -136,6 +136,18 @@ describe.skipIf(skip !== null)('the seven-day unstaffed digest (E-108)', () => {
     expect(notified(foh.id)).toBeGreaterThan(0)
   })
 
+  // A declined claim leaves nobody committed, exactly like an open shift, so it is chased the
+  // same way rather than staying invisible until somebody happens to check (E-107, known issue).
+  test('a declined shift inside seven days is chased too', async () => {
+    clearDigests()
+    const house = performanceInDays(3, 'declined-shift')
+    stampShift(house.performanceId, 'BAR', 1, 'DECLINED', admin.id)
+
+    const answer = await escalate()
+    expect(answer.performances).toBeGreaterThan(0)
+    expect(notified(foh.id)).toBeGreaterThan(0)
+  })
+
   test('a performance more than seven days out is not chased', async () => {
     const before = await escalate()
     const house = performanceInDays(10, 'too-far')
