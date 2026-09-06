@@ -15,6 +15,7 @@ export default defineEventHandler(async (event) => {
 
   const subject = await findById(userId)
   if (!subject || subject.anonymisedAt !== null) throw createError({ statusCode: 404, statusMessage: 'No such member' })
+  if (subject.disabled) throw createError({ statusCode: 403, statusMessage: 'That account is disabled and cannot be assigned a shift' })
 
   // The same live gate self-claiming rides: an officer's assignment does not admit somebody a
   // training gap would otherwise refuse (E-107 criterion 3).
