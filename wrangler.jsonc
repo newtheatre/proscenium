@@ -15,5 +15,18 @@
         "hello@newtheatre.org.uk"
       ]
     }
+  ],
+  "secrets_store_secrets": [
+    {
+      "binding": "SESSION_PASSWORD",
+      "store_id": "fdfe08b6b01f498fbddbc08c2891cadb",
+      "secret_name": "NUXT_SESSION_PASSWORD",
+    },
+  ],
+  "routes": [
+    {
+      "pattern": "proscenium.newtheatre.org.uk",
+      "custom_domain": true,
+    },
   ]
 }
