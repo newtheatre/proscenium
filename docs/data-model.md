@@ -609,9 +609,14 @@ text; people by role, never diagnosis) · `severity` CHECK `NOTE|NEAR_MISS|INCID
 
 ### age_checks  APPEND-ONLY
 `id` PK · `performance_id` restrict NULL (bar can check outside a show) · `checked_by`
-restrict · `outcome` CHECK `ACCEPTED|REFUSED` · `reason` CHECK enum (mandatory on REFUSED) ·
-`description` (appearance, never a name) · `product` · `notes` · `supersedes_id` NULL ·
-`created_at`. The licensing register; exports span CSV and PDF.
+restrict · `outcome` CHECK `ACCEPTED|REFUSED` · `id_type` CHECK enum, NULL (the ID accepted,
+mandatory on ACCEPTED) · `reason` CHECK enum, NULL (mandatory on REFUSED) · `description`
+(appearance, never a name) · `product` · `notes` · `supersedes_id` NULL self-FK, UNIQUE (one
+correction per entry) · `created_at`. CHECK `age_checks_outcome_shape` ties `id_type` and
+`reason` to `outcome` so exactly one is ever set, never both, never neither. Split from a
+single `reason` column the original outline carried: criterion 1 asks for the ID type and the
+refusal reason as two distinct pieces of information, not one column doing both jobs
+(E-118). The licensing register; exports span CSV and PDF (E-119, not yet built).
 
 ### night_reports
 `performance_id` PK → performances restrict · `payload` JSON (attendance, takings by tender,

@@ -529,9 +529,39 @@ guidance are read straight from `showWarnings()` and the show row, the same sour
 show page reads, so neither can drift from the other.
 
 Quick links to the incident log, the Challenge 25 register, near-miss reporting, the checklists
-and the backstage board are not on the screen yet: none of E-115, E-117, E-118, E-114 or E-120
-has built its destination (`docs/known-issues.md`). Till is linked because it is the one
-show-night screen that already exists.
+and the backstage board are not on the screen yet: none of E-115, E-117, E-114 or E-120 has
+built its destination (`docs/known-issues.md`); E-118's register is real now but not yet linked
+from `/tonight`, added in the same pull request as the rest once the group is done. Till is
+linked because it is the one show-night screen that already existed before E-112.
+
+### The Challenge 25 register (E-118)
+
+`server/db/schema/show-night.ts` adds `age_checks`, append-only like `incidents` (0010): hand-
+authored triggers refuse `UPDATE` and `DELETE` outright, and `age_checks_outcome_shape` ties
+`id_type` and `reason` to `outcome` so a row is never accepted-with-a-reason or refused-with-an-
+ID. `server/utils/age-checks.ts` holds two statement builders, neither of which writes on its
+own: `recordAgeCheck(checkedBy, input, id)` for a fresh entry (no predicate, nothing else can
+have created it) and `supersedeAgeCheck(checkedBy, entryId, input, id)` for a correction,
+predicated `WHERE EXISTS (that entry) AND NOT EXISTS (a correction of it already)` and decided
+from the statement's own `RETURNING` via `auditedWrite()` (0049, read onto an INSERT rather than
+an UPDATE). The partial unique index `age_checks_one_correction` is the same guarantee a second
+time, in case a future caller ever bypasses the predicate.
+
+`recordAgeCheck()` is what F-106 is waited on for (build-order.md's own seam): it returns
+`{ id, statement }`, the same shape `postEntry()` returns, so a till sale and its inline age
+check commit in one `db.batch` or not at all. It is safe to consume now, ahead of E-115 and
+E-117: nothing in it depends on either, and the only story it depends on is E-111, already
+merged. `POST /api/tonight/age-checks`, `GET /api/tonight/age-checks` and
+`POST /api/tonight/age-checks/[id]/supersede` are guarded by the new
+`requireAnyNightAuthority(event, roles)` in `server/utils/night-authority.ts`, which tries each
+role in turn and returns the first that resolves, for the screens more than one role reaches
+(criterion 4: bar or door staff, and the duty manager's own tonight screen). A signed-out caller
+is told that on the first attempt rather than asked again for every role.
+
+The officer bypass still resolves against `coverage()`, which needs a venue running something
+tonight; an age check's own `performance_id` may be null regardless of what authority resolved
+against, which is how criterion 4's "bar can check outside a show" is read here: the check
+itself never has to name a performance, even on a night that has one.
 
 ## The programme (build-order contract d, 0043)
 

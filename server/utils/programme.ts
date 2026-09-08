@@ -51,6 +51,12 @@ export const PERFORMANCE_REFERENCES: PerformanceReference[] = [
     heldBy: performanceId => heldSeatsSubquery(performanceId),
     why: 'a seat somebody holds: the performance may be cancelled and refunded, never deleted',
   },
+  {
+    table: 'age_checks',
+    column: 'performance_id',
+    sold: false,
+    why: 'a Challenge 25 entry: licensing evidence, and nobody has bought a seat (E-118)',
+  },
 ]
 
 export function soldReferences(references = PERFORMANCE_REFERENCES): PerformanceReference[] {
