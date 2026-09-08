@@ -170,6 +170,14 @@ const CATALOGUE = {
   'age-check.superseded': { label: 'Challenge 25 entry corrected', module: 'show-night' },
   'incident.logged': { label: 'Incident or near miss logged', module: 'show-night' },
   'incident.superseded': { label: 'Incident entry corrected', module: 'show-night' },
+  'incident.reviewed': { label: 'Incident marked reviewed', module: 'show-night' },
+  'checklist-item.created': { label: 'Checklist item added', module: 'show-night' },
+  'checklist-item.updated': { label: 'Checklist item changed', module: 'show-night' },
+  'checklist-item.retired': { label: 'Checklist item retired', module: 'show-night' },
+  'checklist-item.reinstated': { label: 'Checklist item reinstated', module: 'show-night' },
+  'checklist.ticked': { label: 'Checklist item ticked', module: 'show-night' },
+  'checklist.exempted': { label: 'Checklist item closed over with a reason', module: 'show-night' },
+  'checklist.closed': { label: 'Night closed', module: 'show-night' },
 
   // Module F: bar
 

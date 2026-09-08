@@ -1,6 +1,9 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { showNightBounds } from '#shared/utils/show-night'
+// Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
+// Bun, where nothing is auto-imported (CONTRIBUTING).
+import { newId } from './accounts'
 import type { ChecklistItemInput, Phase, SystemCheck } from '#shared/utils/checklist'
 import type { SQL } from 'drizzle-orm'
 
@@ -89,7 +92,9 @@ export function stampsForNightQuery(venueId: string, night: string): SQL {
   `
 }
 
-async function readStamps(venueId: string, night: string): Promise<(ChecklistStampRow & { required: number, exempted: number })[]> {
+type RawStampRow = Omit<ChecklistStampRow, 'required' | 'exempted'> & { required: number, exempted: number }
+
+async function readStamps(venueId: string, night: string): Promise<RawStampRow[]> {
   return db.all(stampsForNightQuery(venueId, night))
 }
 
@@ -99,11 +104,12 @@ export async function ensureStamped(venueId: string, night: string): Promise<voi
   const items = await itemsForVenue(venueId)
   if (items.length === 0) return
 
-  await db.batch(items.map(item => db.run(sql`
+  const statements = items.map(item => db.run(sql`
     INSERT INTO checklist_stamps (id, venue_id, night, item_id, phase, label, sort, required, system_check)
     VALUES (${newId()}, ${venueId}, ${night}, ${item.id}, ${item.phase}, ${item.label}, ${item.sort}, ${item.required ? 1 : 0}, ${item.systemCheck})
     ON CONFLICT (venue_id, night, item_id) DO NOTHING
-  `)) as [SQL, ...SQL[]])
+  `))
+  await db.batch(statements as never)
 }
 
 // No reservation for tonight's performances at this venue is left in a status a show should have
@@ -186,26 +192,26 @@ export async function checklistFor(venueId: string, night: string): Promise<Chec
   return entries
 }
 
-// Predicated on the stamp being unticked, hand-tickable and not already exempted, so a double
-// tap settles to one write rather than two (0049's own shape, without a RETURNING to race).
-export function tickStatement(stampId: string, tickedBy: string): SQL {
+// Predicated on the stamp being unticked, hand-tickable, not already exempted and this duty
+// manager's own venue and night, decided from `RETURNING` via `auditedWrite()` (0049).
+export function tickStatement(stampId: string, venueId: string, night: string, tickedBy: string): SQL {
   return sql`
     UPDATE checklist_stamps
     SET ticked_by = ${tickedBy}, ticked_at = unixepoch()
-    WHERE id = ${stampId} AND system_check IS NULL AND ticked_at IS NULL AND exempted = 0
+    WHERE id = ${stampId} AND venue_id = ${venueId} AND night = ${night}
+      AND system_check IS NULL AND ticked_at IS NULL AND exempted = 0
+    RETURNING id
   `
 }
 
-export function exemptStatement(stampId: string, reason: string, exemptedBy: string): SQL {
+export function exemptStatement(stampId: string, venueId: string, night: string, reason: string, exemptedBy: string): SQL {
   return sql`
     UPDATE checklist_stamps
     SET exempted = 1, exempt_reason = ${reason}, exempted_by = ${exemptedBy}, exempted_at = unixepoch()
-    WHERE id = ${stampId} AND ticked_at IS NULL AND exempted = 0
+    WHERE id = ${stampId} AND venue_id = ${venueId} AND night = ${night}
+      AND ticked_at IS NULL AND exempted = 0
+    RETURNING id
   `
-}
-
-export function reviewIncidentEntry(actorId: string, incidentId: string): { id: string, action: string, actorId: string, target: string, detail: null } {
-  return { id: newId(), action: 'incident.reviewed', actorId, target: `incident:${incidentId}`, detail: null }
 }
 
 export interface ChecklistCloseRow {
