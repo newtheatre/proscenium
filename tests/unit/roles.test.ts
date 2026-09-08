@@ -133,12 +133,12 @@ describe('permissions come from live grants only', () => {
     expect(held).toEqual(['bar.read', 'bar.write'])
   })
 
-  // The front of house officer administers the rota in the same way, days ahead and sitting
-  // down. It is an ordinary standing permission beside the bypass, never part of it (0046).
-  test('the front of house officer holds the rota administration and nothing else standing', () => {
+  // The front of house officer administers the rota and the checklist in the same way, days
+  // ahead and sitting down. Both are ordinary standing permissions beside the bypass (0046).
+  test('the front of house officer holds the rota and checklist administration and nothing else standing', () => {
     const held = [...permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now)]
       .filter(permission => !OPERATIONAL_PERMISSIONS.includes(permission)).sort()
-    expect(held).toEqual(['rota.read', 'rota.write'])
+    expect(held).toEqual(['checklist.read', 'checklist.write', 'rota.read', 'rota.write'])
   })
 
   // Nothing outside the three named ones may be operational, whatever a role picks up later.

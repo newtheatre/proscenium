@@ -98,47 +98,61 @@ async function readStamps(venueId: string, night: string): Promise<RawStampRow[]
   return db.all(stampsForNightQuery(venueId, night))
 }
 
+// A stamp for one item, conflict-proof against a second caller stamping the same night at once:
+// the unique index is what actually decides it, this is only ever a harmless retry (criterion 1).
+export function stampStatement(item: ChecklistItemRow, venueId: string, night: string, id: string): SQL {
+  return sql`
+    INSERT INTO checklist_stamps (id, venue_id, night, item_id, phase, label, sort, required, system_check)
+    VALUES (${id}, ${venueId}, ${night}, ${item.id}, ${item.phase}, ${item.label}, ${item.sort}, ${item.required ? 1 : 0}, ${item.systemCheck})
+    ON CONFLICT (venue_id, night, item_id) DO NOTHING
+  `
+}
+
 // One stamp per active item, made the first time tonight's checklist is touched: an edit to
 // `checklist_items` afterwards changes nothing already stamped (criterion 1).
 export async function ensureStamped(venueId: string, night: string): Promise<void> {
   const items = await itemsForVenue(venueId)
   if (items.length === 0) return
 
-  const statements = items.map(item => db.run(sql`
-    INSERT INTO checklist_stamps (id, venue_id, night, item_id, phase, label, sort, required, system_check)
-    VALUES (${newId()}, ${venueId}, ${night}, ${item.id}, ${item.phase}, ${item.label}, ${item.sort}, ${item.required ? 1 : 0}, ${item.systemCheck})
-    ON CONFLICT (venue_id, night, item_id) DO NOTHING
-  `))
+  const statements = items.map(item => db.run(stampStatement(item, venueId, night, newId())))
   await db.batch(statements as never)
 }
 
 // No reservation for tonight's performances here is left in a status a show should have resolved
 // by its own end (criterion 3). Needs a door scan D-126 does not build yet (docs/known-issues.md).
-export async function noShowHoldsReleased(venueId: string, night: string): Promise<boolean> {
+export function noShowHoldsReleasedQuery(venueId: string, night: string): SQL {
   const { from, to } = showNightBounds(night)
-  const [row] = await db.all<{ unresolved: number }>(sql`
+  return sql`
     SELECT count(*) AS unresolved
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
     WHERE p.venue_id = ${venueId}
       AND p.starts_at >= ${Math.floor(from.getTime() / 1000)} AND p.starts_at < ${Math.floor(to.getTime() / 1000)}
       AND r.status IN ('PENDING', 'COLLECTED')
-  `)
+  `
+}
+
+export async function noShowHoldsReleased(venueId: string, night: string): Promise<boolean> {
+  const [row] = await db.all<{ unresolved: number }>(noShowHoldsReleasedQuery(venueId, night))
   return (row?.unresolved ?? 0) === 0
 }
 
 // Every incident logged tonight carries at least one `incident.reviewed` audit entry. Reviewing
 // is acknowledgement, not resolving a follow-up: E-116's severity routing is a separate story.
-export async function incidentsReviewed(night: string): Promise<boolean> {
+export function incidentsReviewedQuery(night: string): SQL {
   const { from, to } = showNightBounds(night)
-  const [row] = await db.all<{ unreviewed: number }>(sql`
+  return sql`
     SELECT count(*) AS unreviewed
     FROM incidents i
     WHERE i.happened_at >= ${Math.floor(from.getTime() / 1000)} AND i.happened_at < ${Math.floor(to.getTime() / 1000)}
       AND NOT EXISTS (
         SELECT 1 FROM audit_log a WHERE a.action = 'incident.reviewed' AND a.target = 'incident:' || i.id
       )
-  `)
+  `
+}
+
+export async function incidentsReviewed(night: string): Promise<boolean> {
+  const [row] = await db.all<{ unreviewed: number }>(incidentsReviewedQuery(night))
   return (row?.unreviewed ?? 0) === 0
 }
 
