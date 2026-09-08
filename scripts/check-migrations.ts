@@ -3,8 +3,8 @@
 // the snapshot does not carry. Refusing one is invariant 0010; there are no exemptions.
 
 import { join } from 'node:path'
-import { journalProblems } from '../shared/utils/migrations'
-import type { JournalEntry } from '../shared/utils/migrations'
+import { dependentsByTable, journalProblems, rebuildDependentProblems } from '../shared/utils/migrations'
+import type { JournalEntry, SnapshotTable } from '../shared/utils/migrations'
 
 const DIR = 'server/db/migrations/sqlite'
 const META = join(DIR, 'meta')
@@ -30,19 +30,8 @@ if (!newest) {
   process.exit(0)
 }
 
-interface SnapshotForeignKey { onDelete?: string, tableTo: string }
-interface SnapshotTable { name: string, foreignKeys?: Record<string, SnapshotForeignKey> }
 const latest: { tables?: Record<string, SnapshotTable> } = await Bun.file(join(META, newest)).json()
-
-// Which tables lose rows when a given table is dropped.
-const cascadesOnto = new Map<string, Set<string>>()
-for (const table of Object.values(latest.tables ?? {})) {
-  for (const fk of Object.values(table.foreignKeys ?? {})) {
-    if (fk.onDelete !== 'cascade') continue
-    if (!cascadesOnto.has(fk.tableTo)) cascadesOnto.set(fk.tableTo, new Set())
-    cascadesOnto.get(fk.tableTo)!.add(table.name)
-  }
-}
+const dependentsOnto = dependentsByTable(latest.tables ?? {})
 
 // The table a trigger fires on, read from its body: the name prefix is a
 // convention nothing enforces, and the filenames already diverge from it.
@@ -83,11 +72,7 @@ for (const file of scan(DIR, '*.sql')) {
     }
     if (event.kind === 'rebuild') {
       if (grandfathered) continue
-      const dependents = cascadesOnto.get(event.table!)
-      if (dependents?.size) {
-        problems.push(`${file}: rebuilds \`${event.table}\`, and dropping it cascades to `
-          + `${[...dependents].map(t => `\`${t}\``).join(', ')}. Those rows go silently.`)
-      }
+      problems.push(...rebuildDependentProblems(file, event.table!, dependentsOnto.get(event.table!) ?? []))
       continue
     }
     // `DROP TABLE t` takes the table's triggers with it. Only a CREATE after
@@ -106,13 +91,16 @@ for (const file of scan(DIR, '*.sql')) {
 }
 
 if (problems.length) {
-  console.error('check-migrations: a table rebuild would silently drop something.\n')
+  console.error('check-migrations: a table rebuild would silently drop something, or abort outright.\n')
   for (const problem of problems) console.error(`  ${problem}`)
   console.error('\nD1 runs migrations inside a transaction, where `PRAGMA foreign_keys=OFF` is a')
-  console.error('no-op, so Drizzle\'s rebuild does not disable the cascade it assumes it has.')
-  console.error('A rebuild is `DROP TABLE` plus a rename, so it also takes every schema object')
-  console.error('the Drizzle snapshot does not carry: today that means triggers, and Drizzle')
-  console.error('cannot re-emit what it has never seen.')
+  console.error('no-op, so Drizzle\'s rebuild does not disable the checks it assumes it has. A')
+  console.error('cascading or set-null dependent loses rows or a reference silently; a restrict or')
+  console.error('no-action dependent aborts the whole migration the moment a referencing row exists,')
+  console.error('which an empty development database never has and production always eventually will.')
+  console.error('A rebuild is `DROP TABLE` plus a rename, so it also takes every schema object the')
+  console.error('Drizzle snapshot does not carry: today that means triggers, and Drizzle cannot')
+  console.error('re-emit what it has never seen.')
   console.error('Split the change so no rebuild is needed (add, rename and alter separately),')
   console.error('or hand-author the migration to save and restore what the drop would take,')
   console.error('re-creating any trigger AFTER the `ALTER TABLE __new_… RENAME TO …`.')
@@ -133,7 +121,7 @@ if (disagreements.length) {
   process.exit(1)
 }
 
-const guarded = [...cascadesOnto.keys()].length
-console.log(`check-migrations: ${guarded} tables have rows cascading onto them and `
-  + `${liveTriggers.size} triggers are live, none dropped by a rebuild. `
+const guarded = [...dependentsOnto.keys()].length
+console.log(`check-migrations: ${guarded} tables have foreign keys guarding a rebuild and `
+  + `${liveTriggers.size} triggers are live, none dropped or bypassed. `
   + `${(journal.entries ?? []).length} journal entries match their files.`)

@@ -50,3 +50,44 @@ export function journalProblems(entries: JournalEntry[], files: string[]): strin
 }
 
 const quoted = (name: string): string => `\`${name}\``
+
+export interface SnapshotForeignKey { onDelete?: string, tableTo: string }
+export interface SnapshotTable { name: string, foreignKeys?: Record<string, SnapshotForeignKey> }
+export interface RebuildDependent { table: string, onDelete: string }
+
+// Every table with an incoming foreign key, keyed by the table it points at, however the key is
+// guarded: cascade, set null, restrict and the SQLite default no action all reach here.
+export function dependentsByTable(tables: Record<string, SnapshotTable>): Map<string, RebuildDependent[]> {
+  const dependentsOnto = new Map<string, RebuildDependent[]>()
+  for (const table of Object.values(tables)) {
+    for (const fk of Object.values(table.foreignKeys ?? {})) {
+      if (!dependentsOnto.has(fk.tableTo)) dependentsOnto.set(fk.tableTo, [])
+      dependentsOnto.get(fk.tableTo)!.push({ table: table.name, onDelete: fk.onDelete ?? 'no action' })
+    }
+  }
+  return dependentsOnto
+}
+
+// What rebuilding `table` costs, one message per outcome its dependents force: cascade and set
+// null lose data silently, restrict and no action abort the whole migration outright (0010).
+export function rebuildDependentProblems(file: string, table: string, dependents: RebuildDependent[]): string[] {
+  const problems: string[] = []
+  const cascading = dependents.filter(d => d.onDelete === 'cascade').map(d => d.table)
+  const nulling = dependents.filter(d => d.onDelete === 'set null').map(d => d.table)
+  const blocking = dependents.filter(d => d.onDelete === 'restrict' || d.onDelete === 'no action').map(d => d.table)
+
+  if (cascading.length) {
+    problems.push(`${file}: rebuilds \`${table}\`, and dropping it cascades to `
+      + `${cascading.map(quoted).join(', ')}. Those rows go silently.`)
+  }
+  if (nulling.length) {
+    problems.push(`${file}: rebuilds \`${table}\`, and dropping it nulls the reference in `
+      + `${nulling.map(quoted).join(', ')}. Those rows survive with the link silently severed.`)
+  }
+  if (blocking.length) {
+    problems.push(`${file}: rebuilds \`${table}\`, and ${blocking.map(quoted).join(', ')} `
+      + `reference it without cascading. The rebuild's own DROP TABLE runs with foreign keys still `
+      + `enforced, so the whole migration aborts the moment a referencing row exists.`)
+  }
+  return problems
+}
