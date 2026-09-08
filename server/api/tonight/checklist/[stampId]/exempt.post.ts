@@ -1,8 +1,7 @@
 import { exemptForm } from '#shared/utils/checklist'
 
-// The exception path: close over an incomplete item by recording a reason (criterion 5). The
-// reason is what a future night report and FOH digest would read; neither exists yet to read it
-// (docs/known-issues.md).
+// The exception path: close over an incomplete item by recording a reason (criterion 5), for a
+// night report and FOH digest that do not exist yet to read it (docs/known-issues.md).
 export default defineEventHandler(async (event) => {
   const stampId = getRouterParam(event, 'stampId') ?? ''
   const resolved = await requireNightAuthority(event, 'DUTY_MANAGER')

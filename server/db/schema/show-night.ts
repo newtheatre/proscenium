@@ -158,10 +158,8 @@ export const checklistItems = sqliteTable('checklist_items', {
   check('checklist_items_system_check_values', sql`${table.systemCheck} IS NULL OR ${table.systemCheck} IN ('NO_SHOW_HOLDS_RELEASED', 'INCIDENTS_REVIEWED')`),
 ])
 
-// One row per item stamped onto a venue's night, snapshotting the item as it read at the moment
-// of stamping: editing `checklist_items` afterwards changes nothing already stamped (E-101's own
-// pattern, criterion 1). Mutable once stamped, unlike `incidents` and `age_checks`: ticking a box
-// is a state a duty manager moves through once, not a record a correction supersedes.
+// A snapshot of an item at the moment it is stamped onto a venue's night: editing
+// `checklist_items` afterwards changes nothing already stamped (E-101's pattern, criterion 1).
 export const checklistStamps = sqliteTable('checklist_stamps', {
   id: id(),
   venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),

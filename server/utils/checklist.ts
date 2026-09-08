@@ -112,9 +112,8 @@ export async function ensureStamped(venueId: string, night: string): Promise<voi
   await db.batch(statements as never)
 }
 
-// No reservation for tonight's performances at this venue is left in a status a show should have
-// resolved by its own end (criterion 3). Needs a door scan to ever move one, which D-126 does not
-// build yet, so this stays honestly unmet until it does (docs/known-issues.md).
+// No reservation for tonight's performances here is left in a status a show should have resolved
+// by its own end (criterion 3). Needs a door scan D-126 does not build yet (docs/known-issues.md).
 export async function noShowHoldsReleased(venueId: string, night: string): Promise<boolean> {
   const { from, to } = showNightBounds(night)
   const [row] = await db.all<{ unresolved: number }>(sql`
