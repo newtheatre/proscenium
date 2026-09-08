@@ -42,8 +42,11 @@ another stream's namespace; ask the owning stream by name instead.
    `bun run check:migrations`, `bun run check:content-tokens`, `bun run check:ledger`,
    `bun run check:notifications`, `bun run check:audit`. Then the affected e2e suites with
    `bun run test:e2e`. Then `/code-review medium` on your diff; fix confirmed findings. If one
-   call cannot cover a suite, split it by file and run each in sequence. Never background a
-   command and end your turn: it cannot wake you, its result is lost, and the lead restarts you.
+   call cannot cover a suite, split it by file and run each in sequence. Never end your turn
+   waiting: a background command cannot wake you, so its result is lost and the lead restarts
+   you. A long build may be backgrounded for you whatever you choose; when that happens poll it
+   in the same turn (`while kill -0 <pid>; do sleep 20; done`) and prove the outcome from the
+   artefact it wrote, because its piped output dies with the turn.
 5. Open the PR: `gh pr create --base unified/main` with a title in the repo's habit (a
    sentence, then the ids in parentheses) and a body naming the ids, the criteria each test
    pins, any interpretation, and any seam you provided. No attribution trailers.
