@@ -48,9 +48,10 @@ step is offline against the dumps.
 - **Identity transform** (the cutover's first import, K-112): merges the four user stores on
   the canonical auth id, mints fresh ids, wipes any password on an @newtheatre.org.uk
   address (decision 0008), preserves anonymised tombstones as tombstones, drops old-domain
-  passkeys (SP-4), maps role grants through `role-map.json` (provisional until the workshop
-  signs the vocabulary; unmapped grants land in the exceptions report), and imports the old
-  audit histories into `audit_archive`.
+  passkeys (SP-4), and maps role grants through `role-map.json` (provisional until the
+  workshop signs the vocabulary; unmapped grants land in the exceptions report). The old
+  estate's audit history is not imported, in any shape (decision 0030); `reconcile.ts` checks
+  that nothing has quietly started importing it again.
 - **Reconciliation**: source-versus-target counts, the register count guard (K-115), and the
   invariant checks (no Workspace passwords, tombstones preserved, email uniqueness, every old role
   mapped, no old estate id left in `granted_by`, every address lowercase).
@@ -82,8 +83,6 @@ so a rehearsal updates the estate rather than importing a second copy of it. The
 because this repository is public and the map is what links the archived old estate to live
 identities. Losing it costs a reload of a scratch target, not ten thousand duplicate people: wipe
 the rehearsal database and start again.
-
-The old estate's audit history is deliberately not imported (decision 0030).
 
 Remaining transforms (programme, reservations and tickets, rooms, bar) follow the same
 shape, one file per module, as the weekly rehearsals proceed.

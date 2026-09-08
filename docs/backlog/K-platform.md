@@ -7,7 +7,7 @@ without losing a row that matters. Phasing follows the roadmap: the platform sto
 Phase 1, the migration stories rehearse weekly through Phase 2 and complete at the 31 October
 cutover.
 
-Stories: 24. Phases: 21 MVP, 0 V2, 0 Later, 3 resolved.
+Stories: 24. Phases: 20 MVP, 0 V2, 0 Later, 4 resolved.
 
 ## Open questions
 
@@ -324,7 +324,7 @@ Stories: 24. Phases: 21 MVP, 0 V2, 0 Later, 3 resolved.
 ## K-116: Bar opening balances by physical stocktake
 
 - Role: Bar officer
-- Phase: MVP
+- Phase: Resolved, satisfied by procedure (verified against production, 6 September 2026)
 - Story: As the bar manager, I want cutover stock levels established by a physical count so that
   the new ledger opens on what is actually on the shelf, not on damaged history.
 - Depends on: K-113
@@ -338,6 +338,22 @@ Stories: 24. Phases: 21 MVP, 0 V2, 0 Later, 3 resolved.
      on-hand equals what was counted.
   4. Blank counts are distinguishable from zero counts, and a finished stocktake posts its
      adjustments atomically.
+- Resolution:
+  1. A fresh production export (6 September 2026, `migration/inventory.ts`) shows no stock-movement
+     history to transform: `stocktakes` 0, `stocktake_lines` 0, `stock_deliveries` 0,
+     `stock_delivery_lines` 0, and `stock_movements` 4 rows whose quantities sum to zero. Criteria 1
+     and 2 have nothing to import.
+  2. Criteria 3 and 4 are already met by F-115's stocktake screen and its apply route
+     (`server/api/admin/bar/stocktakes/[id]/apply.post.ts`, `/bar/stock/stocktakes`): a physical
+     count posts as the trusted balance, a blank count reads differently from an entered zero, and
+     a finished stocktake's adjustments post atomically. Nothing further to build.
+  3. K-116 is satisfied by procedure rather than a transform: at cutover the bar counts physical
+     stock into F-115's existing screen, and that count is the opening balance
+     (`docs/operations.md`, "The bar's opening balance").
+  4. The old estate's bar catalogue (`bar_products` 40, `bar_prices` 34, `bar_recipe_items` 18,
+     `bar_categories` 5) does hold real rows and is untouched by this resolution. Whether it is
+     worth importing, and whose story that is, arguably F-111's, is a live question for the
+     committee rather than answered here.
 - Source: Prompt Book F-2; audit PR-12 (container damage, stocktake blanks); Get-In part 3,
   constraint 5
 

@@ -111,6 +111,19 @@ Travel bookmark is taken first and why the load is safe to run again after a par
 Keep `out/id-map.tsv` until cutover is complete. After that it is the key to an estate that no
 longer exists, and it goes with the archive rather than staying on anybody's laptop.
 
+### The bar's opening balance (K-116)
+
+Not a transform. A production export (6 September 2026) found no stock-movement history to
+import: `stocktakes`, `stocktake_lines`, `stock_deliveries` and `stock_delivery_lines` all read
+zero rows, and the four rows in `stock_movements` sum to zero quantity. There is nothing to
+carry across.
+
+At cutover, the bar manager counts physical stock into the stocktake screen bar already has
+(`/bar/stock/stocktakes`, F-115) and applies it. That count **is** the opening balance: F-115's
+apply route already does everything K-116 asked for beyond the transform (a blank count reads
+differently from an entered zero, and a finished stocktake posts its adjustments in one atomic
+batch). No second screen, and no import step precedes it.
+
 ## The health check
 
 `GET /api/health` is public and returns:
