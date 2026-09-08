@@ -1,14 +1,23 @@
+import { db, schema } from '@nuxthub/db'
 import { consola } from 'consola'
-import type { H3Event } from 'h3'
 import { eq, inArray } from 'drizzle-orm'
+// Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
+// Bun, where nothing is auto-imported (CONTRIBUTING).
+import { findById } from './accounts'
+import { render } from './templates'
 import { undeliverableReason } from '#shared/utils/deliverability'
 import { deliversOn, messageType } from '#shared/utils/notifications'
-import type { Channel, Preference } from '#shared/utils/notifications'
 import { formatSender, senderForTopic, SENDERS } from '#shared/utils/senders'
+import type { Channel, Preference } from '#shared/utils/notifications'
 import type { TemplateContext } from '#server/utils/templates'
+import type { H3Event } from 'h3'
 
 // The only thing in this application that hands a message to a provider (0013, H-101). A CI
 // check refuses the binding anywhere else, so there is one place these rules can be skipped.
+
+// Nitro's own extension to `import.meta`, absent from Bun's; read through a local shape so
+// this file still typechecks under `tests/`, where nothing is auto-imported (CONTRIBUTING).
+const isDev = (): boolean => Boolean((import.meta as { dev?: boolean }).dev)
 
 export interface Attachment {
   filename: string
@@ -41,7 +50,7 @@ const MAILBOX = '.data/mail'
 // The dev server runs on Node and does not surface a handler's console output, so a message with
 // nowhere to go was being recorded as sent while nobody could read it.
 async function writeToMailbox(message: Outbound): Promise<void> {
-  if (!import.meta.dev) return
+  if (!isDev()) return
   try {
     const { mkdir, writeFile } = await import('node:fs/promises')
     await mkdir(MAILBOX, { recursive: true })
@@ -76,7 +85,7 @@ const consoleTransport: Transport = {
 function transportFor(event: H3Event | undefined): Transport {
   // Development never hands a message to a provider, whatever the emulator supplies: a stub
   // binding accepts a message and drops it, which reads as delivered (architecture.md).
-  if (import.meta.dev) return consoleTransport
+  if (isDev()) return consoleTransport
 
   const binding = (event?.context.cloudflare?.env as unknown as { EMAIL?: EmailBinding } | undefined)?.EMAIL
   if (!binding) return consoleTransport
