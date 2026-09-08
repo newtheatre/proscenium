@@ -37,6 +37,9 @@ export const profileForm = z.object({
   name: z.string().trim().min(1).max(200),
   pronouns: optionalText(80),
   phone: optionalText(40),
+  // Consent, not a fact recorded about somebody: whether tonight's duty manager sees this phone
+  // number on the team list while a shift is confirmed (E-112 criterion 2).
+  shiftContactVisible: z.boolean().default(false),
   emergencyName: optionalText(200),
   emergencyPhone: optionalText(40),
   emergencyRelation: optionalText(80),

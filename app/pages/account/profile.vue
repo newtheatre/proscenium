@@ -18,6 +18,7 @@ const state = reactive({
   name: '',
   pronouns: '',
   phone: '',
+  shiftContactVisible: false,
   emergencyName: '',
   emergencyPhone: '',
   emergencyRelation: '',
@@ -35,6 +36,7 @@ async function load(): Promise<void> {
     name: profile.name,
     pronouns: profile.pronouns ?? '',
     phone: profile.phone ?? '',
+    shiftContactVisible: profile.shiftContactVisible,
     emergencyName: profile.emergencyName ?? '',
     emergencyPhone: profile.emergencyPhone ?? '',
     emergencyRelation: profile.emergencyRelation ?? '',
@@ -129,6 +131,17 @@ useSeoMeta({ title: 'Profile' })
             type="tel"
             class="w-full"
             data-test="profile-phone"
+          />
+        </UFormField>
+
+        <UFormField
+          label="Share my phone with tonight's team"
+          name="shiftContactVisible"
+          description="Only while you hold a confirmed shift, and only to the duty manager running that performance."
+        >
+          <USwitch
+            v-model="state.shiftContactVisible"
+            data-test="profile-shift-contact-visible"
           />
         </UFormField>
 

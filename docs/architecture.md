@@ -497,6 +497,42 @@ than going out transactionally: it is the first shift message that is a courtesy
 outcome, so a preference may govern it (criterion 4). The call time is the venue's `doors_at`
 where one is set, curtain otherwise: nothing else records a time distinct from either.
 
+### The duty manager's tonight screen (E-112)
+
+`GET /api/tonight/duty-manager`, guarded by `requireNightAuthority(event, 'DUTY_MANAGER')` like
+every other show-night route, is `/tonight` itself once a caller resolves that authority: the
+hub becomes the screen rather than linking out to one. `server/utils/tonight.ts` holds three
+query builders, each bound to one performance id and nothing that grows with a table's size
+(0003): `tonightHouseQuery` for the live numbers, `tonightTeamQuery` for the roster,
+`tonightPerformanceQuery` for the show and its warnings. "Sold" rides `heldSeatsSubquery` from
+`server/utils/capacity.ts`, never a second count of `tickets`, which
+`tests/unit/capacity-guard.test.ts` refuses outright (D-105 criterion 2); "admitted" is
+`reservations.status = 'DOOR'`, which reads honestly as nought until D-126 builds the door scan.
+
+`readTeamRow()` is the roster's pure half: `OPEN`, `DECLINED` and an unconfirmed `CLAIMED` all
+read as unfilled, because "who is actually coming" is the question the screen answers, never a
+blank name for an open slot (criterion 2). A filled slot's phone shows only when
+`shift_contact_preferences.visible` is set, a new table rather than a `users` column so nothing
+here is a NOT NULL addition to a table build-order.md fixes; the toggle lives on
+`/account/profile` beside the phone number it governs, through the same `profileForm` and
+`saveProfile()` the rest of the profile already uses. Consent is read fresh on every load, so
+withdrawing it takes effect on the screen's next poll rather than the holder's next shift.
+
+The screen polls every 20 seconds while open (criterion 3, an interpretation: the criterion
+names the behaviour and not a number). A poll that fails leaves the last-fetched values on
+screen and turns `NightStale` amber rather than clearing anything, because a spinner is
+exactly what criterion 3 refuses; only the very first load shows one, before there is anything
+stale to fall back to. A caller `requireNightAuthority` refuses is shown the hub's own fallback
+links instead of a failure banner, which is how `/tonight` still serves a DOOR or BAR shift
+holder who is not tonight's duty manager. Content warnings, the latecomer policy and the age
+guidance are read straight from `showWarnings()` and the show row, the same source the public
+show page reads, so neither can drift from the other.
+
+Quick links to the incident log, the Challenge 25 register, near-miss reporting, the checklists
+and the backstage board are not on the screen yet: none of E-115, E-117, E-118, E-114 or E-120
+has built its destination (`docs/known-issues.md`). Till is linked because it is the one
+show-night screen that already exists.
+
 ## The programme (build-order contract d, 0043)
 
 Where we perform, what we perform and when. `venues`, `seasons`, `show_categories`, `shows`,

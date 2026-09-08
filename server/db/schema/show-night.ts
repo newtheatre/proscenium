@@ -66,3 +66,11 @@ export const shifts = sqliteTable('shifts', {
   uniqueIndex('shifts_one_confirmed_duty_manager').on(table.performanceId)
     .where(sql`role = 'DUTY_MANAGER' AND status = 'CONFIRMED'`),
 ])
+
+// Consent, not a fact about the person: whether their phone shows on tonight's team list. A new
+// table rather than a `users` column, which build-order.md fixes against new NOT NULL additions.
+export const shiftContactPreferences = sqliteTable('shift_contact_preferences', {
+  userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  visible: integer('visible', { mode: 'boolean' }).notNull().default(false),
+  updatedAt: integer('updated_at').notNull().default(now),
+})

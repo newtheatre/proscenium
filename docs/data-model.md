@@ -595,6 +595,13 @@ restamps the open ones from the new venue's template; a held shift in a role the
 template does not staff at all is cancelled rather than left stranded, and its holder is
 told either way (E-101, E-102, committee direction 4 September 2026).
 
+### shift_contact_preferences
+`user_id` PK → users cascade · `visible` bool default false · `updated_at`. Consent, not a fact
+recorded about somebody: whether tonight's duty manager sees this phone number on the team
+list while a shift is confirmed. A table rather than a `users` column, because nothing may add
+a NOT NULL column to `users` (build-order.md). Deleted outright on erasure, not scrubbed
+(E-112 criterion 2).
+
 ### incidents  APPEND-ONLY
 `id` PK · `performance_id` restrict · `reported_by` restrict · `body` (operational free
 text; people by role, never diagnosis) · `severity` CHECK `NOTE|NEAR_MISS|INCIDENT|SERIOUS` ·

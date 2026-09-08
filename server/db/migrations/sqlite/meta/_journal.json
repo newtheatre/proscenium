@@ -470,6 +470,13 @@
       "when": 1788688329985,
       "tag": "0066_health_incidents_track_sustained_unhealthiness",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "6",
+      "when": 1788830203945,
+      "tag": "0067_wise_thunderbird",
+      "breakpoints": true
     }
   ]
 }

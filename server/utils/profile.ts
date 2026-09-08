@@ -13,6 +13,7 @@ export interface Profile {
   pronouns: string | null
   phone: string | null
   email: string
+  shiftContactVisible: boolean
   emergencyName: string | null
   emergencyPhone: string | null
   emergencyRelation: string | null
@@ -28,11 +29,17 @@ export async function profileFor(account: AccountRow): Promise<Profile> {
     .where(eq(schema.emergencyContacts.userId, account.id))
     .limit(1)
 
+  const [shiftContact] = await db.select({ visible: schema.shiftContactPreferences.visible })
+    .from(schema.shiftContactPreferences)
+    .where(eq(schema.shiftContactPreferences.userId, account.id))
+    .limit(1)
+
   return {
     name: account.name,
     pronouns: account.pronouns,
     phone: account.phone,
     email: account.email,
+    shiftContactVisible: shiftContact?.visible ?? false,
     emergencyName: contact?.name ?? null,
     emergencyPhone: contact?.phone ?? null,
     emergencyRelation: contact?.relation ?? null,
@@ -64,9 +71,17 @@ export async function saveProfile(account: AccountRow, input: ProfileInput): Pro
           set: { name: input.emergencyName, phone: input.emergencyPhone!, relation: input.emergencyRelation, updatedAt: now },
         })
 
+  const shiftContact = db.insert(schema.shiftContactPreferences)
+    .values({ userId: account.id, visible: input.shiftContactVisible, updatedAt: now })
+    .onConflictDoUpdate({
+      target: schema.shiftContactPreferences.userId,
+      set: { visible: input.shiftContactVisible, updatedAt: now },
+    })
+
   await db.batch([
     person,
     contact,
+    shiftContact,
     db.insert(schema.auditLog).values(auditEntry({
       actorId: account.id,
       action: 'account.profile.updated',
@@ -77,7 +92,7 @@ export async function saveProfile(account: AccountRow, input: ProfileInput): Pro
   ])
 }
 
-const COMPARED = ['name', 'pronouns', 'phone', 'emergencyName', 'emergencyPhone', 'emergencyRelation'] as const
+const COMPARED = ['name', 'pronouns', 'phone', 'shiftContactVisible', 'emergencyName', 'emergencyPhone', 'emergencyRelation'] as const
 
 function changedFields(before: Profile, input: ProfileInput): string[] {
   return COMPARED.filter(field => before[field] !== input[field])
