@@ -165,6 +165,7 @@ const CATALOGUE = {
   'shift.confirmed': { label: 'Claimed shift approved', module: 'show-night' },
   'shift.declined': { label: 'Claimed shift declined', module: 'show-night' },
   'shift.released': { label: 'Held shift released back to open', module: 'show-night' },
+  'shift.dismissed': { label: 'Declined claim cleared by its own claimant', module: 'show-night' },
   'shift.reassigned': { label: 'Shift assigned or reassigned by an officer', module: 'show-night' },
   'age-check.logged': { label: 'Challenge 25 check logged', module: 'show-night' },
   'age-check.superseded': { label: 'Challenge 25 entry corrected', module: 'show-night' },

@@ -642,6 +642,30 @@ single `reason` column the original outline carried: criterion 1 asks for the ID
 refusal reason as two distinct pieces of information, not one column doing both jobs
 (E-118). The licensing register; exports span CSV and PDF (E-119, not yet built).
 
+### checklist_items
+`id` PK · `venue_id` → venues cascade · `phase` CHECK `PRE|POST` · `label` · `sort` · `required`
+bool · `system_check` CHECK enum, NULL (`NO_SHOW_HOLDS_RELEASED|INCIDENTS_REVIEWED`; NULL is
+hand-ticked) · `active` bool (soft-retired, never deleted: a stamp keeps referencing it) ·
+`updated_by` set null · `updated_at`. The committee's own configuration (E-114 criterion 1),
+mutable like `shift_templates` rather than append-only: ticking a box is a state, not a record.
+
+### checklist_stamps
+`id` PK · `venue_id` → venues restrict · `night` · `item_id` → checklist_items restrict ·
+`phase`, `label`, `sort`, `required`, `system_check` (snapshotted from the item at the moment of
+stamping) · `ticked_by` restrict NULL · `ticked_at` NULL · `exempted` bool · `exempt_reason` NULL
+· `exempted_by` restrict NULL · `exempted_at` NULL · `stamped_at`. UNIQUE (`venue_id`, `night`,
+`item_id`): one stamp per item per venue per night, made the first time that night's checklist is
+touched, so an edit to `checklist_items` afterwards changes nothing already stamped (E-101's own
+pattern). Keyed to a venue and a night rather than a performance, like `till_sessions`. A
+system-verified item's `ticked_by`/`ticked_at` stay NULL forever; its done state is read live
+against the data the check names, never stored (E-114 criterion 3).
+
+### checklist_closes
+`id` PK · `venue_id` → venues restrict · `night` · `closed_by` restrict · `closed_at`. UNIQUE
+(`venue_id`, `night`) makes closing idempotent, the same guarantee `night_reports`' PK gives its
+own close. The close-night action itself (E-114 criterion 4); blocked while a required item
+across either phase is neither ticked nor exempted.
+
 ### night_reports
 `performance_id` PK → performances restrict · `payload` JSON (attendance, takings by tender,
 incidents, milestones, staffing, bar summary, access counts only) · `closing_note` ·
@@ -777,8 +801,9 @@ so a session once closed stays closed and a fresh one opening later that night i
 own rather than a reuse. Keys to the night rather than a performance, so one session covers a
 matinee and an evening at the same venue (E-127), the same choice 0044 makes for an officer
 bypass. The expected reconciliation figure at close is F-118's, which needs sales that do not
-exist yet; a close-night checklist for a session left open past its night is F-102's own query
-(`staleUnclosedSessionsQuery`), with no screen reading it until E-114's checklist exists.
+exist yet; a session left open past its night is F-102's own query (`staleUnclosedSessionsQuery`).
+E-114's checklist criterion 3 names only two system-verified checks; a stale till session is not
+a third one it added, so this query still has no screen reading it (`docs/known-issues.md`).
 
 ### stock_movements  APPEND-ONLY
 `id` PK · `item_id` → bar_items restrict · `qty` signed integer, whole units of the item's own

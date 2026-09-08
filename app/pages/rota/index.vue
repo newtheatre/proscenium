@@ -45,6 +45,7 @@ const { data, status, refresh } = await useFetch<Page<OpenShift>>('/api/rota/shi
 
 const claiming = ref<string | null>(null)
 const releasing = ref<string | null>(null)
+const dismissing = ref<string | null>(null)
 
 function releasable(shift: MyShift): boolean {
   return shift.status === 'CLAIMED' || shift.status === 'CONFIRMED'
@@ -67,6 +68,21 @@ async function release(shift: MyShift): Promise<void> {
   }
   finally {
     releasing.value = null
+  }
+}
+
+// A declined claim is a member's own to clear off "what you hold" (E-114).
+async function dismiss(shift: MyShift): Promise<void> {
+  dismissing.value = shift.shiftId
+  try {
+    await $fetch(`/api/rota/shifts/${shift.shiftId}/dismiss`, { method: 'POST' })
+    await Promise.all([refresh(), refreshMine()])
+  }
+  catch (error) {
+    toast.add({ title: 'Could not dismiss that', description: refusalText(error), icon: 'i-lucide-x', color: 'error' })
+  }
+  finally {
+    dismissing.value = null
   }
 }
 
@@ -154,6 +170,17 @@ useSeoMeta({ title: 'My rota' })
             @click="release(shift)"
           >
             Release
+          </UButton>
+          <UButton
+            v-else-if="shift.status === 'DECLINED'"
+            size="sm"
+            color="neutral"
+            variant="subtle"
+            :loading="dismissing === shift.shiftId"
+            :data-test="`dismiss-${shift.shiftId}`"
+            @click="dismiss(shift)"
+          >
+            Dismiss
           </UButton>
         </li>
       </ul>

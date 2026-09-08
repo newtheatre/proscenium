@@ -275,6 +275,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/rota/mine.get.ts', exempt: 'reads your own shifts' },
   { route: 'server/api/rota/shifts/[id]/claim.post.ts', actions: ['shift.claimed'] },
   { route: 'server/api/rota/shifts/[id]/release.post.ts', actions: ['shift.released'] },
+  { route: 'server/api/rota/shifts/[id]/dismiss.post.ts', actions: ['shift.dismissed'] },
   { route: 'server/api/admin/rota/approvals/index.get.ts', exempt: 'reads the queued claims waiting on a decision' },
   { route: 'server/api/admin/rota/approvals/[id]/approve.post.ts', actions: ['shift.confirmed'] },
   { route: 'server/api/admin/rota/approvals/[id]/decline.post.ts', actions: ['shift.declined'] },

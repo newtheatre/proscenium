@@ -121,6 +121,12 @@ export function releaseRefusal(status: ShiftStatus): string {
   return 'This shift has been cancelled'
 }
 
+// Only a declined claim is a member's to clear themselves (E-114, closing the self-service gap
+// E-106 and E-107 left open); anything else, including one already dismissed, reads the same.
+export function dismissRefusal(): string {
+  return 'Only a declined claim can be dismissed this way, or it already has been'
+}
+
 // Why an officer's assignment did not apply: cancelled, or the member already committed
 // elsewhere on the same performance, the only two ways the predicate refuses (E-107 criterion 3).
 export function reassignRefusal(status: ShiftStatus): string {

@@ -167,6 +167,46 @@ describe.skipIf(skip !== null)('releasing a shift (E-107 criterion 1)', () => {
   })
 })
 
+describe.skipIf(skip !== null)('dismissing a declined claim (E-114)', () => {
+  test('the declined claimant clears it off their own list', async () => {
+    const holder = await registerMember(app, 'dismiss-holder', generatePassword())
+    const house = performance(7, 'dismiss-own')
+    claim(house.shiftId, holder.id, 'DECLINED', 'Not eligible after all')
+
+    const before = await send('GET', '/api/rota/mine', undefined, holder.cookie)
+    expect((await before.json() as { items: { shiftId: string }[] }).items.map(item => item.shiftId)).toContain(house.shiftId)
+
+    const dismissed = await send('POST', `/api/rota/shifts/${house.shiftId}/dismiss`, undefined, holder.cookie)
+    expect(dismissed.status).toBe(200)
+
+    const after = await send('GET', '/api/rota/mine', undefined, holder.cookie)
+    expect((await after.json() as { items: { shiftId: string }[] }).items.map(item => item.shiftId)).not.toContain(house.shiftId)
+    expect(read<{ status: string }>('SELECT status FROM shifts WHERE id = ?', house.shiftId)?.status).toBe('CANCELLED')
+  })
+
+  test('somebody else cannot dismiss it', async () => {
+    const holder = await registerMember(app, 'dismiss-owner', generatePassword())
+    const other = await registerMember(app, 'dismiss-stranger', generatePassword())
+    const house = performance(7, 'dismiss-not-yours')
+    claim(house.shiftId, holder.id, 'DECLINED', 'Reason')
+
+    expect((await send('POST', `/api/rota/shifts/${house.shiftId}/dismiss`, undefined, other.cookie)).status).toBe(403)
+  })
+
+  test('a confirmed shift cannot be dismissed this way', async () => {
+    const holder = await registerMember(app, 'dismiss-confirmed', generatePassword())
+    const house = performance(7, 'dismiss-confirmed')
+    claim(house.shiftId, holder.id, 'CONFIRMED')
+
+    expect((await send('POST', `/api/rota/shifts/${house.shiftId}/dismiss`, undefined, holder.cookie)).status).toBe(409)
+  })
+
+  test('a missing shift 404s', async () => {
+    const holder = await registerMember(app, 'dismiss-missing', generatePassword())
+    expect((await send('POST', '/api/rota/shifts/no-such-shift/dismiss', undefined, holder.cookie)).status).toBe(404)
+  })
+})
+
 describe.skipIf(skip !== null)('the release notice window (E-107 criterion 2)', () => {
   test('a release close to the performance notifies the FOH officer immediately', async () => {
     const holder = await registerMember(app, 'release-near', generatePassword())
