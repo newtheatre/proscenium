@@ -245,6 +245,9 @@ Reading the table:
   What tells a walk-up from a collection is the kind, and the reservation's own `DOOR` source.
 - `IMPORT` tenders `NONE` where the old estate recorded none. Imported history lands into closed
   periods (I-109 criterion 3), keeping each entry's original calendar day.
+- Once the import has run in an environment, `ledger_entries` and `ledger_lines` carry six years
+  of real rows. Anything asserting on ledger contents there scopes to what it wrote, never to an
+  assumed-empty table.
 - The night a performance belongs to comes from the performance, and a till session's night comes
   from `showNightOf` (E-110). Neither is read off `london_day`, and no path writes both.
 
