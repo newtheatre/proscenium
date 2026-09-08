@@ -11,9 +11,8 @@ import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { BasketLineInput, PricedBasket, PricedLine, SaleCatalogue, SaleCategory, SaleChoice, SaleProduct, SaleReceipt, SaleVariant } from '#shared/utils/sale'
 import type { BatchItem } from 'drizzle-orm/batch'
 
-// What the till may sell right now, what pricing a basket of it costs, and committing a sale
-// atomically once the till has confirmed it, with its Challenge 25 outcome when it needs one
-// (F-103, F-104, F-105, F-106).
+// What the till may sell right now, what pricing it costs, and the atomic commit once confirmed,
+// with a Challenge 25 outcome folded in when the basket needs one (F-103 through F-106).
 
 interface VariantRow {
   id: string
@@ -49,9 +48,8 @@ export interface Depletion {
   qty: number
 }
 
-// Everything the catalogue, a price check and a sale commit each need about one size: the public
-// `SaleVariant` shape plus what only the write path reads (F-121's `price_ref`, F-113's recipe,
-// F-106's Challenge 25 gate). `ageRestricted` is the owning product's, not this size's own.
+// The public `SaleVariant` shape plus what only the write path reads: F-121's `price_ref`,
+// F-113's recipe, F-106's `ageRestricted` gate (the owning product's flag, not this size's own).
 interface ResolvedVariant extends SaleVariant {
   productId: string
   priceRowId: string
@@ -260,9 +258,8 @@ function saleableAfterAgeCheck(
   return { restricted, sold }
 }
 
-// The cross-check (F-104) and, once it matches, the one atomic write (F-105 criterion 1): a
-// ledger entry, its lines, a stock movement per ingredient, an inline Challenge 25 outcome when
-// the basket needs one (F-106), and every audit row, in one batch.
+// The cross-check (F-104) and the one atomic write (F-105 criterion 1): the ledger entry, its
+// lines and stock, an inline Challenge 25 outcome when the basket needs one, and every audit row.
 export async function commitSale(
   lines: BasketLineInput[],
   on: string,

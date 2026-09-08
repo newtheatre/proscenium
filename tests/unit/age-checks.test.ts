@@ -3,6 +3,7 @@ import {
   AGE_CHECK_CONSTRAINT_REFUSALS,
   ageCheckConstraintRefusal,
   ageCheckForm,
+  inlineAgeCheckForm,
   saysIdType,
   saysOutcome,
   saysRefusalReason,
@@ -13,6 +14,7 @@ import {
 // migrations in `tests/integration/age-checks.test.ts`.
 
 const base = { description: 'Tall man, grey coat', product: null, notes: null, performanceId: null }
+const inlineBase = { description: 'Tall man, grey coat', notes: null }
 
 describe('an entry names exactly one side of its outcome (criterion 1)', () => {
   test('accepted names the ID and nothing else', () => {
@@ -39,6 +41,28 @@ describe('an entry names exactly one side of its outcome (criterion 1)', () => {
 
   test('refused carrying an ID type is refused', () => {
     expect(ageCheckForm.safeParse({ ...base, outcome: 'REFUSED', reason: 'NO_ID_SHOWN', idType: 'PASSPORT' }).success).toBe(false)
+  })
+})
+
+describe('an outcome folded into a sale needs the same shape, minus what the till already knows (F-106)', () => {
+  test('accepted names the ID, with no performance or product to name', () => {
+    const parsed = inlineAgeCheckForm.safeParse({ ...inlineBase, outcome: 'ACCEPTED', idType: 'PASSPORT' })
+    expect(parsed.success).toBe(true)
+  })
+
+  test('refused names why, the same as standalone', () => {
+    expect(inlineAgeCheckForm.safeParse({ ...inlineBase, outcome: 'REFUSED', reason: 'ID_LOOKED_FALSE' }).success).toBe(true)
+  })
+
+  test('accepted with no ID type is refused, the same as standalone', () => {
+    expect(inlineAgeCheckForm.safeParse({ ...inlineBase, outcome: 'ACCEPTED' }).success).toBe(false)
+  })
+
+  test('a performance or a product sent anyway is not part of this shape', () => {
+    const parsed = inlineAgeCheckForm.safeParse({ ...inlineBase, outcome: 'ACCEPTED', idType: 'PASSPORT', performanceId: 'perf-1', product: 'Vodka' })
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && 'performanceId' in parsed.data).toBe(false)
+    expect(parsed.success && 'product' in parsed.data).toBe(false)
   })
 })
 

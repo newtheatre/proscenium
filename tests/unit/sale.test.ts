@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, saleForm } from '#shared/utils/sale'
 
+const aLine = { variantId: 'var-1', qty: 1 }
+
 // F-103's write-path rules: a basket line is a size at a quantity, and a basket is a bounded list
 // of them, so nothing here can grow the bound parameters a price check binds without limit.
 
@@ -47,5 +49,31 @@ describe('a sale submission carries what the screen believes the total is (F-104
     expect(saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: 2.5 }).success).toBe(false)
     expect(saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: -1 }).success).toBe(false)
     expect(saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: 0 }).success).toBe(true)
+  })
+})
+
+describe('an age-restricted line may carry a Challenge 25 outcome (F-106 criterion 1)', () => {
+  test('a submission with no restricted line needs no outcome', () => {
+    const parsed = saleForm.safeParse({ lines: [aLine], expectedTotalPence: 250 })
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.ageCheck).toBeNull()
+  })
+
+  test('a valid outcome rides alongside the basket', () => {
+    const parsed = saleForm.safeParse({
+      lines: [aLine],
+      expectedTotalPence: 250,
+      ageCheck: { outcome: 'ACCEPTED', idType: 'PASSPORT', description: 'Tall man, grey coat' },
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  test('an outcome with no ID type on an accepted check is refused, the same as standalone', () => {
+    const parsed = saleForm.safeParse({
+      lines: [aLine],
+      expectedTotalPence: 250,
+      ageCheck: { outcome: 'ACCEPTED', description: 'Tall man, grey coat' },
+    })
+    expect(parsed.success).toBe(false)
   })
 })
