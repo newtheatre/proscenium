@@ -13,6 +13,16 @@ const UNSCOPED = '*'
 const SCREEN = /^[a-z][a-z0-9-]*$/
 const KEY_SEGMENTS = 5
 
+declare const NIGHT_CACHE_KEY: unique symbol
+
+// A hand-built string looks like a key and throws deep inside a catch block that was written for
+// an offline loader, not for a typo (K-103, bar's #743). Opaque so only nightCacheKey() makes one.
+export type NightCacheKey = string & { readonly [NIGHT_CACHE_KEY]: true }
+
+// Thrown only for a key that did not come from nightCacheKey(): a programming error, never the
+// offline case the cache exists for, so a caller must not fold it into the same "quiet" path.
+export class MalformedNightCacheKeyError extends TypeError {}
+
 export interface NightCacheScope {
   screen: string
   night: string
@@ -48,7 +58,7 @@ function segment(name: string, value: string | null | undefined): string {
   return value
 }
 
-export function nightCacheKey(scope: NightCacheScope): string {
+export function nightCacheKey(scope: NightCacheScope): NightCacheKey {
   if (!SCREEN.test(scope.screen)) {
     throw new TypeError(`a night cache screen is lower-case and hyphenated, not "${scope.screen}"`)
   }
@@ -65,7 +75,8 @@ export function nightCacheKey(scope: NightCacheScope): string {
   if (!scope.wholeNight && !scoped) {
     throw new TypeError('a night cache key names a venue or a performance, or says wholeNight: two venues may run one night')
   }
-  return [NIGHT_CACHE_PREFIX, scope.screen, scope.night, venueId, performanceId].join(SEPARATOR)
+  // The one place this brand is minted: everywhere else takes NightCacheKey as given.
+  return [NIGHT_CACHE_PREFIX, scope.screen, scope.night, venueId, performanceId].join(SEPARATOR) as NightCacheKey
 }
 
 export interface NightCacheKeyParts {
@@ -123,9 +134,9 @@ export function readNightCache<T>(store: NightCacheStore, key: string): NightCac
 
 // Null when the device would not take it (a full or refusing store), because a screen that cannot
 // cache still has to render.
-export function writeNightCache<T>(store: NightCacheStore, key: string, data: T, at: Date = new Date()): NightCacheEntry<T> | null {
+export function writeNightCache<T>(store: NightCacheStore, key: NightCacheKey, data: T, at: Date = new Date()): NightCacheEntry<T> | null {
   const parts = nightCacheKeyParts(key)
-  if (!parts) throw new TypeError(`"${key}" is not a night cache key: build one with nightCacheKey()`)
+  if (!parts) throw new MalformedNightCacheKeyError(`"${key}" is not a night cache key: build one with nightCacheKey()`)
 
   const entry: NightCacheEntry<T> = { key, night: parts.night, cachedAt: at.getTime(), data }
   try {
@@ -156,7 +167,7 @@ export function pruneNightCache(store: NightCacheStore, night: string): string[]
 
 // A failure leaves the last good night where it was and rejects, so the screen keeps rendering
 // what it had (K-103 criterion 2). It answers even when the device refused to store the result.
-export async function refreshNightCache<T>(store: NightCacheStore, key: string, loader: () => Promise<T>, at: Date = new Date()): Promise<NightCacheEntry<T>> {
+export async function refreshNightCache<T>(store: NightCacheStore, key: NightCacheKey, loader: () => Promise<T>, at: Date = new Date()): Promise<NightCacheEntry<T>> {
   const data = await loader()
   const stored = writeNightCache(store, key, data, at)
   return stored ?? { key, night: nightCacheKeyParts(key)!.night, cachedAt: at.getTime(), data }

@@ -20,7 +20,9 @@ code and documentation a successor can pick up cold.
 
 - One application, one D1 database. Atomicity is `db.batch` only; contended claims are
   conditional writes with the predicate on the statement; ids scope by subquery, never an
-  `IN` list from a result set; bound parameters chunk at 90 (0001, 0003, 0006).
+  `IN` list from a result set; bound parameters chunk at 90 (0001, 0003, 0006). The same rule
+  bites from a second direction: a computation that binds one parameter per row of an unrelated
+  table it walks, such as a whole catalogue, scales exactly the way an `IN` list does.
 - Money is integer pence in the append-only ledger; every money-taking screen sends its
   expected total and a mismatch refuses quoting both figures (0004, 0005).
 - **Payment only via the SU's physical SumUp reader.** No online charge, no card data, ever.

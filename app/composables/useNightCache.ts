@@ -1,5 +1,6 @@
 import { getCurrentInstance, onMounted, ref, shallowRef, toValue, watch } from 'vue'
 import {
+  MalformedNightCacheKeyError,
   NIGHT_CACHE_PREFIX,
   memoryNightCacheStore,
   pruneNightCache,
@@ -7,7 +8,7 @@ import {
   refreshNightCache,
 } from '#shared/utils/night-cache'
 import type { MaybeRefOrGetter, Ref, ShallowRef } from 'vue'
-import type { NightCacheStore } from '#shared/utils/night-cache'
+import type { NightCacheKey, NightCacheStore } from '#shared/utils/night-cache'
 
 // A show-night screen's data, held on the device so venue Wi-Fi dropping never blanks it (K-103).
 // Everything imported rather than auto-imported, because the tests run this outside Nuxt.
@@ -46,7 +47,7 @@ export interface NightCache<T> {
   refresh: () => Promise<void>
 }
 
-export function useNightCache<T>(key: MaybeRefOrGetter<string>, loader: () => Promise<T>, options: NightCacheOptions = {}): NightCache<T> {
+export function useNightCache<T>(key: MaybeRefOrGetter<NightCacheKey>, loader: () => Promise<T>, options: NightCacheOptions = {}): NightCache<T> {
   const store = options.store ?? deviceNightCacheStore()
   const data = shallowRef<T | null>(null)
   const cachedAt = ref<number | null>(null)
@@ -77,6 +78,9 @@ export function useNightCache<T>(key: MaybeRefOrGetter<string>, loader: () => Pr
       pruneNightCache(store, entry.night)
     }
     catch (thrown) {
+      // A malformed key is a programming error, not the offline case this cache exists for:
+      // it must not vanish into a stale-looking screen the way a real loader failure should.
+      if (thrown instanceof MalformedNightCacheKeyError) throw thrown
       if (asked !== toValue(key)) return
       // What the screen is showing stays put: a failed load is a stale screen, never a blank one.
       error.value = thrown instanceof Error ? thrown : new Error(String(thrown))
@@ -102,12 +106,14 @@ export function useNightCache<T>(key: MaybeRefOrGetter<string>, loader: () => Pr
 
 // What one screen caches for another, so the emergency card is there from the start of the shift
 // rather than from the first visit to it (K-103 criterion 3, E-113 criterion 2).
-export async function primeNightCache<T>(key: string, load: () => T | Promise<T>, store: NightCacheStore = deviceNightCacheStore()): Promise<boolean> {
+export async function primeNightCache<T>(key: NightCacheKey, load: () => T | Promise<T>, store: NightCacheStore = deviceNightCacheStore()): Promise<boolean> {
   try {
     await refreshNightCache(store, key, async () => await load())
     return true
   }
-  catch {
+  catch (thrown) {
+    // A malformed key is a programming error, loud even though a loader failure here stays quiet.
+    if (thrown instanceof MalformedNightCacheKeyError) throw thrown
     // Best effort by design: priming another screen must never break the screen doing it.
     return false
   }
