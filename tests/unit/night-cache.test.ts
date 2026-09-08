@@ -3,6 +3,7 @@ import { effectScope, nextTick, ref } from 'vue'
 import { primeNightCache, useNightCache } from '#composables/useNightCache'
 import { lastSyncedLabel } from '#shared/utils/night-shell'
 import {
+  MalformedNightCacheKeyError,
   NIGHT_CACHE_PREFIX,
   memoryNightCacheStore,
   nightCacheKey,
@@ -12,7 +13,7 @@ import {
   refreshNightCache,
   writeNightCache,
 } from '#shared/utils/night-cache'
-import type { NightCacheStore } from '#shared/utils/night-cache'
+import type { NightCacheKey, NightCacheStore } from '#shared/utils/night-cache'
 
 // K-103: what a show-night screen keeps on the device, and what it is allowed to claim about it.
 // The composable binds these rules to localStorage; the rules themselves are held here.
@@ -140,8 +141,18 @@ describe('what a screen reads back, and what it may claim about it (criteria 1 a
     expect(readNightCache(store, key)).toBeNull()
   })
 
+  // nightCacheKey() is the only legitimate source of a key, so this simulates a caller that
+  // bypassed the type system (untyped JS, a cast, a value round-tripped through storage).
   test('a key that is not one of ours is never written', () => {
-    expect(() => writeNightCache(memoryNightCacheStore(), 'nuxt-colour-mode', { admitted: 3 })).toThrow()
+    const notOurs = 'nuxt-colour-mode' as NightCacheKey
+    expect(() => writeNightCache(memoryNightCacheStore(), notOurs, { admitted: 3 })).toThrow(MalformedNightCacheKeyError)
+  })
+
+  test('a hand-rolled key does not typecheck: only nightCacheKey() may produce one', () => {
+    expect(() => {
+      // @ts-expect-error a plain string is not a NightCacheKey
+      writeNightCache(memoryNightCacheStore(), 'nuxt-colour-mode', { admitted: 3 })
+    }).toThrow(MalformedNightCacheKeyError)
   })
 
   // A device that cannot store anything still has to render: the fallback is memory, so a screen
@@ -254,6 +265,17 @@ describe('what a screen holding one of these sees (criteria 2 and 3)', () => {
     })
   })
 
+  // A malformed key is a programming error, not the offline case above: it must not be folded
+  // into the same quiet error.value state a genuine loader failure gets.
+  test('a malformed key is thrown loudly, never swallowed like a loader failure', async () => {
+    await inScope(async () => {
+      const store = memoryNightCacheStore()
+      const bad = 'nuxt-colour-mode' as NightCacheKey
+      const cache = useNightCache<{ admitted: number }>(bad, () => Promise.resolve({ admitted: 9 }), { store, immediate: false })
+      await expect(cache.refresh()).rejects.toThrow(MalformedNightCacheKeyError)
+    })
+  })
+
   test('a load that answers replaces the night and sweeps the nights it left', async () => {
     await inScope(async () => {
       const store = memoryNightCacheStore()
@@ -314,6 +336,12 @@ describe('what a screen holding one of these sees (criteria 2 and 3)', () => {
 
     expect(await primeNightCache(card, () => Promise.reject(new Error('offline')), store)).toBe(false)
     expect(readNightCache<{ assemblyPoint: string }>(store, card)?.data.assemblyPoint).toBe('The car park')
+  })
+
+  test('priming with a malformed key is thrown loudly, not folded into "best effort"', async () => {
+    const store = memoryNightCacheStore()
+    const bad = 'nuxt-colour-mode' as NightCacheKey
+    await expect(primeNightCache(bad, () => ({ assemblyPoint: 'The car park' }), store)).rejects.toThrow(MalformedNightCacheKeyError)
   })
 })
 
