@@ -299,6 +299,14 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // note written on the slot is not.
     why: 'Which performances somebody worked. The staffing record survives; a note on the slot does not.',
   },
+  {
+    name: 'shift_contact_preferences',
+    column: 'user_id',
+    section: null,
+    columns: null,
+    erasure: 'delete',
+    why: 'Whether a phone number shows to tonight\'s team, consented to rather than recorded about them.',
+  },
 
   // Module F: bar
 

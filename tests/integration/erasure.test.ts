@@ -89,6 +89,8 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
     [`INSERT INTO shifts (id, performance_id, role, slot, user_id, status, notes, assigned_by)
       VALUES (?, ?, ?, 1, ?, 'CONFIRMED', ?, ?)`,
     `sh-${id}`, `perf-${id}`, 'DUTY_MANAGER', id, `${NAME} has the keys`, id],
+    // Consent, not a fact recorded about them, so it goes rather than being scrubbed (E-112).
+    ['INSERT INTO shift_contact_preferences (user_id, visible) VALUES (?, 1)', id],
     // A price this person set. Append-only and free of anything but a figure and a date, which is
     // why an erasure leaves it with only the tombstone's reference in it (F-116).
     ['INSERT INTO bar_categories (id, name) VALUES (?, ?)', `bc-${id}`, 'Wine'],
@@ -249,6 +251,19 @@ describe('erasure (K-109, 0011)', () => {
       await erase(database, id)
 
       expect(rows(database, 'SELECT user_id FROM access_profiles WHERE user_id = ?', id)).toHaveLength(0)
+    })
+  })
+
+  // Consent goes with the person it was consent from; keeping "did they once agree to this" about
+  // somebody now anonymised answers a question that no longer has a subject (E-112).
+  test('the shift contact preference is deleted outright, not anonymised', async () => {
+    await withDatabase(async (database) => {
+      const id = seedPerson(database)
+      expect(rows(database, 'SELECT user_id FROM shift_contact_preferences WHERE user_id = ?', id)).toHaveLength(1)
+
+      await erase(database, id)
+
+      expect(rows(database, 'SELECT user_id FROM shift_contact_preferences WHERE user_id = ?', id)).toHaveLength(0)
     })
   })
 

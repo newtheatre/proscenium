@@ -8,3 +8,9 @@ export function refusalText(error: unknown, fallback = 'That did not work. Try a
 export function refusalData<T>(error: unknown): T | undefined {
   return (error as { data?: { data?: T } }).data?.data
 }
+
+// For a screen that reacts differently to "you cannot do this" than to a network drop: the same
+// distinction `$fetch` itself throws with (E-112 criterion 3).
+export function refusalStatus(error: unknown): number | undefined {
+  return (error as { statusCode?: number }).statusCode
+}
