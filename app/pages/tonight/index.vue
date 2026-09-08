@@ -239,6 +239,12 @@ function houseLine(house: Performance['house']): string {
         color="neutral"
         to="/tonight/till"
       />
+      <NightAction
+        label="Incident log"
+        icon="i-lucide-clipboard-list"
+        color="neutral"
+        to="/tonight/incidents"
+      />
     </template>
   </NightScreen>
 </template>
