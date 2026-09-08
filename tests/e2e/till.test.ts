@@ -5,11 +5,12 @@ import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import { currentShowNight } from '#shared/utils/show-night'
+import { officerBypassTarget } from '#shared/utils/night-authority'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// F-101 and F-102 through the real routes. Only the E-111 officer branch is built, so every case
-// here uses an officer persona; a confirmed BAR shift opening the till waits on show night wave 3.
+// F-101 and F-102 through the real routes, both branches of E-111's guard: a confirmed BAR shift
+// opens the till on its own, and the officer role remains the fallback when no shift covers it.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -111,6 +112,21 @@ function insertStaleSession(venueId: string, staleNight: string, openedBy: strin
   }
 }
 
+let nextSlot = 100
+
+function shiftFor(performanceId: string, role: string, userId: string, status = 'CONFIRMED'): string {
+  const database = new Database(app.databaseFile)
+  try {
+    const id = `${performanceId}-${role}-${(nextSlot += 1)}`
+    database.query('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(id, performanceId, role, nextSlot, userId, status)
+    return id
+  }
+  finally {
+    database.close()
+  }
+}
+
 describe.skipIf(skip !== null)('the till opens only to tonight\'s bar authority (F-101 criteria 1, 2, 5)', () => {
   test('the bar manager opens the till', async () => {
     const response = await openTill(house.venueId, bar.cookie)
@@ -118,6 +134,35 @@ describe.skipIf(skip !== null)('the till opens only to tonight\'s bar authority 
     const body = await response.json() as { ok: boolean, opened: boolean, session: TillSessionBody }
     expect(body.opened).toBe(true)
     expect(body.session).toMatchObject({ venueId: house.venueId, night, openedBy: bar.id, closedAt: null })
+  })
+
+  // The rota, not a standing grant: a confirmed bar shift opens the till with no officer role held
+  // at all, and resolves via the shift branch rather than recording an officer bypass (0044).
+  test('a confirmed bar shift opens the till, with no bar manager role at all', async () => {
+    const shiftVenue = programme('till-shift-bar')
+    const holder = await registerMember(app, 'till-shift-bar', generatePassword())
+    shiftFor(shiftVenue.performanceId, 'BAR', holder.id)
+
+    const response = await openTill(shiftVenue.venueId, holder.cookie)
+    expect(response.status).toBe(200)
+    const body = await response.json() as { ok: boolean, opened: boolean, session: TillSessionBody }
+    expect(body.opened).toBe(true)
+    expect(body.session).toMatchObject({ venueId: shiftVenue.venueId, night, openedBy: holder.id, closedAt: null })
+    expect(auditCount('night.officer-bypass', officerBypassTarget(night, shiftVenue.venueId, 'BAR'))).toBe(0)
+  })
+
+  // A door shift is not bar authority, so the roles stay refused even though the holder is
+  // rostered tonight: the shift branch does not blur what F-101 criterion 2 keeps apart.
+  test('a confirmed door shift does not open the till: the roles are not interchangeable', async () => {
+    const shiftVenue = programme('till-shift-door')
+    const holder = await registerMember(app, 'till-shift-door', generatePassword())
+    shiftFor(shiftVenue.performanceId, 'DOOR', holder.id)
+
+    const response = await openTill(shiftVenue.venueId, holder.cookie)
+    expect(response.status).toBe(403)
+    const refusal = await message(response)
+    expect(refusal).toContain('BAR')
+    expect(refusal).toContain('bar manager')
   })
 
   test('the front of house officer does not open the till', async () => {
