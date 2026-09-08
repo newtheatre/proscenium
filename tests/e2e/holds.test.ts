@@ -106,9 +106,8 @@ async function bookedHold(
 }
 
 describe.skipIf(skip !== null)('an unpaid hold releases once past its own expiry (D-106)', () => {
-  // A performance thirty minutes out, releasing an hour before curtain: the release point is
-  // already thirty minutes in the past the moment the reservation is written, the edge case
-  // docs/known-issues.md records rather than papers over.
+  // Thirty minutes out, releasing an hour before curtain: the release point is already past
+  // the moment the reservation is written, the edge case docs/known-issues.md records.
   const STARTS_AT_OFFSET_MINUTES = 30
   const HOLD_RELEASE_MINUTES_BEFORE = 60
 
