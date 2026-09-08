@@ -1,4 +1,4 @@
-import { and, isNull, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import {
   daysUntilRetentionThreshold,
   isRetentionGuest,
@@ -66,16 +66,14 @@ async function warn(
   return true
 }
 
-async function sendDigest(event: H3Event | undefined, at: Date, armed: boolean, run: RetentionRun): Promise<void> {
+// Sent whether armed or not: it is the thing the IT Manager reviews before arming, so dry-run
+// mode must email it for real, not merely report that it would (J-105 criterion 4, criterion 3).
+async function sendDigest(event: H3Event | undefined, at: Date, run: RetentionRun): Promise<void> {
   const period = londonDay(at)
   const recipients = await liveAdmins()
 
   for (const admin of recipients) {
     const key = retentionDigestClaimFor(admin.id, period)
-    if (!armed) {
-      if (!await claimHeld(key)) run.digests++
-      continue
-    }
     const took = await claimNotification({ userId: admin.id, type: 'retention.digest', key })
     if (!took) continue
     await notify(event, {
@@ -84,6 +82,7 @@ async function sendDigest(event: H3Event | undefined, at: Date, armed: boolean, 
       claim: key,
       context: {
         name: '',
+        armed: run.armed,
         window: run.window,
         final: run.final,
         anonymised: run.anonymised,
@@ -107,8 +106,16 @@ export interface RetentionRun {
   digests: number
 }
 
-// A losing candidate for warning falls through to the next kind, never both: final is the
-// tighter window and is checked first, the same order training's own sweep uses.
+// What the arming route checks before RETENTION_ARMED may turn on (J-105 criterion 4): reviewing
+// a digest is nobody's to verify in code, but one having existed to review is.
+export async function hasSentRetentionDigest(): Promise<boolean> {
+  const [row] = await db.select({ id: schema.notificationLog.id })
+    .from(schema.notificationLog)
+    .where(and(eq(schema.notificationLog.type, 'retention.digest'), eq(schema.notificationLog.status, 'SENT')))
+    .limit(1)
+  return row !== undefined
+}
+
 export async function sweepRetention(event: H3Event | undefined, at: Date = new Date()): Promise<RetentionRun> {
   const armed = await configValue(event, 'RETENTION_ARMED')
   const fullYears = await configValue(event, 'RETENTION_FULL_ACCOUNT_YEARS')
@@ -147,6 +154,6 @@ export async function sweepRetention(event: H3Event | undefined, at: Date = new 
     if (outcome.erased) run.anonymised++
   }
 
-  await sendDigest(event, at, armed, run)
+  await sendDigest(event, at, run)
   return run
 }
