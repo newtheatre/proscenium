@@ -1,0 +1,126 @@
+import { describe, expect, test } from 'bun:test'
+import {
+  bookableTicketTypesQuery,
+  reservationCurrentStateQuery,
+  reservationForResendQuery,
+} from '#server/utils/reservations'
+import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { tonightsPerformance } from '#tests/helpers/programme'
+import type { BookableTicketTypeRow } from '#server/utils/reservations'
+import type { TestDatabase } from '#tests/helpers/database'
+import type { SQL } from 'drizzle-orm'
+
+// The queries D-104, D-108 and D-109 read against the real migrations. What each row means once
+// read is tests/unit/reservations.test.ts's pure rules.
+
+async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
+  const database = await createTestDatabase()
+  try {
+    await fn(database)
+  }
+  finally {
+    database.close()
+  }
+}
+
+function read<T>(database: TestDatabase, statement: SQL): T[] {
+  const [query, ...parameters] = boundStatement(database, statement)
+  return rows<T>(database, query, ...parameters)
+}
+
+function user(database: TestDatabase, id: string, email: string): void {
+  database.batch([['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', id, email, 'A Booker']])
+}
+
+describe('bookableTicketTypesQuery reads restricted_to alongside the price chain (D-109 criterion 1)', () => {
+  test('an open type and a member-restricted type both come back, filtering is left to the caller', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
+        ['INSERT INTO ticket_types (id, name, price, kind, restricted_to) VALUES (?, ?, ?, ?, ?)', 'tt-member', 'Member', 500, 'SINGLE', 'MEMBER'],
+      ])
+
+      const found = read<BookableTicketTypeRow>(database, bookableTicketTypesQuery(seeded.performanceId, seeded.showId))
+      expect(found.map(row => row.id).sort()).toEqual(['tt-member', 'tt-standard'])
+      expect(found.find(row => row.id === 'tt-member')?.restrictedTo).toBe('MEMBER')
+      expect(found.find(row => row.id === 'tt-standard')?.restrictedTo).toBeNull()
+    })
+  })
+
+  test('an access or companion type never appears, whatever it is restricted to', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind, access_kind) VALUES (?, ?, ?, ?, ?)', 'tt-access', 'Access', 0, 'SINGLE', 'ACCESS'],
+      ])
+
+      const found = read<BookableTicketTypeRow>(database, bookableTicketTypesQuery(seeded.performanceId, seeded.showId))
+      expect(found).toEqual([])
+    })
+  })
+
+  test('a performance override joins onto the right row, not every row', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
+        ['INSERT INTO performance_ticket_overrides (id, performance_id, ticket_type_id, price) VALUES (?, ?, ?, ?)',
+          'po-1', seeded.performanceId, 'tt-standard', 500],
+      ])
+
+      const [found] = read<BookableTicketTypeRow>(database, bookableTicketTypesQuery(seeded.performanceId, seeded.showId))
+      expect(found?.performancePrice).toBe(500)
+      expect(found?.showPrice).toBeNull()
+    })
+  })
+})
+
+describe('a resend reads the booker, the template fields and a summed total in one row (criterion 2)', () => {
+  test('the total is the sum of this reservation\'s tickets, not every ticket sold', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'booker@example.invalid')
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-1', 'ABCDEF', seeded.performanceId, 'u-1', 'PENDING', 'WEB'],
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+          't-1', 'r-1', seeded.performanceId, 'tt-standard', 900, 'BASE'],
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+          't-2', 'r-1', seeded.performanceId, 'tt-standard', 900, 'BASE'],
+      ])
+
+      const [found] = read<{ id: string, userId: string, totalPence: number, showTitle: string }>(
+        database, reservationForResendQuery('ABCDEF'),
+      )
+      expect(found?.id).toBe('r-1')
+      expect(found?.userId).toBe('u-1')
+      expect(found?.totalPence).toBe(1800)
+      expect(found?.showTitle).toBe('A Test Show')
+    })
+  })
+
+  test('an unknown reference reads nothing, the shape a refused enumeration attempt gets', async () => {
+    await withDatabase((database) => {
+      expect(read(database, reservationForResendQuery('ZZZZZZ'))).toEqual([])
+    })
+  })
+})
+
+describe('the current state a QR answers with is read live from the row (D-108 criterion 1)', () => {
+  test('a cancelled reservation carries who cancelled it', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'booker@example.invalid')
+      database.batch([
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source, cancelled_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'r-1', 'ABCDEF', seeded.performanceId, 'u-1', 'CANCELLED', 'WEB', 'CUSTOMER'],
+      ])
+
+      const [found] = read<{ status: string, cancelledBy: string | null }>(database, reservationCurrentStateQuery('r-1'))
+      expect(found?.status).toBe('CANCELLED')
+      expect(found?.cancelledBy).toBe('CUSTOMER')
+    })
+  })
+})

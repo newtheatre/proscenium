@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { decodeQrToken, encodeQrToken } from '#shared/utils/qr-tokens'
 
-// The token shape only: the signature itself is server/utils/qr-tokens.ts, which needs the
-// worker secret and so is exercised in tests/integration/qr-tokens.test.ts instead (D-108).
+// The token shape only: the signature itself is server/utils/qr-tokens.ts, which needs a real
+// Nitro runtime for its worker secret and so is exercised end to end, in tests/e2e/qr.test.ts.
 
 describe('a QR token is a reservation id and its signature, joined unambiguously', () => {
   test('encoding then decoding returns the same pair', () => {
