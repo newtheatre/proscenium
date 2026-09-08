@@ -283,7 +283,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-    await visit(view, `${app.baseURL}/tonight/till`, `[data-test="variant-${variantId}"]`)
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
     await click(view, `[data-test="variant-${variantId}"]`)
     await waitFor(view, `document.querySelector('[data-test="choice-option-${await optionIdFor(groupId, itemId)}"]')`)
     await click(view, `[data-test="choice-option-${await optionIdFor(groupId, itemId)}"]`)
@@ -326,7 +326,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-    await visit(view, `${app.baseURL}/tonight/till`, `[data-test="allergen-${productId}"]`)
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="allergen-${productId}"]`)
     await click(view, `[data-test="allergen-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="allergen-note"]')`)
     expect(await textOf(view, '[data-test="allergen-state"]')).toContain('Allergens recorded')

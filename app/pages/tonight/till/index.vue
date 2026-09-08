@@ -2,6 +2,8 @@
 import { londonClock } from '#shared/utils/london'
 import { says, saysMoney } from '#shared/utils/bar'
 import { MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
+import { nightCacheKey } from '#shared/utils/night-cache'
+import { currentShowNight } from '#shared/utils/show-night'
 import type { PricedBasket, SaleCatalogue, SaleChoice, SaleProduct, SaleVariant } from '#shared/utils/sale'
 import type { TillSession } from '#shared/utils/till'
 
@@ -11,6 +13,10 @@ useSeoMeta({ title: 'Till' })
 // The guard is the route's, not this screen's: what a refusal says is written where it is
 // raised, so this only ever displays it (E-111 criterion 5).
 const request = useRequestFetch()
+const route = useRoute()
+// Optional: names which venue when more than one runs tonight, which the route already resolves
+// unaided on the (typical) night only one does. Multi-venue bars are their own story (F-202).
+const requestedVenueId = computed(() => (typeof route.query.venueId === 'string' ? route.query.venueId : undefined))
 const syncedAt = ref<Date | null>(null)
 const failure = ref<string | null>(null)
 const busy = ref(false)
@@ -21,7 +27,9 @@ async function load(): Promise<void> {
   busy.value = true
   failure.value = null
   try {
-    const status = await request<{ night: string, venueId: string, session: TillSession | null }>('/api/till')
+    const status = await request<{ night: string, venueId: string, session: TillSession | null }>('/api/till', {
+      query: { venueId: requestedVenueId.value },
+    })
     session.value = status.session
     venueId.value = status.venueId
     syncedAt.value = new Date()
@@ -38,7 +46,10 @@ async function open(): Promise<void> {
   busy.value = true
   failure.value = null
   try {
-    const opened = await request<{ session: TillSession }>('/api/till', { method: 'POST', body: {} })
+    const opened = await request<{ session: TillSession }>('/api/till', {
+      method: 'POST',
+      body: { venueId: requestedVenueId.value },
+    })
     session.value = opened.session
     syncedAt.value = new Date()
   }
@@ -73,8 +84,8 @@ async function close(): Promise<void> {
 onMounted(load)
 
 // The catalogue, held on the device so venue Wi-Fi dropping mid-service never blanks the grid
-// (K-103). Keyed to the venue: a device may staff a different one on a different night.
-const catalogueKey = computed(() => `till-products:${venueId.value ?? 'none'}`)
+// (K-103). Whole-night, not venue-scoped: products, variants and prices are estate-wide (F-202).
+const catalogueKey = computed(() => nightCacheKey({ screen: 'till-products', night: currentShowNight(), wholeNight: true }))
 const catalogue = useNightCache<SaleCatalogue>(catalogueKey, () =>
   request<SaleCatalogue>('/api/till/products', { query: { venueId: venueId.value ?? undefined } }), { immediate: false })
 
