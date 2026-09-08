@@ -3,21 +3,16 @@ import { sql } from 'drizzle-orm'
 import { findByEmail, newId } from './accounts'
 import { auditedWrite } from './audit'
 import { heldSeatsQuery, ticketInsertQueries } from './capacity'
-import { notify } from './notify'
-import { qrSvgBase64 } from './qr'
-import { qrTokenFor } from './qr-tokens'
 import { auditEntry } from '#shared/utils/audit'
 import { normaliseEmail } from '#shared/utils/auth'
 import { capacityRefusal } from '#shared/utils/capacity'
-import { formatLondon } from '#shared/utils/london'
 import { generateReservationReference } from '#shared/utils/reservations'
-import { resolvePrice, saysPrice } from '#shared/utils/ticket-types'
+import { resolvePrice } from '#shared/utils/ticket-types'
 import type { TicketToWrite } from './capacity'
 import type { CapacityRefusal } from '#shared/utils/capacity'
 import type { ReservationSource } from '#shared/utils/reservations'
 import type { PriceSource, TicketTypeRestriction } from '#shared/utils/ticket-types'
 import type { SQL } from 'drizzle-orm'
-import type { H3Event } from 'h3'
 
 // Resolving what a performance may sell and writing what it sold (D-104). The predicate that
 // gates capacity is D-105's; this is the one place that assembles an order against it.
@@ -112,10 +107,10 @@ export interface WrittenTicket {
 }
 
 export interface WriteReservationResult {
+  // The QR token is minted from this id by the caller (`qrTokenFor()`), not here: this file
+  // stays free of anything that needs a worker secret, so `tests/` can import it under Bun.
+  id: string
   reference: string
-  // Issued once, here, and never again: the plaintext exists only in this response and the
-  // confirmation email built from it (D-108 criterion 1).
-  qrToken: string
   // The tickets the batch actually wrote: fewer than requested means the capacity predicate on
   // at least one statement did not match, and the whole order wrote none of itself (D-105).
   tickets: WrittenTicket[]
@@ -194,7 +189,7 @@ export async function writeReservation(input: WriteReservationInput): Promise<Wr
     await db.run(sql`UPDATE reservations SET status = 'CANCELLED', updated_at = unixepoch() WHERE id = ${id} AND status = 'PENDING'`)
   }
 
-  return { reference, qrToken: await qrTokenFor(id), tickets: written, requested: tickets.length }
+  return { id, reference, tickets: written, requested: tickets.length }
 }
 
 // The message a refused order quotes, read fresh after the batch: the decision already happened
@@ -202,34 +197,6 @@ export async function writeReservation(input: WriteReservationInput): Promise<Wr
 export async function currentCapacityRefusal(performanceId: string, capacity: number | null, wanted: number): Promise<CapacityRefusal | null> {
   const [row] = await db.all<{ held: number }>(heldSeatsQuery(performanceId))
   return capacityRefusal(capacity, Number(row?.held ?? 0), wanted)
-}
-
-export interface ConfirmationContext {
-  userId: string
-  reference: string
-  showTitle: string
-  startsAt: number
-  totalPence: number
-  qrToken: string
-}
-
-// Shared by the reservation write and the resend route, so a resend renders from the same
-// template with the same QR rather than a second, driftable copy (D-108 criteria 1, 2).
-export async function sendReservationConfirmation(event: H3Event | undefined, context: ConfirmationContext): Promise<void> {
-  const url = `${useRuntimeConfig(event).public.baseURL}/qr/${context.qrToken}`
-  await notify(event, {
-    userId: context.userId,
-    type: 'reservation.confirmed',
-    context: {
-      name: '',
-      reference: context.reference,
-      show: context.showTitle,
-      when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
-      totalDue: saysPrice(context.totalPence),
-      url,
-      qrSvg: qrSvgBase64(url),
-    },
-  })
 }
 
 export interface ReservationForResend {

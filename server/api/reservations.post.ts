@@ -102,6 +102,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const qrToken = await qrTokenFor(result.id)
+
   // The batch committed, so the booking is real: send after, never before (0003).
   await sendReservationConfirmation(event, {
     userId: booker.id,
@@ -109,7 +111,7 @@ export default defineEventHandler(async (event) => {
     showTitle: performance.showTitle,
     startsAt: performance.startsAt,
     totalPence: result.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0),
-    qrToken: result.qrToken,
+    qrToken,
   })
 
   return {
@@ -118,6 +120,6 @@ export default defineEventHandler(async (event) => {
     performanceId: input.performanceId,
     tickets: result.tickets,
     totalPence: result.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0),
-    qrToken: result.qrToken,
+    qrToken,
   }
 })

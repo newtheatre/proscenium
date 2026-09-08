@@ -186,6 +186,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/reservations.ts'],
   },
   { route: 'server/api/performances/[id]/booking.get.ts', exempt: 'reads what the booking form needs; nothing is written' },
+  { route: 'server/api/reservations/resend.post.ts', exempt: 'sends a message; the send is recorded in notification_log' },
+  { route: 'server/routes/qr/[token].get.ts', exempt: 'exchanges a token for a cookie; nothing is written' },
 
   // Module E: show night
 
