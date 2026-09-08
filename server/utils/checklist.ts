@@ -37,6 +37,38 @@ export async function itemsForVenue(venueId: string, includeRetired = false): Pr
   return rows.map(row => ({ ...row, required: row.required === 1, active: row.active === 1 }))
 }
 
+export interface VenueChecklist {
+  venueId: string
+  venueName: string
+  items: ChecklistItemRow[]
+}
+
+// Every venue and its active checklist items, for the committee's own overview screen, the same
+// shape `listVenueTemplates()` returns for E-101.
+export async function listVenueChecklists(): Promise<VenueChecklist[]> {
+  const rows = await db.all<{ venueId: string, venueName: string, id: string | null, phase: Phase | null, label: string | null, sort: number | null, required: number | null, systemCheck: SystemCheck | null, active: number | null, updatedAt: number | null }>(sql`
+    SELECT v.id AS venueId, v.name AS venueName,
+           i.id AS id, i.phase AS phase, i.label AS label, i.sort AS sort,
+           i.required AS required, i.system_check AS systemCheck, i.active AS active, i.updated_at AS updatedAt
+    FROM venues v
+    LEFT JOIN checklist_items i ON i.venue_id = v.id AND i.active = 1
+    ORDER BY v.name COLLATE NOCASE, i.phase, i.sort, i.label COLLATE NOCASE
+  `)
+
+  const venues = new Map<string, VenueChecklist>()
+  for (const row of rows) {
+    const held = venues.get(row.venueId) ?? { venueId: row.venueId, venueName: row.venueName, items: [] }
+    if (row.id !== null) {
+      held.items.push({
+        id: row.id, venueId: row.venueId, phase: row.phase!, label: row.label!, sort: row.sort!,
+        required: row.required === 1, systemCheck: row.systemCheck, active: row.active === 1, updatedAt: row.updatedAt!,
+      })
+    }
+    venues.set(row.venueId, held)
+  }
+  return [...venues.values()]
+}
+
 export function insertItemStatement(input: ChecklistItemInput, updatedBy: string, id: string): SQL {
   return sql`
     INSERT INTO checklist_items (id, venue_id, phase, label, sort, required, system_check, updated_by)

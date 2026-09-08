@@ -21,9 +21,8 @@ import type { TestDatabase } from '#tests/helpers/database'
 import type { ChecklistItemInput } from '#shared/utils/checklist'
 import type { SQL } from 'drizzle-orm'
 
-// E-114 against the real migrations, exercising the pure statement and query builders directly:
-// `server/utils/checklist.ts`'s async wrappers need the live `db` singleton and are covered by
-// `tests/e2e/checklist.test.ts` instead. `tests/unit/checklist.test.ts` pins the pure validation.
+// E-114's pure statement and query builders against the real migrations. The async wrappers
+// need the live `db` singleton, covered by `tests/e2e/checklist.test.ts` instead.
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()

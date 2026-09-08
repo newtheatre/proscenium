@@ -71,6 +71,10 @@ export const viewBarStock = defineAbility((viewer: Viewer) => holds(viewer, 'bar
 export const viewRota = defineAbility((viewer: Viewer) => holds(viewer, 'rota.read'))
 export const manageRota = defineAbility((viewer: Viewer) => holds(viewer, 'rota.write'))
 
+// The checklist's own committee configuration, planned ahead the same way (0009, E-114).
+export const viewChecklist = defineAbility((viewer: Viewer) => holds(viewer, 'checklist.read'))
+export const manageChecklist = defineAbility((viewer: Viewer) => holds(viewer, 'checklist.write'))
+
 // Tonight is derived from a confirmed shift and expires at 04:00 with nothing to revoke (0014,
 // E-111), so it is read from the request rather than from anything the viewer holds.
 export const workTonight = defineAbility((viewer: Viewer) => viewer.onShiftTonight)
@@ -111,6 +115,8 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   verifyAccessProfiles: 'access.verify',
   viewRota: 'rota.read',
   manageRota: 'rota.write',
+  viewChecklist: 'checklist.read',
+  manageChecklist: 'checklist.write',
   workTheDoor: 'night.door',
   workTheTill: 'night.till',
   manageTonight: 'night.manage',

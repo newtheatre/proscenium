@@ -259,6 +259,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['checklist.closed', 'night.officer-bypass'],
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
+  { route: 'server/api/admin/checklist/index.get.ts', exempt: 'reads every venue\'s checklist, including a venue with none' },
   { route: 'server/api/admin/checklist/items/index.get.ts', exempt: 'reads a venue\'s checklist items, including a venue with none' },
   { route: 'server/api/admin/checklist/items/index.post.ts', actions: ['checklist-item.created'] },
   { route: 'server/api/admin/checklist/items/[id]/index.put.ts', actions: ['checklist-item.updated'] },
