@@ -112,6 +112,27 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
     expect(performances[1]!.starts_at * 1000).toBeGreaterThan(tonight.to.getTime())
   })
 
+  // The till (F-103) needs a real catalogue to show, at Matt's request and outside build-order
+  // rule 5's usual cut: a category default, a two-size product, a choice group and an allergen.
+  test('there is a bar catalogue with a category default, a choice group and an allergen note', () => {
+    expect(read<{ n: number }>('SELECT count(*) n FROM bar_categories')?.n).toBeGreaterThanOrEqual(2)
+    expect(read<{ n: number }>(`SELECT count(*) n FROM bar_products WHERE status = 'ACTIVE'`)?.n)
+      .toBeGreaterThanOrEqual(3)
+    expect(read<{ n: number }>('SELECT count(*) n FROM category_prices')?.n).toBeGreaterThan(0)
+
+    const gin = read<{ id: string }>(`SELECT id FROM bar_products WHERE name = 'Gin'`)
+    expect(read<{ n: number }>('SELECT count(*) n FROM product_variants WHERE product_id = ?', gin?.id)?.n)
+      .toBe(2)
+    expect(read<{ n: number }>(`
+      SELECT count(*) n FROM variant_components c
+      JOIN product_variants v ON v.id = c.variant_id
+      WHERE v.product_id = ? AND c.choice_group_id IS NOT NULL
+    `, gin?.id)?.n).toBe(1)
+
+    expect(read<{ n: number }>(`SELECT count(*) n FROM bar_products WHERE allergen_state = 'RECORDED'`)?.n)
+      .toBeGreaterThan(0)
+  })
+
   // The venue points at the auditorium, and that attachment is all a room ever knows of a venue.
   test('the venue names a room, and no room names a venue (0043)', () => {
     const venue = read<{ room_id: string | null }>('SELECT room_id FROM venues')
@@ -133,6 +154,8 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
 
   test('running it again adds people rather than duplicating rooms', () => {
     const before = read<{ n: number }>('SELECT count(*) n FROM rooms')!.n
+    const barBefore = read<{ n: number }>('SELECT count(*) n FROM bar_products')!.n
+    const pricesBefore = read<{ n: number }>('SELECT count(*) n FROM variant_prices')!.n
     const ran = Bun.spawnSync(['bun', 'scripts/seed.ts', app.databaseFile], { stdout: 'pipe', stderr: 'pipe' })
 
     expect(ran.exitCode).toBe(0)
@@ -140,5 +163,8 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
     // Tonight has to stay tonight, so a second run moves the performances rather than adding two.
     expect(read<{ n: number }>('SELECT count(*) n FROM venues')?.n).toBe(1)
     expect(read<{ n: number }>('SELECT count(*) n FROM performances')?.n).toBe(2)
+    // Append-only tables gain no second row either: a rerun is not a correction (0010).
+    expect(read<{ n: number }>('SELECT count(*) n FROM bar_products')?.n).toBe(barBefore)
+    expect(read<{ n: number }>('SELECT count(*) n FROM variant_prices')?.n).toBe(pricesBefore)
   })
 })
