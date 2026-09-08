@@ -1671,6 +1671,13 @@ drill, never an edit. `/admin/backups` (`backups.read`/`backups.write`) reads th
 **passed** and flags it overdue past `BACKUP_DRILL_INTERVAL_DAYS` (`isDrillOverdue`,
 `shared/utils/backup.ts`); a failed drill does not clear the flag (K-108, J-107).
 
+### health_incidents
+`id` PK · `status` CHECK `OPEN|CLOSED` · `opened_at` · `closed_at`. At most one `OPEN` row
+(partial unique index), the same singleton shape as `stocktakes`. Names no person: the `health:watch`
+task opens one on the first unhealthy `/api/health` check and closes it the moment one recovers.
+Whether the IT Manager has been told is `notification_log`'s own claim keyed on this id, not a
+column here (0048, J-106 criterion 5).
+
 ## The conditional-write claims (0006), in one place
 
 | Claim | Mechanism |

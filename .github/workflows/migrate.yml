@@ -119,7 +119,27 @@ jobs:
           fi
           echo "Ledger confirms nothing is pending."
 
+      # The ledger being clean here says the schema is right; it says nothing about the
+      # deployed code, which Workers Builds applies from the same push and cannot be
+      # sequenced against (J-106 criterion 3, docs/operations.md). A few retries tolerate
+      # ordinary propagation, not a genuine wait for the other pipeline to finish.
+      - name: Check the live health endpoint
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if status=$(curl -fsS -o /tmp/health.json -w '%{http_code}' https://newtheatre.org.uk/api/health); then
+              if [ "$status" = "200" ]; then
+                echo "Health endpoint reports ok."
+                exit 0
+              fi
+            fi
+            echo "Attempt $attempt: not healthy yet, retrying in 15s."
+            sleep 15
+          done
+          echo "::error::/api/health did not report ok after the migration applied. Response:"
+          cat /tmp/health.json 2>/dev/null || echo "(no response body)"
+          exit 1
+
       - name: Report the restore point on failure
         if: failure() && steps.bookmark.outputs.bookmark != ''
         run: |
-          echo "::error::Migration failed or did not land. Restore with: bunx wrangler d1 time-travel restore unified --bookmark=${{ steps.bookmark.outputs.bookmark }}"
+          echo "::error::This run failed after the restore point was taken (a bad migration, or the live health check above). Restore with: bunx wrangler d1 time-travel restore unified --bookmark=${{ steps.bookmark.outputs.bookmark }}"

@@ -1136,6 +1136,24 @@ Nothing is lost if you let it lapse: your account, your bookings and your histor
 The Nottingham New Theatre`,
     }
   },
+  'health-alert': (context: TemplateContext): Rendered => {
+    const since = String(context.since)
+    return {
+      subject: 'The estate has been unhealthy for a while',
+      html: layout(`<p>Hello ${context.name},</p>
+<p><code>/api/health</code> has read unhealthy since ${since} and has not recovered.</p>
+<p>Check the endpoint and the migrate workflow: a schema behind its code, or a missing session
+secret, are the two things it watches for.</p>`),
+      text: `Hello ${context.name},
+
+/api/health has read unhealthy since ${since} and has not recovered.
+
+Check the endpoint and the migrate workflow: a schema behind its code, or a missing session
+secret, are the two things it watches for.
+
+The Nottingham New Theatre`,
+    }
+  },
 } as const
 
 export type TemplateName = keyof typeof TEMPLATES
