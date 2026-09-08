@@ -261,7 +261,7 @@ const readProduct = (row: ProductRow): BarProduct => ({
   everSold: row.everSold === 1,
 })
 
-const PRODUCT_COLUMNS = sql`
+export const PRODUCT_COLUMNS = sql`
   p.id AS id,
   p.name AS name,
   p.category_id AS categoryId,
@@ -418,7 +418,7 @@ const VARIANT_COLUMNS = sql`
 
 // Scoped by subquery rather than by an id list read out of the variants: a bound-parameter count
 // must not grow with the rows it covers (0003, 0006).
-function componentsQuery(scope: SQL): SQL {
+export function componentsQuery(scope: SQL): SQL {
   return sql`
     SELECT c.id AS id, c.variant_id AS variantId, c.item_id AS itemId, i.name AS itemName, i.unit AS unit,
            c.choice_group_id AS choiceGroupId, g.name AS choiceGroupName,
@@ -490,7 +490,7 @@ interface ChoiceGroupOptionRow {
   sort: number
 }
 
-function choiceGroupOptionsQuery(scope: SQL): SQL {
+export function choiceGroupOptionsQuery(scope: SQL): SQL {
   return sql`
     SELECT o.id AS id, o.choice_group_id AS choiceGroupId, o.item_id AS itemId, i.name AS itemName,
            i.unit AS unit, o.qty AS qty, o.sort AS sort

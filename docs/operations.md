@@ -31,16 +31,18 @@ recorded and fixed before the release goes out.
 - [ ] Sign in and open `/tonight`. The night's screens are listed and reachable without scrolling.
 - [ ] **Admit**: open the door screen, find tonight's performance, admit a ticket, and see it
       counted. Then refuse one, and read the reason back.
-- [ ] **Sell**: open the till, add two items, take payment on the reader, and read the total back
-      before it is committed.
+- [ ] **Sell**: open the till, add two sizes to the basket including one with a mixer choice,
+      edit a quantity, remove a line, and read the server-computed total back. Taking payment on
+      the reader is F-104 and F-105's, and stays skipped until they land.
 - [ ] **Age check**: run a challenge from the till to its decision, both ways: recorded and refused.
 - [ ] Each screen's "last synced" line is present and names a plausible minute.
 - [ ] Turn the network off, and each screen still shows what it last held.
 - [ ] Every action tapped once did what it said the first time.
 
 Signed off by the person who walked it, named in the release notes with the date. Until the door
-(D-126), the till (F-103 onwards) and the age check (E-118) are built, the steps naming them are
-skipped and recorded as skipped rather than ticked.
+(D-126) and the age check (E-118) are built, the steps naming them are skipped and recorded as
+skipped rather than ticked. The till's own step walks what F-103 built; taking payment on the
+reader waits for F-104 and F-105.
 
 ## Applying migrations
 
