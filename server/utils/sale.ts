@@ -113,8 +113,12 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
 export async function priceBasket(lines: BasketLineInput[], on: string): Promise<PricedBasket> {
   const variants = await activeVariantsWithChoices(on)
 
+  // Scoped to the basket's own lines, bounded by MAX_BASKET_LINES, never to the whole catalogue
+  // (0003): a basket of two should not bind a parameter per product the till has ever priced.
   interface ProductName { id: string, name: string }
-  const productIds = [...new Set([...variants.values()].map(variant => variant.productId))]
+  const productIds = [...new Set(lines
+    .map(line => variants.get(line.variantId)?.productId)
+    .filter((id): id is string => id !== undefined))]
   const productNames = productIds.length === 0
     ? []
     : await db.all<ProductName>(sql`SELECT id AS id, name AS name FROM bar_products WHERE id IN (${sql.join(productIds.map(id => sql`${id}`), sql`, `)})`)
