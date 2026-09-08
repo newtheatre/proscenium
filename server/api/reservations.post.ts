@@ -4,8 +4,11 @@ import {
   RESERVATION_EMAIL_WINDOW_MINUTES,
   RESERVATION_IP_LIMIT,
   RESERVATION_IP_WINDOW_MINUTES,
+  bornExpiredReason,
+  holdExpiresAt,
   overCapReason,
   reservationForm,
+  resolveHoldReleaseMinutes,
   totalTickets,
 } from '#shared/utils/reservations'
 
@@ -51,6 +54,17 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const releaseMinutes = resolveHoldReleaseMinutes(
+    performance.holdReleaseMinutesBefore,
+    await configValue(event, 'HOLD_RELEASE_MINUTES_BEFORE'),
+  )
+  const expiresAt = holdExpiresAt(performance.startsAt, releaseMinutes)
+
+  // Refused before a hold row exists, not cleaned up after: a booking that would already be
+  // due for release the moment it is made is not a hold at all (committee decision, D-106).
+  const bornExpired = bornExpiredReason(expiresAt, Math.floor(Date.now() / 1000))
+  if (bornExpired) throw createError({ statusCode: 409, statusMessage: bornExpired })
+
   const cap = await configValue(event, 'PUBLIC_ORDER_SEAT_CAP')
   const capRefusal = overCapReason(input.lines, cap)
   if (capRefusal) throw createError({ statusCode: 400, statusMessage: capRefusal })
@@ -75,6 +89,7 @@ export default defineEventHandler(async (event) => {
     windowBypassed: false,
     lines,
     capacity,
+    holdExpiresAt: expiresAt,
   })
 
   if (result.tickets.length < result.requested) {

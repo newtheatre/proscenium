@@ -1,3 +1,7 @@
+import { db, schema } from '@nuxthub/db'
+// Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
+// Bun, where nothing is auto-imported (CONTRIBUTING).
+import { createError } from 'h3'
 import { CONFIG_KEYS, hasDefault } from '#shared/utils/config'
 import type { ConfigKey } from '#shared/utils/config'
 import type { PasswordPolicy } from '#shared/utils/auth'

@@ -1,4 +1,4 @@
-import type { NotificationTopic } from './senders'
+import type { NotificationTopic, SenderKey } from './senders'
 
 // The catalogue every outbound message is typed against (0013, H-101). A type that is not here
 // cannot be sent, so nothing goes out untyped.
@@ -15,6 +15,9 @@ export interface MessageType {
   // Verification, claim and reset are the only things an unverified address may receive
   // (A-102 criterion 2).
   reachesUnverified?: true
+  // Overrides the topic-derived sender: for a transactional type that still wants a branded
+  // identity rather than the generic accounts address (D-107).
+  sender?: SenderKey
 }
 
 export const MESSAGE_TYPES = {
@@ -202,6 +205,16 @@ export const MESSAGE_TYPES = {
   'external.request.relisted': { topic: 'ROOMS', channels: ['EMAIL'], template: 'request-relisted' },
 
   // Module D: ticketing
+
+  // Transactional (D-107 criterion 3): a guest holds nobody's preferences to read, and this is
+  // what they typed their address in for. Reaches an unverified account, which every guest is.
+  'reservation.hold-expiring': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'reservation-hold-expiring',
+    reachesUnverified: true,
+    sender: 'BOX_OFFICE',
+  },
 
   // Module E: show night
 

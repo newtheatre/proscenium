@@ -25,6 +25,7 @@ export default defineEventHandler(async (event) => {
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
   const window = input.bookingClosesHoursBefore ?? null
+  const holdRelease = input.holdReleaseMinutesBefore ?? null
   // Clearing this never touches status: sales stay off until an explicit on-sale action
   // (D-122 criterion 3).
   const externalBookingUrl = input.externalBookingUrl ?? null
@@ -50,6 +51,7 @@ export default defineEventHandler(async (event) => {
         capacityOverride: [held.capacityOverride, input.capacityOverride ?? null],
         effectiveCapacity: [effectiveCapacity(held), capacity],
         bookingClosesHoursBefore: [held.bookingClosesHoursBefore, window],
+        holdReleaseMinutesBefore: [held.holdReleaseMinutesBefore, holdRelease],
         externalBookingUrl: [held.externalBookingUrl, externalBookingUrl],
       }),
       // Internal prose stays on the record; the trail records only that it moved (0011).
@@ -71,6 +73,7 @@ export default defineEventHandler(async (event) => {
           interval_minutes = ${input.intervalMinutes ?? null},
           capacity_override = ${input.capacityOverride ?? null},
           booking_closes_hours_before = ${window},
+          hold_release_minutes_before = ${holdRelease},
           external_booking_url = ${externalBookingUrl},
           notes = ${input.notes ?? null},
           updated_at = unixepoch()

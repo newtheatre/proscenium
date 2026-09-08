@@ -1,4 +1,5 @@
 import { formatLondon } from '#shared/utils/london'
+import { plural } from '#shared/utils/text'
 
 // Every message carries both parts (H-109 criterion 3), and any date in one is London-pinned,
 // because the worker runs in UTC (0014).
@@ -1132,6 +1133,27 @@ Membership is bought at the Students' Union, not from us, so renew it there and 
 change up from their record.
 
 Nothing is lost if you let it lapse: your account, your bookings and your history all stay.
+
+The Nottingham New Theatre`,
+    }
+  },
+  'reservation-hold-expiring': (context: TemplateContext): Rendered => {
+    const show = String(context.show)
+    const when = String(context.when)
+    const releasesAt = String(context.releasesAt)
+    const reference = String(context.reference)
+    return {
+      subject: `Your hold on ${show} releases soon`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Your unpaid reservation ${reference} for ${show}, ${when}, is held until ${releasesAt}.</p>
+<p>Pay at the box office before then to keep your seats, or cancel to free them for somebody
+else. After ${releasesAt} the seats go back on sale and cannot be guaranteed back to you.</p>`),
+      text: `Hello ${context.name},
+
+Your unpaid reservation ${reference} for ${show}, ${when}, is held until ${releasesAt}.
+
+Pay at the box office before then to keep your seats, or cancel to free them for somebody else.
+After ${releasesAt} the seats go back on sale and cannot be guaranteed back to you.
 
 The Nottingham New Theatre`,
     }

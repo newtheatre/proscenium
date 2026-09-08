@@ -20,6 +20,9 @@ export const MAX_SHOW_SLUG = 120
 // A window opening more than a month before curtain is a typed mistake, not a policy.
 export const MAX_BOOKING_CLOSES_HOURS = 720
 
+// A hold released more than a day before curtain is a typed mistake, not a policy (D-106).
+export const MAX_HOLD_RELEASE_MINUTES = 1440
+
 // A ten hour show is Wagner, and this is not that theatre.
 export const MAX_PERFORMANCE_MINUTES = 600
 
@@ -76,6 +79,8 @@ const performanceFields = {
   intervalMinutes: z.number().int().nonnegative().max(120).nullish(),
   capacityOverride: z.number().int().nonnegative().nullish(),
   bookingClosesHoursBefore: hoursBefore.nullish(),
+  // Null inherits the configured default; an explicit value is this performance's own (D-106).
+  holdReleaseMinutesBefore: z.number().int().nonnegative().max(MAX_HOLD_RELEASE_MINUTES).nullish(),
   // Set: every internal sales path refuses, quoting it. Cleared: sales stay off until an
   // explicit on-sale action, never automatically (D-122 criteria 1 and 3).
   externalBookingUrl: optionalUrl(MAX_EXTERNAL_BOOKING_URL),
@@ -150,6 +155,7 @@ export interface AdminPerformance {
   capacityOverride: number | null
   venueCapacity: number | null
   bookingClosesHoursBefore: number | null
+  holdReleaseMinutesBefore: number | null
   externalBookingUrl: string | null
   status: PerformanceStatus
   notes: string | null
