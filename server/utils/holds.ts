@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { auditedWrite } from './audit'
 import { configValue } from './configuration'
 import { claimNotification, notify } from './notify'
 import { auditEntry } from '#shared/utils/audit'
@@ -67,8 +68,8 @@ export interface ReleaseRun {
   released: number
 }
 
-// One `db.batch` per hold: the audit insert is predicated on `changes() = 1`, so a hold
-// already moved by something else writes no trail for a release that did not happen (D-106 criterion 5).
+// `auditedWrite` is 0049's shape: a hold already moved by something else writes no trail for
+// a release that did not happen (D-106 criterion 5).
 export async function releaseExpiredHolds(at: Date, cap: number): Promise<ReleaseRun> {
   const now = Math.floor(at.getTime() / 1000)
   const candidates = await db.all<ExpiredHoldRow>(expiredHoldsQuery(now, cap))
@@ -76,15 +77,8 @@ export async function releaseExpiredHolds(at: Date, cap: number): Promise<Releas
   let released = 0
   for (const candidate of candidates) {
     const entry = auditEntry({ actorId: null, action: 'reservation.expired', target: `reservation:${candidate.id}` })
-    const [updated] = await db.batch([
-      db.all<{ id: string }>(releaseHoldStatement(candidate.id)),
-      db.run(sql`
-        INSERT INTO audit_log (id, actor_id, action, target, detail)
-        SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, NULL
-        WHERE changes() = 1
-      `),
-    ])
-    if (updated.length > 0) released += 1
+    const applied = await auditedWrite(db.all<{ id: string }>(releaseHoldStatement(candidate.id)), entry)
+    if (applied) released += 1
   }
 
   return { eligible: candidates.length, released }
