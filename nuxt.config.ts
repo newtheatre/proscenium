@@ -177,6 +177,12 @@ export default defineNuxtConfig({
         },
       },
     },
+
+    rollupConfig: {
+      output: {
+        intro: 'import "reflect-metadata";',
+      },
+    },
   },
 
   hub: {
