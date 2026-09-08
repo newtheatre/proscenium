@@ -6,6 +6,7 @@ import { Database } from 'bun:sqlite'
 import { Hash } from '@adonisjs/hash'
 import { Scrypt } from '@adonisjs/hash/drivers/scrypt'
 import { assertLocalTarget, assertNotProduction, generatePassword, registrableAddress } from '../tests/helpers/seed'
+import { londonDayOf } from '../shared/utils/ledger'
 import { currentShowNight, showNightBounds, showNightOf } from '../shared/utils/show-night'
 import { DEPARTMENTS, readCatalogue } from './lib/catalogue'
 
@@ -427,12 +428,203 @@ async function seedCatalogue(): Promise<{ departments: number, modules: number, 
   return { departments: DEPARTMENTS.length, modules: modules.length, prerequisites }
 }
 
+// True when a row already answers that predicate, so a dated append-only table gets one row from
+// a rerun rather than a fresh one every time (variant_prices, category_prices, stock_movements).
+function exists(table: string, where: Record<string, string>): boolean {
+  const columns = Object.keys(where)
+  const clause = columns.map(column => `${column} = ?`).join(' AND ')
+  return Boolean(db.query(`SELECT 1 FROM ${table} WHERE ${clause} LIMIT 1`).get(...columns.map(column => where[column]!)))
+}
+
+interface SeedItem {
+  name: string
+  unit: 'ML' | 'ITEM'
+  containerMl: number | null
+  ageRestricted: boolean
+  allergenNotes: string | null
+  unitCostPence: number
+  caseSize: number
+}
+
+interface SeedVariant {
+  servingKind: string
+  label: string
+  // Omitted deliberately on one size, so it falls back to the category default (F-121).
+  pricePence?: number
+  recipe?: { item: string, qty: number }
+  choice?: { name: string, options: { item: string, qty: number }[] }
+}
+
+interface SeedProduct {
+  name: string
+  category: string
+  ageRestricted: boolean
+  allergenState: 'UNKNOWN' | 'NONE' | 'RECORDED'
+  allergenNote?: string
+  variants: SeedVariant[]
+}
+
+// The subcommittee's bar catalogue, at Matt's request and outside build-order rule 5's usual cut
+// (Wave 0 and show night wave 1 only); see the pull request that added this for why.
+function seedBar(people: Seeded[]): { categories: number, products: number, items: number } {
+  const on = londonDayOf(new Date())
+  const seller = people[0]?.id ?? null
+
+  const items: SeedItem[] = [
+    { name: 'Gin', unit: 'ML', containerMl: 700, ageRestricted: true, allergenNotes: null, unitCostPence: 1400, caseSize: 6 },
+    { name: 'Tonic water', unit: 'ML', containerMl: 1000, ageRestricted: false, allergenNotes: null, unitCostPence: 90, caseSize: 12 },
+    { name: 'Lemonade', unit: 'ML', containerMl: 1000, ageRestricted: false, allergenNotes: null, unitCostPence: 90, caseSize: 12 },
+    { name: 'House red', unit: 'ML', containerMl: 750, ageRestricted: true, allergenNotes: 'Contains sulphites.', unitCostPence: 650, caseSize: 6 },
+    { name: 'Lager', unit: 'ITEM', containerMl: null, ageRestricted: true, allergenNotes: 'Contains barley (gluten).', unitCostPence: 90, caseSize: 24 },
+  ]
+  const itemId = new Map<string, string>()
+  for (const item of items) {
+    const seeded = keyed('bar_items', 'name', item.name, () => {
+      const id_ = id()
+      db.query(`INSERT INTO bar_items (id, name, unit, container_ml, age_restricted, allergen_notes)
+                VALUES (?, ?, ?, ?, ?, ?)`)
+        .run(id_, item.name, item.unit, item.containerMl, item.ageRestricted ? 1 : 0, item.allergenNotes)
+      return id_
+    })
+    itemId.set(item.name, seeded)
+
+    // One delivery each, so on-hand is a real number and not a screen nobody has stocked.
+    if (!exists('stock_movements', { item_id: seeded, kind: 'DELIVERY' })) {
+      const qty = (item.unit === 'ML' ? item.containerMl! : 1) * item.caseSize
+      db.query(`INSERT INTO stock_movements (id, item_id, qty, kind, unit_cost_pence, actor_id)
+                VALUES (?, ?, ?, 'DELIVERY', ?, ?)`)
+        .run(id(), seeded, qty, item.unitCostPence, seller)
+    }
+  }
+
+  const categories = [
+    { name: 'Spirits', sort: 0 },
+    { name: 'Wine & beer', sort: 1 },
+  ]
+  const categoryId = new Map<string, string>()
+  for (const category of categories) {
+    categoryId.set(category.name, keyed('bar_categories', 'name', category.name, () => {
+      const id_ = id()
+      db.query('INSERT INTO bar_categories (id, name, sort) VALUES (?, ?, ?)').run(id_, category.name, category.sort)
+      return id_
+    }))
+  }
+
+  // Every spirit £2.50 as a single, £4.00 as a double: 0017's own example, and what the Gin
+  // single below falls back to rather than needing a price row of its own.
+  const spiritsId = categoryId.get('Spirits')!
+  for (const [servingKind, pricePence] of [['single', 250], ['double', 400]] as const) {
+    if (!exists('category_prices', { category_id: spiritsId, serving_kind: servingKind })) {
+      db.query(`INSERT INTO category_prices (id, category_id, serving_kind, price_pence, effective_from, created_by)
+                VALUES (?, ?, ?, ?, ?, ?)`)
+        .run(id(), spiritsId, servingKind, pricePence, on, seller)
+    }
+  }
+
+  const products: SeedProduct[] = [
+    {
+      name: 'Gin',
+      category: 'Spirits',
+      ageRestricted: true,
+      allergenState: 'UNKNOWN',
+      variants: [
+        { servingKind: 'single', label: 'Single', recipe: { item: 'Gin', qty: 25 } },
+        {
+          servingKind: 'double',
+          label: 'Double',
+          pricePence: 450,
+          recipe: { item: 'Gin', qty: 50 },
+          choice: { name: 'Mixers', options: [{ item: 'Tonic water', qty: 100 }, { item: 'Lemonade', qty: 100 }] },
+        },
+      ],
+    },
+    {
+      name: 'House red',
+      category: 'Wine & beer',
+      ageRestricted: true,
+      allergenState: 'RECORDED',
+      allergenNote: 'Contains sulphites.',
+      variants: [
+        { servingKind: '175ml', label: '175ml glass', pricePence: 550, recipe: { item: 'House red', qty: 175 } },
+      ],
+    },
+    {
+      name: 'Lager',
+      category: 'Wine & beer',
+      ageRestricted: true,
+      allergenState: 'RECORDED',
+      allergenNote: 'Contains barley (gluten).',
+      variants: [
+        { servingKind: 'can', label: 'Can', pricePence: 400, recipe: { item: 'Lager', qty: 1 } },
+      ],
+    },
+  ]
+
+  for (const product of products) {
+    const productId = keyed('bar_products', 'name', product.name, () => {
+      const id_ = id()
+      db.query(`INSERT INTO bar_products (id, category_id, name, status, age_restricted, allergen_state, allergen_note)
+                VALUES (?, ?, ?, 'ACTIVE', ?, ?, ?)`)
+        .run(id_, categoryId.get(product.category)!, product.name, product.ageRestricted ? 1 : 0,
+          product.allergenState, product.allergenNote ?? null)
+      return id_
+    })
+
+    for (const variant of product.variants) {
+      let variantId = (db.query('SELECT id FROM product_variants WHERE product_id = ? AND serving_kind = ?')
+        .get(productId, variant.servingKind) as { id: string } | null)?.id
+
+      if (!variantId) {
+        variantId = id()
+        db.query('INSERT INTO product_variants (id, product_id, serving_kind, label) VALUES (?, ?, ?, ?)')
+          .run(variantId, productId, variant.servingKind, variant.label)
+      }
+
+      if (variant.pricePence !== undefined && !exists('variant_prices', { variant_id: variantId })) {
+        db.query(`INSERT INTO variant_prices (id, variant_id, price_pence, effective_from, created_by)
+                  VALUES (?, ?, ?, ?, ?)`)
+          .run(id(), variantId, variant.pricePence, on, seller)
+      }
+
+      if (variant.recipe) {
+        db.query(`INSERT INTO variant_components (id, variant_id, item_id, qty)
+                  VALUES (?, ?, ?, ?)
+                  ON CONFLICT (variant_id, item_id) DO NOTHING`)
+          .run(id(), variantId, itemId.get(variant.recipe.item)!, variant.recipe.qty)
+      }
+
+      if (variant.choice) {
+        const choice = variant.choice
+        const groupId = keyed('choice_groups', 'name', choice.name, () => {
+          const id_ = id()
+          db.query('INSERT INTO choice_groups (id, name) VALUES (?, ?)').run(id_, choice.name)
+          return id_
+        })
+        for (const [sort, option] of choice.options.entries()) {
+          db.query(`INSERT INTO choice_group_items (id, choice_group_id, item_id, qty, sort)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT (choice_group_id, item_id) DO NOTHING`)
+            .run(id(), groupId, itemId.get(option.item)!, option.qty, sort)
+        }
+        if (!exists('variant_components', { variant_id: variantId, choice_group_id: groupId })) {
+          db.query(`INSERT INTO variant_components (id, variant_id, choice_group_id, qty, included_in_price)
+                    VALUES (?, ?, ?, 1, 1)`)
+            .run(id(), variantId, groupId)
+        }
+      }
+    }
+  }
+
+  return { categories: categories.length, products: products.length, items: items.length }
+}
+
 const rooms = seedRooms()
 const spaces = seedExternalSpaces()
 const catalogue = await seedCatalogue()
 const people = await seedPeople()
 const bookings = seedBookings(rooms, people)
 const programme = seedProgramme(rooms, people)
+const bar = seedBar(people)
 db.close()
 
 // Printed once, and nowhere else. Nothing here is committed and there is no way to read a
@@ -442,7 +634,9 @@ console.info(`  ${rooms.length} rooms, ${spaces} SU rooms, ${people.length} peop
 console.info(`  ${catalogue.modules} training modules across ${catalogue.departments} departments, `
   + `${catalogue.prerequisites} prerequisites`)
 console.info(`  1 venue and 1 show, with ${programme.performances} performances: one tonight, one next week`)
-console.info(`  1 venue shift template, stamped as ${programme.shifts} open shifts across them\n`)
+console.info(`  1 venue shift template, stamped as ${programme.shifts} open shifts across them`)
+console.info(`  ${bar.categories} bar categories, ${bar.products} products and ${bar.items} stocked items, `
+  + 'one delivered each\n')
 console.info('  Every module is a DRAFT, as the subcommittee draft has them, so members see none of')
 console.info('  them until somebody publishes one.\n')
 console.info('  Sign in as any of these. The passwords are shown here and nowhere else:\n')
