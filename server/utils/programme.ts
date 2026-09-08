@@ -202,6 +202,7 @@ const PERFORMANCE_COLUMNS = sql`
   p.capacity_override AS capacityOverride,
   v.capacity AS venueCapacity,
   p.booking_closes_hours_before AS bookingClosesHoursBefore,
+  p.hold_release_minutes_before AS holdReleaseMinutesBefore,
   p.external_booking_url AS externalBookingUrl,
   p.status AS status,
   p.notes AS notes

@@ -9,7 +9,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 
 | Setting | Current folklore | Proposed default | Notes |
 | --- | --- | --- | --- |
-| Reservation hold expiry | none (holds live forever) | 15 minutes before curtain | Per-show override allowed |
+| Reservation hold expiry | none (holds live forever) | 15 minutes before curtain, released in batches of 200 a run | Per-show override allowed. The reminder before expiry (D-107) has no folklore value to propose and ships unset until this session gives it one |
 | Per-order seat cap (public) | 10 | 10 | Box office uncapped |
 | Refund policy | undocumented, ad hoc | free cancellation while unpaid; paid refunds in person, manager approval | Constraint: money moves in person only |
 | Comp authority | tonight's duty manager or staff | unchanged | Comp request expiry 10 minutes |

@@ -4,7 +4,7 @@ import { CONFIG_KEYS, CONFIG_KEY_NAMES, hasDefault, isConfigKey } from '#shared/
 
 // The keys the workshop register proposes no value for (0019). They ship unset, and the
 // features needing them wait rather than guessing. Typed, so a typo here is a build error.
-const UNSET: ConfigKey[] = ['NIGHT_REPORT_RECIPIENTS']
+const UNSET: ConfigKey[] = ['NIGHT_REPORT_RECIPIENTS', 'HOLD_REMINDER_MINUTES_BEFORE']
 
 describe('configuration surface (0012, 0019)', () => {
   test('every shipped default validates against its own key schema', () => {

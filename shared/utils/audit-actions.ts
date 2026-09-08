@@ -147,6 +147,7 @@ const CATALOGUE = {
   'access-profile.verified': { label: 'Access profile verified', module: 'ticketing' },
   'access-profile.declined': { label: 'Access profile declined', module: 'ticketing' },
   'access-profile.tombstone.purged': { label: 'Withdrawn access profile deleted after its tombstone', module: 'ticketing' },
+  'reservation.expired': { label: 'Unpaid hold released on expiry', module: 'ticketing' },
 
   // Module E: show night
 

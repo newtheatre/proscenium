@@ -29,6 +29,19 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Minutes before curtain that an unpaid reservation hold is released. Per-show override allowed.',
   },
+  // No proposed value in the workshop register: ships unset, so the reminder job sends nothing
+  // until the committee sets one (0019, D-107).
+  HOLD_REMINDER_MINUTES_BEFORE: {
+    schema: z.number().int().positive(),
+    workshop: 'money-and-box-office',
+    describes: 'Minutes before a hold releases that its holder is reminded, by email.',
+  },
+  HOLD_RELEASE_BATCH_CAP: {
+    schema: z.number().int().positive(),
+    default: 200,
+    workshop: 'money-and-box-office',
+    describes: 'The most holds one release run may expire, so a backlog after an outage drains over several runs rather than one huge batch.',
+  },
   PUBLIC_ORDER_SEAT_CAP: {
     schema: z.number().int().positive(),
     default: 10,
@@ -545,6 +558,9 @@ export const ENFORCED_KEYS = [
   'MEMBERSHIP_RENEWAL_NOTICE_DAYS',
   'PRIVILEGED_ROLES',
   'PUBLIC_ORDER_SEAT_CAP',
+  'HOLD_RELEASE_MINUTES_BEFORE',
+  'HOLD_REMINDER_MINUTES_BEFORE',
+  'HOLD_RELEASE_BATCH_CAP',
   'SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE',
   'SHIFT_ELIGIBILITY_DOOR_MODULE',
   'SHIFT_ELIGIBILITY_BAR_MODULE',

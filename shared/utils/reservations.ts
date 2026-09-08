@@ -70,3 +70,21 @@ export function overCapReason(lines: { quantity: number }[], cap: number): strin
   }
   return null
 }
+
+// D-106: the hold release point, in minutes before curtain. A performance's own value wins;
+// null inherits the configured default, the same NULL-means-inherit rule the booking window uses.
+export function resolveHoldReleaseMinutes(performanceOverride: number | null, defaultMinutes: number): number {
+  return performanceOverride ?? defaultMinutes
+}
+
+// The instant an unpaid hold releases, in integer seconds UTC: measured back from curtain, never
+// across a wall clock, so the clocks changing does not move it relative to the performance (0014).
+export function holdExpiresAt(startsAt: number, minutesBefore: number): number {
+  return startsAt - minutesBefore * 60
+}
+
+// D-107 criterion 2: keyed on the expiry it warns about, not the reservation alone, so a hold
+// whose expiry moves re-arms the reminder instead of finding the old claim already taken.
+export function holdReminderClaim(reservationId: string, expiresAt: number): string {
+  return `reservation.hold-expiring:${reservationId}:${expiresAt}`
+}

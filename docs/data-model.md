@@ -294,7 +294,7 @@ for the two that read and `ticketing.write` for the rest:
 | `POST /api/admin/shows/[id]/publish` | Publishes or unpublishes. `cascadePerformances` takes DRAFT performances on sale in the same batch; CANCELLED ones are skipped by predicate. |
 | `DELETE /api/admin/shows/[id]` | Deletes a show nothing has sold under, with its performances and prices. A show with sold tickets is a 409 naming unpublishing and cancelling as the way. |
 | `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. |
-| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, window and internal notes. It does not take the status. |
+| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. |
 | `POST /api/admin/performances/[id]/sale` | On sale or off sale, per performance. A cancelled or externally ticketed performance is a 409. |
 | `POST /api/admin/performances/[id]/cancel` | Cancels one, and answers with how many tickets are owed a refund. |
 | `DELETE /api/admin/performances/[id]` | Deletes a performance nothing has sold for. One that has is a 409 naming cancelling as the way. |
@@ -461,6 +461,19 @@ named; `PUBLIC_ORDER_SEAT_CAP` (10 by default) is checked per line and against t
 Reservation endpoints are rate limited by IP (`server/utils/request-ip.ts`, reading
 `CF-Connecting-IP`) and by email address, and every refusal is enumeration-safe: nothing in the
 response distinguishes an address that already held an account from one that did not.
+
+**Release and reminders (D-106, D-107).** `hold_expires_at` is set at reservation to curtain
+minus `HOLD_RELEASE_MINUTES_BEFORE` (15 by default), or a performance's own
+`hold_release_minutes_before` when it has one, the same NULL-means-inherit rule the booking
+window uses. The `holds:release` cron reads `server/utils/holds.ts` every ten minutes: it warns
+first, then releases. `releaseHoldStatement()` is one conditional `UPDATE ... WHERE id = ? AND
+status = 'PENDING' RETURNING id`, its audit row predicated on `changes() = 1`, so a hold moved by
+anything else in the window writes no trail for a release that did not happen. A reminder claims
+`notification_log` on `reservation.hold-expiring:<reservationId>:<holdExpiresAt>`
+(`holdReminderClaim()`), which is why an extended or edited hold re-arms it rather than finding
+the old claim already spent: the expiry is part of the key. Reminders read
+`HOLD_REMINDER_MINUTES_BEFORE`, which carries no workshop value and ships unset, so they send
+nothing until the committee sets one; release runs regardless.
 
 ### tickets
 `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances

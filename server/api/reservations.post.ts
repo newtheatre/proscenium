@@ -4,8 +4,10 @@ import {
   RESERVATION_EMAIL_WINDOW_MINUTES,
   RESERVATION_IP_LIMIT,
   RESERVATION_IP_WINDOW_MINUTES,
+  holdExpiresAt,
   overCapReason,
   reservationForm,
+  resolveHoldReleaseMinutes,
   totalTickets,
 } from '#shared/utils/reservations'
 
@@ -68,6 +70,11 @@ export default defineEventHandler(async (event) => {
   const capacity = effectiveCapacity(performance)
   const booker = account ? { id: account.id } : await guestAccount(email, name)
 
+  const releaseMinutes = resolveHoldReleaseMinutes(
+    performance.holdReleaseMinutesBefore,
+    await configValue(event, 'HOLD_RELEASE_MINUTES_BEFORE'),
+  )
+
   const result = await writeReservation({
     performanceId: input.performanceId,
     userId: booker.id,
@@ -75,6 +82,7 @@ export default defineEventHandler(async (event) => {
     windowBypassed: false,
     lines,
     capacity,
+    holdExpiresAt: holdExpiresAt(performance.startsAt, releaseMinutes),
   })
 
   if (result.tickets.length < result.requested) {

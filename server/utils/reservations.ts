@@ -89,6 +89,9 @@ export interface WriteReservationInput {
   windowBypassed: boolean
   lines: ReservationLineToWrite[]
   capacity: number | null
+  // When this unpaid hold releases; null never expires, which is what a paid or desk-collected
+  // booking wants once D-114 clears it (D-106 criterion 1).
+  holdExpiresAt: number | null
 }
 
 export interface WrittenTicket {
@@ -154,8 +157,8 @@ export async function writeReservation(input: WriteReservationInput): Promise<Wr
     })))
 
   const reservationInsert = sql`
-    INSERT INTO reservations (id, reference, performance_id, user_id, status, source, window_bypassed)
-    VALUES (${id}, ${reference}, ${input.performanceId}, ${input.userId}, 'PENDING', ${input.source}, ${input.windowBypassed})
+    INSERT INTO reservations (id, reference, performance_id, user_id, status, source, window_bypassed, hold_expires_at)
+    VALUES (${id}, ${reference}, ${input.performanceId}, ${input.userId}, 'PENDING', ${input.source}, ${input.windowBypassed}, ${input.holdExpiresAt})
   `
 
   const [, ...ticketRows] = await db.batch([

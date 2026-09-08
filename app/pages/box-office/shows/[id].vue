@@ -184,6 +184,7 @@ const form = reactive({
   intervalMinutes: null as number | null,
   capacityOverride: null as number | null,
   bookingClosesHoursBefore: null as number | null,
+  holdReleaseMinutesBefore: null as number | null,
   externalBookingUrl: '',
   notes: '',
 })
@@ -227,6 +228,7 @@ function editPerformance(one: AdminPerformance | null): void {
     intervalMinutes: one?.intervalMinutes ?? null,
     capacityOverride: one?.capacityOverride ?? null,
     bookingClosesHoursBefore: one?.bookingClosesHoursBefore ?? null,
+    holdReleaseMinutesBefore: one?.holdReleaseMinutesBefore ?? null,
     externalBookingUrl: one?.externalBookingUrl ?? '',
     notes: one?.notes ?? '',
   })
@@ -246,6 +248,7 @@ async function savePerformance(): Promise<void> {
     intervalMinutes: form.intervalMinutes,
     capacityOverride: form.capacityOverride,
     bookingClosesHoursBefore: form.bookingClosesHoursBefore,
+    holdReleaseMinutesBefore: form.holdReleaseMinutesBefore,
     externalBookingUrl: blank(form.externalBookingUrl),
     notes: blank(form.notes),
   }
@@ -884,6 +887,21 @@ const columns: TableColumn<AdminPerformance>[] = [
                 :max="720"
                 class="w-full"
                 data-test="performance-window"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Unpaid holds release"
+              name="holdReleaseMinutesBefore"
+              hint="Optional"
+              description="Minutes before curtain. Leave it empty to take the configured default."
+            >
+              <UInputNumber
+                v-model="form.holdReleaseMinutesBefore"
+                :min="0"
+                :max="1440"
+                class="w-full"
+                data-test="performance-hold-release"
               />
             </UFormField>
           </div>

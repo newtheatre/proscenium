@@ -188,7 +188,7 @@ export async function notify(event: H3Event | undefined, notification: Notificat
     return 'SKIPPED_UNDELIVERABLE'
   }
 
-  const sender = type.topic ? senderForTopic(type.topic) : SENDERS.ACCOUNTS
+  const sender = type.sender ? SENDERS[type.sender] : type.topic ? senderForTopic(type.topic) : SENDERS.ACCOUNTS
   const rendered = render(type.template, { ...notification.context, name: account.name })
 
   try {
