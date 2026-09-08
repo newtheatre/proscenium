@@ -76,6 +76,32 @@ export const shiftContactPreferences = sqliteTable('shift_contact_preferences', 
   updatedAt: integer('updated_at').notNull().default(now),
 })
 
+// The incident log (E-115), append-only. A near miss is one of `severity`'s own values, never a
+// second table: E-117 criterion 3's "distinct type" is this column, not a new one.
+export const incidents = sqliteTable('incidents', {
+  id: id(),
+  performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),
+  reportedBy: text('reported_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  category: text('category').notNull(),
+  severity: text('severity').notNull(),
+  // Operational free text: people by role, never a diagnosis (docs/data-model.md).
+  body: text('body').notNull(),
+  // Defaults to now; backdatable within tonight only, checked at the write path against the
+  // show-night boundary rather than a static CHECK (E-115 criterion 1).
+  happenedAt: integer('happened_at').notNull().default(now),
+  supersedesId: text('supersedes_id').references((): AnySQLiteColumn => incidents.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  index('incidents_performance').on(table.performanceId),
+  index('incidents_reported_by').on(table.reportedBy),
+  index('incidents_created_at').on(table.createdAt),
+  // One correction per entry: a second would leave the chain ambiguous (E-115 criterion 3).
+  uniqueIndex('incidents_one_correction').on(table.supersedesId),
+  check('incidents_category_values', sql`${table.category} IN ('MEDICAL', 'BEHAVIOUR', 'SAFETY', 'SECURITY', 'PROPERTY', 'OTHER')`),
+  check('incidents_severity_values', sql`${table.severity} IN ('NOTE', 'NEAR_MISS', 'INCIDENT', 'SERIOUS')`),
+  check('incidents_no_self_supersede', sql`${table.supersedesId} IS NULL OR ${table.supersedesId} <> ${table.id}`),
+])
+
 // The Challenge 25 register (E-118), licensing evidence and append-only like `incidents`.
 // `performance_id` is nullable because bar checks age outside a show as well as inside one.
 export const ageChecks = sqliteTable('age_checks', {
