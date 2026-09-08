@@ -531,11 +531,12 @@ holder who is not tonight's duty manager. Content warnings, the latecomer policy
 guidance are read straight from `showWarnings()` and the show row, the same source the public
 show page reads, so neither can drift from the other.
 
-Quick links to the checklists and the backstage board are not on the screen yet: neither E-114
-nor E-120 has built its destination (`docs/known-issues.md`). Till, the incident log at
-`/tonight/incidents` and the Challenge 25 register at `/tonight/age-checks` are all linked now.
-Near-miss reporting reaches through a second tap on the incident log screen rather than a first
-tap from `/tonight` itself, an interpretation of E-117 criterion 1 recorded in the known issue.
+A quick link to the backstage board is not on the screen yet: E-120 has not built its destination
+(`docs/known-issues.md`). Till, the incident log, the Challenge 25 register and the checklist are
+all linked now, the last three from a plain button grid in the scrollable content rather than the
+sticky action slot, which K-102 criterion 2 reserves for the one primary action (Till). Near-miss
+reporting reaches through a second tap on the incident log screen rather than a first tap from
+`/tonight` itself, an interpretation of E-117 criterion 1 recorded in the known issue.
 
 ### The Challenge 25 register (E-118)
 
