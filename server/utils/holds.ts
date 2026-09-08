@@ -89,17 +89,8 @@ export interface HoldReminderRun {
   sent: number
 }
 
-// Blocked rather than guessing while `HOLD_REMINDER_MINUTES_BEFORE` carries no committee value
-// (0019): the release half of this task still runs, and this half sends nothing.
 export async function sendHoldReminders(event: H3Event | undefined, at: Date, cap: number): Promise<HoldReminderRun> {
-  let reminderMinutes: number
-  try {
-    reminderMinutes = await configValue(event, 'HOLD_REMINDER_MINUTES_BEFORE')
-  }
-  catch {
-    return { eligible: 0, sent: 0 }
-  }
-
+  const reminderMinutes = await configValue(event, 'HOLD_REMINDER_MINUTES_BEFORE')
   const now = Math.floor(at.getTime() / 1000)
   const candidates = await db.all<ReminderCandidateRow>(reminderCandidatesQuery(now, reminderMinutes, cap))
 

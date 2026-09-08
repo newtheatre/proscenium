@@ -29,10 +29,11 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Minutes before curtain that an unpaid reservation hold is released. Per-show override allowed.',
   },
-  // No proposed value in the workshop register: ships unset, so the reminder job sends nothing
-  // until the committee sets one (0019, D-107).
+  // Proposed and unconfirmed, per docs/workshops.md: shipped rather than left unset, so the
+  // reminder is live from day one instead of a dormant feature awaiting a value (0019, D-107).
   HOLD_REMINDER_MINUTES_BEFORE: {
     schema: z.number().int().positive(),
+    default: 60,
     workshop: 'money-and-box-office',
     describes: 'Minutes before a hold releases that its holder is reminded, by email.',
   },

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { holdExpiresAt, holdReminderClaim, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
+import { bornExpiredReason, holdExpiresAt, holdReminderClaim, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
 
 // D-106 and D-107 as pure rules. What the database enforces is in tests/integration/holds.test.ts.
 
@@ -26,6 +26,21 @@ describe('a hold expires measured back from curtain (0014)', () => {
   test('nought minutes releases at curtain itself', () => {
     const startsAt = 1_800_000_000
     expect(holdExpiresAt(startsAt, 0)).toBe(startsAt)
+  })
+})
+
+describe('a booking born inside its own release window is refused (committee decision, D-106)', () => {
+  test('a hold expiring in the future is not refused', () => {
+    expect(bornExpiredReason(1_800_000_100, 1_800_000_000)).toBeNull()
+  })
+
+  test('a hold expiring exactly now is refused: due for release is not a hold', () => {
+    expect(bornExpiredReason(1_800_000_000, 1_800_000_000)).not.toBeNull()
+  })
+
+  test('a hold that would already be in the past is refused, naming the box office', () => {
+    const reason = bornExpiredReason(1_799_999_000, 1_800_000_000)
+    expect(reason).toContain('box office')
   })
 })
 

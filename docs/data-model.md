@@ -472,8 +472,10 @@ anything else in the window writes no trail for a release that did not happen. A
 `notification_log` on `reservation.hold-expiring:<reservationId>:<holdExpiresAt>`
 (`holdReminderClaim()`), which is why an extended or edited hold re-arms it rather than finding
 the old claim already spent: the expiry is part of the key. Reminders read
-`HOLD_REMINDER_MINUTES_BEFORE`, which carries no workshop value and ships unset, so they send
-nothing until the committee sets one; release runs regardless.
+`HOLD_REMINDER_MINUTES_BEFORE` (60 by default, proposed and unconfirmed per
+`docs/workshops.md`). A booking whose hold would already be due for release the moment it is
+made is refused outright at the write path, quoting the box office as the alternative, rather
+than held and released minutes later (committee decision).
 
 ### tickets
 `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances

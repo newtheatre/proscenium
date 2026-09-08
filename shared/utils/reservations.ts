@@ -83,6 +83,14 @@ export function holdExpiresAt(startsAt: number, minutesBefore: number): number {
   return startsAt - minutesBefore * 60
 }
 
+// Decision: a booking this close to curtain is refused outright rather than held and released
+// minutes later. Keeping these seats sellable at the door is the release window's own point.
+export function bornExpiredReason(holdExpiresAt: number, now: number): string | null {
+  if (holdExpiresAt > now) return null
+  return 'Online booking cannot hold seats this close to curtain. Contact the box office directly, '
+    + 'or come to the theatre in person; tickets may still be available on the door.'
+}
+
 // D-107 criterion 2: keyed on the expiry it warns about, not the reservation alone, so a hold
 // whose expiry moves re-arms the reminder instead of finding the old claim already taken.
 export function holdReminderClaim(reservationId: string, expiresAt: number): string {

@@ -69,10 +69,10 @@ function query<T>(sql: string, ...parameters: unknown[]): T | undefined {
 
 // A performance in the future, so the customer window (D-112) never refuses the booking, with
 // its own hold-release override set so the test controls exactly when the hold expires.
-async function bookedHold(
+async function setUpBookableShow(
   holdReleaseMinutesBefore: number,
-  startsAtOffsetMinutes = 7 * 24 * 60,
-): Promise<{ reservationId: string, holdExpiresAt: number }> {
+  startsAtOffsetMinutes: number,
+): Promise<{ performanceId: string, ticketTypeId: string }> {
   const title = named('The Seagull')
   const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) })
   const showId = (await show.json() as { id: string }).id
@@ -90,6 +90,15 @@ async function bookedHold(
 
   expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true })).status).toBe(200)
 
+  return { performanceId, ticketTypeId }
+}
+
+async function bookedHold(
+  holdReleaseMinutesBefore: number,
+  startsAtOffsetMinutes = 7 * 24 * 60,
+): Promise<{ reservationId: string, holdExpiresAt: number }> {
+  const { performanceId, ticketTypeId } = await setUpBookableShow(holdReleaseMinutesBefore, startsAtOffsetMinutes)
+
   const email = registrableAddress('guest')
   const answered = await send('POST', '/api/reservations', {
     performanceId,
@@ -105,15 +114,25 @@ async function bookedHold(
   return { reservationId: row.id, holdExpiresAt: row.holdExpiresAt }
 }
 
-describe.skipIf(skip !== null)('an unpaid hold releases once past its own expiry (D-106)', () => {
-  // Thirty minutes out, releasing an hour before curtain: the release point is already past
-  // the moment the reservation is written, the edge case docs/known-issues.md records.
-  const STARTS_AT_OFFSET_MINUTES = 30
-  const HOLD_RELEASE_MINUTES_BEFORE = 60
+// Direct SQL, not the API: this simulates the passage of time between a valid booking and its
+// own release point, the only way to reach that state now the write path refuses it outright.
+function backdateHold(reservationId: string, at: number): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.prepare('UPDATE reservations SET hold_expires_at = ? WHERE id = ?').run(at, reservationId)
+  }
+  finally {
+    database.close()
+  }
+}
 
-  test('a hold born already past its release point is expired on the next run', async () => {
-    const { reservationId, holdExpiresAt } = await bookedHold(HOLD_RELEASE_MINUTES_BEFORE, STARTS_AT_OFFSET_MINUTES)
-    expect(holdExpiresAt).toBeLessThan(Math.floor(Date.now() / 1000))
+describe.skipIf(skip !== null)('an unpaid hold releases once past its own expiry (D-106)', () => {
+  const STARTS_AT_OFFSET_MINUTES = 60
+  const HOLD_RELEASE_MINUTES_BEFORE = 5
+
+  test('a hold past its release point is expired on the next run', async () => {
+    const { reservationId } = await bookedHold(HOLD_RELEASE_MINUTES_BEFORE, STARTS_AT_OFFSET_MINUTES)
+    backdateHold(reservationId, Math.floor(Date.now() / 1000) - 1)
 
     await runReleaseTask()
 
@@ -129,6 +148,7 @@ describe.skipIf(skip !== null)('an unpaid hold releases once past its own expiry
 
   test('a second run finds nothing left to release', async () => {
     const { reservationId } = await bookedHold(HOLD_RELEASE_MINUTES_BEFORE, STARTS_AT_OFFSET_MINUTES)
+    backdateHold(reservationId, Math.floor(Date.now() / 1000) - 1)
     await runReleaseTask()
     await runReleaseTask()
 
@@ -137,6 +157,28 @@ describe.skipIf(skip !== null)('an unpaid hold releases once past its own expiry
       'reservation.expired', `reservation:${reservationId}`,
     )
     expect(trail?.total).toBe(1)
+  }, CASE_TIMEOUT_MS)
+})
+
+describe.skipIf(skip !== null)('a booking born already past its release point is refused outright (D-106)', () => {
+  // Thirty minutes out, releasing an hour before curtain: the release point is already past
+  // the moment the reservation would be written, the committee decision this write path enforces.
+  test('the reservation write path refuses rather than creating a doomed hold', async () => {
+    const { performanceId, ticketTypeId } = await setUpBookableShow(60, 30)
+
+    const email = registrableAddress('guest')
+    const answered = await send('POST', '/api/reservations', {
+      performanceId,
+      lines: [{ ticketTypeId, quantity: 1 }],
+      guest: { name: 'Hold Tester', email },
+    }, '')
+
+    expect(answered.status).toBe(409)
+
+    const row = query<{ total: number }>(
+      'SELECT count(*) AS total FROM reservations WHERE performance_id = ?', performanceId,
+    )
+    expect(row?.total).toBe(0)
   }, CASE_TIMEOUT_MS)
 })
 
