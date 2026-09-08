@@ -724,6 +724,40 @@ after a device restart, exactly the old estate's gap the criterion names. Whole-
 than venue-scoped: a shift holder resolves exactly one venue a night (0044), so nothing here
 has to learn which before it can prime or read.
 
+### The backstage board's join (E-120)
+
+`shared/utils/backstage.ts`'s `deriveBoardCode(secret, night, venueId, epoch)` is the whole of
+the code: HMAC-SHA256 over `backstage-board:${night}:${venueId}:${epoch}`, truncated to six
+digits the same way `shared/utils/totp.ts` truncates a TOTP step. Nothing stores the result; a
+row only ever holds the `epoch` a code was derived at and the `failed_attempts` count that moves
+it, both on `backstage_nights` (one row per venue per night, made the first time anybody needs
+it, the E-101 stamping pattern again). The secret is a new worker secret,
+`NUXT_BACKSTAGE_BOARD_SECRET` (`runtimeConfig.backstageBoardSecret`), read fresh on every call
+rather than imported as a `CryptoKey` the way `access-profile-crypto.ts` does, since HMAC signs
+from the raw string directly.
+
+`recordFailedAttemptStatement()` is one `UPDATE` whose `SET` clauses all read the row's
+pre-update values, so incrementing the counter and rolling the epoch over at the tenth failure
+happen atomically in a single statement rather than a read-then-write (0049's own reasoning,
+applied to arithmetic instead of a predicate). A correct guess resets the counter without moving
+the epoch, the same shape a login lockout uses.
+
+`POST /api/board/join` is deliberately public: no account and no personal data are asked for,
+so it carries no `requireNightAuthority` call and, for that reason, lives outside
+`server/api/tonight/**` entirely, in its own `server/api/board/` namespace. Every route under
+`/api/tonight/**` is required to check show-night authority itself
+(`tests/unit/night-authority.test.ts`, E-111 criterion 5); a route that legitimately never does
+does not belong in that namespace at all, matching the separate `/board` entry the route
+ownership table already carries. The join tries every venue running tonight against the
+submitted code, since a crew member gives only the code, never a venue; a wrong guess counts as
+a failed attempt against each venue tried, so nothing about the response tells an attacker which
+venue they were closest to. `GET /api/tonight/board/code` is the opposite: guarded, and reachable
+only from the duty manager's own `/tonight`, revealed on tap rather than shown by default or
+polled (criterion 5).
+
+Not built here, and not this story's: `backstage_messages`, `backstage_presets`, a manual reset
+and the 30-day free-text purge are all E-121's and E-122's (`docs/data-model.md`).
+
 ## The programme (build-order contract d, 0043)
 
 Where we perform, what we perform and when. `venues`, `seasons`, `show_categories`, `shows`,
