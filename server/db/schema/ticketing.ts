@@ -17,8 +17,8 @@ export const ticketTypes = sqliteTable('ticket_types', {
   kind: text('kind').notNull(),
   // Set on the two types no public payload may ever carry (D-128).
   accessKind: text('access_kind'),
-  // Entitlement gate, set once at creation (D-109 criterion 1). Concession has no
-  // committee-agreed evidence yet, so it is not a value; that type is checked at the desk instead.
+  // Entitlement gate, set once at creation (D-109 criterion 1). No CHECK: a rebuild this
+  // `restrict`-FK'd table cannot survive once sold; enforced by Zod at the write path (0012).
   restrictedTo: text('restricted_to'),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
   activeByDefault: integer('active_by_default', { mode: 'boolean' }).notNull().default(true),
@@ -29,7 +29,6 @@ export const ticketTypes = sqliteTable('ticket_types', {
   uniqueIndex('ticket_types_name_nocase').on(sql`${table.name} COLLATE NOCASE`),
   check('ticket_types_kind_values', sql`${table.kind} IN ('SINGLE', 'PASS_ADMISSION')`),
   check('ticket_types_access_kind_values', sql`${table.accessKind} IS NULL OR ${table.accessKind} IN ('ACCESS', 'COMPANION')`),
-  check('ticket_types_restricted_to_values', sql`${table.restrictedTo} IS NULL OR ${table.restrictedTo} IN ('MEMBER')`),
   check('ticket_types_price_pence', sql`${table.price} >= 0`),
 ])
 
