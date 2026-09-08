@@ -19,6 +19,9 @@ export interface BarProductReference {
   // Which rows count towards that requirement, as SQL over the referencing table. Written here
   // and never taken from a request, which is what makes raw interpolation of it safe.
   countingOnly?: string
+  // False when the table is append-only and carries no FK, so a PRAGMA-driven completeness
+  // check cannot discover it and must not expect it either (F-105).
+  hasForeignKey?: boolean
   why: string
 }
 
@@ -106,14 +109,14 @@ export async function retiredIngredientsOf(productId: string): Promise<string[]>
 }
 
 // Every FK to `product_variants` is classified here or the build fails (bar-variants.test.ts,
-// F-111's rule). `ledger_lines.product_variant_id` has no FK, so F-105's sale row is by hand.
+// F-111's rule). `ledger_lines.product_variant_id` has no FK, so the sale row below is by hand.
 export const VARIANT_REFERENCES: BarProductReference[] = [
   {
     table: 'variant_prices',
     column: 'variant_id',
     sale: false,
     requiredToActivate: null,
-    why: 'what this size costs from a date: configuration, and nobody has bought anything',
+    why: 'what this size costs from a date: configuration, whether or not it has ever sold',
   },
   {
     table: 'variant_components',
@@ -121,6 +124,14 @@ export const VARIANT_REFERENCES: BarProductReference[] = [
     sale: false,
     requiredToActivate: null,
     why: 'what pouring one consumes: a recipe, not a sale',
+  },
+  {
+    table: 'ledger_lines',
+    column: 'product_variant_id',
+    sale: true,
+    requiredToActivate: null,
+    hasForeignKey: false,
+    why: 'a real sale (F-105); no foreign key exists to find this by, since the table is append-only',
   },
 ]
 
@@ -164,14 +175,37 @@ export function effectiveCategoryPriceColumn(categoryId: SQL, servingKind: SQL, 
   )`
 }
 
+// The same two rows' own ids, so a caller that needs to cite which one resolved (F-121's
+// `price_ref`, F-105) can, without a second round trip against a row that could move under it.
+export function effectivePriceIdColumn(alias: string, on: string): SQL {
+  return sql`(
+    SELECT p.id FROM variant_prices p
+    WHERE p.variant_id = ${sql.raw(alias)}.id AND p.effective_from <= ${on}
+    ORDER BY p.effective_from DESC, p.created_at DESC, p.rowid DESC
+    LIMIT 1
+  )`
+}
+
+export function effectiveCategoryPriceIdColumn(categoryId: SQL, servingKind: SQL, on: string): SQL {
+  return sql`(
+    SELECT cp.id FROM category_prices cp
+    WHERE cp.category_id = ${categoryId} AND cp.serving_kind = ${servingKind} AND cp.effective_from <= ${on}
+    ORDER BY cp.effective_from DESC, cp.created_at DESC, cp.rowid DESC
+    LIMIT 1
+  )`
+}
+
 // Variant price first, category default second, null when neither prices it (0017, F-121
 // criterion 2). `priceSource` names which level answered, so a stray override is visible (criterion 5).
-export function resolvedPriceColumns(categoryId: SQL, variantAlias: string, on: string): { pricePence: SQL, priceSource: SQL } {
+export function resolvedPriceColumns(categoryId: SQL, variantAlias: string, on: string): { pricePence: SQL, priceSource: SQL, priceRowId: SQL } {
   const variantPrice = effectivePriceColumn(variantAlias, on)
   const categoryPrice = effectiveCategoryPriceColumn(categoryId, sql`${sql.raw(variantAlias)}.serving_kind`, on)
+  const variantPriceId = effectivePriceIdColumn(variantAlias, on)
+  const categoryPriceId = effectiveCategoryPriceIdColumn(categoryId, sql`${sql.raw(variantAlias)}.serving_kind`, on)
   return {
     pricePence: sql`COALESCE(${variantPrice}, ${categoryPrice})`,
     priceSource: sql`CASE WHEN ${variantPrice} IS NOT NULL THEN 'variant' WHEN ${categoryPrice} IS NOT NULL THEN 'category' ELSE NULL END`,
+    priceRowId: sql`CASE WHEN ${variantPrice} IS NOT NULL THEN ${variantPriceId} ELSE ${categoryPriceId} END`,
   }
 }
 

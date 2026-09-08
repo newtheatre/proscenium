@@ -7,8 +7,8 @@ import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, wa
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// F-104 through the real route and the real screen: a sale submission is refused, quoting both
-// figures, whenever it disagrees with what the till would charge. Nothing is written here either way.
+// F-104 through the real route and screen: a sale is refused, quoting both figures, whenever it
+// disagrees with what the till would charge. What a match writes is F-105's own suite.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -110,22 +110,20 @@ function ledgerCounts(): { entries: number, lines: number } {
   }
 }
 
-describe.skipIf(skip !== null)('a matching total is accepted, and nothing is written (F-104 criterion 1)', () => {
+describe.skipIf(skip !== null)('a matching total is accepted (F-104 criterion 1)', () => {
   test('the server confirms the same total it would price the basket at', async () => {
     const { venueId } = programme('charge-match')
     const { variantId } = await aSellableProduct()
     await openTill(venueId)
 
-    const before = ledgerCounts()
     const answered = await charge(venueId, [{ variantId, qty: 2 }], 500)
     expect(answered.status).toBe(200)
-    const body = await answered.json() as { ok: boolean, totalPence: number }
+    const body = await answered.json() as { ok: boolean, totalPence: number, entryId: string }
     expect(body.ok).toBe(true)
     expect(body.totalPence).toBe(500)
-
-    // Neither table gained a row: the write is F-105's, not this route's (0001, historical rows
-    // already live here from the money import, so a bare count would be meaningless).
-    expect(ledgerCounts()).toEqual(before)
+    // What a match actually commits (the ledger entry, its lines and the stock it depletes) is
+    // F-105's own suite, `tests/e2e/till-sale-commit.test.ts`; this only proves the entry exists.
+    expect(body.entryId).toBeTruthy()
   })
 })
 

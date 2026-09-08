@@ -95,3 +95,11 @@ export interface PricedBasket {
   lines: PricedLine[]
   totalPence: number
 }
+
+// What a completed sale answers with (F-105): the ledger entry it posted, so a receipt or a void
+// can cite it, and the same lines a price check would have shown.
+export interface SaleReceipt {
+  entryId: string
+  totalPence: number
+  lines: PricedLine[]
+}
