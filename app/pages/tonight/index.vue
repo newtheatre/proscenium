@@ -245,6 +245,12 @@ function houseLine(house: Performance['house']): string {
         color="neutral"
         to="/tonight/incidents"
       />
+      <NightAction
+        label="Challenge 25 register"
+        icon="i-lucide-id-card"
+        color="neutral"
+        to="/tonight/age-checks"
+      />
     </template>
   </NightScreen>
 </template>

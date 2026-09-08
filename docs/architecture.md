@@ -531,12 +531,11 @@ holder who is not tonight's duty manager. Content warnings, the latecomer policy
 guidance are read straight from `showWarnings()` and the show row, the same source the public
 show page reads, so neither can drift from the other.
 
-Quick links to the Challenge 25 register, the checklists and the backstage board are not on the
-screen yet: E-118's register has no screen of its own to link to, and neither E-114 nor E-120
-has built its destination (`docs/known-issues.md`). The incident log at `/tonight/incidents`
-is linked now, and reaches near-miss reporting through a second tap on that screen rather than
-a first tap from `/tonight` itself, an interpretation of E-117 criterion 1 recorded in the same
-row. Till is linked because it is the one show-night screen that already existed before E-112.
+Quick links to the checklists and the backstage board are not on the screen yet: neither E-114
+nor E-120 has built its destination (`docs/known-issues.md`). Till, the incident log at
+`/tonight/incidents` and the Challenge 25 register at `/tonight/age-checks` are all linked now.
+Near-miss reporting reaches through a second tap on the incident log screen rather than a first
+tap from `/tonight` itself, an interpretation of E-117 criterion 1 recorded in the known issue.
 
 ### The Challenge 25 register (E-118)
 
@@ -566,6 +565,12 @@ The officer bypass still resolves against `coverage()`, which needs a venue runn
 tonight; an age check's own `performance_id` may be null regardless of what authority resolved
 against, which is how criterion 4's "bar can check outside a show" is read here: the check
 itself never has to name a performance, even on a night that has one.
+
+`/tonight/age-checks` is criterion 4's standalone half from the tonight screen: log a check,
+correct one, and read tonight's register, linked from `/tonight`. The criterion's other two
+halves stay open on issue #457: the till-inline reachability is F-106's, and the door half
+waits on a door screen existing at all, which no story has built yet and which is not this
+screen's work to start.
 
 ### The incident log and near-miss reporting (E-115, E-117)
 
