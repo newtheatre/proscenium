@@ -2,11 +2,13 @@
 import { boardJoinForm } from '#shared/utils/backstage'
 
 // No account, no personal data: the code and a display label are the whole of the form
-// (E-120 criterion 1). The device's token is kept only for this browser to reuse later.
+// (E-120 criterion 1). The device's own token rides a cookie, the one storage `useCookie`
+// already owns (the device store is `useNightCache`/`useWriteQueue`'s alone, tests/unit/night-cache.test.ts).
 const state = reactive({ code: '', label: '' })
 const joining = ref(false)
 const failure = ref<string | null>(null)
 const joined = ref<{ venueName: string } | null>(null)
+const deviceToken = useCookie<string | null>('nnt-backstage-token', { maxAge: 60 * 60 * 24, sameSite: 'lax' })
 
 async function join(): Promise<void> {
   joining.value = true
@@ -16,7 +18,7 @@ async function join(): Promise<void> {
       method: 'POST',
       body: state,
     })
-    if (import.meta.client) localStorage.setItem('nnt-backstage-token', answered.token)
+    deviceToken.value = answered.token
     joined.value = { venueName: answered.venueName }
   }
   catch (error) {
