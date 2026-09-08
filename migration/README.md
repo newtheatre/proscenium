@@ -21,22 +21,35 @@ flowchart LR
   M --> R[reconcile.ts]
   U --> R
   R --> G{Green?}
-  G -- yes --> W[Weekly rehearsal recorded on epic 338]
+  G -- yes --> L[load.ts, applied to a target with the real schema]
+  L --> B[transform-bookings.ts, the same target]
+  B --> W[Weekly rehearsal recorded on epic 338]
   G -- no --> F[Fix the transform, never the numbers]
 ```
 
 ## Running a rehearsal
+
+A target with the real application schema first, the same one every later step writes into:
+`bun run dev` once creates `.data/db/sqlite.db`, or copy it, or apply the Drizzle migrations to
+a scratch file by hand.
 
 ```bash
 bun install
 ./migration/export.sh          # pulls fresh dumps from production via wrangler
 bun migration/inventory.ts     # loads dumps locally, writes out/manifest.json + .md
 bun migration/transform-identity.ts   # builds the unified identity core in out/unified.sqlite
-bun migration/transform-bookings.ts   # imports the old rooms history onto those accounts
 bun migration/reconcile.ts     # verifies counts and invariants; non-zero exit on failure
-bun migration/load.ts          # writes out/load.sql
-bun migration/load.ts /tmp/rehearsal.db   # and applies it to a local target
+bun migration/load.ts /tmp/rehearsal.db          # writes out/load.sql and applies it
+bun migration/transform-bookings.ts /tmp/rehearsal.db   # the old rooms history, same target
+bun migration/transform-money.ts /tmp/rehearsal.db      # ticket revenue, same target
 ```
+
+**`transform-bookings.ts` and `transform-money.ts` take the target as an argument and refuse to
+run without one, on purpose.** Unlike identity, `room_bookings.room_id` and
+`external_requests`' own room reference are real foreign keys onto rooms administered through the
+live app; no hand-maintained schema subset can ever hold real room ids, because rooms are never
+migrated, only referenced. `load.ts` has to run against the same target first, so the users these
+key to already exist there (`docs/known-issues.md`).
 
 `export.sh` requires a wrangler login with access to the New Theatre account. Every later
 step is offline against the dumps.
