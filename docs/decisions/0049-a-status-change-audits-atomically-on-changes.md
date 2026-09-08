@@ -127,6 +127,26 @@ parameter.
   This record applies to both; the sweep is a later pull request. `docs/known-issues.md` carries a
   row for each so the gap is visible until then rather than only implied by this record's own
   survey being incomplete.
+- **Amended 8 September 2026: the fourth call site arrived, so the helper is built.** Both
+  previously-unswept routes above were fixed in the meantime, and the pattern had spread to
+  fifteen call sites across bar, rota, training, rooms and access profiles, well past the "three
+  call sites, no fourth yet" reasoning the Decision section's "No helper" paragraph gives.
+  `server/utils/audit.ts` now exports `auditedWrite(write, entry)`: it batches the caller's own
+  write with the audit insert conditional on that write's `changes()`, and returns whether the
+  write applied, exactly the contract the "No helper" paragraph sketched as `statusChangeBatch`.
+  The signature is the caller's own write statement rather than `table, id, from, to`: real call
+  sites update more than one column (`performances/[id]/index.put.ts`), use predicates a
+  three-parameter shape cannot express (the `NOT EXISTS` clauses in `claimShiftStatement` and
+  `assignShiftStatement`), or are an `INSERT ... ON CONFLICT` rather than an `UPDATE`
+  (`guestAccount` in `server/utils/reservations.ts`). The refusal wording stays at every call site,
+  unchanged from the original decision: the helper reports only the fact of whether the write
+  applied. All fifteen now use it. Three routes still hand-type the shape rather than using the
+  helper, each for its own reason: `till/index.post.ts` and `till/close.post.ts` never check
+  whether their write applied, so there is no boolean for a helper to return; `bar/stocktakes/[id]/
+  apply.post.ts` chains a third statement off the same `changes()` the audit insert leaves behind,
+  which a two-statement helper cannot express. The five external-request routes named in
+  `docs/known-issues.md` are a separate, larger change, because `assign.post.ts` also needs its
+  `externalAssignments` insert folded into the same batch, not only its audit.
 
 ## Options considered
 

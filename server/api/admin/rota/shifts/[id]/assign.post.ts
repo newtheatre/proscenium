@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { formatLondon } from '#shared/utils/london'
 import { reassignRefusal, saysShiftRole, shiftAssignForm } from '#shared/utils/rota'
@@ -36,16 +35,9 @@ export default defineEventHandler(async (event) => {
 
   // One UPDATE on the row that already exists, so replacing a duty manager never puts a second
   // CONFIRMED row on the performance for the index to arbitrate (E-107 criterion 4).
-  const [assigned] = await withShiftConstraints(() => db.batch([
-    db.all<{ id: string }>(assignShiftStatement(id, userId, resolved.account.id)),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
-      WHERE changes() = 1
-    `),
-  ]))
+  const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(assignShiftStatement(id, userId, resolved.account.id)), entry))
 
-  if (assigned.length === 0) {
+  if (!applied) {
     const now = await shiftDetail(id)
     throw createError({ statusCode: 409, statusMessage: reassignRefusal(now?.status ?? held.status) })
   }

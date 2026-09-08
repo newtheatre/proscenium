@@ -57,24 +57,18 @@ export default defineEventHandler(async (event) => {
     detail: { heldOn: session.heldOn, told: signedUp.length },
   })
 
-  // The audit insert reads `changes()`, this connection's own UPDATE row count, not the
-  // resulting state: a losing request's UPDATE touches nothing, whatever the winner did (0049).
-  const [cancelled] = await db.batch([
+  const applied = await auditedWrite(
     db.all<{ id: string }>(sql`
       UPDATE training_sessions SET status = 'CANCELLED', cancelled_at = ${now}, cancelled_by = ${resolved.account.id},
         cancel_reason = ${input.reason}, updated_at = ${now}
       WHERE id = ${id} AND status <> 'CANCELLED' RETURNING id
     `),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
-      WHERE changes() = 1
-    `),
-  ])
+    entry,
+  )
 
   // A losing racer is refused, not told it succeeded: the audit stayed silent, so the caller
   // must too (0049).
-  if (cancelled.length === 0) {
+  if (!applied) {
     throw createError({ statusCode: 409, statusMessage: 'That session is already cancelled' })
   }
 

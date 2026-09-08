@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { formatLondon } from '#shared/utils/london'
 import { approvalRefusal, saysShiftRole } from '#shared/utils/rota'
@@ -19,16 +18,9 @@ export default defineEventHandler(async (event) => {
     detail: changes({ status: [held.status, 'CONFIRMED'] }),
   })
 
-  const [approved] = await withShiftConstraints(() => db.batch([
-    db.all<{ id: string }>(approveShiftStatement(id)),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
-      WHERE changes() = 1
-    `),
-  ]))
+  const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(approveShiftStatement(id)), entry))
 
-  if (approved.length === 0) {
+  if (!applied) {
     const now = await shiftDetail(id)
     throw createError({ statusCode: 409, statusMessage: approvalRefusal(now?.status ?? held.status) })
   }

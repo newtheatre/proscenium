@@ -118,20 +118,16 @@ export async function withdrawAccessProfile(userId: string): Promise<WithdrawOut
 
   // The predicate rides the write, so two withdrawals racing (a double click, two tabs) leave
   // one audit row rather than two (0003, 0006).
-  const [updated] = await db.batch([
+  const applied = await auditedWrite(
     db.all<{ userId: string }>(sql`
       UPDATE access_profiles SET status = 'WITHDRAWN', withdrawn_at = ${now}, consent_foh_at = NULL, updated_at = ${now}
       WHERE user_id = ${userId} AND status <> 'WITHDRAWN'
       RETURNING user_id AS userId
     `),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, NULL
-      WHERE changes() = 1
-    `),
-  ])
+    entry,
+  )
 
-  if (updated.length === 0) return { withdrawn: false, alreadyWithdrawn: true }
+  if (!applied) return { withdrawn: false, alreadyWithdrawn: true }
   return { withdrawn: true, alreadyWithdrawn: false }
 }
 
@@ -218,7 +214,7 @@ export async function verifyAccessProfile(event: H3Event, userId: string, office
 
   // The predicate rides the UPDATE, so a patron withdrawing (or a second officer deciding) between
   // the read above and this write loses the race instead of being silently overwritten (0003, 0006).
-  const [updated] = await db.batch([
+  const applied = await auditedWrite(
     db.all<{ userId: string }>(sql`
       UPDATE access_profiles
       SET status = 'VERIFIED', encrypted_payload = ${encrypted.ciphertext}, encryption_iv = ${encrypted.iv},
@@ -226,14 +222,10 @@ export async function verifyAccessProfile(event: H3Event, userId: string, office
       WHERE user_id = ${userId} AND ${decidablePredicate(now)}
       RETURNING user_id AS userId
     `),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, NULL
-      WHERE changes() = 1
-    `),
-  ])
+    entry,
+  )
 
-  if (updated.length === 0) requireDecidable(await rowFor(userId), Math.floor(Date.now() / 1000))
+  if (!applied) requireDecidable(await rowFor(userId), Math.floor(Date.now() / 1000))
 }
 
 export async function declineAccessProfile(event: H3Event, userId: string, officerId: string): Promise<void> {
@@ -244,21 +236,17 @@ export async function declineAccessProfile(event: H3Event, userId: string, offic
   const encrypted = await encryptAccessProfilePayload(payload, userId)
   const entry = auditEntry({ actorId: officerId, action: 'access-profile.declined', target: `user:${userId}` })
 
-  const [updated] = await db.batch([
+  const applied = await auditedWrite(
     db.all<{ userId: string }>(sql`
       UPDATE access_profiles
       SET status = 'DECLINED', encrypted_payload = ${encrypted.ciphertext}, encryption_iv = ${encrypted.iv}, updated_at = ${now}
       WHERE user_id = ${userId} AND ${decidablePredicate(now)}
       RETURNING user_id AS userId
     `),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, NULL
-      WHERE changes() = 1
-    `),
-  ])
+    entry,
+  )
 
-  if (updated.length === 0) requireDecidable(await rowFor(userId), Math.floor(Date.now() / 1000))
+  if (!applied) requireDecidable(await rowFor(userId), Math.floor(Date.now() / 1000))
 }
 
 // The 30-day tombstone from withdrawal, then gone outright (D-127 criterion 5). One batch per

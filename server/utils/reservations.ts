@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { findByEmail, newId } from './accounts'
+import { auditedWrite } from './audit'
 import { heldSeatsQuery, ticketInsertQueries } from './capacity'
 import { auditEntry } from '#shared/utils/audit'
 import { normaliseEmail } from '#shared/utils/auth'
@@ -121,19 +122,15 @@ export async function guestAccount(email: string, name: string): Promise<GuestAc
 
   // Two concurrent checkouts can both pass the read above, so the insert itself carries the
   // conflict guard, and the audit rides `changes()` rather than trusting the read (0006, 0049).
-  const [inserted] = await db.batch([
+  const created = await auditedWrite(
     db.all<{ id: string }>(sql`
       INSERT INTO users (id, email, name) VALUES (${id}, ${normalised}, ${name.trim()})
       ON CONFLICT (email) DO NOTHING
       RETURNING id
     `),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, NULL
-      WHERE changes() = 1
-    `),
-  ])
-  if (inserted.length > 0) return { id, created: true }
+    entry,
+  )
+  if (created) return { id, created: true }
 
   // Lost the race: somebody else's checkout won between the read above and this insert.
   const winner = await findByEmail(email)
