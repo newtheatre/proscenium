@@ -65,6 +65,7 @@ const COLUMNS = sql`
   t.price AS price,
   t.kind AS kind,
   t.access_kind AS accessKind,
+  t.restricted_to AS restrictedTo,
   t.archived AS archived,
   t.active_by_default AS activeByDefault
 `

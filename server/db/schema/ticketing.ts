@@ -17,6 +17,11 @@ export const ticketTypes = sqliteTable('ticket_types', {
   kind: text('kind').notNull(),
   // Set on the two types no public payload may ever carry (D-128).
   accessKind: text('access_kind'),
+  // Entitlement gate, set once at creation like kind and access kind (D-109 criterion 1).
+  // Concession has no committee-agreed eligibility evidence yet, so it is not a value here:
+  // a concession type is offered to everybody online and checked at the desk instead
+  // (criterion 3), which needs no gate at all.
+  restrictedTo: text('restricted_to'),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
   activeByDefault: integer('active_by_default', { mode: 'boolean' }).notNull().default(true),
 }, table => [
@@ -26,6 +31,7 @@ export const ticketTypes = sqliteTable('ticket_types', {
   uniqueIndex('ticket_types_name_nocase').on(sql`${table.name} COLLATE NOCASE`),
   check('ticket_types_kind_values', sql`${table.kind} IN ('SINGLE', 'PASS_ADMISSION')`),
   check('ticket_types_access_kind_values', sql`${table.accessKind} IS NULL OR ${table.accessKind} IN ('ACCESS', 'COMPANION')`),
+  check('ticket_types_restricted_to_values', sql`${table.restrictedTo} IS NULL OR ${table.restrictedTo} IN ('MEMBER')`),
   check('ticket_types_price_pence', sql`${table.price} >= 0`),
 ])
 
@@ -67,7 +73,8 @@ export const reservations = sqliteTable('reservations', {
   cancelledBy: text('cancelled_by'),
   customerNotes: text('customer_notes'),
   staffNotes: text('staff_notes'),
-  // The stable QR credential, minted once at reservation and never reissued (D-108).
+  // Unused: the QR is a stateless HMAC over this row's id (`server/utils/qr-tokens.ts`), so a
+  // resend can reproduce the identical code without a stored credential to leak (D-108).
   qrTokenHash: text('qr_token_hash'),
   // True only for a desk booking past the customer window (D-112 criterion 3); a web
   // reservation is always false, since `saleRefusal` already refused a closed one.

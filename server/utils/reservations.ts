@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import { findByEmail, newId } from './accounts'
 import { auditedWrite } from './audit'
 import { heldSeatsQuery, ticketInsertQueries } from './capacity'
+import { qrTokenFor } from './qr-tokens'
 import { auditEntry } from '#shared/utils/audit'
 import { normaliseEmail } from '#shared/utils/auth'
 import { capacityRefusal } from '#shared/utils/capacity'
@@ -11,7 +12,7 @@ import { resolvePrice } from '#shared/utils/ticket-types'
 import type { TicketToWrite } from './capacity'
 import type { CapacityRefusal } from '#shared/utils/capacity'
 import type { ReservationSource } from '#shared/utils/reservations'
-import type { PriceSource } from '#shared/utils/ticket-types'
+import type { PriceSource, TicketTypeRestriction } from '#shared/utils/ticket-types'
 import type { SQL } from 'drizzle-orm'
 
 // Resolving what a performance may sell and writing what it sold (D-104). The predicate that
@@ -27,6 +28,7 @@ export interface BookableTicketTypeRow {
   showActive: number | null
   performancePrice: number | null
   performanceActive: number | null
+  restrictedTo: TicketTypeRestriction | null
 }
 
 export interface BookableTicketType {
@@ -35,14 +37,18 @@ export interface BookableTicketType {
   description: string | null
   price: number
   source: PriceSource
+  restrictedTo: TicketTypeRestriction | null
 }
 
 const readFlag = (value: number | null): boolean | null => (value === null ? null : value === 1)
 
 // Active, publicly listed types resolved down the same chain the listing reads, so a quoted
 // price can never differ from what the write path charges. Pure, so it needs no database.
-export function readBookableTicketTypes(rows: BookableTicketTypeRow[]): BookableTicketType[] {
+// A member-restricted type is dropped for a caller who is not currently one (D-109 criterion 1);
+// a concession type carries no gate here at all and is left for the desk (criterion 3).
+export function readBookableTicketTypes(rows: BookableTicketTypeRow[], isMember: boolean): BookableTicketType[] {
   return rows.flatMap((row) => {
+    if (row.restrictedTo === 'MEMBER' && !isMember) return []
     const resolved = resolvePrice(
       { price: row.basePrice, activeByDefault: row.activeByDefault === 1 },
       row.showPrice === null && row.showActive === null ? null : { price: row.showPrice, active: readFlag(row.showActive) },
@@ -51,14 +57,17 @@ export function readBookableTicketTypes(rows: BookableTicketTypeRow[]): Bookable
         : { price: row.performancePrice, active: readFlag(row.performanceActive) },
     )
     if (!resolved.active) return []
-    return [{ id: row.id, name: row.name, description: row.description, price: resolved.price, source: resolved.source }]
+    return [{
+      id: row.id, name: row.name, description: row.description, price: resolved.price,
+      source: resolved.source, restrictedTo: row.restrictedTo,
+    }]
   })
 }
 
 export function bookableTicketTypesQuery(performanceId: string, showId: string): SQL {
   return sql`
     SELECT t.id AS id, t.name AS name, t.description AS description, t.price AS basePrice,
-           t.active_by_default AS activeByDefault,
+           t.active_by_default AS activeByDefault, t.restricted_to AS restrictedTo,
            so.price AS showPrice, so.active AS showActive,
            po.price AS performancePrice, po.active AS performanceActive
     FROM ticket_types t
@@ -69,8 +78,8 @@ export function bookableTicketTypesQuery(performanceId: string, showId: string):
   `
 }
 
-export async function bookableTicketTypes(performanceId: string, showId: string): Promise<BookableTicketType[]> {
-  return readBookableTicketTypes(await db.all<BookableTicketTypeRow>(bookableTicketTypesQuery(performanceId, showId)))
+export async function bookableTicketTypes(performanceId: string, showId: string, isMember: boolean): Promise<BookableTicketType[]> {
+  return readBookableTicketTypes(await db.all<BookableTicketTypeRow>(bookableTicketTypesQuery(performanceId, showId)), isMember)
 }
 
 export interface ReservationLineToWrite {
@@ -102,6 +111,9 @@ export interface WrittenTicket {
 
 export interface WriteReservationResult {
   reference: string
+  // Issued once, here, and never again: the plaintext exists only in this response and the
+  // confirmation email built from it (D-108 criterion 1).
+  qrToken: string
   // The tickets the batch actually wrote: fewer than requested means the capacity predicate on
   // at least one statement did not match, and the whole order wrote none of itself (D-105).
   tickets: WrittenTicket[]
@@ -180,7 +192,7 @@ export async function writeReservation(input: WriteReservationInput): Promise<Wr
     await db.run(sql`UPDATE reservations SET status = 'CANCELLED', updated_at = unixepoch() WHERE id = ${id} AND status = 'PENDING'`)
   }
 
-  return { reference, tickets: written, requested: tickets.length }
+  return { reference, qrToken: await qrTokenFor(id), tickets: written, requested: tickets.length }
 }
 
 // The message a refused order quotes, read fresh after the batch: the decision already happened

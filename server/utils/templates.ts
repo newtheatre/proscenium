@@ -1158,6 +1158,35 @@ After ${releasesAt} the seats go back on sale and cannot be guaranteed back to y
 The Nottingham New Theatre`,
     }
   },
+  // The stable QR (D-108 criterion 1): embedded inline, never attached, so an image-blocking
+  // client still shows the text and the link underneath it.
+  'reservation-confirmed': (context: TemplateContext): Rendered => {
+    const reference = String(context.reference)
+    const show = String(context.show)
+    const when = String(context.when)
+    const totalDue = String(context.totalDue)
+    const url = String(context.url)
+    const qrSvg = String(context.qrSvg)
+    return {
+      subject: `Your reservation for ${show}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Reference <strong>${reference}</strong> for ${show}, ${when}.</p>
+<p><strong>UNPAID.</strong> ${totalDue} is due at the box office on the night; this reservation
+holds your seats and is not a purchase until then.</p>
+<p><img src="data:image/svg+xml;base64,${qrSvg}" alt="Booking QR code" width="200" height="200"></p>
+<p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
+      text: `Hello ${context.name},
+
+Reference ${reference} for ${show}, ${when}.
+
+UNPAID. ${totalDue} is due at the box office on the night; this reservation holds your seats and
+is not a purchase until then.
+
+Open your booking: ${url}
+
+The Nottingham New Theatre`,
+    }
+  },
   'health-alert': (context: TemplateContext): Rendered => {
     const since = String(context.since)
     return {

@@ -10,9 +10,9 @@ export default defineEventHandler(async (event) => {
   // The predicate rides the INSERT, so two officers naming the same thing at once produce one
   // type and a refusal rather than a constraint error (0003, 0006).
   const created = await db.all<{ id: string }>(sql`
-    INSERT INTO ticket_types (id, name, description, price, kind, access_kind, archived, active_by_default)
+    INSERT INTO ticket_types (id, name, description, price, kind, access_kind, restricted_to, archived, active_by_default)
     SELECT ${id}, ${input.name}, ${input.description ?? null}, ${input.price}, ${input.kind},
-           ${input.accessKind ?? null}, 0, ${input.activeByDefault ? 1 : 0}
+           ${input.accessKind ?? null}, ${input.restrictedTo ?? null}, 0, ${input.activeByDefault ? 1 : 0}
     WHERE NOT EXISTS (SELECT 1 FROM ticket_types WHERE name = ${input.name} COLLATE NOCASE)
     RETURNING id
   `)
@@ -26,7 +26,10 @@ export default defineEventHandler(async (event) => {
     actorId: resolved.account.id,
     action: 'ticket-type.created',
     target: `ticket-type:${id}`,
-    detail: { name: input.name, price: input.price, kind: input.kind, accessKind: input.accessKind ?? null },
+    detail: {
+      name: input.name, price: input.price, kind: input.kind,
+      accessKind: input.accessKind ?? null, restrictedTo: input.restrictedTo ?? null,
+    },
   }))
 
   return { ok: true, id }

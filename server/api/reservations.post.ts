@@ -1,3 +1,4 @@
+import { formatLondon } from '#shared/utils/london'
 import { saleRefusal } from '#shared/utils/programme'
 import {
   RESERVATION_EMAIL_LIMIT,
@@ -11,6 +12,31 @@ import {
   resolveHoldReleaseMinutes,
   totalTickets,
 } from '#shared/utils/reservations'
+import { saysPrice } from '#shared/utils/ticket-types'
+import type { H3Event } from 'h3'
+
+// The QR is sent once, at reservation, and a resend carries the same one (D-108 criteria 1, 2).
+async function sendConfirmation(
+  event: H3Event,
+  userId: string,
+  performance: { showTitle: string, startsAt: number },
+  result: { reference: string, qrToken: string, tickets: { pricePaid: number }[] },
+): Promise<void> {
+  const url = `${useRuntimeConfig(event).public.baseURL}/qr/${result.qrToken}`
+  await notify(event, {
+    userId,
+    type: 'reservation.confirmed',
+    context: {
+      name: '',
+      reference: result.reference,
+      show: performance.showTitle,
+      when: formatLondon(new Date(performance.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      totalDue: saysPrice(result.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0)),
+      url,
+      qrSvg: qrSvgBase64(url),
+    },
+  })
+}
 
 // Reserve tickets online, guest or signed in (D-104). No money moves and no ledger entry is
 // written: the box office takes payment in person, on the night (0005).
@@ -70,8 +96,10 @@ export default defineEventHandler(async (event) => {
   if (capRefusal) throw createError({ statusCode: 400, statusMessage: capRefusal })
 
   // Resolved against the performance, never the show alone: a performance-level override can
-  // price or retire a type the show still offers.
-  const resolved = new Map((await bookableTicketTypes(input.performanceId, performance.showId)).map(type => [type.id, type]))
+  // price or retire a type the show still offers. Re-checked here, not trusted from the read
+  // the booking screen made: a membership can lapse between the two (D-109 criterion 1).
+  const isMember = account ? await hasCurrentMembership(event, account.id, new Date()) : false
+  const resolved = new Map((await bookableTicketTypes(input.performanceId, performance.showId, isMember)).map(type => [type.id, type]))
 
   const lines = input.lines.map((line) => {
     const type = resolved.get(line.ticketTypeId)
@@ -100,6 +128,9 @@ export default defineEventHandler(async (event) => {
       statusMessage: capacityFailure?.says ?? 'This performance no longer has room for that order',
     })
   }
+
+  // The batch committed, so the booking is real: send after, never before (0003).
+  await sendConfirmation(event, booker.id, performance, result)
 
   return {
     reference: result.reference,
