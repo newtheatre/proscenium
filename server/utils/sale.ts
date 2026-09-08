@@ -4,20 +4,23 @@ import { sql } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
 import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, resolvedPriceColumns } from '#server/utils/bar'
+import { ageCheckConstraintRefusal } from '#shared/utils/age-checks'
 import { postEntry } from '#server/utils/ledger'
 import { priceRef, saysMoney } from '#shared/utils/bar'
-import type { AuditRow } from '#shared/utils/audit'
+import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { BasketLineInput, PricedBasket, PricedLine, SaleCatalogue, SaleCategory, SaleChoice, SaleProduct, SaleReceipt, SaleVariant } from '#shared/utils/sale'
 import type { BatchItem } from 'drizzle-orm/batch'
 
 // What the till may sell right now, what pricing a basket of it costs, and committing a sale
-// atomically once the till has confirmed it (F-103, F-104, F-105).
+// atomically once the till has confirmed it, with its Challenge 25 outcome when it needs one
+// (F-103, F-104, F-105, F-106).
 
 interface VariantRow {
   id: string
   productId: string
   servingKind: string
   label: string
+  ageRestricted: number
   pricePence: number | null
   priceSource: 'variant' | 'category' | null
   priceRowId: string | null
@@ -47,10 +50,12 @@ export interface Depletion {
 }
 
 // Everything the catalogue, a price check and a sale commit each need about one size: the public
-// `SaleVariant` shape plus what only the write path reads (F-121's `price_ref`, F-113's recipe).
+// `SaleVariant` shape plus what only the write path reads (F-121's `price_ref`, F-113's recipe,
+// F-106's Challenge 25 gate). `ageRestricted` is the owning product's, not this size's own.
 interface ResolvedVariant extends SaleVariant {
   productId: string
   priceRowId: string
+  ageRestricted: boolean
   recipe: Depletion[]
 }
 
@@ -67,6 +72,7 @@ async function activeVariantsWithChoices(on: string): Promise<Resolvable> {
   const { pricePence, priceSource, priceRowId } = resolvedPriceColumns(sql`p.category_id`, 'v', on)
   const variantRows = await db.all<VariantRow>(sql`
     SELECT v.id AS id, v.product_id AS productId, v.serving_kind AS servingKind, v.label AS label,
+           p.age_restricted AS ageRestricted,
            ${pricePence} AS pricePence, ${priceSource} AS priceSource, ${priceRowId} AS priceRowId
     FROM product_variants v JOIN bar_products p ON p.id = v.product_id
     WHERE v.status = 'ACTIVE' AND p.status = 'ACTIVE'
@@ -113,6 +119,7 @@ async function activeVariantsWithChoices(on: string): Promise<Resolvable> {
       pricePence: row.pricePence,
       priceSource: row.priceSource,
       priceRowId: row.priceRowId,
+      ageRestricted: row.ageRestricted === 1,
       choice,
       recipe: recipeOf.get(row.id) ?? [],
     }]
@@ -146,8 +153,9 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
       allergenState: row.allergenState,
       allergenNote: row.allergenNote,
       variants: variants.filter(variant => variant.productId === row.id)
-        // Only what the screen needs: the write-path fields (price row, recipe) stay internal.
-        .map(({ productId: _productId, priceRowId: _priceRowId, recipe: _recipe, ...variant }) => variant),
+        // Only what the screen needs: the write-path fields (price row, recipe, the product's own
+        // age-restricted flag, already carried on the product itself) stay internal.
+        .map(({ productId: _productId, priceRowId: _priceRowId, ageRestricted: _ageRestricted, recipe: _recipe, ...variant }) => variant),
     }))
     .filter(product => product.variants.length > 0)
 
@@ -229,56 +237,129 @@ export async function priceBasket(lines: BasketLineInput[], on: string): Promise
   return { lines: priced, totalPence }
 }
 
+// Everything `commitSale` knows about who is selling and where, beyond the basket itself: what
+// its audit rows cite, and which performance an inline age check attaches to (F-106).
+export interface SaleContext {
+  actorId: string
+  sessionId: string
+  venueId: string
+  night: string
+  performanceId: string | null
+}
+
+// A refused Challenge 25 outcome drops every restricted line rather than the whole basket: what
+// is left may still be sold, at its own, smaller total (F-106 criterion 3).
+function saleableAfterAgeCheck(
+  resolved: ResolvedLine[],
+  priced: PricedLine[],
+  ageCheck: InlineAgeCheckInput | null,
+): { restricted: number[], sold: number[] } {
+  const restricted = resolved.map((line, index) => (line.variant.ageRestricted ? index : -1)).filter(index => index !== -1)
+  const refused = restricted.length > 0 && ageCheck?.outcome === 'REFUSED'
+  const sold = refused ? resolved.map((_, index) => index).filter(index => !restricted.includes(index)) : resolved.map((_, index) => index)
+  return { restricted, sold }
+}
+
 // The cross-check (F-104) and, once it matches, the one atomic write (F-105 criterion 1): a
-// ledger entry, its lines, a stock movement per ingredient, and the session's audit row, in one batch.
+// ledger entry, its lines, a stock movement per ingredient, an inline Challenge 25 outcome when
+// the basket needs one (F-106), and every audit row, in one batch.
 export async function commitSale(
   lines: BasketLineInput[],
   on: string,
-  actorId: string,
   expectedTotalPence: number,
-  audit: AuditRow,
+  ageCheck: InlineAgeCheckInput | null,
+  context: SaleContext,
 ): Promise<SaleReceipt> {
-  const { resolved, priced, totalPence } = await resolveSale(lines, on)
-  if (totalPence !== expectedTotalPence) {
+  const { resolved, priced } = await resolveSale(lines, on)
+  const { restricted, sold } = saleableAfterAgeCheck(resolved, priced, ageCheck)
+
+  // No route sells a restricted line without an outcome on record first (F-106 criteria 1, 5).
+  if (restricted.length > 0 && !ageCheck) {
+    const names = [...new Set(restricted.map(index => priced[index]!.productName))]
     throw createError({
       statusCode: 409,
-      statusMessage: `The screen said ${saysMoney(expectedTotalPence)}; the till now reads ${saysMoney(totalPence)}. Nothing has been charged: check the basket and try again.`,
+      statusMessage: `${names.join(' and ')} ${names.length === 1 ? 'needs' : 'need'} a Challenge 25 outcome before this can be charged`,
     })
   }
 
-  const posted = postEntry({
-    source: 'TILL',
-    tender: 'CARD',
-    actorId,
-    lines: resolved.map(line => ({
-      kind: 'BAR_ITEM',
-      amountPence: line.amountPence,
-      qty: line.qty,
-      unitPricePence: line.variant.pricePence,
-      productVariantId: line.variant.id,
-      priceRef: priceRef(line.variant.priceSource, line.variant.priceRowId),
-      choices: line.choiceItemId ? { choiceItemId: line.choiceItemId, choiceItemName: line.choiceItemName } : null,
-    })),
-  })
+  const soldResolved = sold.map(index => resolved[index]!)
+  const soldPriced = sold.map(index => priced[index]!)
+  const refusedPriced = restricted.filter(index => !sold.includes(index)).map(index => priced[index]!)
+  const soldTotalPence = soldPriced.reduce((sum, line) => sum + line.amountPence, 0)
 
-  const statements: BatchItem<'sqlite'>[] = [...posted.statements]
-  // Every movement cites the sale line that caused it (criterion 3), which is only known once
-  // `postEntry` has assigned that line's id; a movement of zero can never reach the batch (0010).
-  resolved.forEach((line, index) => {
-    const lineId = posted.lineIds[index]!
-    for (const ingredient of line.depletion) {
-      statements.push(db.insert(schema.stockMovements).values({
-        id: newId(),
-        itemId: ingredient.itemId,
-        qty: -(ingredient.qty * line.qty),
-        kind: 'SALE',
-        refTable: 'ledger_lines',
-        refId: lineId,
-        actorId,
-      }))
-    }
-  })
-  statements.push(db.insert(schema.auditLog).values(audit))
+  if (soldTotalPence !== expectedTotalPence) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `The screen said ${saysMoney(expectedTotalPence)}; the till now reads ${saysMoney(soldTotalPence)}. Nothing has been charged: check the basket and try again.`,
+    })
+  }
+
+  const statements: BatchItem<'sqlite'>[] = []
+  let entryId: string | null = null
+
+  if (soldResolved.length > 0) {
+    const posted = postEntry({
+      source: 'TILL',
+      tender: 'CARD',
+      actorId: context.actorId,
+      lines: soldResolved.map(line => ({
+        kind: 'BAR_ITEM',
+        amountPence: line.amountPence,
+        qty: line.qty,
+        unitPricePence: line.variant.pricePence,
+        productVariantId: line.variant.id,
+        priceRef: priceRef(line.variant.priceSource, line.variant.priceRowId),
+        choices: line.choiceItemId ? { choiceItemId: line.choiceItemId, choiceItemName: line.choiceItemName } : null,
+      })),
+    })
+    statements.push(...posted.statements)
+    // Every movement cites the sale line that caused it (F-105 criterion 3), which is only known
+    // once `postEntry` has assigned that line's id; a movement of zero never reaches the batch (0010).
+    soldResolved.forEach((line, index) => {
+      const lineId = posted.lineIds[index]!
+      for (const ingredient of line.depletion) {
+        statements.push(db.insert(schema.stockMovements).values({
+          id: newId(),
+          itemId: ingredient.itemId,
+          qty: -(ingredient.qty * line.qty),
+          kind: 'SALE',
+          refTable: 'ledger_lines',
+          refId: lineId,
+          actorId: context.actorId,
+        }))
+      }
+    })
+    statements.push(db.insert(schema.auditLog).values(auditEntry({
+      actorId: context.actorId,
+      action: 'bar.till.sale',
+      target: `till-session:${context.sessionId}`,
+      detail: { venueId: context.venueId, night: context.night, lines: soldResolved.length },
+    })))
+    entryId = posted.id
+  }
+
+  let ageCheckResult: SaleReceipt['ageCheck'] = null
+  if (ageCheck && restricted.length > 0) {
+    const id = newId()
+    const restrictedNames = [...new Set(restricted.map(index => priced[index]!.productName))]
+    const write = recordAgeCheck(context.actorId, {
+      performanceId: context.performanceId,
+      outcome: ageCheck.outcome,
+      idType: ageCheck.idType,
+      reason: ageCheck.reason,
+      description: ageCheck.description,
+      product: restrictedNames.join(', '),
+      notes: ageCheck.notes,
+    }, id)
+    statements.push(db.run(write.statement))
+    statements.push(db.insert(schema.auditLog).values(auditEntry({
+      actorId: context.actorId,
+      action: 'age-check.logged',
+      target: `age-check:${id}`,
+      detail: { outcome: ageCheck.outcome },
+    })))
+    ageCheckResult = { id, outcome: ageCheck.outcome }
+  }
 
   try {
     await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
@@ -289,8 +370,12 @@ export async function commitSale(
     if (error instanceof Error && error.message.includes('stock_movements_sale_exceeds_on_hand')) {
       throw createError({ statusCode: 409, statusMessage: 'Not enough left in stock for this sale: nothing has been charged.' })
     }
+    if (error instanceof Error) {
+      const refusal = ageCheckConstraintRefusal(error)
+      if (refusal) throw createError(refusal)
+    }
     throw error
   }
 
-  return { entryId: posted.id, totalPence: posted.totalPence, lines: priced }
+  return { entryId, totalPence: soldTotalPence, lines: soldPriced, ageCheck: ageCheckResult, refusedLines: refusedPriced }
 }

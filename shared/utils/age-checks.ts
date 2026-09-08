@@ -36,29 +36,42 @@ const NOTES_LIMIT = 1000
 
 // The description is guidance, not enforcement: nothing here can tell a name from a description,
 // so the form's own copy is what keeps one out (E-118 criterion 2).
-export const ageCheckForm = z.object({
-  performanceId: z.string().min(1).nullish().transform(value => value ?? null),
+const outcomeFields = {
   outcome: z.enum(AGE_CHECK_OUTCOMES),
   idType: z.enum(ID_TYPES).nullish().transform(value => value ?? null),
   reason: z.enum(REFUSAL_REASONS).nullish().transform(value => value ?? null),
   description: z.string().trim().min(1, 'Describe who you checked, never by name').max(DESCRIPTION_LIMIT),
-  product: z.string().trim().max(200).nullish().transform(value => (value ?? '').trim() || null),
   notes: z.string().trim().max(NOTES_LIMIT).nullish().transform(value => (value ?? '').trim() || null),
-}).refine(
-  input => input.outcome !== 'ACCEPTED' || input.idType !== null,
-  { path: ['idType'], message: 'Say what ID was shown' },
-).refine(
-  input => input.outcome !== 'REFUSED' || input.reason !== null,
-  { path: ['reason'], message: 'Say why, because a refusal needs a reason on the record' },
-).refine(
-  input => input.outcome !== 'ACCEPTED' || input.reason === null,
-  { path: ['reason'], message: 'An accepted check has no refusal reason' },
-).refine(
-  input => input.outcome !== 'REFUSED' || input.idType === null,
-  { path: ['idType'], message: 'A refusal names no ID: nothing was accepted' },
-)
+}
+
+// Shared between a standalone check and one folded into a sale (F-106): what an outcome requires
+// is the same wherever it is asked, so the predicate is written once and wired to both shapes.
+interface OutcomeShape { outcome: AgeCheckOutcome, idType: IdType | null, reason: RefusalReason | null }
+const acceptedNeedsIdType = (input: OutcomeShape): boolean => input.outcome !== 'ACCEPTED' || input.idType !== null
+const refusedNeedsReason = (input: OutcomeShape): boolean => input.outcome !== 'REFUSED' || input.reason !== null
+const acceptedHasNoReason = (input: OutcomeShape): boolean => input.outcome !== 'ACCEPTED' || input.reason === null
+const refusedHasNoIdType = (input: OutcomeShape): boolean => input.outcome !== 'REFUSED' || input.idType === null
+
+export const ageCheckForm = z.object({
+  performanceId: z.string().min(1).nullish().transform(value => value ?? null),
+  ...outcomeFields,
+  product: z.string().trim().max(200).nullish().transform(value => (value ?? '').trim() || null),
+}).refine(acceptedNeedsIdType, { path: ['idType'], message: 'Say what ID was shown' })
+  .refine(refusedNeedsReason, { path: ['reason'], message: 'Say why, because a refusal needs a reason on the record' })
+  .refine(acceptedHasNoReason, { path: ['reason'], message: 'An accepted check has no refusal reason' })
+  .refine(refusedHasNoIdType, { path: ['idType'], message: 'A refusal names no ID: nothing was accepted' })
 
 export type AgeCheckInput = z.output<typeof ageCheckForm>
+
+// Folded into a till sale (F-106): the performance is the till's own to resolve, and the product
+// is the basket's restricted lines, not a second thing for staff to type.
+export const inlineAgeCheckForm = z.object(outcomeFields)
+  .refine(acceptedNeedsIdType, { path: ['idType'], message: 'Say what ID was shown' })
+  .refine(refusedNeedsReason, { path: ['reason'], message: 'Say why, because a refusal needs a reason on the record' })
+  .refine(acceptedHasNoReason, { path: ['reason'], message: 'An accepted check has no refusal reason' })
+  .refine(refusedHasNoIdType, { path: ['idType'], message: 'A refusal names no ID: nothing was accepted' })
+
+export type InlineAgeCheckInput = z.output<typeof inlineAgeCheckForm>
 
 export const supersedeForm = z.object({
   outcome: z.enum(AGE_CHECK_OUTCOMES),

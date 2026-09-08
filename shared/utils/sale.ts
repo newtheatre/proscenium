@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { inlineAgeCheckForm } from './age-checks'
+import type { AgeCheckOutcome } from './age-checks'
 import type { AllergenState, BarPriceSource, ServingKind } from './bar'
 
 // The till's basket: what is on offer and what pricing one up costs, in integer pence (F-103).
@@ -26,8 +28,10 @@ export type BasketInput = z.output<typeof basketForm>
 
 // A sale submission carries what the screen believes the total is, so the server can refuse a
 // stale or wrong figure by name rather than charging whatever it likes (0004, F-104 criterion 1).
+// `ageCheck` answers the Challenge 25 prompt inline, when the basket needs one (F-106 criterion 1).
 export const saleForm = basketForm.extend({
   expectedTotalPence: z.number().int().nonnegative(),
+  ageCheck: inlineAgeCheckForm.nullish().transform(value => value ?? null),
 })
 
 export type SaleInput = z.output<typeof saleForm>
@@ -97,9 +101,12 @@ export interface PricedBasket {
 }
 
 // What a completed sale answers with (F-105): the ledger entry it posted, so a receipt or a void
-// can cite it, and the same lines a price check would have shown.
+// can cite it, and the same lines a price check would have shown. A refusal at Challenge 25 can
+// leave nothing sold (`entryId` null) while still logging the check (F-106 criteria 1, 3).
 export interface SaleReceipt {
-  entryId: string
+  entryId: string | null
   totalPence: number
   lines: PricedLine[]
+  ageCheck: { id: string, outcome: AgeCheckOutcome } | null
+  refusedLines: PricedLine[]
 }
