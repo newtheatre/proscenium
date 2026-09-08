@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm } from '#shared/utils/sale'
+import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, saleForm } from '#shared/utils/sale'
 
 // F-103's write-path rules: a basket line is a size at a quantity, and a basket is a bounded list
 // of them, so nothing here can grow the bound parameters a price check binds without limit.
@@ -34,5 +34,18 @@ describe('a basket is bounded, so a price check never binds a growing parameter 
   test('a basket at the cap is accepted', () => {
     const lines = Array.from({ length: MAX_BASKET_LINES }, () => ({ variantId: 'var-1', qty: 1 }))
     expect(basketForm.safeParse({ lines }).success).toBe(true)
+  })
+})
+
+describe('a sale submission carries what the screen believes the total is (F-104 criterion 1)', () => {
+  test('a basket with an expected total is valid', () => {
+    expect(saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: 250 }).success).toBe(true)
+  })
+
+  test('an expected total is required, whole, and never negative', () => {
+    expect(saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }] }).success).toBe(false)
+    expect(saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: 2.5 }).success).toBe(false)
+    expect(saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: -1 }).success).toBe(false)
+    expect(saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: 0 }).success).toBe(true)
   })
 })
