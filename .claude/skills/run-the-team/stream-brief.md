@@ -34,15 +34,20 @@ another stream's namespace; ask the owning stream by name instead.
    next independent group and report `blocked` for this one.
 2. One migration per PR, generated last, after rebasing onto `origin/unified/main`. Append to
    shared registries only inside your module's banner section.
-3. Run in order: `bun run build`, `bun run typecheck`, `bun run typecheck:bun`, `bun run lint`,
-   `bun run test`, `bun run check:comments`, `bun run check:migrations`,
-   `bun run check:content-tokens`, `bun run check:ledger`, `bun run check:notifications`,
-   `bun run check:audit`. Then the affected e2e suites with `bun run test:e2e`. Then
-   `/code-review medium` on your diff; fix confirmed findings.
-4. Push and open the PR: `gh pr create --base unified/main` with a title in the repo's habit
-   (a sentence, then the ids in parentheses) and a body naming the ids, the criteria each test
+3. Commit and push before you verify: `git push -u origin unified/<STREAM>/<ids>`. A branch
+   with no pull request runs no CI, so pushing early costs nothing, and a commit that has not
+   left your worktree is lost with it. Push each later fix as you make it.
+4. Run in order, each command in the foreground: `bun run build`, `bun run typecheck`,
+   `bun run typecheck:bun`, `bun run lint`, `bun run test`, `bun run check:comments`,
+   `bun run check:migrations`, `bun run check:content-tokens`, `bun run check:ledger`,
+   `bun run check:notifications`, `bun run check:audit`. Then the affected e2e suites with
+   `bun run test:e2e`. Then `/code-review medium` on your diff; fix confirmed findings. If one
+   call cannot cover a suite, split it by file and run each in sequence. Never background a
+   command and end your turn: it cannot wake you, its result is lost, and the lead restarts you.
+5. Open the PR: `gh pr create --base unified/main` with a title in the repo's habit (a
+   sentence, then the ids in parentheses) and a body naming the ids, the criteria each test
    pins, any interpretation, and any seam you provided. No attribution trailers.
-5. Send `main` a STATUS block. Then continue with the next group unless two of your PRs are
+6. Send `main` a STATUS block. Then continue with the next group unless two of your PRs are
    open or nothing is unblocked; in that case write the next group's failing tests and stop.
 
 ## STATUS block
@@ -64,9 +69,8 @@ question; record the interpretation in the PR that applies it.
 
 ## Things that will cost you an evening if forgotten
 
-- A background command never wakes an agent that has already ended its turn. Run a long
-  command in the foreground, or poll it (`while kill -0 <pid>; do sleep 20; done`), and stop
-  only once you hold its result. Ending a turn to wait costs the lead a restart.
+- Verification runs in the foreground, and you push before it, both for the same reason: a
+  turn that ends holds no result and protects no work. This is step 3 and step 4 above.
 - Two runs on one port kill each other; a leaked dev server from another worktree is accepted
   by the test runner and every new route then 404s. Use your ports and nothing else.
 - `bun run build` while `bun run dev` runs breaks dev unless `NUXT_HUB_DIR` is set.
