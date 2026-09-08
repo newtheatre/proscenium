@@ -106,6 +106,31 @@ function houseLine(house: Performance['house']): string {
   const remaining = house.remaining === null ? 'uncapped' : `${house.remaining} left`
   return `${house.sold} sold · ${house.admitted} admitted · ${remaining}`
 }
+
+// Shown only on request, never polled or cached: a code sitting on screen is a code anyone
+// walking past has read (E-120 criteria 2, 5).
+const boardCode = ref<string | null>(null)
+const boardCodeFailure = ref<string | null>(null)
+const revealingCode = ref(false)
+
+async function revealCode(): Promise<void> {
+  revealingCode.value = true
+  boardCodeFailure.value = null
+  try {
+    boardCode.value = (await $fetch<{ code: string }>('/api/tonight/board/code')).code
+  }
+  catch (refused) {
+    boardCodeFailure.value = refusalText(refused)
+  }
+  finally {
+    revealingCode.value = false
+  }
+}
+
+function hideCode(): void {
+  boardCode.value = null
+  boardCodeFailure.value = null
+}
 </script>
 
 <template>
@@ -252,6 +277,52 @@ function houseLine(house: Performance['house']): string {
       >
         Nothing running tonight.
       </p>
+
+      <div
+        class="rounded-lg border border-default p-4"
+        data-test="board-code"
+      >
+        <p class="text-sm text-muted">
+          Backstage board
+        </p>
+        <UAlert
+          v-if="boardCodeFailure"
+          data-test="board-code-failure"
+          color="error"
+          variant="subtle"
+          :description="boardCodeFailure"
+        />
+        <p
+          v-else-if="boardCode"
+          class="mt-1 flex items-center justify-between gap-2"
+        >
+          <span
+            class="font-mono text-2xl tracking-widest"
+            data-test="board-code-value"
+          >{{ boardCode }}</span>
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            data-test="board-code-hide"
+            @click="hideCode"
+          >
+            Hide
+          </UButton>
+        </p>
+        <UButton
+          v-else
+          size="sm"
+          color="neutral"
+          variant="subtle"
+          class="mt-1"
+          :loading="revealingCode"
+          data-test="board-code-reveal"
+          @click="revealCode"
+        >
+          Show tonight's code
+        </UButton>
+      </div>
     </div>
 
     <p

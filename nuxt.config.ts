@@ -75,6 +75,9 @@ export default defineNuxtConfig({
     // Base64 HMAC key signing a reservation's QR token (D-108). A worker secret: nothing
     // outside this app ever verifies one.
     qrTokenSecret: '',
+    // HMAC key material for the backstage board's join code (E-120). Never stored, never
+    // logged, and read by nothing outside this app.
+    backstageBoardSecret: '',
     public: {
       // Every emailed link is built from this. NUXT_PUBLIC_BASE_URL overrides it, and development
       // points at the local port so a verification link in .data/mail is one that works.
