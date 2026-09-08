@@ -57,7 +57,9 @@ async function holidayCoverage(event?: H3Event): Promise<{ ok: boolean, coveredT
   }
 }
 
-async function liveAdmins(): Promise<{ id: string }[]> {
+// Exported for the retention sweep (K-111): its digest goes to the same audience an unhealthy
+// deploy already reaches.
+export async function liveAdmins(): Promise<{ id: string }[]> {
   const live = or(isNull(schema.roleGrants.expiresAt), sql`${schema.roleGrants.expiresAt} > unixepoch()`)
   return db.select({ id: schema.roleGrants.userId })
     .from(schema.roleGrants)

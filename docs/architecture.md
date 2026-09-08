@@ -270,9 +270,9 @@ Reading the table:
 All Nitro scheduled tasks mirrored in wrangler cron triggers. The system notices, humans
 decide (principle P6): no task ever awards a record, approves a request or takes money.
 
-`sessions:sweep`, `nights:close` and `retention:sweep` are stubs that report the story they are
-waiting for and do nothing else; the rest do their work, `holds:release` from D-106 and D-107,
-`backup` from K-108 and J-107, and `health:watch` from J-106.
+`sessions:sweep` and `nights:close` are stubs that report the story they are waiting for and do
+nothing else; the rest do their work, `holds:release` from D-106 and D-107, `backup` from K-108
+and J-107, `health:watch` from J-106 and `retention:sweep` from K-111.
 
 | Cron (UTC) | Task | Does |
 | --- | --- | --- |
@@ -287,7 +287,7 @@ waiting for and do nothing else; the rest do their work, `holds:release` from D-
 | `12 0 * * *` | `nights:close` | Auto-closes unsigned night reports inside 24 hours, retries unsent report emails. |
 | `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, notification retries, unverified account expiry (0026). |
 | `0 5 * * 1` | `backup` | A row-count and ledger-total manifest to R2 (the `BLOB` binding), independent of D1. A failure audits `backup.export-failed` rather than only logging. Point-in-time restore is D1 Time Travel, already automatic; the restore drill and its cadence are administered at `/admin/backups` (K-108, J-107). |
-| `0 4 1 * *` | `retention:sweep` | Inactivity warnings and anonymisation (ships dry-run, armed by config with typed confirmation). |
+| `0 4 1 * *` | `retention:sweep` | Two independent warnings (window and final) for an account approaching its inactivity threshold, a sign-in re-arming the claim by carrying `lastLoginAt` in its key; exempts a current member, a live role holder and an unsettled tab debtor; anonymises what is past its threshold, capped per run, reusing `eraseAccount()`. The digest always sends, dry-run or armed, since it is what the IT Manager reviews before arming (0011, K-111). |
 
 ## Notifications
 

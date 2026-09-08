@@ -32,7 +32,8 @@ const live = (now: number): SQL => or(
   gt(schema.roleGrants.expiresAt, now),
 )!
 
-const holdsLiveRole = (now: number, role?: string): SQL => sql`exists (
+// Exported for the retention sweep (K-111): a live role, any role, is a role-holder exemption.
+export const holdsLiveRole = (now: number, role?: string): SQL => sql`exists (
   select 1 from ${schema.roleGrants}
   where ${schema.roleGrants.userId} = ${schema.users.id}
     and ${role ? sql`${schema.roleGrants.role} = ${role}` : sql`1 = 1`}
@@ -77,9 +78,9 @@ export interface DirectoryQuery {
 
 const graceDays = (event: H3Event): Promise<number> => configValue(event, 'MEMBERSHIP_GRACE_DAYS')
 
-// Current means today is inside the term or its grace window, read at query time so a membership
-// that ran out overnight stops counting without a sweep having to run (0009, 0031).
-function currentMembership(grace: number): SQL {
+// Current means today is inside the term or its grace window, read at query time (0009, 0031).
+// Exported for the retention sweep too (K-111): an active member is exempt.
+export function currentMembership(grace: number): SQL {
   return sql`exists (select 1 from ${schema.memberships}
     where ${schema.memberships.userId} = ${schema.users.id}
       and ${schema.memberships.startsOn} <= ${londonDay(new Date())}

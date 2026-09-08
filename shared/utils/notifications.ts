@@ -359,6 +359,28 @@ export const MESSAGE_TYPES = {
     template: 'health-alert',
   },
 
+  // Module K: platform
+
+  // No topic: an account approaching anonymisation is not something a preference silences
+  // (K-111, 0011).
+  'retention.warning.window': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'retention-warning-window',
+  },
+
+  'retention.warning.final': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'retention-warning-final',
+  },
+
+  'retention.digest': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'retention-digest',
+  },
+
 } as const satisfies Record<string, MessageType>
 
 export type MessageTypeName = keyof typeof MESSAGE_TYPES

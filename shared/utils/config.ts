@@ -450,6 +450,23 @@ export const CONFIG_KEYS = {
     workshop: 'people-and-communications',
     describes: 'Retention ships as a dry-run and is armed by typed confirmation, in December.',
   },
+  // No workshop has proposed a warning cadence, unlike the periods above (0011): the sweep is
+  // built and blocked until the IT Manager sets one (0019).
+  RETENTION_WARNING_DAYS: {
+    schema: z.number().int().positive(),
+    workshop: 'people-and-communications',
+    describes: 'Days before an inactive account is anonymised that its first warning is sent.',
+  },
+  RETENTION_FINAL_WARNING_DAYS: {
+    schema: z.number().int().positive(),
+    workshop: 'people-and-communications',
+    describes: 'Days before anonymisation that the final warning is sent.',
+  },
+  RETENTION_SWEEP_CAP: {
+    schema: z.number().int().positive(),
+    workshop: 'people-and-communications',
+    describes: 'The most accounts one retention sweep may anonymise a run.',
+  },
   // A number of days, not a term: no term dates exist anywhere in the system (0034). Reads as
   // overdue from the first deploy, which is what puts the first drill before December.
   BACKUP_DRILL_INTERVAL_DAYS: {
@@ -567,9 +584,12 @@ export const ENFORCED_KEYS = [
   'SHIFT_ELIGIBILITY_BAR_MODULE',
   'SHIFT_CLAIM_AUTO_CONFIRM',
   'SHIFT_RELEASE_NOTICE_HOURS',
-  // Read by the directory to count the accounts a sweep would warn, which is the whole of its
-  // effect until K-111 builds the sweep itself.
+  'RETENTION_ARMED',
+  'RETENTION_FINAL_WARNING_DAYS',
   'RETENTION_FULL_ACCOUNT_YEARS',
+  'RETENTION_GUEST_YEARS',
+  'RETENTION_SWEEP_CAP',
+  'RETENTION_WARNING_DAYS',
   'SESSION_EDIT_WINDOW_DAYS',
   'SESSION_SIGNUP_CLOSES_HOURS',
   'SIGN_IN_ATTEMPTS_PER_ACCOUNT',

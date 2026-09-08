@@ -1,11 +1,11 @@
-// Registered so its cron trigger has a handler; the work arrives with K-111. It reports what it
-// is waiting for rather than a count it did not produce.
+// Monthly. Warns twice before anonymising, digests the IT Manager, and ships disarmed until a
+// typed confirmation turns it on (K-111).
 export default defineTask({
   meta: {
     name: 'retention:sweep',
-    description: 'Inactivity warnings and anonymisation, dry-run by default (K-111, not built)',
+    description: 'Inactivity warnings and anonymisation, dry-run by default',
   },
-  run() {
-    return { result: { awaiting: 'K-111' } }
+  async run() {
+    return { result: await sweepRetention(undefined, new Date()) }
   },
 })

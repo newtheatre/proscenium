@@ -1176,6 +1176,61 @@ secret, are the two things it watches for.
 The Nottingham New Theatre`,
     }
   },
+
+  // A heads-up, not a demand: signing in at all is what clears it (K-111, 0011).
+  'retention-warning-window': (context: TemplateContext): Rendered => ({
+    subject: 'Your account has been quiet for a while',
+    html: layout(`<p>Hello ${context.name},</p>
+<p>We have not seen you sign in for a while, and accounts we do not hear from eventually get
+anonymised so we are not holding data on people who have moved on.</p>
+<p>If you are still around, signing in is all it takes: <a href="${String(context.accountUrl)}">your
+account</a>.</p>`),
+    text: `Hello ${context.name},
+
+We have not seen you sign in for a while, and accounts we do not hear from eventually get
+anonymised so we are not holding data on people who have moved on.
+
+If you are still around, signing in is all it takes:
+${String(context.accountUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
+  'retention-warning-final': (context: TemplateContext): Rendered => ({
+    subject: 'Your account will be anonymised soon',
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Your account is close to being anonymised for inactivity. Nothing has happened yet, and signing
+in now stops it: <a href="${String(context.accountUrl)}">your account</a>.</p>`),
+    text: `Hello ${context.name},
+
+Your account is close to being anonymised for inactivity. Nothing has happened yet, and signing in
+now stops it:
+${String(context.accountUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
+  // Sent whether or not it has anything in it, the same reasoning training's own digest uses: a
+  // period with nothing to report still proves the sweep ran.
+  'retention-digest': (context: TemplateContext): Rendered => {
+    const capNote = context.cappedAt !== null ? ` (capped at ${String(context.cappedAt)} this run)` : ''
+    const line = context.armed
+      ? `${String(context.anonymised)} accounts anonymised${capNote}.`
+      : `${String(context.wouldAnonymise)} accounts would have been anonymised${capNote}, dry-run only.`
+    return {
+      subject: 'Retention sweep digest',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${String(context.window)} first warnings and ${String(context.final)} final warnings sent this run.</p>
+<p>${line}</p>`),
+      text: `Hello ${context.name},
+
+${String(context.window)} first warnings and ${String(context.final)} final warnings sent this run.
+
+${line}
+
+The Nottingham New Theatre`,
+    }
+  },
 } as const
 
 export type TemplateName = keyof typeof TEMPLATES

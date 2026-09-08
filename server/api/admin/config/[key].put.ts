@@ -15,16 +15,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'No such setting' })
   }
 
-  // Arming retention would arm nothing: there is no sweep and no reviewed dry-run digest, so the
-  // switch would read as done while doing nothing (J-105 criterion 4, K-111).
-  if (key === 'RETENTION_ARMED') {
+  const input = await readValidatedBodyOrThrow(event, body)
+
+  // Whether a digest was actually reviewed is nobody's to verify in code; that at least one
+  // exists to have been read is (J-105 criterion 4, K-111).
+  if (key === 'RETENTION_ARMED' && input.value === true && !await hasSentRetentionDigest()) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Retention cannot be armed until the sweep exists and a dry-run digest has been reviewed',
+      statusMessage: 'Retention cannot be armed until a dry-run digest has gone out to review',
     })
   }
-
-  const input = await readValidatedBodyOrThrow(event, body)
 
   // The pair rules compare against the other keys as they stand, so the set is read first.
   const overrides = await configOverrides(event)
