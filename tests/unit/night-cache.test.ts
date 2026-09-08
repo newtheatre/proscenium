@@ -345,13 +345,15 @@ describe('what a screen holding one of these sees (criteria 2 and 3)', () => {
   })
 })
 
-describe('one composable owns the device store', () => {
+describe('named composables own the device store', () => {
   // The old estate mirrored the emergency card to localStorage from the screen that showed it,
   // which is how it survived a dropped connection but not an offline first load (K-103).
+  const OWNERS = new Set(['composables/useNightCache.ts', 'composables/useWriteQueue.ts'])
+
   test('nothing else in the application reaches for the device store', async () => {
     const offenders: string[] = []
     for (const file of [...new Bun.Glob('**/*.{ts,vue}').scanSync({ cwd: 'app', onlyFiles: true })].sort()) {
-      if (file === 'composables/useNightCache.ts') continue
+      if (OWNERS.has(file)) continue
       if ((await Bun.file(`app/${file}`).text()).includes('localStorage')) offenders.push(`app/${file}`)
     }
     expect(offenders).toEqual([])

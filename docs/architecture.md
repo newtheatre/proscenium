@@ -93,7 +93,7 @@ namespace, and asks the owner for one anywhere else.
 | Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/`, `app/pages/[...slug].vue` (the content catch-all, D-103) |
 | Show night | `/rota` and `/rota/manage/**` (templates, rota administration and the venue emergency card at `/rota/manage/venues/[id]/emergency`), the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**`, `/api/admin/rota/**` and `server/utils/night-authority.ts`. The console screens sit under `/rota/manage`, never `/admin`: `/tonight` is the phone-first shell rather than a console prefix (0040, 0046). |
 | Bar | `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**` |
-| Platform | `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `tests/helpers/race.ts` |
+| Platform | `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`, `tests/helpers/race.ts` |
 
 `/tonight` is the one prefix three streams write under, which is why the shell below is owned by
 one of them and settled before any of the screens are built. The hub page itself was written by
@@ -673,10 +673,41 @@ answered, and `cache.error` is the failure that left the screen stale rather tha
 | The store is `localStorage`, falling back to memory when a device refuses it. | A screen that cannot cache still has to render, and the fallback lives as long as the tab. |
 
 The version is in the key (`nnt.night.1:...`), so changing the envelope retires every entry an
-older build wrote instead of reading it wrongly. Nothing else in `app/` touches the device store,
-which a test enforces: the old estate mirrored the emergency card to `localStorage` from the
-screen that displayed it, and that is why the card survived a dropped connection but not a first
-load.
+older build wrote instead of reading it wrongly. Only this and `useWriteQueue` (K-104, below)
+touch the device store, which a test enforces: the old estate mirrored the emergency card to
+`localStorage` from the screen that displayed it, and that is why the card survived a dropped
+connection but not a first load.
+
+### The write queue (K-104)
+
+`app/composables/useWriteQueue.ts` is the device-side outbox a scan, an admit or a till sale
+queues into while offline. `shared/utils/write-queue.ts` holds the rules, over one queue per
+device rather than one per screen: what a duty manager does at the door and what the till takes
+both wait their turn in the same order.
+
+```ts
+const queue = useWriteQueue<AdmitPayload>(async (action) => {
+  const result = await $fetch('/api/tonight/admit', { method: 'POST', body: action.payload })
+  return result.ok ? { ok: true } : { ok: false, retry: result.transient, reason: result.reason }
+})
+
+queue.enqueue('admit', { ticketId })
+```
+
+The caller owns the submit function and its wire format; this owns the queue, the order and what
+may be claimed about a pending action, the same split `useNightCache` draws between the loader and
+the cache.
+
+| Rule | Why |
+| --- | --- |
+| A submit answers `ok`, or refuses with `retry: true` or `retry: false`. | A dropped connection and a real refusal look identical to a screen unless the queue is told which one it is. |
+| `retry: true` halts the drain; `retry: false` rejects that action and moves to the next. | Submitting in order means a later action must never apply ahead of one still stuck, but an unrelated action is not held hostage by a conflict that is not its own (criterion 1). |
+| A rejected action is never retried automatically. | Retrying a conflict is the silent merge criterion 3 refuses; it waits in `queue.rejected` for a human to dismiss. |
+| `queue.connection` reads offline whenever anything is pending, never from the browser's own online flag. | A queue that has not yet drained is unsynced whatever the browser claims, and criterion 2 asks for that state, not a network probe. |
+| The store is `localStorage`, falling back to memory when a device refuses it. | The same reasoning as the night cache: a screen that cannot persist the queue still has to let the shift carry on. |
+
+No screen adopts this yet: F-103 (till) and D-126 (door) build the writes that will call it. This
+is the mechanism K-103 set the precedent for landing ahead of the screens that need it.
 
 ## Environments
 

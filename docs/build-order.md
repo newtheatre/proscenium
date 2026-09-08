@@ -156,7 +156,8 @@ screens sit under `/bar`, not `/admin`: `/admin` means System and nothing else, 
 
 Routes and files owned: `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`,
 `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`,
-`app/components/Night*.vue`, `app/composables/useNightCache.ts`, `tests/helpers/race.ts`.
+`app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`,
+`tests/helpers/race.ts`.
 The notification screens sit under `/comms` and the finance ones under `/money`, the prefixes
 their sidebar groups were declared with (0040). The four that stay under `/admin` are System,
 which is exactly what `/admin` means.
