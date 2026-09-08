@@ -531,11 +531,11 @@ holder who is not tonight's duty manager. Content warnings, the latecomer policy
 guidance are read straight from `showWarnings()` and the show row, the same source the public
 show page reads, so neither can drift from the other.
 
-Quick links to the incident log, the Challenge 25 register, near-miss reporting, the checklists
-and the backstage board are not on the screen yet: none of E-115, E-117, E-114 or E-120 has
-built its destination (`docs/known-issues.md`); E-118's register is real now but not yet linked
-from `/tonight`, added in the same pull request as the rest once the group is done. Till is
-linked because it is the one show-night screen that already existed before E-112.
+Quick links to the checklists and the backstage board are not on the screen yet: neither E-114
+nor E-120 has built its destination (`docs/known-issues.md`). Till, the incident log at
+`/tonight/incidents` and the Challenge 25 register at `/tonight/age-checks` are all linked now.
+Near-miss reporting reaches through a second tap on the incident log screen rather than a first
+tap from `/tonight` itself, an interpretation of E-117 criterion 1 recorded in the known issue.
 
 ### The Challenge 25 register (E-118)
 
@@ -565,6 +565,41 @@ The officer bypass still resolves against `coverage()`, which needs a venue runn
 tonight; an age check's own `performance_id` may be null regardless of what authority resolved
 against, which is how criterion 4's "bar can check outside a show" is read here: the check
 itself never has to name a performance, even on a night that has one.
+
+`/tonight/age-checks` is criterion 4's standalone half from the tonight screen: log a check,
+correct one, and read tonight's register, linked from `/tonight`. The criterion's other two
+halves stay open on issue #457: the till-inline reachability is F-106's, and the door half
+waits on a door screen existing at all, which no story has built yet and which is not this
+screen's work to start.
+
+### The incident log and near-miss reporting (E-115, E-117)
+
+`incidents` follows the age-checks template exactly: `server/utils/incidents.ts` holds
+`recordIncidentStatement()` and `supersedeIncidentStatement()`, pure statement builders returning
+`{ id, statement }`, and `POST /api/tonight/incidents`, `GET /api/tonight/incidents` and
+`POST /api/tonight/incidents/[id]/supersede` are guarded by
+`requireAnyNightAuthority(event, ['DUTY_MANAGER', 'DOOR', 'BAR'])`, writing through
+`auditedWrite()` (0049). The register is append-only by the same pair of hand-authored triggers
+and the same partial unique index (`incidents_one_correction`) as `age_checks`.
+
+A near miss (E-117) is not a second table: `severity = 'NEAR_MISS'` on the same `incidents` row
+is criterion 3's "distinct type". `POST /api/tonight/incidents/near-miss` takes `nearMissForm`,
+which asks for a category and a sentence and nothing else (criteria 1, 2): no `severity` field
+exists on the input, no `happenedAt` either, since a near miss is always logged as it happens,
+against the trigger it would otherwise block. The route fixes `severity` itself; anything a
+caller sends under that name is ignored, never trusted.
+
+`happenedAt` is optional on a full incident and defaults to now; when set, it is checked at the
+write path against `showNightBounds(currentShowNight())`, never a static CHECK, because "tonight"
+moves. The same check runs again on a supersede, against the correction's own `happenedAt` (or
+the original entry's, if the correction does not change it).
+
+Two gaps neither criterion closes yet, both recorded in `docs/known-issues.md`: criterion 5
+asks that free text naming an erased person be scrubbed on erasure, and the mechanical erasure
+system only matches a single FK column against the erased id, not an arbitrary name appearing
+inside `body`; and no "safety officer" role exists in `shared/utils/roles.ts` to scope a
+historical, cross-night read separate from tonight's own log, which is why the read endpoint
+here is tonight-only, the same scope E-118's register already carries.
 
 ## The programme (build-order contract d, 0043)
 

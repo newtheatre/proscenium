@@ -484,6 +484,13 @@
       "when": 1788866351423,
       "tag": "0068_the_challenge_25_register_is_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "6",
+      "when": 1788875505477,
+      "tag": "0069_the_incident_log_is_append_only",
+      "breakpoints": true
     }
   ]
 }

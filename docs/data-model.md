@@ -603,9 +603,18 @@ a NOT NULL column to `users` (build-order.md). Deleted outright on erasure, not 
 (E-112 criterion 2).
 
 ### incidents  APPEND-ONLY
-`id` PK · `performance_id` restrict · `reported_by` restrict · `body` (operational free
-text; people by role, never diagnosis) · `severity` CHECK `NOTE|NEAR_MISS|INCIDENT|SERIOUS` ·
-`supersedes_id` NULL self-FK · `created_at`. Follow-ups live in V2's workflow tables.
+`id` PK · `performance_id` restrict · `reported_by` restrict · `category` CHECK
+`MEDICAL|BEHAVIOUR|SAFETY|SECURITY|PROPERTY|OTHER` · `severity` CHECK
+`NOTE|NEAR_MISS|INCIDENT|SERIOUS` · `body` (operational free text; people by role, never
+diagnosis) · `happened_at` (defaults to now, backdatable within tonight only, checked at the
+write path against the show-night boundary rather than a static CHECK) · `supersedes_id` NULL
+self-FK, UNIQUE (one correction per entry) · `created_at`. `category` was added to the
+original outline: criterion 1 asks the reporter to say what kind of thing happened, which a
+free-text body alone cannot answer for a list or a filter (E-115). A near miss is
+`severity = 'NEAR_MISS'` on the same table, not a second one (E-117 criterion 3). Follow-ups
+live in V2's workflow tables. Who reported an entry is kept on erasure, not scrubbed, the same
+reasoning `age_checks.checked_by` survives on; scrubbing a mention of somebody else inside
+`body` is a known gap (`docs/known-issues.md`).
 
 ### age_checks  APPEND-ONLY
 `id` PK · `performance_id` restrict NULL (bar can check outside a show) · `checked_by`

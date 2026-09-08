@@ -214,6 +214,26 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['age-check.superseded', 'night.officer-bypass'],
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
+  {
+    route: 'server/api/tonight/incidents/index.get.ts',
+    actions: ['night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+  {
+    route: 'server/api/tonight/incidents/index.post.ts',
+    actions: ['incident.logged', 'night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+  {
+    route: 'server/api/tonight/incidents/near-miss.post.ts',
+    actions: ['incident.logged', 'night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+  {
+    route: 'server/api/tonight/incidents/[id]/supersede.post.ts',
+    actions: ['incident.superseded', 'night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
   { route: 'server/api/admin/rota/templates/index.get.ts', exempt: 'reads every venue\'s template, including the venues that have none' },
   {
     route: 'server/api/admin/rota/templates/[venueId]/index.put.ts',

@@ -167,6 +167,8 @@ const CATALOGUE = {
   'shift.reassigned': { label: 'Shift assigned or reassigned by an officer', module: 'show-night' },
   'age-check.logged': { label: 'Challenge 25 check logged', module: 'show-night' },
   'age-check.superseded': { label: 'Challenge 25 entry corrected', module: 'show-night' },
+  'incident.logged': { label: 'Incident or near miss logged', module: 'show-night' },
+  'incident.superseded': { label: 'Incident entry corrected', module: 'show-night' },
 
   // Module F: bar
 

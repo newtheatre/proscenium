@@ -317,6 +317,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // inspection, the same reasoning `shift_templates.updated_by` survives on (E-118).
     why: 'Who ran a Challenge 25 check. The register is licensing evidence and must answer for itself.',
   },
+  {
+    name: 'incidents',
+    column: 'reported_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Who reported it is the safety record, the same reasoning `age_checks.checked_by` survives
+    // on. Scrubbing a mention of somebody else in the body is a known gap (docs/known-issues.md).
+    why: 'Who reported an incident. The log is the safety record and must answer for itself.',
+  },
 
   // Module F: bar
 

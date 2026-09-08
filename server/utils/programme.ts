@@ -57,6 +57,12 @@ export const PERFORMANCE_REFERENCES: PerformanceReference[] = [
     sold: false,
     why: 'a Challenge 25 entry: licensing evidence, and nobody has bought a seat (E-118)',
   },
+  {
+    table: 'incidents',
+    column: 'performance_id',
+    sold: false,
+    why: 'a safety record: who reported what, and nobody has bought a seat (E-115)',
+  },
 ]
 
 export function soldReferences(references = PERFORMANCE_REFERENCES): PerformanceReference[] {
