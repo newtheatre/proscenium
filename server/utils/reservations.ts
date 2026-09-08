@@ -3,17 +3,21 @@ import { sql } from 'drizzle-orm'
 import { findByEmail, newId } from './accounts'
 import { auditedWrite } from './audit'
 import { heldSeatsQuery, ticketInsertQueries } from './capacity'
+import { notify } from './notify'
+import { qrSvgBase64 } from './qr'
 import { qrTokenFor } from './qr-tokens'
 import { auditEntry } from '#shared/utils/audit'
 import { normaliseEmail } from '#shared/utils/auth'
 import { capacityRefusal } from '#shared/utils/capacity'
+import { formatLondon } from '#shared/utils/london'
 import { generateReservationReference } from '#shared/utils/reservations'
-import { resolvePrice } from '#shared/utils/ticket-types'
+import { resolvePrice, saysPrice } from '#shared/utils/ticket-types'
 import type { TicketToWrite } from './capacity'
 import type { CapacityRefusal } from '#shared/utils/capacity'
 import type { ReservationSource } from '#shared/utils/reservations'
 import type { PriceSource, TicketTypeRestriction } from '#shared/utils/ticket-types'
 import type { SQL } from 'drizzle-orm'
+import type { H3Event } from 'h3'
 
 // Resolving what a performance may sell and writing what it sold (D-104). The predicate that
 // gates capacity is D-105's; this is the one place that assembles an order against it.
@@ -42,10 +46,8 @@ export interface BookableTicketType {
 
 const readFlag = (value: number | null): boolean | null => (value === null ? null : value === 1)
 
-// Active, publicly listed types resolved down the same chain the listing reads, so a quoted
-// price can never differ from what the write path charges. Pure, so it needs no database.
-// A member-restricted type is dropped for a caller who is not currently one (D-109 criterion 1);
-// a concession type carries no gate here at all and is left for the desk (criterion 3).
+// Resolved down the same chain the listing reads, so a quoted price never differs from the
+// write path's. A member-restricted type is dropped for a caller who is not one (D-109 criterion 1).
 export function readBookableTicketTypes(rows: BookableTicketTypeRow[], isMember: boolean): BookableTicketType[] {
   return rows.flatMap((row) => {
     if (row.restrictedTo === 'MEMBER' && !isMember) return []
@@ -200,4 +202,89 @@ export async function writeReservation(input: WriteReservationInput): Promise<Wr
 export async function currentCapacityRefusal(performanceId: string, capacity: number | null, wanted: number): Promise<CapacityRefusal | null> {
   const [row] = await db.all<{ held: number }>(heldSeatsQuery(performanceId))
   return capacityRefusal(capacity, Number(row?.held ?? 0), wanted)
+}
+
+export interface ConfirmationContext {
+  userId: string
+  reference: string
+  showTitle: string
+  startsAt: number
+  totalPence: number
+  qrToken: string
+}
+
+// Shared by the reservation write and the resend route, so a resend renders from the same
+// template with the same QR rather than a second, driftable copy (D-108 criteria 1, 2).
+export async function sendReservationConfirmation(event: H3Event | undefined, context: ConfirmationContext): Promise<void> {
+  const url = `${useRuntimeConfig(event).public.baseURL}/qr/${context.qrToken}`
+  await notify(event, {
+    userId: context.userId,
+    type: 'reservation.confirmed',
+    context: {
+      name: '',
+      reference: context.reference,
+      show: context.showTitle,
+      when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      totalDue: saysPrice(context.totalPence),
+      url,
+      qrSvg: qrSvgBase64(url),
+    },
+  })
+}
+
+export interface ReservationForResend {
+  id: string
+  userId: string | null
+  reference: string
+  status: string
+  showTitle: string
+  startsAt: number
+  totalPence: number
+}
+
+// Everything a resend needs in one row: the booker (to check the email match), the template
+// fields, and the total, summed here rather than trusting a client-supplied figure.
+export function reservationForResendQuery(reference: string): SQL {
+  return sql`
+    SELECT r.id AS id, r.user_id AS userId, r.reference AS reference, r.status AS status,
+           s.title AS showTitle, p.starts_at AS startsAt,
+           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence
+    FROM reservations r
+    JOIN performances p ON p.id = r.performance_id
+    JOIN shows s ON s.id = p.show_id
+    WHERE r.reference = ${reference}
+  `
+}
+
+export async function reservationForResend(reference: string): Promise<ReservationForResend | undefined> {
+  const [row] = await db.all<ReservationForResend>(reservationForResendQuery(reference))
+  return row
+}
+
+export interface ReservationCurrentState {
+  reference: string
+  status: string
+  cancelledBy: string | null
+  showTitle: string
+  startsAt: number
+  totalPence: number
+}
+
+// What the QR answers when it is presented: live, from this row, never from anything saved
+// earlier (D-108 criterion 1). "Exchanged" and "wrong night" await D-111 and D-126.
+export function reservationCurrentStateQuery(id: string): SQL {
+  return sql`
+    SELECT r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
+           s.title AS showTitle, p.starts_at AS startsAt,
+           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence
+    FROM reservations r
+    JOIN performances p ON p.id = r.performance_id
+    JOIN shows s ON s.id = p.show_id
+    WHERE r.id = ${id}
+  `
+}
+
+export async function reservationCurrentState(id: string): Promise<ReservationCurrentState | undefined> {
+  const [row] = await db.all<ReservationCurrentState>(reservationCurrentStateQuery(id))
+  return row
 }

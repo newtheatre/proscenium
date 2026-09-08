@@ -17,10 +17,8 @@ export const ticketTypes = sqliteTable('ticket_types', {
   kind: text('kind').notNull(),
   // Set on the two types no public payload may ever carry (D-128).
   accessKind: text('access_kind'),
-  // Entitlement gate, set once at creation like kind and access kind (D-109 criterion 1).
-  // Concession has no committee-agreed eligibility evidence yet, so it is not a value here:
-  // a concession type is offered to everybody online and checked at the desk instead
-  // (criterion 3), which needs no gate at all.
+  // Entitlement gate, set once at creation (D-109 criterion 1). Concession has no
+  // committee-agreed evidence yet, so it is not a value; that type is checked at the desk instead.
   restrictedTo: text('restricted_to'),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
   activeByDefault: integer('active_by_default', { mode: 'boolean' }).notNull().default(true),

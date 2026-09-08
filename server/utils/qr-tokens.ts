@@ -1,8 +1,12 @@
 import { decodeQrToken, encodeQrToken } from '#shared/utils/qr-tokens'
 
 // Stateless by design: a resend recomputes the identical signature from the reservation id
-// alone, so the QR a booker saved on day one still opens on the night (D-108 criterion 1).
-// Nothing is stored; nothing to leak from a backup.
+// alone, so nothing is stored and nothing can leak from a backup (D-108 criterion 1).
+
+// The cookie a browser exchange leaves behind, so the token itself stops sitting in the
+// address bar and any referrer header after the first open (D-108 criterion 4).
+export const QR_COOKIE_NAME = 'nnt-qr-token'
+export const QR_COOKIE_MAX_AGE_SECONDS = 60 * 60
 
 let key: Promise<CryptoKey> | undefined
 

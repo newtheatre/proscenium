@@ -3,15 +3,17 @@ import { h, resolveComponent } from 'vue'
 import {
   TICKET_TYPE_ACCESS_KINDS,
   TICKET_TYPE_KINDS,
+  TICKET_TYPE_RESTRICTIONS,
   newTicketTypeForm,
   saysAccessKind,
   saysPrice,
+  saysRestriction,
   saysTicketTypeKind,
   ticketTypeForm,
 } from '#shared/utils/ticket-types'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
-import type { TicketType, TicketTypeAccessKind, TicketTypeKind } from '#shared/utils/ticket-types'
+import type { TicketType, TicketTypeAccessKind, TicketTypeKind, TicketTypeRestriction } from '#shared/utils/ticket-types'
 
 definePageMeta({ layout: 'console', title: 'Ticket types', middleware: 'console' })
 
@@ -67,6 +69,7 @@ interface FormState {
   price: number
   kind: TicketTypeKind
   accessKind: TicketTypeAccessKind | null
+  restrictedTo: TicketTypeRestriction | null
   activeByDefault: boolean
 }
 
@@ -75,6 +78,7 @@ const state = reactive<FormState>({
   price: 0,
   kind: 'SINGLE',
   accessKind: null,
+  restrictedTo: null,
   activeByDefault: true,
 })
 
@@ -91,6 +95,10 @@ const accessOptions = [
   { label: 'Neither', value: null },
   ...TICKET_TYPE_ACCESS_KINDS.map(kind => ({ label: saysAccessKind(kind) ?? kind, value: kind })),
 ]
+const restrictionOptions = [
+  { label: 'Nobody, open to all', value: null },
+  ...TICKET_TYPE_RESTRICTIONS.map(restriction => ({ label: saysRestriction(restriction) ?? restriction, value: restriction })),
+]
 
 function edit(type: TicketType | null): void {
   editing.value = type
@@ -101,6 +109,7 @@ function edit(type: TicketType | null): void {
     price: type?.price ?? 0,
     kind: type?.kind ?? 'SINGLE',
     accessKind: type?.accessKind ?? null,
+    restrictedTo: type?.restrictedTo ?? null,
     activeByDefault: type?.activeByDefault ?? true,
   })
   open.value = true
@@ -124,7 +133,7 @@ async function save(): Promise<void> {
     else {
       await $fetch('/api/admin/ticket-types', {
         method: 'POST',
-        body: { ...body, kind: state.kind, accessKind: state.accessKind },
+        body: { ...body, kind: state.kind, accessKind: state.accessKind, restrictedTo: state.restrictedTo },
       })
     }
     toast.add({
@@ -211,6 +220,9 @@ const columns: TableColumn<TicketType>[] = [
           : null,
         row.original.accessKind
           ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => saysAccessKind(row.original.accessKind))
+          : null,
+        row.original.restrictedTo
+          ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => saysRestriction(row.original.restrictedTo))
           : null,
         row.original.archived
           ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Archived')
@@ -437,6 +449,20 @@ const columns: TableColumn<TicketType>[] = [
               :items="accessOptions"
               class="w-full"
               data-test="ticket-type-access"
+            />
+          </UFormField>
+
+          <UFormField
+            v-if="!editing"
+            label="Who may book it online"
+            name="restrictedTo"
+            description="A restricted type only appears for a signed-in booker who currently qualifies; a guest never sees it."
+          >
+            <USelect
+              v-model="state.restrictedTo"
+              :items="restrictionOptions"
+              class="w-full"
+              data-test="ticket-type-restriction"
             />
           </UFormField>
 
