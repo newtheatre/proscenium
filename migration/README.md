@@ -51,6 +51,8 @@ live app; no hand-maintained schema subset can ever hold real room ids, because 
 migrated, only referenced. `load.ts` has to run against the same target first, so the users these
 key to already exist there (`docs/known-issues.md`).
 
+`transform-money.ts` differs from the other two in one respect worth knowing: `ledger_entries` and `ledger_lines` are the application's own tables, so the money step writes into the real schema rather than staging through `out/unified.sqlite` the way identity and bookings do.
+
 `export.sh` requires a wrangler login with access to the New Theatre account. Every later
 step is offline against the dumps.
 
@@ -88,6 +90,20 @@ step is offline against the dumps.
   applies it to a local target when given one. It never deletes, so a person or a grant that
   vanished upstream stays until somebody decides; and it never touches production, which is applied
   by hand from the runbook in `docs/operations.md`.
+- **Money** (K-114, I-109): six years of ticket revenue as opening ledger history, from `tickets`,
+  never `transactions`, which the old estate holds one row in across its whole life; the price
+  lived on the ticket (`price_paid`), not in a separate ledger table. `reservations` is not read:
+  no reservation-level record is imported here, so `customer_notes`, `staff_notes` and
+  `anonymised_at` never enter the picture, and nothing needs un-tombstoning. A refund
+  (`refunded_at` set) posts a second, reversing entry rather than replacing the sale, so both the
+  gross figure and the net stay reconstructable from ledger rows (0004, 0010). A ticket whose
+  `price_confidence` reads anything but `EXACT` still imports, and is named in the exceptions
+  report rather than silently trusted. `performance_id`, `reservation_id` and `ticket_id` are left
+  unset on every imported line: no programme transform exists yet to map the old performance ids
+  to new ones, and 0015 forbids carrying the old ones through unmapped. The total is unaffected;
+  attributing a historical sale to its performance is recoverable later, but only for as long as
+  `out/id-map.tsv` and the archived old estate exist (0015), which is why the mapping lives in the
+  ticket id kept in `out/money-id-map.tsv`, not a column on the entry.
 
 ## Why the same person keeps the same id
 
@@ -97,5 +113,8 @@ because this repository is public and the map is what links the archived old est
 identities. Losing it costs a reload of a scratch target, not ten thousand duplicate people: wipe
 the rehearsal database and start again.
 
-Remaining transforms (programme, reservations and tickets, rooms, bar) follow the same
-shape, one file per module, as the weekly rehearsals proceed.
+The old estate's audit history is deliberately not imported (decision 0030).
+
+Remaining transforms (programme, reservations as records, bar) follow the same shape, one file
+per module, as the weekly rehearsals proceed. Bar has nothing to transform: production holds no
+stock-movement history to import (K-116, `docs/backlog/K-platform.md`).
