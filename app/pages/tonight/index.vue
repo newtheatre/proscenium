@@ -26,12 +26,14 @@ interface Performance {
   team: TeamMember[]
 }
 interface DutyManagerTonight { night: string, venueId: string, performances: Performance[] }
+interface ChecklistEntry { phase: 'PRE' | 'POST', label: string, required: boolean, done: boolean }
 
 // Every 20 seconds while the screen is open, so house numbers move on their own (criterion 3).
 const POLL_MS = 20_000
 
 const request = useRequestFetch()
 const data = ref<DutyManagerTonight | null>(null)
+const checklist = ref<ChecklistEntry[]>([])
 const syncedAt = ref<Date | null>(null)
 const staleness = ref<string | null>(null)
 // Assumed true until the first answer says otherwise, so the screen never flashes the fallback
@@ -48,6 +50,12 @@ async function load(): Promise<void> {
     syncedAt.value = new Date()
     staleness.value = null
     isDutyManager.value = true
+    // Best-effort: a screen that cannot reach the checklist still shows the rest (criterion 6
+    // is a warning, not a blocker of the house numbers above it).
+    try {
+      checklist.value = (await request<{ items: ChecklistEntry[] }>('/api/tonight/checklist')).items
+    }
+    catch { /* the banner below just stays empty */ }
   }
   catch (refused) {
     // Not tonight's duty manager: the fallback hub below, not a failure banner.
@@ -64,6 +72,13 @@ async function load(): Promise<void> {
     asked.value = true
   }
 }
+
+// From house open: doors, or curtain where none is set (E-114 criterion 6).
+const houseOpen = computed(() => {
+  const now = Date.now() / 1000
+  return (data.value?.performances ?? []).some(performance => now >= (performance.doorsAt ?? performance.startsAt))
+})
+const incompletePre = computed(() => checklist.value.filter(item => item.phase === 'PRE' && item.required && !item.done))
 
 onMounted(() => {
   load()
@@ -100,6 +115,15 @@ function houseLine(house: Performance['house']): string {
       color="warning"
       variant="subtle"
       :description="`Showing what was last loaded: ${staleness}`"
+    />
+
+    <UAlert
+      v-if="houseOpen && incompletePre.length > 0"
+      data-test="checklist-warning"
+      color="warning"
+      variant="subtle"
+      title="Pre-show checklist incomplete"
+      :description="incompletePre.map(item => item.label).join(', ')"
     />
 
     <div
@@ -232,24 +256,44 @@ function houseLine(house: Performance['house']): string {
       here.
     </p>
 
+    <!-- Navigational, not the primary action: a grid in the scrollable content, never the
+         sticky thumb-zone slot K-102 criterion 2 reserves for one action (E-112 criterion 4). -->
+    <div class="mt-6 grid grid-cols-2 gap-2">
+      <UButton
+        to="/tonight/incidents"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-clipboard-list"
+        data-test="link-incidents"
+      >
+        Incident log
+      </UButton>
+      <UButton
+        to="/tonight/age-checks"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-id-card"
+        data-test="link-age-checks"
+      >
+        Challenge 25
+      </UButton>
+      <UButton
+        to="/tonight/checklist"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-list-checks"
+        data-test="link-checklist"
+      >
+        Checklist
+      </UButton>
+    </div>
+
     <template #actions>
       <NightAction
         label="Till"
         icon="i-lucide-store"
         color="neutral"
         to="/tonight/till"
-      />
-      <NightAction
-        label="Incident log"
-        icon="i-lucide-clipboard-list"
-        color="neutral"
-        to="/tonight/incidents"
-      />
-      <NightAction
-        label="Challenge 25 register"
-        icon="i-lucide-id-card"
-        color="neutral"
-        to="/tonight/age-checks"
       />
     </template>
   </NightScreen>

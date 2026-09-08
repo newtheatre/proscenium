@@ -531,11 +531,12 @@ holder who is not tonight's duty manager. Content warnings, the latecomer policy
 guidance are read straight from `showWarnings()` and the show row, the same source the public
 show page reads, so neither can drift from the other.
 
-Quick links to the checklists and the backstage board are not on the screen yet: neither E-114
-nor E-120 has built its destination (`docs/known-issues.md`). Till, the incident log at
-`/tonight/incidents` and the Challenge 25 register at `/tonight/age-checks` are all linked now.
-Near-miss reporting reaches through a second tap on the incident log screen rather than a first
-tap from `/tonight` itself, an interpretation of E-117 criterion 1 recorded in the known issue.
+A quick link to the backstage board is not on the screen yet: E-120 has not built its destination
+(`docs/known-issues.md`). Till, the incident log, the Challenge 25 register and the checklist are
+all linked now, the last three from a plain button grid in the scrollable content rather than the
+sticky action slot, which K-102 criterion 2 reserves for the one primary action (Till). Near-miss
+reporting reaches through a second tap on the incident log screen rather than a first tap from
+`/tonight` itself, an interpretation of E-117 criterion 1 recorded in the known issue.
 
 ### The Challenge 25 register (E-118)
 
@@ -600,6 +601,49 @@ system only matches a single FK column against the erased id, not an arbitrary n
 inside `body`; and no "safety officer" role exists in `shared/utils/roles.ts` to scope a
 historical, cross-night read separate from tonight's own log, which is why the read endpoint
 here is tonight-only, the same scope E-118's register already carries.
+
+### The pre and post-show checklist (E-114)
+
+`checklist_items` is the committee's own configuration, one row per venue and phase, mutable
+like `shift_templates` rather than append-only: ticking a box is a state a duty manager moves
+through once, not a record a correction supersedes. `checklist_stamps` is the E-101 pattern
+applied a second time: `ensureStamped()` snapshots every active item onto a venue's night the
+first time `GET /api/tonight/checklist` reads it, so an edit to `checklist_items` afterwards
+changes nothing already stamped (criterion 1). Ticking (`POST .../tick`) and exempting
+(`POST .../exempt`) are both predicated `UPDATE`s decided from `RETURNING` via `auditedWrite()`
+(0049); a system-verified stamp's `system_check IS NULL` predicate is what refuses a hand-tick
+outright, matched by its own CHECK at the schema layer too.
+
+A system-verified item's done state is never stored: `noShowHoldsReleased()` and
+`incidentsReviewed()` (`server/utils/checklist.ts`) run live against `reservations` and
+`incidents`/`audit_log` on every read. Reviewing an incident (`POST
+/api/tonight/incidents/[id]/review`) writes an `incident.reviewed` audit entry rather than a
+column on `incidents`, which cannot be touched post-insert; acknowledgement, not E-116's later
+severity-routed resolution, which is a separate workflow this does not build.
+
+`POST /api/tonight/checklist/close` recomputes every required item across both phases; anything
+neither ticked nor exempted refuses with a 409 naming it by label (criterion 4), and a second
+close reads back the first's `checklist_closes` row rather than refusing (idempotent, matching
+`night_reports`' own PK guarantee). `/tonight` shows a warning banner for incomplete required
+pre-show items from house open, `doors_at` where a performance sets one, curtain otherwise
+(criterion 6).
+
+`/rota/manage/checklists` is the committee's own screen; `/tonight/checklist` is the duty
+manager's. Both, and the pure statement and query builders they call, are guarded the same way
+their siblings are: `checklist.read`/`checklist.write` (a new, paired standing permission on
+`FOH_MANAGER`, alongside `rota.read`/`rota.write`) for configuration, `requireNightAuthority(event,
+'DUTY_MANAGER')` for the tonight screen, since criterion 1 names the checklist as the duty
+manager's own, unlike the incident log's wider `BAR`/`DOOR`/`DUTY_MANAGER` reach.
+
+Two gaps recorded in `docs/known-issues.md`: criterion 5's exception reason has nowhere to be
+read except the database, since neither `night_reports` (E-123) nor an FOH digest (E-124) is
+built yet; and `noShowHoldsReleased()` can never clear itself in production until D-126 builds a
+door to move a reservation off `PENDING`/`COLLECTED`.
+
+**Also closes a standing gap from E-106/E-107**: `POST /api/rota/shifts/[id]/dismiss` lets a
+member clear a declined claim off their own `/rota` list, cancelling it the same way an
+officer's reassignment already would; the known-issues row asking whether this was a member's
+call or an officer's is resolved in the member's favour and removed.
 
 ## The programme (build-order contract d, 0043)
 

@@ -10,6 +10,7 @@ import {
   viewBackups,
   viewBarCatalogue,
   viewBarStock,
+  viewChecklist,
   viewFellows,
   viewMembers,
   viewPassTypes,
@@ -66,6 +67,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Shift templates', icon: 'i-lucide-clipboard-list', to: '/rota/manage/templates', ability: viewRota },
       { label: 'Approvals', icon: 'i-lucide-check-check', to: '/rota/manage/approvals', ability: viewRota },
       { label: 'Unfilled shifts', icon: 'i-lucide-user-round-x', to: '/rota/manage/shifts', ability: viewRota },
+      { label: 'Checklists', icon: 'i-lucide-list-checks', to: '/rota/manage/checklists', ability: viewChecklist },
     ],
   },
 

@@ -327,6 +327,42 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // on. Scrubbing a mention of somebody else in the body is a known gap (docs/known-issues.md).
     why: 'Who reported an incident. The log is the safety record and must answer for itself.',
   },
+  {
+    name: 'checklist_items',
+    column: 'updated_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // What a venue checks before and after a show is a fact about the routine, the same reasoning
+    // `shift_templates.updated_by` survives on.
+    why: 'Who last edited a checklist item. It describes the routine, not the person who set it up.',
+  },
+  {
+    name: 'checklist_stamps',
+    column: 'ticked_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    why: 'Who ticked a checklist item tonight. The close-night record survives and must answer for itself.',
+  },
+  {
+    name: 'checklist_stamps',
+    column: 'exempted_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // A second entry keyed on the table's other person-naming column (K-109). Free text in
+    // `exempt_reason` naming somebody else is the same known gap as `incidents.body`.
+    why: 'Who recorded an exception over an unticked item. The reason it exists is the record.',
+  },
+  {
+    name: 'checklist_closes',
+    column: 'closed_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    why: 'Who closed the night. The close-night record survives and must answer for itself.',
+  },
 
   // Module F: bar
 

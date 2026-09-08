@@ -9,6 +9,7 @@ import {
   confirmedShiftsTonightQuery,
   countOpenShiftsQuery,
   declineShiftStatement,
+  dismissShiftStatement,
   myShiftsQuery,
   openShiftsQuery,
   releaseShiftStatement,
@@ -854,6 +855,49 @@ describe('releasing a held shift (E-107 criterion 1)', () => {
 
       expect(run(database, releaseShiftStatement('shift-open', who))).toHaveLength(0)
       expect(run(database, releaseShiftStatement('shift-declined', who))).toHaveLength(0)
+    })
+  })
+})
+
+describe('dismissing a declined claim (E-114)', () => {
+  test('a declined claim cancels, naming who dismissed it by holding user_id', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'declined')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status, decline_reason) VALUES (?, ?, ?, 1, ?, ?, ?)',
+        'shift-declined', tonight.performanceId, 'DOOR', who, 'DECLINED', 'Not eligible']])
+
+      expect(run(database, dismissShiftStatement('shift-declined', who))).toHaveLength(1)
+      expect(shiftsOn(database, tonight.performanceId)[0]).toMatchObject({ status: 'CANCELLED', user_id: who })
+    })
+  })
+
+  test('somebody else dismissing it matches nothing', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const holder = person(database, 'holder')
+      const other = person(database, 'other')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+        'shift-declined', tonight.performanceId, 'DOOR', holder, 'DECLINED']])
+
+      expect(run(database, dismissShiftStatement('shift-declined', other))).toHaveLength(0)
+      expect(shiftsOn(database, tonight.performanceId)[0]).toMatchObject({ status: 'DECLINED', user_id: holder })
+    })
+  })
+
+  test('an open, claimed or confirmed shift has nothing to dismiss this way', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'somebody')
+      database.batch([
+        ['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)',
+          'shift-open', tonight.performanceId, 'DOOR', 'OPEN'],
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 2, ?, ?)',
+          'shift-confirmed', tonight.performanceId, 'BAR', who, 'CONFIRMED'],
+      ])
+
+      expect(run(database, dismissShiftStatement('shift-open', who))).toHaveLength(0)
+      expect(run(database, dismissShiftStatement('shift-confirmed', who))).toHaveLength(0)
     })
   })
 })

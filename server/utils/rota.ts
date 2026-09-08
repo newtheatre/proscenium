@@ -312,6 +312,16 @@ export function releaseShiftStatement(shiftId: string, userId: string): SQL {
   `
 }
 
+// A member clearing a declined claim off their own list (E-114). Cancelled rather than deleted,
+// the same terminal state an officer reassigning it away would leave (E-106, E-107).
+export function dismissShiftStatement(shiftId: string, userId: string): SQL {
+  return sql`
+    UPDATE shifts SET status = 'CANCELLED'
+    WHERE id = ${shiftId} AND user_id = ${userId} AND status = 'DECLINED'
+    RETURNING id
+  `
+}
+
 // An officer's assignment, onto an open shift or over an existing holder: confirmed by
 // definition, one UPDATE on the row that already exists, never a delete and an insert (criteria 3, 4).
 export function assignShiftStatement(shiftId: string, userId: string, actorId: string): SQL {
