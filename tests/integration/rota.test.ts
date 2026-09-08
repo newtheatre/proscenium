@@ -6,6 +6,7 @@ import {
   cancelOrphanedShiftsStatement,
   cancelShiftsStatement,
   claimShiftStatement,
+  confirmedShiftsTonightQuery,
   countOpenShiftsQuery,
   declineShiftStatement,
   myShiftsQuery,
@@ -15,6 +16,7 @@ import {
   stampPerformanceStatement,
 } from '#server/utils/rota'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import type { OpenShiftRow } from '#server/utils/rota'
@@ -949,6 +951,54 @@ describe('an officer assigning or reassigning a shift (E-107 criteria 3 and 4)',
         'shift-held', tonight.performanceId, 'DOOR', member, 'CLAIMED']])
 
       expect(run(database, assignShiftStatement('shift-held', member, officer))).toHaveLength(1)
+    })
+  })
+})
+
+// What show-night authority's SHIFT branch resolves against: disabled and anonymised are
+// re-checked at the query, not trusted from the shift row (0009, the coordinator's review).
+describe('a confirmed shift resolves authority only for a current account', () => {
+  const bounds = showNightBounds(currentShowNight())
+  const from = Math.floor(bounds.from.getTime() / 1000)
+  const to = Math.floor(bounds.to.getTime() / 1000)
+
+  function confirmedShift(database: TestDatabase, performanceId: string, role: string, userId: string): void {
+    database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+      `${performanceId}-${role}`, performanceId, role, userId, 'CONFIRMED']])
+  }
+
+  test('an ordinary confirmed shift resolves', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const holder = person(database, 'holder')
+      confirmedShift(database, tonight.performanceId, 'DOOR', holder)
+
+      const resolved = run(database, confirmedShiftsTonightQuery(holder, 'DOOR', from, to, {}))
+      expect(resolved).toHaveLength(1)
+    })
+  })
+
+  test('a disabled holder resolves nothing', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const holder = person(database, 'holder')
+      database.batch([['UPDATE users SET disabled = 1 WHERE id = ?', holder]])
+      confirmedShift(database, tonight.performanceId, 'DOOR', holder)
+
+      const resolved = run(database, confirmedShiftsTonightQuery(holder, 'DOOR', from, to, {}))
+      expect(resolved).toHaveLength(0)
+    })
+  })
+
+  test('an anonymised holder resolves nothing', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const holder = person(database, 'holder')
+      database.batch([['UPDATE users SET anonymised_at = unixepoch() WHERE id = ?', holder]])
+      confirmedShift(database, tonight.performanceId, 'DOOR', holder)
+
+      const resolved = run(database, confirmedShiftsTonightQuery(holder, 'DOOR', from, to, {}))
+      expect(resolved).toHaveLength(0)
     })
   })
 })

@@ -223,6 +223,20 @@ describe.skipIf(skip !== null)('an officer assigning or reassigning a shift (E-1
     expect(read<{ status: string }>('SELECT status FROM shifts WHERE id = ?', house.shiftId)?.status).toBe('OPEN')
   })
 
+  // A disabled account is not a fact operational authority may derive from (0009): assigning one
+  // a shift must refuse at the write, not merely fail to grant anything once assigned.
+  test('a disabled account cannot be assigned a shift, and the shift is untouched', async () => {
+    const member = await registerMember(app, 'assign-disabled', generatePassword())
+    await award(member.id)
+    const house = performance(7, 'assign-disabled')
+
+    expect((await send('POST', `/api/admin/accounts/${member.id}/security`, { operation: 'disable' })).status).toBe(200)
+
+    const answered = await send('POST', `/api/admin/rota/shifts/${house.shiftId}/assign`, { userId: member.id }, foh.cookie)
+    expect(answered.status).toBe(403)
+    expect(read<{ status: string }>('SELECT status FROM shifts WHERE id = ?', house.shiftId)?.status).toBe('OPEN')
+  })
+
   test('assigning replaces a declined shift, and the outgoing claimant is told', async () => {
     const outgoing = await registerMember(app, 'assign-outgoing', generatePassword())
     const incoming = await registerMember(app, 'assign-incoming', generatePassword())
