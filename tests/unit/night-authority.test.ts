@@ -165,7 +165,9 @@ describe('every show-night route checks authority itself (E-111 criterion 5)', (
     const skipped: string[] = []
     for (const route of routes()) {
       const source = await Bun.file(route).text()
-      if (!source.includes('requireNightAuthority(')) skipped.push(route)
+      // requireAnyNightAuthority is the multi-role form (E-118 criterion 4); both call the same
+      // guard underneath, so either spelling in a route's own source satisfies this.
+      if (!source.includes('requireNightAuthority(') && !source.includes('requireAnyNightAuthority(')) skipped.push(route)
     }
     expect(skipped).toEqual([])
   })

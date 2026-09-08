@@ -132,3 +132,19 @@ export async function requireNightAuthority(event: H3Event, role: NightRole, sco
     via: 'OFFICER',
   }
 }
+
+// For a screen more than one role reaches (E-118 criterion 4). Tried in order, first success
+// wins; a signed-out caller is told that immediately rather than asked again for each role.
+export async function requireAnyNightAuthority(event: H3Event, roles: NightRole[], scope: NightScope = {}): Promise<NightAuthority> {
+  let refusal: unknown
+  for (const role of roles) {
+    try {
+      return await requireNightAuthority(event, role, scope)
+    }
+    catch (error) {
+      if ((error as { statusCode?: number }).statusCode === 401) throw error
+      refusal = error
+    }
+  }
+  throw refusal
+}

@@ -307,6 +307,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'delete',
     why: 'Whether a phone number shows to tonight\'s team, consented to rather than recorded about them.',
   },
+  {
+    name: 'age_checks',
+    column: 'checked_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Licensing evidence: who ran the check is a fact the register must still answer for at an
+    // inspection, the same reasoning `shift_templates.updated_by` survives on (E-118).
+    why: 'Who ran a Challenge 25 check. The register is licensing evidence and must answer for itself.',
+  },
 
   // Module F: bar
 

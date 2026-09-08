@@ -477,6 +477,13 @@
       "when": 1788831912206,
       "tag": "0067_a_shift_holder_chooses_whether_their_phone_shows",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "6",
+      "when": 1788866351423,
+      "tag": "0068_the_challenge_25_register_is_append_only",
+      "breakpoints": true
     }
   ]
 }

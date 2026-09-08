@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { check, index, integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { performances, venues } from './programme'
 import { users } from './identity'
+import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 
 const now = sql`(unixepoch())`
 const id = () => text('id').primaryKey()
@@ -74,3 +75,38 @@ export const shiftContactPreferences = sqliteTable('shift_contact_preferences', 
   visible: integer('visible', { mode: 'boolean' }).notNull().default(false),
   updatedAt: integer('updated_at').notNull().default(now),
 })
+
+// The Challenge 25 register (E-118), licensing evidence and append-only like `incidents`.
+// `performance_id` is nullable because bar checks age outside a show as well as inside one.
+export const ageChecks = sqliteTable('age_checks', {
+  id: id(),
+  performanceId: text('performance_id').references(() => performances.id, { onDelete: 'restrict' }),
+  checkedBy: text('checked_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  outcome: text('outcome').notNull(),
+  // Which side of the outcome is populated, never both: what ID was accepted, or why refused.
+  idType: text('id_type'),
+  reason: text('reason'),
+  // Appearance, never a name; the form's own guidance is what actually keeps a name out.
+  description: text('description').notNull(),
+  product: text('product'),
+  notes: text('notes'),
+  supersedesId: text('supersedes_id').references((): AnySQLiteColumn => ageChecks.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  index('age_checks_performance').on(table.performanceId),
+  index('age_checks_checked_by').on(table.checkedBy),
+  index('age_checks_created_at').on(table.createdAt),
+  // One correction per entry: a second one would leave the chain ambiguous about which
+  // correction is current (E-118 criterion 3).
+  uniqueIndex('age_checks_one_correction').on(table.supersedesId),
+  check('age_checks_outcome_values', sql`${table.outcome} IN ('ACCEPTED', 'REFUSED')`),
+  check('age_checks_id_type_values', sql`${table.idType} IS NULL OR ${table.idType} IN ('PASSPORT', 'DRIVING_LICENCE', 'PASS_CARD', 'OTHER')`),
+  check('age_checks_reason_values', sql`${table.reason} IS NULL OR ${table.reason} IN ('NO_ID_SHOWN', 'ID_LOOKED_FALSE', 'APPEARED_UNDERAGE', 'OTHER')`),
+  // Exactly one side of the outcome carries data: accepted names the ID, refused names why,
+  // and neither ever carries both (E-118 criterion 1).
+  check('age_checks_outcome_shape', sql`
+    (${table.outcome} = 'ACCEPTED' AND ${table.idType} IS NOT NULL AND ${table.reason} IS NULL)
+    OR (${table.outcome} = 'REFUSED' AND ${table.reason} IS NOT NULL AND ${table.idType} IS NULL)
+  `),
+  check('age_checks_no_self_supersede', sql`${table.supersedesId} IS NULL OR ${table.supersedesId} <> ${table.id}`),
+])
