@@ -27,22 +27,16 @@ export default defineEventHandler(async (event) => {
     detail: changes({ status: [held.status, status] }),
   })
 
-  // The audit insert reads `changes()`, this connection's own UPDATE row count, not the
-  // resulting state: a losing request's UPDATE touches nothing, whatever the winner did (0049).
-  const [updated] = await db.batch([
+  const applied = await auditedWrite(
     db.all<{ id: string }>(sql`
       UPDATE product_variants SET status = ${status} WHERE id = ${id} AND status = ${held.status} RETURNING id
     `),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
-      WHERE changes() = 1
-    `),
-  ])
+    entry,
+  )
 
   // A losing racer is refused, not told it succeeded: the audit stayed silent, so the caller
   // must too (0049).
-  if (updated.length === 0) {
+  if (!applied) {
     const now = await variantById(id, londonDayOf(new Date()))
     if (!now) throw createError({ statusCode: 404, statusMessage: 'No such serving size' })
     throw createError({

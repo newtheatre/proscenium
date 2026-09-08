@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { saysShiftRole } from '#shared/utils/rota'
 
@@ -29,16 +28,9 @@ export default defineEventHandler(async (event) => {
     detail: changes({ status: [held.status, status] }),
   })
 
-  const [claimed] = await withShiftConstraints(() => db.batch([
-    db.all<{ id: string }>(claimShiftStatement(id, account.id, status)),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
-      WHERE changes() = 1
-    `),
-  ]))
+  const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(claimShiftStatement(id, account.id, status)), entry))
 
-  if (claimed.length === 0) {
+  if (!applied) {
     const now = await shiftDetail(id)
     if (!now) throw createError({ statusCode: 404, statusMessage: 'No such shift' })
     if (now.status !== 'OPEN') throw createError({ statusCode: 409, statusMessage: 'That shift has already been taken' })

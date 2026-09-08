@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
 
   // The capacity check rides the UPDATE, so a booking landing after the read above cannot slip
   // under the new capacity; the audit reads `changes()`, so a refused edit writes no trail (0003).
-  const [updated] = await db.batch([
+  const applied = await auditedWrite(
     db.all<{ id: string }>(sql`
       UPDATE performances
       SET venue_id = ${input.venueId},
@@ -77,14 +77,10 @@ export default defineEventHandler(async (event) => {
       WHERE id = ${id} AND ${loweringPredicate(id, capacity)}
       RETURNING id
     `),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
-      WHERE changes() = 1
-    `),
-  ])
+    entry,
+  )
 
-  if (updated.length === 0) {
+  if (!applied) {
     const now = await performanceById(id)
     if (!now) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
     throw createError({

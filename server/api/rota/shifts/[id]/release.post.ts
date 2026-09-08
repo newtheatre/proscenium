@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { formatLondon } from '#shared/utils/london'
 import { releaseRefusal, saysShiftRole } from '#shared/utils/rota'
@@ -30,16 +29,9 @@ export default defineEventHandler(async (event) => {
     detail: changes({ status: [held.status, 'OPEN'] }),
   })
 
-  const [released] = await withShiftConstraints(() => db.batch([
-    db.all<{ id: string }>(releaseShiftStatement(id, account.id)),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
-      WHERE changes() = 1
-    `),
-  ]))
+  const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(releaseShiftStatement(id, account.id)), entry))
 
-  if (released.length === 0) {
+  if (!applied) {
     const now = await shiftDetail(id)
     // Still held, by somebody else: an officer's reassignment landed in the gap, which
     // `releaseRefusal` has no wording for because it only ever expects the caller's own status.
