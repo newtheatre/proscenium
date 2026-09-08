@@ -120,6 +120,61 @@ Travel bookmark is taken first and why the load is safe to run again after a par
 Keep `out/id-map.tsv` until cutover is complete. After that it is the key to an estate that no
 longer exists, and it goes with the archive rather than staying on anybody's laptop.
 
+### The rollback runbook (K-119)
+
+The old estate goes read-only on 1 November and can be re-armed within a day for the rest of the
+season if a cutover-blocking defect appears (0015, `roadmap.md` Phase 3). This is what re-arming
+means as a checkable state, what flips and in what order, and what the one-day bound actually
+rests on.
+
+**Who decides, and what happens first.** The IT Manager declares a defect cutover-blocking and
+directs the rollback; nobody else's local judgement freezes an estate. The first action is not
+technical: the committee and the duty officers for the shows affected are told before any system
+changes state, so nobody is mid-write on something about to move under them.
+
+**What flips, in order:**
+
+1. Each of the four old apps (stage-door, proscenium, rooms, rehearsal) reverses its own
+   read-only toggle. That mechanism is that app's own, operated there, not specified here
+   (criterion 1); this runbook only assumes it exists and is fast, because the estate's Workers
+   Builds deploy in minutes, not hours.
+2. The old estate resumes as authoritative: door, money, bookings and registers follow it again
+   for every show still to run this season, the same "one system for a show's whole run" rule
+   that governed the original cutover (0015).
+3. The new system's write paths are **not** frozen by anything built today: no maintenance-mode
+   toggle exists in this application. Whether a rollback needs one, so the two estates never
+   accept a write for the same show at once, is a decision nobody has made; naming it here is
+   the honest step, not inventing a switch that does not exist.
+
+**What the one-day bound depends on, beyond the toggle:**
+
+- **Reconciling what happened on the new system in the interim.** Every show that ran
+  authoritatively on the new system between the week of 26 October and the rollback has bookings,
+  sales and registers that exist only there; the old estate resumes from its 31 October
+  frozen-export state and knows nothing of them. `migration/` only ever runs old-to-new: there is
+  no reverse transform, and writing one is not a day's work. Whether that gap is closed by hand
+  (duty officers re-keying a short window's activity into the reactivated old estate) or accepted
+  as a recorded loss for the affected shows is a decision nobody has made; the bound is only honest
+  once it is.
+- **Anyone who exists only in the new system.** An account created, or a role granted, after
+  cutover has no old-estate counterpart: `out/id-map.tsv` maps identities the other way and stays
+  archived (`migration/README.md`), but nothing maps a new-only person back. They re-enrol on the
+  old estate by the ordinary path, the same as any new starter.
+
+**What "re-armed" means, checkably, not as a feeling:**
+
+- A real write against each of the four old apps succeeds and is visible after a reload, not just
+  that a read-only banner has gone.
+- The IT Manager has told the committee and duty officers which system is authoritative for every
+  show still to run, by name, not by implication.
+- The interim-reconciliation decision above has been made, and acted on or explicitly deferred, for
+  every show that ran on the new system since 26 October.
+
+**The rehearsal.** Like the restore drill (K-108, J-107), this runbook is exercised once before
+cutover, not left for the drawer: the IT Manager walks it end to end and records how long each
+step actually took. A rehearsal that overruns the one-day bound is the finding, not something to
+average away, and 0015's bound is revisited before cutover rather than after.
+
 ### The bar's opening balance (K-116)
 
 Not a transform. A production export (6 September 2026) found no stock-movement history to

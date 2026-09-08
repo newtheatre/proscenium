@@ -152,7 +152,7 @@ screens sit under `/bar`, not `/admin`: `/admin` means System and nothing else, 
 | 3 | A-119 · H-108 · K-114 + I-109 · J-105 | K-114 and I-109 import from `tickets` and `reservations`, not the old estate's near-empty `transactions` table (verified against production, 6 September 2026). K-116 no longer needs a wave: it resolved without a pull request, on the same verification finding no stock-movement history to transform (`docs/backlog/K-platform.md`). |
 | 4 | A-123 · I-102 · K-104 | I-102 closes when D-114, D-116, D-124, F-105 and F-108 have each added their row to the checklist test, each in its own pull request; I-102's own pull request asserts the list is complete. K-104 needs a real door write and a real till write to reconcile against. |
 | 5 | I-103 + I-104 · I-105 · K-105 close | K-105 closes when the four racing tests (D-105, E-104, F-105, register marks) are in CI. |
-| 6 | I-107 + I-108 · K-119 | K-119 needs K-112 (closed), K-114 (this wave) and K-115 (resolved, nothing to import). K-116 no longer gates it either: resolved without a build. |
+| 6 | I-107 + I-108 | K-119 no longer needs a wave: criteria 1, 2 and 4 are operational acts on the old estate, and criterion 3 resolved as the runbook in `docs/operations.md` (`docs/backlog/K-platform.md`). |
 
 Routes and files owned: `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`,
 `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`,

@@ -7,7 +7,7 @@ without losing a row that matters. Phasing follows the roadmap: the platform sto
 Phase 1, the migration stories rehearse weekly through Phase 2 and complete at the 31 October
 cutover.
 
-Stories: 24. Phases: 20 MVP, 0 V2, 0 Later, 4 resolved.
+Stories: 24. Phases: 19 MVP, 0 V2, 0 Later, 5 resolved.
 
 ## Open questions
 
@@ -384,7 +384,8 @@ Stories: 24. Phases: 20 MVP, 0 V2, 0 Later, 4 resolved.
 ## K-119: Read-only old estate and the rollback plan
 
 - Role: Administrator
-- Phase: MVP
+- Phase: Resolved, criterion 3 satisfied by runbook; criteria 1, 2 and 4 are operational (Matt's
+  decision, 8 September 2026)
 - Story: As the IT Manager, I want the old estate frozen read-only with a rehearsed rollback so
   that cutover is reversible for a season and irreversible only by choice.
 - Depends on: K-112, K-114, K-115, K-116
@@ -397,6 +398,21 @@ Stories: 24. Phases: 20 MVP, 0 V2, 0 Later, 4 resolved.
      appears, and the runbook is rehearsed once before cutover, not written for the drawer.
   4. After one term read-only, the old estate is exported, archived and shut down; DNS collapses
      to one domain, and the archive's location is recorded in operations documentation.
+- Resolution:
+  1. Criteria 1, 2 and 4 are acts on the old estate's own four applications and on the domain
+     (flipping a write path, holding a show to one system, the eventual export and DNS collapse),
+     not work in this repository; there is nothing here for them to build against.
+  2. Criterion 3 is written: `docs/operations.md`, "The rollback runbook", gives the order things
+     flip in, who decides, what the one-day bound depends on beyond the toggle (reconciling the
+     new system's interim activity, and anyone who exists only there), and what "re-armed" means
+     as a checkable state rather than a feeling.
+  3. Two steps the runbook cannot specify are named as open decisions rather than invented: whether
+     the new system needs a matching write freeze during a rollback, since no maintenance-mode
+     toggle exists in this application today, and whether a rollback's interim activity is
+     reconciled into the reactivated old estate by hand or accepted as a recorded loss. Both want
+     an owner before the rehearsal, not before this record.
+  4. The rehearsal itself, like K-108's restore drill, is operational: it happens once against the
+     real runbook before cutover, and is not this story's work to perform now.
 - Source: Prompt Book K-1 (operations); audit EW-1 to EW-4 (the estate being retired); Get-In
   part 3 (cutover strategy), part 4 (Phase 3 rollback gate)
 
