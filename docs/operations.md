@@ -32,8 +32,9 @@ recorded and fixed before the release goes out.
 - [ ] **Admit**: open the door screen, find tonight's performance, admit a ticket, and see it
       counted. Then refuse one, and read the reason back.
 - [ ] **Sell**: open the till, add two sizes to the basket including one with a mixer choice,
-      edit a quantity, remove a line, and read the server-computed total back. Taking payment on
-      the reader is F-104 and F-105's, and stays skipped until they land.
+      edit a quantity, remove a line, tap Charge, and read back the figure to key into the
+      reader. Force a mismatch (change a price after the screen last asked) and see it refused,
+      naming both figures, before it settles.
 - [ ] **Age check**: run a challenge from the till to its decision, both ways: recorded and refused.
 - [ ] Each screen's "last synced" line is present and names a plausible minute.
 - [ ] Turn the network off, and each screen still shows what it last held.
@@ -41,8 +42,8 @@ recorded and fixed before the release goes out.
 
 Signed off by the person who walked it, named in the release notes with the date. Until the door
 (D-126) and the age check (E-118) are built, the steps naming them are skipped and recorded as
-skipped rather than ticked. The till's own step walks what F-103 built; taking payment on the
-reader waits for F-104 and F-105.
+skipped rather than ticked. The till's own step walks what F-103 and F-104 built; nothing is
+recorded as a sale until F-105 lands the atomic write.
 
 ## Applying migrations
 

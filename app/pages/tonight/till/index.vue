@@ -198,6 +198,51 @@ watch(basket, () => {
   priceTimer = setTimeout(() => void recomputeTotal(), 250)
 }, { deep: true })
 
+const charging = ref(false)
+const chargeFailure = ref<string | null>(null)
+const charged = ref<{ totalPence: number } | null>(null)
+
+// The submission step (F-104): sends what the screen believes the total is, and the server
+// refuses a stale or wrong figure by name rather than trusting it (0004, 0005 criteria 1, 2).
+async function charge(): Promise<void> {
+  if (!priced.value || !venueId.value || basket.value.length === 0) return
+  charging.value = true
+  chargeFailure.value = null
+  try {
+    const answered = await $fetch<PricedBasket>('/api/till/sale', {
+      method: 'POST',
+      body: {
+        venueId: venueId.value,
+        lines: basket.value.map(line => ({ variantId: line.variantId, qty: line.qty, choiceItemId: line.choiceItemId })),
+        expectedTotalPence: priced.value.totalPence,
+      },
+    })
+    charged.value = { totalPence: answered.totalPence }
+  }
+  catch (refused) {
+    chargeFailure.value = refusalText(refused)
+    // The refusal already names the true figure; catch the total up to it too, so what is shown
+    // under the message is the one a retry would now send (F-104 criterion 3, no bypass).
+    await recomputeTotal()
+  }
+  finally {
+    charging.value = false
+  }
+}
+
+function nextSale(): void {
+  basket.value = []
+  priced.value = null
+  charged.value = null
+  chargeFailure.value = null
+}
+
+// Editing the basket after a refusal is the correction; the message it was reading no longer
+// describes what would be resubmitted, so it clears rather than going stale.
+watch(basket, () => {
+  chargeFailure.value = null
+}, { deep: true })
+
 function lineAmount(line: BasketLine): string | null {
   const index = basket.value.findIndex(entry => entry.id === line.id)
   const amount = priced.value?.lines[index]?.amountPence
@@ -254,130 +299,162 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           Nothing is on the till yet. Price a size in the catalogue, and it appears here.
         </p>
 
-        <div
-          v-for="category in categories"
-          :key="category.id"
-        >
-          <template v-if="productsIn(category.id).length">
-            <h2 class="mb-2 text-sm font-semibold text-muted">
-              {{ category.name }}
-            </h2>
-            <div class="mb-4 space-y-2">
-              <div
-                v-for="product in productsIn(category.id)"
-                :key="product.id"
-                class="rounded-lg border border-default p-2"
-                :data-test="`product-${product.id}`"
-              >
-                <div class="flex items-start justify-between gap-1">
-                  <span class="text-sm font-medium">{{ product.name }}</span>
-                  <UButton
-                    size="sm"
-                    color="neutral"
-                    variant="ghost"
-                    icon="i-lucide-info"
-                    class="min-h-12 min-w-12"
-                    :aria-label="`Allergens for ${product.name}`"
-                    :data-test="`allergen-${product.id}`"
-                    @click="allergenOpen = { name: product.name, state: product.allergenState, note: product.allergenNote }"
-                  />
-                </div>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <UButton
-                    v-for="variant in product.variants"
-                    :key="variant.id"
-                    color="neutral"
-                    variant="subtle"
-                    class="min-h-12 min-w-12"
-                    :data-test="`variant-${variant.id}`"
-                    @click="tapVariant(product.name, variant)"
-                  >
-                    {{ variant.label }} · {{ saysMoney(variant.pricePence) }}
-                  </UButton>
+        <template v-if="!charged">
+          <div
+            v-for="category in categories"
+            :key="category.id"
+          >
+            <template v-if="productsIn(category.id).length">
+              <h2 class="mb-2 text-sm font-semibold text-muted">
+                {{ category.name }}
+              </h2>
+              <div class="mb-4 space-y-2">
+                <div
+                  v-for="product in productsIn(category.id)"
+                  :key="product.id"
+                  class="rounded-lg border border-default p-2"
+                  :data-test="`product-${product.id}`"
+                >
+                  <div class="flex items-start justify-between gap-1">
+                    <span class="text-sm font-medium">{{ product.name }}</span>
+                    <UButton
+                      size="sm"
+                      color="neutral"
+                      variant="ghost"
+                      icon="i-lucide-info"
+                      class="min-h-12 min-w-12"
+                      :aria-label="`Allergens for ${product.name}`"
+                      :data-test="`allergen-${product.id}`"
+                      @click="allergenOpen = { name: product.name, state: product.allergenState, note: product.allergenNote }"
+                    />
+                  </div>
+                  <div class="mt-2 flex flex-wrap gap-2">
+                    <UButton
+                      v-for="variant in product.variants"
+                      :key="variant.id"
+                      color="neutral"
+                      variant="subtle"
+                      class="min-h-12 min-w-12"
+                      :data-test="`variant-${variant.id}`"
+                      @click="tapVariant(product.name, variant)"
+                    >
+                      {{ variant.label }} · {{ saysMoney(variant.pricePence) }}
+                    </UButton>
+                  </div>
                 </div>
               </div>
-            </div>
-          </template>
-        </div>
-
-        <div
-          v-if="basket.length"
-          class="space-y-3 border-t border-default pt-4"
-          data-test="basket"
-        >
-          <h2 class="text-sm font-semibold text-muted">
-            Basket
-          </h2>
-          <div
-            v-for="line in basket"
-            :key="line.id"
-            class="flex items-center justify-between gap-2"
-            :data-test="`line-${line.id}`"
-          >
-            <div class="min-w-0">
-              <p class="truncate text-sm font-medium">
-                {{ line.productName }}, {{ line.variantLabel }}<span v-if="line.choiceItemName">, {{ line.choiceItemName }}</span>
-              </p>
-              <p
-                class="text-xs text-muted"
-                :data-test="`line-amount-${line.id}`"
-              >
-                {{ lineAmount(line) ?? 'Pricing…' }}
-              </p>
-            </div>
-            <div class="flex items-center gap-1">
-              <UButton
-                size="sm"
-                color="neutral"
-                variant="ghost"
-                icon="i-lucide-minus"
-                class="size-12"
-                :aria-label="`One fewer ${line.variantLabel}`"
-                :data-test="`line-minus-${line.id}`"
-                @click="decrementLine(line)"
-              />
-              <span
-                class="w-6 text-center text-sm"
-                :data-test="`line-qty-${line.id}`"
-              >{{ line.qty }}</span>
-              <UButton
-                size="sm"
-                color="neutral"
-                variant="ghost"
-                icon="i-lucide-plus"
-                class="size-12"
-                :aria-label="`One more ${line.variantLabel}`"
-                :data-test="`line-plus-${line.id}`"
-                @click="incrementLine(line)"
-              />
-              <UButton
-                size="sm"
-                color="error"
-                variant="ghost"
-                icon="i-lucide-x"
-                class="size-12"
-                :aria-label="`Remove ${line.variantLabel}`"
-                :data-test="`line-remove-${line.id}`"
-                @click="removeLine(line)"
-              />
-            </div>
+            </template>
           </div>
 
-          <UAlert
-            v-if="priceFailure"
-            data-test="price-failure"
-            color="error"
-            variant="subtle"
-            :description="priceFailure"
-          />
-          <p
-            v-else
-            class="flex items-center justify-between text-base font-semibold"
-            data-test="basket-total"
+          <div
+            v-if="basket.length"
+            class="space-y-3 border-t border-default pt-4"
+            data-test="basket"
           >
-            <span>Total</span>
-            <span data-test="basket-total-amount">{{ priced && !pricing ? saysMoney(priced.totalPence) : 'Pricing…' }}</span>
-          </p>
+            <h2 class="text-sm font-semibold text-muted">
+              Basket
+            </h2>
+            <div
+              v-for="line in basket"
+              :key="line.id"
+              class="flex items-center justify-between gap-2"
+              :data-test="`line-${line.id}`"
+            >
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium">
+                  {{ line.productName }}, {{ line.variantLabel }}<span v-if="line.choiceItemName">, {{ line.choiceItemName }}</span>
+                </p>
+                <p
+                  class="text-xs text-muted"
+                  :data-test="`line-amount-${line.id}`"
+                >
+                  {{ lineAmount(line) ?? 'Pricing…' }}
+                </p>
+              </div>
+              <div class="flex items-center gap-1">
+                <UButton
+                  size="sm"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-minus"
+                  class="size-12"
+                  :aria-label="`One fewer ${line.variantLabel}`"
+                  :data-test="`line-minus-${line.id}`"
+                  @click="decrementLine(line)"
+                />
+                <span
+                  class="w-6 text-center text-sm"
+                  :data-test="`line-qty-${line.id}`"
+                >{{ line.qty }}</span>
+                <UButton
+                  size="sm"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-plus"
+                  class="size-12"
+                  :aria-label="`One more ${line.variantLabel}`"
+                  :data-test="`line-plus-${line.id}`"
+                  @click="incrementLine(line)"
+                />
+                <UButton
+                  size="sm"
+                  color="error"
+                  variant="ghost"
+                  icon="i-lucide-x"
+                  class="size-12"
+                  :aria-label="`Remove ${line.variantLabel}`"
+                  :data-test="`line-remove-${line.id}`"
+                  @click="removeLine(line)"
+                />
+              </div>
+            </div>
+
+            <UAlert
+              v-if="chargeFailure"
+              data-test="charge-failure"
+              color="error"
+              variant="subtle"
+              :description="chargeFailure"
+            />
+            <UAlert
+              v-if="priceFailure"
+              data-test="price-failure"
+              color="error"
+              variant="subtle"
+              :description="priceFailure"
+            />
+            <p
+              v-else
+              class="flex items-center justify-between text-base font-semibold"
+              data-test="basket-total"
+            >
+              <span>Total</span>
+              <span data-test="basket-total-amount">{{ priced && !pricing ? saysMoney(priced.totalPence) : 'Pricing…' }}</span>
+            </p>
+          </div>
+        </template>
+
+        <div
+          v-else
+          class="space-y-4"
+          data-test="charge-confirmation"
+        >
+          <UAlert
+            color="success"
+            variant="subtle"
+            icon="i-lucide-check"
+            title="Key this into the reader"
+            :description="charged ? saysMoney(charged.totalPence) : ''"
+          />
+          <UButton
+            block
+            size="xl"
+            class="min-h-12"
+            data-test="next-sale"
+            @click="nextSale"
+          >
+            Start the next sale
+          </UButton>
         </div>
       </div>
 
@@ -389,6 +466,14 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
       </p>
 
       <template #actions>
+        <NightAction
+          v-if="session && !charged && basket.length && priced"
+          :label="`Charge ${saysMoney(priced.totalPence)}`"
+          icon="i-lucide-credit-card"
+          :disabled="pricing"
+          :loading="charging"
+          @press="charge"
+        />
         <NightAction
           v-if="session"
           label="Close till"
