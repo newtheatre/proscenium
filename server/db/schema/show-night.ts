@@ -136,3 +136,73 @@ export const ageChecks = sqliteTable('age_checks', {
   `),
   check('age_checks_no_self_supersede', sql`${table.supersedesId} IS NULL OR ${table.supersedesId} <> ${table.id}`),
 ])
+
+// The pre and post-show checklist's committee configuration (E-114). Keyed to a venue, not a
+// performance: like `till_sessions`, one night at a venue may cover more than one performance.
+export const checklistItems = sqliteTable('checklist_items', {
+  id: id(),
+  venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'cascade' }),
+  phase: text('phase').notNull(),
+  label: text('label').notNull(),
+  sort: integer('sort').notNull().default(0),
+  required: integer('required', { mode: 'boolean' }).notNull().default(true),
+  // A live check the item ticks itself from; NULL means a person ticks it by hand (criterion 3).
+  systemCheck: text('system_check'),
+  // Soft-retired, never deleted: a stamp already made keeps referencing it (criterion 1).
+  active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  index('checklist_items_venue').on(table.venueId),
+  check('checklist_items_phase_values', sql`${table.phase} IN ('PRE', 'POST')`),
+  check('checklist_items_system_check_values', sql`${table.systemCheck} IS NULL OR ${table.systemCheck} IN ('NO_SHOW_HOLDS_RELEASED', 'INCIDENTS_REVIEWED')`),
+])
+
+// One row per item stamped onto a venue's night, snapshotting the item as it read at the moment
+// of stamping: editing `checklist_items` afterwards changes nothing already stamped (E-101's own
+// pattern, criterion 1). Mutable once stamped, unlike `incidents` and `age_checks`: ticking a box
+// is a state a duty manager moves through once, not a record a correction supersedes.
+export const checklistStamps = sqliteTable('checklist_stamps', {
+  id: id(),
+  venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),
+  night: text('night').notNull(),
+  itemId: text('item_id').notNull().references(() => checklistItems.id, { onDelete: 'restrict' }),
+  phase: text('phase').notNull(),
+  label: text('label').notNull(),
+  sort: integer('sort').notNull(),
+  required: integer('required', { mode: 'boolean' }).notNull(),
+  systemCheck: text('system_check'),
+  tickedBy: text('ticked_by').references(() => users.id, { onDelete: 'restrict' }),
+  tickedAt: integer('ticked_at'),
+  exempted: integer('exempted', { mode: 'boolean' }).notNull().default(false),
+  exemptReason: text('exempt_reason'),
+  exemptedBy: text('exempted_by').references(() => users.id, { onDelete: 'restrict' }),
+  exemptedAt: integer('exempted_at'),
+  stampedAt: integer('stamped_at').notNull().default(now),
+}, table => [
+  // One stamp per item per venue per night: stamping is idempotent (E-102's own pattern).
+  unique('checklist_stamps_venue_night_item').on(table.venueId, table.night, table.itemId),
+  index('checklist_stamps_venue_night').on(table.venueId, table.night),
+  check('checklist_stamps_phase_values', sql`${table.phase} IN ('PRE', 'POST')`),
+  check('checklist_stamps_ticked_shape', sql`
+    (${table.tickedBy} IS NULL AND ${table.tickedAt} IS NULL) OR (${table.tickedBy} IS NOT NULL AND ${table.tickedAt} IS NOT NULL)
+  `),
+  check('checklist_stamps_exempt_shape', sql`
+    (${table.exempted} = 0 AND ${table.exemptReason} IS NULL AND ${table.exemptedBy} IS NULL AND ${table.exemptedAt} IS NULL)
+    OR (${table.exempted} = 1 AND ${table.exemptReason} IS NOT NULL AND ${table.exemptedBy} IS NOT NULL AND ${table.exemptedAt} IS NOT NULL)
+  `),
+  check('checklist_stamps_not_ticked_and_exempted', sql`NOT (${table.tickedAt} IS NOT NULL AND ${table.exempted} = 1)`),
+  // A system-verified item ticks itself from live data, never from a person (criterion 3).
+  check('checklist_stamps_system_never_hand_ticked', sql`${table.systemCheck} IS NULL OR ${table.tickedBy} IS NULL`),
+])
+
+// The close-night action itself (criterion 4): one row per venue per night, written once.
+export const checklistCloses = sqliteTable('checklist_closes', {
+  id: id(),
+  venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),
+  night: text('night').notNull(),
+  closedBy: text('closed_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  closedAt: integer('closed_at').notNull().default(now),
+}, table => [
+  unique('checklist_closes_venue_night').on(table.venueId, table.night),
+])
