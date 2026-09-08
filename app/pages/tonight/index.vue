@@ -256,30 +256,44 @@ function houseLine(house: Performance['house']): string {
       here.
     </p>
 
+    <!-- Navigational, not the primary action: a grid in the scrollable content, never the
+         sticky thumb-zone slot K-102 criterion 2 reserves for one action (E-112 criterion 4). -->
+    <div class="mt-6 grid grid-cols-2 gap-2">
+      <UButton
+        to="/tonight/incidents"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-clipboard-list"
+        data-test="link-incidents"
+      >
+        Incident log
+      </UButton>
+      <UButton
+        to="/tonight/age-checks"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-id-card"
+        data-test="link-age-checks"
+      >
+        Challenge 25
+      </UButton>
+      <UButton
+        to="/tonight/checklist"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-list-checks"
+        data-test="link-checklist"
+      >
+        Checklist
+      </UButton>
+    </div>
+
     <template #actions>
       <NightAction
         label="Till"
         icon="i-lucide-store"
         color="neutral"
         to="/tonight/till"
-      />
-      <NightAction
-        label="Incident log"
-        icon="i-lucide-clipboard-list"
-        color="neutral"
-        to="/tonight/incidents"
-      />
-      <NightAction
-        label="Challenge 25 register"
-        icon="i-lucide-id-card"
-        color="neutral"
-        to="/tonight/age-checks"
-      />
-      <NightAction
-        label="Checklist"
-        icon="i-lucide-list-checks"
-        color="neutral"
-        to="/tonight/checklist"
       />
     </template>
   </NightScreen>
