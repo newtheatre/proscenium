@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { auditedWrite } from './audit'
+import { configValue } from './configuration'
 import { postEntry } from './ledger'
 import { requireNightAuthority } from './night-authority'
 import { auditEntry } from '#shared/utils/audit'
@@ -11,9 +12,10 @@ import type { NightScope } from '#shared/utils/night-authority'
 // D-116: refunding a ticket and, once nothing is left owed, cancelling the booking it belonged
 // to. Kept apart from server/utils/desk.ts's reads, matching D-114's own collect/desk split.
 
-// Criterion 2: a standing `money.refund` holder approves on their own account; anyone else needs
-// tonight's confirmed duty manager, since that authority derives from the shift, not a grant (0009).
+// Criterion 2, gated by REFUND_PAID_REQUIRES_MANAGER: a standing `money.refund` holder approves
+// themselves, or tonight's confirmed duty manager, whose authority derives from the shift (0009).
 export async function requireRefundApproval(event: H3Event, resolved: Authority, scope: NightScope): Promise<string> {
+  if (!await configValue(event, 'REFUND_PAID_REQUIRES_MANAGER')) return resolved.account.id
   if (resolved.permissions.has('money.refund')) return resolved.account.id
   const night = await requireNightAuthority(event, 'DUTY_MANAGER', scope)
   return night.account.id

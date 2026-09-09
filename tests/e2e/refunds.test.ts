@@ -287,6 +287,19 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2)', () => {
     const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 }, dutyManager.cookie)
     expect(refused.status).toBe(403)
   }, CASE_TIMEOUT_MS)
+
+  test('REFUND_PAID_REQUIRES_MANAGER off lets an ordinary officer refund directly', async () => {
+    const set = await send('PUT', '/api/admin/config/REFUND_PAID_REQUIRES_MANAGER', { value: false }, officer.cookie)
+    expect(set.status).toBe(200)
+    try {
+      const { reservationId, ticketId } = await collectedBooking(900)
+      const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
+      expect(refunded.status).toBe(200)
+    }
+    finally {
+      await send('PUT', '/api/admin/config/REFUND_PAID_REQUIRES_MANAGER', { value: true }, officer.cookie)
+    }
+  }, CASE_TIMEOUT_MS)
 })
 
 describe.skipIf(skip !== null)('the double refund: concurrent requests for the same ticket (criterion 4, K-121)', () => {
