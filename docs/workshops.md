@@ -64,6 +64,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Membership grace window | none: nobody tracked an expiry | 14 days past expiry still counts | Owner: IT Manager. A renewal in hand should not be a refusal at the desk (0031) |
 | Membership renewal notice | none | remind 21 days before a person's own expiry | Owner: IT Manager. Each membership has its own date, so this is not a year-end chase |
 | Retention periods | 2 years full accounts, 3 years guests (dry-run) | unchanged, armed in December | |
+| Retention sweep caps | 100 warnings and 200 anonymisations a run (old estate) | unchanged | A-126 criterion 4, carried rather than proposed here (audit SD-12). A technical guard on the size of one run rather than a policy number, in the availability sweep bound's shape, so it ships its carried figure instead of leaving the IT Manager to invent one at arming. Two keys: `RETENTION_WARNING_CAP` and `RETENTION_SWEEP_CAP`. How much notice a person gets, the row above's warning cadence, is the policy half and stays unset |
 | Backup restore drill interval | none: never run | 120 days | New setting. K-108 and J-107 ask for the drill "each term"; no term dates exist anywhere in the system (0034), so the cadence is a configured interval, in the `ROOM_BOOKING_HORIZON_WEEKS` shape, rather than a calendar the theatre's own year does not keep in code. 120 days approximates three terms a year without claiming to track them, and reads as overdue from the first deploy, which is what puts the first drill before the December break (K-108 criterion 4) without a separate rule for it. Owner: IT Manager |
 | Unverified account expiry | none: an unproven address held an account forever | 30 days, then anonymised, capped at 200 a run | Owner: IT Manager. An account that never proved its address cannot sign in and expires on its own rule (0026) |
 | Health alert window | none: nobody watched `/api/health` after a deploy | 30 minutes | New setting (J-106 criterion 5). How long `/api/health` may read unhealthy before the notification centre tells the IT Manager, rather than on the first failed check: a deploy and its migration job can legitimately race for a few minutes (`docs/operations.md` §5), and alerting on that ordinary window would train the IT Manager to ignore the alert. Owner: IT Manager |
@@ -80,7 +81,10 @@ The proposed values are shipped in `shared/utils/config.ts`, one validated key e
 amending one is a settings change rather than a release (0012, 0019). Two rows above have no
 proposed value: the night report recipients, which ships unset until a session confirms it, and
 the shift eligibility mapping, which ships a default of null per role, refusing rather than
-guessing until a session names each module (0019, E-103).
+guessing until a session names each module (0019, E-103). Retention is the reverse case: its
+periods and caps carry values, but no session has proposed a warning cadence, so
+`RETENTION_WARNING_DAYS` and `RETENTION_FINAL_WARNING_DAYS` ship unset and the sweep refuses to
+run until the IT Manager sets them (A-126).
 
 Three rows are decisions the committee still makes and settings the system does not hold: the pass
 products and the per-room opening hours are records rather than rules, entered through the screens

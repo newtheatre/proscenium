@@ -1281,18 +1281,20 @@ The Nottingham New Theatre`,
   // Sent whether or not it has anything in it, the same reasoning training's own digest uses: a
   // period with nothing to report still proves the sweep ran.
   'retention-digest': (context: TemplateContext): Rendered => {
-    const capNote = context.cappedAt !== null ? ` (capped at ${String(context.cappedAt)} this run)` : ''
+    const capNote = (at: unknown): string => at !== null ? ` (capped at ${String(at)} this run)` : ''
+    const warnings = `${String(context.window)} first warnings and ${String(context.final)} final warnings sent this run${capNote(context.warningsCappedAt)}.`
+    const anonymiseNote = capNote(context.anonymisationsCappedAt)
     const line = context.armed
-      ? `${String(context.anonymised)} accounts anonymised${capNote}.`
-      : `${String(context.wouldAnonymise)} accounts would have been anonymised${capNote}, dry-run only.`
+      ? `${String(context.anonymised)} accounts anonymised${anonymiseNote}.`
+      : `${String(context.wouldAnonymise)} accounts would have been anonymised${anonymiseNote}, dry-run only.`
     return {
       subject: 'Retention sweep digest',
       html: layout(`<p>Hello ${context.name},</p>
-<p>${String(context.window)} first warnings and ${String(context.final)} final warnings sent this run.</p>
+<p>${warnings}</p>
 <p>${line}</p>`),
       text: `Hello ${context.name},
 
-${String(context.window)} first warnings and ${String(context.final)} final warnings sent this run.
+${warnings}
 
 ${line}
 

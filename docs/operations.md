@@ -212,10 +212,10 @@ Registered in `nuxt.config.ts` and mirrored in the wrangler cron triggers; the t
 agree, and `tests/unit/tasks.test.ts` fails if they drift or if a name has no handler.
 
 **`daily:sweeps`, `training:expiry-sweep`, `shifts:escalate`, `rooms:sweep`, `rooms:remind`,
-`shifts:remind`, `backup` and `health:watch` do work today.** The other four (`holds:release`,
-`sessions:sweep`, `nights:close`, `retention:sweep`) are stubs that report the story they are
-waiting for, and exist so their cron trigger has something to call: a cron pointing at a missing
-handler errors on every firing.
+`shifts:remind`, `backup`, `health:watch`, `holds:release` and `retention:sweep` do work today.**
+The other two (`sessions:sweep`, `nights:close`) are stubs that report the story they are waiting
+for, and exist so their cron trigger has something to call: a cron pointing at a missing handler
+errors on every firing.
 
 ### health:watch (every 10 minutes)
 
@@ -256,6 +256,36 @@ The ledger is pruned at `TRAINING_LEDGER_MONTHS` (24) in every mode, armed or no
 
 To run it by hand, `POST /_nitro/tasks/training:expiry-sweep`. The result reports `armed`, the
 counts for each window, `digests` and `pruned`.
+
+### retention:sweep (04:00 on the 1st)
+
+Warns accounts approaching their inactivity threshold, anonymises the ones past it and digests the
+IT Manager. It reuses A-125's erasure engine for the write, so an automated anonymisation is the
+same code path as a hand-run one, attributed to system (A-126 criteria 5, 6).
+
+**It ships disarmed.** With `RETENTION_ARMED` false it computes what it would do, reports
+`wouldAnonymise` and claims nothing, so arming it later still warns everybody who was due. Arming
+is refused until a dry-run digest has actually sent (J-105 criterion 4), which is why the digest
+emails for real in dry-run rather than merely reporting that it would.
+
+Two warnings go out per account, and they are independent: one at `RETENTION_WARNING_DAYS` before
+the threshold, one at `RETENTION_FINAL_WARNING_DAYS`. Both keys ship unset, so **the sweep refuses
+to run until the IT Manager sets a cadence** (0019). Each warning is claimed once per account and
+window, keyed on the last sign-in, so a fresh sign-in restarts the clock and a later dormant spell
+warns again.
+
+**An unverified address and an unclaimed guest are never warned**, only anonymised on their own
+clock: a guest never asked for an account, and a warning to an unproven address is a message 0026
+forbids. Full accounts anonymise at `RETENTION_FULL_ACCOUNT_YEARS` (2) of inactivity, guests at
+`RETENTION_GUEST_YEARS` (3). Current members, live role holders (administrators included) and
+anyone owing on an unsettled tab are exempt, recomputed every run rather than recorded.
+
+Each run is capped twice: `RETENTION_WARNING_CAP` (100) warnings and `RETENTION_SWEEP_CAP` (200)
+anonymisations. A cap refuses the surplus rather than queuing it, so the next run finds the same
+accounts still due and takes the next slice; the digest names the cap it hit.
+
+To run it by hand, `POST /_nitro/tasks/retention:sweep`. The result reports `armed`, the counts for
+each window, `warningsCappedAt`, `anonymisationsCappedAt`, `wouldAnonymise` and `digests`.
 
 ### backup (05:00 Monday) and the restore drill (K-108, J-107)
 
@@ -394,6 +424,7 @@ worker secret without it is silently ignored.
 
 ## Not built yet
 
-Named here so nobody looks for them: the retention sweep (K-111), and the operator documentation
-published in-app (J-109), which is where the restore drill procedure belongs once it exists
-(J-107 criterion 5). The stub above is the placeholder for the first.
+Named here so nobody looks for it: the operator documentation published in-app (J-109), which is
+where the restore drill procedure belongs once it exists (J-107 criterion 5). The retention sweep
+is built and documented above; what it still waits on is a warning cadence and, in December, an
+arming (A-126, K-111).

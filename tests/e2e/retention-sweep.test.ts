@@ -5,8 +5,8 @@ import { generatePassword, registrableAddress, syntheticPerson } from '#tests/he
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
-// K-111. The sweep warns twice, anonymises what is past its threshold, exempts what 0011 names,
-// caps a run, and ships disarmed so nothing above changes data until somebody arms it.
+// A-126, built as K-111; the criterion numbers below are A-126's. The sweep warns twice,
+// anonymises what is due, exempts what 0011 names, caps both halves, and ships disarmed.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -20,10 +20,11 @@ beforeAll(async () => {
   app = await startApp()
   cookie = (await adminSession(app)).cookie
 
-  // No workshop proposed a warning cadence or a cap, so the keys ship unset (0019); the sweep
-  // is blocked until a value is set, exactly as it will be in production before it is relied on.
+  // No workshop proposed a warning cadence, so those two keys ship unset (0019) and the sweep is
+  // blocked until they are set, exactly as it will be in production before it is relied on.
   await setConfig('RETENTION_WARNING_DAYS', 30)
   await setConfig('RETENTION_FINAL_WARNING_DAYS', 7)
+  // Both caps ship at the carried figures; a suite of a handful of accounts wants smaller ones.
   await setConfig('RETENTION_SWEEP_CAP', 50)
 }, BOOT_TIMEOUT_MS)
 
@@ -67,7 +68,8 @@ interface RetentionRun {
   final: number
   anonymised: number
   wouldAnonymise: string[]
-  cappedAt: number | null
+  warningsCappedAt: number | null
+  anonymisationsCappedAt: number | null
   digests: number
 }
 
@@ -107,7 +109,7 @@ function claimsFor(userId: string): { type: string }[] {
 const isAnonymised = (userId: string): boolean =>
   read<{ anonymisedAt: number | null }>('SELECT anonymised_at as anonymisedAt FROM users WHERE id = ?', userId)?.anonymisedAt !== null
 
-describe.skipIf(skip !== null)('the sweep ships disarmed (criterion 3)', () => {
+describe.skipIf(skip !== null)('the sweep ships disarmed (criterion 5)', () => {
   test('a disarmed run reports what it would warn about and writes no claim', async () => {
     const id = await inactiveAccount(20)
 
@@ -127,7 +129,7 @@ describe.skipIf(skip !== null)('the sweep ships disarmed (criterion 3)', () => {
   })
 })
 
-describe.skipIf(skip !== null)('armed, it warns once per account and window (criterion 1)', () => {
+describe.skipIf(skip !== null)('armed, it warns once per account and window (criteria 1, 3)', () => {
   test('the same account is warned once, however many times the sweep runs', async () => {
     const id = await inactiveAccount(20)
     await arm(true)
@@ -160,7 +162,7 @@ describe.skipIf(skip !== null)('armed, it warns once per account and window (cri
     }
   })
 
-  // Criterion 1's own trap: a claim that outlived a sign-in would never warn again.
+  // Criterion 3's own trap: a claim that outlived a sign-in would never warn again.
   test('a sign-in changes the claim, so a later dormant spell is warned about again', async () => {
     const id = await inactiveAccount(20)
     await arm(true)
@@ -184,7 +186,7 @@ describe.skipIf(skip !== null)('armed, it warns once per account and window (cri
   })
 })
 
-describe.skipIf(skip !== null)('exemptions and the cap (criterion 2)', () => {
+describe.skipIf(skip !== null)('exemptions and the two caps (criteria 2, 4)', () => {
   test('a current member is never anonymised, whatever their inactivity', async () => {
     const id = await inactiveAccount(-10)
     write(
@@ -253,7 +255,7 @@ describe.skipIf(skip !== null)('exemptions and the cap (criterion 2)', () => {
     }
   })
 
-  test('a run touches no more than the configured cap', async () => {
+  test('a run anonymises no more than the configured cap', async () => {
     await setConfig('RETENTION_SWEEP_CAP', 1)
     const first = await inactiveAccount(-10)
     const second = await inactiveAccount(-10)
@@ -261,16 +263,34 @@ describe.skipIf(skip !== null)('exemptions and the cap (criterion 2)', () => {
     try {
       const run = await runSweep()
       expect(run.wouldAnonymise.length).toBeLessThanOrEqual(1)
-      expect(run.cappedAt).toBe(1)
+      expect(run.anonymisationsCappedAt).toBe(1)
       expect(run.wouldAnonymise.some(id => id === first || id === second)).toBe(true)
     }
     finally {
       await setConfig('RETENTION_SWEEP_CAP', 50)
     }
   })
+
+  // The second cap (criterion 4). Warnings and anonymisations are bounded separately, so a run
+  // full of warnings can no longer send an unbounded number of them.
+  test('a run warns no more than the warning cap, and says it was capped', async () => {
+    await setConfig('RETENTION_WARNING_CAP', 1)
+    await inactiveAccount(20)
+    await inactiveAccount(20)
+
+    try {
+      const run = await runSweep()
+      expect(run.window + run.final).toBe(1)
+      expect(run.warningsCappedAt).toBe(1)
+      expect(run.anonymisationsCappedAt).toBeNull()
+    }
+    finally {
+      await setConfig('RETENTION_WARNING_CAP', 100)
+    }
+  })
 })
 
-describe.skipIf(skip !== null)('armed, anonymisation actually happens (criteria 3, 4)', () => {
+describe.skipIf(skip !== null)('armed, anonymisation actually happens (criteria 1, 5)', () => {
   test('an account past its threshold is anonymised once armed, and only once', async () => {
     const id = await inactiveAccount(-10)
     await arm(true)
@@ -306,7 +326,54 @@ describe.skipIf(skip !== null)('armed, anonymisation actually happens (criteria 
   })
 })
 
-describe.skipIf(skip !== null)('the digest (criterion 3)', () => {
+// The 29 August 2026 amendment to criterion 1. notify() already refuses the send; what these pin
+// is that the sweep never takes the claim either, so the warning trail stays honest.
+describe.skipIf(skip !== null)('nothing unproven or unclaimed is warned (criterion 1, amended)', () => {
+  test('an unverified account inside the window is not warned, armed or not', async () => {
+    const id = await inactiveAccount(20)
+    write('UPDATE users SET verified = 0 WHERE id = ?', id)
+    await arm(true)
+
+    try {
+      await runSweep()
+      expect(claimsFor(id)).toEqual([])
+    }
+    finally {
+      await arm(false)
+    }
+  })
+
+  test('an unclaimed guest inside its window is not warned', async () => {
+    const id = await inactiveAccount(20, 3)
+    write('UPDATE users SET password = NULL, google_sub = NULL WHERE id = ?', id)
+    await arm(true)
+
+    try {
+      await runSweep()
+      expect(claimsFor(id)).toEqual([])
+    }
+    finally {
+      await arm(false)
+    }
+  })
+
+  test('a guest past its threshold is anonymised without ever being warned', async () => {
+    const id = await inactiveAccount(-10, 3)
+    write('UPDATE users SET password = NULL, google_sub = NULL WHERE id = ?', id)
+    await arm(true)
+
+    try {
+      await runSweep()
+      expect(isAnonymised(id)).toBe(true)
+      expect(claimsFor(id)).toEqual([])
+    }
+    finally {
+      await arm(false)
+    }
+  })
+})
+
+describe.skipIf(skip !== null)('the digest (criterion 5)', () => {
   // One claim per admin per day (0048): every earlier test in this file already ran a sweep
   // today, so by now the fresh claim this asserts has to be read back rather than counted again.
   test('a run always digests the IT Manager, whatever it found', () => {

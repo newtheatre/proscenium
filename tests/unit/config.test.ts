@@ -7,7 +7,6 @@ import { CONFIG_KEYS, CONFIG_KEY_NAMES, hasDefault, isConfigKey } from '#shared/
 const UNSET: ConfigKey[] = [
   'NIGHT_REPORT_RECIPIENTS',
   'RETENTION_FINAL_WARNING_DAYS',
-  'RETENTION_SWEEP_CAP',
   'RETENTION_WARNING_DAYS',
 ]
 

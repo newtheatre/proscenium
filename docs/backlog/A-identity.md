@@ -393,6 +393,11 @@ Open questions for the committee:
   4. Each run caps at 100 warnings and 200 anonymisations.
   5. The sweep ships in dry-run: it computes, reports and emails a digest but changes nothing. Arming it is an explicit configuration change with a preview of who is affected, a typed confirmation, and an audit entry (J-3).
   6. Every automated anonymisation is attributed to system in the audit trail and uses the same code path as A-125.
+- Built by: K-111, which shipped criteria 1 to 3, 6 and the dry-run half of criterion 5 without
+  ever naming this story (`server/utils/retention.ts`, `server/tasks/retention/sweep.ts`,
+  `tests/e2e/retention-sweep.test.ts`, documented in `docs/operations.md`). Criterion 4's second
+  cap and criterion 1's 29 August amendment landed afterwards under A-126. What remains of
+  criterion 5, the arming preview and typed confirmation, is J-105's (`docs/known-issues.md`).
 - Source: Prompt Book A-5; audit SD-12 (periods, caps and dry-run discipline carry); Get-In part 2 (retention row: carry, dry-run-first).
 
 ## A-127: Award, record and revoke a fellowship
