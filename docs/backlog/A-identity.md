@@ -387,7 +387,7 @@ Open questions for the committee:
 - Story: As the theatre, I want dormant accounts warned and then anonymised automatically so that we do not hold personal data forever, and I want the automation to prove itself before it acts.
 - Depends on: A-125
 - Acceptance criteria:
-  1. A nightly sweep finds full accounts inactive for 2 years, sends a 60-day warning, then a 30-day warning, then anonymises; guest accounts anonymise after 3 years of no activity, without warning. All periods are configuration. Amended 29 August 2026: the sweep never warns an unverified or unclaimed account. An unverified one expires on its own rule long before this reaches it, and a warning is a message A-102 criterion 2 forbids to an unverified address (0026).
+  1. A monthly sweep finds full accounts inactive for 2 years, sends a 60-day warning, then a 30-day warning, then anonymises; guest accounts anonymise after 3 years of no activity, without warning. All periods are configuration. Amended 29 August 2026: the sweep never warns an unverified or unclaimed account. An unverified one expires on its own rule long before this reaches it, and a warning is a message A-102 criterion 2 forbids to an unverified address (0026). Amended 9 September 2026: monthly rather than nightly, which is the cadence K-111 built and this criterion now agrees with (cron `0 4 1 * *`). Anonymising a dormant account is not urgent to the day, and a monthly run bounds the blast radius of a mistake; a run that skipped a window still fires both warnings, so no account loses its notice to the wider gap.
   2. Exempt: current members, current role holders, administrators, and anyone with unsettled money.
   3. Any sign-in clears the account's warning trail and restarts the clock.
   4. Each run caps at 100 warnings and 200 anonymisations.
@@ -396,7 +396,8 @@ Open questions for the committee:
 - Built by: K-111, which shipped criteria 1 to 3, 6 and the dry-run half of criterion 5 without
   ever naming this story (`server/utils/retention.ts`, `server/tasks/retention/sweep.ts`,
   `tests/e2e/retention-sweep.test.ts`, documented in `docs/operations.md`). Criterion 4's second
-  cap and criterion 1's 29 August amendment landed afterwards under A-126. What remains of
+  cap and criterion 1's 29 August amendment landed afterwards under A-126, which is also when
+  criterion 1's cadence was amended to the monthly one already running. What remains of
   criterion 5, the arming preview and typed confirmation, is J-105's (`docs/known-issues.md`).
 - Source: Prompt Book A-5; audit SD-12 (periods, caps and dry-run discipline carry); Get-In part 2 (retention row: carry, dry-run-first).
 
