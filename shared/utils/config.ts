@@ -491,10 +491,19 @@ export const CONFIG_KEYS = {
     workshop: 'people-and-communications',
     describes: 'Days before anonymisation that the final warning is sent.',
   },
+  // Two caps, not one: warnings and anonymisations are bounded separately, at the figures the
+  // old estate's sweep carried (A-126 criterion 4, docs/workshops.md).
   RETENTION_SWEEP_CAP: {
     schema: z.number().int().positive(),
+    default: 200,
     workshop: 'people-and-communications',
-    describes: 'The most accounts one retention sweep may anonymise a run.',
+    describes: 'The most accounts one retention sweep may anonymise a run; its warnings are capped separately.',
+  },
+  RETENTION_WARNING_CAP: {
+    schema: z.number().int().positive(),
+    default: 100,
+    workshop: 'people-and-communications',
+    describes: 'The most inactivity warnings one retention sweep may send a run, counting both windows.',
   },
   // A number of days, not a term: no term dates exist anywhere in the system (0034). Reads as
   // overdue from the first deploy, which is what puts the first drill before December.
@@ -626,6 +635,7 @@ export const ENFORCED_KEYS = [
   'RETENTION_FULL_ACCOUNT_YEARS',
   'RETENTION_GUEST_YEARS',
   'RETENTION_SWEEP_CAP',
+  'RETENTION_WARNING_CAP',
   'RETENTION_WARNING_DAYS',
   'SESSION_EDIT_WINDOW_DAYS',
   'SESSION_SIGNUP_CLOSES_HOURS',

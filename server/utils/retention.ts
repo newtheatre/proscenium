@@ -2,6 +2,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm'
 import {
   daysUntilRetentionThreshold,
   isRetentionGuest,
+  isRetentionWarnable,
   retentionDigestClaimFor,
   retentionWarningClaimFor,
 } from '#shared/utils/retention'
@@ -10,11 +11,12 @@ import type { RetentionWarningKind } from '#shared/utils/retention'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
-// Inactivity warnings and anonymisation, dry-run by default (K-111). Reuses K-109's erasure
-// engine for the write and 0011's exemptions, computed fresh every run rather than tracked.
+// Inactivity warnings and anonymisation, dry-run by default (A-126, built as K-111). Reuses
+// K-109's erasure engine for the write and 0011's exemptions, computed fresh every run.
 
 interface CandidateRow {
   id: string
+  verified: boolean
   password: string | null
   googleSub: string | null
   lastLoginAt: number | null
@@ -31,6 +33,7 @@ const unsettledMoney = (): SQL => sql`exists (
 async function candidates(event: H3Event | undefined, now: number): Promise<CandidateRow[]> {
   return db.select({
     id: schema.users.id,
+    verified: schema.users.verified,
     password: schema.users.password,
     googleSub: schema.users.googleSub,
     lastLoginAt: schema.users.lastLoginAt,
@@ -66,6 +69,24 @@ async function warn(
   return true
 }
 
+// Refuses the surplus rather than deferring it: the next run finds the same accounts still due
+// and takes the next slice, so a cap never becomes a queue (criterion 4).
+async function warnWithinCap(
+  event: H3Event | undefined,
+  kind: RetentionWarningKind,
+  row: CandidateRow,
+  run: RetentionRun,
+  cap: number,
+): Promise<void> {
+  if (run.window + run.final >= cap) {
+    run.warningsCappedAt = cap
+    return
+  }
+  if (!await warn(event, kind, row, run.armed)) return
+  if (kind === 'final') run.final++
+  else run.window++
+}
+
 // Sent whether armed or not: it is the thing the IT Manager reviews before arming, so dry-run
 // mode must email it for real, not merely report that it would (J-105 criterion 4, criterion 3).
 async function sendDigest(event: H3Event | undefined, at: Date, run: RetentionRun): Promise<void> {
@@ -87,7 +108,8 @@ async function sendDigest(event: H3Event | undefined, at: Date, run: RetentionRu
         final: run.final,
         anonymised: run.anonymised,
         wouldAnonymise: run.wouldAnonymise.length,
-        cappedAt: run.cappedAt,
+        warningsCappedAt: run.warningsCappedAt,
+        anonymisationsCappedAt: run.anonymisationsCappedAt,
       },
     })
     run.digests++
@@ -101,8 +123,9 @@ export interface RetentionRun {
   anonymised: number
   // Dry-run only: who a real arming would have anonymised this run.
   wouldAnonymise: string[]
-  // Set when more accounts were due than the cap allowed through this run.
-  cappedAt: number | null
+  // Each set when more was due this run than its own cap allowed through (criterion 4).
+  warningsCappedAt: number | null
+  anonymisationsCappedAt: number | null
   digests: number
 }
 
@@ -122,10 +145,20 @@ export async function sweepRetention(event: H3Event | undefined, at: Date = new 
   const guestYears = await configValue(event, 'RETENTION_GUEST_YEARS')
   const windowDays = await configValue(event, 'RETENTION_WARNING_DAYS')
   const finalDays = await configValue(event, 'RETENTION_FINAL_WARNING_DAYS')
-  const cap = await configValue(event, 'RETENTION_SWEEP_CAP')
+  const warningCap = await configValue(event, 'RETENTION_WARNING_CAP')
+  const anonymiseCap = await configValue(event, 'RETENTION_SWEEP_CAP')
   const now = Math.floor(at.getTime() / 1000)
 
-  const run: RetentionRun = { armed, window: 0, final: 0, anonymised: 0, wouldAnonymise: [], cappedAt: null, digests: 0 }
+  const run: RetentionRun = {
+    armed,
+    window: 0,
+    final: 0,
+    anonymised: 0,
+    wouldAnonymise: [],
+    warningsCappedAt: null,
+    anonymisationsCappedAt: null,
+    digests: 0,
+  }
   const due: CandidateRow[] = []
 
   for (const row of await candidates(event, now)) {
@@ -136,14 +169,18 @@ export async function sweepRetention(event: H3Event | undefined, at: Date = new 
       due.push(row)
       continue
     }
+    // A guest and an unproven address are anonymised on their own clock without being written
+    // to, so neither may take a claim here either (criterion 1, amended 29 August 2026).
+    if (!isRetentionWarnable(row)) continue
+
     // Independent, not either-or: a sweep that skipped a gap can find an account inside both
     // windows at once, and both fire, the same reasoning training's own sweep uses.
-    if (days <= finalDays && await warn(event, 'final', row, armed)) run.final++
-    if (days <= windowDays && await warn(event, 'window', row, armed)) run.window++
+    if (days <= finalDays) await warnWithinCap(event, 'final', row, run, warningCap)
+    if (days <= windowDays) await warnWithinCap(event, 'window', row, run, warningCap)
   }
 
-  const capped = due.slice(0, cap)
-  if (due.length > cap) run.cappedAt = cap
+  const capped = due.slice(0, anonymiseCap)
+  if (due.length > anonymiseCap) run.anonymisationsCappedAt = anonymiseCap
 
   for (const row of capped) {
     if (!armed) {

@@ -2,14 +2,15 @@ import { describe, expect, test } from 'bun:test'
 import {
   daysUntilRetentionThreshold,
   isRetentionGuest,
+  isRetentionWarnable,
   retentionDigestClaimFor,
   retentionWarningClaimFor,
 } from '#shared/utils/retention'
 
-// K-111: inactivity periods are configuration, a person approaching one is warned twice, and a
-// sign-in clears the trail. This is the pure half; the sweep itself is tests/e2e/retention-sweep.
+// A-126 (built as K-111): inactivity periods are configuration, a person approaching one is warned
+// twice, and a sign-in clears the trail. The pure half; the sweep is tests/e2e/retention-sweep.
 
-describe('claim keys (criterion 1)', () => {
+describe('claim keys (criteria 1, 3)', () => {
   test('a warning claim carries the kind, the account and the sign-in it was computed against', () => {
     expect(retentionWarningClaimFor('window', 'u1', 1_700_000_000))
       .toBe('retention.warning.window:u1:1700000000')
@@ -45,6 +46,24 @@ describe('a guest account, for retention purposes (criterion 1)', () => {
     expect(isRetentionGuest({ password: 'hash', googleSub: null })).toBe(false)
     expect(isRetentionGuest({ password: null, googleSub: 'sub' })).toBe(false)
     expect(isRetentionGuest({ password: 'hash', googleSub: 'sub' })).toBe(false)
+  })
+})
+
+// The 29 August 2026 amendment. A guest or an unproven address is anonymised on its own clock
+// without ever being written to, so the sweep must not claim a warning it cannot send either.
+describe('who may be warned at all (A-126 criterion 1, amended)', () => {
+  test('a verified full account is the only thing warned', () => {
+    expect(isRetentionWarnable({ verified: true, password: 'hash', googleSub: null })).toBe(true)
+    expect(isRetentionWarnable({ verified: true, password: null, googleSub: 'sub' })).toBe(true)
+  })
+
+  test('an unverified address is never warned, however complete its sign-in', () => {
+    expect(isRetentionWarnable({ verified: false, password: 'hash', googleSub: 'sub' })).toBe(false)
+  })
+
+  test('an unclaimed guest is never warned, even with a verified address', () => {
+    expect(isRetentionWarnable({ verified: true, password: null, googleSub: null })).toBe(false)
+    expect(isRetentionWarnable({ verified: false, password: null, googleSub: null })).toBe(false)
   })
 })
 

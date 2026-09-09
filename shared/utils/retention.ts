@@ -26,6 +26,16 @@ export function isRetentionGuest(account: RetentionIdentity): boolean {
   return account.password === null && account.googleSub === null
 }
 
+export interface RetentionAccount extends RetentionIdentity {
+  verified: boolean
+}
+
+// Anonymised without warning: a guest never claimed the account, and a warning to an address
+// nobody has proven is a message A-102 criterion 2 forbids (A-126 criterion 1, amended 0026).
+export function isRetentionWarnable(account: RetentionAccount): boolean {
+  return account.verified && !isRetentionGuest(account)
+}
+
 // Positive means not yet due; zero or negative means the threshold has passed. A year is
 // 365.25 days, the same figure the admin directory's own retention filter already uses.
 export function daysUntilRetentionThreshold(lastActiveAt: number, years: number, now: number): number {
