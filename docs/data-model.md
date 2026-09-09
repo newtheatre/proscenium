@@ -509,6 +509,28 @@ Apple Wallet or Google Wallet (criterion 3) needs credentials this environment d
 QR still renders as an image on the confirmation email and `/qr`, which can be saved or
 screenshotted (`docs/known-issues.md`).
 
+**Collection at the desk (D-114).** `/box-office/desk` finds today's performance (with the
+adjacent nights to browse to), then a booking against it by reference, a scanned QR (a USB or
+Bluetooth scanner types the decoded payload like a keyboard) or the booker's name.
+`POST /api/box-office/desk/reservations/[id]/collect` is the payment boundary: it recomputes
+the amount due server-side (the ticket total for `CARD`, zero for `COMP`) and refuses a mismatch
+quoting both figures, exactly the shape F-104's till cross-check uses. Collection writes the
+reservation's conditional `PENDING → COLLECTED` update (clearing `hold_expires_at`) and its
+ledger entry (`server/utils/ledger.ts`'s `postEntry`, source `DESK`, kind `TICKET_COLLECTION`,
+one line per ticket priced from what D-104 already snapshotted) in one batch. A partial unique
+index and a trigger on `ledger_lines` (`ledger_lines_ticket_collection_once`,
+`ledger_lines_ticket_collection_needs_collected_reservation`) enforce that a ticket is collected
+once, ever, and that a line can only exist for a reservation the same batch actually collected,
+so a lost race aborts the whole transaction rather than posting money for nothing (0001, I-102
+criterion 6); `check:migrations` refuses a rebuild of `ledger_lines` against a `restrict`
+dependent for exactly this reason, so the guard is index and trigger only. `COMP` needs a reason
+and is refused outright without `ticketing.manage` (committee decision): an ordinary desk officer
+cannot self-approve one, though whoever does hold the permission still approves their own; D-117's
+own request-and-approval workflow, which replaces this gate rather than removing it, is not built.
+Editing an unpaid booking (D-110) and refunding a collected one (D-116) are the other two-thirds
+of the same boundary invariant, neither built here; nothing currently offers a way to attempt
+either, so "un-collecting" has no route to refuse it yet (`docs/known-issues.md`).
+
 ### tickets
 `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances
 restrict · `ticket_type_id` → ticket_types restrict · `price_paid` pence snapshot ·

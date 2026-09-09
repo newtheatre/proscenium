@@ -84,6 +84,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     icon: 'i-lucide-ticket',
     prefix: '/box-office',
     items: [
+      { label: 'Desk', icon: 'i-lucide-search', to: '/box-office/desk', ability: viewProgramme },
       { label: 'Shows', icon: 'i-lucide-drama', to: '/box-office/shows', ability: viewProgramme },
       { label: 'Ticket types', icon: 'i-lucide-tag', to: '/box-office/ticket-types', ability: viewTicketTypes },
       { label: 'Passes', icon: 'i-lucide-wallet-cards', to: '/box-office/pass-types', ability: viewPassTypes },
