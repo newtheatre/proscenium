@@ -3,6 +3,7 @@ import { readBookableTicketTypes } from '#server/utils/reservations'
 import {
   RESERVATION_REFERENCE_LENGTH,
   generateReservationReference,
+  looksLikeReference,
   overCapReason,
   qrStatusDisplay,
   reservationForm,
@@ -160,5 +161,20 @@ describe('a resend is asked for by reference and email, not a token (criterion 2
   test('the wrong reference length is refused before any lookup happens', () => {
     const parsed = reservationResendForm.safeParse({ reference: 'AB', email: 'alex@example.invalid' })
     expect(parsed.success).toBe(false)
+  })
+})
+
+describe('a reference is told from a name by its alphabet, not just its length (D-114 criterion 1)', () => {
+  test('a generated reference always looks like one', () => {
+    for (let i = 0; i < 50; i += 1) expect(looksLikeReference(generateReservationReference())).toBe(true)
+  })
+
+  test('a six-letter name is not mistaken for a reference: O is not in the alphabet', () => {
+    expect(looksLikeReference('Booker')).toBe(false)
+  })
+
+  test('the wrong length is never a reference, however plausible its letters', () => {
+    expect(looksLikeReference('ABCDE')).toBe(false)
+    expect(looksLikeReference('ABCDEFG')).toBe(false)
   })
 })

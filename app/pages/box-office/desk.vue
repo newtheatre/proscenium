@@ -182,6 +182,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
           icon="i-lucide-chevron-left"
           color="neutral"
           variant="ghost"
+          aria-label="Previous night"
           data-test="desk-previous-night"
           @click="nightly && goTo(nightly.previousNight)"
         />
@@ -193,6 +194,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
           icon="i-lucide-chevron-right"
           color="neutral"
           variant="ghost"
+          aria-label="Next night"
           data-test="desk-next-night"
           @click="nightly && goTo(nightly.nextNight)"
         />

@@ -21,10 +21,17 @@ export const RESERVATION_EMAIL_WINDOW_MINUTES = 60
 // typed into a search box, never a credential on its own (docs/data-model.md).
 const REFERENCE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
 export const RESERVATION_REFERENCE_LENGTH = 6
+const REFERENCE_SHAPE = new RegExp(`^[${REFERENCE_ALPHABET}]{${RESERVATION_REFERENCE_LENGTH}}$`)
 
 export function generateReservationReference(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(RESERVATION_REFERENCE_LENGTH))
   return [...bytes].map(byte => REFERENCE_ALPHABET[byte % REFERENCE_ALPHABET.length]).join('')
+}
+
+// The alphabet excludes O, 0, 1 and I, so a six-letter name (Booker) can never be mistaken for
+// one: length alone is not enough to tell a desk search's reference from a name (D-114 criterion 1).
+export function looksLikeReference(value: string): boolean {
+  return REFERENCE_SHAPE.test(value.toUpperCase())
 }
 
 // A structural ceiling only, well above anything a real order asks for: the actual cap is

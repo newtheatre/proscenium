@@ -1,6 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { RESERVATION_REFERENCE_LENGTH } from '#shared/utils/reservations'
+import { looksLikeReference } from '#shared/utils/reservations'
 import type { SQL } from 'drizzle-orm'
 
 // The desk screen (D-114): finding today's performance and a booking against it. Kept free of
@@ -47,7 +47,7 @@ export interface DeskSearchRow {
 function searchPredicate(q: string | undefined): SQL {
   if (!q) return sql``
   const trimmed = q.trim()
-  if (trimmed.length === RESERVATION_REFERENCE_LENGTH) {
+  if (looksLikeReference(trimmed)) {
     return sql` AND r.reference = ${trimmed.toUpperCase()}`
   }
   return sql` AND u.name LIKE ${contains(trimmed)} ESCAPE '\\'`
