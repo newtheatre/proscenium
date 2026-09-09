@@ -397,6 +397,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'A stock movement is financial evidence. It stamps who moved the stock, and the tombstone still answers for it.',
   },
   {
+    name: 'discounts',
+    column: 'updated_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Editable in place, unlike the append-only tables above, but a name and a percentage are not
+    // personal either way; only who created and last edited it references a person (F-117).
+    why: 'A discount is a name and a percentage. It stamps who created and last edited it, and the tombstone still answers for both.',
+  },
+  {
     name: 'till_sessions',
     column: 'opened_by',
     section: null,

@@ -505,6 +505,13 @@
       "when": 1788970800000,
       "tag": "0071_a_sale_never_takes_on_hand_negative",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "6",
+      "when": 1788938017628,
+      "tag": "0072_discounts_percent_capped_and_snapshotted",
+      "breakpoints": true
     }
   ]
 }

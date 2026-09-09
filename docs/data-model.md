@@ -557,9 +557,12 @@ money and the thing it paid for commit in one batch (0001, I-102 criterion 6).
 `shared/utils/ledger.ts` and enforced at the one write path, because a CHECK on an append-only
 table can never be widened (0033):
 `TICKET_COLLECTION|WALK_UP|PASS_SALE|PASS_ADMISSION|BAR_ITEM|TAB_SETTLEMENT|REFUND|IMPORT` ·
-`amount_pence` gross · `reservation_id` NULL · `performance_id` NULL · `ticket_id` NULL ·
-`product_variant_id` NULL · `qty` · `unit_price_pence` · `price_ref` (which price row and
-level resolved, F-121) · `choices` JSON.
+`amount_pence` what actually moved, net of any discount · `reservation_id` NULL ·
+`performance_id` NULL · `ticket_id` NULL · `product_variant_id` NULL · `qty` ·
+`unit_price_pence` · `price_ref` (which price row and level resolved, F-121) · `choices` JSON ·
+`discount_id` NULL, no foreign key (append-only, the same reasoning as the ids above) ·
+`discount_percent` NULL · `discount_pence` NULL, the cut this line took: snapshotted at the
+moment of sale, so a later edit to the `discounts` row never restates it (F-117 criterion 3).
 Which source, tender and kind each money path posts under is the table in `architecture.md`
 under Money and the ledger. A path not in that table has not been agreed.
 
@@ -716,6 +719,15 @@ restricts on the foreign key.
 ### bar_categories
 `id` PK · `name` unique, case-insensitively · `sort`, which drives the till's layout and is read
 per request · `colour` CHECK six hexadecimal characters after a hash.
+
+### discounts
+`id` PK · `name` unique, case-insensitively · `percent` CHECK 1 to 100 · `status` CHECK
+`ACTIVE|RETIRED` · `created_by`, `updated_by` NULL → users restrict · `created_at` · `updated_at`.
+Editable in place, unlike the append-only tables above: a discount's own row is configuration,
+and what a past sale actually charged is the snapshot on its own `ledger_lines`, not this row
+(F-117 criterion 3). The percentage cap itself is `BAR_DISCOUNT_MAX_PERCENT`, configuration
+enforced at the write path (0012), which ships unset until a workshop or a settings change sets
+it, so creating or editing a discount refuses outright until then (0019).
 
 ### bar_products  (sellable things)
 `id` PK · `category_id` → bar_categories restrict · `name` unique, case-insensitively · `status`
