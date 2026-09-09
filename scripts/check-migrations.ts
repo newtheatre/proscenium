@@ -1,9 +1,16 @@
 #!/usr/bin/env bun
-// A generated table rebuild silently deletes every cascading row, and every schema object
-// the snapshot does not carry. Refusing one is invariant 0010; there are no exemptions.
+// A generated table rebuild silently deletes every cascading row, drops every schema object the
+// snapshot does not carry, and can corrupt an added column. Refusing one is 0010 and 0052.
 
 import { join } from 'node:path'
-import { dependentsByTable, journalProblems, rebuildDependentProblems } from '../shared/utils/migrations'
+import {
+  copyingInserts,
+  dependentsByTable,
+  journalProblems,
+  rebuildDependentProblems,
+  snapshotBefore,
+  unresolvedCopyProblems,
+} from '../shared/utils/migrations'
 import type { JournalEntry, SnapshotTable } from '../shared/utils/migrations'
 
 const DIR = 'server/db/migrations/sqlite'
@@ -23,14 +30,23 @@ function scan(dir: string, pattern: string): string[] {
   }
 }
 
-const snapshots = scan(META, '*_snapshot.json')
-const newest = snapshots.at(-1)
+const snapshotFiles = scan(META, '*_snapshot.json')
+const newest = snapshotFiles.at(-1)
 if (!newest) {
   console.log('check-migrations: no snapshots generated yet, nothing to check.')
   process.exit(0)
 }
 
-const latest: { tables?: Record<string, SnapshotTable> } = await Bun.file(join(META, newest)).json()
+interface Snapshot { tables?: Record<string, SnapshotTable> }
+
+// Every snapshot, numbered, so a rebuild can be checked against the schema as it stood right
+// before it ran rather than only against the newest one.
+const snapshots = await Promise.all(snapshotFiles.map(async (file) => {
+  const data: Snapshot = await Bun.file(join(META, file)).json()
+  return { number: Number(file.slice(0, 4)), data }
+}))
+
+const latest = snapshots.find(s => s.number === Number(newest.slice(0, 4)))?.data ?? {}
 const dependentsOnto = dependentsByTable(latest.tables ?? {})
 
 // The table a trigger fires on, read from its body: the name prefix is a
@@ -60,6 +76,14 @@ for (const file of scan(DIR, '*.sql')) {
   const sql = await Bun.file(join(DIR, file)).text()
   const grandfathered = GRANDFATHERED.has(file.replace(/\.sql$/, ''))
   const rebuilt = new Map<string, string[]>()
+
+  if (!grandfathered) {
+    const before = snapshotBefore(Number(file.slice(0, 4)), snapshots)?.tables ?? {}
+    for (const copy of copyingInserts(sql)) {
+      const sourceColumns = new Set(Object.keys(before[copy.sourceTable]?.columns ?? {}))
+      problems.push(...unresolvedCopyProblems(file, copy, sourceColumns))
+    }
+  }
 
   for (const event of eventsIn(sql)) {
     if (event.kind === 'create') {
@@ -91,7 +115,7 @@ for (const file of scan(DIR, '*.sql')) {
 }
 
 if (problems.length) {
-  console.error('check-migrations: a table rebuild would silently drop something, or abort outright.\n')
+  console.error('check-migrations: a table rebuild would silently corrupt or drop something, or abort outright.\n')
   for (const problem of problems) console.error(`  ${problem}`)
   console.error('\nD1 runs migrations inside a transaction, where `PRAGMA foreign_keys=OFF` is a')
   console.error('no-op, so Drizzle\'s rebuild does not disable the checks it assumes it has. A')
@@ -100,11 +124,14 @@ if (problems.length) {
   console.error('which an empty development database never has and production always eventually will.')
   console.error('A rebuild is `DROP TABLE` plus a rename, so it also takes every schema object the')
   console.error('Drizzle snapshot does not carry: today that means triggers, and Drizzle cannot')
-  console.error('re-emit what it has never seen.')
-  console.error('Split the change so no rebuild is needed (add, rename and alter separately),')
-  console.error('or hand-author the migration to save and restore what the drop would take,')
-  console.error('re-creating any trigger AFTER the `ALTER TABLE __new_… RENAME TO …`.')
-  console.error('See docs/decisions/0010-append-only-registers.md.')
+  console.error('re-emit what it has never seen. Drizzle can also add a column to the copying INSERT')
+  console.error('as a double-quoted identifier the old table never had; SQLite reads that as a string')
+  console.error('literal rather than erroring, so every copied row silently gets the column\'s own name.')
+  console.error('Split the change so no rebuild is needed (add, rename and alter separately), or')
+  console.error('hand-author the migration: save and restore what a drop would take, re-creating any')
+  console.error('trigger AFTER the `ALTER TABLE __new_… RENAME TO …`, and replace an unresolved')
+  console.error('copying column with a real expression.')
+  console.error('See docs/decisions/0010-append-only-registers.md and 0052.')
   process.exit(1)
 }
 

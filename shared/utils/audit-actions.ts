@@ -148,6 +148,7 @@ const CATALOGUE = {
   'access-profile.declined': { label: 'Access profile declined', module: 'ticketing' },
   'access-profile.tombstone.purged': { label: 'Withdrawn access profile deleted after its tombstone', module: 'ticketing' },
   'reservation.expired': { label: 'Unpaid hold released on expiry', module: 'ticketing' },
+  'reservation.collected': { label: 'Booking collected at the desk', module: 'ticketing' },
 
   // Module E: show night
 
@@ -179,6 +180,10 @@ const CATALOGUE = {
   'checklist.ticked': { label: 'Checklist item ticked', module: 'show-night' },
   'checklist.exempted': { label: 'Checklist item closed over with a reason', module: 'show-night' },
   'checklist.closed': { label: 'Night closed', module: 'show-night' },
+  'emergency-card.updated': { label: 'Venue emergency card updated', module: 'show-night' },
+  'incident-severity.routing-changed': { label: 'Severity follow-up routing changed', module: 'show-night' },
+  'incident-followup.closed': { label: 'Incident follow-up closed', module: 'show-night' },
+  'age-checks.exported': { label: 'Challenge 25 register exported', module: 'show-night' },
 
   // Module F: bar
 
@@ -200,6 +205,7 @@ const CATALOGUE = {
   'bar.discount.created': { label: 'Bar discount added', module: 'bar' },
   'bar.discount.updated': { label: 'Bar discount changed', module: 'bar' },
   'bar.discount.status.changed': { label: 'Bar discount retired or put back', module: 'bar' },
+  'bar.tab.cap-overridden': { label: 'A tab charge over the cap approved by a manager', module: 'bar' },
   'bar.item.created': { label: 'Stocked item added', module: 'bar' },
   'bar.item.updated': { label: 'Stocked item changed', module: 'bar' },
   'bar.item.status.changed': { label: 'Stocked item retired or put back', module: 'bar' },

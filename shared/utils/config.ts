@@ -73,6 +73,18 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Minutes a comp request stays open before it lapses.',
   },
+  RESERVATION_RESEND_ATTEMPTS: {
+    schema: z.number().int().positive(),
+    default: 5,
+    workshop: 'money-and-box-office',
+    describes: 'Confirmation-email resends allowed per reference per window (D-108 criterion 2).',
+  },
+  RESERVATION_RESEND_WINDOW_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 60,
+    workshop: 'money-and-box-office',
+    describes: 'The window reservation resends are counted over.',
+  },
   ACCESS_PROFILE_VALIDITY_MONTHS: {
     schema: z.number().int().positive().max(60),
     default: 24,
@@ -101,6 +113,15 @@ export const CONFIG_KEYS = {
     default: 50,
     workshop: 'money-and-box-office',
     describes: 'The most a bar discount may take off, as a percentage. A discount above it is refused, on creation and on edit.',
+  },
+  // Empty is the honest starting state, not a guess: who qualifies is still open (F-bar.md), so
+  // nobody is authorised until a committee decision adds them (F-108 criterion 1).
+  BAR_AUTHORISED_TAB_HOLDERS: {
+    schema: z.array(z.string().trim().min(1)),
+    default: [],
+    workshop: 'money-and-box-office',
+    sensitive: true,
+    describes: 'User ids currently authorised to charge purchases to a tab, checked live on every charge.',
   },
 
   // Module I: finance
@@ -579,6 +600,9 @@ export const ENFORCED_KEYS = [
   'EXTERNAL_REQUEST_NOTICE_WORKING_DAYS',
   'BANK_HOLIDAYS',
   'BAR_DISCOUNT_MAX_PERCENT',
+  'BAR_TAB_CAP_PENCE',
+  'BAR_TAB_CAP_MANAGER_OVERRIDE',
+  'BAR_AUTHORISED_TAB_HOLDERS',
   'ROOM_NO_SHOW_WINDOW_DAYS',
   'ROOM_NO_SHOW_RECORD_AT',
   'ROOM_NO_SHOW_PREAPPROVAL_AT',
@@ -588,6 +612,8 @@ export const ENFORCED_KEYS = [
   'HOLD_RELEASE_MINUTES_BEFORE',
   'HOLD_REMINDER_MINUTES_BEFORE',
   'HOLD_RELEASE_BATCH_CAP',
+  'RESERVATION_RESEND_ATTEMPTS',
+  'RESERVATION_RESEND_WINDOW_MINUTES',
   'SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE',
   'SHIFT_ELIGIBILITY_DOOR_MODULE',
   'SHIFT_ELIGIBILITY_BAR_MODULE',

@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7ae5b405-e591-4885-9c4b-04b5ea5fe405",
-  "prevId": "ed01b3f6-091e-4ff3-8f3d-8b57b67cbf1b",
+  "id": "65f0ed3a-cbf3-4b96-9dfc-940f25bc9c9e",
+  "prevId": "b14ad24f-75e4-4013-b296-e649d75d4784",
   "tables": {
     "access_profiles": {
       "name": "access_profiles",
@@ -1926,126 +1926,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "discounts": {
-      "name": "discounts",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "percent": {
-          "name": "percent",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'ACTIVE'"
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        }
-      },
-      "indexes": {
-        "discounts_name_nocase": {
-          "name": "discounts_name_nocase",
-          "columns": [
-            "\"name\" COLLATE NOCASE"
-          ],
-          "isUnique": true
-        },
-        "discounts_name": {
-          "name": "discounts_name",
-          "columns": [
-            "name"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "discounts_created_by_users_id_fk": {
-          "name": "discounts_created_by_users_id_fk",
-          "tableFrom": "discounts",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "discounts_updated_by_users_id_fk": {
-          "name": "discounts_updated_by_users_id_fk",
-          "tableFrom": "discounts",
-          "tableTo": "users",
-          "columnsFrom": [
-            "updated_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "discounts_percent_range": {
-          "name": "discounts_percent_range",
-          "value": "\"discounts\".\"percent\" > 0 AND \"discounts\".\"percent\" <= 100"
-        },
-        "discounts_status_values": {
-          "name": "discounts_status_values",
-          "value": "\"discounts\".\"status\" IN ('ACTIVE', 'RETIRED')"
-        }
-      }
-    },
     "emergency_contacts": {
       "name": "emergency_contacts",
       "columns": {
@@ -3427,27 +3307,6 @@
         "choices": {
           "name": "choices",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "discount_id": {
-          "name": "discount_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "discount_percent": {
-          "name": "discount_percent",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "discount_pence": {
-          "name": "discount_pence",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -7846,6 +7705,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "restricted_to": {
+          "name": "restricted_to",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "archived": {
           "name": "archived",
           "type": "integer",
@@ -9335,10 +9201,17 @@
     "venue_emergency_info": {
       "name": "venue_emergency_info",
       "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
         "venue_id": {
           "name": "venue_id",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -9381,7 +9254,7 @@
           "name": "updated_by",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "updated_at": {
@@ -9393,7 +9266,16 @@
           "default": "(unixepoch())"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "venue_emergency_info_venue_created": {
+          "name": "venue_emergency_info_venue_created",
+          "columns": [
+            "venue_id",
+            "updated_at"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "venue_emergency_info_venue_id_venues_id_fk": {
           "name": "venue_emergency_info_venue_id_venues_id_fk",
@@ -9405,7 +9287,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "venue_emergency_info_updated_by_users_id_fk": {
@@ -9418,7 +9300,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -9567,13 +9449,6 @@
         }
       },
       "choice_groups_name_nocase": {
-        "columns": {
-          "\"name\" COLLATE NOCASE": {
-            "isExpression": true
-          }
-        }
-      },
-      "discounts_name_nocase": {
         "columns": {
           "\"name\" COLLATE NOCASE": {
             "isExpression": true

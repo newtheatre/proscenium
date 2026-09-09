@@ -186,6 +186,17 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/reservations.ts'],
   },
   { route: 'server/api/performances/[id]/booking.get.ts', exempt: 'reads what the booking form needs; nothing is written' },
+  { route: 'server/api/reservations/resend.post.ts', exempt: 'sends a message; the send is recorded in notification_log' },
+  { route: 'server/routes/qr/[token].get.ts', exempt: 'exchanges a token for a cookie; nothing is written' },
+  { route: 'server/api/box-office/desk/performances.get.ts', exempt: 'reads tonight\'s programme; nothing is written' },
+  { route: 'server/api/box-office/desk/search.get.ts', exempt: 'reads bookings against a performance; nothing is written' },
+  { route: 'server/api/box-office/desk/scan.post.ts', exempt: 'resolves a scanned code to a booking; nothing is written' },
+  { route: 'server/api/box-office/desk/reservations/[id].get.ts', exempt: 'reads one booking; nothing is written' },
+  {
+    route: 'server/api/box-office/desk/reservations/[id]/collect.post.ts',
+    actions: ['reservation.collected'],
+    via: ['server/utils/desk-collection.ts'],
+  },
 
   // Module E: show night
 
@@ -264,6 +275,18 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/checklist/items/index.post.ts', actions: ['checklist-item.created'] },
   { route: 'server/api/admin/checklist/items/[id]/index.put.ts', actions: ['checklist-item.updated'] },
   { route: 'server/api/admin/checklist/items/[id]/status.post.ts', actions: ['checklist-item.retired', 'checklist-item.reinstated'] },
+  { route: 'server/api/admin/venues/emergency.get.ts', exempt: 'reads every venue\'s current emergency card, including a venue with none' },
+  { route: 'server/api/admin/venues/[id]/emergency.put.ts', actions: ['emergency-card.updated'] },
+  {
+    route: 'server/api/tonight/emergency.get.ts',
+    actions: ['night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+  { route: 'server/api/admin/safety/severities/index.get.ts', exempt: 'reads the fixed four-severity routing table' },
+  { route: 'server/api/admin/safety/severities/[severity]/index.put.ts', actions: ['incident-severity.routing-changed'] },
+  { route: 'server/api/admin/safety/open-items.get.ts', exempt: 'reads the open-items list, gated by the safety officer\'s own permission' },
+  { route: 'server/api/admin/safety/incidents/[id]/close.post.ts', actions: ['incident-followup.closed'] },
+  { route: 'server/api/admin/age-checks/export.get.ts', actions: ['age-checks.exported'] },
   { route: 'server/api/admin/rota/templates/index.get.ts', exempt: 'reads every venue\'s template, including the venues that have none' },
   {
     route: 'server/api/admin/rota/templates/[venueId]/index.put.ts',
@@ -331,8 +354,9 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/till/close.post.ts', actions: ['bar.till.closed'] },
   { route: 'server/api/till/products.get.ts', exempt: 'reads what the till may sell right now, writing nothing' },
   { route: 'server/api/till/discounts.get.ts', exempt: 'reads the active discounts the till may apply, writing nothing' },
+  { route: 'server/api/till/tab-holders.get.ts', exempt: 'reads who the till may charge a sale to, writing nothing' },
   { route: 'server/api/till/price.post.ts', exempt: 'prices a basket against live prices; nothing is written until F-104 and F-105 land the sale write' },
-  { route: 'server/api/till/sale.post.ts', actions: ['bar.till.sale', 'age-check.logged'], via: ['server/utils/sale.ts'] },
+  { route: 'server/api/till/sale.post.ts', actions: ['bar.till.sale', 'age-check.logged', 'bar.tab.cap-overridden'], via: ['server/utils/sale.ts'] },
 
   // Module G: training
 

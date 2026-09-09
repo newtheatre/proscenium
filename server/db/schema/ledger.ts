@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { users } from './identity'
 
 const now = sql`(unixepoch())`
@@ -71,4 +71,7 @@ export const ledgerLines = sqliteTable('ledger_lines', {
   index('ledger_lines_entry').on(table.entryId),
   index('ledger_lines_kind').on(table.kind),
   index('ledger_lines_performance').on(table.performanceId),
+  // A ticket is collected once, ever: the guard is the index, not application code, so a retry
+  // or a second officer never posts a second entry for the same seat (D-114 criterion 2).
+  uniqueIndex('ledger_lines_ticket_collection_once').on(table.ticketId).where(sql`kind = 'TICKET_COLLECTION'`),
 ])

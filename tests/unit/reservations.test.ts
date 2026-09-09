@@ -3,8 +3,11 @@ import { readBookableTicketTypes } from '#server/utils/reservations'
 import {
   RESERVATION_REFERENCE_LENGTH,
   generateReservationReference,
+  looksLikeReference,
   overCapReason,
+  qrStatusDisplay,
   reservationForm,
+  reservationResendForm,
   totalTickets,
 } from '#shared/utils/reservations'
 import type { BookableTicketTypeRow } from '#server/utils/reservations'
@@ -92,23 +95,86 @@ describe('a bookable price resolves the same chain the public listing does', () 
     showActive: null,
     performancePrice: null,
     performanceActive: null,
+    restrictedTo: null,
     ...overrides,
   })
 
   test('with no override, the base price and default activity resolve', () => {
-    const [resolved] = readBookableTicketTypes([row()])
+    const [resolved] = readBookableTicketTypes([row()], false)
     expect(resolved?.price).toBe(900)
     expect(resolved?.source).toBe('BASE')
   })
 
   test('a performance override wins over a show override', () => {
-    const [resolved] = readBookableTicketTypes([row({ showPrice: 700, showActive: 1, performancePrice: 500, performanceActive: 1 })])
+    const [resolved] = readBookableTicketTypes([row({ showPrice: 700, showActive: 1, performancePrice: 500, performanceActive: 1 })], false)
     expect(resolved?.price).toBe(500)
     expect(resolved?.source).toBe('PERFORMANCE')
   })
 
   test('a type deactivated at every level offering it is not bookable at all', () => {
-    const resolved = readBookableTicketTypes([row({ activeByDefault: 0 })])
+    const resolved = readBookableTicketTypes([row({ activeByDefault: 0 })], false)
     expect(resolved).toEqual([])
+  })
+
+  test('a member-restricted type is dropped for a caller who is not one (D-109 criterion 1)', () => {
+    const resolved = readBookableTicketTypes([row({ restrictedTo: 'MEMBER' })], false)
+    expect(resolved).toEqual([])
+  })
+
+  test('a member-restricted type is offered to a current member', () => {
+    const [resolved] = readBookableTicketTypes([row({ restrictedTo: 'MEMBER' })], true)
+    expect(resolved?.id).toBe('tt-standard')
+  })
+
+  test('an unrestricted type is offered either way', () => {
+    expect(readBookableTicketTypes([row()], false)).toHaveLength(1)
+    expect(readBookableTicketTypes([row()], true)).toHaveLength(1)
+  })
+})
+
+describe('what the QR answers, loudly distinct per state (D-108 criterion 5)', () => {
+  test('unpaid names the amount due', () => {
+    expect(qrStatusDisplay('PENDING', null, '£9.00')).toEqual({ headline: 'Unpaid', detail: '£9.00 due at the box office on the night.' })
+  })
+
+  test('paid and admitted read differently from each other', () => {
+    expect(qrStatusDisplay('COLLECTED', null, null).headline).toBe('Paid')
+    expect(qrStatusDisplay('DOOR', null, null).headline).toBe('Admitted')
+  })
+
+  test('a cancellation names who cancelled', () => {
+    expect(qrStatusDisplay('CANCELLED', 'CUSTOMER', null).detail).toContain('booker')
+    expect(qrStatusDisplay('CANCELLED', 'STAFF', null).detail).toContain('box office')
+  })
+
+  test('a lapsed hold reads distinctly from a cancellation', () => {
+    expect(qrStatusDisplay('EXPIRED', null, null).headline).not.toBe(qrStatusDisplay('CANCELLED', null, null).headline)
+  })
+})
+
+describe('a resend is asked for by reference and email, not a token (criterion 2)', () => {
+  test('a well-formed reference and address parse', () => {
+    const parsed = reservationResendForm.safeParse({ reference: 'ABCDEF', email: 'alex@example.invalid' })
+    expect(parsed.success).toBe(true)
+  })
+
+  test('the wrong reference length is refused before any lookup happens', () => {
+    const parsed = reservationResendForm.safeParse({ reference: 'AB', email: 'alex@example.invalid' })
+    expect(parsed.success).toBe(false)
+  })
+})
+
+describe('a reference is told from a name by its alphabet, not just its length (D-114 criterion 1)', () => {
+  test('a generated reference always looks like one', () => {
+    for (let i = 0; i < 50; i += 1) expect(looksLikeReference(generateReservationReference())).toBe(true)
+  })
+
+  test('a six-letter name is not mistaken for a reference: O is not in the alphabet', () => {
+    expect(looksLikeReference('Booker')).toBe(false)
+  })
+
+  test('the wrong length is never a reference, however plausible its letters', () => {
+    expect(looksLikeReference('ABCDE')).toBe(false)
+    expect(looksLikeReference('ABCDEFG')).toBe(false)
   })
 })

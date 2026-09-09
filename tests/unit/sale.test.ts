@@ -52,6 +52,20 @@ describe('a sale submission carries what the screen believes the total is (F-104
   })
 })
 
+describe('a sale may name a tab holder to charge instead of the reader (F-108)', () => {
+  test('no tab holder named is the default, and the sale is on the reader', () => {
+    const parsed = saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: 250 })
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.tabHolderId).toBeNull()
+  })
+
+  test('a tab holder id is carried through', () => {
+    const parsed = saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: 250, tabHolderId: 'user-1' })
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.tabHolderId).toBe('user-1')
+  })
+})
+
 describe('an age-restricted line may carry a Challenge 25 outcome (F-106 criterion 1)', () => {
   test('a submission with no restricted line needs no outcome', () => {
     const parsed = saleForm.safeParse({ lines: [aLine], expectedTotalPence: 250 })

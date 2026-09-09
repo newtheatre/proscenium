@@ -21,10 +21,17 @@ export const RESERVATION_EMAIL_WINDOW_MINUTES = 60
 // typed into a search box, never a credential on its own (docs/data-model.md).
 const REFERENCE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
 export const RESERVATION_REFERENCE_LENGTH = 6
+const REFERENCE_SHAPE = new RegExp(`^[${REFERENCE_ALPHABET}]{${RESERVATION_REFERENCE_LENGTH}}$`)
 
 export function generateReservationReference(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(RESERVATION_REFERENCE_LENGTH))
   return [...bytes].map(byte => REFERENCE_ALPHABET[byte % REFERENCE_ALPHABET.length]).join('')
+}
+
+// The alphabet excludes O, 0, 1 and I, so a six-letter name (Booker) can never be mistaken for
+// one: length alone is not enough to tell a desk search's reference from a name (D-114 criterion 1).
+export function looksLikeReference(value: string): boolean {
+  return REFERENCE_SHAPE.test(value.toUpperCase())
 }
 
 // A structural ceiling only, well above anything a real order asks for: the actual cap is
@@ -95,4 +102,38 @@ export function bornExpiredReason(holdExpiresAt: number, now: number): string | 
 // whose expiry moves re-arms the reminder instead of finding the old claim already taken.
 export function holdReminderClaim(reservationId: string, expiresAt: number): string {
   return `reservation.hold-expiring:${reservationId}:${expiresAt}`
+}
+
+export const reservationResendForm = z.object({
+  reference: z.string().trim().length(RESERVATION_REFERENCE_LENGTH),
+  email: z.string().email().max(320),
+})
+
+export interface QrStatusDisplay {
+  headline: string
+  detail: string | null
+}
+
+// What the QR page (and eventually the door, D-126) says for each state a reservation can be
+// in when the code is presented, loudly distinct from every other (D-108 criterion 5).
+export function qrStatusDisplay(status: string, cancelledBy: string | null, totalDue: string | null): QrStatusDisplay {
+  switch (status) {
+    case 'PENDING':
+      return { headline: 'Unpaid', detail: totalDue ? `${totalDue} due at the box office on the night.` : null }
+    case 'COLLECTED':
+      return { headline: 'Paid', detail: 'Collected at the box office.' }
+    case 'DOOR':
+      return { headline: 'Admitted', detail: 'Already checked in at the door.' }
+    case 'EXPIRED':
+      return { headline: 'Lapsed', detail: 'This hold was released. Contact the box office if you still want to attend.' }
+    case 'CANCELLED':
+      return {
+        headline: 'Cancelled',
+        detail: cancelledBy === 'CUSTOMER' ? 'Cancelled by the booker.' : 'Cancelled by the box office.',
+      }
+    case 'NO_SHOW':
+      return { headline: 'No-show', detail: 'Recorded as not attended.' }
+    default:
+      return { headline: status, detail: null }
+  }
 }

@@ -7,6 +7,7 @@ import {
   publicTicketTypes,
   saysAccessKind,
   saysPrice,
+  saysRestriction,
   saysTicketTypeKind,
   ticketTypeForm,
 } from '#shared/utils/ticket-types'
@@ -23,6 +24,7 @@ function type(over: Partial<TicketType> = {}): TicketType {
     price: 700,
     kind: 'SINGLE',
     accessKind: null,
+    restrictedTo: null,
     archived: false,
     activeByDefault: true,
     everSold: false,
@@ -114,6 +116,11 @@ describe('what a screen says', () => {
     expect(saysAccessKind('ACCESS')).toBe('Access')
     expect(saysAccessKind('COMPANION')).toBe('Companion')
     expect(saysAccessKind(null)).toBeNull()
+  })
+
+  test('a restricted type names who; an open type has nothing to say (D-109 criterion 1)', () => {
+    expect(saysRestriction('MEMBER')).toBe('Current members only')
+    expect(saysRestriction(null)).toBeNull()
   })
 
   test('pence format as pounds only at display', () => {

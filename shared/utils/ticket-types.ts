@@ -5,9 +5,13 @@ import { z } from 'zod'
 
 export const TICKET_TYPE_KINDS = ['SINGLE', 'PASS_ADMISSION'] as const
 export const TICKET_TYPE_ACCESS_KINDS = ['ACCESS', 'COMPANION'] as const
+// Concession has no committee-agreed eligibility evidence yet (docs/backlog/D-ticketing.md open
+// questions), so it is not a value here: it stays an ordinary, unrestricted type (D-109).
+export const TICKET_TYPE_RESTRICTIONS = ['MEMBER'] as const
 
 export type TicketTypeKind = (typeof TICKET_TYPE_KINDS)[number]
 export type TicketTypeAccessKind = (typeof TICKET_TYPE_ACCESS_KINDS)[number]
+export type TicketTypeRestriction = (typeof TICKET_TYPE_RESTRICTIONS)[number]
 
 export const MAX_TICKET_TYPE_NAME = 80
 
@@ -31,6 +35,7 @@ export const ticketTypeForm = z.object({
 export const newTicketTypeForm = ticketTypeForm.extend({
   kind: z.enum(TICKET_TYPE_KINDS).default('SINGLE'),
   accessKind: z.enum(TICKET_TYPE_ACCESS_KINDS).nullish(),
+  restrictedTo: z.enum(TICKET_TYPE_RESTRICTIONS).nullish(),
 })
 
 export const archiveTicketTypeForm = z.object({
@@ -49,6 +54,7 @@ export interface TicketType {
   price: number
   kind: TicketTypeKind
   accessKind: TicketTypeAccessKind | null
+  restrictedTo: TicketTypeRestriction | null
   archived: boolean
   activeByDefault: boolean
   everSold: boolean
@@ -86,6 +92,10 @@ export function saysAccessKind(accessKind: string | null): string | null {
   if (accessKind === 'ACCESS') return 'Access'
   if (accessKind === 'COMPANION') return 'Companion'
   return null
+}
+
+export function saysRestriction(restrictedTo: string | null): string | null {
+  return restrictedTo === 'MEMBER' ? 'Current members only' : null
 }
 
 // Pence in, pounds out, formatted the one way every screen shows money (0004).

@@ -1,9 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { showNightBounds } from '#shared/utils/show-night'
-// Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
-// Bun, where nothing is auto-imported (CONTRIBUTING).
-import { newId } from './accounts'
 import type { ChecklistItemInput, Phase, SystemCheck } from '#shared/utils/checklist'
 import type { SQL } from 'drizzle-orm'
 
@@ -27,9 +24,15 @@ const ITEM_COLUMNS = sql`
   required AS required, system_check AS systemCheck, active AS active, updated_at AS updatedAt
 `
 
+// `'POST'` sorts before `'PRE'` as text (the second letter, `O` before `R`), which inverts the
+// running order. Sorted explicitly so pre-show always lists above post-show.
+function phaseOrder(column: SQL): SQL {
+  return sql`CASE WHEN ${column} = 'PRE' THEN 0 ELSE 1 END`
+}
+
 export function itemsForVenueQuery(venueId: string, includeRetired: boolean): SQL {
   const predicate = includeRetired ? sql`` : sql` AND active = 1`
-  return sql`SELECT ${ITEM_COLUMNS} FROM checklist_items WHERE venue_id = ${venueId}${predicate} ORDER BY phase, sort, label COLLATE NOCASE`
+  return sql`SELECT ${ITEM_COLUMNS} FROM checklist_items WHERE venue_id = ${venueId}${predicate} ORDER BY ${phaseOrder(sql`phase`)}, sort, label COLLATE NOCASE`
 }
 
 export async function itemsForVenue(venueId: string, includeRetired = false): Promise<ChecklistItemRow[]> {
@@ -52,7 +55,7 @@ export async function listVenueChecklists(): Promise<VenueChecklist[]> {
            i.required AS required, i.system_check AS systemCheck, i.active AS active, i.updated_at AS updatedAt
     FROM venues v
     LEFT JOIN checklist_items i ON i.venue_id = v.id AND i.active = 1
-    ORDER BY v.name COLLATE NOCASE, i.phase, i.sort, i.label COLLATE NOCASE
+    ORDER BY v.name COLLATE NOCASE, ${phaseOrder(sql`i.phase`)}, i.sort, i.label COLLATE NOCASE
   `)
 
   const venues = new Map<string, VenueChecklist>()
@@ -120,7 +123,7 @@ export function stampsForNightQuery(venueId: string, night: string): SQL {
     LEFT JOIN users u1 ON u1.id = cs.ticked_by
     LEFT JOIN users u2 ON u2.id = cs.exempted_by
     WHERE cs.venue_id = ${venueId} AND cs.night = ${night}
-    ORDER BY cs.phase, cs.sort, cs.label COLLATE NOCASE
+    ORDER BY ${phaseOrder(sql`cs.phase`)}, cs.sort, cs.label COLLATE NOCASE
   `
 }
 
@@ -130,8 +133,8 @@ async function readStamps(venueId: string, night: string): Promise<RawStampRow[]
   return db.all(stampsForNightQuery(venueId, night))
 }
 
-// A stamp for one item, conflict-proof against a second caller stamping the same night at once:
-// the unique index is what actually decides it, this is only ever a harmless retry (criterion 1).
+// A stamp for one item, conflict-proof the same way `ensureStampedStatement` below is; kept for
+// a test or a caller that already holds one item rather than a whole venue's night.
 export function stampStatement(item: ChecklistItemRow, venueId: string, night: string, id: string): SQL {
   return sql`
     INSERT INTO checklist_stamps (id, venue_id, night, item_id, phase, label, sort, required, system_check)
@@ -140,14 +143,21 @@ export function stampStatement(item: ChecklistItemRow, venueId: string, night: s
   `
 }
 
-// One stamp per active item, made the first time tonight's checklist is touched: an edit to
-// `checklist_items` afterwards changes nothing already stamped (criterion 1).
-export async function ensureStamped(venueId: string, night: string): Promise<void> {
-  const items = await itemsForVenue(venueId)
-  if (items.length === 0) return
+// Every active item stamped in one set-based write, `rota.ts`'s own shape: no read first, a
+// fixed parameter count, and no early exit needed since a stamped night conflicts on every row.
+export function ensureStampedStatement(venueId: string, night: string): SQL {
+  return sql`
+    INSERT INTO checklist_stamps (id, venue_id, night, item_id, phase, label, sort, required, system_check)
+    SELECT lower(hex(randomblob(16))), ${venueId}, ${night}, i.id, i.phase, i.label, i.sort, i.required, i.system_check
+    FROM checklist_items i
+    WHERE i.venue_id = ${venueId} AND i.active = 1
+    ON CONFLICT (venue_id, night, item_id) DO NOTHING
+    RETURNING id
+  `
+}
 
-  const statements = items.map(item => db.run(stampStatement(item, venueId, night, newId())))
-  await db.batch(statements as never)
+export async function ensureStamped(venueId: string, night: string): Promise<void> {
+  await db.all(ensureStampedStatement(venueId, night))
 }
 
 // No reservation for tonight's performances here is left in a status a show should have resolved
@@ -169,28 +179,35 @@ export async function noShowHoldsReleased(venueId: string, night: string): Promi
   return (row?.unresolved ?? 0) === 0
 }
 
-// Every incident logged tonight carries at least one `incident.reviewed` audit entry. Reviewing
-// is acknowledgement, not resolving a follow-up: E-116's severity routing is a separate story.
-export function incidentsReviewedQuery(night: string): SQL {
+// Every incident tonight at this venue carries an `incident.reviewed` audit entry. Venue-scoped
+// like `noShowHoldsReleasedQuery`, so a night two venues both run never crosses over (E-127).
+export function incidentsReviewedQuery(venueId: string, night: string): SQL {
   const { from, to } = showNightBounds(night)
   return sql`
     SELECT count(*) AS unreviewed
     FROM incidents i
-    WHERE i.happened_at >= ${Math.floor(from.getTime() / 1000)} AND i.happened_at < ${Math.floor(to.getTime() / 1000)}
+    JOIN performances p ON p.id = i.performance_id
+    WHERE p.venue_id = ${venueId}
+      AND i.happened_at >= ${Math.floor(from.getTime() / 1000)} AND i.happened_at < ${Math.floor(to.getTime() / 1000)}
       AND NOT EXISTS (
         SELECT 1 FROM audit_log a WHERE a.action = 'incident.reviewed' AND a.target = 'incident:' || i.id
       )
   `
 }
 
-export async function incidentsReviewed(night: string): Promise<boolean> {
-  const [row] = await db.all<{ unreviewed: number }>(incidentsReviewedQuery(night))
+export async function incidentsReviewed(venueId: string, night: string): Promise<boolean> {
+  const [row] = await db.all<{ unreviewed: number }>(incidentsReviewedQuery(venueId, night))
   return (row?.unreviewed ?? 0) === 0
 }
 
+// Exhaustive on purpose: a third `SystemCheck` means touching this and `saysSystemCheck()`, not
+// only writing a query (docs/known-issues.md); `never` refuses to compile until both are.
 async function evaluate(check: SystemCheck, venueId: string, night: string): Promise<boolean> {
-  if (check === 'NO_SHOW_HOLDS_RELEASED') return noShowHoldsReleased(venueId, night)
-  return incidentsReviewed(night)
+  switch (check) {
+    case 'NO_SHOW_HOLDS_RELEASED': return noShowHoldsReleased(venueId, night)
+    case 'INCIDENTS_REVIEWED': return incidentsReviewed(venueId, night)
+    default: return check satisfies never
+  }
 }
 
 export interface ChecklistEntry {
@@ -209,15 +226,20 @@ export interface ChecklistEntry {
   exemptedAt: number | null
 }
 
-// Tonight's checklist, stamped if it is not already, with every system-verified item's state
-// read live rather than from what was last stored (criterion 3).
+// Tonight's checklist, stamped if it is not already, every system-verified item read live rather
+// than stored (criterion 3). At most two distinct checks exist, so each resolves once and is shared.
 export async function checklistFor(venueId: string, night: string): Promise<ChecklistEntry[]> {
   await ensureStamped(venueId, night)
   const stamps = await readStamps(venueId, night)
 
+  const distinctChecks = [...new Set(stamps.map(stamp => stamp.systemCheck).filter((check): check is SystemCheck => check !== null))]
+  const resolved = new Map(await Promise.all(
+    distinctChecks.map(async check => [check, await evaluate(check, venueId, night)] as const),
+  ))
+
   const entries: ChecklistEntry[] = []
   for (const stamp of stamps) {
-    const systemDone = stamp.systemCheck ? await evaluate(stamp.systemCheck, venueId, night) : null
+    const systemDone = stamp.systemCheck ? (resolved.get(stamp.systemCheck) ?? false) : null
     entries.push({
       id: stamp.id,
       itemId: stamp.itemId,
@@ -249,12 +271,14 @@ export function tickStatement(stampId: string, venueId: string, night: string, t
   `
 }
 
+// Guarded like `tickStatement`, `system_check IS NULL` included: `checklistFor` never reads
+// `exempted` for a system-verified stamp, so recording one there would audit a no-op.
 export function exemptStatement(stampId: string, venueId: string, night: string, reason: string, exemptedBy: string): SQL {
   return sql`
     UPDATE checklist_stamps
     SET exempted = 1, exempt_reason = ${reason}, exempted_by = ${exemptedBy}, exempted_at = unixepoch()
     WHERE id = ${stampId} AND venue_id = ${venueId} AND night = ${night}
-      AND ticked_at IS NULL AND exempted = 0
+      AND system_check IS NULL AND ticked_at IS NULL AND exempted = 0
     RETURNING id
   `
 }

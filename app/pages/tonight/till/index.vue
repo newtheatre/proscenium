@@ -39,6 +39,9 @@ async function load(): Promise<void> {
   }
   catch (refused) {
     failure.value = refusalText(refused)
+    // A recognised refusal is still a completed sync, so NightStale is not left saying "not yet
+    // synced" forever (matching /tonight/index.vue's own shape).
+    if (refusalStatus(refused) === 401 || refusalStatus(refused) === 403) syncedAt.value = new Date()
   }
   finally {
     busy.value = false
@@ -111,6 +114,19 @@ watch([session, venueId], () => {
 })
 
 const selectedDiscountId = ref<string | null>(null)
+
+// Who the till may charge a sale to instead of the reader (F-108). The allow-list is short by
+// nature, so this refreshes alongside the catalogue rather than needing its own trigger.
+interface TabHolder { id: string, name: string }
+const tabHoldersKey = computed(() => nightCacheKey({ screen: 'till-tab-holders', night: currentShowNight(), wholeNight: true }))
+const tabHolders = useNightCache<{ holders: TabHolder[] }>(tabHoldersKey, () =>
+  request<{ holders: TabHolder[] }>('/api/till/tab-holders', { query: { venueId: venueId.value ?? undefined } }), { immediate: false })
+
+watch([session, venueId], () => {
+  if (session.value && venueId.value) void tabHolders.refresh()
+})
+
+const selectedTabHolderId = ref<string | null>(null)
 
 interface BasketLine {
   id: string
@@ -216,7 +232,7 @@ watch([basket, selectedDiscountId], () => {
 
 const charging = ref(false)
 const chargeFailure = ref<string | null>(null)
-const charged = ref<{ totalPence: number, refusedLines: PricedLine[], discount: SaleReceipt['discount'] } | null>(null)
+const charged = ref<{ totalPence: number, refusedLines: PricedLine[], discount: SaleReceipt['discount'], tab: SaleReceipt['tab'] } | null>(null)
 
 // A restricted line is the product's flag, already on the catalogue this screen holds: no second
 // lookup, and no route sells one without an outcome on record first (F-106 criteria 1, 5).
@@ -238,8 +254,8 @@ function resetAgeCheck(): void {
   ageCheckError.value = null
 }
 
-// The submission step (F-104, F-105), refusing a stale total by name (0004). A restricted line
-// with no outcome yet opens the Challenge 25 prompt instead of charging (F-106).
+// The submission step (F-104, F-105, 0004). A restricted line with no outcome yet opens the
+// Challenge 25 prompt (F-106); a tab holder chosen below charges credit, not the reader (F-108).
 async function charge(ageCheck: InlineAgeCheckInput | null = null): Promise<void> {
   if (!priced.value || !venueId.value || basket.value.length === 0) return
   if (!ageCheck && needsAgeCheck.value) {
@@ -263,9 +279,15 @@ async function charge(ageCheck: InlineAgeCheckInput | null = null): Promise<void
         expectedTotalPence,
         ageCheck,
         discountId: selectedDiscountId.value,
+        tabHolderId: selectedTabHolderId.value,
       },
     })
-    charged.value = { totalPence: answered.totalPence, refusedLines: answered.refusedLines, discount: answered.discount }
+    charged.value = {
+      totalPence: answered.totalPence,
+      refusedLines: answered.refusedLines,
+      discount: answered.discount,
+      tab: answered.tab,
+    }
     resetAgeCheck()
   }
   catch (refused) {
@@ -305,6 +327,7 @@ function nextSale(): void {
   charged.value = null
   chargeFailure.value = null
   selectedDiscountId.value = null
+  selectedTabHolderId.value = null
   resetAgeCheck()
 }
 
@@ -514,6 +537,40 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               </div>
             </div>
 
+            <div
+              v-if="tabHolders.data.value?.holders.length"
+              class="space-y-2"
+              data-test="tab-holder-picker"
+            >
+              <p class="text-xs text-muted">
+                Charge to
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <UButton
+                  size="sm"
+                  :color="selectedTabHolderId === null ? 'primary' : 'neutral'"
+                  :variant="selectedTabHolderId === null ? 'solid' : 'subtle'"
+                  class="min-h-10"
+                  data-test="tab-holder-none"
+                  @click="selectedTabHolderId = null"
+                >
+                  The reader
+                </UButton>
+                <UButton
+                  v-for="holder in tabHolders.data.value.holders"
+                  :key="holder.id"
+                  size="sm"
+                  :color="selectedTabHolderId === holder.id ? 'primary' : 'neutral'"
+                  :variant="selectedTabHolderId === holder.id ? 'solid' : 'subtle'"
+                  class="min-h-10"
+                  :data-test="`tab-holder-${holder.id}`"
+                  @click="selectedTabHolderId = holder.id"
+                >
+                  {{ holder.name }}'s tab
+                </UButton>
+              </div>
+            </div>
+
             <UAlert
               v-if="chargeFailure"
               data-test="charge-failure"
@@ -557,7 +614,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             color="success"
             variant="subtle"
             icon="i-lucide-check"
-            title="Key this into the reader"
+            :title="charged?.tab ? `On ${charged.tab.holderName}'s tab` : 'Key this into the reader'"
             :description="charged ? saysMoney(charged.totalPence) : ''"
           />
           <UAlert
@@ -573,6 +630,13 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             color="info"
             variant="subtle"
             :description="`${charged.discount.name} applied: -${charged.discount.percent}%`"
+          />
+          <UAlert
+            v-if="charged?.tab"
+            data-test="tab-balance-note"
+            color="info"
+            variant="subtle"
+            :description="`${charged.tab.holderName}'s tab now stands at ${saysMoney(charged.tab.outstandingPence)}${charged.tab.capOverridden ? ', over the cap, approved by a manager' : ''}`"
           />
           <UButton
             block
@@ -596,8 +660,8 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
       <template #actions>
         <NightAction
           v-if="session && !charged && basket.length && priced"
-          :label="`Charge ${saysMoney(priced.totalPence)}`"
-          icon="i-lucide-credit-card"
+          :label="selectedTabHolderId ? `Put ${saysMoney(priced.totalPence)} on the tab` : `Charge ${saysMoney(priced.totalPence)}`"
+          :icon="selectedTabHolderId ? 'i-lucide-book-user' : 'i-lucide-credit-card'"
           :disabled="pricing"
           :loading="charging"
           @press="() => charge()"

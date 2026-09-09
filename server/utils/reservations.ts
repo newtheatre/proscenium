@@ -11,7 +11,7 @@ import { resolvePrice } from '#shared/utils/ticket-types'
 import type { TicketToWrite } from './capacity'
 import type { CapacityRefusal } from '#shared/utils/capacity'
 import type { ReservationSource } from '#shared/utils/reservations'
-import type { PriceSource } from '#shared/utils/ticket-types'
+import type { PriceSource, TicketTypeRestriction } from '#shared/utils/ticket-types'
 import type { SQL } from 'drizzle-orm'
 
 // Resolving what a performance may sell and writing what it sold (D-104). The predicate that
@@ -27,6 +27,7 @@ export interface BookableTicketTypeRow {
   showActive: number | null
   performancePrice: number | null
   performanceActive: number | null
+  restrictedTo: TicketTypeRestriction | null
 }
 
 export interface BookableTicketType {
@@ -35,14 +36,16 @@ export interface BookableTicketType {
   description: string | null
   price: number
   source: PriceSource
+  restrictedTo: TicketTypeRestriction | null
 }
 
 const readFlag = (value: number | null): boolean | null => (value === null ? null : value === 1)
 
-// Active, publicly listed types resolved down the same chain the listing reads, so a quoted
-// price can never differ from what the write path charges. Pure, so it needs no database.
-export function readBookableTicketTypes(rows: BookableTicketTypeRow[]): BookableTicketType[] {
+// Resolved down the same chain the listing reads, so a quoted price never differs from the
+// write path's. A member-restricted type is dropped for a caller who is not one (D-109 criterion 1).
+export function readBookableTicketTypes(rows: BookableTicketTypeRow[], isMember: boolean): BookableTicketType[] {
   return rows.flatMap((row) => {
+    if (row.restrictedTo === 'MEMBER' && !isMember) return []
     const resolved = resolvePrice(
       { price: row.basePrice, activeByDefault: row.activeByDefault === 1 },
       row.showPrice === null && row.showActive === null ? null : { price: row.showPrice, active: readFlag(row.showActive) },
@@ -51,14 +54,17 @@ export function readBookableTicketTypes(rows: BookableTicketTypeRow[]): Bookable
         : { price: row.performancePrice, active: readFlag(row.performanceActive) },
     )
     if (!resolved.active) return []
-    return [{ id: row.id, name: row.name, description: row.description, price: resolved.price, source: resolved.source }]
+    return [{
+      id: row.id, name: row.name, description: row.description, price: resolved.price,
+      source: resolved.source, restrictedTo: row.restrictedTo,
+    }]
   })
 }
 
 export function bookableTicketTypesQuery(performanceId: string, showId: string): SQL {
   return sql`
     SELECT t.id AS id, t.name AS name, t.description AS description, t.price AS basePrice,
-           t.active_by_default AS activeByDefault,
+           t.active_by_default AS activeByDefault, t.restricted_to AS restrictedTo,
            so.price AS showPrice, so.active AS showActive,
            po.price AS performancePrice, po.active AS performanceActive
     FROM ticket_types t
@@ -69,8 +75,8 @@ export function bookableTicketTypesQuery(performanceId: string, showId: string):
   `
 }
 
-export async function bookableTicketTypes(performanceId: string, showId: string): Promise<BookableTicketType[]> {
-  return readBookableTicketTypes(await db.all<BookableTicketTypeRow>(bookableTicketTypesQuery(performanceId, showId)))
+export async function bookableTicketTypes(performanceId: string, showId: string, isMember: boolean): Promise<BookableTicketType[]> {
+  return readBookableTicketTypes(await db.all<BookableTicketTypeRow>(bookableTicketTypesQuery(performanceId, showId)), isMember)
 }
 
 export interface ReservationLineToWrite {
@@ -101,6 +107,9 @@ export interface WrittenTicket {
 }
 
 export interface WriteReservationResult {
+  // The QR token is minted from this id by the caller (`qrTokenFor()`), not here: this file
+  // stays free of anything that needs a worker secret, so `tests/` can import it under Bun.
+  id: string
   reference: string
   // The tickets the batch actually wrote: fewer than requested means the capacity predicate on
   // at least one statement did not match, and the whole order wrote none of itself (D-105).
@@ -180,7 +189,7 @@ export async function writeReservation(input: WriteReservationInput): Promise<Wr
     await db.run(sql`UPDATE reservations SET status = 'CANCELLED', updated_at = unixepoch() WHERE id = ${id} AND status = 'PENDING'`)
   }
 
-  return { reference, tickets: written, requested: tickets.length }
+  return { id, reference, tickets: written, requested: tickets.length }
 }
 
 // The message a refused order quotes, read fresh after the batch: the decision already happened
@@ -188,4 +197,61 @@ export async function writeReservation(input: WriteReservationInput): Promise<Wr
 export async function currentCapacityRefusal(performanceId: string, capacity: number | null, wanted: number): Promise<CapacityRefusal | null> {
   const [row] = await db.all<{ held: number }>(heldSeatsQuery(performanceId))
   return capacityRefusal(capacity, Number(row?.held ?? 0), wanted)
+}
+
+export interface ReservationForResend {
+  id: string
+  userId: string | null
+  reference: string
+  status: string
+  showTitle: string
+  startsAt: number
+  totalPence: number
+}
+
+// Everything a resend needs in one row: the booker (to check the email match), the template
+// fields, and the total, summed here rather than trusting a client-supplied figure.
+export function reservationForResendQuery(reference: string): SQL {
+  return sql`
+    SELECT r.id AS id, r.user_id AS userId, r.reference AS reference, r.status AS status,
+           s.title AS showTitle, p.starts_at AS startsAt,
+           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence
+    FROM reservations r
+    JOIN performances p ON p.id = r.performance_id
+    JOIN shows s ON s.id = p.show_id
+    WHERE r.reference = ${reference}
+  `
+}
+
+export async function reservationForResend(reference: string): Promise<ReservationForResend | undefined> {
+  const [row] = await db.all<ReservationForResend>(reservationForResendQuery(reference))
+  return row
+}
+
+export interface ReservationCurrentState {
+  reference: string
+  status: string
+  cancelledBy: string | null
+  showTitle: string
+  startsAt: number
+  totalPence: number
+}
+
+// What the QR answers when it is presented: live, from this row, never from anything saved
+// earlier (D-108 criterion 1). "Exchanged" and "wrong night" await D-111 and D-126.
+export function reservationCurrentStateQuery(id: string): SQL {
+  return sql`
+    SELECT r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
+           s.title AS showTitle, p.starts_at AS startsAt,
+           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence
+    FROM reservations r
+    JOIN performances p ON p.id = r.performance_id
+    JOIN shows s ON s.id = p.show_id
+    WHERE r.id = ${id}
+  `
+}
+
+export async function reservationCurrentState(id: string): Promise<ReservationCurrentState | undefined> {
+  const [row] = await db.all<ReservationCurrentState>(reservationCurrentStateQuery(id))
+  return row
 }

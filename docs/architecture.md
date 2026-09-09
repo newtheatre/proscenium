@@ -90,7 +90,7 @@ namespace, and asks the owner for one anywhere else.
 
 | Stream | Routes and files owned |
 | --- | --- |
-| Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/`, `app/pages/[...slug].vue` (the content catch-all, D-103) |
+| Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/qr` (the QR retrieval and resend flow, D-108), `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/`, `app/pages/[...slug].vue` (the content catch-all, D-103) |
 | Show night | `/rota` and `/rota/manage/**` (templates, rota administration and the venue emergency card at `/rota/manage/venues/[id]/emergency`), the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**`, `/api/admin/rota/**` and `server/utils/night-authority.ts`. The console screens sit under `/rota/manage`, never `/admin`: `/tonight` is the phone-first shell rather than a console prefix (0040, 0046). |
 | Bar | `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**` |
 | Platform | `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`, `tests/helpers/race.ts` |
@@ -223,12 +223,13 @@ ledger holds no night column and gains none.
 | Money path | Posts when | Module | Source | Tender | Kind |
 | --- | --- | --- | --- | --- | --- |
 | Desk collection | The reader is paid at collection, never at reservation (D-114) | ticketing | `DESK` | `CARD` | `TICKET_COLLECTION` |
-| Comp admission | An approved comp is issued (D-117) | ticketing | `DESK` | `COMP` | `TICKET_COLLECTION` |
+| Comp admission | A comp is issued at collection (D-114), gated behind `ticketing.manage` rather than plain desk access; D-117's own request-and-approval workflow, still owed, replaces that gate rather than removing it | ticketing | `DESK` | `COMP` | `TICKET_COLLECTION` |
 | Walk-up sale | Reservation and payment in one desk flow (D-115) | ticketing | `DESK` | `CARD`, `COMP` | `WALK_UP` |
 | Refund | The money is handed back, one entry per ticket (D-116) | ticketing | `DESK` | `CARD` | `REFUND` |
 | Pass sale | A pass is issued and paid for at the desk (D-124) | ticketing | `DESK` | `CARD` | `PASS_SALE` |
 | Pass admission | A pass covers a seat, online or at the door (D-125, D-126) | ticketing | `SELF_SERVE`, `DESK` | `NONE` | `PASS_ADMISSION` |
 | Bar item | The sale, its lines and its stock movements commit together (F-105); a sale after midnight is the calendar day it happened on, not the night's; a discount, if any, is net into `amount_pence` and snapshotted alongside it (F-117) | bar | `TILL` | `CARD`, `COMP`, `TAB` | `BAR_ITEM` |
+| Tab charge | Credit extended, not money taken (F-108); the entry stamps the debtor and stays outstanding until settled, capped per holder unless a duty manager or bar manager overrides it | bar | `TILL` | `TAB` | `BAR_ITEM` |
 | Tab settlement | A tab is settled on the reader, bounded to the charges it covers (F-109); the settlement's own calendar day, not the charges' | bar | `TILL` | `CARD` | `TAB_SETTLEMENT` |
 | Void of a tab charge | An unsettled charge is voided with a reason (F-109); the calendar day of the void, not of the charge | bar | `TILL` | `TAB` | `BAR_ITEM` |
 | Imported history | Six years of the old estate load as opening history (I-109, K-114) | finance | `IMPORT` | `CARD`, `NONE` | `IMPORT` |
@@ -602,6 +603,57 @@ inside `body`; and no "safety officer" role exists in `shared/utils/roles.ts` to
 historical, cross-night read separate from tonight's own log, which is why the read endpoint
 here is tonight-only, the same scope E-118's register already carries.
 
+### Severity routing to follow-up (E-116)
+
+`incident_severity_config` is committee configuration, one row per severity, seeded by the
+migration with `requires_follow_up = false` on all four: nothing routes until a committee
+member deliberately opts a severity in, deliberately not the generic `CONFIG_KEYS` system,
+which would 503 on every incident write until all four keys were configured by hand
+(criterion 1). `PUT /api/admin/safety/severities/[severity]` flips one, guarded by
+`safety.write` (a new standing permission on a new `SAFETY_OFFICER` role); the route is always
+an UPDATE, never a create, since every severity already exists.
+
+`notifySafetyOfficersIfNeeded()` (`server/utils/incident-safety.ts`) is called once, after the
+write, from the three places an incident's severity can land or change:
+`POST /api/tonight/incidents`, `POST /api/tonight/incidents/near-miss` (against the fixed
+`NEAR_MISS` severity E-117 always writes) and `POST /api/tonight/incidents/[id]/supersede`
+(against the correction's own severity, so a correction can move an incident into follow-up
+territory or out of it; only the new entry's severity is ever checked). It reads
+`incident_severity_config`, and if the severity is routed, notifies every live holder of
+`safety.write` (`safetyOfficers()`, mirroring `rotaOfficers()`'s established shape) as a
+transactional message with no incident free text in it, per 0011 (criterion 2).
+
+`GET /api/admin/safety/open-items` is the safety officer's list: every incident at a routed
+severity with no closure yet, across every night, not scoped to tonight. `POST
+/api/admin/safety/incidents/[id]/close` requires a resolution note and writes
+`incident_followup_closures`, append-only and `UNIQUE(incident_id)`: a second closure attempt
+matches nothing and 409s, the same predicated-write shape as everywhere else in this codebase
+(0049, criterion 3). Flagging an open or closed follow-up on the night report (criterion 4)
+waits on `night_reports` (E-123, `docs/known-issues.md`).
+
+### The licensing export (E-119)
+
+`GET /api/admin/age-checks/export` is gated on `age-checks.export`, a new standing permission
+on `FOH_MANAGER` alone: an officer role, never a shift, per criterion 4; the bar manager who
+can log a check cannot export the register. `exportQuery()` (`server/utils/age-checks-export.ts`)
+takes a half-open `[from, to)` range in epoch seconds (`startOfLondonDay()` on each edge) and
+left-joins `performances`/`venues` so a bar-only check with no performance still appears, with
+its venue name null rather than dropped; every superseded entry and its correction both appear,
+linked by `supersedesId`/`supersededBy`, nothing filtered out (criteria 1, 2).
+
+CSV goes through `toCsv()`/`csvField()` (`server/utils/csv.ts`), the codebase's one
+formula-injection guard (D-129), not `admin/audit/export.get.ts`'s own older, unguarded `cell()`
+helper. PDF goes through a new hand-built table renderer on `pdf-lib`
+(`server/utils/pdf.ts`, `buildTablePdf()`): pure JS, no native bindings, so it runs on Workers,
+paginating rather than overflowing past its first page. Its content streams compress
+(`FlateDecode`), so nothing in the codebase or its tests should string-search the raw PDF bytes
+for drawn text; `PDFDocument.load(bytes)` and pdf-lib's own API is the only way to inspect one.
+Both formats state venue (or venues, deduplicated, falling back to "Bar (no performance)" for a
+null one), period and generation date in the header, and cover exactly the same rows, since the
+output format is the point of the story: an inspector opens either without explanation
+(criterion 1). Every export writes an `age-checks.exported` audit entry naming the actor, the
+range, the format and the row count, before the file body is built (criterion 3).
+
 ### The pre and post-show checklist (E-114)
 
 `checklist_items` is the committee's own configuration, one row per venue and phase, mutable
@@ -641,9 +693,36 @@ built yet; and `noShowHoldsReleased()` can never clear itself in production unti
 door to move a reservation off `PENDING`/`COLLECTED`.
 
 **Also closes a standing gap from E-106/E-107**: `POST /api/rota/shifts/[id]/dismiss` lets a
-member clear a declined claim off their own `/rota` list, cancelling it the same way an
-officer's reassignment already would; the known-issues row asking whether this was a member's
+member clear a declined claim off their own `/rota` list. It returns the shift to `OPEN`, naming
+nobody, exactly as `releaseShiftStatement` does, not `CANCELLED`: the position stays fillable,
+only the member's own name comes off it. The known-issues row asking whether this was a member's
 call or an officer's is resolved in the member's favour and removed.
+
+### The venue emergency card (E-113)
+
+`venue_emergency_info` moves from one row per venue to append-only: `recordCardStatement()` is
+a bare INSERT with no predicate, and the latest row per venue by `updated_at` is the current
+card (`currentCardQuery()`, `currentCardsQuery()` for the committee's own overview across every
+venue, a venue with none included). Migration 0071 rebuilds the table rather than altering it
+(no `ALTER COLUMN`), and the generated copy-forward `INSERT` needed a hand correction: it named
+a source column, `id`, the old single-row table never had, since drizzle-kit's diff treated the
+new primary key as something to copy rather than to invent. Corrected to `lower(hex(randomblob(16)))`
+per migrated row; the append-only triggers are hand-added after generation, as this whole family
+of tables requires (0010).
+
+`GET /api/tonight/emergency` reads the current card for whichever venue
+`requireAnyNightAuthority(event, ['DUTY_MANAGER', 'DOOR', 'BAR'])` resolves; `PUT
+/api/admin/venues/[id]/emergency` writes a new version, gated by a new standing permission pair,
+`emergency-card.read`/`write`, granted to `FOH_MANAGER` alongside `checklist.*` and `rota.*`.
+
+**Closes K-103 criterion 3's own gap, cited from that section**: `app/layouts/tonight.vue`
+(platform's, `onMounted`) fetches `/api/tonight/emergency` once and calls `primeNightCache()`
+with a whole-night key, so any show-night screen, not only `/tonight/emergency` itself, leaves
+the card cached from the first screen a shift holder opens. `/tonight/emergency` then reads
+that same key through `useNightCache`, which is what makes the card open with no round trip
+after a device restart, exactly the old estate's gap the criterion names. Whole-night rather
+than venue-scoped: a shift holder resolves exactly one venue a night (0044), so nothing here
+has to learn which before it can prime or read.
 
 ## The programme (build-order contract d, 0043)
 

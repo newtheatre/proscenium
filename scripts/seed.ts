@@ -253,15 +253,18 @@ function seedProgramme(rooms: { id: string, name: string }[], people: Seeded[]):
     return id_
   })
 
-  // The card front of house reads in the dark (E-113). It describes the building and nobody else.
-  db.query(`INSERT INTO venue_emergency_info (venue_id, assembly_point, exits, isolation_points, what3words, notes, updated_by, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (venue_id) DO NOTHING`)
-    .run(venueId, 'The car park behind the Portland Building',
-      'Two: stage left to the alley, and the foyer to Portland Hill.',
-      'Lighting isolation is in the box; gas is in the workshop corridor.',
-      'towns.match.press', 'The nearest defibrillator is inside the Portland Building foyer.',
-      people[0]?.id ?? null, now)
+  // The card front of house reads in the dark (E-113). Append-only, so a re-run is a no-op only
+  // once a first row already exists, never a second version of the same seed.
+  const hasEmergencyCard = db.query(`SELECT id FROM venue_emergency_info WHERE venue_id = ? LIMIT 1`).get(venueId)
+  if (!hasEmergencyCard) {
+    db.query(`INSERT INTO venue_emergency_info (id, venue_id, assembly_point, exits, isolation_points, what3words, notes, updated_by)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id(), venueId, 'The car park behind the Portland Building',
+        'Two: stage left to the alley, and the foyer to Portland Hill.',
+        'Lighting isolation is in the box; gas is in the workshop corridor.',
+        'towns.match.press', 'The nearest defibrillator is inside the Portland Building foyer.',
+        people[0]!.id)
+  }
 
   const seasonId = keyed('seasons', 'name', '2026/27', () => {
     const id_ = id()

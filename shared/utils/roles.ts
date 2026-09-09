@@ -12,6 +12,7 @@ export const ROLES = [
   'FRONT_OF_HOUSE',
   'BAR_MANAGER',
   'ACCESSIBILITY_OFFICER',
+  'SAFETY_OFFICER',
   'COMMITTEE',
 ] as const
 
@@ -68,6 +69,17 @@ export const PERMISSIONS = [
   // never operational (0009, E-114).
   'checklist.read',
   'checklist.write',
+  // The venue emergency card: committee-editable, cached for reading, never a standing grant
+  // over anything operational (E-113).
+  'emergency-card.read',
+  'emergency-card.write',
+  // The safety officer's own standing work: configuring which severities route to them, reading
+  // and closing the open-items list. Neither derives from a shift (0009, E-116).
+  'safety.read',
+  'safety.write',
+  // Exporting the licensing register's history. A shift alone reads tonight's entries; taking a
+  // copy of the whole register for an inspection is the standing officer's (E-119 criterion 4).
+  'age-checks.export',
   // The one exception to the rule above, and it is named, bounded and audited: a designated
   // officer opens tonight's screens without a shift, and every use is recorded (0044, E-111).
   'night.door',
@@ -97,7 +109,7 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   BOX_OFFICE: ['ticketing.read', 'ticketing.write'],
   // Administers the rota in advance, and opens the door and duty manager screens without a shift
   // tonight. The till is the bar manager's (0044, 0046, E-101 criterion 2).
-  FOH_MANAGER: ['night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write'],
+  FOH_MANAGER: ['night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export'],
   FRONT_OF_HOUSE: [],
   // Owns the bar's catalogue and its stock, and opens the till without a bar shift. Nothing in
   // the old estate grants this role, so the import cannot reach it (0044, F-101 criterion 1).
@@ -105,6 +117,9 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   // Verifies access profile declarations and nothing else: sighting evidence and agreeing the
   // door's wording is the whole of the job (D-127 criterion 2).
   ACCESSIBILITY_OFFICER: ['access.verify'],
+  // Configures which severities route to them, and reads and closes the open-items list.
+  // Nothing in the old estate grants this role, so the import cannot reach it (E-116).
+  SAFETY_OFFICER: ['safety.read', 'safety.write'],
   COMMITTEE: [],
 }
 

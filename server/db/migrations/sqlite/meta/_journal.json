@@ -509,8 +509,36 @@
     {
       "idx": 72,
       "version": "6",
-      "when": 1788938017628,
-      "tag": "0072_discounts_percent_capped_and_snapshotted",
+      "when": 1788936496151,
+      "tag": "0072_heavy_randall",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "6",
+      "when": 1788945730659,
+      "tag": "0073_the_venue_emergency_card_is_versioned_and_append_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "6",
+      "when": 1788947359234,
+      "tag": "0074_severity_routing_to_follow_up",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "6",
+      "when": 1788949288293,
+      "tag": "0075_round_nightshade",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "6",
+      "when": 1788952059538,
+      "tag": "0076_strong_johnny_blaze",
       "breakpoints": true
     }
   ]

@@ -7,14 +7,15 @@ import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, resolvedPric
 import { ageCheckConstraintRefusal } from '#shared/utils/age-checks'
 import { discountedPence } from '#shared/utils/discounts'
 import { postEntry } from '#server/utils/ledger'
+import { authorisedTabHolder, canOverrideTabCap, outstandingTabBalance } from '#server/utils/tab-holders'
 import { priceRef, saysMoney } from '#shared/utils/bar'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { Discount } from '#shared/utils/discounts'
 import type { BasketLineInput, PricedBasket, PricedLine, SaleCatalogue, SaleCategory, SaleChoice, SaleProduct, SaleReceipt, SaleVariant } from '#shared/utils/sale'
 import type { BatchItem } from 'drizzle-orm/batch'
 
-// What the till may sell right now, what pricing it costs, and the atomic commit once confirmed,
-// with a Challenge 25 outcome and a discount folded in when the basket needs them (F-103 through F-117).
+// What the till may sell right now, what pricing it costs, and the atomic commit once confirmed:
+// a reader or tab charge, a Challenge 25 outcome and a discount folded in as needed (F-103 to F-117).
 
 type PublicDiscount = Pick<Discount, 'id' | 'name' | 'percent'>
 
@@ -262,8 +263,8 @@ export async function priceBasket(lines: BasketLineInput[], on: string, discount
   return { lines: priced, totalPence, discount: publicDiscount(discount) }
 }
 
-// Everything `commitSale` knows about who is selling and where, beyond the basket itself: what
-// its audit rows cite, and which performance an inline age check attaches to (F-106).
+// Everything `commitSale` knows beyond the basket: what its audit rows cite, which performance
+// an age check attaches to (F-106), and which night a tab override is checked against (F-108).
 export interface SaleContext {
   actorId: string
   sessionId: string
@@ -285,14 +286,47 @@ function saleableAfterAgeCheck(
   return { restricted, sold }
 }
 
+// The tab side of the cross-check (F-108 criteria 1, 3, 4): resolved once, so the balance read
+// and the write it gates can never see two different figures.
+async function resolveTab(
+  tabHolderId: string | null,
+  actorId: string,
+  night: string,
+  chargePence: number,
+): Promise<{ holderId: string, holderName: string, outstandingPence: number, capOverridden: boolean } | null> {
+  if (!tabHolderId) return null
+
+  const holder = await authorisedTabHolder(undefined, tabHolderId)
+  if (!holder) throw createError({ statusCode: 409, statusMessage: 'That member is not authorised to charge to a tab' })
+
+  const cap = await configValue(undefined, 'BAR_TAB_CAP_PENCE')
+  const outstandingPence = await outstandingTabBalance(tabHolderId)
+  let capOverridden = false
+
+  if (outstandingPence + chargePence > cap) {
+    const overrideEnabled = await configValue(undefined, 'BAR_TAB_CAP_MANAGER_OVERRIDE')
+    if (!overrideEnabled || !await canOverrideTabCap(actorId, night)) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `${holder.name}'s tab is at ${saysMoney(outstandingPence)}; this charge of ${saysMoney(chargePence)} `
+          + `would take it past the ${saysMoney(cap)} cap. A duty manager or bar manager can override.`,
+      })
+    }
+    capOverridden = true
+  }
+
+  return { holderId: holder.id, holderName: holder.name, outstandingPence, capOverridden }
+}
+
 // The cross-check (F-104) and the one atomic write (F-105 criterion 1): the ledger entry, its
-// lines and stock, an inline Challenge 25 outcome when the basket needs one, and every audit row.
+// lines and stock, a Challenge 25 outcome and a tab charge when the basket needs them, and audit.
 export async function commitSale(
   lines: BasketLineInput[],
   on: string,
   expectedTotalPence: number,
   ageCheck: InlineAgeCheckInput | null,
   discountId: string | null,
+  tabHolderId: string | null,
   context: SaleContext,
 ): Promise<SaleReceipt> {
   const { resolved, priced, discount } = await resolveSale(lines, on, discountId)
@@ -319,14 +353,19 @@ export async function commitSale(
     })
   }
 
+  // Only relevant when there is something to charge: a full age-check refusal leaves nothing for
+  // any tender to apply to.
+  const tab = soldResolved.length > 0 ? await resolveTab(tabHolderId, context.actorId, context.night, soldTotalPence) : null
+
   const statements: BatchItem<'sqlite'>[] = []
   let entryId: string | null = null
 
   if (soldResolved.length > 0) {
     const posted = postEntry({
       source: 'TILL',
-      tender: 'CARD',
+      tender: tab ? 'TAB' : 'CARD',
       actorId: context.actorId,
+      tabDebtorId: tab?.holderId ?? null,
       lines: soldResolved.map((line, index) => ({
         kind: 'BAR_ITEM',
         // Net of the discount: what actually moved, the ledger's own meaning for the column
@@ -363,8 +402,24 @@ export async function commitSale(
       actorId: context.actorId,
       action: 'bar.till.sale',
       target: `till-session:${context.sessionId}`,
-      detail: { venueId: context.venueId, night: context.night, lines: soldResolved.length, discountId: discount?.id ?? null },
+      detail: {
+        venueId: context.venueId,
+        night: context.night,
+        lines: soldResolved.length,
+        discountId: discount?.id ?? null,
+        tender: tab ? 'TAB' : 'CARD',
+      },
     })))
+    // A separate row from the sale itself: real because `actorId` above is only set by whoever
+    // was actually signed in to submit it (F-108 criterion 4).
+    if (tab?.capOverridden) {
+      statements.push(db.insert(schema.auditLog).values(auditEntry({
+        actorId: context.actorId,
+        action: 'bar.tab.cap-overridden',
+        target: `till-session:${context.sessionId}`,
+        detail: { tabHolderId: tab.holderId, chargePence: soldTotalPence },
+      })))
+    }
     entryId = posted.id
   }
 
@@ -414,5 +469,6 @@ export async function commitSale(
     ageCheck: ageCheckResult,
     refusedLines: refusedPriced,
     discount: publicDiscount(discount),
+    tab: tab ? { holderName: tab.holderName, outstandingPence: tab.outstandingPence + soldTotalPence, capOverridden: tab.capOverridden } : null,
   }
 }

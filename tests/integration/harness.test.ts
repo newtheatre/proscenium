@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { MAX_BOUND_PARAMETERS, createTestDatabase, rows } from '#tests/helpers/database'
+import { Database } from 'bun:sqlite'
+import { MAX_BOUND_PARAMETERS, applyMigration, applyMigrations, createTestDatabase, rows } from '#tests/helpers/database'
 
 describe('the integration harness', () => {
   test('applies the compiled migrations and gives a usable database', async () => {
@@ -47,5 +48,23 @@ describe('the integration harness', () => {
         .toThrow(/over the 90 chunk limit/)
     }
     finally { database.close() }
+  })
+
+  // What a test proving a specific rebuild's own copy needs: the schema as it stood right
+  // before that migration, then that migration alone, so a seeded old-shape row is real (0052).
+  test('applyMigrations can stop before a tag, and applyMigration finishes just that one', async () => {
+    const raw = new Database(':memory:')
+    raw.exec('PRAGMA foreign_keys = ON;')
+    try {
+      const applied = await applyMigrations(raw, '0001_audit_log_append_only')
+      expect(applied).not.toContain('0001_audit_log_append_only')
+
+      raw.exec(`INSERT INTO audit_log (id, action) VALUES ('a1', 'test.action')`)
+      expect(() => raw.exec(`UPDATE audit_log SET action = 'test.other' WHERE id = 'a1'`)).not.toThrow()
+
+      await applyMigration(raw, '0001_audit_log_append_only')
+      expect(() => raw.exec(`UPDATE audit_log SET action = 'test.again' WHERE id = 'a1'`)).toThrow()
+    }
+    finally { raw.close() }
   })
 })
