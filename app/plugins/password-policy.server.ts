@@ -1,7 +1,7 @@
 import type { PasswordPolicy } from '#shared/utils/auth'
 
-// Read once while rendering, so the rule on the form is the rule the server will enforce (0012).
-// Typed explicitly: inferring it from the route map alone has grown too deep for tsc to resolve.
+// Read once while rendering (0012). Both generics are load-bearing: the second, widened to
+// string, trades away the route-literal check to stay under tsc's depth limit (0053 amendment).
 export default defineNuxtPlugin(async () => {
-  usePasswordPolicy().value = await useRequestFetch()<PasswordPolicy>('/api/auth/password-policy')
+  usePasswordPolicy().value = await useRequestFetch()<PasswordPolicy, string>('/api/auth/password-policy')
 })

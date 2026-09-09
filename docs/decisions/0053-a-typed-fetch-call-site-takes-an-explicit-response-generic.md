@@ -2,6 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-09-09
+- Amended: 9 September 2026, see the section near the bottom before applying this record: the
+  response generic alone does not short-circuit the recursion generally.
 
 ## Context
 
@@ -80,3 +82,60 @@ workaround from being written again.
 - **Splitting `app`'s tsconfig project from `server`'s to shrink what a component resolves.**
   Rejected on the evidence above: the route map's visibility to app code is the feature, not an
   accident of project layout, and the recursion cost travels with the route count regardless.
+
+## Amended 9 September 2026: the response generic alone is not the fix
+
+The Decision section above is wrong as a general claim, and this correction is load-bearing
+enough to read before applying the record, not just as a historical footnote.
+
+**What was wrong.** `password-policy.server.ts`, in exactly the form this record prescribes,
+failed on show night's branch (#775) once its routes pushed the count past main's: `TS2322` and
+`TS2589` together, naming the call's **method** position, not its response position:
+`NitroFetchOptions<R, AvailableRouterMethod<R>> extends O ? "get" : ExtractedRouteMethod<R, O>`.
+`Base$Fetch`'s call signature is `<T, R extends NitroFetchRequest, O extends NitroFetchOptions<R>
+= NitroFetchOptions<R>>`; resolving `O`'s own default type, needed to type-check the call at all,
+requires `AvailableRouterMethod<R>`, which calls `MatchedRoutes<R>` regardless of what `T` is.
+Supplying a response generic short-circuits only `TypedInternalResponse`'s **response** position;
+the **method** position resolves against the whole route map unconditionally, on every call,
+whether or not the caller reads the result.
+
+**Two hypotheses were tested directly and falsified, not assumed away.** Switching
+`useRequestFetch()<T>(...)` to `$fetch<T>(...)` produces the identical error: both share
+`Base$Fetch`'s signature, so which one is called does not matter. Reshaping the assignment,
+tried four ways (a direct property assignment, a local `const`, a local typed `unknown`, and
+routing the call through `useAsyncData`'s own callback), made no difference either: the
+recursion happens while resolving the call expression's own type, before anything is done with
+the result.
+
+**What actually holds, verified rather than reasoned to.** Widening the second generic, `R`, to
+plain `string` alongside the response generic avoids both recursions: `$fetch<PasswordPolicy,
+string>('/api/auth/password-policy')`. Confirmed against every call shape found in the app: no
+options, `{ method }` alone, `{ method, body }`, `{ query }`, and a call whose result is
+discarded entirely (still needs it: the method position is resolved regardless of whether the
+response is read). **The instruction, usable directly:** add `, string` as the second type
+argument on any `$fetch`, `useFetch`, `useLazyFetch` or `useRequestFetch()` call that starts
+failing this way. This is the remedy for bar's `#777` and box office's `D-124` too, the moment
+show night's routes land on main; do not re-derive it.
+
+**The trade is bigger than the Decision section states.** Widening `R` means the route argument
+is no longer checked against `NitroFetchRequest`: a typo'd or renamed route stops failing to
+typecheck. "The generic keeps the route literal checked" is true only for a response-position-only
+fix, which this record now knows does not hold generally. There is no way found to keep the route
+literal checked *and* stay under the depth limit for a call using a string literal route once the
+route count is high enough; if a future case needs the route checked more than it needs to typecheck
+cleanly, the honest fallback is a targeted, understood suppression (`// @ts-expect-error`, with a
+comment naming the mechanism and citing this record) rather than the wider-`R` form, which a reader
+does not otherwise choose to weaken.
+
+**`useRequestFetch()<T>(...)`, single generic, is not something show night introduced.** It is
+the pre-existing pattern across dozens of call sites throughout the app (`TicketPrices.vue`,
+`admin/index.vue`, `useAccount.ts`, and many more), and a full-repository check found upward of
+sixty of them. Converting all of them is real, sizeable work, tracked in `docs/known-issues.md`
+rather than attempted wholesale in the pull request that carries this amendment.
+
+**The trap this amendment exists to name explicitly:** *a green `typecheck` on any one branch
+proves nothing about the pattern's safety in general.* It proves only that branch's total route
+count sits under whatever threshold `tsc` gives up at. A call site that passes today can start
+failing from a merge that adds routes somewhere else in the app entirely, on a file the merge
+never touched. Re-run `typecheck` after any rebase that adds routes; do not trust a check that
+predates it.
