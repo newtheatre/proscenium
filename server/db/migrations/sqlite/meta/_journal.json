@@ -512,6 +512,13 @@
       "when": 1788936496151,
       "tag": "0072_heavy_randall",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "6",
+      "when": 1788945730659,
+      "tag": "0073_the_venue_emergency_card_is_versioned_and_append_only",
+      "breakpoints": true
     }
   ]
 }
