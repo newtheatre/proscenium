@@ -90,7 +90,7 @@ namespace, and asks the owner for one anywhere else.
 
 | Stream | Routes and files owned |
 | --- | --- |
-| Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/qr` (retrieval, resend and self-service edit and cancel while unpaid: D-108, D-110), `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/`, `app/pages/[...slug].vue` (the content catch-all, D-103) |
+| Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/qr` (retrieval, resend and self-service edit and cancel while unpaid: D-108, D-110), `/passes` (a pass's own QR retrieval, D-124), `/account/passes`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/`, `app/pages/[...slug].vue` (the content catch-all, D-103) |
 | Show night | `/rota` and `/rota/manage/**` (templates, rota administration, the venue emergency card and the backstage board's own milestone types and presets at `/rota/manage/backstage`), the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**`, `/api/admin/rota/**`, `/api/admin/backstage/**`, `/api/board/**` and `server/utils/night-authority.ts`. The console screens sit under `/rota/manage`, never `/admin`: `/tonight` is the phone-first shell rather than a console prefix (0040, 0046). |
 | Bar | `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**` |
 | Platform | `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`, `tests/helpers/race.ts` |
@@ -286,6 +286,7 @@ without naming it).
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |
 | `0 9 * * *` | `sessions:sweep` | Session reminders and unmarked-register nags (G-119, not yet built). |
 | `0 10 * * *` | `shifts:remind` | Tomorrow's confirmed shift holders, one message per shift with a calendar attachment carrying the call time (E-109). Idempotent per shift, read from `notification_log`'s claim column rather than a column on `shifts`. |
+| `0 11 * * *` | `passes:expire-requests` | Lapses a pending pass request once its product's own sales window has closed unfulfilled, capped per run like `holds:release` (`PASS_REQUEST_EXPIRE_BATCH_CAP`, D-124 criterion 3). |
 | `0 17 * * *` | `rooms:remind` | Tomorrow's room bookings, one message per member however many they hold, with the calendar file attached (C-113). Idempotent: a second run the same London day sends nothing, read from `notification_log` rather than a column. |
 | `12 0 * * *` | `nights:close` | Auto-closes unsigned night reports inside 24 hours, retries unsent report emails. |
 | `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, notification retries, unverified account expiry (0026). |

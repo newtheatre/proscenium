@@ -600,24 +600,63 @@ two that read and `ticketing.write` for the rest:
 
 **"Ever issued" and "live coverage" are queries over rows, never columns.** `PASS_TYPE_REFERENCES`
 and `PASS_COVERAGE_REFERENCES` in `server/utils/pass-types.ts` declare the tables the predicates
-read; both are empty and so both read as "never" until D-124 builds `passes`. An integration test
-proves the query shape against a stand-in table so the predicates are not decorative.
+read; `passes` now carries a row in each (D-124), so removing a covered show or deleting a pass
+product with a live pass against it is gated for real, not vacuously.
 
 ### passes
-`id` PK · `reference` UNIQUE · `pass_type_id` restrict · `pass_type_price_id` restrict ·
-`user_id` → users restrict · `price_paid` snapshot · `status` CHECK
-`ACTIVE|CANCELLED|EXPIRED` · `issued_by` · `notes` scrub · timestamps.
+`id` PK · `reference` UNIQUE, the same no-look-alike shape a reservation's is · `pass_type_id`
+restrict · `pass_type_price_id` restrict · `user_id` → users restrict · `price_paid` snapshot ·
+`status` CHECK `ACTIVE|CANCELLED|EXPIRED` · `issued_by` restrict · `notes` scrub · timestamps.
 Issuing posts a `PASS_SALE` ledger entry in the same batch (fixing the old estate's silent
 pass money).
+
+**Issuing at the desk (D-124).** `POST /api/box-office/desk/passes` is the payment boundary: the
+same expected-total cross-check D-114's collection uses, against the chosen price point. Approval
+needs no separate gate beyond `ticketing.write`, unlike D-116's refund; the cap (criterion 4) is
+the write's own race-safe guard. The cap check is the insert's own predicate
+(`passCapAllows()` in `server/utils/pass-types.ts`, over the count of passes not `CANCELLED`),
+and `postEntry()`'s `guard` parameter (the same knob D-116 added) makes the `PASS_SALE` entry
+conditional on the pass insert's own `changes()`, so a refused issue posts no ledger entry and
+needs no new migration or DB-level uniqueness constraint. `priceRef` on the ledger line carries
+the pass's own id: no dedicated column exists for it, and the field is documented unconstrained
+for exactly this (0033). A buyer is chosen through `GET
+/api/box-office/desk/passes/buyers`, column allow-listed (name, email) and gated at
+`ticketing.write` rather than `accounts.read`, since an ordinary desk officer holds the first and
+not the second (K-123 criterion 1).
+
+**Requesting online, and fulfilling at the desk (criterion 3).** `POST /api/account/passes/request`
+writes a `pass_requests` row and nothing else: no capacity, no cap, no pass. `GET
+/api/box-office/desk/passes/[passTypeId]/requests` lists pending ones by name, oldest first; the
+issue route takes an optional `requestId` and marks it `FULFILLED` in the same batch as the pass
+insert, guarded on the entry actually posting, so a request is never marked fulfilled against an
+issue that itself failed the cap. `passes:expire-requests` (daily, `PASS_REQUEST_EXPIRE_BATCH_CAP`)
+lapses a still-`PENDING` request once its product's own `sales_close_at` has passed, D-106's own
+hold-release shape.
+
+**The holder's own QR (criterion 5).** `passQrTokenFor()`/`verifyPassQrToken()`
+(`server/utils/pass-qr-tokens.ts`) reuse D-108's HMAC scheme over `"pass:" + passId` rather than a
+second secret: the prefix domain-separates a pass token from a reservation token, so neither
+resolves against the other's route even if the two id spaces collided. `GET /passes/[token]`
+exchanges it for a cookie exactly as `/qr/[token]` does; `GET /api/passes/current` and `/passes`
+read the pass live from that cookie. The email (`pass-issued` template) carries the same QR
+inline. `GET /api/account/passes` is the signed-in view: held passes and the caller's own
+requests, regardless of channel.
 
 ### pass_admissions  APPEND-ONLY
 `id` PK · `pass_id` restrict · `performance_id` restrict · `ticket_id` UNIQUE restrict ·
 `admitted_at` · `admitted_by` NULL (self-serve).
 **UNIQUE (`pass_id`, `performance_id`) is the once-per-performance rule.**
+D-124 creates this table only; nothing yet writes to it, since admitting on a pass is D-125's
+self-serve redemption and D-126's door, neither built. Append-only and trigger-enforced (0010),
+the same reasoning as the ledger: a register of admissions must be defensible after the fact, and
+"everything record-like keys to a performance" applies to one exactly (CLAUDE.md). The trigger is
+hand-appended after the generated `CREATE TABLE`, since drizzle-kit generates no triggers; it must
+be re-added if the migration is ever renumbered ahead of merging.
 
 ### pass_requests
 `id` PK · request → decision workflow (`status` CHECK `PENDING|FULFILLED|DECLINED|EXPIRED`,
-`note` scrub, `decided_by`, `pass_id` NULL). A request is not a pass.
+`note` scrub, `decided_by` restrict, `pass_id` restrict, NULL until fulfilled). A request is not
+a pass; `(status = 'FULFILLED') = (pass_id IS NOT NULL)` is a CHECK, not a convention.
 
 ## The ledger (module I)
 

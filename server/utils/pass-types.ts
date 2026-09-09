@@ -26,6 +26,18 @@ export const PASS_TYPE_REFERENCES: PassTypeReference[] = [
     issued: false,
     why: 'a show this pass covers: configuration, not an issued pass',
   },
+  {
+    table: 'pass_requests',
+    column: 'pass_type_id',
+    issued: false,
+    why: 'a request for this pass type: reserves nothing and issues nothing until the desk fulfils it (D-124)',
+  },
+  {
+    table: 'passes',
+    column: 'pass_type_id',
+    issued: true,
+    why: 'a held pass of this type, issued at the desk and paid for (D-124)',
+  },
 ]
 
 export function issuedReferences(references = PASS_TYPE_REFERENCES): PassTypeReference[] {
@@ -48,16 +60,23 @@ export function everIssuedQuery(passTypeId: string, references = issuedReference
   return sql`SELECT CASE WHEN ${sql.join(terms, sql` OR `)} THEN 1 ELSE 0 END AS everIssued`
 }
 
-// D-124 adds a row here once `passes` exists, counting only the ones still live for that show.
-// Empty until then, so removing a covered show is never manager-gated before anything holds one.
 export interface PassCoverageReference {
   table: string
   liveCount: (passTypeId: SQL, showId: SQL) => SQL
   why: string
 }
 
-// Genuinely empty, not a stand-in: D-124 has not landed a row here yet.
-export const PASS_COVERAGE_REFERENCES: PassCoverageReference[] = []
+// A pass covers everything its type covers, never one show alone, so a live pass gates removing
+// any covered show, whichever one is being asked about (D-123 criterion 4).
+export const PASS_COVERAGE_REFERENCES: PassCoverageReference[] = [
+  {
+    table: 'passes',
+    // Show-blind on purpose: a pass covers everything its type covers, so which show is being
+    // asked about makes no difference to whether a live one exists.
+    liveCount: passTypeId => sql`(SELECT count(*) FROM passes WHERE pass_type_id = ${passTypeId} AND status = 'ACTIVE')`,
+    why: 'a live pass grants access to everything its type currently covers, not one show at a time',
+  },
+]
 
 // How many live passes of this type cover this one show, bound by two parameters whatever the
 // registry holds (D-123 criterion 4).
@@ -166,4 +185,11 @@ export async function passTypeBySlug(slug: string, exceptId?: string): Promise<P
     FROM pass_types t WHERE t.slug = ${slug}${except} LIMIT 1
   `)
   return row ? read(row) : undefined
+}
+
+// D-124 criterion 4: the cap is asked at the statement that issues, over the same "not
+// cancelled" count `sellablePassTypes()` shows, never a count read earlier and trusted.
+export function passCapAllows(passTypeId: string, maxIssued: number | null): SQL {
+  if (maxIssued === null) return sql`1 = 1`
+  return sql`(SELECT count(*) FROM passes WHERE pass_type_id = ${passTypeId} AND status != 'CANCELLED') < ${maxIssued}`
 }

@@ -275,6 +275,52 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     scrub: ['customer_notes', 'staff_notes'],
     why: 'Booking and sales statistics must survive erasure; free text about the booker need not (D-104).',
   },
+  {
+    name: 'passes',
+    column: 'user_id',
+    section: 'passes',
+    columns: ['reference', 'pass_type_id', 'pass_type_price_id', 'price_paid', 'status', 'created_at'],
+    erasure: 'scrub',
+    scrub: ['notes'],
+    why: 'Pass sales and issuance statistics must survive erasure; a desk note about the holder need not (D-124).',
+  },
+  {
+    name: 'passes',
+    column: 'issued_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Which officer issued it is a fact the ledger and the pass itself still answer for, as
+    // `age_checks.checked_by` survives on.
+    why: 'Which officer issued a pass. The sale record survives; it does not describe the officer.',
+  },
+  {
+    name: 'pass_admissions',
+    column: 'admitted_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // pass_admissions is append-only and trigger-enforced (0010): an UPDATE here would abort
+    // the whole erasure batch, so this entry must never carry scrub or delete.
+    why: 'Which officer admitted a pass at the door. The admission register is evidence and must answer for itself.',
+  },
+  {
+    name: 'pass_requests',
+    column: 'user_id',
+    section: 'pass-requests',
+    columns: ['pass_type_id', 'status', 'created_at', 'decided_at'],
+    erasure: 'scrub',
+    scrub: ['note'],
+    why: 'How many people requested a pass type must survive; a note on the request need not.',
+  },
+  {
+    name: 'pass_requests',
+    column: 'decided_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    why: 'Which officer decided a request. The decision survives; it does not describe the officer.',
+  },
 
   // Module E: show night
 

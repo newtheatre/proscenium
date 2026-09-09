@@ -98,8 +98,8 @@ describe('"has ever been issued" is a query over rows, never a flag (criterion 3
     })
   })
 
-  test('configuration alone, prices and covered shows, is never an issuance', async () => {
-    expect(issuedReferences()).toEqual([])
+  test('configuration alone, prices and covered shows, is never an issuance; a held pass is (D-124)', async () => {
+    expect(issuedReferences().map(reference => reference.table)).toEqual(['passes'])
   })
 
   test('a pass with no issuance table still says never issued', async () => {
@@ -159,10 +159,43 @@ describe('"has ever been issued" is a query over rows, never a flag (criterion 3
 })
 
 describe('a live pass against a show is a count over rows (criterion 4)', () => {
-  test('nothing live until D-124 exists', async () => {
+  test('nothing live for a pass type with no passes issued (D-124)', async () => {
     await withDatabase((database) => {
-      const [query] = boundStatement(database, liveCoverageQuery('pt-1', 's1'))
-      const [row] = rows<{ live: number }>(database, query)
+      const id = passType(database)
+      const [query, ...parameters] = boundStatement(database, liveCoverageQuery(id, 's1'))
+      const [row] = rows<{ live: number }>(database, query, ...parameters)
+      expect(row!.live).toBe(0)
+    })
+  })
+
+  test('an active pass against this type flips the real count, whichever show is asked about', async () => {
+    await withDatabase((database) => {
+      const id = passType(database)
+      insert(database, 'users', { id: 'u-1', email: 'alex@example.invalid', name: 'Alex' })
+      insert(database, 'pass_type_prices', { id: 'price-1', pass_type_id: id, label: 'Standard', price: 4500 })
+      insert(database, 'passes', {
+        id: 'pass-1', reference: 'ABCDEF', pass_type_id: id, pass_type_price_id: 'price-1',
+        user_id: 'u-1', price_paid: 4500, status: 'ACTIVE', issued_by: 'u-1',
+      })
+
+      const [query, ...parameters] = boundStatement(database, liveCoverageQuery(id, 'any-show'))
+      const [row] = rows<{ live: number }>(database, query, ...parameters)
+      expect(row!.live).toBe(1)
+    })
+  })
+
+  test('a cancelled pass does not count as live', async () => {
+    await withDatabase((database) => {
+      const id = passType(database)
+      insert(database, 'users', { id: 'u-1', email: 'alex@example.invalid', name: 'Alex' })
+      insert(database, 'pass_type_prices', { id: 'price-1', pass_type_id: id, label: 'Standard', price: 4500 })
+      insert(database, 'passes', {
+        id: 'pass-1', reference: 'ABCDEF', pass_type_id: id, pass_type_price_id: 'price-1',
+        user_id: 'u-1', price_paid: 4500, status: 'CANCELLED', issued_by: 'u-1',
+      })
+
+      const [query, ...parameters] = boundStatement(database, liveCoverageQuery(id, 'any-show'))
+      const [row] = rows<{ live: number }>(database, query, ...parameters)
       expect(row!.live).toBe(0)
     })
   })
