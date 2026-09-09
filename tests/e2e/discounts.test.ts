@@ -134,7 +134,9 @@ describe.skipIf(skip !== null)('a discount is a percentage above zero, capped by
     expect(answered.status).toBe(409)
   })
 
-  test('creation is refused outright when no cap has ever been set', async () => {
+  // Shipped at a proposed 50%, not left unset (docs/workshops.md): a discount works with no
+  // settings change, and the cap still refuses whatever the current value holds.
+  test('the shipped default works with no override set at all', async () => {
     const database = new Database(app.databaseFile)
     try {
       database.run(`DELETE FROM config WHERE key = 'BAR_DISCOUNT_MAX_PERCENT'`)
@@ -142,8 +144,10 @@ describe.skipIf(skip !== null)('a discount is a percentage above zero, capped by
     finally {
       database.close()
     }
-    const answered = await createDiscount(named('No cap yet'), 5)
-    expect(answered.status).toBe(503)
+    expect((await createDiscount(named('Default cap'), 50)).status).toBe(200)
+    const answered = await createDiscount(named('Over default cap'), 51)
+    expect(answered.status).toBe(409)
+    expect(await message(answered)).toContain('50%')
     await setCap(20)
   })
 })

@@ -726,8 +726,8 @@ per request · `colour` CHECK six hexadecimal characters after a hash.
 Editable in place, unlike the append-only tables above: a discount's own row is configuration,
 and what a past sale actually charged is the snapshot on its own `ledger_lines`, not this row
 (F-117 criterion 3). The percentage cap itself is `BAR_DISCOUNT_MAX_PERCENT`, configuration
-enforced at the write path (0012), which ships unset until a workshop or a settings change sets
-it, so creating or editing a discount refuses outright until then (0019).
+enforced at the write path (0012), shipped at a proposed 50% (`docs/workshops.md`) rather than
+left unset; creating or editing a discount above whatever it currently holds still refuses.
 
 ### bar_products  (sellable things)
 `id` PK · `category_id` → bar_categories restrict · `name` unique, case-insensitively · `status`
