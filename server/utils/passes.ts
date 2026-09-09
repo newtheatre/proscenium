@@ -2,9 +2,8 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 
-// Reading pass products to sell, requests waiting to be fulfilled, and what a member already
-// holds (D-124). Kept apart from server/utils/pass-issue.ts's write path, matching D-114's own
-// collect/desk split, so tests/ can import these under Bun.
+// Reading what to sell, what is pending and what a member holds (D-124). Kept apart from
+// server/utils/pass-issue.ts's write path, matching D-114's own collect/desk split.
 
 export interface SellablePassPrice {
   id: string

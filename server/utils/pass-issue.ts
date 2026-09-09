@@ -29,9 +29,8 @@ export interface IssuePassResult {
   entryId?: string
 }
 
-// Race-safe (criterion 4): the cap is the statement's own predicate, asked against the count of
-// everything not cancelled, never a read taken earlier. `postEntry`'s guard rides the pass
-// insert's `changes()`, so a refused issue posts no ledger entry (0001, D-116's own pattern).
+// Race-safe (criterion 4): the cap is the insert's own predicate, and `postEntry`'s guard rides
+// its `changes()`, so a refused issue posts no ledger entry (0001, D-116's own pattern).
 export async function issuePass(input: IssuePassWriteInput, at = new Date()): Promise<IssuePassResult> {
   const passId = newId()
   const reference = generatePassReference()

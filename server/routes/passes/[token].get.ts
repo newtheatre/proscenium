@@ -1,6 +1,5 @@
-// Opening a pass's QR link in a browser: the signed token in the URL is exchanged for a
-// short-lived httpOnly cookie and never rendered again, the same shape D-108's reservation link
-// uses (server/routes/qr/[token].get.ts).
+// Opening a pass's QR link: the signed token is exchanged for a short-lived cookie and never
+// rendered again, the same shape D-108's reservation link uses.
 export default defineEventHandler(async (event) => {
   const token = getRouterParam(event, 'token') ?? ''
   const passId = await verifyPassQrToken(token)
