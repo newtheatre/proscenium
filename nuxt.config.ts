@@ -120,6 +120,7 @@ export default defineNuxtConfig({
       '0 8 * * *': ['rooms:sweep'],
       '0 9 * * *': ['sessions:sweep'],
       '0 10 * * *': ['shifts:remind'],
+      '0 11 * * *': ['passes:expire-requests'],
       '0 17 * * *': ['rooms:remind'],
       '12 0 * * *': ['nights:close'],
       '0 4 * * *': ['daily:sweeps'],
@@ -148,7 +149,7 @@ export default defineNuxtConfig({
           },
         },
         triggers: {
-          crons: ['*/10 * * * *', '0 4 * * *', '0 5 * * 1', '0 6 * * *', '0 7 * * *', '0 8 * * *', '0 9 * * *', '0 10 * * *', '0 17 * * *', '12 0 * * *', '0 4 1 * *'],
+          crons: ['*/10 * * * *', '0 4 * * *', '0 5 * * 1', '0 6 * * *', '0 7 * * *', '0 8 * * *', '0 9 * * *', '0 10 * * *', '0 11 * * *', '0 17 * * *', '12 0 * * *', '0 4 1 * *'],
         },
       },
     },

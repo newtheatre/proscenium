@@ -1244,6 +1244,30 @@ Changed your mind? Book again from the show's page while seats remain.
 The Nottingham New Theatre`,
     }
   },
+  // D-124 criterion 5: a scannable QR inline, the same reasoning as the reservation confirmation
+  // (D-108 criterion 1), so an image-blocking client still shows the reference and the link.
+  'pass-issued': (context: TemplateContext): Rendered => {
+    const reference = String(context.reference)
+    const passType = String(context.passType)
+    const priceLabel = String(context.priceLabel)
+    const url = String(context.url)
+    const qrSvg = String(context.qrSvg)
+    return {
+      subject: `Your ${passType}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Reference <strong>${reference}</strong>: ${passType} (${priceLabel}), issued and paid for at
+the box office.</p>
+<p><img src="data:image/svg+xml;base64,${qrSvg}" alt="Pass QR code" width="200" height="200"></p>
+<p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
+      text: `Hello ${context.name},
+
+Reference ${reference}: ${passType} (${priceLabel}), issued and paid for at the box office.
+
+Open your pass: ${url}
+
+The Nottingham New Theatre`,
+    }
+  },
   'health-alert': (context: TemplateContext): Rendered => {
     const since = String(context.since)
     return {

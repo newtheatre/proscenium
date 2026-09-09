@@ -154,6 +154,10 @@ const CATALOGUE = {
   'reservation.exchanged': { label: 'Exchanged for another performance', module: 'ticketing', self: true },
   'ticket.refunded': { label: 'Ticket refunded at the desk', module: 'ticketing' },
   'reservation.cancelled.staff': { label: 'Booking cancelled at the desk', module: 'ticketing' },
+  'pass.issued': { label: 'Pass issued at the desk', module: 'ticketing' },
+  'pass.request.created': { label: 'Pass requested', module: 'ticketing', self: true },
+  'pass.request.fulfilled': { label: 'Pass request fulfilled at issue', module: 'ticketing' },
+  'pass.request.expired': { label: 'Pass request lapsed unfulfilled', module: 'ticketing' },
 
   // Module E: show night
 

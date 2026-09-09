@@ -85,12 +85,13 @@ export async function passTypeForSale(id: string): Promise<PassTypeForSale | und
 export interface PassTypePriceRow {
   id: string
   passTypeId: string
+  label: string
   price: number
 }
 
 export async function passTypePriceById(id: string): Promise<PassTypePriceRow | undefined> {
   const [row] = await db.all<PassTypePriceRow>(sql`
-    SELECT id AS id, pass_type_id AS passTypeId, price AS price FROM pass_type_prices WHERE id = ${id}
+    SELECT id AS id, pass_type_id AS passTypeId, label AS label, price AS price FROM pass_type_prices WHERE id = ${id}
   `)
   return row
 }
@@ -175,6 +176,59 @@ export function ownPassRequestsQuery(userId: string): SQL {
     WHERE r.user_id = ${userId}
     ORDER BY r.created_at DESC
   `
+}
+
+export interface PassCurrentState {
+  id: string
+  reference: string
+  userId: string
+  passTypeName: string
+  priceLabel: string
+  pricePaid: number
+  status: string
+}
+
+// What the QR answers when it is presented, read live rather than from anything saved earlier,
+// the same shape D-108's reservation retrieval uses (server/utils/reservations.ts).
+export function passCurrentStateQuery(id: string): SQL {
+  return sql`
+    SELECT p.id AS id, p.reference AS reference, p.user_id AS userId, t.name AS passTypeName,
+           pr.label AS priceLabel, p.price_paid AS pricePaid, p.status AS status
+    FROM passes p
+    JOIN pass_types t ON t.id = p.pass_type_id
+    JOIN pass_type_prices pr ON pr.id = p.pass_type_price_id
+    WHERE p.id = ${id}
+  `
+}
+
+export async function passCurrentState(id: string): Promise<PassCurrentState | undefined> {
+  const [row] = await db.all<PassCurrentState>(passCurrentStateQuery(id))
+  return row
+}
+
+export interface PassBuyer {
+  id: string
+  name: string
+  email: string
+}
+
+const contains = (term: string): string => `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
+
+// K-123 criterion 1: a buyer is chosen by name or email, never typed as an id. Column
+// allow-listed, since an ordinary desk officer issuing a pass holds no accounts.read.
+export function passBuyersQuery(q: string): SQL {
+  const term = contains(q)
+  return sql`
+    SELECT id AS id, name AS name, email AS email FROM users
+    WHERE disabled = 0 AND anonymised_at IS NULL
+      AND (name LIKE ${term} ESCAPE '\\' OR email LIKE ${term} ESCAPE '\\')
+    ORDER BY name COLLATE NOCASE
+    LIMIT 20
+  `
+}
+
+export async function passBuyers(q: string): Promise<PassBuyer[]> {
+  return db.all<PassBuyer>(passBuyersQuery(q))
 }
 
 export async function ownPassRequests(userId: string): Promise<OwnPassRequest[]> {

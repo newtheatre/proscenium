@@ -286,6 +286,7 @@ without naming it).
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |
 | `0 9 * * *` | `sessions:sweep` | Session reminders and unmarked-register nags (G-119, not yet built). |
 | `0 10 * * *` | `shifts:remind` | Tomorrow's confirmed shift holders, one message per shift with a calendar attachment carrying the call time (E-109). Idempotent per shift, read from `notification_log`'s claim column rather than a column on `shifts`. |
+| `0 11 * * *` | `passes:expire-requests` | Lapses a pending pass request once its product's own sales window has closed unfulfilled, capped per run like `holds:release` (`PASS_REQUEST_EXPIRE_BATCH_CAP`, D-124 criterion 3). |
 | `0 17 * * *` | `rooms:remind` | Tomorrow's room bookings, one message per member however many they hold, with the calendar file attached (C-113). Idempotent: a second run the same London day sends nothing, read from `notification_log` rather than a column. |
 | `12 0 * * *` | `nights:close` | Auto-closes unsigned night reports inside 24 hours, retries unsent report emails. |
 | `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, notification retries, unverified account expiry (0026). |
