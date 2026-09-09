@@ -540,6 +540,13 @@
       "when": 1788952059538,
       "tag": "0076_strong_johnny_blaze",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "6",
+      "when": 1788964078710,
+      "tag": "0077_the_backstage_boards_join_code",
+      "breakpoints": true
     }
   ]
 }

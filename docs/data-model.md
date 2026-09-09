@@ -764,11 +764,27 @@ incidents, milestones, staffing, bar summary, access counts only) · `closing_no
 `closed_by` NULL (auto-close) · `auto_closed` bool · `closed_at` · `emailed_at` NULL = retry
 queue. UNIQUE by PK makes closing idempotent.
 
-### backstage_nights / backstage_devices / backstage_messages / backstage_presets
-As the estate's proven design: the join code is derived (HMAC of night + epoch + secret) and
-never stored; devices hold a token hash and the epoch they joined at; messages carry
-`direction`, optional `milestone` CHECK enum, snapshot `label`, acknowledgement; presets are
-committee-editable. Free text purges at 30 days; milestones persist into the night report.
+### backstage_nights
+`id` PK · `venue_id` → venues restrict · `night` · `epoch` (starts at 0, only ever increases) ·
+`failed_attempts` · `created_at` · `updated_at`. UNIQUE (`venue_id`, `night`): one row per venue
+per night, created the first time anybody needs it, the duty manager asking for the code or the
+first join attempt (E-120 criteria 2, 3). Ten failed attempts move `epoch` and reset
+`failed_attempts` to nought in one `UPDATE`; a correct code resets the counter without moving
+the epoch (criterion 4). The join code itself is never a column: `deriveBoardCode(secret,
+night, venue_id, epoch)` (`shared/utils/backstage.ts`) recomputes it from a worker secret
+(`NUXT_BACKSTAGE_BOARD_SECRET`) on every read, so a database dump reveals no valid code.
+
+### backstage_devices
+`id` PK · `night_id` → backstage_nights cascade · `label` (whatever the crew member typed, never
+validated as a name) · `token_hash` UNIQUE · `joined_epoch` · `joined_at` · `last_seen_at` NULL.
+No account and no personal data (criterion 1): there is no `user_id` column at all. A rotation
+moves `backstage_nights.epoch` and stops a new join with the old code; it revokes nothing
+already joined, since `joined_epoch` is a record of when, not a live check on how (criterion 4).
+
+### backstage_messages / backstage_presets
+Not built. E-121's own tables: milestones, calls and acknowledgements over a joined device's
+connection. A manual reset, the 30-day free-text purge and the night report's timeline are
+E-122's; E-120 only ever gets a device onto the board.
 
 ### foh_contacts
 `id` PK · `kind` CHECK `COMMITTEE|VENUE|SECURITY|TAXI|OTHER` · `label` · `phone` · `note` ·
