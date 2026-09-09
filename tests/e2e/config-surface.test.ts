@@ -101,7 +101,8 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
     const known = listed.find(setting => setting.key === 'PASSWORD_MIN_LENGTH')!
     expect(known.default).toBe(CONFIG_KEYS.PASSWORD_MIN_LENGTH.default)
     expect(known.enforced).toBe(true)
-    expect(listed.find(setting => setting.key === 'BAR_TAB_CAP_PENCE')!.enforced).toBe(false)
+    expect(listed.find(setting => setting.key === 'BAR_TAB_CAP_PENCE')!.enforced).toBe(true)
+    expect(listed.find(setting => setting.key === 'DISCOUNT_CODES_ENABLED')!.enforced).toBe(false)
   })
 
   test('a change is stored, shows who made it, and takes effect at the write path', async () => {
@@ -196,9 +197,12 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       await visit(view, `${app.baseURL}/admin/settings`, '[data-test="config-search"]')
 
       // Fifty keys, found by searching for what the key decides rather than its name (0032).
+      await fill(view, 'input[data-test="config-search"]', 'discount codes')
+      await waitFor(view, 'document.querySelector(\'[data-test="setting-DISCOUNT_CODES_ENABLED"]\')')
+      expect(await textOf(view)).toContain('Not enforced yet')
+
       await fill(view, 'input[data-test="config-search"]', 'bar tab')
       await waitFor(view, 'document.querySelector(\'[data-test="setting-BAR_TAB_CAP_PENCE"]\')')
-      expect(await textOf(view)).toContain('Not enforced yet')
 
       // Money reads in pounds, which is what the officer types (0004). An input's value is not
       // text on the page, so it is read rather than searched for.
