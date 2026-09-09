@@ -2,7 +2,7 @@
 import { boardJoinForm } from '#shared/utils/backstage'
 
 // No account, no personal data: the code and a display label are the whole of the form
-// (E-120 criterion 1). A cookie, never `localStorage`, which is `useNightCache`'s alone.
+// (E-120 criterion 1). A cookie, never the device store, which is `useNightCache`'s alone.
 const state = reactive({ code: '', label: '' })
 const joining = ref(false)
 const failure = ref<string | null>(null)
