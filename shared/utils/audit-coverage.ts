@@ -273,6 +273,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['night.officer-bypass'],
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
+  { route: 'server/api/admin/safety/severities/index.get.ts', exempt: 'reads the fixed four-severity routing table' },
+  { route: 'server/api/admin/safety/severities/[severity]/index.put.ts', actions: ['incident-severity.routing-changed'] },
+  { route: 'server/api/admin/safety/open-items.get.ts', exempt: 'reads the open-items list, gated by the safety officer\'s own permission' },
+  { route: 'server/api/admin/safety/incidents/[id]/close.post.ts', actions: ['incident-followup.closed'] },
+  { route: 'server/api/admin/age-checks/export.get.ts', actions: ['age-checks.exported'] },
   { route: 'server/api/admin/rota/templates/index.get.ts', exempt: 'reads every venue\'s template, including the venues that have none' },
   {
     route: 'server/api/admin/rota/templates/[venueId]/index.put.ts',

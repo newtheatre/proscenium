@@ -44,9 +44,9 @@ describe('the role vocabulary', () => {
     for (const target of targets) {
       expect(`${target}: ${isRole(target)}`).toBe(`${target}: true`)
     }
-    // Every role should be reachable by import, save the two the old estate never had: no card
-    // reader (0044) and no access profiles to verify (D-127), so neither has an old row to map.
-    expect([...ROLES].filter(role => !targets.has(role))).toEqual(['BAR_MANAGER', 'ACCESSIBILITY_OFFICER'])
+    // Every role should be reachable by import, save three the old estate never had: no card
+    // reader (0044), no access profiles (D-127) and no safety officer (E-116).
+    expect([...ROLES].filter(role => !targets.has(role))).toEqual(['BAR_MANAGER', 'ACCESSIBILITY_OFFICER', 'SAFETY_OFFICER'])
   })
 
   // Questions 7 and 8, answered 2 September. Pinned because a role widening is a governance
@@ -134,11 +134,12 @@ describe('permissions come from live grants only', () => {
   })
 
   // The front of house officer administers the rota, the checklist and the emergency card the
-  // same way, days ahead and sitting down: ordinary standing permissions beside the bypass (0046).
+  // same way, and exports the licensing register: ordinary standing permissions beside the
+  // bypass (0046).
   test('the front of house officer holds that standing administration and nothing else', () => {
     const held = [...permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now)]
       .filter(permission => !OPERATIONAL_PERMISSIONS.includes(permission)).sort()
-    expect(held).toEqual(['checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'rota.read', 'rota.write'])
+    expect(held).toEqual(['age-checks.export', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'rota.read', 'rota.write'])
   })
 
   // Nothing outside the three named ones may be operational, whatever a role picks up later.

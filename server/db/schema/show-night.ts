@@ -204,3 +204,26 @@ export const checklistCloses = sqliteTable('checklist_closes', {
 }, table => [
   unique('checklist_closes_venue_night').on(table.venueId, table.night),
 ])
+
+// Which severities route to the safety officer (E-116 criterion 1). One row per severity,
+// defaulting closed: a severity nobody has opted in notifies nobody, never guessed open.
+export const incidentSeverityConfig = sqliteTable('incident_severity_config', {
+  severity: text('severity').primaryKey(),
+  requiresFollowUp: integer('requires_follow_up', { mode: 'boolean' }).notNull().default(false),
+  updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  check('incident_severity_config_values', sql`${table.severity} IN ('NOTE', 'NEAR_MISS', 'INCIDENT', 'SERIOUS')`),
+])
+
+// A follow-up's closure, append-only: the resolution note is a new entry, never an edit to the
+// incident it closes (criterion 3). UNIQUE makes an incident open until exactly one exists.
+export const incidentFollowupClosures = sqliteTable('incident_followup_closures', {
+  id: id(),
+  incidentId: text('incident_id').notNull().references(() => incidents.id, { onDelete: 'restrict' }),
+  resolutionNote: text('resolution_note').notNull(),
+  closedBy: text('closed_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  closedAt: integer('closed_at').notNull().default(now),
+}, table => [
+  uniqueIndex('incident_followup_closures_incident').on(table.incidentId),
+])
