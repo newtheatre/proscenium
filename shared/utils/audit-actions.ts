@@ -180,6 +180,9 @@ const CATALOGUE = {
   'checklist.exempted': { label: 'Checklist item closed over with a reason', module: 'show-night' },
   'checklist.closed': { label: 'Night closed', module: 'show-night' },
   'emergency-card.updated': { label: 'Venue emergency card updated', module: 'show-night' },
+  'incident-severity.routing-changed': { label: 'Severity follow-up routing changed', module: 'show-night' },
+  'incident-followup.closed': { label: 'Incident follow-up closed', module: 'show-night' },
+  'age-checks.exported': { label: 'Challenge 25 register exported', module: 'show-night' },
 
   // Module F: bar
 

@@ -465,6 +465,23 @@ it lives.
 The Nottingham New Theatre`,
   }),
 
+  // No description or detail: audit detail carries no personal free text, and this is the same
+  // wording whichever incident it is (0011, E-116 criterion 2).
+  'incident-follow-up-required': (context: TemplateContext): Rendered => ({
+    subject: `Follow-up required: a ${context.severity} incident`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>A ${context.category} incident logged at ${context.severity} severity needs your
+follow-up.</p>
+<p>Open the safety officer's list to read and close it.</p>`),
+    text: `Hello ${context.name},
+
+A ${context.category} incident logged at ${context.severity} severity needs your follow-up.
+
+Open the safety officer's list to read and close it.
+
+The Nottingham New Theatre`,
+  }),
+
   // Good news, so it leads with it. The way out is in the same breath as the place, because a
   // place nobody uses is one somebody else was waiting for.
   'training-session-promoted': (context: TemplateContext): Rendered => {

@@ -363,6 +363,24 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'keep',
     why: 'Who closed the night. The close-night record survives and must answer for itself.',
   },
+  {
+    name: 'incident_severity_config',
+    column: 'updated_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    why: 'Who last changed the routing. It describes the policy, not the person who set it up.',
+  },
+  {
+    name: 'incident_followup_closures',
+    column: 'closed_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Scrubbing a mention of somebody else in resolution_note is the same known gap as
+    // `incidents.body` (docs/known-issues.md).
+    why: 'Who closed a follow-up. The safety record survives and must answer for itself.',
+  },
 
   // Module F: bar
 
