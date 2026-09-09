@@ -59,6 +59,20 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
 interface Item { id: string, label: string, phase: string, required: boolean, systemCheck: string | null }
 
 describe.skipIf(skip !== null)('committee configuration (E-114 criterion 1)', () => {
+  test('pre-show lists above post-show on the committee overview, whatever order they were added', async () => {
+    const post = await send('POST', '/api/admin/checklist/items', { venueId: house.venueId, phase: 'POST', label: 'Ordering: post', sort: 1, required: true })
+    expect(post.status).toBe(200)
+    const pre = await send('POST', '/api/admin/checklist/items', { venueId: house.venueId, phase: 'PRE', label: 'Ordering: pre', sort: 1, required: true })
+    expect(pre.status).toBe(200)
+
+    const overview = await send('GET', '/api/admin/checklist')
+    const { venues } = await overview.json() as { venues: { venueId: string, items: { phase: string, label: string }[] }[] }
+    const items = venues.find(venue => venue.venueId === house.venueId)!.items
+    expect(items[0]).toMatchObject({ phase: 'PRE', label: 'Ordering: pre' })
+    expect(items.find(item => item.label === 'Ordering: post')?.phase).toBe('POST')
+    expect(items.findIndex(item => item.phase === 'PRE')).toBeLessThan(items.findIndex(item => item.phase === 'POST'))
+  })
+
   test('an administrator can add, edit and retire a checklist item', async () => {
     const created = await send('POST', '/api/admin/checklist/items', { venueId: house.venueId, phase: 'PRE', label: 'Fire exits checked', sort: 1, required: true })
     expect(created.status).toBe(200)
@@ -137,7 +151,7 @@ describe.skipIf(skip !== null)('closing the night (E-114 criterion 4)', () => {
     expect(body.statusMessage ?? body.message ?? '').toContain('Till reconciled')
   })
 
-  test('closing succeeds once every required item is ticked or exempted, and is idempotent', async () => {
+  test('closing succeeds once every required item is ticked or exempted, a reload still knows it, and a second close refuses', async () => {
     const read1 = await send('GET', '/api/tonight/checklist', undefined, foh.cookie)
     const { items } = await read1.json() as { items: { id: string, required: boolean, done: boolean, systemCheck: string | null }[] }
 
@@ -149,8 +163,13 @@ describe.skipIf(skip !== null)('closing the night (E-114 criterion 4)', () => {
     const closed = await send('POST', '/api/tonight/checklist/close', undefined, foh.cookie)
     expect(closed.status).toBe(200)
 
+    // A fresh read, not the close response: this is what a reloaded screen actually sees.
+    const reread = await send('GET', '/api/tonight/checklist', undefined, foh.cookie)
+    const { close } = await reread.json() as { close: { closedAt: number, closedByName: string } | null }
+    expect(close?.closedByName).toBeTruthy()
+
     const closedAgain = await send('POST', '/api/tonight/checklist/close', undefined, foh.cookie)
-    expect(closedAgain.status).toBe(200)
+    expect(closedAgain.status).toBe(409)
   })
 })
 

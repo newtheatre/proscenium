@@ -21,6 +21,11 @@ interface Entry {
   exemptedAt: number | null
 }
 
+interface CloseInfo {
+  closedAt: number
+  closedByName: string
+}
+
 const request = useRequestFetch()
 const toast = useToast()
 
@@ -28,14 +33,17 @@ const syncedAt = ref<Date | null>(null)
 const failure = ref<string | null>(null)
 const busy = ref(true)
 const items = ref<Entry[]>([])
-const closedAt = ref<number | null>(null)
+// Read from the server on every load, never only from `closeNight()`'s own response: otherwise
+// a reload forgets the night is closed and re-enables the close action (E-114 follow-up).
+const close = ref<CloseInfo | null>(null)
 
 async function load(): Promise<void> {
   busy.value = true
   failure.value = null
   try {
-    const listed = await request<{ items: Entry[] }>('/api/tonight/checklist')
+    const listed = await request<{ items: Entry[], close: CloseInfo | null }>('/api/tonight/checklist')
     items.value = listed.items
+    close.value = listed.close
     syncedAt.value = new Date()
   }
   catch (refused) {
@@ -97,18 +105,21 @@ async function submitExempt(): Promise<void> {
 
 const closeFailure = ref<string | null>(null)
 
+// Always resyncs, success or refusal: a race can still 409 even with `close` read live, and the
+// server's own state answers that, not a guess.
 async function closeNight(): Promise<void> {
   saving.value = true
   closeFailure.value = null
   try {
-    const closed = await $fetch<{ closedAt: number }>('/api/tonight/checklist/close', { method: 'POST' })
-    closedAt.value = closed.closedAt
+    await $fetch('/api/tonight/checklist/close', { method: 'POST' })
     toast.add({ title: 'Night closed', icon: 'i-lucide-check', color: 'success' })
   }
   catch (refused) {
     closeFailure.value = refusalText(refused)
   }
   finally {
+    await load()
+    if (close.value) closeFailure.value = null
     saving.value = false
   }
 }
@@ -136,11 +147,11 @@ async function closeNight(): Promise<void> {
         data-test="checklist-list"
       >
         <UAlert
-          v-if="closedAt"
+          v-if="close"
           data-test="checklist-closed"
           color="success"
           variant="subtle"
-          description="Tonight is closed."
+          :description="`Tonight is closed, by ${close.closedByName}.`"
         />
 
         <section
@@ -240,7 +251,7 @@ async function closeNight(): Promise<void> {
           label="Close the night"
           icon="i-lucide-door-closed"
           color="primary"
-          :disabled="!!closedAt"
+          :disabled="!!close"
           :loading="saving"
           data-test="close-night"
           @press="closeNight"

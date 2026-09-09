@@ -87,6 +87,22 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
     }
   }, CASE_TIMEOUT_MS)
 
+  // A navigational link outside the sticky slot is not the primary action the cardinality half
+  // of criterion 2 governs, but the thumb-sized half still applies to anything a thumb taps.
+  test('the hub\'s navigational links are thumb-sized too', async () => {
+    const view = await openView(PHONE)
+    try {
+      await visit(view, `${app.baseURL}/tonight`)
+      for (const selector of ['[data-test="link-incidents"]', '[data-test="link-age-checks"]', '[data-test="link-checklist"]']) {
+        const link = await boxOf(view, selector)
+        expect(link.height).toBeGreaterThanOrEqual(NIGHT_TAP_TARGET_PX)
+      }
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   // Criterion 3: stage black by default, with the shell marked dark rather than the page opting in.
   test('the shell is dark before any page asks for it', async () => {
     const view = await openView(PHONE)

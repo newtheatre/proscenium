@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   closeStatement,
+  ensureStampedStatement,
   exemptStatement,
   incidentsReviewedQuery,
   insertItemStatement,
@@ -124,6 +125,70 @@ describe('stamping onto a venue\'s night (criteria 1, 2)', () => {
       expect(run(database, stampsForNightQuery(b.id, NIGHT))).toHaveLength(1)
     })
   })
+
+  test('pre-show always lists above post-show, whatever order the items were added', async () => {
+    await withDatabase(async (database) => {
+      const officer = person(database, 'officer')
+      const venue = testVenue(database)
+      run(database, insertItemStatement(item(venue.id, { phase: 'POST', label: 'Till reconciled', sort: 1 }), officer, 'ci-post'))
+      run(database, insertItemStatement(item(venue.id, { phase: 'PRE', label: 'Fire exits checked', sort: 1 }), officer, 'ci-pre'))
+
+      const items = run(database, itemsForVenueQuery(venue.id, false))
+      expect(items.map(row => row.phase)).toEqual(['PRE', 'POST'])
+    })
+  })
+})
+
+describe('ensureStampedStatement, the whole-venue stamp (criteria 1, 2, 0006)', () => {
+  test('one set-based write stamps every active item, none of a retired one', async () => {
+    await withDatabase(async (database) => {
+      const officer = person(database, 'officer')
+      const venue = testVenue(database)
+      run(database, insertItemStatement(item(venue.id, { label: 'Fire exits checked' }), officer, 'ci-1'))
+      run(database, insertItemStatement(item(venue.id, { label: 'Till float counted' }), officer, 'ci-2'))
+      run(database, insertItemStatement(item(venue.id, { label: 'Retired before tonight' }), officer, 'ci-3'))
+      run(database, retireItemStatement('ci-3', false, officer))
+
+      const written = run(database, ensureStampedStatement(venue.id, NIGHT))
+      expect(written).toHaveLength(2)
+
+      const stamps = run(database, stampsForNightQuery(venue.id, NIGHT))
+      expect(stamps.map(stamp => stamp.label).sort()).toEqual(['Fire exits checked', 'Till float counted'])
+    })
+  })
+
+  test('running it again writes nothing more: a fully stamped night conflicts on every row', async () => {
+    await withDatabase(async (database) => {
+      const officer = person(database, 'officer')
+      const venue = testVenue(database)
+      run(database, insertItemStatement(item(venue.id), officer, 'ci-1'))
+
+      expect(run(database, ensureStampedStatement(venue.id, NIGHT))).toHaveLength(1)
+      expect(run(database, ensureStampedStatement(venue.id, NIGHT))).toHaveLength(0)
+      expect(run(database, stampsForNightQuery(venue.id, NIGHT))).toHaveLength(1)
+    })
+  })
+
+  test('an item added after the night is already stamped is picked up, still with no duplicate', async () => {
+    await withDatabase(async (database) => {
+      const officer = person(database, 'officer')
+      const venue = testVenue(database)
+      run(database, insertItemStatement(item(venue.id, { label: 'Fire exits checked' }), officer, 'ci-1'))
+      expect(run(database, ensureStampedStatement(venue.id, NIGHT))).toHaveLength(1)
+
+      run(database, insertItemStatement(item(venue.id, { label: 'Added mid-night' }), officer, 'ci-2'))
+      const written = run(database, ensureStampedStatement(venue.id, NIGHT))
+      expect(written).toHaveLength(1)
+      expect(run(database, stampsForNightQuery(venue.id, NIGHT))).toHaveLength(2)
+    })
+  })
+
+  test('a venue with nothing configured writes nothing', async () => {
+    await withDatabase(async (database) => {
+      const venue = testVenue(database)
+      expect(run(database, ensureStampedStatement(venue.id, NIGHT))).toHaveLength(0)
+    })
+  })
 })
 
 describe('ticking and exempting (criteria 2, 3, 5)', () => {
@@ -155,6 +220,18 @@ describe('ticking and exempting (criteria 2, 3, 5)', () => {
       const stampId = stampedItem(database, venue.id, officer, { systemCheck: 'INCIDENTS_REVIEWED', phase: 'POST' })
 
       expect(run(database, tickStatement(stampId, venue.id, NIGHT, officer))).toHaveLength(0)
+    })
+  })
+
+  test('a system-verified item cannot be exempted either: recording one would be audited and have no effect', async () => {
+    await withDatabase(async (database) => {
+      const officer = person(database, 'officer')
+      const venue = testVenue(database)
+      const stampId = stampedItem(database, venue.id, officer, { systemCheck: 'INCIDENTS_REVIEWED', phase: 'POST' })
+
+      expect(run(database, exemptStatement(stampId, venue.id, NIGHT, 'Reason', officer))).toHaveLength(0)
+      const [after] = run(database, stampsForNightQuery(venue.id, NIGHT))
+      expect(after).toMatchObject({ exempted: 0, exemptReason: null })
     })
   })
 
@@ -190,6 +267,19 @@ describe('ticking and exempting (criteria 2, 3, 5)', () => {
       expect(run(database, tickStatement(stampId, 'venue-elsewhere', NIGHT, officer))).toHaveLength(0)
     })
   })
+
+  test('pre-show always lists above post-show on the stamped list too', async () => {
+    await withDatabase(async (database) => {
+      const officer = person(database, 'officer')
+      const venue = testVenue(database)
+      run(database, insertItemStatement(item(venue.id, { phase: 'POST', label: 'Till reconciled', sort: 1 }), officer, 'ci-post'))
+      run(database, insertItemStatement(item(venue.id, { phase: 'PRE', label: 'Fire exits checked', sort: 1 }), officer, 'ci-pre'))
+      run(database, ensureStampedStatement(venue.id, NIGHT))
+
+      const stamps = run(database, stampsForNightQuery(venue.id, NIGHT))
+      expect(stamps.map(stamp => stamp.phase)).toEqual(['PRE', 'POST'])
+    })
+  })
 })
 
 describe('the no-show-holds system check (criterion 3)', () => {
@@ -214,15 +304,30 @@ describe('the incidents-reviewed system check (criterion 3)', () => {
     await withDatabase((database) => {
       const made = tonightsPerformance(database, { night: NIGHT })
       const officer = person(database, 'officer')
-      expect(run(database, incidentsReviewedQuery(NIGHT))[0]?.unreviewed).toBe(0)
+      expect(run(database, incidentsReviewedQuery(made.venueId, NIGHT))[0]?.unreviewed).toBe(0)
 
       const happenedAt = Math.floor(showNightBounds(NIGHT).from.getTime() / 1000) + 3600
       run(database, recordIncidentStatement(officer, made.performanceId, 'SAFETY', 'NOTE', 'Body', happenedAt, 'in-1').statement)
-      expect(run(database, incidentsReviewedQuery(NIGHT))[0]?.unreviewed).toBe(1)
+      expect(run(database, incidentsReviewedQuery(made.venueId, NIGHT))[0]?.unreviewed).toBe(1)
 
       database.batch([['INSERT INTO audit_log (id, actor_id, action, target) VALUES (?, ?, ?, ?)',
         'al-1', officer, 'incident.reviewed', 'incident:in-1']])
-      expect(run(database, incidentsReviewedQuery(NIGHT))[0]?.unreviewed).toBe(0)
+      expect(run(database, incidentsReviewedQuery(made.venueId, NIGHT))[0]?.unreviewed).toBe(0)
+    })
+  })
+
+  // 0043, E-127: two venues can run the same night, and one venue's unreviewed incident must
+  // never trip the other's checklist item, nor let reviewing the wrong venue's clear it.
+  test('an unreviewed incident at another venue does not trip this one\'s check', async () => {
+    await withDatabase((database) => {
+      const a = tonightsPerformance(database, { night: NIGHT, suffix: 'a' })
+      const b = tonightsPerformance(database, { night: NIGHT, suffix: 'b' })
+      const officer = person(database, 'officer')
+      const happenedAt = Math.floor(showNightBounds(NIGHT).from.getTime() / 1000) + 3600
+      run(database, recordIncidentStatement(officer, b.performanceId, 'SAFETY', 'NOTE', 'Body', happenedAt, 'in-b').statement)
+
+      expect(run(database, incidentsReviewedQuery(a.venueId, NIGHT))[0]?.unreviewed).toBe(0)
+      expect(run(database, incidentsReviewedQuery(b.venueId, NIGHT))[0]?.unreviewed).toBe(1)
     })
   })
 })

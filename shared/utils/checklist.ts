@@ -14,8 +14,14 @@ export function saysPhase(phase: Phase): string {
 export const SYSTEM_CHECKS = ['NO_SHOW_HOLDS_RELEASED', 'INCIDENTS_REVIEWED'] as const
 export type SystemCheck = (typeof SYSTEM_CHECKS)[number]
 
+// Exhaustive on purpose, matching `evaluate()`'s dispatch in `server/utils/checklist.ts`: a
+// third check must touch both, and `never` refuses to compile until it does.
 export function saysSystemCheck(check: SystemCheck): string {
-  return check === 'NO_SHOW_HOLDS_RELEASED' ? 'No-show holds released' : 'Tonight\'s incidents reviewed'
+  switch (check) {
+    case 'NO_SHOW_HOLDS_RELEASED': return 'No-show holds released'
+    case 'INCIDENTS_REVIEWED': return 'Tonight\'s incidents reviewed'
+    default: return check satisfies never
+  }
 }
 
 const LABEL_LIMIT = 200
