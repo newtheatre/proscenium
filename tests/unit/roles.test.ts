@@ -133,9 +133,8 @@ describe('permissions come from live grants only', () => {
     expect(held).toEqual(['bar.read', 'bar.write'])
   })
 
-  // The front of house officer administers the rota, the checklist and the emergency card the
-  // same way, and exports the licensing register: ordinary standing permissions beside the
-  // bypass (0046).
+  // The front of house officer administers the rota, checklist, emergency card and licensing
+  // export the same way: ordinary standing permissions beside the bypass (0046).
   test('the front of house officer holds that standing administration and nothing else', () => {
     const held = [...permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now)]
       .filter(permission => !OPERATIONAL_PERMISSIONS.includes(permission)).sort()
