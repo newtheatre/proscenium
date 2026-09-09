@@ -96,3 +96,37 @@ export function bornExpiredReason(holdExpiresAt: number, now: number): string | 
 export function holdReminderClaim(reservationId: string, expiresAt: number): string {
   return `reservation.hold-expiring:${reservationId}:${expiresAt}`
 }
+
+export const reservationResendForm = z.object({
+  reference: z.string().trim().length(RESERVATION_REFERENCE_LENGTH),
+  email: z.string().email().max(320),
+})
+
+export interface QrStatusDisplay {
+  headline: string
+  detail: string | null
+}
+
+// What the QR page (and eventually the door, D-126) says for each state a reservation can be
+// in when the code is presented, loudly distinct from every other (D-108 criterion 5).
+export function qrStatusDisplay(status: string, cancelledBy: string | null, totalDue: string | null): QrStatusDisplay {
+  switch (status) {
+    case 'PENDING':
+      return { headline: 'Unpaid', detail: totalDue ? `${totalDue} due at the box office on the night.` : null }
+    case 'COLLECTED':
+      return { headline: 'Paid', detail: 'Collected at the box office.' }
+    case 'DOOR':
+      return { headline: 'Admitted', detail: 'Already checked in at the door.' }
+    case 'EXPIRED':
+      return { headline: 'Lapsed', detail: 'This hold was released. Contact the box office if you still want to attend.' }
+    case 'CANCELLED':
+      return {
+        headline: 'Cancelled',
+        detail: cancelledBy === 'CUSTOMER' ? 'Cancelled by the booker.' : 'Cancelled by the box office.',
+      }
+    case 'NO_SHOW':
+      return { headline: 'No-show', detail: 'Recorded as not attended.' }
+    default:
+      return { headline: status, detail: null }
+  }
+}

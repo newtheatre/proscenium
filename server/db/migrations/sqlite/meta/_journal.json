@@ -505,6 +505,13 @@
       "when": 1788970800000,
       "tag": "0071_a_sale_never_takes_on_hand_negative",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "6",
+      "when": 1788936496151,
+      "tag": "0072_heavy_randall",
+      "breakpoints": true
     }
   ]
 }

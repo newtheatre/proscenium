@@ -17,6 +17,9 @@ export const ticketTypes = sqliteTable('ticket_types', {
   kind: text('kind').notNull(),
   // Set on the two types no public payload may ever carry (D-128).
   accessKind: text('access_kind'),
+  // Entitlement gate, set once at creation (D-109 criterion 1). No CHECK: a rebuild this
+  // `restrict`-FK'd table cannot survive once sold; enforced by Zod at the write path (0012).
+  restrictedTo: text('restricted_to'),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
   activeByDefault: integer('active_by_default', { mode: 'boolean' }).notNull().default(true),
 }, table => [
@@ -67,7 +70,8 @@ export const reservations = sqliteTable('reservations', {
   cancelledBy: text('cancelled_by'),
   customerNotes: text('customer_notes'),
   staffNotes: text('staff_notes'),
-  // The stable QR credential, minted once at reservation and never reissued (D-108).
+  // Unused: the QR is a stateless HMAC over this row's id (`server/utils/qr-tokens.ts`), so a
+  // resend can reproduce the identical code without a stored credential to leak (D-108).
   qrTokenHash: text('qr_token_hash'),
   // True only for a desk booking past the customer window (D-112 criterion 3); a web
   // reservation is always false, since `saleRefusal` already refused a closed one.

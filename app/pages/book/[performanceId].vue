@@ -23,6 +23,7 @@ interface BookingInfo {
 interface Confirmation {
   reference: string
   totalPence: number
+  qrToken: string
 }
 
 const route = useRoute()
@@ -116,13 +117,20 @@ useSeoMeta({ title: 'Book tickets' })
         title="Reservation held"
         :description="`Reference ${confirmation.reference}. Pay ${saysPrice(confirmation.totalPence)} at the box office on the night; this reservation is unpaid until then.`"
       />
-      <UButton
-        to="/whats-on"
-        variant="link"
-        class="px-0"
-      >
-        Back to what's on
-      </UButton>
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          :to="`/qr/${confirmation.qrToken}`"
+          data-test="view-booking"
+        >
+          View your booking
+        </UButton>
+        <UButton
+          to="/whats-on"
+          variant="link"
+        >
+          Back to what's on
+        </UButton>
+      </div>
     </div>
 
     <div v-else-if="data!.refusal">
