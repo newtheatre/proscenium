@@ -5,13 +5,13 @@ import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, resolvedPriceColumns } from '#server/utils/bar'
 import { postEntry } from '#server/utils/ledger'
+import { authorisedTabHolder, canOverrideTabCap, outstandingTabBalance } from '#server/utils/tab-holders'
 import { priceRef, saysMoney } from '#shared/utils/bar'
-import type { AuditRow } from '#shared/utils/audit'
 import type { BasketLineInput, PricedBasket, PricedLine, SaleCatalogue, SaleCategory, SaleChoice, SaleProduct, SaleReceipt, SaleVariant } from '#shared/utils/sale'
 import type { BatchItem } from 'drizzle-orm/batch'
 
 // What the till may sell right now, what pricing a basket of it costs, and committing a sale
-// atomically once the till has confirmed it (F-103, F-104, F-105).
+// atomically once the till has confirmed it, on the reader or on a tab (F-103 through F-108).
 
 interface VariantRow {
   id: string
@@ -229,14 +229,55 @@ export async function priceBasket(lines: BasketLineInput[], on: string): Promise
   return { lines: priced, totalPence }
 }
 
-// The cross-check (F-104) and, once it matches, the one atomic write (F-105 criterion 1): a
-// ledger entry, its lines, a stock movement per ingredient, and the session's audit row, in one batch.
+// Everything `commitSale` knows about who is selling and where, beyond the basket itself: what
+// its audit rows cite (F-105), and which night an override is checked against (F-108).
+export interface SaleContext {
+  actorId: string
+  sessionId: string
+  venueId: string
+  night: string
+}
+
+// The tab side of the cross-check (F-108 criteria 1, 3, 4): resolved once, so the balance read
+// and the write it gates can never see two different figures.
+async function resolveTab(
+  tabHolderId: string | null,
+  actorId: string,
+  night: string,
+  chargePence: number,
+): Promise<{ holderId: string, holderName: string, outstandingPence: number, capOverridden: boolean } | null> {
+  if (!tabHolderId) return null
+
+  const holder = await authorisedTabHolder(undefined, tabHolderId)
+  if (!holder) throw createError({ statusCode: 409, statusMessage: 'That member is not authorised to charge to a tab' })
+
+  const cap = await configValue(undefined, 'BAR_TAB_CAP_PENCE')
+  const outstandingPence = await outstandingTabBalance(tabHolderId)
+  let capOverridden = false
+
+  if (outstandingPence + chargePence > cap) {
+    const overrideEnabled = await configValue(undefined, 'BAR_TAB_CAP_MANAGER_OVERRIDE')
+    if (!overrideEnabled || !await canOverrideTabCap(actorId, night)) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `${holder.name}'s tab is at ${saysMoney(outstandingPence)}; this charge of ${saysMoney(chargePence)} `
+          + `would take it past the ${saysMoney(cap)} cap. A duty manager or bar manager can override.`,
+      })
+    }
+    capOverridden = true
+  }
+
+  return { holderId: holder.id, holderName: holder.name, outstandingPence, capOverridden }
+}
+
+// The cross-check (F-104) and the one atomic write (F-105 criterion 1): the ledger entry, its
+// lines, stock and every audit row, in one batch. A tab charge is credit, not money (F-108).
 export async function commitSale(
   lines: BasketLineInput[],
   on: string,
-  actorId: string,
   expectedTotalPence: number,
-  audit: AuditRow,
+  tabHolderId: string | null,
+  context: SaleContext,
 ): Promise<SaleReceipt> {
   const { resolved, priced, totalPence } = await resolveSale(lines, on)
   if (totalPence !== expectedTotalPence) {
@@ -246,10 +287,13 @@ export async function commitSale(
     })
   }
 
+  const tab = await resolveTab(tabHolderId, context.actorId, context.night, totalPence)
+
   const posted = postEntry({
     source: 'TILL',
-    tender: 'CARD',
-    actorId,
+    tender: tab ? 'TAB' : 'CARD',
+    actorId: context.actorId,
+    tabDebtorId: tab?.holderId ?? null,
     lines: resolved.map(line => ({
       kind: 'BAR_ITEM',
       amountPence: line.amountPence,
@@ -274,11 +318,26 @@ export async function commitSale(
         kind: 'SALE',
         refTable: 'ledger_lines',
         refId: lineId,
-        actorId,
+        actorId: context.actorId,
       }))
     }
   })
-  statements.push(db.insert(schema.auditLog).values(audit))
+  statements.push(db.insert(schema.auditLog).values(auditEntry({
+    actorId: context.actorId,
+    action: 'bar.till.sale',
+    target: `till-session:${context.sessionId}`,
+    detail: { venueId: context.venueId, night: context.night, lines: resolved.length, tender: tab ? 'TAB' : 'CARD' },
+  })))
+  // A separate row from the sale itself: real because `actorId` above is only set by whoever
+  // was actually signed in to submit it (F-108 criterion 4).
+  if (tab?.capOverridden) {
+    statements.push(db.insert(schema.auditLog).values(auditEntry({
+      actorId: context.actorId,
+      action: 'bar.tab.cap-overridden',
+      target: `till-session:${context.sessionId}`,
+      detail: { tabHolderId: tab.holderId, chargePence: totalPence },
+    })))
+  }
 
   try {
     await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
@@ -292,5 +351,10 @@ export async function commitSale(
     throw error
   }
 
-  return { entryId: posted.id, totalPence: posted.totalPence, lines: priced }
+  return {
+    entryId: posted.id,
+    totalPence: posted.totalPence,
+    lines: priced,
+    tab: tab ? { holderName: tab.holderName, outstandingPence: tab.outstandingPence + totalPence, capOverridden: tab.capOverridden } : null,
+  }
 }

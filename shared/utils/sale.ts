@@ -24,10 +24,11 @@ export const basketForm = z.object({
 export type BasketLineInput = z.output<typeof basketLineForm>
 export type BasketInput = z.output<typeof basketForm>
 
-// A sale submission carries what the screen believes the total is, so the server can refuse a
-// stale or wrong figure by name rather than charging whatever it likes (0004, F-104 criterion 1).
+// The screen's own belief of the total (0004, F-104 criterion 1). `tabHolderId` charges the
+// sale to a tab instead of the reader (F-108); omitted, it is card.
 export const saleForm = basketForm.extend({
   expectedTotalPence: z.number().int().nonnegative(),
+  tabHolderId: z.string().trim().min(1).nullish().transform(value => value ?? null),
 })
 
 export type SaleInput = z.output<typeof saleForm>
@@ -96,10 +97,11 @@ export interface PricedBasket {
   totalPence: number
 }
 
-// What a completed sale answers with (F-105): the ledger entry it posted, so a receipt or a void
-// can cite it, and the same lines a price check would have shown.
+// What a completed sale answers with (F-105): the ledger entry it posted. `tab` is set only on
+// a tab charge, naming the holder, the balance it now stands at, and whether the cap was waived.
 export interface SaleReceipt {
   entryId: string
   totalPence: number
   lines: PricedLine[]
+  tab: { holderName: string, outstandingPence: number, capOverridden: boolean } | null
 }

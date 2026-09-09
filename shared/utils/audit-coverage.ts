@@ -326,8 +326,9 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/till/index.post.ts', actions: ['bar.till.opened'] },
   { route: 'server/api/till/close.post.ts', actions: ['bar.till.closed'] },
   { route: 'server/api/till/products.get.ts', exempt: 'reads what the till may sell right now, writing nothing' },
+  { route: 'server/api/till/tab-holders.get.ts', exempt: 'reads who the till may charge a sale to, writing nothing' },
   { route: 'server/api/till/price.post.ts', exempt: 'prices a basket against live prices; nothing is written until F-104 and F-105 land the sale write' },
-  { route: 'server/api/till/sale.post.ts', actions: ['bar.till.sale'], via: ['server/utils/sale.ts'] },
+  { route: 'server/api/till/sale.post.ts', actions: ['bar.till.sale', 'bar.tab.cap-overridden'], via: ['server/utils/sale.ts'] },
 
   // Module G: training
 

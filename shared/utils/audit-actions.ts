@@ -197,6 +197,7 @@ const CATALOGUE = {
   'bar.variant.choice.changed': { label: 'A serving size choice group attached or cleared', module: 'bar' },
   'bar.variant.price.set': { label: 'Serving size priced from a date', module: 'bar' },
   'bar.choice-group.created': { label: 'Choice group added', module: 'bar' },
+  'bar.tab.cap-overridden': { label: 'A tab charge over the cap approved by a manager', module: 'bar' },
   'bar.item.created': { label: 'Stocked item added', module: 'bar' },
   'bar.item.updated': { label: 'Stocked item changed', module: 'bar' },
   'bar.item.status.changed': { label: 'Stocked item retired or put back', module: 'bar' },
