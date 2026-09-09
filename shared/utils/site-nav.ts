@@ -11,6 +11,7 @@ import {
   viewBarCatalogue,
   viewBarStock,
   viewChecklist,
+  viewEmergencyCard,
   viewFellows,
   viewMembers,
   viewPassTypes,
@@ -68,6 +69,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Approvals', icon: 'i-lucide-check-check', to: '/rota/manage/approvals', ability: viewRota },
       { label: 'Unfilled shifts', icon: 'i-lucide-user-round-x', to: '/rota/manage/shifts', ability: viewRota },
       { label: 'Checklists', icon: 'i-lucide-list-checks', to: '/rota/manage/checklists', ability: viewChecklist },
+      { label: 'Emergency cards', icon: 'i-lucide-siren', to: '/rota/manage/emergency', ability: viewEmergencyCard },
     ],
   },
 

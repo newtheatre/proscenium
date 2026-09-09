@@ -1,10 +1,23 @@
 <script setup lang="ts">
+import { nightCacheKey } from '#shared/utils/night-cache'
+import { currentShowNight } from '#shared/utils/show-night'
+
 // A phone held in a foyer is not a dashboard: a plain dark subtree, big targets, nothing that
 // needs a mouse (docs/design-language.md). The hub is the navigation; there is no sidebar.
 const route = useRoute()
 
 // The hub is the way back, so it does not offer a link to itself.
 const atTheHub = computed(() => route.path === '/tonight')
+
+// Opening any show-night screen caches the emergency card, whole-night rather than venue-scoped
+// since a shift holder resolves only one (0044). Best effort: no shift, nothing to prime.
+onMounted(async () => {
+  try {
+    const card = await $fetch<unknown>('/api/tonight/emergency')
+    await primeNightCache(nightCacheKey({ screen: 'emergency-card', night: currentShowNight(), wholeNight: true }), () => card)
+  }
+  catch { /* nothing to prime */ }
+})
 </script>
 
 <template>
