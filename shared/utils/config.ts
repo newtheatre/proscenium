@@ -94,6 +94,13 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Whether a manager may raise the tab cap for one tab.',
   },
+  // No proposed value in docs/workshops.md: ships unset, so creating or editing a discount is
+  // refused until a workshop or a settings change sets one (0019, F-117 criterion 1).
+  BAR_DISCOUNT_MAX_PERCENT: {
+    schema: z.number().int().positive().max(100),
+    workshop: 'money-and-box-office',
+    describes: 'The most a bar discount may take off, as a percentage. A discount above it is refused, on creation and on edit.',
+  },
 
   // Module I: finance
 

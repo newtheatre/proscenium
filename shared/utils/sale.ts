@@ -21,6 +21,9 @@ export const basketForm = z.object({
   venueId: z.string().trim().min(1).optional(),
   performanceId: z.string().trim().min(1).optional(),
   lines: z.array(basketLineForm).min(1, 'A basket needs at least one line').max(MAX_BASKET_LINES),
+  // On both the price check and the sale itself, so a discount is never a surprise at charge time
+  // that the screen never priced (F-104 criterion 1, F-117 criterion 4).
+  discountId: z.string().trim().min(1).nullish().transform(value => value ?? null),
 })
 
 export type BasketLineInput = z.output<typeof basketLineForm>
@@ -91,12 +94,18 @@ export interface PricedLine {
   qty: number
   unitPricePence: number
   priceSource: Exclude<BarPriceSource, null>
+  // The line's own sticker amount: gross, before any discount (unchanged by F-117).
   amountPence: number
+  // What a discount took off this line, 0 when none applies. Never negative to the line: it is
+  // subtracted from `amountPence`, never itself the charge (F-117 criterion 3).
+  discountPence: number
 }
 
 export interface PricedBasket {
   lines: PricedLine[]
+  // Net: the sum of every line's `amountPence` less its `discountPence` (F-117 criterion 4).
   totalPence: number
+  discount: { id: string, name: string, percent: number } | null
 }
 
 // What a completed sale answers with (F-105): the ledger entry it posted, so a receipt or a void
@@ -107,4 +116,5 @@ export interface SaleReceipt {
   lines: PricedLine[]
   ageCheck: { id: string, outcome: AgeCheckOutcome } | null
   refusedLines: PricedLine[]
+  discount: { id: string, name: string, percent: number } | null
 }

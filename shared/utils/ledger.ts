@@ -49,7 +49,8 @@ const pence = z.number().int()
 
 export const lineForm = z.object({
   kind: z.enum(KIND_NAMES),
-  // Gross, and negative on a reversal. Zero is a comp, which is a fact rather than an absence.
+  // What actually moved: net of any discount, and negative on a reversal. Zero is a comp, which
+  // is a fact rather than an absence.
   amountPence: pence,
   qty: z.number().int().min(1).default(1),
   unitPricePence: pence.nullish(),
@@ -59,6 +60,11 @@ export const lineForm = z.object({
   productVariantId: z.string().max(64).nullish(),
   priceRef: z.string().max(200).nullish(),
   choices: z.record(z.string(), z.unknown()).nullish(),
+  // The discount that reduced this line, snapshotted rather than referenced: a later edit to the
+  // discount's own name or percentage never restates what this line actually charged (F-117).
+  discountId: z.string().max(64).nullish(),
+  discountPercent: z.number().int().positive().max(100).nullish(),
+  discountPence: pence.nullish(),
 })
 
 export type LineInput = z.input<typeof lineForm>

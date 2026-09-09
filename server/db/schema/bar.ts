@@ -23,6 +23,24 @@ export const barCategories = sqliteTable('bar_categories', {
   check('bar_categories_colour_hex', sql`${table.colour} IS NULL OR ${table.colour} GLOB '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'`),
 ])
 
+// A percentage a bar manager may apply to a sale, capped by configuration (0012). Editable in
+// place: a past sale's own ledger lines snapshot what it charged, so an edit here never restates it.
+export const discounts = sqliteTable('discounts', {
+  id: id(),
+  name: text('name').notNull(),
+  percent: integer('percent').notNull(),
+  status: text('status').notNull().default('ACTIVE'),
+  createdBy: text('created_by').references(() => users.id, { onDelete: 'restrict' }),
+  updatedBy: text('updated_by').references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  unique('discounts_name').on(table.name),
+  uniqueIndex('discounts_name_nocase').on(sql`${table.name} COLLATE NOCASE`),
+  check('discounts_percent_range', sql`${table.percent} > 0 AND ${table.percent} <= 100`),
+  check('discounts_status_values', sql`${table.status} IN ('ACTIVE', 'RETIRED')`),
+])
+
 // A sellable thing. Its serving sizes, its recipe and its prices arrive as their own tables
 // (F-112, F-113, F-116); a product carries what the till has to show beside the buttons.
 export const barProducts = sqliteTable('bar_products', {

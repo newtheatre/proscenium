@@ -55,6 +55,9 @@ export function postEntry(input: EntryInput, at = new Date()): PostedEntry {
       productVariantId: line.productVariantId ?? null,
       priceRef: line.priceRef ?? null,
       choices: line.choices ?? null,
+      discountId: line.discountId ?? null,
+      discountPercent: line.discountPercent ?? null,
+      discountPence: line.discountPence ?? null,
     }))
   }
 

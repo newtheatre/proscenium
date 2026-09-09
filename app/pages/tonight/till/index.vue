@@ -6,6 +6,7 @@ import { MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
 import { nightCacheKey } from '#shared/utils/night-cache'
 import { currentShowNight } from '#shared/utils/show-night'
 import type { IdType, InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
+import type { Discount } from '#shared/utils/discounts'
 import type { PricedBasket, PricedLine, SaleCatalogue, SaleChoice, SaleProduct, SaleReceipt, SaleVariant } from '#shared/utils/sale'
 import type { TillSession } from '#shared/utils/till'
 
@@ -99,6 +100,18 @@ const categories = computed(() => catalogue.data.value?.categories ?? [])
 const products = computed(() => catalogue.data.value?.products ?? [])
 const productsIn = (categoryId: string): SaleProduct[] => products.value.filter(product => product.categoryId === categoryId)
 
+// Active discounts only: a manager who retires one mid-service should not see it offered a
+// moment later (F-117).
+const discountsKey = computed(() => nightCacheKey({ screen: 'till-discounts', night: currentShowNight(), wholeNight: true }))
+const discounts = useNightCache<{ discounts: Discount[] }>(discountsKey, () =>
+  request<{ discounts: Discount[] }>('/api/till/discounts', { query: { venueId: venueId.value ?? undefined } }), { immediate: false })
+
+watch([session, venueId], () => {
+  if (session.value && venueId.value) void discounts.refresh()
+})
+
+const selectedDiscountId = ref<string | null>(null)
+
 interface BasketLine {
   id: string
   variantId: string
@@ -179,6 +192,7 @@ async function recomputeTotal(): Promise<void> {
       body: {
         venueId: venueId.value,
         lines: basket.value.map(line => ({ variantId: line.variantId, qty: line.qty, choiceItemId: line.choiceItemId })),
+        discountId: selectedDiscountId.value,
       },
     })
   }
@@ -190,7 +204,7 @@ async function recomputeTotal(): Promise<void> {
   }
 }
 
-watch(basket, () => {
+watch([basket, selectedDiscountId], () => {
   clearTimeout(priceTimer)
   if (basket.value.length === 0) {
     priced.value = null
@@ -202,7 +216,7 @@ watch(basket, () => {
 
 const charging = ref(false)
 const chargeFailure = ref<string | null>(null)
-const charged = ref<{ totalPence: number, refusedLines: PricedLine[] } | null>(null)
+const charged = ref<{ totalPence: number, refusedLines: PricedLine[], discount: SaleReceipt['discount'] } | null>(null)
 
 // A restricted line is the product's flag, already on the catalogue this screen holds: no second
 // lookup, and no route sells one without an outcome on record first (F-106 criteria 1, 5).
@@ -235,7 +249,7 @@ async function charge(ageCheck: InlineAgeCheckInput | null = null): Promise<void
   // A refusal drops the restricted lines: what the screen expects to be charged has to shrink to
   // match, or the server's own cross-check would refuse a total nobody asked for (F-104, F-106).
   const expectedTotalPence = ageCheck?.outcome === 'REFUSED'
-    ? priced.value.lines.filter((_, index) => !isRestricted(basket.value[index]!)).reduce((sum, line) => sum + line.amountPence, 0)
+    ? priced.value.lines.filter((_, index) => !isRestricted(basket.value[index]!)).reduce((sum, line) => sum + line.amountPence - line.discountPence, 0)
     : priced.value.totalPence
 
   charging.value = true
@@ -248,9 +262,10 @@ async function charge(ageCheck: InlineAgeCheckInput | null = null): Promise<void
         lines: basket.value.map(line => ({ variantId: line.variantId, qty: line.qty, choiceItemId: line.choiceItemId })),
         expectedTotalPence,
         ageCheck,
+        discountId: selectedDiscountId.value,
       },
     })
-    charged.value = { totalPence: answered.totalPence, refusedLines: answered.refusedLines }
+    charged.value = { totalPence: answered.totalPence, refusedLines: answered.refusedLines, discount: answered.discount }
     resetAgeCheck()
   }
   catch (refused) {
@@ -289,6 +304,7 @@ function nextSale(): void {
   priced.value = null
   charged.value = null
   chargeFailure.value = null
+  selectedDiscountId.value = null
   resetAgeCheck()
 }
 
@@ -464,6 +480,40 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               </div>
             </div>
 
+            <div
+              v-if="discounts.data.value?.discounts.length"
+              class="space-y-2"
+              data-test="discount-picker"
+            >
+              <p class="text-xs text-muted">
+                Discount
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <UButton
+                  size="sm"
+                  :color="selectedDiscountId === null ? 'primary' : 'neutral'"
+                  :variant="selectedDiscountId === null ? 'solid' : 'subtle'"
+                  class="min-h-10"
+                  data-test="discount-none"
+                  @click="selectedDiscountId = null"
+                >
+                  None
+                </UButton>
+                <UButton
+                  v-for="discount in discounts.data.value.discounts"
+                  :key="discount.id"
+                  size="sm"
+                  :color="selectedDiscountId === discount.id ? 'primary' : 'neutral'"
+                  :variant="selectedDiscountId === discount.id ? 'solid' : 'subtle'"
+                  class="min-h-10"
+                  :data-test="`discount-${discount.id}`"
+                  @click="selectedDiscountId = discount.id"
+                >
+                  {{ discount.name }} (-{{ discount.percent }}%)
+                </UButton>
+              </div>
+            </div>
+
             <UAlert
               v-if="chargeFailure"
               data-test="charge-failure"
@@ -478,14 +528,23 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               variant="subtle"
               :description="priceFailure"
             />
-            <p
-              v-else
-              class="flex items-center justify-between text-base font-semibold"
-              data-test="basket-total"
-            >
-              <span>Total</span>
-              <span data-test="basket-total-amount">{{ priced && !pricing ? saysMoney(priced.totalPence) : 'Pricing…' }}</span>
-            </p>
+            <template v-else>
+              <p
+                v-if="priced?.discount"
+                class="flex items-center justify-between text-xs text-muted"
+                data-test="basket-discount"
+              >
+                <span>{{ priced.discount.name }} (-{{ priced.discount.percent }}%)</span>
+                <span>-{{ saysMoney(priced.lines.reduce((sum, line) => sum + line.discountPence, 0)) }}</span>
+              </p>
+              <p
+                class="flex items-center justify-between text-base font-semibold"
+                data-test="basket-total"
+              >
+                <span>Total</span>
+                <span data-test="basket-total-amount">{{ priced && !pricing ? saysMoney(priced.totalPence) : 'Pricing…' }}</span>
+              </p>
+            </template>
           </div>
         </template>
 
@@ -507,6 +566,13 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             color="warning"
             variant="subtle"
             :description="`Not sold, on the ID refusal: ${charged.refusedLines.map(line => line.productName).join(', ')}`"
+          />
+          <UAlert
+            v-if="charged && charged.discount"
+            data-test="discount-applied-note"
+            color="info"
+            variant="subtle"
+            :description="`${charged.discount.name} applied: -${charged.discount.percent}%`"
           />
           <UButton
             block

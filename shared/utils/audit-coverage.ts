@@ -305,6 +305,10 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/bar/variants/[id]/prices.post.ts', actions: ['bar.variant.price.set'] },
   { route: 'server/api/admin/bar/choice-groups/index.get.ts', exempt: 'reads the choice groups a variant may attach' },
   { route: 'server/api/admin/bar/choice-groups/index.post.ts', actions: ['bar.choice-group.created'] },
+  { route: 'server/api/admin/bar/discounts/index.get.ts', exempt: 'reads every discount, active and retired' },
+  { route: 'server/api/admin/bar/discounts/index.post.ts', actions: ['bar.discount.created'] },
+  { route: 'server/api/admin/bar/discounts/[id]/index.put.ts', actions: ['bar.discount.updated'] },
+  { route: 'server/api/admin/bar/discounts/[id]/status.post.ts', actions: ['bar.discount.status.changed'] },
   { route: 'server/api/admin/bar/items/index.get.ts', exempt: 'reads the stocked items and what is on hand' },
   { route: 'server/api/admin/bar/items/index.post.ts', actions: ['bar.item.created'] },
   { route: 'server/api/admin/bar/items/[id]/index.put.ts', actions: ['bar.item.updated'] },
@@ -326,6 +330,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/till/index.post.ts', actions: ['bar.till.opened'] },
   { route: 'server/api/till/close.post.ts', actions: ['bar.till.closed'] },
   { route: 'server/api/till/products.get.ts', exempt: 'reads what the till may sell right now, writing nothing' },
+  { route: 'server/api/till/discounts.get.ts', exempt: 'reads the active discounts the till may apply, writing nothing' },
   { route: 'server/api/till/price.post.ts', exempt: 'prices a basket against live prices; nothing is written until F-104 and F-105 land the sale write' },
   { route: 'server/api/till/sale.post.ts', actions: ['bar.till.sale', 'age-check.logged'], via: ['server/utils/sale.ts'] },
 

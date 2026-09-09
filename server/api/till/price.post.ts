@@ -8,5 +8,5 @@ export default defineEventHandler(async (event) => {
   const resolved = await requireNightAuthority(event, 'BAR', { venueId: input.venueId, performanceId: input.performanceId })
   requireOpenSession(await openSessionFor(resolved.venueId, resolved.night))
 
-  return priceBasket(input.lines, londonDayOf(new Date()))
+  return priceBasket(input.lines, londonDayOf(new Date()), input.discountId)
 })
