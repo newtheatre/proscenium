@@ -67,6 +67,9 @@ async function onSalePassType(over: Record<string, unknown> = {}): Promise<{ id:
   const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) }, officer.cookie)
   const showId = (await show.json() as { id: string }).id
 
+  // status is a PUT-only field: newPassTypeForm is .strict() and has no status of its own.
+  const { status, ...createOver } = over
+
   const name = named('Season pass')
   const created = await send('POST', '/api/admin/pass-types', {
     name,
@@ -75,21 +78,24 @@ async function onSalePassType(over: Record<string, unknown> = {}): Promise<{ id:
     validUntil: now + 180 * 86_400,
     prices: [{ label: 'Standard', price: 4500 }],
     showIds: [showId],
-    ...over,
+    ...createOver,
   }, officer.cookie)
   expect(created.status).toBe(200)
   const { id } = await created.json() as { id: string }
 
-  const detail = await send('GET', `/api/admin/pass-types/${id}`, undefined, officer.cookie)
-  const { prices } = await detail.json() as { prices: { id: string }[] }
-
+  // PUT replaces the price rows wholesale (no price history until D-124 snapshots what a pass
+  // paid), so the price id is only real once fetched after publish, never before it.
   const published = await send('PUT', `/api/admin/pass-types/${id}`, {
     name, slug: slugged(name), validFrom: now, validUntil: now + 180 * 86_400,
-    prices: [{ label: 'Standard', price: 4500 }], status: 'ON_SALE', ...over,
+    prices: [{ label: 'Standard', price: 4500 }], status: 'ON_SALE', ...createOver,
+    ...(status === undefined ? {} : { status }),
   }, officer.cookie)
   expect(published.status).toBe(200)
 
-  return { id, priceId: prices[0]!.id }
+  const detail = await send('GET', `/api/admin/pass-types/${id}`, undefined, officer.cookie)
+  const { passType } = await detail.json() as { passType: { prices: { id: string }[] } }
+
+  return { id, priceId: passType.prices[0]!.id }
 }
 
 describe.skipIf(skip !== null)('issuing a pass at the desk (criteria 1, 2)', () => {
