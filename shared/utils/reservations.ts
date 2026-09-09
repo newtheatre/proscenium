@@ -109,6 +109,71 @@ export const reservationResendForm = z.object({
   email: z.string().email().max(320),
 })
 
+// D-110: self-service edit while unpaid. Desired totals per type, the same shape a fresh
+// booking uses, so "each type appears at most once" is one rule either way (criterion 1).
+export const reservationEditForm = z.strictObject({
+  lines: z.array(reservationLineForm).min(1).max(MAX_LINES)
+    .refine(
+      lines => new Set(lines.map(line => line.ticketTypeId)).size === lines.length,
+      'A ticket type appears once; add to its quantity instead of a second line',
+    ),
+})
+
+export type ReservationEditInput = z.output<typeof reservationEditForm>
+
+export const reservationExchangeForm = z.strictObject({
+  performanceId: z.string().trim().min(1),
+})
+
+export type ReservationExchangeInput = z.output<typeof reservationExchangeForm>
+
+export interface TicketTypeCount {
+  ticketTypeId: string
+  quantity: number
+}
+
+export interface TicketEditDelta {
+  additions: TicketTypeCount[]
+  removals: TicketTypeCount[]
+  desiredTotal: number
+}
+
+// What moves to reach the desired counts from what is currently held, per type: never a whole
+// replacement, so an untouched line's ticket rows and their snapshotted prices stay put.
+export function ticketEditDelta(current: TicketTypeCount[], desired: TicketTypeCount[]): TicketEditDelta {
+  const have = new Map(current.map(line => [line.ticketTypeId, line.quantity]))
+  const want = new Map(desired.map(line => [line.ticketTypeId, line.quantity]))
+  const types = new Set([...have.keys(), ...want.keys()])
+
+  const additions: TicketTypeCount[] = []
+  const removals: TicketTypeCount[] = []
+  for (const ticketTypeId of types) {
+    const before = have.get(ticketTypeId) ?? 0
+    const after = want.get(ticketTypeId) ?? 0
+    if (after > before) additions.push({ ticketTypeId, quantity: after - before })
+    else if (before > after) removals.push({ ticketTypeId, quantity: before - after })
+  }
+
+  return { additions, removals, desiredTotal: desired.reduce((total, line) => total + line.quantity, 0) }
+}
+
+// Criterion 2: a reservation with nothing left is a cancellation, not an edit.
+export function belowMinimumTicketsReason(desiredTotal: number): string | null {
+  if (desiredTotal >= 1) return null
+  return 'A booking must keep at least one ticket. Cancel it instead if none are wanted.'
+}
+
+// Criterion 3: cancellation this close to curtain has nowhere useful to send the freed seats.
+export function pastCurtainReason(startsAt: number, now: number): string | null {
+  if (startsAt > now) return null
+  return 'This performance has already started, so it can no longer be cancelled online. Contact the box office directly.'
+}
+
+export interface QrExchangedTo {
+  showTitle: string
+  when: string
+}
+
 export interface QrStatusDisplay {
   headline: string
   detail: string | null
@@ -116,7 +181,12 @@ export interface QrStatusDisplay {
 
 // What the QR page (and eventually the door, D-126) says for each state a reservation can be
 // in when the code is presented, loudly distinct from every other (D-108 criterion 5).
-export function qrStatusDisplay(status: string, cancelledBy: string | null, totalDue: string | null): QrStatusDisplay {
+export function qrStatusDisplay(
+  status: string,
+  cancelledBy: string | null,
+  totalDue: string | null,
+  exchangedTo: QrExchangedTo | null = null,
+): QrStatusDisplay {
   switch (status) {
     case 'PENDING':
       return { headline: 'Unpaid', detail: totalDue ? `${totalDue} due at the box office on the night.` : null }
@@ -127,6 +197,11 @@ export function qrStatusDisplay(status: string, cancelledBy: string | null, tota
     case 'EXPIRED':
       return { headline: 'Lapsed', detail: 'This hold was released. Contact the box office if you still want to attend.' }
     case 'CANCELLED':
+      // Exchanged is cancelled-with-a-pointer (D-111), not a fourth status: `reservations.status`
+      // carries a restrict-FK'd dependent, so its CHECK constraint cannot be extended (0010).
+      if (exchangedTo) {
+        return { headline: 'Exchanged', detail: `Exchanged for ${exchangedTo.showTitle}, ${exchangedTo.when}.` }
+      }
       return {
         headline: 'Cancelled',
         detail: cancelledBy === 'CUSTOMER' ? 'Cancelled by the booker.' : 'Cancelled by the box office.',

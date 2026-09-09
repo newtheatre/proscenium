@@ -2,12 +2,17 @@ import { describe, expect, test } from 'bun:test'
 import { readBookableTicketTypes } from '#server/utils/reservations'
 import {
   RESERVATION_REFERENCE_LENGTH,
+  belowMinimumTicketsReason,
   generateReservationReference,
   looksLikeReference,
   overCapReason,
+  pastCurtainReason,
   qrStatusDisplay,
+  reservationEditForm,
+  reservationExchangeForm,
   reservationForm,
   reservationResendForm,
+  ticketEditDelta,
   totalTickets,
 } from '#shared/utils/reservations'
 import type { BookableTicketTypeRow } from '#server/utils/reservations'
@@ -150,6 +155,13 @@ describe('what the QR answers, loudly distinct per state (D-108 criterion 5)', (
   test('a lapsed hold reads distinctly from a cancellation', () => {
     expect(qrStatusDisplay('EXPIRED', null, null).headline).not.toBe(qrStatusDisplay('CANCELLED', null, null).headline)
   })
+
+  test('an exchanged booking reads distinctly from an ordinary cancellation (D-111 criterion 4)', () => {
+    const exchanged = qrStatusDisplay('CANCELLED', 'CUSTOMER', null, { showTitle: 'A Different Show', when: 'Friday' })
+    expect(exchanged.headline).toBe('Exchanged')
+    expect(exchanged.headline).not.toBe(qrStatusDisplay('CANCELLED', 'CUSTOMER', null).headline)
+    expect(exchanged.detail).toContain('A Different Show')
+  })
 })
 
 describe('a resend is asked for by reference and email, not a token (criterion 2)', () => {
@@ -176,5 +188,86 @@ describe('a reference is told from a name by its alphabet, not just its length (
   test('the wrong length is never a reference, however plausible its letters', () => {
     expect(looksLikeReference('ABCDE')).toBe(false)
     expect(looksLikeReference('ABCDEFG')).toBe(false)
+  })
+})
+
+describe('D-110: what changes to reach the desired ticket counts (criterion 1)', () => {
+  test('a type not currently held that becomes wanted is an addition', () => {
+    const delta = ticketEditDelta([], [{ ticketTypeId: 'standard', quantity: 2 }])
+    expect(delta.additions).toEqual([{ ticketTypeId: 'standard', quantity: 2 }])
+    expect(delta.removals).toEqual([])
+    expect(delta.desiredTotal).toBe(2)
+  })
+
+  test('a held type dropped from the desired lines is a removal of everything held', () => {
+    const delta = ticketEditDelta([{ ticketTypeId: 'standard', quantity: 3 }], [])
+    expect(delta.removals).toEqual([{ ticketTypeId: 'standard', quantity: 3 }])
+    expect(delta.additions).toEqual([])
+  })
+
+  test('raising one type and lowering another in the same request nets both independently', () => {
+    const delta = ticketEditDelta(
+      [{ ticketTypeId: 'standard', quantity: 2 }, { ticketTypeId: 'concession', quantity: 1 }],
+      [{ ticketTypeId: 'standard', quantity: 3 }, { ticketTypeId: 'concession', quantity: 0 }],
+    )
+    expect(delta.additions).toEqual([{ ticketTypeId: 'standard', quantity: 1 }])
+    expect(delta.removals).toEqual([{ ticketTypeId: 'concession', quantity: 1 }])
+    expect(delta.desiredTotal).toBe(3)
+  })
+
+  test('an unchanged type moves nowhere', () => {
+    const delta = ticketEditDelta([{ ticketTypeId: 'standard', quantity: 2 }], [{ ticketTypeId: 'standard', quantity: 2 }])
+    expect(delta.additions).toEqual([])
+    expect(delta.removals).toEqual([])
+  })
+})
+
+describe('D-110: a booking keeps at least one ticket (criterion 2)', () => {
+  test('a desired total of zero is refused', () => {
+    expect(belowMinimumTicketsReason(0)).not.toBeNull()
+  })
+
+  test('one or more is fine', () => {
+    expect(belowMinimumTicketsReason(1)).toBeNull()
+  })
+})
+
+describe('D-110: self-cancel is refused once the performance has started (criterion 3)', () => {
+  test('before curtain is fine', () => {
+    expect(pastCurtainReason(2_000, 1_000)).toBeNull()
+  })
+
+  test('at or after curtain is refused', () => {
+    expect(pastCurtainReason(1_000, 1_000)).not.toBeNull()
+    expect(pastCurtainReason(1_000, 2_000)).not.toBeNull()
+  })
+})
+
+describe('D-110: the edit form matches the booking form\'s own line shape (criterion 1)', () => {
+  test('a well-formed set of lines parses', () => {
+    const parsed = reservationEditForm.safeParse({ lines: [{ ticketTypeId: 'standard', quantity: 2 }] })
+    expect(parsed.success).toBe(true)
+  })
+
+  test('a type appearing twice is refused before it reaches the database', () => {
+    const parsed = reservationEditForm.safeParse({
+      lines: [{ ticketTypeId: 'standard', quantity: 1 }, { ticketTypeId: 'standard', quantity: 1 }],
+    })
+    expect(parsed.success).toBe(false)
+  })
+
+  test('no lines at all is refused: cancel is the route for that, not an empty edit', () => {
+    const parsed = reservationEditForm.safeParse({ lines: [] })
+    expect(parsed.success).toBe(false)
+  })
+})
+
+describe('D-111: exchange asks for a target performance and nothing else', () => {
+  test('a performance id parses', () => {
+    expect(reservationExchangeForm.safeParse({ performanceId: 'perf-1' }).success).toBe(true)
+  })
+
+  test('an empty id is refused', () => {
+    expect(reservationExchangeForm.safeParse({ performanceId: '' }).success).toBe(false)
   })
 })

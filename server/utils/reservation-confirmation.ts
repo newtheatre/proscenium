@@ -34,3 +34,26 @@ export async function sendReservationConfirmation(event: H3Event | undefined, co
     },
   })
 }
+
+export interface CancellationContext {
+  userId: string
+  reservationId: string
+}
+
+// D-110 criterion 3: a booker cancelling their own hold hears back, the same way one collected
+// or refunded already does. Read live, not from what the caller had in hand.
+export async function sendReservationCancellation(event: H3Event | undefined, context: CancellationContext): Promise<void> {
+  const state = await reservationCurrentState(context.reservationId)
+  if (!state) return
+
+  await notify(event, {
+    userId: context.userId,
+    type: 'reservation.cancelled',
+    context: {
+      name: '',
+      reference: state.reference,
+      show: state.showTitle,
+      when: formatLondon(new Date(state.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+    },
+  })
+}

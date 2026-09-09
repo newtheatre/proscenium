@@ -1,4 +1,5 @@
 import { decodeQrToken, encodeQrToken } from '#shared/utils/qr-tokens'
+import type { H3Event } from 'h3'
 
 // Stateless by design: a resend recomputes the identical signature from the reservation id
 // alone, so nothing is stored and nothing can leak from a backup (D-108 criterion 1).
@@ -56,4 +57,16 @@ export async function verifyQrToken(token: string): Promise<string | null> {
   if (!decoded) return null
   const expected = await sign(decoded.reservationId)
   return signaturesMatch(expected, decoded.signature) ? decoded.reservationId : null
+}
+
+// The cookie is every self-service route's only credential (D-110, D-111 committee reading of
+// D-108): a guest booker has no session to sign in with, so this is what proves the booking is theirs.
+export async function requireQrReservationId(event: H3Event): Promise<string> {
+  const token = getCookie(event, QR_COOKIE_NAME)
+  if (!token) throw createError({ statusCode: 401, statusMessage: 'Open the link from your confirmation email to manage this booking' })
+
+  const reservationId = await verifyQrToken(token)
+  if (!reservationId) throw createError({ statusCode: 401, statusMessage: 'That link has expired. Open it again from your email' })
+
+  return reservationId
 }

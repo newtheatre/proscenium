@@ -527,9 +527,26 @@ dependent for exactly this reason, so the guard is index and trigger only. `COMP
 and is refused outright without `ticketing.manage` (committee decision): an ordinary desk officer
 cannot self-approve one, though whoever does hold the permission still approves their own; D-117's
 own request-and-approval workflow, which replaces this gate rather than removing it, is not built.
-Editing an unpaid booking (D-110) and refunding a collected one (D-116) are the other two-thirds
-of the same boundary invariant, neither built here; nothing currently offers a way to attempt
-either, so "un-collecting" has no route to refuse it yet (`docs/known-issues.md`).
+Refunding a collected booking (D-116) is the other remaining third of the same boundary invariant,
+not built here; nothing currently offers a way to attempt it, so "un-collecting" has no route to
+refuse it yet (`docs/known-issues.md`).
+
+**Self-service while unpaid (D-110).** The QR cookie D-108 already issues is the only credential:
+`PUT /api/qr/tickets` and `POST /api/qr/cancel` act on whichever reservation the cookie names, no
+account session required, since a guest booker has none. Editing sends desired totals per type,
+the same line shape a fresh booking uses (`reservationEditForm`); `ticketEditDelta()` (pure,
+`shared/utils/reservations.ts`) turns that into additions and removals against what is currently
+held. Every added and removed line, in the same request, shares one guard computed once
+(`capacityAllows` against the *desired total*, not the delta, `AND` a fresh `status = 'PENDING'`
+check): capacity is asked for the shape the booking ends up in, and a short house refuses the
+whole edit, decreases included, not just the increase that would not fit (criterion 2). A desired
+total under one ticket is refused before anything is written; cancel is the route for emptying a
+booking. Cancelling reuses `cancelled_by = 'CUSTOMER'`, the same column D-114's desk flow already
+checks, sets `hold_expires_at` to `NULL` and is refused once the performance has started
+(criterion 3) or once anything but `PENDING` has been reached (criterion 4: a collected booking's
+`/qr` page offers only a refund note, since D-116 owns the actual refund). Both routes read the
+reservation back afterwards rather than trusting their own statements, since the guard is
+identical everywhere and either the whole request landed or none of it did.
 
 ### tickets
 `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances

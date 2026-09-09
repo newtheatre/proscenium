@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import {
   bookableTicketTypesQuery,
+  currentTicketLinesQuery,
+  namedTicketLinesQuery,
   reservationCurrentStateQuery,
   reservationForResendQuery,
+  selfServiceReservationQuery,
 } from '#server/utils/reservations'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -121,6 +124,68 @@ describe('the current state a QR answers with is read live from the row (D-108 c
       const [found] = read<{ status: string, cancelledBy: string | null }>(database, reservationCurrentStateQuery('r-1'))
       expect(found?.status).toBe('CANCELLED')
       expect(found?.cancelledBy).toBe('CUSTOMER')
+    })
+  })
+})
+
+describe('what a self-service write needs about its own reservation (D-110, D-111)', () => {
+  test('carries the performance\'s show and start, not just its own id', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'booker@example.invalid')
+      database.batch([
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-1', 'ABCDEF', seeded.performanceId, 'u-1', 'PENDING', 'WEB'],
+      ])
+
+      const [found] = read<{ id: string, status: string, performanceId: string, showId: string }>(
+        database, selfServiceReservationQuery('r-1'),
+      )
+      expect(found?.status).toBe('PENDING')
+      expect(found?.performanceId).toBe(seeded.performanceId)
+      expect(found?.showId).toBe(seeded.showId)
+    })
+  })
+})
+
+describe('the current ticket lines an edit reads as its "have" side (D-110 criterion 1)', () => {
+  test('grouped by type, unrefunded only', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'booker@example.invalid')
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-1', 'ABCDEF', seeded.performanceId, 'u-1', 'PENDING', 'WEB'],
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+          't-1', 'r-1', seeded.performanceId, 'tt-standard', 900, 'BASE'],
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+          't-2', 'r-1', seeded.performanceId, 'tt-standard', 900, 'BASE'],
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source, refunded_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          't-3', 'r-1', seeded.performanceId, 'tt-standard', 900, 'BASE', 1_700_000_000],
+      ])
+
+      const [found] = read<{ ticketTypeId: string, quantity: number }>(database, currentTicketLinesQuery('r-1'))
+      expect(found).toEqual({ ticketTypeId: 'tt-standard', quantity: 2 })
+    })
+  })
+})
+
+describe('the named ticket lines a screen reads (D-110)', () => {
+  test('carries the type\'s name alongside the count', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'booker@example.invalid')
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-1', 'ABCDEF', seeded.performanceId, 'u-1', 'PENDING', 'WEB'],
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+          't-1', 'r-1', seeded.performanceId, 'tt-standard', 900, 'BASE'],
+      ])
+
+      const [found] = read<{ ticketTypeId: string, ticketTypeName: string, quantity: number }>(database, namedTicketLinesQuery('r-1'))
+      expect(found).toEqual({ ticketTypeId: 'tt-standard', ticketTypeName: 'Standard', quantity: 1 })
     })
   })
 })

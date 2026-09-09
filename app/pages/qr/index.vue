@@ -5,6 +5,12 @@ import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
 
 type Outcome = 'working' | 'found' | 'resend' | 'sent'
 
+interface NamedLine {
+  ticketTypeId: string
+  ticketTypeName: string
+  quantity: number
+}
+
 interface Booking {
   reference: string
   status: string
@@ -13,6 +19,13 @@ interface Booking {
   when: string
   totalDue: string | null
   qrSvg: string
+  lines: NamedLine[]
+}
+
+interface BookableType {
+  id: string
+  name: string
+  price: number
 }
 
 const route = useRoute()
@@ -25,12 +38,16 @@ const resendFields: AuthFormField[] = [
   { name: 'email', type: 'email', label: 'Email address', autocomplete: 'email', required: true },
 ]
 
+async function loadBooking(): Promise<void> {
+  booking.value = await $fetch<Booking>('/api/qr/current')
+  outcome.value = 'found'
+}
+
 // The exchanged cookie names the booking; a missing or spent one is an invitation to resend,
 // never a dead end (D-108 criterion 2 sits next to criterion 4 for exactly this reason).
 onMounted(async () => {
   try {
-    booking.value = await $fetch<Booking>('/api/qr/current')
-    outcome.value = 'found'
+    await loadBooking()
   }
   catch {
     outcome.value = 'resend'
@@ -45,6 +62,75 @@ async function resend(payload: FormSubmitEvent<z.output<typeof reservationResend
 
 const display = computed(() => booking.value ? qrStatusDisplay(booking.value.status, booking.value.cancelledBy, booking.value.totalDue) : null)
 const resendHeadline = computed(() => (route.query.refused ? 'That link isn\'t valid' : 'Open your booking from your email'))
+
+// D-110: editing and cancelling while unpaid, both against the same cookie the QR page already
+// reads with (criterion 5: the same page reflects whatever the edit or cancel leaves behind).
+const editing = ref(false)
+const editLoading = ref(false)
+const editFailure = ref<string | null>(null)
+const bookableTypes = ref<BookableType[]>([])
+const quantities = ref<Record<string, number>>({})
+
+async function startEdit(): Promise<void> {
+  editFailure.value = null
+  editLoading.value = true
+  try {
+    const options = await $fetch<{ ticketTypes: BookableType[], lines: NamedLine[] }>('/api/qr/edit-options')
+    bookableTypes.value = options.ticketTypes
+    const seeded: Record<string, number> = {}
+    for (const type of options.ticketTypes) seeded[type.id] = 0
+    for (const line of options.lines) seeded[line.ticketTypeId] = line.quantity
+    quantities.value = seeded
+    editing.value = true
+  }
+  catch (error) {
+    editFailure.value = refusalText(error)
+  }
+  finally {
+    editLoading.value = false
+  }
+}
+
+const editSaving = ref(false)
+
+async function saveEdit(): Promise<void> {
+  editSaving.value = true
+  editFailure.value = null
+  try {
+    const lines = Object.entries(quantities.value)
+      .filter(([, quantity]) => quantity > 0)
+      .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity }))
+    await $fetch('/api/qr/tickets', { method: 'PUT', body: { lines } })
+    editing.value = false
+    await loadBooking()
+  }
+  catch (error) {
+    editFailure.value = refusalText(error)
+  }
+  finally {
+    editSaving.value = false
+  }
+}
+
+const cancelling = ref(false)
+const cancelConfirming = ref(false)
+const cancelFailure = ref<string | null>(null)
+
+async function cancelBooking(): Promise<void> {
+  cancelling.value = true
+  cancelFailure.value = null
+  try {
+    await $fetch('/api/qr/cancel', { method: 'POST' })
+    cancelConfirming.value = false
+    await loadBooking()
+  }
+  catch (error) {
+    cancelFailure.value = refusalText(error)
+  }
+  finally {
+    cancelling.value = false
+  }
+}
 
 useSeoMeta({ title: 'Your booking' })
 </script>
@@ -89,6 +175,22 @@ useSeoMeta({ title: 'Your booking' })
         >
           {{ display.detail }}
         </p>
+
+        <ul
+          v-if="booking.lines.length > 0"
+          class="space-y-1 text-sm"
+          data-test="booking-lines"
+        >
+          <li
+            v-for="line in booking.lines"
+            :key="line.ticketTypeId"
+            class="flex justify-between"
+          >
+            <span>{{ line.ticketTypeName }}</span>
+            <span>&times;{{ line.quantity }}</span>
+          </li>
+        </ul>
+
         <img
           :src="`data:image/svg+xml;base64,${booking.qrSvg}`"
           alt="Booking QR code"
@@ -99,6 +201,118 @@ useSeoMeta({ title: 'Your booking' })
         <p class="text-xs text-muted">
           Save this image to keep the code, or show this page at the door.
         </p>
+
+        <!-- Criterion 4: nothing self-service left to offer once money has moved; a refund is a
+             box office conversation, not a form (D-116). -->
+        <UAlert
+          v-if="booking.status === 'COLLECTED'"
+          data-test="booking-refund-policy"
+          color="neutral"
+          variant="subtle"
+          title="Already paid"
+          description="This booking has been collected. Refunds are handled in person at the box office; bring your reference."
+        />
+
+        <div
+          v-if="booking.status === 'PENDING' && !editing"
+          class="flex flex-wrap gap-2 pt-2"
+        >
+          <UButton
+            data-test="booking-edit-start"
+            color="neutral"
+            variant="subtle"
+            :loading="editLoading"
+            @click="startEdit"
+          >
+            Change tickets
+          </UButton>
+          <UButton
+            data-test="booking-cancel-start"
+            color="error"
+            variant="subtle"
+            @click="cancelConfirming = true"
+          >
+            Cancel booking
+          </UButton>
+        </div>
+
+        <UAlert
+          v-if="editFailure"
+          color="error"
+          variant="subtle"
+          :description="editFailure"
+        />
+
+        <div
+          v-if="editing"
+          class="space-y-3 border-t border-default pt-4"
+          data-test="booking-edit-form"
+        >
+          <div
+            v-for="type in bookableTypes"
+            :key="type.id"
+            class="flex items-center justify-between gap-3"
+          >
+            <span class="text-sm">{{ type.name }}</span>
+            <UInputNumber
+              v-model="quantities[type.id]"
+              :min="0"
+              :max="99"
+              :data-test="`booking-edit-quantity-${type.id}`"
+            />
+          </div>
+          <div class="flex gap-2">
+            <UButton
+              data-test="booking-edit-save"
+              :loading="editSaving"
+              @click="saveEdit"
+            >
+              Save changes
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              @click="editing = false"
+            >
+              Cancel
+            </UButton>
+          </div>
+        </div>
+
+        <UAlert
+          v-if="cancelFailure"
+          color="error"
+          variant="subtle"
+          :description="cancelFailure"
+        />
+
+        <div
+          v-if="cancelConfirming"
+          class="space-y-3 border-t border-default pt-4"
+          data-test="booking-cancel-confirm"
+        >
+          <p class="text-sm text-muted">
+            Cancel this booking? Nothing has been charged, so nothing needs refunding, but the
+            seats go back on sale immediately.
+          </p>
+          <div class="flex gap-2">
+            <UButton
+              data-test="booking-cancel-confirm-submit"
+              color="error"
+              :loading="cancelling"
+              @click="cancelBooking"
+            >
+              Yes, cancel it
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              @click="cancelConfirming = false"
+            >
+              Keep it
+            </UButton>
+          </div>
+        </div>
       </div>
 
       <div

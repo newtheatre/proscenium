@@ -226,6 +226,15 @@ export const MESSAGE_TYPES = {
     sender: 'BOX_OFFICE',
   },
 
+  // Transactional, same reach as the confirmation it undoes (D-110 criterion 3).
+  'reservation.cancelled': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'reservation-cancelled',
+    reachesUnverified: true,
+    sender: 'BOX_OFFICE',
+  },
+
   // Module E: show night
 
   // Transactional, so no rota preference can silence it: somebody who turned shift email off

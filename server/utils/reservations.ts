@@ -2,7 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { findByEmail, newId } from './accounts'
 import { auditedWrite } from './audit'
-import { heldSeatsQuery, ticketInsertQueries } from './capacity'
+import { capacityAllows, heldSeatsQuery, reservationIsPending, ticketAdditionQueries, ticketInsertQueries, ticketRemovalQueries } from './capacity'
 import { auditEntry } from '#shared/utils/audit'
 import { normaliseEmail } from '#shared/utils/auth'
 import { capacityRefusal } from '#shared/utils/capacity'
@@ -10,7 +10,7 @@ import { generateReservationReference } from '#shared/utils/reservations'
 import { resolvePrice } from '#shared/utils/ticket-types'
 import type { TicketToWrite } from './capacity'
 import type { CapacityRefusal } from '#shared/utils/capacity'
-import type { ReservationSource } from '#shared/utils/reservations'
+import type { ReservationSource, TicketTypeCount } from '#shared/utils/reservations'
 import type { PriceSource, TicketTypeRestriction } from '#shared/utils/ticket-types'
 import type { SQL } from 'drizzle-orm'
 
@@ -254,4 +254,123 @@ export function reservationCurrentStateQuery(id: string): SQL {
 export async function reservationCurrentState(id: string): Promise<ReservationCurrentState | undefined> {
   const [row] = await db.all<ReservationCurrentState>(reservationCurrentStateQuery(id))
   return row
+}
+
+export interface SelfServiceReservation {
+  id: string
+  status: string
+  userId: string | null
+  performanceId: string
+  showId: string
+  startsAt: number
+}
+
+// What every self-service write (D-110, D-111) needs to decide and price against: the
+// reservation's own state plus enough of its performance to re-run capacity and sale checks.
+export function selfServiceReservationQuery(id: string): SQL {
+  return sql`
+    SELECT r.id AS id, r.status AS status, r.user_id AS userId, r.performance_id AS performanceId,
+           p.show_id AS showId, p.starts_at AS startsAt
+    FROM reservations r
+    JOIN performances p ON p.id = r.performance_id
+    WHERE r.id = ${id}
+  `
+}
+
+export async function selfServiceReservation(id: string): Promise<SelfServiceReservation | undefined> {
+  const [row] = await db.all<SelfServiceReservation>(selfServiceReservationQuery(id))
+  return row
+}
+
+// Grouped by type, unrefunded only: the "have" side of D-110's edit delta (criterion 1).
+export function currentTicketLinesQuery(reservationId: string): SQL {
+  return sql`
+    SELECT ticket_type_id AS ticketTypeId, count(*) AS quantity
+    FROM tickets
+    WHERE reservation_id = ${reservationId} AND refunded_at IS NULL
+    GROUP BY ticket_type_id
+  `
+}
+
+export async function currentTicketLines(reservationId: string): Promise<TicketTypeCount[]> {
+  return db.all<TicketTypeCount>(currentTicketLinesQuery(reservationId))
+}
+
+export interface NamedTicketLine extends TicketTypeCount {
+  ticketTypeName: string
+}
+
+// The same grouping, named for a screen rather than a write path.
+export function namedTicketLinesQuery(reservationId: string): SQL {
+  return sql`
+    SELECT t.ticket_type_id AS ticketTypeId, tt.name AS ticketTypeName, count(*) AS quantity
+    FROM tickets t
+    JOIN ticket_types tt ON tt.id = t.ticket_type_id
+    WHERE t.reservation_id = ${reservationId} AND t.refunded_at IS NULL
+    GROUP BY t.ticket_type_id, tt.name
+    ORDER BY tt.name COLLATE NOCASE
+  `
+}
+
+export async function namedTicketLines(reservationId: string): Promise<NamedTicketLine[]> {
+  return db.all<NamedTicketLine>(namedTicketLinesQuery(reservationId))
+}
+
+export interface EditReservationTicketsInput {
+  reservationId: string
+  performanceId: string
+  capacity: number | null
+  additions: (TicketToWrite & { ticketTypeId: string })[]
+  removals: TicketTypeCount[]
+  desiredTotal: number
+  // The booker themselves: self-service has no officer to name (`self: true`, shared/utils/audit-actions.ts).
+  actorId: string | null
+}
+
+export interface EditReservationTicketsResult {
+  applied: boolean
+}
+
+// Every added and removed line shares one guard, evaluated against the *desired total*, not the
+// delta: capacity is asked once, for the shape the booking ends up in (D-110 criterion 2).
+export async function editReservationTickets(input: EditReservationTicketsInput): Promise<EditReservationTicketsResult> {
+  const guard = sql`${capacityAllows(input.performanceId, input.capacity, input.desiredTotal, input.reservationId)} AND ${reservationIsPending(input.reservationId)}`
+
+  await db.batch([
+    db.run(sql`UPDATE reservations SET updated_at = unixepoch() WHERE id = ${input.reservationId} AND status = 'PENDING'`),
+    ...ticketAdditionQueries(input.additions, guard).map(statement => db.run(statement)),
+    ...ticketRemovalQueries(input.reservationId, input.removals, guard).map(statement => db.run(statement)),
+  ])
+
+  // Read back rather than trusted: the guard is identical everywhere, so the final total is
+  // either the desired one or nothing moved (criterion 2). The audit rides that same fact.
+  const after = await currentTicketLines(input.reservationId)
+  const total = after.reduce((sum, line) => sum + line.quantity, 0)
+  const applied = total === input.desiredTotal
+
+  if (applied) {
+    const entry = auditEntry({
+      actorId: input.actorId,
+      action: 'reservation.tickets-changed',
+      target: `reservation:${input.reservationId}`,
+      detail: { desiredTotal: input.desiredTotal },
+    })
+    await db.run(sql`INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)})`)
+  }
+
+  return { applied }
+}
+
+// The hold releases the instant status leaves `HOLDING_STATUSES`, so cancelling frees capacity
+// with no separate sweep (D-110 criterion 3), the same shape D-106's own release uses.
+export async function cancelReservation(reservationId: string, actorId: string | null): Promise<boolean> {
+  const entry = auditEntry({ actorId, action: 'reservation.cancelled', target: `reservation:${reservationId}` })
+  return auditedWrite(
+    db.all<{ id: string }>(sql`
+      UPDATE reservations SET status = 'CANCELLED', cancelled_by = 'CUSTOMER', hold_expires_at = NULL, updated_at = unixepoch()
+      WHERE id = ${reservationId} AND status = 'PENDING'
+      RETURNING id
+    `),
+    entry,
+  )
 }

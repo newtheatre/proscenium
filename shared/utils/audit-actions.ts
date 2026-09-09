@@ -149,6 +149,9 @@ const CATALOGUE = {
   'access-profile.tombstone.purged': { label: 'Withdrawn access profile deleted after its tombstone', module: 'ticketing' },
   'reservation.expired': { label: 'Unpaid hold released on expiry', module: 'ticketing' },
   'reservation.collected': { label: 'Booking collected at the desk', module: 'ticketing' },
+  'reservation.tickets-changed': { label: 'Tickets changed while unpaid', module: 'ticketing', self: true },
+  'reservation.cancelled': { label: 'Booking cancelled by its booker', module: 'ticketing', self: true },
+  'reservation.exchanged': { label: 'Exchanged for another performance', module: 'ticketing', self: true },
 
   // Module E: show night
 
