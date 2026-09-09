@@ -257,6 +257,36 @@ The ledger is pruned at `TRAINING_LEDGER_MONTHS` (24) in every mode, armed or no
 To run it by hand, `POST /_nitro/tasks/training:expiry-sweep`. The result reports `armed`, the
 counts for each window, `digests` and `pruned`.
 
+### Role lapses, inside daily:sweeps (04:00)
+
+Committee roles run to the end of the theatre's year, 31 July London, and expire at read time: a
+lapsed grant grants nothing from the instant it expires, whether or not any sweep has run (0009).
+What A-119 adds is notice, visibility and tidying, none of which change who holds what.
+
+**The holder is warned once per grant and date**, `ROLE_LAPSE_NOTICE_DAYS` (14) before it lapses.
+Somebody holding four roles that lapse on the same day gets one message naming all four, not four
+messages. The claim carries the grant and its expiry, so changing an expiry re-arms the warning
+rather than finding the notice already spent. An unverified or anonymised holder is skipped rather
+than claimed for: a claim taken for a message the notification centre then refuses would be that
+account's whole notice, gone silently.
+
+The message says plainly that this is the standing role and nothing else. A shift somebody is
+confirmed for still opens the screens it always did, because authority on the night derives from
+tonight's facts rather than from a grant (0009).
+
+**Administrators are digested monthly, on the first**, with what is lapsing, what lapsed recently
+and every permanent grant. The standing report of permanent grants is the point of the digest as
+much as the lapses are: a grant with no expiry is an exception, and an exception nobody sees
+becomes the rule. The digest sends whether or not it has anything in it, for the same reason the
+training one does. A lapsed grant stays in the digest for exactly as long as its row survives the
+prune below, so the two windows are ends of the same one.
+
+**Grants lapsed longer ago than `ROLE_GRANT_PRUNE_DAYS` (90) are deleted**, and each deletion is
+trailed as `role.pruned` with no actor. This is housekeeping: the row had granted nothing since it
+expired, and the trail keeps what it said. To run the whole nightly sweep by hand,
+`POST /_nitro/tasks/daily:sweeps`; its `roleLapses` result reports `warned`, `holders`, `digests`,
+`pruned` and the `standing` counts the digest would carry.
+
 ### retention:sweep (04:00 on the 1st)
 
 Warns accounts approaching their inactivity threshold, anonymises the ones past it and digests the

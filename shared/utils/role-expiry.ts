@@ -12,14 +12,14 @@ export function roleDigestClaimFor(userId: string, period: string): string {
   return `role.expiry.digest:${userId}:${period}`
 }
 
-// A grant lapsing at or before this is inside its holder's notice. Computed here and bound as a
-// parameter, so the arithmetic exists once rather than again in SQL.
+// A grant lapsing no later than this instant is inside its holder's notice. The arithmetic lives
+// here and binds as a parameter, so SQL never repeats it.
 export function lapseNoticeCutoff(now: number, days: number): number {
   return now + days * 86_400
 }
 
-// A grant that lapsed at or before this is housekeeping (criterion 4). Enforcement is read-time,
-// so the row has changed nothing since the instant it expired.
+// A grant that lapsed no later than this instant is housekeeping (criterion 4). Enforcement is
+// read-time, so the row has granted nothing since the instant it expired.
 export function lapsedBefore(now: number, days: number): number {
   return now - days * 86_400
 }
