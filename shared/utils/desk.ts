@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { pageQuery } from './pagination'
+import { saysPrice } from './ticket-types'
 
 // D-114: finding a booking at the desk and taking payment for it. Collection is the payment
 // boundary (criterion 2); this file is the pure shape of what crosses it.
@@ -56,4 +57,18 @@ export function uncollectableReason(status: string): string | null {
 // screen shows as due before the officer confirms it (criterion 3).
 export function amountDueFor(tender: DeskTender, ticketTotalPence: number): number {
   return tender === 'COMP' ? 0 : ticketTotalPence
+}
+
+// D-116 criterion 1: money is handed back the same way it was taken, in person; the reader shows
+// the figure and this is what refuses a mismatch before anything writes, quoting both.
+export const refundTicketForm = z.strictObject({
+  expectedTotalPence: z.number().int().min(0),
+})
+
+export type RefundTicketInput = z.output<typeof refundTicketForm>
+
+// D-116 criterion 6: a booking still holding unrefunded money is refused, not silently allowed.
+export function strandedMoneyReason(strandedPence: number): string | null {
+  if (strandedPence <= 0) return null
+  return `${saysPrice(strandedPence)} is still unrefunded on this booking. Refund every ticket first, then cancel.`
 }

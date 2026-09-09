@@ -54,6 +54,9 @@ export const PERMISSIONS = [
   // Narrowing what a pass product already covers once it has live passes against it: general
   // box office is not enough, echoing D-117's comp approval (D-123 criterion 4).
   'ticketing.manage',
+  // Approving a refund: general box office is not enough (D-116 criterion 2). Tonight's
+  // confirmed duty manager reaches the same approval without holding it (0009).
+  'money.refund',
   // Deciding an access profile declaration: sighting evidence, agreeing the door's wording. A
   // named accessibility officer's, never general box office's (D-127 criterion 2).
   'access.verify',
@@ -97,7 +100,7 @@ export const OPERATIONAL_PERMISSIONS: readonly Permission[] = ['night.door', 'ni
 // now would grant authority over features nobody has reviewed.
 export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   ADMIN: PERMISSIONS,
-  MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'fellowships.write', 'members.read', 'members.write', 'rooms.read', 'rooms.write', 'ticketing.manage', 'training.read', 'training.write'],
+  MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'fellowships.write', 'members.read', 'members.write', 'money.refund', 'rooms.read', 'rooms.write', 'ticketing.manage', 'training.read', 'training.write'],
   // J-103's story is the Theatre Manager's: they are who searches the trail and records what
   // happened outside the system.
   THEATRE_MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'members.read', 'rooms.read', 'rooms.write', 'training.read'],

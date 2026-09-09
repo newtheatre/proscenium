@@ -1,11 +1,12 @@
 import { db, schema } from '@nuxthub/db'
-import { asc, eq, inArray } from 'drizzle-orm'
+import { asc, eq, inArray, sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { newId } from './accounts'
 import { entryForm, londonDayOf, totalOf } from '#shared/utils/ledger'
 import type { EntryInput, NettableEntry } from '#shared/utils/ledger'
 import type { BatchItem } from 'drizzle-orm/batch'
+import type { SQL } from 'drizzle-orm'
 
 // The only writer of the ledger: check:ledger refuses any other file that inserts into its
 // tables, which makes "every money path posts" a build failure rather than a habit (0004).
@@ -21,48 +22,73 @@ export interface PostedEntry {
 
 // Statements rather than a write: money and the thing it paid for commit in one batch or not at
 // all, and only the caller knows what the other half is (0001, I-102 criterion 6).
-export function postEntry(input: EntryInput, at = new Date()): PostedEntry {
+export function postEntry(input: EntryInput, at = new Date(), guard?: SQL): PostedEntry {
   const entry = entryForm.parse(input)
   const id = entry.id ?? newId()
   const totalPence = totalOf(entry.lines)
+  const happenedAt = Math.floor(at.getTime() / 1000)
+  const londonDay = londonDayOf(at)
 
-  const statements: BatchItem<'sqlite'>[] = [
-    db.insert(schema.ledgerEntries).values({
-      id,
-      happenedAt: Math.floor(at.getTime() / 1000),
-      londonDay: londonDayOf(at),
-      source: entry.source,
-      tender: entry.tender,
-      actorId: entry.actorId ?? null,
-      totalPence,
-      reversesEntryId: entry.reversesEntryId ?? null,
-      compReason: entry.compReason ?? null,
-      compApprovedBy: entry.compApprovedBy ?? null,
-      tabDebtorId: entry.tabDebtorId ?? null,
-    }),
-  ]
+  // `guard`: an earlier contended claim's own condition, so a caller whose claim lost posts
+  // nothing here either (0001, D-116); every existing caller omits it and keeps this unconditional.
+  const entryStatement = guard === undefined
+    ? db.insert(schema.ledgerEntries).values({
+        id,
+        happenedAt,
+        londonDay,
+        source: entry.source,
+        tender: entry.tender,
+        actorId: entry.actorId ?? null,
+        totalPence,
+        reversesEntryId: entry.reversesEntryId ?? null,
+        compReason: entry.compReason ?? null,
+        compApprovedBy: entry.compApprovedBy ?? null,
+        tabDebtorId: entry.tabDebtorId ?? null,
+      })
+    : db.run(sql`
+        INSERT INTO ledger_entries
+          (id, happened_at, london_day, source, tender, actor_id, total_pence, reverses_entry_id, comp_reason, comp_approved_by, tab_debtor_id)
+        SELECT ${id}, ${happenedAt}, ${londonDay}, ${entry.source}, ${entry.tender}, ${entry.actorId ?? null},
+               ${totalPence}, ${entry.reversesEntryId ?? null}, ${entry.compReason ?? null}, ${entry.compApprovedBy ?? null}, ${entry.tabDebtorId ?? null}
+        WHERE ${guard}
+      `)
+
+  const statements: BatchItem<'sqlite'>[] = [entryStatement]
 
   const lineIds: string[] = []
   for (const line of entry.lines) {
     const lineId = newId()
     lineIds.push(lineId)
-    statements.push(db.insert(schema.ledgerLines).values({
-      id: lineId,
-      entryId: id,
-      kind: line.kind,
-      amountPence: line.amountPence,
-      qty: line.qty,
-      unitPricePence: line.unitPricePence ?? null,
-      reservationId: line.reservationId ?? null,
-      performanceId: line.performanceId ?? null,
-      ticketId: line.ticketId ?? null,
-      productVariantId: line.productVariantId ?? null,
-      priceRef: line.priceRef ?? null,
-      choices: line.choices ?? null,
-      discountId: line.discountId ?? null,
-      discountPercent: line.discountPercent ?? null,
-      discountPence: line.discountPence ?? null,
-    }))
+    statements.push(guard === undefined
+      ? db.insert(schema.ledgerLines).values({
+          id: lineId,
+          entryId: id,
+          kind: line.kind,
+          amountPence: line.amountPence,
+          qty: line.qty,
+          unitPricePence: line.unitPricePence ?? null,
+          reservationId: line.reservationId ?? null,
+          performanceId: line.performanceId ?? null,
+          ticketId: line.ticketId ?? null,
+          productVariantId: line.productVariantId ?? null,
+          priceRef: line.priceRef ?? null,
+          choices: line.choices ?? null,
+          discountId: line.discountId ?? null,
+          discountPercent: line.discountPercent ?? null,
+          discountPence: line.discountPence ?? null,
+        })
+      // Guarded on the entry existing, not `guard` again: a line for an entry this batch did not
+      // write would violate `ledger_lines`' own foreign key first regardless (0001).
+      : db.run(sql`
+          INSERT INTO ledger_lines
+            (id, entry_id, kind, amount_pence, qty, unit_price_pence, reservation_id, performance_id, ticket_id,
+             product_variant_id, price_ref, choices, discount_id, discount_percent, discount_pence)
+          SELECT ${lineId}, ${id}, ${line.kind}, ${line.amountPence}, ${line.qty}, ${line.unitPricePence ?? null},
+                 ${line.reservationId ?? null}, ${line.performanceId ?? null}, ${line.ticketId ?? null},
+                 ${line.productVariantId ?? null}, ${line.priceRef ?? null}, ${line.choices ? JSON.stringify(line.choices) : null},
+                 ${line.discountId ?? null}, ${line.discountPercent ?? null}, ${line.discountPence ?? null}
+          WHERE EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${id})
+        `))
   }
 
   return { id, totalPence, statements, lineIds }

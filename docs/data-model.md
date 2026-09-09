@@ -527,9 +527,22 @@ dependent for exactly this reason, so the guard is index and trigger only. `COMP
 and is refused outright without `ticketing.manage` (committee decision): an ordinary desk officer
 cannot self-approve one, though whoever does hold the permission still approves their own; D-117's
 own request-and-approval workflow, which replaces this gate rather than removing it, is not built.
-Refunding a collected booking (D-116) is the other remaining third of the same boundary invariant,
-not built here; nothing currently offers a way to attempt it, so "un-collecting" has no route to
-refuse it yet (`docs/known-issues.md`).
+
+**Refunds and cancelling a paid booking (D-116).** `POST
+/api/box-office/desk/reservations/[id]/tickets/[ticketId]/refund` hands money back one ticket at
+a time, under the same expected-total cross-check collection uses. Approval (criterion 2) needs
+`money.refund` (manager and admin) or tonight's confirmed duty manager for that performance,
+gated by the `REFUND_PAID_REQUIRES_MANAGER` configuration key (default true, registered ahead of
+this story); the general desk permission (`ticketing.write`) is still needed to reach the screen
+at all, so a duty-manager shift with no box office role cannot use it. The race (criterion 4) is
+the ticket's own conditional claim (`UPDATE tickets SET refunded_at = ? WHERE ... AND refunded_at
+IS NULL`): `postEntry()` (`server/utils/ledger.ts`) gained an optional `guard` parameter for
+exactly this, making the ledger entry conditional on the claim's own `changes()` and the line
+conditional on the entry's existence, so a losing claim posts no ledger row either, with no new
+migration (0001). `POST /api/box-office/desk/reservations/[id]/cancel` is refused while any
+ticket still holds unrefunded money, quoting the amount (criterion 6); once every ticket is
+refunded it cancels with `cancelled_by = 'STAFF'`. Refunded tickets leave `deskReservation()`'s
+own ticket list immediately (criterion 5), the same filter that already frees capacity.
 
 **Self-service while unpaid (D-110).** The QR cookie D-108 already issues is the only credential:
 `PUT /api/qr/tickets` and `POST /api/qr/cancel` act on whichever reservation the cookie names, no

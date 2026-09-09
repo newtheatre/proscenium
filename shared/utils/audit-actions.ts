@@ -152,6 +152,8 @@ const CATALOGUE = {
   'reservation.tickets-changed': { label: 'Tickets changed while unpaid', module: 'ticketing', self: true },
   'reservation.cancelled': { label: 'Booking cancelled by its booker', module: 'ticketing', self: true },
   'reservation.exchanged': { label: 'Exchanged for another performance', module: 'ticketing', self: true },
+  'ticket.refunded': { label: 'Ticket refunded at the desk', module: 'ticketing' },
+  'reservation.cancelled.staff': { label: 'Booking cancelled at the desk', module: 'ticketing' },
 
   // Module E: show night
 

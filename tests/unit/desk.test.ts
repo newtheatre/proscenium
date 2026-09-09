@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { amountDueFor, collectForm, deskSearchForm, uncollectableReason } from '#shared/utils/desk'
+import { amountDueFor, collectForm, deskSearchForm, refundTicketForm, strandedMoneyReason, uncollectableReason } from '#shared/utils/desk'
 
 // D-114 as pure rules. The database enforcement (the ticket-collection-once guard) is in
 // tests/integration/desk.test.ts; the full desk flow is tests/e2e/desk.test.ts.
@@ -52,5 +52,26 @@ describe('the search request is scoped to one performance (criterion 1)', () => 
   test('a performance id is required; a search term is not', () => {
     expect(deskSearchForm.safeParse({ performanceId: 'p-1' }).success).toBe(true)
     expect(deskSearchForm.safeParse({ q: 'Alex' }).success).toBe(false)
+  })
+})
+
+describe('a refund is a well-formed expected total (D-116 criterion 1)', () => {
+  test('a non-negative figure parses', () => {
+    expect(refundTicketForm.safeParse({ expectedTotalPence: 900 }).success).toBe(true)
+  })
+
+  test('a negative figure is refused before it reaches the route', () => {
+    expect(refundTicketForm.safeParse({ expectedTotalPence: -1 }).success).toBe(false)
+  })
+})
+
+describe('a booking still owing money is not cancelled (D-116 criterion 6)', () => {
+  test('nothing stranded has nothing to refuse', () => {
+    expect(strandedMoneyReason(0)).toBeNull()
+  })
+
+  test('anything still unrefunded quotes the amount', () => {
+    const reason = strandedMoneyReason(900)
+    expect(reason).toContain('£9.00')
   })
 })
