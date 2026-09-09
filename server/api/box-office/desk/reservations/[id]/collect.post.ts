@@ -1,13 +1,11 @@
 import { collectForm, uncollectableReason } from '#shared/utils/desk'
 
-const body = collectForm.omit({ reservationId: true })
-
 // The payment boundary (criterion 2): the reader is paid from the figure this route refuses to
 // let drift from what the server actually charges (criterion 3, D-104 criterion 1 for tickets).
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
   const id = getRouterParam(event, 'id') ?? ''
-  const input = await readValidatedBodyOrThrow(event, body)
+  const input = await readValidatedBodyOrThrow(event, collectForm)
 
   const reservation = await deskReservation(id)
   if (!reservation) throw createError({ statusCode: 404, statusMessage: 'No such booking' })

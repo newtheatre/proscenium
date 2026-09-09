@@ -32,19 +32,19 @@ describe('what is due now depends on the tender (criterion 4)', () => {
 
 describe('a comp needs a reason; a card needs nothing else', () => {
   test('CARD with no reason is a well-formed request', () => {
-    expect(collectForm.safeParse({ reservationId: 'r-1', expectedTotalPence: 900, tender: 'CARD' }).success).toBe(true)
+    expect(collectForm.safeParse({ expectedTotalPence: 900, tender: 'CARD' }).success).toBe(true)
   })
 
   test('COMP with no reason is refused before it reaches the route', () => {
-    expect(collectForm.safeParse({ reservationId: 'r-1', expectedTotalPence: 0, tender: 'COMP' }).success).toBe(false)
+    expect(collectForm.safeParse({ expectedTotalPence: 0, tender: 'COMP' }).success).toBe(false)
   })
 
   test('COMP with a reason is well-formed', () => {
-    expect(collectForm.safeParse({ reservationId: 'r-1', expectedTotalPence: 0, tender: 'COMP', compReason: 'Reviewer' }).success).toBe(true)
+    expect(collectForm.safeParse({ expectedTotalPence: 0, tender: 'COMP', compReason: 'Reviewer' }).success).toBe(true)
   })
 
   test('a tender outside CARD or COMP is refused: the theatre takes no cash', () => {
-    expect(collectForm.safeParse({ reservationId: 'r-1', expectedTotalPence: 900, tender: 'CASH' }).success).toBe(false)
+    expect(collectForm.safeParse({ expectedTotalPence: 900, tender: 'CASH' }).success).toBe(false)
   })
 })
 

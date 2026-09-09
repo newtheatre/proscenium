@@ -138,15 +138,15 @@ function withCollectionGuard(database: TestDatabase): void {
 
 function ledgerEntry(database: TestDatabase, id: string): void {
   database.batch([[
-    "INSERT INTO ledger_entries (id, london_day, source, tender, total_pence) VALUES (?, '2026-09-09', 'DESK', 'CARD', 900)",
-    id,
+    'INSERT INTO ledger_entries (id, london_day, source, tender, total_pence) VALUES (?, ?, ?, ?, ?)',
+    id, '2026-09-09', 'DESK', 'CARD', 900,
   ]])
 }
 
 function insertLine(database: TestDatabase, entryId: string, ticketId: string): void {
   database.batch([[
-    "INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, ticket_id) VALUES (?, ?, 'TICKET_COLLECTION', 900, ?)",
-    crypto.randomUUID(), entryId, ticketId,
+    'INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, ticket_id) VALUES (?, ?, ?, ?, ?)',
+    crypto.randomUUID(), entryId, 'TICKET_COLLECTION', 900, ticketId,
   ]])
 }
 

@@ -16,8 +16,9 @@ export const deskSearchForm = pageQuery.extend({
 
 export type DeskSearchInput = z.output<typeof deskSearchForm>
 
+// No `reservationId` here: the one route that validates this takes it from the URL, and a
+// refined schema cannot be `.omit()`, so it is never part of the body's own shape at all.
 export const collectForm = z.object({
-  reservationId: z.string().trim().min(1),
   // In pence, re-checked against the server's own sum (criterion 3): a human reads this off
   // the screen into the reader, so it must never silently drift from what is actually charged.
   expectedTotalPence: z.number().int().min(0),
@@ -28,7 +29,7 @@ export const collectForm = z.object({
   { path: ['compReason'], message: 'A comp needs a reason' },
 )
 
-export type CollectInput = z.output<typeof collectForm>
+export type CollectInput = z.output<typeof collectForm> & { reservationId: string }
 
 // What a booking's own status says about whether it can be collected right now, in the
 // booker-facing words the desk screen shows. Null means it can.
