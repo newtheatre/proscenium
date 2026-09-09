@@ -10,7 +10,7 @@ password; there is one unified app, so the old cross-app session contract does n
 passkeys enrolled against the old relying-party id cannot cross to the new one (SP-4 found one
 affected account, so no re-enrolment flow is built).
 
-**Counts: 26 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
+**Counts: 27 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
 
 Open questions for the committee:
 
@@ -433,6 +433,42 @@ Open questions for the committee:
   time, and the committee is asked to confirm. Shipped that way on 30 August 2026 and recorded in
   known issues, so the question has somewhere to be answered rather than being lost in a story.
 - Source: Committee direction, 26 August 2026; decision 0023.
+
+## A-128: Let a passkey satisfy the privileged second-factor check
+
+- Role: Officer
+- Phase: MVP
+- Story: As an officer who signs in with a passkey, I want that to count as my second factor so
+  that I am not made to enrol an authenticator app as well before I can use the roles I hold.
+- Depends on: A-105, A-112
+- Acceptance criteria:
+  1. One definition of a confirmed second factor, read by every path that asks: the privileged
+     guard, the admin directory's warning banner and its filter (A-112 criterion 5), the account
+     security screen and the wording of the refusal. Today `confirmedFactor()` reads
+     `totp_secrets` alone, so a passkey holder is refused with "This role needs an authenticator
+     app before it can be used" and is counted among the privileged accounts with no factor.
+  2. A passkey satisfies the check for the session it proved, not for every session on an account
+     that owns one. The account-wide reading would weaken A-112 rather than serve it: an account
+     holding a password and a passkey but no authenticator app signs in on the password alone
+     today, because the challenge is authenticator-only, so counting the passkey account-wide
+     would let a stolen password reach money, personal data and safety records.
+  3. The refusal names both ways out, enrolling an authenticator app or signing in with the
+     passkey, so somebody refused mid-shift is told what to do rather than left to guess.
+  4. A passkey sign-in remains a complete sign-in with no second step, and nothing else bypasses
+     the challenge (A-105 criterion 2, A-111 criterion 5). This story adds no new bypass.
+  5. Removing a passkey is refused while it is the only thing satisfying the check for a
+     privileged role the account holds, which is the refusal removing the last authenticator
+     already gets (A-112 criterion 3).
+  6. A decision record carries what counts as a second factor and why, names the boundary it
+     moves (which accounts reach privileged surfaces they are refused today), and settles whether
+     the session may record how it was proven, which the session contract deliberately keeps to
+     identity alone (0009).
+  7. Tests pin the boundary in both directions: a password-and-passkey account with no
+     authenticator reaches a privileged surface after a passkey sign-in and is refused after a
+     password sign-in, and an unconfirmed authenticator enrolment still counts for nothing (A-109
+     criterion 2).
+- Source: A-105 criterion 2, which says a passkey satisfies both the credential step and the
+  second factor and is built that way at sign-in only; A-112; audit SD-5.
 
 ## A-201: Import an SU membership list by hand
 
