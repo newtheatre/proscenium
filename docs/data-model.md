@@ -209,10 +209,14 @@ effect is that the venue's performances apply blackouts to that room (0043).
 Feature vocabulary and junction (both cascade). Not yet built: no story reads them, and the
 Wave 0 contract does not list them.
 
-### venue_emergency_info
-`venue_id` PK → venues cascade · `assembly_point` · `exits` · `isolation_points` ·
+### venue_emergency_info  APPEND-ONLY
+`id` PK · `venue_id` → venues restrict · `assembly_point` · `exits` · `isolation_points` ·
 `what3words` · `notes` (free text, safe: describes the building, never a person) ·
-`updated_by` → users set null · `updated_at`.
+`updated_by` → users restrict · `updated_at`. Versioned, not a single row per venue (E-113
+criterion 1): an edit is a new row, and the latest per venue by `updated_at` is the current
+card. Rebuilt from a single-row-per-venue shape in migration 0071, which also hand-corrects a
+`drizzle-kit` bug in the generated copy-forward `INSERT` (it named a column, `id`, the old
+table never had) and adds the append-only triggers by hand, as every table in this family does.
 
 ### seasons
 `id` PK · `name` UNIQUE · `starts_on` · `ends_on` · `sort` · `archived` bool. The financial

@@ -646,6 +646,32 @@ nobody, exactly as `releaseShiftStatement` does, not `CANCELLED`: the position s
 only the member's own name comes off it. The known-issues row asking whether this was a member's
 call or an officer's is resolved in the member's favour and removed.
 
+### The venue emergency card (E-113)
+
+`venue_emergency_info` moves from one row per venue to append-only: `recordCardStatement()` is
+a bare INSERT with no predicate, and the latest row per venue by `updated_at` is the current
+card (`currentCardQuery()`, `currentCardsQuery()` for the committee's own overview across every
+venue, a venue with none included). Migration 0071 rebuilds the table rather than altering it
+(no `ALTER COLUMN`), and the generated copy-forward `INSERT` needed a hand correction: it named
+a source column, `id`, the old single-row table never had, since drizzle-kit's diff treated the
+new primary key as something to copy rather than to invent. Corrected to `lower(hex(randomblob(16)))`
+per migrated row; the append-only triggers are hand-added after generation, as this whole family
+of tables requires (0010).
+
+`GET /api/tonight/emergency` reads the current card for whichever venue
+`requireAnyNightAuthority(event, ['DUTY_MANAGER', 'DOOR', 'BAR'])` resolves; `PUT
+/api/admin/venues/[id]/emergency` writes a new version, gated by a new standing permission pair,
+`emergency-card.read`/`write`, granted to `FOH_MANAGER` alongside `checklist.*` and `rota.*`.
+
+**Closes K-103 criterion 3's own gap, cited from that section**: `app/layouts/tonight.vue`
+(platform's, `onMounted`) fetches `/api/tonight/emergency` once and calls `primeNightCache()`
+with a whole-night key, so any show-night screen, not only `/tonight/emergency` itself, leaves
+the card cached from the first screen a shift holder opens. `/tonight/emergency` then reads
+that same key through `useNightCache`, which is what makes the card open with no round trip
+after a device restart, exactly the old estate's gap the criterion names. Whole-night rather
+than venue-scoped: a shift holder resolves exactly one venue a night (0044), so nothing here
+has to learn which before it can prime or read.
+
 ## The programme (build-order contract d, 0043)
 
 Where we perform, what we perform and when. `venues`, `seasons`, `show_categories`, `shows`,
