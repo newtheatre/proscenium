@@ -42,11 +42,14 @@ const settled = useDebounced(searchTerm, 250)
 // The account directory: it already pages and allow-lists its columns. Never cached, because a
 // remembered answer would offer somebody since renamed or erased.
 const instance = useId()
+// Cast to a plain function type before calling: matching the route against Nitro's typed route
+// map to check the query shape grows too deep for tsc once enough routes exist (TS2589).
+const searchAccounts = $fetch as unknown as (route: string, options: { query: unknown }) => Promise<Listing>
 const { data, status } = await useAsyncData(
   () => `person-picker-${instance}-${settled.value}`,
   () => settled.value.trim().length < 2
     ? Promise.resolve({ items: [] } as Listing)
-    : $fetch<Listing>('/api/admin/accounts', {
+    : searchAccounts('/api/admin/accounts', {
         query: { search: settled.value.trim(), pageSize: 10, includeAnonymised: props.includeErased },
       }),
   { watch: [settled], default: (): Listing => ({ items: [] }), getCachedData: () => undefined },

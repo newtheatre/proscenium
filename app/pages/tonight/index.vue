@@ -113,11 +113,15 @@ const boardCode = ref<string | null>(null)
 const boardCodeFailure = ref<string | null>(null)
 const revealingCode = ref(false)
 
+// Cast to a plain function type before calling: matching the route against Nitro's typed route
+// map to infer a return type grows too deep for tsc once enough routes exist (TS2589).
+const getBoardCode = $fetch as unknown as (route: string) => Promise<{ code: string }>
+
 async function revealCode(): Promise<void> {
   revealingCode.value = true
   boardCodeFailure.value = null
   try {
-    boardCode.value = (await $fetch<{ code: string }>('/api/tonight/board/code')).code
+    boardCode.value = (await getBoardCode('/api/tonight/board/code')).code
   }
   catch (refused) {
     boardCodeFailure.value = refusalText(refused)

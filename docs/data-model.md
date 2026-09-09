@@ -796,7 +796,16 @@ with the old code; it revokes nothing already joined, since `joined_epoch` is a 
 not a live check on how (E-120 criterion 4). A manual reset is the only thing that sets
 `revoked_at`, and it does so for every currently-connected device in the same batch the epoch
 moves in: `requireDevice()` (`server/utils/backstage.ts`) refuses a revoked device's cookie
-outright (E-122 criterion 1).
+outright (E-122 criterion 1). `revoked_at` is a flag, not a removal: `label` is free text and
+will name people in practice, so a device row is also purged at 30 days once nothing still
+references it (`purgeStaleDevicesStatement()`, part of `daily:sweeps`, E-122 criterion 4),
+bounded by `joined_at` so a device that joined recently and has simply not posted yet is never
+swept as if it were stale.
+
+This table, `backstage_messages` and `backstage_acknowledgements` have no entry in
+`shared/utils/personal-data.ts`, and deliberately so: that registry keys on a column tying a row
+to a person, and none of the three has one. The 30-day purge above is ordinary data-minimisation,
+not GDPR erasure (0011), which governs a person's own record and does not engage here.
 
 ### backstage_milestone_types
 `id` PK · `label` UNIQUE · `sort` · `active` bool · `updated_by` set null · `updated_at`. The

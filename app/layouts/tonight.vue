@@ -13,7 +13,10 @@ const atTheHub = computed(() => route.path === '/tonight')
 // since a shift holder resolves only one (0044). Best effort: no shift, nothing to prime.
 onMounted(async () => {
   try {
-    const card = await $fetch<unknown>('/api/tonight/emergency')
+    // Cast before calling: matching the route against Nitro's typed map to infer a return
+    // type grows too deep for tsc once enough routes exist (TS2589).
+    const fetchEmergencyCard = $fetch as unknown as (route: string) => Promise<unknown>
+    const card = await fetchEmergencyCard('/api/tonight/emergency')
     await primeNightCache(nightCacheKey({ screen: 'emergency-card', night: currentShowNight(), wholeNight: true }), () => card)
   }
   catch { /* nothing to prime */ }

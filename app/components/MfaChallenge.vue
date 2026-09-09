@@ -19,7 +19,10 @@ async function answer(code: string): Promise<void> {
   notice.value = null
 
   try {
-    await $fetch('/api/auth/mfa/challenge', { method: 'POST', body: { attemptId: attempt.value, code } })
+    // Cast before calling: matching the route against Nitro's typed map to check the body
+    // shape grows too deep for tsc once enough routes exist (TS2589).
+    const challenge = $fetch as unknown as (route: string, options: { method: 'POST', body: unknown }) => Promise<unknown>
+    await challenge('/api/auth/mfa/challenge', { method: 'POST', body: { attemptId: attempt.value, code } })
     emit('answered')
   }
   catch (error) {

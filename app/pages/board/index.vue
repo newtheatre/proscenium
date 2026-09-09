@@ -10,11 +10,15 @@ const failure = ref<string | null>(null)
 const joined = ref<{ venueName: string } | null>(null)
 const deviceToken = useCookie<string | null>('nnt-backstage-token', { maxAge: 60 * 60 * 24, sameSite: 'lax' })
 
+// Cast to a plain function type before calling: matching the route against Nitro's typed route
+// map to check the body shape grows too deep for tsc once enough routes exist (TS2589).
+const postJoin = $fetch as unknown as (route: string, options: { method: 'POST', body: unknown }) => Promise<{ token: string, venueName: string }>
+
 async function join(): Promise<void> {
   joining.value = true
   failure.value = null
   try {
-    const answered = await $fetch<{ token: string, venueName: string }>('/api/board/join', {
+    const answered = await postJoin('/api/board/join', {
       method: 'POST',
       body: state,
     })
@@ -53,9 +57,14 @@ const acknowledgements = ref<Acknowledgement[]>([])
 const boardFailure = ref<string | null>(null)
 const freeText = ref('')
 
+const getConfig = $fetch as unknown as (route: string) => Promise<{ milestoneTypes: MilestoneType[], presets: Preset[] }>
+const getMessages = $fetch as unknown as (route: string) => Promise<{ messages: Message[], acknowledgements: Acknowledgement[] }>
+const postMessage = $fetch as unknown as (route: string, options: { method: 'POST', body: unknown }) => Promise<unknown>
+const postAck = $fetch as unknown as (route: string, options: { method: 'POST' }) => Promise<unknown>
+
 async function loadConfig(): Promise<void> {
   try {
-    const answered = await $fetch<{ milestoneTypes: MilestoneType[], presets: Preset[] }>('/api/board/config')
+    const answered = await getConfig('/api/board/config')
     milestoneTypes.value = answered.milestoneTypes
     presets.value = answered.presets
   }
@@ -64,7 +73,7 @@ async function loadConfig(): Promise<void> {
 
 async function loadMessages(): Promise<void> {
   try {
-    const answered = await $fetch<{ messages: Message[], acknowledgements: Acknowledgement[] }>('/api/board/messages')
+    const answered = await getMessages('/api/board/messages')
     messages.value = answered.messages
     acknowledgements.value = answered.acknowledgements
     boardFailure.value = null
@@ -96,7 +105,7 @@ interface QueuedMessage { milestoneTypeId: string | null, presetId: string | nul
 // it was actually composed rather than the moment it finally sent (criterion 6, K-104).
 const writeQueue = useWriteQueue<QueuedMessage>(async (action) => {
   try {
-    await $fetch('/api/board/messages', {
+    await postMessage('/api/board/messages', {
       method: 'POST',
       body: { ...action.payload, composedAt: Math.floor(action.queuedAt / 1000) },
     })
@@ -129,7 +138,7 @@ function postFreeText(): void {
 
 async function acknowledge(messageId: string): Promise<void> {
   try {
-    await $fetch(`/api/board/messages/${messageId}/acknowledge`, { method: 'POST' })
+    await postAck(`/api/board/messages/${messageId}/acknowledge`, { method: 'POST' })
     await loadMessages()
   }
   catch { /* a tap that failed to record is a tap the crew member can try again */ }

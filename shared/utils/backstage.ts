@@ -48,6 +48,8 @@ export const postMessageForm = z.object({
   // The device's own clock at the moment of composing, carried through an offline queue
   // unchanged (criterion 6); never trusted for ordering, only for display.
   composedAt: z.number().int().positive(),
+// Load-bearing for retention: a milestone row's body is null by construction, so the 30-day
+// purge can never be asked to keep crew free text alive under cover of a kept milestone.
 }).refine(
   data => [data.milestoneTypeId, data.presetId, data.body].filter(value => value !== null).length === 1,
   'Send exactly one of a milestone, a preset, or free text',
