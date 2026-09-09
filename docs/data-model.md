@@ -922,6 +922,18 @@ exist yet; a session left open past its night is F-102's own query (`staleUnclos
 E-114's checklist criterion 3 names only two system-verified checks; a stale till session is not
 a third one it added, so this query still has no screen reading it (`docs/known-issues.md`).
 
+### comp_requests
+`id` PK · `venue_id` → venues restrict · `night` · `requested_by` → users restrict · `reason` ·
+`lines` JSON basket, read exactly at approval and at the sale, never resubmitted · `status` CHECK
+`PENDING|APPROVED|DECLINED` · `decided_by` NULL → users restrict, `decided_at` NULL, set together
+or not at all · `decline_reason` NULL, set exactly when declined · `entry_id`, set once the request
+is spent (F-110 criterion 2's atomic claim). `entry_id` carries **no foreign key**, by design, the
+same shape `ledger_lines.product_variant_id` and `stock_movements.ref_id` already are: the claim
+sets it before the `ledger_entries` row it names exists, since that row is only written once the
+claim has already won, so an immediate foreign key would refuse the very statement that makes the
+claim atomic. Do not add one back; the fix for a stale reference is a read-time check, not a
+constraint SQLite cannot enforce at the moment it is written.
+
 ### stock_movements  APPEND-ONLY
 `id` PK · `item_id` → bar_items restrict · `qty` signed integer, whole units of the item's own
 counting unit · `kind` CHECK `DELIVERY|SALE|COMP|STOCKTAKE|WASTAGE|TRANSFER|ADJUST|REVERSAL` ·

@@ -523,7 +523,7 @@ export async function commitCompSale(
   }
 
   if (soldResolved.length === 0) {
-    return { entryId: null, totalPence: 0, lines: soldPriced, ageCheck: null, refusedLines: refusedPriced, tab: null, comp: null }
+    return { entryId: null, totalPence: 0, lines: soldPriced, ageCheck: null, refusedLines: refusedPriced, tab: null, discount: null, comp: null }
   }
 
   const entryId = newId()
@@ -621,6 +621,7 @@ export async function commitCompSale(
     ageCheck: ageCheckResult,
     refusedLines: refusedPriced,
     tab: null,
+    discount: null,
     comp: { reason: request.reason, foregonePence },
   }
 }
