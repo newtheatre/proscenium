@@ -109,8 +109,8 @@ export interface PricedBasket {
   discount: { id: string, name: string, percent: number } | null
 }
 
-// What a completed sale answers with (F-105): the ledger entry it posted. A Challenge 25 refusal
-// can leave nothing sold, `entryId` null (F-106); `tab` is set only on a tab charge (F-108).
+// What a completed sale answers with (F-105): `entryId` can be null on a full age-check refusal
+// (F-106); `tab` is set only on a tab charge (F-108), `comp` only on a comp, `totalPence` zero (F-110).
 export interface SaleReceipt {
   entryId: string | null
   totalPence: number
@@ -119,4 +119,5 @@ export interface SaleReceipt {
   refusedLines: PricedLine[]
   discount: { id: string, name: string, percent: number } | null
   tab: { holderName: string, outstandingPence: number, capOverridden: boolean } | null
+  comp: { reason: string, foregonePence: number } | null
 }

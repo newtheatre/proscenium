@@ -41,6 +41,34 @@ export const discounts = sqliteTable('discounts', {
   check('discounts_status_values', sql`${table.status} IN ('ACTIVE', 'RETIRED')`),
 ])
 
+// A request to give a basket away, decided once by tonight's duty manager or the bar manager,
+// never the requester (F-110 criterion 1). `lines` is read exactly, never resubmitted.
+export const compRequests = sqliteTable('comp_requests', {
+  id: id(),
+  venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),
+  night: text('night').notNull(),
+  requestedBy: text('requested_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  reason: text('reason').notNull(),
+  lines: text('lines', { mode: 'json' }).notNull(),
+  status: text('status').notNull().default('PENDING'),
+  decidedBy: text('decided_by').references(() => users.id, { onDelete: 'restrict' }),
+  decidedAt: integer('decided_at'),
+  declineReason: text('decline_reason'),
+  // Set once approved becomes sold (criterion 2's atomic claim). No foreign key: the claim is
+  // written before the ledger entry it names exists, which only lands once the claim has won.
+  entryId: text('entry_id'),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  index('comp_requests_venue_night').on(table.venueId, table.night),
+  check('comp_requests_status_values', sql`${table.status} IN ('PENDING', 'APPROVED', 'DECLINED')`),
+  check('comp_requests_decided_shape', sql`
+    (${table.status} = 'PENDING' AND ${table.decidedBy} IS NULL AND ${table.decidedAt} IS NULL)
+    OR (${table.status} <> 'PENDING' AND ${table.decidedBy} IS NOT NULL AND ${table.decidedAt} IS NOT NULL)
+  `),
+  check('comp_requests_decline_reason_shape', sql`(${table.status} = 'DECLINED') = (${table.declineReason} IS NOT NULL)`),
+  check('comp_requests_entry_needs_approval', sql`${table.entryId} IS NULL OR ${table.status} = 'APPROVED'`),
+])
+
 // A sellable thing. Its serving sizes, its recipe and its prices arrive as their own tables
 // (F-112, F-113, F-116); a product carries what the till has to show beside the buttons.
 export const barProducts = sqliteTable('bar_products', {
