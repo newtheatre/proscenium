@@ -206,6 +206,10 @@ export const MEMBER_NAV: NavEntry[] = [
 
   { label: 'My profile', icon: 'i-lucide-user', to: '/account/profile', ability: signedIn },
   { label: 'Sign-in and security', icon: 'i-lucide-shield', to: '/account/security', ability: signedIn },
+
+  // Module H: communications
+
+  { label: 'Notifications', icon: 'i-lucide-bell', to: '/account/notifications', ability: signedIn },
 ]
 
 // The account menu is the only place all four shells are reachable from each other, because it is

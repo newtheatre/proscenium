@@ -93,7 +93,8 @@ namespace, and asks the owner for one anywhere else.
 | Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/qr` (retrieval, resend and self-service edit and cancel while unpaid: D-108, D-110), `/passes` (a pass's own QR retrieval, D-124), `/account/passes`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/`, `app/pages/[...slug].vue` (the content catch-all, D-103) |
 | Show night | `/rota` and `/rota/manage/**` (templates, rota administration, the venue emergency card and the backstage board's own milestone types and presets at `/rota/manage/backstage`), the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**`, `/api/admin/rota/**`, `/api/admin/backstage/**`, `/api/board/**` and `server/utils/night-authority.ts`. The console screens sit under `/rota/manage`, never `/admin`: `/tonight` is the phone-first shell rather than a console prefix (0040, 0046). |
 | Bar | `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**` |
-| Platform | `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`, `tests/helpers/race.ts` |
+| Platform | `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`, `tests/helpers/race.ts` |
+| Communications | `/account/notifications`, `/comms/**`, `server/utils/notify.ts`, `server/utils/notification-preferences.ts`, `shared/utils/notifications.ts`, `shared/utils/senders.ts` |
 
 `/tonight` is the one prefix three streams write under, which is why the shell below is owned by
 one of them and settled before any of the screens are built. The hub page itself was written by
@@ -299,6 +300,21 @@ One centre (`server/utils/notify.ts`, decision 0013): per-topic preferences, tra
 always delivers, digest coalescing, full send log with retries, undeliverable and anonymised
 addresses dropped before the provider. Channels: email now, in-app inbox now, push when it
 actually delivers.
+
+### Preferences and the inbox (H-102, 0054)
+
+Five topics, two switchable channels, one row per person per topic, and a row only where the
+member has chosen. An absent row means the configured default
+(`NOTIFICATION_EMAIL_DEFAULT_TOPICS`, `NOTIFICATION_PUSH_DEFAULT_TOPICS`), which is why nothing is
+seeded at registration: a workshop changing a default still reaches everybody who never chose.
+The screen is `/account/notifications` and shows every cell with its default beside it.
+
+Order inside `notify()`, which is what the criteria turn on: resolve the account, render, write
+the inbox entry, then judge the email. A topic switched off is logged `SUPPRESSED_PREFERENCE` and
+never handed to the provider; a transactional type is not asked about at all. The inbox entry is
+written first and unconditionally (except for an anonymised account), so no preference, unproven
+address or provider failure can make a message unfindable. Every type carrying a topic declares
+the `INBOX` channel, and a unit test fails the build where one does not.
 
 ## The show night (0014, E-110)
 

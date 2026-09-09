@@ -31,9 +31,14 @@ const { data: unassessed } = await useAsyncData(
 const SAYS: Record<string, string> = {
   FAILED: 'The provider refused it',
   SKIPPED_UNDELIVERABLE: 'Not sent',
+  SUPPRESSED_PREFERENCE: 'Not sent',
+  PENDING: 'Spoken for',
 }
 
+// Keyed on the error where there is one and on the status otherwise, because a suppression is
+// the status itself rather than a failure with a reason (H-102 criterion 3).
 const WHY: Record<string, string> = {
+  'SUPPRESSED_PREFERENCE': 'muted this topic',
   'preference': 'muted this topic',
   'unverified-address': 'has not proved their address',
   'no-account': 'the account is gone',
@@ -41,7 +46,7 @@ const WHY: Record<string, string> = {
 }
 
 function saysWhy(entry: Trouble): string {
-  return WHY[entry.error ?? ''] ?? entry.error ?? 'no reason recorded'
+  return WHY[entry.error ?? ''] ?? WHY[entry.status] ?? entry.error ?? 'no reason recorded'
 }
 
 onMounted(() => {
