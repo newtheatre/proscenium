@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { letters, skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -222,8 +222,7 @@ describe.skipIf(skip !== null)('the displaced member is told and offered a slot 
       `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.booking.bumped'`,
       member.id)?.n ?? 0) - before).toBe(1)
 
-    const files = [...new Bun.Glob('*.txt').scanSync({ cwd: '.data/mail', onlyFiles: true })]
-    const bodies = await Promise.all(files.map(name => Bun.file(`.data/mail/${name}`).text()))
+    const bodies = await letters(app)
     const message = bodies.find(body => body.includes('The get-in moved') && body.includes(member.email))
     expect(message).toBeDefined()
   })

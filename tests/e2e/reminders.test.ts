@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { letters, skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -128,8 +128,7 @@ describe.skipIf(skip !== null)('the day-before reminder (criterion 3)', () => {
     placeBooking(member.id, tomorrowAt(18), 'CONFIRMED', 'Dress run')
     await remind()
 
-    const files = [...new Bun.Glob('*.txt').scanSync({ cwd: '.data/mail', onlyFiles: true })]
-    const bodies = await Promise.all(files.map(name => Bun.file(`.data/mail/${name}`).text()))
+    const bodies = await letters(app)
     const reminder = bodies.find(body => body.includes('Dress run') && body.includes(member.email))
 
     expect(reminder).toBeDefined()

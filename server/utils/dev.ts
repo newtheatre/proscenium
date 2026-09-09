@@ -1,4 +1,6 @@
 import { eq } from 'drizzle-orm'
+// The writer's own constant, so the tools cannot read a path the centre stopped writing to.
+import { MAILBOX } from './mailbox'
 import { PERSONAS, PERSONA_PASSWORD } from '#shared/utils/personas'
 
 // Development-only helpers (K-124). Every caller is guarded, and nuxt.config keeps the routes out
@@ -7,7 +9,6 @@ import { PERSONAS, PERSONA_PASSWORD } from '#shared/utils/personas'
 // Beside the database they describe, so a run against a throwaway hub directory does not read a
 // map written for the developer's own one.
 const DEV_DIR = process.env.NUXT_HUB_DIR ?? '.data'
-const MAILBOX = `${DEV_DIR}/mail`
 
 export interface Letter { name: string, to: string, subject: string, body: string }
 

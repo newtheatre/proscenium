@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -251,8 +251,7 @@ describe.skipIf(skip !== null)('one booking on its own (criterion 1)', () => {
 
     // The mailbox the development transport writes to, which is the only place a message body
     // can be read back: notification_log records the outcome, never the content.
-    const files = [...new Bun.Glob('*.txt').scanSync({ cwd: '.data/mail', onlyFiles: true })]
-    const recent = await Promise.all(files.map(async name => Bun.file(`.data/mail/${name}`).text()))
+    const recent = await letters(app)
     const confirmation = recent.find(body => body.includes('Read-through') && body.includes(member.email))
 
     expect(confirmation).toBeDefined()
