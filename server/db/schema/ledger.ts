@@ -62,6 +62,11 @@ export const ledgerLines = sqliteTable('ledger_lines', {
   productVariantId: text('product_variant_id'),
   priceRef: text('price_ref'),
   choices: text('choices', { mode: 'json' }),
+  // Snapshotted, not referenced: no foreign key, the same reasoning as the ids above, so a later
+  // edit to the discount itself never restates what this line actually charged (F-117).
+  discountId: text('discount_id'),
+  discountPercent: integer('discount_percent'),
+  discountPence: integer('discount_pence'),
 }, table => [
   index('ledger_lines_entry').on(table.entryId),
   index('ledger_lines_kind').on(table.kind),

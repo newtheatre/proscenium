@@ -5,15 +5,31 @@ import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, resolvedPriceColumns } from '#server/utils/bar'
 import { ageCheckConstraintRefusal } from '#shared/utils/age-checks'
+import { discountedPence } from '#shared/utils/discounts'
 import { postEntry } from '#server/utils/ledger'
 import { authorisedTabHolder, canOverrideTabCap, outstandingTabBalance } from '#server/utils/tab-holders'
 import { priceRef, saysMoney } from '#shared/utils/bar'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
+import type { Discount } from '#shared/utils/discounts'
 import type { BasketLineInput, PricedBasket, PricedLine, SaleCatalogue, SaleCategory, SaleChoice, SaleProduct, SaleReceipt, SaleVariant } from '#shared/utils/sale'
 import type { BatchItem } from 'drizzle-orm/batch'
 
-// What the till may sell right now, what pricing it costs, and the atomic commit once confirmed,
-// on the reader or a tab, with a Challenge 25 outcome folded in when it needs one (F-103 to F-108).
+// What the till may sell right now, what pricing it costs, and the atomic commit once confirmed:
+// a reader or tab charge, a Challenge 25 outcome and a discount folded in as needed (F-103 to F-117).
+
+type PublicDiscount = Pick<Discount, 'id' | 'name' | 'percent'>
+
+// A discount the basket named, resolved once and reused by both the price check and the commit,
+// so neither can disagree about what it takes off (F-104 criterion 1, F-117 criterion 4).
+async function resolveDiscount(discountId: string | null): Promise<Discount | null> {
+  if (!discountId) return null
+  const discount = await discountById(discountId)
+  if (!discount) throw createError({ statusCode: 404, statusMessage: 'No such discount' })
+  if (discount.status !== 'ACTIVE') {
+    throw createError({ statusCode: 409, statusMessage: `${discount.name} is retired, so it cannot be applied to a new sale` })
+  }
+  return discount
+}
 
 interface VariantRow {
   id: string
@@ -202,9 +218,14 @@ function resolveLines(lines: BasketLineInput[], { variants, optionById }: Resolv
 
 // The one resolution both pricing and committing build from, called once rather than twice, so
 // no price change can land between a check and its write (F-103 criterion 3, F-104 criterion 1).
-async function resolveSale(lines: BasketLineInput[], on: string): Promise<{ resolved: ResolvedLine[], priced: PricedLine[], totalPence: number }> {
+async function resolveSale(
+  lines: BasketLineInput[],
+  on: string,
+  discountId: string | null,
+): Promise<{ resolved: ResolvedLine[], priced: PricedLine[], totalPence: number, discount: Discount | null }> {
   const catalogue = await activeVariantsWithChoices(on)
   const resolved = resolveLines(lines, catalogue)
+  const discount = await resolveDiscount(discountId)
 
   // Scoped to the basket's own lines, bounded by MAX_BASKET_LINES, never to the whole catalogue
   // (0003): a basket of two should not bind a parameter per product the till has ever priced.
@@ -224,16 +245,22 @@ async function resolveSale(lines: BasketLineInput[], on: string): Promise<{ reso
     unitPricePence: line.variant.pricePence,
     priceSource: line.variant.priceSource,
     amountPence: line.amountPence,
+    discountPence: discount ? discountedPence(line.amountPence, discount.percent) : 0,
   }))
 
-  return { resolved, priced, totalPence: priced.reduce((sum, line) => sum + line.amountPence, 0) }
+  const totalPence = priced.reduce((sum, line) => sum + line.amountPence - line.discountPence, 0)
+  return { resolved, priced, totalPence, discount }
+}
+
+function publicDiscount(discount: Discount | null): PublicDiscount | null {
+  return discount ? { id: discount.id, name: discount.name, percent: discount.percent } : null
 }
 
 // Recomputes a submitted basket against live, effective prices: never the client's own arithmetic
 // (0004). A line naming a variant this cannot sell right now is refused by name (F-103 criterion 3).
-export async function priceBasket(lines: BasketLineInput[], on: string): Promise<PricedBasket> {
-  const { priced, totalPence } = await resolveSale(lines, on)
-  return { lines: priced, totalPence }
+export async function priceBasket(lines: BasketLineInput[], on: string, discountId: string | null): Promise<PricedBasket> {
+  const { priced, totalPence, discount } = await resolveSale(lines, on, discountId)
+  return { lines: priced, totalPence, discount: publicDiscount(discount) }
 }
 
 // Everything `commitSale` knows beyond the basket: what its audit rows cite, which performance
@@ -298,10 +325,11 @@ export async function commitSale(
   on: string,
   expectedTotalPence: number,
   ageCheck: InlineAgeCheckInput | null,
+  discountId: string | null,
   tabHolderId: string | null,
   context: SaleContext,
 ): Promise<SaleReceipt> {
-  const { resolved, priced } = await resolveSale(lines, on)
+  const { resolved, priced, discount } = await resolveSale(lines, on, discountId)
   const { restricted, sold } = saleableAfterAgeCheck(resolved, priced, ageCheck)
 
   // No route sells a restricted line without an outcome on record first (F-106 criteria 1, 5).
@@ -316,7 +344,7 @@ export async function commitSale(
   const soldResolved = sold.map(index => resolved[index]!)
   const soldPriced = sold.map(index => priced[index]!)
   const refusedPriced = restricted.filter(index => !sold.includes(index)).map(index => priced[index]!)
-  const soldTotalPence = soldPriced.reduce((sum, line) => sum + line.amountPence, 0)
+  const soldTotalPence = soldPriced.reduce((sum, line) => sum + line.amountPence - line.discountPence, 0)
 
   if (soldTotalPence !== expectedTotalPence) {
     throw createError({
@@ -338,14 +366,19 @@ export async function commitSale(
       tender: tab ? 'TAB' : 'CARD',
       actorId: context.actorId,
       tabDebtorId: tab?.holderId ?? null,
-      lines: soldResolved.map(line => ({
+      lines: soldResolved.map((line, index) => ({
         kind: 'BAR_ITEM',
-        amountPence: line.amountPence,
+        // Net of the discount: what actually moved, the ledger's own meaning for the column
+        // (F-117 criterion 3). The gross figure and the cut that reached it are its own columns.
+        amountPence: line.amountPence - soldPriced[index]!.discountPence,
         qty: line.qty,
         unitPricePence: line.variant.pricePence,
         productVariantId: line.variant.id,
         priceRef: priceRef(line.variant.priceSource, line.variant.priceRowId),
         choices: line.choiceItemId ? { choiceItemId: line.choiceItemId, choiceItemName: line.choiceItemName } : null,
+        discountId: discount?.id ?? null,
+        discountPercent: discount?.percent ?? null,
+        discountPence: soldPriced[index]!.discountPence || null,
       })),
     })
     statements.push(...posted.statements)
@@ -369,7 +402,13 @@ export async function commitSale(
       actorId: context.actorId,
       action: 'bar.till.sale',
       target: `till-session:${context.sessionId}`,
-      detail: { venueId: context.venueId, night: context.night, lines: soldResolved.length, tender: tab ? 'TAB' : 'CARD' },
+      detail: {
+        venueId: context.venueId,
+        night: context.night,
+        lines: soldResolved.length,
+        discountId: discount?.id ?? null,
+        tender: tab ? 'TAB' : 'CARD',
+      },
     })))
     // A separate row from the sale itself: real because `actorId` above is only set by whoever
     // was actually signed in to submit it (F-108 criterion 4).
@@ -429,6 +468,7 @@ export async function commitSale(
     lines: soldPriced,
     ageCheck: ageCheckResult,
     refusedLines: refusedPriced,
+    discount: publicDiscount(discount),
     tab: tab ? { holderName: tab.holderName, outstandingPence: tab.outstandingPence + soldTotalPence, capOverridden: tab.capOverridden } : null,
   }
 }

@@ -106,6 +106,14 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Whether a manager may raise the tab cap for one tab.',
   },
+  // Proposed and unconfirmed, per docs/workshops.md: shipped rather than left unset, so the
+  // feature is live from day one instead of dormant awaiting a value (0019, F-117 criterion 1).
+  BAR_DISCOUNT_MAX_PERCENT: {
+    schema: z.number().int().positive().max(100),
+    default: 50,
+    workshop: 'money-and-box-office',
+    describes: 'The most a bar discount may take off, as a percentage. A discount above it is refused, on creation and on edit.',
+  },
   // Empty is the honest starting state, not a guess: who qualifies is still open (F-bar.md), so
   // nobody is authorised until a committee decision adds them (F-108 criterion 1).
   BAR_AUTHORISED_TAB_HOLDERS: {
@@ -591,6 +599,7 @@ export const ENFORCED_KEYS = [
   'ROOM_PURPOSES',
   'EXTERNAL_REQUEST_NOTICE_WORKING_DAYS',
   'BANK_HOLIDAYS',
+  'BAR_DISCOUNT_MAX_PERCENT',
   'BAR_TAB_CAP_PENCE',
   'BAR_TAB_CAP_MANAGER_OVERRIDE',
   'BAR_AUTHORISED_TAB_HOLDERS',

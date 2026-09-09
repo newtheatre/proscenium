@@ -533,6 +533,13 @@
       "when": 1788949288293,
       "tag": "0075_round_nightshade",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "6",
+      "when": 1788952059538,
+      "tag": "0076_strong_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }

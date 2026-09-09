@@ -91,3 +91,17 @@ describe('an age-restricted line may carry a Challenge 25 outcome (F-106 criteri
     expect(parsed.success).toBe(false)
   })
 })
+
+describe('a basket may name a discount to apply (F-117 criterion 4)', () => {
+  test('no discount named is the default', () => {
+    const parsed = basketForm.safeParse({ lines: [aLine] })
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.discountId).toBeNull()
+  })
+
+  test('a discount id is carried through', () => {
+    const parsed = basketForm.safeParse({ lines: [aLine], discountId: 'disc-1' })
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.discountId).toBe('disc-1')
+  })
+})

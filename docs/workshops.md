@@ -19,6 +19,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Pass products for 2026/27 | set yearly | to be listed in session | Entered through the box office screens, not settings: prices are dated and append-only (0025, D-123) |
 | Confirmation resend limit | none: no resend existed | 5 per reference per hour | D-108 criterion 2. Shipped as this session's proposed value rather than left unset, so a booker can resend their own confirmation from day one |
 | Bar tab cap | £20 soft nag | £20 hard cap, manager override | Old soft cap never blocked |
+| Bar discount cap | none: no discount capability existed | 50% maximum | F-117. Shipped as this session's proposed value rather than left unset, so the feature is live rather than dormant; this row is what confirms it, not the code default |
 | Authorised tab holders | committee only, informally | none, empty until named | F-108. Who qualifies (committee only, or a treasurer-approved list) is still open; the list starts empty rather than guessed, so nobody may charge to a tab until the session names who may |
 | Discount codes | none | none at launch | Capability exists, unused until wanted |
 | Season boundary | 1 August to 31 July | unchanged | Drives reporting and role expiry |
