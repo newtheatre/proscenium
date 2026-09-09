@@ -417,6 +417,12 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/bar/order-list/export.get.ts', exempt: 'reads the same shortfalls as CSV' },
   { route: 'server/api/admin/bar/reports/index.get.ts', exempt: 'reads sales, GP, variance, comps and discounts, writing nothing' },
   { route: 'server/api/admin/bar/reports/export.get.ts', actions: ['bar.report.exported'] },
+  { route: 'server/api/admin/bar/tabs.get.ts', exempt: 'reads who still owes a balance, writing nothing' },
+  {
+    route: 'server/api/admin/bar/tab-charges/[id]/void.post.ts',
+    actions: ['bar.tab-charge.voided'],
+    via: ['server/utils/tab-settlement.ts'],
+  },
   { route: 'server/api/admin/bar/movements/index.get.ts', exempt: 'reads the movement history' },
   {
     route: 'server/api/admin/bar/movements/index.post.ts',
@@ -443,6 +449,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/comps.ts', 'server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
   { route: 'server/api/till/comp-requests/[id]/sale.post.ts', actions: ['bar.till.sale', 'age-check.logged'], via: ['server/utils/sale.ts'] },
+  { route: 'server/api/till/tab-settlements/index.get.ts', exempt: 'reads one holder\'s outstanding charges, writing nothing' },
+  {
+    route: 'server/api/till/tab-settlements/index.post.ts',
+    actions: ['bar.tab.settled'],
+    via: ['server/utils/tab-settlement.ts'],
+  },
+  { route: 'server/api/account/tab.get.ts', exempt: 'reads your own tab' },
 
   // Module G: training
 

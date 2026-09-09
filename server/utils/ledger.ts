@@ -44,12 +44,15 @@ export function postEntry(input: EntryInput, at = new Date(), guard?: SQL): Post
         compReason: entry.compReason ?? null,
         compApprovedBy: entry.compApprovedBy ?? null,
         tabDebtorId: entry.tabDebtorId ?? null,
+        voidOfEntryId: entry.voidOfEntryId ?? null,
+        voidReason: entry.voidReason ?? null,
       })
     : db.run(sql`
         INSERT INTO ledger_entries
-          (id, happened_at, london_day, source, tender, actor_id, total_pence, reverses_entry_id, comp_reason, comp_approved_by, tab_debtor_id)
+          (id, happened_at, london_day, source, tender, actor_id, total_pence, reverses_entry_id, comp_reason, comp_approved_by, tab_debtor_id, void_of_entry_id, void_reason)
         SELECT ${id}, ${happenedAt}, ${londonDay}, ${entry.source}, ${entry.tender}, ${entry.actorId ?? null},
-               ${totalPence}, ${entry.reversesEntryId ?? null}, ${entry.compReason ?? null}, ${entry.compApprovedBy ?? null}, ${entry.tabDebtorId ?? null}
+               ${totalPence}, ${entry.reversesEntryId ?? null}, ${entry.compReason ?? null}, ${entry.compApprovedBy ?? null}, ${entry.tabDebtorId ?? null},
+               ${entry.voidOfEntryId ?? null}, ${entry.voidReason ?? null}
         WHERE ${guard}
       `)
 
@@ -76,17 +79,18 @@ export function postEntry(input: EntryInput, at = new Date(), guard?: SQL): Post
           discountId: line.discountId ?? null,
           discountPercent: line.discountPercent ?? null,
           discountPence: line.discountPence ?? null,
+          settlesEntryId: line.settlesEntryId ?? null,
         })
       // Guarded on the entry existing, not `guard` again: a line for an entry this batch did not
       // write would violate `ledger_lines`' own foreign key first regardless (0001).
       : db.run(sql`
           INSERT INTO ledger_lines
             (id, entry_id, kind, amount_pence, qty, unit_price_pence, reservation_id, performance_id, ticket_id,
-             product_variant_id, price_ref, choices, discount_id, discount_percent, discount_pence)
+             product_variant_id, price_ref, choices, discount_id, discount_percent, discount_pence, settles_entry_id)
           SELECT ${lineId}, ${id}, ${line.kind}, ${line.amountPence}, ${line.qty}, ${line.unitPricePence ?? null},
                  ${line.reservationId ?? null}, ${line.performanceId ?? null}, ${line.ticketId ?? null},
                  ${line.productVariantId ?? null}, ${line.priceRef ?? null}, ${line.choices ? JSON.stringify(line.choices) : null},
-                 ${line.discountId ?? null}, ${line.discountPercent ?? null}, ${line.discountPence ?? null}
+                 ${line.discountId ?? null}, ${line.discountPercent ?? null}, ${line.discountPence ?? null}, ${line.settlesEntryId ?? null}
           WHERE EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${id})
         `))
   }
