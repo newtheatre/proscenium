@@ -96,8 +96,6 @@ async function aSellableProduct(pricePence = 500, ageRestricted = false): Promis
   return { variantId, productId }
 }
 
-const aMember = (): Promise<TestMember> => registerMember(app, 'comp-member', generatePassword())
-
 interface AskInput { venueId: string, lines: unknown[], reason: string }
 const ask = (input: AskInput, as = barStaff.cookie): Promise<Response> =>
   send('POST', '/api/till/comp-requests', input, as)
@@ -105,8 +103,8 @@ const approve = (id: string, as: string): Promise<Response> =>
   send('POST', `/api/till/comp-requests/${id}/approve`, {}, as)
 const decline = (id: string, reason: string, as: string): Promise<Response> =>
   send('POST', `/api/till/comp-requests/${id}/decline`, { reason }, as)
-const give = (id: string, expectedForegonePence: number, as = barStaff.cookie, ageCheck: unknown = null): Promise<Response> =>
-  send('POST', `/api/till/comp-requests/${id}/sale`, { expectedForegonePence, ageCheck }, as)
+const give = (id: string, venueId: string, expectedForegonePence: number, as = barStaff.cookie, ageCheck: unknown = null): Promise<Response> =>
+  send('POST', `/api/till/comp-requests/${id}/sale`, { venueId, expectedForegonePence, ageCheck }, as)
 
 interface LedgerEntryRow {
   tender: string
@@ -245,9 +243,9 @@ describe.skipIf(skip !== null)('approval is claimed atomically (criterion 2)', (
 
 describe.skipIf(skip !== null)('a comp sale writes a zero-value payment with full-price lines snapshotted (criterion 4)', () => {
   test('the entry is COMP, zero total, and the line keeps the retail price', async () => {
-    const { id } = await approvedRequest(500)
+    const { id, venueId } = await approvedRequest(500)
 
-    const answered = await give(id, 500)
+    const answered = await give(id, venueId, 500)
     expect(answered.status).toBe(200)
     const body = await answered.json() as { entryId: string, comp: { foregonePence: number } }
     expect(body.comp.foregonePence).toBe(500)
@@ -287,7 +285,7 @@ describe.skipIf(skip !== null)('a comp sale writes a zero-value payment with ful
     const onHandBefore = (before.query('SELECT coalesce(sum(qty), 0) AS n FROM stock_movements WHERE item_id = ?').get(itemId) as { n: number }).n
     before.close()
 
-    expect((await give(id, 500)).status).toBe(200)
+    expect((await give(id, venueId, 500)).status).toBe(200)
 
     const after = new Database(app.databaseFile, { readonly: true })
     const onHandAfter = (after.query('SELECT coalesce(sum(qty), 0) AS n FROM stock_movements WHERE item_id = ?').get(itemId) as { n: number }).n
@@ -296,10 +294,10 @@ describe.skipIf(skip !== null)('a comp sale writes a zero-value payment with ful
   })
 
   test('the basket given is the one approved, not whatever the till last held', async () => {
-    const { id } = await approvedRequest(500)
+    const { id, venueId } = await approvedRequest(500)
     // The give route takes no basket at all: only a request id and the screen's own belief of the
     // total, so there is nothing for a till to substitute (F-110 criteria 2, 4).
-    const mismatched = await give(id, 999)
+    const mismatched = await give(id, venueId, 999)
     expect(mismatched.status).toBe(409)
     expect(await message(mismatched)).toContain('£9.99')
   })
@@ -307,9 +305,9 @@ describe.skipIf(skip !== null)('a comp sale writes a zero-value payment with ful
 
 describe.skipIf(skip !== null)('an approved comp cannot be given twice (criterion 2, extended to the spend)', () => {
   test('a second attempt to give the same comp is refused', async () => {
-    const { id } = await approvedRequest(500)
-    expect((await give(id, 500)).status).toBe(200)
-    const second = await give(id, 500)
+    const { id, venueId } = await approvedRequest(500)
+    expect((await give(id, venueId, 500)).status).toBe(200)
+    const second = await give(id, venueId, 500)
     expect(second.status).toBe(409)
   })
 
@@ -322,11 +320,11 @@ describe.skipIf(skip !== null)('an approved comp cannot be given twice (criterio
     const asked = await ask({ venueId, lines: [{ variantId, qty: 1 }], reason: 'A round on the house' })
     const { id } = await asked.json() as { id: string }
 
-    const pending = await give(id, 500)
+    const pending = await give(id, venueId, 500)
     expect(pending.status).toBe(409)
 
     await decline(id, 'Not tonight', barManager.cookie)
-    const declined = await give(id, 500)
+    const declined = await give(id, venueId, 500)
     expect(declined.status).toBe(409)
   })
 })
@@ -342,7 +340,7 @@ describe.skipIf(skip !== null)('a restricted line still needs a Challenge 25 out
     const { id } = await asked.json() as { id: string }
     await approve(id, barManager.cookie)
 
-    const answered = await give(id, 500)
+    const answered = await give(id, venueId, 500)
     expect(answered.status).toBe(409)
     expect(await message(answered)).toContain('Challenge 25')
   })

@@ -442,6 +442,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // Holds no free text: an opener and an applier, both timestamps, and a status.
     why: 'Who opened and applied a stocktake is what any on-hand figure audits to (F-115); the tombstone still answers for it.',
   },
+  {
+    name: 'comp_requests',
+    column: 'requested_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // `reason` and `decline_reason` naming somebody else is the same known gap as `incidents.body`
+    // (docs/known-issues.md); the request is financial evidence and must answer for itself.
+    why: 'Who asked for a comp and who decided it is what a foregone-revenue figure audits to (F-110); the tombstone still answers for it.',
+  },
 
   // Module G: training
 

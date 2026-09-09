@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Which request' })
   const input = await readValidatedBodyOrThrow(event, commitCompSaleForm)
 
-  const resolved = await requireNightAuthority(event, 'BAR')
+  const resolved = await requireNightAuthority(event, 'BAR', { venueId: input.venueId, performanceId: input.performanceId })
   const session = requireOpenSession(await openSessionFor(resolved.venueId, resolved.night))
 
   const committed = await commitCompSale(id, londonDayOf(new Date()), input.expectedForegonePence, input.ageCheck, {

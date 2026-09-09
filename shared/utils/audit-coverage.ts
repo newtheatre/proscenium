@@ -376,8 +376,16 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/till/sale.post.ts', actions: ['bar.till.sale', 'age-check.logged', 'bar.tab.cap-overridden'], via: ['server/utils/sale.ts'] },
   { route: 'server/api/till/comp-requests/index.get.ts', exempt: 'reads tonight\'s pending comp requests, writing nothing' },
   { route: 'server/api/till/comp-requests/index.post.ts', actions: ['bar.comp-request.created'], via: ['server/utils/comps.ts'] },
-  { route: 'server/api/till/comp-requests/[id]/approve.post.ts', actions: ['bar.comp-request.approved'], via: ['server/utils/comps.ts'] },
-  { route: 'server/api/till/comp-requests/[id]/decline.post.ts', actions: ['bar.comp-request.declined'], via: ['server/utils/comps.ts'] },
+  {
+    route: 'server/api/till/comp-requests/[id]/approve.post.ts',
+    actions: ['bar.comp-request.approved', 'night.officer-bypass'],
+    via: ['server/utils/comps.ts', 'server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+  {
+    route: 'server/api/till/comp-requests/[id]/decline.post.ts',
+    actions: ['bar.comp-request.declined', 'night.officer-bypass'],
+    via: ['server/utils/comps.ts', 'server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
   { route: 'server/api/till/comp-requests/[id]/sale.post.ts', actions: ['bar.till.sale', 'age-check.logged'], via: ['server/utils/sale.ts'] },
 
   // Module G: training

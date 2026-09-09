@@ -2,7 +2,6 @@ import { sql } from 'drizzle-orm'
 import { check, index, integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { users } from './identity'
-import { ledgerEntries } from './ledger'
 import { venues } from './programme'
 
 const now = sql`(unixepoch())`
@@ -55,9 +54,9 @@ export const compRequests = sqliteTable('comp_requests', {
   decidedBy: text('decided_by').references(() => users.id, { onDelete: 'restrict' }),
   decidedAt: integer('decided_at'),
   declineReason: text('decline_reason'),
-  // Set once the approved request actually becomes a sale, so the same approval can never post
-  // twice (criterion 2's atomic claim, carried through to the write it authorises).
-  entryId: text('entry_id').references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+  // Set once approved becomes sold (criterion 2's atomic claim). No foreign key: the claim is
+  // written before the ledger entry it names exists, which only lands once the claim has won.
+  entryId: text('entry_id'),
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
   index('comp_requests_venue_night').on(table.venueId, table.night),

@@ -23,9 +23,11 @@ export const declineCompRequestForm = z.object({
 
 export type DeclineCompRequestInput = z.output<typeof declineCompRequestForm>
 
-// What spending an approved request submits: the screen's own belief of what it is giving away
-// (0004, F-104's cross-check reused for a comp), and an inline Challenge 25 outcome if it needs one.
+// What spending an approved request submits: which venue tonight (the same scope a sale names),
+// the screen's own belief of what it gives away (0004), and a Challenge 25 outcome if it needs one.
 export const commitCompSaleForm = z.object({
+  venueId: z.string().trim().min(1).optional(),
+  performanceId: z.string().trim().min(1).optional(),
   expectedForegonePence: z.number().int().nonnegative(),
   ageCheck: inlineAgeCheckForm.nullish().transform(value => value ?? null),
 })
