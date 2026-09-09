@@ -87,6 +87,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     prefix: '/box-office',
     items: [
       { label: 'Desk', icon: 'i-lucide-search', to: '/box-office/desk', ability: viewProgramme },
+      { label: 'Issue passes', icon: 'i-lucide-ticket-check', to: '/box-office/desk/passes', ability: viewProgramme },
       { label: 'Shows', icon: 'i-lucide-drama', to: '/box-office/shows', ability: viewProgramme },
       { label: 'Ticket types', icon: 'i-lucide-tag', to: '/box-office/ticket-types', ability: viewTicketTypes },
       { label: 'Passes', icon: 'i-lucide-wallet-cards', to: '/box-office/pass-types', ability: viewPassTypes },
@@ -185,6 +186,7 @@ export const MEMBER_NAV: NavEntry[] = [
   // Module D: ticketing
 
   { label: 'Access requirements', icon: 'i-lucide-accessibility', to: '/account/access', ability: signedIn },
+  { label: 'Passes', icon: 'i-lucide-wallet-cards', to: '/account/passes', ability: signedIn },
 
   // Module C: spaces
 
