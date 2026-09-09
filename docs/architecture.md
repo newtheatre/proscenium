@@ -808,6 +808,30 @@ deleting at all). `purgeStaleMessages()` folds into `daily:sweeps`
 (`server/tasks/daily/sweeps.ts`) rather than a new cron entry, since it is exactly the "tidy
 lapsed rows" job that task already runs nightly.
 
+### The night report compiles itself (E-123)
+
+`GET /api/tonight/report` and `server/utils/night-report.ts`. No table, deliberately: criterion 2
+asks that every figure derive from the ledger and the registers at read time, never a stored
+total, so a draft read before close and, once E-124 exists, a frozen read after it run the
+identical queries. `compileNightReport(performanceId, venueId, night)` runs eight independent
+queries together, each its own exported statement builder so an integration test executes the
+real SQL:
+
+| Section | Reads | Note |
+| --- | --- | --- |
+| Attendance | `reservations` | Sold rides `heldSeatsSubquery` (D-105); admitted is `status = 'DOOR'`, a walk-up the same status with `source = 'DOOR'`, a no-show `status = 'NO_SHOW'`, a status nothing yet sets (D-126). |
+| Takings | `ledger_entries`, `ledger_lines` | Grouped by tender, summed from `ll.amount_pence` on the lines matched to this performance, never `le.total_pence`, which can span more than one performance or product in a single entry. A reversal's negative line nets against what it reverses in the same sum; nothing is filtered by `void_of_entry_id`, which marks a tab-charge reversal, not something to exclude (0031). |
+| Incidents | `incidents`, `incident_severity_config`, `incident_followup_closures` | The full chain, each flagged with its follow-up requirement and closure state whichever way it sits. Closes the known-issues gap E-116 criterion 4 left open. |
+| Age checks | `age_checks` | Current (unsuperseded) entries only, accepted and refused counted separately. |
+| Milestones | `backstage_messages` | Venue and night, not performance: the board is E-120's own scope, so a matinee day's two reports read the same timeline and the reader judges which call belonged to which house from the clock. Closes the known-issues gap E-121 criterion 1 left open. |
+| Staffing | `shifts`, `audit_log` | One row per stamped slot, unfilled ones naming nobody. The officer-bypass flag re-reads the exact audit target `requireNightAuthority` writes (`night:{night}:{venueId}:{role}`), matched against this performance inside the bypass's own recorded `performanceIds`. |
+| Bar summary | `ledger_lines` | Revenue and items sold from this performance's `TILL`-sourced lines, alongside takings rather than instead of it. |
+| Access | `access_profiles`, `reservations`, `tickets` | A verified count only, never a need or an identity (criterion 3, D-127 criterion 3's own counts-only rule). |
+
+`GET /api/tonight/report` takes an optional `performanceId`; a venue running more than one
+performance today must name which one, the same shape `POST /api/tonight/authority` already
+refuses ambiguity with (E-127 criterion 1).
+
 ## The programme (build-order contract d, 0043)
 
 Where we perform, what we perform and when. `venues`, `seasons`, `show_categories`, `shows`,
