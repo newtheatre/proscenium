@@ -3,9 +3,8 @@ import { liveGrants } from '#server/utils/authorise'
 import { permissionsFor } from '#shared/utils/roles'
 import { showNightBounds } from '#shared/utils/show-night'
 
-// Duty manager or bar manager, checked live rather than trusted from a client-sent flag: real
-// only because the submitting account actually holds the authority (F-108, F-110). Shared so a
-// tab-cap override and a comp approval never diverge on who counts as a manager.
+// Duty manager or bar manager, checked live rather than trusted from a client-sent flag (F-108,
+// F-110): shared so a tab-cap override and a comp approval never diverge on who counts as one.
 export async function isDutyOrBarManager(accountId: string, night: string): Promise<boolean> {
   const permissions = permissionsFor(await liveGrants(accountId), new Date())
   if (permissions.has('bar.write')) return true

@@ -2,9 +2,8 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
-// Who may charge to a tab, and what they already owe (F-108). The charge itself, and the write
-// that posts it, are `server/utils/sale.ts`'s; who may wave a charge past the cap is shared with
-// comp approval in `server/utils/bar-authority.ts`.
+// Who may charge to a tab, and what they already owe (F-108). The charge and its write are
+// `server/utils/sale.ts`'s; who may wave a charge past the cap is `bar-authority.ts`'s.
 
 // The allow-list is `BAR_AUTHORISED_TAB_HOLDERS`, checked live rather than cached, since a
 // revocation has to take effect on the very next charge (criterion 1).

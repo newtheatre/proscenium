@@ -43,8 +43,7 @@ export const discounts = sqliteTable('discounts', {
 ])
 
 // A request to give a basket away, decided once by tonight's duty manager or the bar manager,
-// never the requester (F-110 criterion 1). `lines` is the basket asked for, so approval and the
-// comp sale itself both read exactly what was requested, not a resubmission.
+// never the requester (F-110 criterion 1). `lines` is read exactly, never resubmitted.
 export const compRequests = sqliteTable('comp_requests', {
   id: id(),
   venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),

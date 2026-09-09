@@ -9,6 +9,7 @@ import { discountedPence } from '#shared/utils/discounts'
 import { postEntry } from '#server/utils/ledger'
 import { isDutyOrBarManager } from '#server/utils/bar-authority'
 import { authorisedTabHolder, outstandingTabBalance } from '#server/utils/tab-holders'
+import { claimCompRequestForSale, compRequestById, compRequestLines, releaseCompRequestClaim } from '#server/utils/comps'
 import { priceRef, saysMoney } from '#shared/utils/bar'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { Discount } from '#shared/utils/discounts'
@@ -16,7 +17,7 @@ import type { BasketLineInput, PricedBasket, PricedLine, SaleCatalogue, SaleCate
 import type { BatchItem } from 'drizzle-orm/batch'
 
 // What the till may sell right now, what pricing it costs, and the atomic commit once confirmed:
-// a reader or tab charge, a Challenge 25 outcome and a discount folded in as needed (F-103 to F-117).
+// a reader, a tab or an approved comp, a Challenge 25 outcome and a discount, folded in as needed.
 
 type PublicDiscount = Pick<Discount, 'id' | 'name' | 'percent'>
 
@@ -471,5 +472,155 @@ export async function commitSale(
     refusedLines: refusedPriced,
     discount: publicDiscount(discount),
     tab: tab ? { holderName: tab.holderName, outstandingPence: tab.outstandingPence + soldTotalPence, capOverridden: tab.capOverridden } : null,
+    comp: null,
+  }
+}
+
+// Spends an already-approved comp request (F-110): the basket it names, never one resubmitted by
+// the till, so an approval can never be stretched to cover a bigger round than was asked for.
+export async function commitCompSale(
+  requestId: string,
+  on: string,
+  expectedForegonePence: number,
+  ageCheck: InlineAgeCheckInput | null,
+  context: SaleContext,
+): Promise<SaleReceipt> {
+  const expiryMinutes = await configValue(undefined, 'COMP_REQUEST_EXPIRY_MINUTES')
+  const request = await compRequestById(requestId, expiryMinutes)
+  if (!request) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
+  if (request.status !== 'APPROVED') {
+    throw createError({ statusCode: 409, statusMessage: request.status === 'PENDING' ? 'That request has not been approved yet' : 'That request was declined' })
+  }
+  if (request.expired) throw createError({ statusCode: 409, statusMessage: 'That request has lapsed; ask again' })
+  if (request.entryId) throw createError({ statusCode: 409, statusMessage: 'That comp has already been given' })
+
+  const lines = await compRequestLines(requestId)
+  if (!lines) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
+
+  // A comp is never discounted on top: it is already free (F-110's own criterion 4).
+  const { resolved, priced } = await resolveSale(lines, on, null)
+  const { restricted, sold } = saleableAfterAgeCheck(resolved, priced, ageCheck)
+
+  if (restricted.length > 0 && !ageCheck) {
+    const names = [...new Set(restricted.map(index => priced[index]!.productName))]
+    throw createError({
+      statusCode: 409,
+      statusMessage: `${names.join(' and ')} ${names.length === 1 ? 'needs' : 'need'} a Challenge 25 outcome before this can be given`,
+    })
+  }
+
+  const soldResolved = sold.map(index => resolved[index]!)
+  const soldPriced = sold.map(index => priced[index]!)
+  const refusedPriced = restricted.filter(index => !sold.includes(index)).map(index => priced[index]!)
+  const foregonePence = soldPriced.reduce((sum, line) => sum + line.amountPence, 0)
+
+  if (foregonePence !== expectedForegonePence) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `The screen said ${saysMoney(expectedForegonePence)} was being given away; the till now reads ${saysMoney(foregonePence)}. `
+        + 'Nothing has been given: check the basket and try again.',
+    })
+  }
+
+  if (soldResolved.length === 0) {
+    return { entryId: null, totalPence: 0, lines: soldPriced, ageCheck: null, refusedLines: refusedPriced, tab: null, comp: null }
+  }
+
+  const entryId = newId()
+  const claimed = await claimCompRequestForSale(requestId, entryId, expiryMinutes)
+  if (!claimed) {
+    throw createError({ statusCode: 409, statusMessage: 'That comp is no longer available to give: it may have just been spent or have lapsed' })
+  }
+
+  const statements: BatchItem<'sqlite'>[] = []
+  const posted = postEntry({
+    id: entryId,
+    source: 'TILL',
+    tender: 'COMP',
+    actorId: context.actorId,
+    compReason: request.reason,
+    compApprovedBy: request.decidedBy,
+    // Zero moves, but the retail price is snapshotted onto each line, so the foregone value is
+    // queryable as unit_price_pence * qty without any special-casing (F-110 criterion 4).
+    lines: soldResolved.map(line => ({
+      kind: 'BAR_ITEM',
+      amountPence: 0,
+      qty: line.qty,
+      unitPricePence: line.variant.pricePence,
+      productVariantId: line.variant.id,
+      priceRef: priceRef(line.variant.priceSource, line.variant.priceRowId),
+      choices: line.choiceItemId ? { choiceItemId: line.choiceItemId, choiceItemName: line.choiceItemName } : null,
+    })),
+  })
+  statements.push(...posted.statements)
+  soldResolved.forEach((line, index) => {
+    const lineId = posted.lineIds[index]!
+    for (const ingredient of line.depletion) {
+      statements.push(db.insert(schema.stockMovements).values({
+        id: newId(),
+        itemId: ingredient.itemId,
+        qty: -(ingredient.qty * line.qty),
+        kind: 'COMP',
+        refTable: 'ledger_lines',
+        refId: lineId,
+        actorId: context.actorId,
+      }))
+    }
+  })
+  statements.push(db.insert(schema.auditLog).values(auditEntry({
+    actorId: context.actorId,
+    action: 'bar.till.sale',
+    target: `till-session:${context.sessionId}`,
+    detail: { venueId: context.venueId, night: context.night, lines: soldResolved.length, tender: 'COMP', compRequestId: requestId },
+  })))
+
+  let ageCheckResult: SaleReceipt['ageCheck'] = null
+  if (ageCheck && restricted.length > 0) {
+    const id = newId()
+    const restrictedNames = [...new Set(restricted.map(index => priced[index]!.productName))]
+    const write = recordAgeCheck(context.actorId, {
+      performanceId: context.performanceId,
+      outcome: ageCheck.outcome,
+      idType: ageCheck.idType,
+      reason: ageCheck.reason,
+      description: ageCheck.description,
+      product: restrictedNames.join(', '),
+      notes: ageCheck.notes,
+    }, id)
+    statements.push(db.run(write.statement))
+    statements.push(db.insert(schema.auditLog).values(auditEntry({
+      actorId: context.actorId,
+      action: 'age-check.logged',
+      target: `age-check:${id}`,
+      detail: { outcome: ageCheck.outcome },
+    })))
+    ageCheckResult = { id, outcome: ageCheck.outcome }
+  }
+
+  try {
+    await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+  }
+  catch (error) {
+    // Frees the request rather than losing it to a claim that never became a sale: a restock and a
+    // retry can still spend the same approval, right up to its expiry.
+    await releaseCompRequestClaim(requestId, entryId)
+    if (error instanceof Error && error.message.includes('stock_movements_sale_exceeds_on_hand')) {
+      throw createError({ statusCode: 409, statusMessage: 'Not enough left in stock to give this: nothing has been given.' })
+    }
+    if (error instanceof Error) {
+      const refusal = ageCheckConstraintRefusal(error)
+      if (refusal) throw createError(refusal)
+    }
+    throw error
+  }
+
+  return {
+    entryId,
+    totalPence: 0,
+    lines: soldPriced,
+    ageCheck: ageCheckResult,
+    refusedLines: refusedPriced,
+    tab: null,
+    comp: { reason: request.reason, foregonePence },
   }
 }
