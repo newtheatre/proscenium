@@ -26,11 +26,12 @@ export const basketForm = z.object({
 export type BasketLineInput = z.output<typeof basketLineForm>
 export type BasketInput = z.output<typeof basketForm>
 
-// The screen's own belief of the total (0004, F-104 criterion 1), plus an inline Challenge 25
-// outcome when the basket needs one (F-106 criterion 1).
+// The screen's own belief of the total (0004, F-104 criterion 1), an inline Challenge 25 outcome
+// when the basket needs one (F-106), and a tab holder to charge instead of the reader (F-108).
 export const saleForm = basketForm.extend({
   expectedTotalPence: z.number().int().nonnegative(),
   ageCheck: inlineAgeCheckForm.nullish().transform(value => value ?? null),
+  tabHolderId: z.string().trim().min(1).nullish().transform(value => value ?? null),
 })
 
 export type SaleInput = z.output<typeof saleForm>
@@ -99,12 +100,13 @@ export interface PricedBasket {
   totalPence: number
 }
 
-// What a completed sale answers with (F-105): the ledger entry it posted, so a receipt or a void
-// can cite it. A Challenge 25 refusal can leave nothing sold, `entryId` null (F-106 criterion 3).
+// What a completed sale answers with (F-105): the ledger entry it posted. A Challenge 25 refusal
+// can leave nothing sold, `entryId` null (F-106); `tab` is set only on a tab charge (F-108).
 export interface SaleReceipt {
   entryId: string | null
   totalPence: number
   lines: PricedLine[]
   ageCheck: { id: string, outcome: AgeCheckOutcome } | null
   refusedLines: PricedLine[]
+  tab: { holderName: string, outstandingPence: number, capOverridden: boolean } | null
 }

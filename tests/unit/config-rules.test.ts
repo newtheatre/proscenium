@@ -78,8 +78,8 @@ describe('what a settings change records (0011, 0024)', () => {
     }
   })
 
-  test('the only key marked as holding personal data is the recipients list', () => {
-    expect(CONFIG_KEY_NAMES.filter(isSensitive)).toEqual(['NIGHT_REPORT_RECIPIENTS'])
+  test('the keys marked as holding personal data are exactly the ones naming specific people', () => {
+    expect(CONFIG_KEY_NAMES.filter(isSensitive).sort()).toEqual(['BAR_AUTHORISED_TAB_HOLDERS', 'NIGHT_REPORT_RECIPIENTS'])
   })
 })
 

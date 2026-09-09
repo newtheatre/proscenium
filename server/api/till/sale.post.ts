@@ -1,14 +1,14 @@
 import { londonDayOf } from '#shared/utils/ledger'
 import { saleForm } from '#shared/utils/sale'
 
-// The submission boundary (F-104), the atomic commit (F-105), and an inline Challenge 25 outcome
-// batched with it when the basket needs one (F-106): a mismatch refuses quoting both figures.
+// The submission boundary (F-104), the atomic commit (F-105), an inline Challenge 25 outcome
+// (F-106) and a tab charge (F-108), all batched together: a mismatch refuses quoting both figures.
 export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, saleForm)
   const resolved = await requireNightAuthority(event, 'BAR', { venueId: input.venueId, performanceId: input.performanceId })
   const session = requireOpenSession(await openSessionFor(resolved.venueId, resolved.night))
 
-  const committed = await commitSale(input.lines, londonDayOf(new Date()), input.expectedTotalPence, input.ageCheck, {
+  const committed = await commitSale(input.lines, londonDayOf(new Date()), input.expectedTotalPence, input.ageCheck, input.tabHolderId, {
     actorId: resolved.account.id,
     sessionId: session.id,
     venueId: resolved.venueId,

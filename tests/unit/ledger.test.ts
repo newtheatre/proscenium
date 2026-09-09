@@ -166,7 +166,7 @@ describe('the money-path table agrees with the code (build order, Wave 0 b)', ()
 
   test('every path the build order names has a row', async () => {
     const named = (await moneyPaths()).map(row => row.path.toLowerCase())
-    for (const path of ['desk collection', 'walk-up', 'refund', 'pass sale', 'pass admission', 'bar item', 'tab settlement', 'void', 'import']) {
+    for (const path of ['desk collection', 'walk-up', 'refund', 'pass sale', 'pass admission', 'bar item', 'tab charge', 'tab settlement', 'void', 'import']) {
       expect(named.some(candidate => candidate.includes(path))).toBe(true)
     }
   })
