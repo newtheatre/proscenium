@@ -101,9 +101,11 @@ describe('deskReservationQuery and deskTicketsQuery read the collection screen i
       database.batch([['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-1', 'Standard', 900, 'SINGLE']])
       ticket(database, 't-1', 'r-1', seeded.performanceId, 'tt-1', 900)
 
-      const [detail] = read<{ bookerName: string, status: string }>(database, deskReservationQuery('r-1'))
+      const [detail] = read<{ bookerName: string, status: string, performanceId: string }>(database, deskReservationQuery('r-1'))
       expect(detail?.bookerName).toBe('Alex Booker')
       expect(detail?.status).toBe('PENDING')
+      // D-116 needs this to scope tonight's duty-manager check to the right performance.
+      expect(detail?.performanceId).toBe(seeded.performanceId)
 
       const tickets = read<{ ticketId: string, ticketTypeName: string, pricePaid: number }>(database, deskTicketsQuery('r-1'))
       expect(tickets).toEqual([{ ticketId: 't-1', ticketTypeName: 'Standard', pricePaid: 900 }])
