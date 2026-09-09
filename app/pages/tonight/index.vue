@@ -43,34 +43,37 @@ const asked = ref(false)
 
 let timer: ReturnType<typeof setInterval> | undefined
 
+// Neither fetch depends on the other's answer, so they run together. The checklist one still
+// runs before house open, so its banner has data the instant `houseOpen` turns true.
 async function load(): Promise<void> {
-  try {
-    const answered = await request<DutyManagerTonight>('/api/tonight/duty-manager')
-    data.value = answered
+  const [dutyManager, checklistFetch] = await Promise.allSettled([
+    request<DutyManagerTonight>('/api/tonight/duty-manager'),
+    request<{ items: ChecklistEntry[] }>('/api/tonight/checklist'),
+  ])
+
+  if (dutyManager.status === 'fulfilled') {
+    data.value = dutyManager.value
     syncedAt.value = new Date()
     staleness.value = null
     isDutyManager.value = true
-    // Best-effort: a screen that cannot reach the checklist still shows the rest (criterion 6
-    // is a warning, not a blocker of the house numbers above it).
-    try {
-      checklist.value = (await request<{ items: ChecklistEntry[] }>('/api/tonight/checklist')).items
-    }
-    catch { /* the banner below just stays empty */ }
   }
-  catch (refused) {
+  else {
     // Not tonight's duty manager: the fallback hub below, not a failure banner.
-    if (refusalStatus(refused) === 403 || refusalStatus(refused) === 401) {
+    if (refusalStatus(dutyManager.reason) === 403 || refusalStatus(dutyManager.reason) === 401) {
       isDutyManager.value = false
     }
     // Anything else, including a dropped connection: the last-fetched values stay on screen,
     // and NightStale is what says they are no longer current. Never a spinner (criterion 3).
     else {
-      staleness.value = refusalText(refused)
+      staleness.value = refusalText(dutyManager.reason)
     }
   }
-  finally {
-    asked.value = true
-  }
+
+  // Best-effort: a screen that cannot reach the checklist still shows the rest (criterion 6
+  // is a warning, not a blocker of the house numbers above it).
+  if (checklistFetch.status === 'fulfilled') checklist.value = checklistFetch.value.items
+
+  asked.value = true
 }
 
 // From house open: doors, or curtain where none is set (E-114 criterion 6).
@@ -256,14 +259,16 @@ function houseLine(house: Performance['house']): string {
       here.
     </p>
 
-    <!-- Navigational, not the primary action: a grid in the scrollable content, never the
-         sticky thumb-zone slot K-102 criterion 2 reserves for one action (E-112 criterion 4). -->
+    <!-- Navigational, not the primary action: a grid in the content, not the sticky thumb-zone
+         slot (E-112 criterion 4), but still thumb-sized rather than `NightAction`'s own selector. -->
     <div class="mt-6 grid grid-cols-2 gap-2">
       <UButton
         to="/tonight/incidents"
         color="neutral"
         variant="subtle"
         icon="i-lucide-clipboard-list"
+        size="lg"
+        class="min-h-12"
         data-test="link-incidents"
       >
         Incident log
@@ -273,6 +278,8 @@ function houseLine(house: Performance['house']): string {
         color="neutral"
         variant="subtle"
         icon="i-lucide-id-card"
+        size="lg"
+        class="min-h-12"
         data-test="link-age-checks"
       >
         Challenge 25
@@ -282,6 +289,8 @@ function houseLine(house: Performance['house']): string {
         color="neutral"
         variant="subtle"
         icon="i-lucide-list-checks"
+        size="lg"
+        class="min-h-12"
         data-test="link-checklist"
       >
         Checklist
