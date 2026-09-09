@@ -371,6 +371,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/bar/stocktakes/[id]/apply.post.ts', actions: ['bar.stocktake.applied'] },
   { route: 'server/api/admin/bar/order-list/index.get.ts', exempt: 'reads shortfalls against par, advisory only' },
   { route: 'server/api/admin/bar/order-list/export.get.ts', exempt: 'reads the same shortfalls as CSV' },
+  { route: 'server/api/admin/bar/reports/index.get.ts', exempt: 'reads sales, GP, variance, comps and discounts, writing nothing' },
+  { route: 'server/api/admin/bar/reports/export.get.ts', actions: ['bar.report.exported'] },
   { route: 'server/api/admin/bar/movements/index.get.ts', exempt: 'reads the movement history' },
   {
     route: 'server/api/admin/bar/movements/index.post.ts',

@@ -225,6 +225,7 @@ const CATALOGUE = {
   'bar.stocktake.opened': { label: 'Stocktake opened', module: 'bar' },
   'bar.stocktake.counted': { label: 'Stocktake counts recorded', module: 'bar' },
   'bar.stocktake.applied': { label: 'Stocktake applied', module: 'bar' },
+  'bar.report.exported': { label: 'A bar report exported as CSV', module: 'bar' },
 
   // Module G: training
 
