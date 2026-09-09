@@ -54,9 +54,8 @@ export const PERMISSIONS = [
   // Narrowing what a pass product already covers once it has live passes against it: general
   // box office is not enough, echoing D-117's comp approval (D-123 criterion 4).
   'ticketing.manage',
-  // Approving a refund: general box office is not enough (D-116 criterion 2). Money crosses
-  // modules, so this stands apart from `ticketing.*`; tonight's confirmed duty manager reaches
-  // the same approval without holding it, since that authority derives from the shift (0009).
+  // Approving a refund: general box office is not enough (D-116 criterion 2). Tonight's
+  // confirmed duty manager reaches the same approval without holding it (0009).
   'money.refund',
   // Deciding an access profile declaration: sighting evidence, agreeing the door's wording. A
   // named accessibility officer's, never general box office's (D-127 criterion 2).

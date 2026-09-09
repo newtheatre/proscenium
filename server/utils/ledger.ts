@@ -22,11 +22,6 @@ export interface PostedEntry {
 
 // Statements rather than a write: money and the thing it paid for commit in one batch or not at
 // all, and only the caller knows what the other half is (0001, I-102 criterion 6).
-//
-// `guard` is the race-safety knob D-116's refund needs and every earlier caller does not: when
-// given, the entry and every line insert only apply while it holds, so a batch that lost a
-// contended claim earlier of its own statements posts nothing here either (0001). Every existing
-// caller omits it and keeps the plain unconditional insert, byte-identical to before.
 export function postEntry(input: EntryInput, at = new Date(), guard?: SQL): PostedEntry {
   const entry = entryForm.parse(input)
   const id = entry.id ?? newId()
@@ -34,6 +29,8 @@ export function postEntry(input: EntryInput, at = new Date(), guard?: SQL): Post
   const happenedAt = Math.floor(at.getTime() / 1000)
   const londonDay = londonDayOf(at)
 
+  // `guard`: an earlier contended claim's own condition, so a caller whose claim lost posts
+  // nothing here either (0001, D-116); every existing caller omits it and keeps this unconditional.
   const entryStatement = guard === undefined
     ? db.insert(schema.ledgerEntries).values({
         id,

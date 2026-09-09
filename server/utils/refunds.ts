@@ -19,7 +19,7 @@ export async function requireRefundApproval(event: H3Event, resolved: Authority,
   return night.account.id
 }
 
-export interface RefundTicketInput {
+export interface RefundTicketWriteInput {
   reservationId: string
   ticketId: string
   pricePaid: number
@@ -31,10 +31,9 @@ export interface RefundTicketResult {
   entryId?: string
 }
 
-// Criterion 4, race-safe: the ticket's own conditional claim is the one true arbiter. `postEntry`'s
-// guard rides `changes()` from that claim, immediately before it in the same batch, so a losing
-// claim posts no entry either; the line insert then rides the entry's own existence (0001).
-export async function refundTicket(input: RefundTicketInput, at = new Date()): Promise<RefundTicketResult> {
+// Race-safe (criterion 4): the ticket's own claim is the arbiter, and `postEntry`'s guard rides
+// its `changes()`, so a losing claim posts no ledger entry either (0001).
+export async function refundTicket(input: RefundTicketWriteInput, at = new Date()): Promise<RefundTicketResult> {
   const claim = sql`
     UPDATE tickets SET refunded_at = ${Math.floor(at.getTime() / 1000)}
     WHERE id = ${input.ticketId} AND reservation_id = ${input.reservationId} AND refunded_at IS NULL

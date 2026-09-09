@@ -208,6 +208,16 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['reservation.collected'],
     via: ['server/utils/desk-collection.ts'],
   },
+  {
+    route: 'server/api/box-office/desk/reservations/[id]/tickets/[ticketId]/refund.post.ts',
+    actions: ['ticket.refunded'],
+    via: ['server/utils/refunds.ts'],
+  },
+  {
+    route: 'server/api/box-office/desk/reservations/[id]/cancel.post.ts',
+    actions: ['reservation.cancelled.staff'],
+    via: ['server/utils/refunds.ts'],
+  },
 
   // Module E: show night
 
