@@ -130,8 +130,14 @@ does not otherwise choose to weaken.
 **`useRequestFetch()<T>(...)`, single generic, is not something show night introduced.** It is
 the pre-existing pattern across dozens of call sites throughout the app (`TicketPrices.vue`,
 `admin/index.vue`, `useAccount.ts`, and many more), and a full-repository check found upward of
-sixty of them. Converting all of them is real, sizeable work, tracked in `docs/known-issues.md`
-rather than attempted wholesale in the pull request that carries this amendment.
+sixty of them.
+
+**Decided rather than deferred: no mechanical sweep, no per-stream conversion pass.** A call
+site converts only once it actually fails, and the fix is mechanical when it does: add `, string`
+as the second type argument, exactly as above. Hitting `TS2589` in a file you did not touch is
+expected as the route map grows, not a regression to investigate; the cause is this record and
+nothing else needs establishing. `docs/known-issues.md` names the pattern so it is recognised on
+sight; it is not a backlog inviting a wholesale conversion pull request, and one is not wanted.
 
 **The trap this amendment exists to name explicitly:** *a green `typecheck` on any one branch
 proves nothing about the pattern's safety in general.* It proves only that branch's total route
