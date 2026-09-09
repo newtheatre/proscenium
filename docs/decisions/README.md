@@ -58,3 +58,4 @@ afterwards, only superseded.
 | 0051 | Editorial content ships as markdown, and copy the committee has not supplied is marked as a placeholder | the deferred editing surface, and why nothing invented reaches the public site |
 | 0050 | An access profile's special category payload is one encrypted blob | why nine flags are not nine columns, and what a worker secret does that a Secrets Store binding would not |
 | 0052 | A table rebuild refuses a copying column that does not resolve | the silent string-literal fallback drizzle-kit's own generated SQL can trigger, and why only the double-quoted form needs a static check |
+| 0053 | A typed-fetch call site takes an explicit response generic, never a route-map cast | the route-count recursion behind `TS2589`, why no central compiler or config fix exists, and the trade the explicit generic makes deliberately |
