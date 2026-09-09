@@ -38,6 +38,9 @@ async function load(): Promise<void> {
   }
   catch (refused) {
     failure.value = refusalText(refused)
+    // A recognised refusal is still a completed sync, so NightStale is not left saying "not yet
+    // synced" forever (matching /tonight/index.vue's own shape).
+    if (refusalStatus(refused) === 401 || refusalStatus(refused) === 403) syncedAt.value = new Date()
   }
   finally {
     busy.value = false
