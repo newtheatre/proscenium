@@ -29,7 +29,9 @@ function postEntry(database: TestDatabase, id: string, totalPence: number, optio
   day?: string
   lines?: { kind: string, amountPence: number }[]
 } = {}): void {
-  const lines = options.lines ?? [{ kind: 'TICKET_COLLECTION', amountPence: totalPence }]
+  // BAR_ITEM, not TICKET_COLLECTION: this file tests append-only generically, and D-114's own
+  // trigger refuses a TICKET_COLLECTION line with no collected reservation behind it.
+  const lines = options.lines ?? [{ kind: 'BAR_ITEM', amountPence: totalPence }]
   database.batch([
     [
       `INSERT INTO ledger_entries (id, happened_at, london_day, source, tender, actor_id, total_pence, reverses_entry_id)

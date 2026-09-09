@@ -11,8 +11,7 @@ import { tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// D-114's queries against the real migrations, and the ticket-collection-once guard the pending
-// migration adds, proved here against its own SQL before the number is confirmed.
+// D-114's queries and its ticket-collection-once guard, against the real migrations.
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()
@@ -112,29 +111,8 @@ describe('deskReservationQuery and deskTicketsQuery read the collection screen i
   })
 })
 
-// The migration is generated once its number is confirmed; its SQL is created here directly so
-// the guard's own logic is proved before then. `check:migrations` reads the real file, not this.
-const TICKET_COLLECTION_ONCE_INDEX = `
-  CREATE UNIQUE INDEX ledger_lines_ticket_collection_once ON ledger_lines (ticket_id)
-  WHERE kind = 'TICKET_COLLECTION'
-`
-const TICKET_COLLECTION_NEEDS_COLLECTED_TRIGGER = `
-  CREATE TRIGGER ledger_lines_ticket_collection_needs_collected_reservation
-  BEFORE INSERT ON ledger_lines
-  WHEN NEW.kind = 'TICKET_COLLECTION'
-  BEGIN
-    SELECT RAISE(ABORT, 'a ticket collection line must reference a collected reservation')
-    WHERE NOT EXISTS (
-      SELECT 1 FROM tickets t JOIN reservations r ON r.id = t.reservation_id
-      WHERE t.id = NEW.ticket_id AND r.status = 'COLLECTED'
-    );
-  END
-`
-
-function withCollectionGuard(database: TestDatabase): void {
-  database.raw.exec(TICKET_COLLECTION_ONCE_INDEX)
-  database.raw.exec(TICKET_COLLECTION_NEEDS_COLLECTED_TRIGGER)
-}
+// The guard is migration 0075, applied by createTestDatabase() like any other: no separate
+// setup needed here, only the rows that put it to the test.
 
 function ledgerEntry(database: TestDatabase, id: string): void {
   database.batch([[
@@ -153,7 +131,6 @@ function insertLine(database: TestDatabase, entryId: string, ticketId: string): 
 describe('a ticket-collection line needs a collected reservation, enforced by the database (criterion 2, 6)', () => {
   test('the line is refused while the reservation is still PENDING', async () => {
     await withDatabase((database) => {
-      withCollectionGuard(database)
       const seeded = tonightsPerformance(database)
       user(database, 'u-1', 'alex@example.invalid', 'Alex Booker')
       reservation(database, 'r-1', seeded.performanceId, 'u-1', 'PENDING')
@@ -167,7 +144,6 @@ describe('a ticket-collection line needs a collected reservation, enforced by th
 
   test('the line is accepted once the reservation is COLLECTED', async () => {
     await withDatabase((database) => {
-      withCollectionGuard(database)
       const seeded = tonightsPerformance(database)
       user(database, 'u-1', 'alex@example.invalid', 'Alex Booker')
       reservation(database, 'r-1', seeded.performanceId, 'u-1', 'COLLECTED')
@@ -181,7 +157,6 @@ describe('a ticket-collection line needs a collected reservation, enforced by th
 
   test('a second line for the same ticket is refused: a seat is collected once, ever', async () => {
     await withDatabase((database) => {
-      withCollectionGuard(database)
       const seeded = tonightsPerformance(database)
       user(database, 'u-1', 'alex@example.invalid', 'Alex Booker')
       reservation(database, 'r-1', seeded.performanceId, 'u-1', 'COLLECTED')
