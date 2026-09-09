@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { check, index, integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { users } from './identity'
+import { ledgerEntries } from './ledger'
 import { venues } from './programme'
 
 const now = sql`(unixepoch())`
@@ -39,6 +40,35 @@ export const discounts = sqliteTable('discounts', {
   uniqueIndex('discounts_name_nocase').on(sql`${table.name} COLLATE NOCASE`),
   check('discounts_percent_range', sql`${table.percent} > 0 AND ${table.percent} <= 100`),
   check('discounts_status_values', sql`${table.status} IN ('ACTIVE', 'RETIRED')`),
+])
+
+// A request to give a basket away, decided once by tonight's duty manager or the bar manager,
+// never the requester (F-110 criterion 1). `lines` is the basket asked for, so approval and the
+// comp sale itself both read exactly what was requested, not a resubmission.
+export const compRequests = sqliteTable('comp_requests', {
+  id: id(),
+  venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),
+  night: text('night').notNull(),
+  requestedBy: text('requested_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  reason: text('reason').notNull(),
+  lines: text('lines', { mode: 'json' }).notNull(),
+  status: text('status').notNull().default('PENDING'),
+  decidedBy: text('decided_by').references(() => users.id, { onDelete: 'restrict' }),
+  decidedAt: integer('decided_at'),
+  declineReason: text('decline_reason'),
+  // Set once the approved request actually becomes a sale, so the same approval can never post
+  // twice (criterion 2's atomic claim, carried through to the write it authorises).
+  entryId: text('entry_id').references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  index('comp_requests_venue_night').on(table.venueId, table.night),
+  check('comp_requests_status_values', sql`${table.status} IN ('PENDING', 'APPROVED', 'DECLINED')`),
+  check('comp_requests_decided_shape', sql`
+    (${table.status} = 'PENDING' AND ${table.decidedBy} IS NULL AND ${table.decidedAt} IS NULL)
+    OR (${table.status} <> 'PENDING' AND ${table.decidedBy} IS NOT NULL AND ${table.decidedAt} IS NOT NULL)
+  `),
+  check('comp_requests_decline_reason_shape', sql`(${table.status} = 'DECLINED') = (${table.declineReason} IS NOT NULL)`),
+  check('comp_requests_entry_needs_approval', sql`${table.entryId} IS NULL OR ${table.status} = 'APPROVED'`),
 ])
 
 // A sellable thing. Its serving sizes, its recipe and its prices arrive as their own tables

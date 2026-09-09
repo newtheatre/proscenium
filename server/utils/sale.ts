@@ -7,7 +7,8 @@ import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, resolvedPric
 import { ageCheckConstraintRefusal } from '#shared/utils/age-checks'
 import { discountedPence } from '#shared/utils/discounts'
 import { postEntry } from '#server/utils/ledger'
-import { authorisedTabHolder, canOverrideTabCap, outstandingTabBalance } from '#server/utils/tab-holders'
+import { isDutyOrBarManager } from '#server/utils/bar-authority'
+import { authorisedTabHolder, outstandingTabBalance } from '#server/utils/tab-holders'
 import { priceRef, saysMoney } from '#shared/utils/bar'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { Discount } from '#shared/utils/discounts'
@@ -305,7 +306,7 @@ async function resolveTab(
 
   if (outstandingPence + chargePence > cap) {
     const overrideEnabled = await configValue(undefined, 'BAR_TAB_CAP_MANAGER_OVERRIDE')
-    if (!overrideEnabled || !await canOverrideTabCap(actorId, night)) {
+    if (!overrideEnabled || !await isDutyOrBarManager(actorId, night)) {
       throw createError({
         statusCode: 409,
         statusMessage: `${holder.name}'s tab is at ${saysMoney(outstandingPence)}; this charge of ${saysMoney(chargePence)} `

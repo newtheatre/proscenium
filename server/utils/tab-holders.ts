@@ -1,13 +1,10 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { confirmedShiftsTonight } from '#server/utils/rota'
-import { liveGrants } from '#server/utils/authorise'
-import { permissionsFor } from '#shared/utils/roles'
-import { showNightBounds } from '#shared/utils/show-night'
 import type { H3Event } from 'h3'
 
-// Who may charge to a tab, what they already owe, and who may wave a charge past the cap
-// (F-108). The charge itself, and the write that posts it, are `server/utils/sale.ts`'s.
+// Who may charge to a tab, and what they already owe (F-108). The charge itself, and the write
+// that posts it, are `server/utils/sale.ts`'s; who may wave a charge past the cap is shared with
+// comp approval in `server/utils/bar-authority.ts`.
 
 // The allow-list is `BAR_AUTHORISED_TAB_HOLDERS`, checked live rather than cached, since a
 // revocation has to take effect on the very next charge (criterion 1).
@@ -40,17 +37,4 @@ export async function outstandingTabBalance(userId: string): Promise<number> {
     WHERE tab_debtor_id = ${userId} AND tab_settled_at IS NULL AND reverses_entry_id IS NULL
   `)
   return row?.total ?? 0
-}
-
-// Duty manager or bar manager, checked live rather than trusted from a client-sent flag: it is
-// real only because the submitting account actually holds the authority (F-108 criterion 4).
-export async function canOverrideTabCap(accountId: string, night: string): Promise<boolean> {
-  const permissions = permissionsFor(await liveGrants(accountId), new Date())
-  if (permissions.has('bar.write')) return true
-
-  const { from, to } = showNightBounds(night)
-  const shifts = await confirmedShiftsTonight(
-    accountId, 'DUTY_MANAGER', Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000), {},
-  )
-  return shifts.length > 0
 }
