@@ -63,6 +63,12 @@ export const PERFORMANCE_REFERENCES: PerformanceReference[] = [
     sold: false,
     why: 'a safety record: who reported what, and nobody has bought a seat (E-115)',
   },
+  {
+    table: 'pass_admissions',
+    column: 'performance_id',
+    sold: false,
+    why: 'a pass admission at the door: the seat it covers is a ticket, which classifies itself above (D-124)',
+  },
 ]
 
 export function soldReferences(references = PERFORMANCE_REFERENCES): PerformanceReference[] {

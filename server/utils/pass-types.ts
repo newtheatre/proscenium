@@ -27,6 +27,12 @@ export const PASS_TYPE_REFERENCES: PassTypeReference[] = [
     why: 'a show this pass covers: configuration, not an issued pass',
   },
   {
+    table: 'pass_requests',
+    column: 'pass_type_id',
+    issued: false,
+    why: 'a request for this pass type: reserves nothing and issues nothing until the desk fulfils it (D-124)',
+  },
+  {
     table: 'passes',
     column: 'pass_type_id',
     issued: true,
