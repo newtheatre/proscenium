@@ -1,14 +1,15 @@
 import { db, schema } from '@nuxthub/db'
 import { consola } from 'consola'
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { findById } from './accounts'
+import { configValue } from './configuration'
 import { MAILBOX, writeToMailbox } from './mailbox'
 import { preferenceDefaults, storedPreferences } from './notification-preferences'
 import { render } from './templates'
 import { undeliverableReason } from '#shared/utils/deliverability'
-import { deliversOn, isTransactional, messageType } from '#shared/utils/notifications'
+import { deliversOn, isMessageType, isTransactional, messageType, outOfAttempts } from '#shared/utils/notifications'
 import { formatSender, senderForTopic, SENDERS } from '#shared/utils/senders'
 import type { Channel, MessageType, NotificationStatus } from '#shared/utils/notifications'
 import type { TemplateContext } from '#server/utils/templates'
@@ -98,23 +99,52 @@ export interface Notification {
 // H-105's, so neither is an answer notify() ever returns (0048).
 type Status = Exclude<NotificationStatus, 'PENDING' | 'RETRYING'>
 
+interface Recorded {
+  userId: string | null
+  type: string
+  channel: Channel
+  status: Status
+  subject?: string | null
+  error?: string | null
+  claim?: string | string[]
+  // Whether a provider was actually handed the message. A refusal before that is not an
+  // attempt, so it does not spend one (H-105 criterion 2).
+  attempted?: boolean
+  // The rendered message, held only while a retry is still owed and cleared once one is not
+  // (0055). Anything terminal passes nothing and so clears it.
+  payload?: string | null
+}
+
 // A claim updates in place; an unclaimed send inserts fresh, exactly as before claims existed.
-async function record(userId: string | null, type: string, channel: Channel, status: Status, subject: string | null, error: string | null, claim?: string | string[]): Promise<void> {
-  const sentAt = status === 'SENT' ? Math.floor(Date.now() / 1000) : null
-  if (claim) {
-    const matches = Array.isArray(claim) ? inArray(schema.notificationLog.claim, claim) : eq(schema.notificationLog.claim, claim)
-    await db.update(schema.notificationLog).set({ status, subject, sentAt, error }).where(matches)
+async function record(entry: Recorded): Promise<void> {
+  const sentAt = entry.status === 'SENT' ? Math.floor(Date.now() / 1000) : null
+  const spent = entry.attempted ? 1 : 0
+  const shared = {
+    status: entry.status,
+    subject: entry.subject ?? null,
+    sentAt,
+    error: entry.error ?? null,
+    retryPayload: entry.payload ?? null,
+  }
+
+  if (entry.claim) {
+    const matches = Array.isArray(entry.claim)
+      ? inArray(schema.notificationLog.claim, entry.claim)
+      : eq(schema.notificationLog.claim, entry.claim)
+    await db.update(schema.notificationLog).set({
+      ...shared,
+      attempts: sql`${schema.notificationLog.attempts} + ${spent}`,
+    }).where(matches)
     return
   }
+
   await db.insert(schema.notificationLog).values({
     id: crypto.randomUUID().replaceAll('-', ''),
-    userId,
-    type,
-    channel,
-    subject,
-    status,
-    sentAt,
-    error,
+    userId: entry.userId,
+    type: entry.type,
+    channel: entry.channel,
+    attempts: spent,
+    ...shared,
   })
 }
 
@@ -160,6 +190,87 @@ export async function claimNotification(claim: {
   return taken.length > 0
 }
 
+// One row's outcome, matched by id: what a retry owns is a specific row rather than a claim key.
+async function resolveById(id: string, status: Status, error: string | null, payload: string | null): Promise<void> {
+  await db.update(schema.notificationLog).set({
+    status,
+    error,
+    sentAt: status === 'SENT' ? Math.floor(Date.now() / 1000) : null,
+    retryPayload: payload,
+    attempts: sql`${schema.notificationLog.attempts} + 1`,
+  }).where(eq(schema.notificationLog.id, id))
+}
+
+interface Rendered { subject: string, html: string, text: string }
+
+function storedMessage(payload: string | null): Rendered | null {
+  if (!payload) return null
+  try {
+    const parsed = JSON.parse(payload) as Partial<Rendered>
+    if (!parsed.subject || !parsed.text) return null
+    return { subject: parsed.subject, html: parsed.html ?? '', text: parsed.text }
+  }
+  catch {
+    return null
+  }
+}
+
+// Sends again exactly what was rendered, for a row the sweep claimed as RETRYING. Every guard
+// runs again: a preference or an erasure may have moved since (H-102 criterion 4, H-107).
+export async function resend(event: H3Event | undefined, id: string, maxAttempts: number): Promise<Status> {
+  const [row] = await db.select({
+    userId: schema.notificationLog.userId,
+    type: schema.notificationLog.type,
+    attempts: schema.notificationLog.attempts,
+    payload: schema.notificationLog.retryPayload,
+  }).from(schema.notificationLog).where(eq(schema.notificationLog.id, id)).limit(1)
+
+  const message = storedMessage(row?.payload ?? null)
+  if (!row || !message) {
+    await resolveById(id, 'FAILED_FINAL', 'nothing to send again', null)
+    return 'FAILED_FINAL'
+  }
+
+  // A type retired from the catalogue between the attempts cannot be rendered or judged, so the
+  // row says so rather than throwing inside a sweep.
+  const type = isMessageType(row.type) ? messageType(row.type) : null
+  const account = row.userId ? await findById(row.userId) : undefined
+  if (!type || !account) {
+    await resolveById(id, 'SKIPPED_UNDELIVERABLE', type ? 'no-account' : 'unregistered-type', null)
+    return 'SKIPPED_UNDELIVERABLE'
+  }
+
+  const undeliverable = undeliverableReason({ email: account.email, anonymisedAt: account.anonymisedAt })
+  if (undeliverable) {
+    await resolveById(id, 'SKIPPED_UNDELIVERABLE', undeliverable, null)
+    return 'SKIPPED_UNDELIVERABLE'
+  }
+
+  if (!account.verified && !type.reachesUnverified) {
+    await resolveById(id, 'SKIPPED_UNDELIVERABLE', 'unverified-address', null)
+    return 'SKIPPED_UNDELIVERABLE'
+  }
+
+  if (!await emailIsWanted(event, type, account.id)) {
+    await resolveById(id, 'SUPPRESSED_PREFERENCE', null, null)
+    return 'SUPPRESSED_PREFERENCE'
+  }
+
+  const sender = type.sender ? SENDERS[type.sender] : type.topic ? senderForTopic(type.topic) : SENDERS.ACCOUNTS
+
+  try {
+    await transportFor(event).send({ to: account.email, from: formatSender(sender), ...message })
+    await resolveById(id, 'SENT', null, null)
+    return 'SENT'
+  }
+  catch (error) {
+    const said = error instanceof Error ? error.message : String(error)
+    const spent = outOfAttempts(row.attempts + 1, maxAttempts)
+    await resolveById(id, spent ? 'FAILED_FINAL' : 'FAILED', said, spent ? null : row.payload)
+    return spent ? 'FAILED_FINAL' : 'FAILED'
+  }
+}
+
 // Whether a claim is already held, for a dry run that must report without taking it.
 export async function claimHeld(key: string): Promise<boolean> {
   const found = await db.select({ id: schema.notificationLog.id })
@@ -177,8 +288,10 @@ export async function notify(event: H3Event | undefined, notification: Notificat
   // Read at send time, not at enqueue: an address changed in between reaches the new one
   // (H-101 criterion 5).
   const account = await findById(notification.userId)
+  const logged = { userId: notification.userId, type: notification.type, channel: 'EMAIL' as Channel, claim: notification.claim }
+
   if (!account) {
-    await record(null, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, 'no-account', notification.claim)
+    await record({ ...logged, userId: null, status: 'SKIPPED_UNDELIVERABLE', error: 'no-account' })
     return 'SKIPPED_UNDELIVERABLE'
   }
 
@@ -194,20 +307,22 @@ export async function notify(event: H3Event | undefined, notification: Notificat
   }
 
   if (undeliverable) {
-    await record(account.id, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, undeliverable, notification.claim)
+    await record({ ...logged, status: 'SKIPPED_UNDELIVERABLE', error: undeliverable })
     return 'SKIPPED_UNDELIVERABLE'
   }
 
   // Only verification, claim and reset may reach an address nobody has proven (A-102).
   if (!account.verified && !type.reachesUnverified) {
-    await record(account.id, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, 'unverified-address', notification.claim)
+    await record({ ...logged, status: 'SKIPPED_UNDELIVERABLE', error: 'unverified-address' })
     return 'SKIPPED_UNDELIVERABLE'
   }
 
   if (!await emailIsWanted(event, type, account.id)) {
-    await record(account.id, notification.type, 'EMAIL', 'SUPPRESSED_PREFERENCE', null, null, notification.claim)
+    await record({ ...logged, status: 'SUPPRESSED_PREFERENCE' })
     return 'SUPPRESSED_PREFERENCE'
   }
+
+  const attachments = notification.attachments ?? []
 
   try {
     await transportFor(event).send({
@@ -216,14 +331,36 @@ export async function notify(event: H3Event | undefined, notification: Notificat
       subject: rendered.subject,
       html: rendered.html,
       text: rendered.text,
-      ...(notification.attachments?.length ? { attachments: notification.attachments } : {}),
+      ...(attachments.length ? { attachments } : {}),
     })
-    await record(account.id, notification.type, 'EMAIL', 'SENT', rendered.subject, null, notification.claim)
+    await record({ ...logged, status: 'SENT', subject: rendered.subject, attempted: true })
     return 'SENT'
   }
   catch (error) {
-    // The message is not lost: the log carries it, and retries are H-105's job.
-    await record(account.id, notification.type, 'EMAIL', 'FAILED', rendered.subject, error instanceof Error ? error.message : String(error), notification.claim)
+    const said = error instanceof Error ? error.message : String(error)
+
+    // An attachment is built by the caller and is not in the log, so a retry would send a
+    // ticket without its ticket. Failed for good instead, for H-106 to re-send from source.
+    if (attachments.length) {
+      await record({ ...logged, status: 'FAILED_FINAL', subject: rendered.subject, error: `${said} (carries an attachment, so it is not retried)`, attempted: true })
+      return 'FAILED_FINAL'
+    }
+
+    const maxAttempts = await configValue(event, 'NOTIFICATION_MAX_ATTEMPTS')
+    if (outOfAttempts(1, maxAttempts)) {
+      await record({ ...logged, status: 'FAILED_FINAL', subject: rendered.subject, error: said, attempted: true })
+      return 'FAILED_FINAL'
+    }
+
+    // The rendered message rides on the row so the sweep can send exactly this again (0055).
+    await record({
+      ...logged,
+      status: 'FAILED',
+      subject: rendered.subject,
+      error: said,
+      attempted: true,
+      payload: JSON.stringify({ subject: rendered.subject, html: rendered.html, text: rendered.text }),
+    })
     return 'FAILED'
   }
 }
