@@ -8,10 +8,8 @@ import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// E-119 through the real route: the licensing register handed to an inspector. The date-range
-// query and the venue join are pinned in `tests/integration/age-checks-export.test.ts`; this is
-// the permission gate, the audit trail, and the output format itself, which is the point of the
-// story (a CSV and a PDF an inspector can open without explanation).
+// E-119's route: the permission gate, the audit trail, and the CSV and PDF an inspector can
+// open without explanation. The date-range query is pinned in the integration suite.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000

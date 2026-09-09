@@ -7,9 +7,8 @@ import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// E-116 through the real routes: the committee's routing config, the open-items list, closing a
-// follow-up, and the wiring into E-115's incident routes that actually notifies the safety
-// officer. The statement and query builders are pinned in `tests/integration/incident-safety.test.ts`.
+// E-116's routes: the committee's routing config, the open-items list, closing a follow-up,
+// and the wiring into E-115's incident routes that actually notifies the safety officer.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000

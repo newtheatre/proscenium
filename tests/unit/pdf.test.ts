@@ -2,9 +2,8 @@ import { PDFDocument } from 'pdf-lib'
 import { describe, expect, test } from 'bun:test'
 import { buildTablePdf } from '#server/utils/pdf'
 
-// E-119's PDF builder. Pure JS on `pdf-lib`, no native bindings, so it runs on Workers
-// (criterion 1). Parsed back with `pdf-lib` itself, since its streams are compressed and a raw
-// text search of the bytes would not see a single row.
+// E-119's PDF builder, pure JS on `pdf-lib` so it runs on Workers (criterion 1). Parsed back
+// with `pdf-lib` itself: its streams are compressed, so a raw text search sees no row.
 
 describe('a table PDF (criterion 1)', () => {
   test('produces a well-formed, single-page PDF that pdf-lib can read back', async () => {

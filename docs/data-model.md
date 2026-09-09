@@ -658,10 +658,24 @@ write path against the show-night boundary rather than a static CHECK) · `super
 self-FK, UNIQUE (one correction per entry) · `created_at`. `category` was added to the
 original outline: criterion 1 asks the reporter to say what kind of thing happened, which a
 free-text body alone cannot answer for a list or a filter (E-115). A near miss is
-`severity = 'NEAR_MISS'` on the same table, not a second one (E-117 criterion 3). Follow-ups
-live in V2's workflow tables. Who reported an entry is kept on erasure, not scrubbed, the same
-reasoning `age_checks.checked_by` survives on; scrubbing a mention of somebody else inside
-`body` is a known gap (`docs/known-issues.md`).
+`severity = 'NEAR_MISS'` on the same table, not a second one (E-117 criterion 3). Who reported
+an entry is kept on erasure, not scrubbed, the same reasoning `age_checks.checked_by` survives
+on; scrubbing a mention of somebody else inside `body` is a known gap
+(`docs/known-issues.md`).
+
+### incident_severity_config
+`severity` PK, the same four values as `incidents.severity` · `requires_follow_up` bool
+default false · `updated_by` set null · `updated_at`. Committee configuration, not
+append-only: one row per severity, seeded closed by the migration so nothing routes until a
+committee member deliberately opts a severity in (E-116 criterion 1). Mutable like
+`checklist_items`, since flipping a flag is a state, not a record.
+
+### incident_followup_closures  APPEND-ONLY
+`id` PK · `incident_id` → incidents restrict, UNIQUE (one closure per incident, so an incident
+is open exactly until this row exists) · `resolution_note` · `closed_by` restrict ·
+`closed_at`. The resolution is a new entry, never an edit to the incident it closes
+(E-116 criterion 3). Flagging a still-open follow-up on the night report is a known gap until
+`night_reports` exists to carry it (`docs/known-issues.md`).
 
 ### age_checks  APPEND-ONLY
 `id` PK · `performance_id` restrict NULL (bar can check outside a show) · `checked_by`
@@ -672,10 +686,11 @@ correction per entry) · `created_at`. CHECK `age_checks_outcome_shape` ties `id
 `reason` to `outcome` so exactly one is ever set, never both, never neither. Split from a
 single `reason` column the original outline carried: criterion 1 asks for the ID type and the
 refusal reason as two distinct pieces of information, not one column doing both jobs
-(E-118). The licensing register; exports span CSV and PDF (E-119, not yet built). A row can
-also come from `POST /api/till/sale`'s inline prompt (F-106): `performance_id` there is the
-till's own resolved authority, null when it spans more than one performance, and `product`
-names the basket's restricted lines rather than something staff types.
+(E-118). The licensing register; exported as CSV or PDF for any date range, not filtered by
+venue, via `/api/admin/age-checks/export` (E-119). A row can also come from `POST
+/api/till/sale`'s inline prompt (F-106): `performance_id` there is the till's own resolved
+authority, null when it spans more than one performance, and `product` names the basket's
+restricted lines rather than something staff types.
 
 ### checklist_items
 `id` PK · `venue_id` → venues cascade · `phase` CHECK `PRE|POST` · `label` · `sort` · `required`
