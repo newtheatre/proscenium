@@ -107,35 +107,53 @@ routing the call through `useAsyncData`'s own callback), made no difference eith
 recursion happens while resolving the call expression's own type, before anything is done with
 the result.
 
-**What actually holds, verified rather than reasoned to.** Widening the second generic, `R`, to
-plain `string` alongside the response generic avoids both recursions: `$fetch<PasswordPolicy,
-string>('/api/auth/password-policy')`. Confirmed against every call shape found in the app: no
-options, `{ method }` alone, `{ method, body }`, `{ query }`, and a call whose result is
-discarded entirely (still needs it: the method position is resolved regardless of whether the
-response is read). **The instruction, usable directly:** add `, string` as the second type
-argument on any `$fetch`, `useFetch`, `useLazyFetch` or `useRequestFetch()` call that starts
-failing this way. This is the remedy for bar's `#777` and box office's `D-124` too, the moment
-show night's routes land on main; do not re-derive it.
+**What actually holds, verified end to end rather than per call site.** The first version of this
+amendment said widening `R` to `string` was "confirmed against every call shape found in the
+app", including calls carrying `{ method }` or `{ method, body }`. That was checked file by file
+and read too much into a clean per-file result: run whole, on `origin/unified/show-night/E-121-E-122`
+as it actually stood, `bun run typecheck` still failed with eleven errors once the widened form
+was applied everywhere. **The two cases are genuinely different and the record now says so.**
 
-**The trade is bigger than the Decision section states.** Widening `R` means the route argument
-is no longer checked against `NitroFetchRequest`: a typo'd or renamed route stops failing to
-typecheck. "The generic keeps the route literal checked" is true only for a response-position-only
-fix, which this record now knows does not hold generally. There is no way found to keep the route
-literal checked *and* stay under the depth limit for a call using a string literal route once the
-route count is high enough; if a future case needs the route checked more than it needs to typecheck
-cleanly, the honest fallback is a targeted, understood suppression (`// @ts-expect-error`, with a
-comment naming the mechanism and citing this record) rather than the wider-`R` form, which a reader
-does not otherwise choose to weaken.
+*A call with no options* (`$fetch<T>(route)`, nothing else): widening `R` to `string` alongside
+`T` holds. `$fetch<PasswordPolicy, string>('/api/auth/password-policy')` is merged and stable on
+`main`. `app/layouts/tonight.vue`'s identical shape, `$fetch<unknown, string>('/api/tonight/emergency')`,
+was independently re-verified the same way, against the real branch, exit code read rather than
+assumed. **The instruction, usable directly: add `, string` as the second type argument.**
+
+*A call carrying options* (`{ method }`, `{ method, body }`, `{ query }`): widening `R` alone
+breaks it differently, `TS2345`, because `O`'s inference no longer has a narrow `R` to key off.
+Supplying a third generic explicitly (`typeof` a locally-extracted options object) made every
+individual failing line typecheck in isolation, but the same whole-branch run then failed
+somewhere else entirely, `app/components/PersonPicker.vue`, a file neither this amendment's
+change nor show night's own pull request touches. That is the same order-sensitive cost this
+record's mechanism section already describes, now confirmed to survive a genuine fix attempt and
+not only the original cast. **No generic form for an options-carrying call has been found that
+holds end to end, and this record stops looking rather than trying a fourth shape**: Matt
+authorised a documented suppression for exactly this reason. The verified answer: a targeted
+`// @ts-expect-error` immediately above the failing line, with a one-line comment citing this
+record, for example `// @ts-expect-error an options-carrying call has no working generic form yet (0053).`
+Confirmed end to end: all eight option-carrying call sites on show night's branch suppressed this
+way, `tonight.vue` given the working no-options form, `bun run typecheck` exits 0.
+
+This is the remedy for bar's `#777` and box office's `D-124` too, the moment show night's routes
+land on main: widen `R` for a plain call, suppress an options-carrying one. Do not re-derive
+either, and do not trust a result that was not run whole against the real branch.
 
 **`useRequestFetch()<T>(...)`, single generic, is not something show night introduced.** It is
 the pre-existing pattern across dozens of call sites throughout the app (`TicketPrices.vue`,
 `admin/index.vue`, `useAccount.ts`, and many more), and a full-repository check found upward of
-sixty of them. Converting all of them is real, sizeable work, tracked in `docs/known-issues.md`
-rather than attempted wholesale in the pull request that carries this amendment.
+sixty of them.
 
-**The trap this amendment exists to name explicitly:** *a green `typecheck` on any one branch
-proves nothing about the pattern's safety in general.* It proves only that branch's total route
-count sits under whatever threshold `tsc` gives up at. A call site that passes today can start
-failing from a merge that adds routes somewhere else in the app entirely, on a file the merge
-never touched. Re-run `typecheck` after any rebase that adds routes; do not trust a check that
-predates it.
+**Decided rather than deferred: no mechanical sweep, no per-stream conversion pass.** A call
+site converts only once it actually fails, and the fix depends on its shape: `, string` for a
+plain call, a suppression citing this record for one carrying options. Hitting `TS2589` or
+`TS2345` in a file you did not touch is expected as the route map grows, not a regression to
+investigate. `docs/known-issues.md` names the pattern so it is recognised on sight; it is not a
+backlog inviting a wholesale conversion pull request, and one is not wanted.
+
+**The trap this amendment exists to name explicitly:** *a green `typecheck` on any one branch, or
+on a handful of edited files rather than the whole branch, proves nothing about the pattern's
+safety in general.* A per-file check that looks clean can still fail once run whole, exactly as
+the options-carrying attempt above did. Re-run `bun run typecheck` end to end, on the real branch,
+reading its exit status, after any rebase that adds routes or any fix to this pattern; do not
+trust a narrower check that predates it or stands in for it.
