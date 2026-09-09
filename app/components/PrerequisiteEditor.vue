@@ -33,14 +33,15 @@ async function apply(next: string[]): Promise<void> {
 
   working.value = true
   try {
-    // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
     for (const requiresId of added) {
+      // @ts-expect-error an options-carrying call has no working generic form yet (0053).
       await $fetch<unknown>(`/api/admin/training/modules/${props.moduleId}/prerequisites`, {
         method: 'POST',
         body: { requiresId },
       })
     }
     for (const need of dropped) {
+      // @ts-expect-error an options-carrying call has no working generic form yet (0053).
       await $fetch<unknown>(`/api/admin/training/prerequisites/${need.id}`, { method: 'DELETE' })
     }
     emit('changed')

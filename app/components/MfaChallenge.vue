@@ -19,7 +19,7 @@ async function answer(code: string): Promise<void> {
   notice.value = null
 
   try {
-    // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
     await $fetch<unknown>('/api/auth/mfa/challenge', { method: 'POST', body: { attemptId: attempt.value, code } })
     emit('answered')
   }

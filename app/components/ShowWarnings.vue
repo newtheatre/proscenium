@@ -68,11 +68,11 @@ function confirmNone(value: boolean): void {
   if (value) chosen.value = new Map()
 }
 
-// Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
 async function save(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
     await $fetch<unknown>(`/api/admin/shows/${props.showId}/warnings`, {
       method: 'PUT',
       body: {

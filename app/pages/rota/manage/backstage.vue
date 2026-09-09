@@ -48,7 +48,9 @@ async function saveType(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
     if (editingType.value) await $fetch<unknown>(`/api/admin/backstage/milestone-types/${editingType.value.id}`, { method: 'PUT', body: typeState })
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
     else await $fetch<unknown>('/api/admin/backstage/milestone-types', { method: 'POST', body: typeState })
     toast.add({ title: editingType.value ? 'Milestone type changed' : 'Milestone type added', icon: 'i-lucide-check', color: 'success' })
     typeOpen.value = false
@@ -65,6 +67,7 @@ async function saveType(): Promise<void> {
 async function setTypeActive(type: MilestoneType, active: boolean): Promise<void> {
   failure.value = null
   try {
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
     await $fetch<unknown>(`/api/admin/backstage/milestone-types/${type.id}/status`, { method: 'POST', body: { active } })
     toast.add({ title: active ? 'Milestone type reinstated' : 'Milestone type retired', icon: 'i-lucide-check', color: 'success' })
     await refreshTypes()
@@ -97,7 +100,9 @@ async function savePreset(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
     if (editingPreset.value) await $fetch<unknown>(`/api/admin/backstage/presets/${editingPreset.value.id}`, { method: 'PUT', body: presetState })
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
     else await $fetch<unknown>('/api/admin/backstage/presets', { method: 'POST', body: presetState })
     toast.add({ title: editingPreset.value ? 'Preset changed' : 'Preset added', icon: 'i-lucide-check', color: 'success' })
     presetOpen.value = false
@@ -114,6 +119,7 @@ async function savePreset(): Promise<void> {
 async function setPresetActive(preset: Preset, active: boolean): Promise<void> {
   failure.value = null
   try {
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
     await $fetch<unknown>(`/api/admin/backstage/presets/${preset.id}/status`, { method: 'POST', body: { active } })
     toast.add({ title: active ? 'Preset reinstated' : 'Preset retired', icon: 'i-lucide-check', color: 'success' })
     await refreshPresets()

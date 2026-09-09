@@ -98,6 +98,7 @@ interface QueuedMessage { milestoneTypeId: string | null, presetId: string | nul
 // it was actually composed rather than the moment it finally sent (criterion 6, K-104).
 const writeQueue = useWriteQueue<QueuedMessage>(async (action) => {
   try {
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
     await $fetch<unknown>('/api/board/messages', {
       method: 'POST',
       body: { ...action.payload, composedAt: Math.floor(action.queuedAt / 1000) },
@@ -131,6 +132,7 @@ function postFreeText(): void {
 
 async function acknowledge(messageId: string): Promise<void> {
   try {
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
     await $fetch<unknown>(`/api/board/messages/${messageId}/acknowledge`, { method: 'POST' })
     await loadMessages()
   }

@@ -72,6 +72,7 @@ async function reset(): Promise<void> {
   resetting.value = true
   resetFailure.value = null
   try {
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
     await $fetch<unknown>('/api/tonight/board/reset', { method: 'POST' })
     confirmingReset.value = false
     toast.add({ title: 'Board reset', description: 'Every device was disconnected. Read the new code out loud.', icon: 'i-lucide-check', color: 'success' })
