@@ -14,10 +14,12 @@ import {
   purgeStaleMessagesStatement,
   recordFailedAttemptStatement,
   recordSuccessStatement,
+  purgeStaleDevicesStatement,
   resetNightStatement,
   retireMilestoneTypeStatement,
   retirePresetStatement,
   revokeDevicesStatement,
+  staleDevicesQuery,
   staleMessagesQuery,
   supersedeMessageStatement,
   updateMilestoneTypeStatement,
@@ -387,6 +389,65 @@ describe('retention (E-122 criterion 4)', () => {
       run(database, postMessageStatement('bn-1', 'bd-1', clearance!.id as string, 'Clearance', 0, 'msg-1'))
 
       expect(() => database.batch([['DELETE FROM backstage_messages WHERE id = ?', 'msg-1']])).toThrow()
+    })
+  })
+
+  // `joined_at` defaults to the real clock, so an "old" device is backdated by hand: the point
+  // under test is the cutoff, not what `joinDeviceStatement` itself can express.
+  function backdateJoin(database: TestDatabase, deviceId: string, at: number): void {
+    database.batch([['UPDATE backstage_devices SET joined_at = ? WHERE id = ?', at, deviceId]])
+  }
+
+  test('a device with nothing left referencing it is stale once it also joined before the cutoff', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Only ever chatted', 'a'.repeat(64), 0, 'bd-1'))
+      backdateJoin(database, 'bd-1', 1000)
+      run(database, postMessageStatement('bn-1', 'bd-1', null, 'Old chatter', 1000, 'msg-old'))
+
+      expect(run(database, staleDevicesQuery(3000))).toHaveLength(0)
+      run(database, purgeStaleMessagesStatement(3000))
+      expect(run(database, staleDevicesQuery(3000)).map(row => row.id)).toEqual(['bd-1'])
+
+      run(database, purgeStaleDevicesStatement(3000))
+      expect(rows(database, 'SELECT id FROM backstage_devices WHERE id = ?', 'bd-1')).toHaveLength(0)
+    })
+  })
+
+  test('a device that ever posted a milestone is never stale, whatever else it did', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Called clearance once', 'a'.repeat(64), 0, 'bd-1'))
+      backdateJoin(database, 'bd-1', 1000)
+      const [clearance] = run(database, milestoneTypesQuery(false))
+      run(database, postMessageStatement('bn-1', 'bd-1', clearance!.id as string, 'Clearance', 1000, 'msg-milestone'))
+      run(database, postMessageStatement('bn-1', 'bd-1', null, 'Old chatter', 1000, 'msg-old'))
+
+      run(database, purgeStaleMessagesStatement(3000))
+      expect(run(database, staleDevicesQuery(3000))).toHaveLength(0)
+    })
+  })
+
+  test('a device that joined before the cutoff and never posted is stale too: silence for 30 days is not activity', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Joined, said nothing', 'a'.repeat(64), 0, 'bd-1'))
+      backdateJoin(database, 'bd-1', 1000)
+
+      expect(run(database, staleDevicesQuery(3000))).toHaveLength(1)
+    })
+  })
+
+  test('a device that joined after the cutoff is protected even with nothing referencing it: recent join is not staleness', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Just joined tonight', 'a'.repeat(64), 0, 'bd-1'))
+
+      expect(run(database, staleDevicesQuery(1))).toHaveLength(0)
     })
   })
 })

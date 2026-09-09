@@ -335,12 +335,35 @@ export function purgeStaleMessagesStatement(beforeEpoch: number): SQL {
   return sql`DELETE FROM backstage_messages WHERE milestone_type_id IS NULL AND composed_at < ${beforeEpoch}`
 }
 
-// Counted before deleting: a scheduled sweep reports what it did, and a raw DELETE's affected
-// count is not something every driver here is trusted to report back accurately.
-export async function purgeStaleMessages(now = new Date()): Promise<number> {
+// `label` is free text and can name people. Only a device nothing still references purges, and
+// only past its own `joined_at` cutoff, so a quiet-but-recently-joined device is never swept.
+export function staleDevicesQuery(beforeEpoch: number): SQL {
+  return sql`
+    SELECT id AS id FROM backstage_devices
+    WHERE joined_at < ${beforeEpoch}
+      AND NOT EXISTS (SELECT 1 FROM backstage_messages WHERE device_id = backstage_devices.id)
+  `
+}
+
+export function purgeStaleDevicesStatement(beforeEpoch: number): SQL {
+  return sql`
+    DELETE FROM backstage_devices
+    WHERE joined_at < ${beforeEpoch}
+      AND NOT EXISTS (SELECT 1 FROM backstage_messages WHERE device_id = backstage_devices.id)
+  `
+}
+
+export interface PurgeResult { messages: number, devices: number }
+
+// Counted before deleting, since not every driver here reports DELETE's affected row count.
+// Messages purge first, so a device they orphan is swept in the same run, not the next one.
+export async function purgeStaleMessages(now = new Date()): Promise<PurgeResult> {
   const cutoff = Math.floor(now.getTime() / 1000) - MESSAGE_RETENTION_DAYS * 24 * 60 * 60
-  const stale = await db.all<{ id: string }>(staleMessagesQuery(cutoff))
-  if (stale.length === 0) return 0
-  await db.run(purgeStaleMessagesStatement(cutoff))
-  return stale.length
+  const staleMessages = await db.all<{ id: string }>(staleMessagesQuery(cutoff))
+  if (staleMessages.length > 0) await db.run(purgeStaleMessagesStatement(cutoff))
+
+  const staleDevices = await db.all<{ id: string }>(staleDevicesQuery(cutoff))
+  if (staleDevices.length > 0) await db.run(purgeStaleDevicesStatement(cutoff))
+
+  return { messages: staleMessages.length, devices: staleDevices.length }
 }
