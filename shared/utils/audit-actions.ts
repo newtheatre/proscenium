@@ -190,6 +190,17 @@ const CATALOGUE = {
   'incident-followup.closed': { label: 'Incident follow-up closed', module: 'show-night' },
   'age-checks.exported': { label: 'Challenge 25 register exported', module: 'show-night' },
   'board.joined': { label: 'A device joined the backstage board', module: 'show-night' },
+  'board.message-posted': { label: 'A backstage board message was posted', module: 'show-night' },
+  'board.message-superseded': { label: 'A backstage board milestone was corrected', module: 'show-night' },
+  'board.reset': { label: 'The backstage board was reset', module: 'show-night' },
+  'backstage-milestone-type.created': { label: 'Backstage milestone type added', module: 'show-night' },
+  'backstage-milestone-type.updated': { label: 'Backstage milestone type changed', module: 'show-night' },
+  'backstage-milestone-type.retired': { label: 'Backstage milestone type retired', module: 'show-night' },
+  'backstage-milestone-type.reinstated': { label: 'Backstage milestone type reinstated', module: 'show-night' },
+  'backstage-preset.created': { label: 'Backstage preset added', module: 'show-night' },
+  'backstage-preset.updated': { label: 'Backstage preset changed', module: 'show-night' },
+  'backstage-preset.retired': { label: 'Backstage preset retired', module: 'show-night' },
+  'backstage-preset.reinstated': { label: 'Backstage preset reinstated', module: 'show-night' },
 
   // Module F: bar
 

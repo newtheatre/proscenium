@@ -34,13 +34,15 @@ async function apply(next: string[]): Promise<void> {
   working.value = true
   try {
     for (const requiresId of added) {
-      await $fetch(`/api/admin/training/modules/${props.moduleId}/prerequisites`, {
+      // @ts-expect-error an options-carrying call has no working generic form yet (0053).
+      await $fetch<unknown>(`/api/admin/training/modules/${props.moduleId}/prerequisites`, {
         method: 'POST',
         body: { requiresId },
       })
     }
     for (const need of dropped) {
-      await $fetch(`/api/admin/training/prerequisites/${need.id}`, { method: 'DELETE' })
+      // @ts-expect-error an options-carrying call has no working generic form yet (0053).
+      await $fetch<unknown>(`/api/admin/training/prerequisites/${need.id}`, { method: 'DELETE' })
     }
     emit('changed')
   }

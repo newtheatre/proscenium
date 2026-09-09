@@ -93,7 +93,7 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
     const view = await openView(PHONE)
     try {
       await visit(view, `${app.baseURL}/tonight`)
-      for (const selector of ['[data-test="link-incidents"]', '[data-test="link-age-checks"]', '[data-test="link-checklist"]']) {
+      for (const selector of ['[data-test="link-incidents"]', '[data-test="link-age-checks"]', '[data-test="link-checklist"]', '[data-test="link-emergency"]', '[data-test="link-board"]']) {
         const link = await boxOf(view, selector)
         expect(link.height).toBeGreaterThanOrEqual(NIGHT_TAP_TARGET_PX)
       }

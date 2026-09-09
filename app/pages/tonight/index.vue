@@ -113,6 +113,7 @@ const boardCode = ref<string | null>(null)
 const boardCodeFailure = ref<string | null>(null)
 const revealingCode = ref(false)
 
+// Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
 async function revealCode(): Promise<void> {
   revealingCode.value = true
   boardCodeFailure.value = null
@@ -374,9 +375,22 @@ function hideCode(): void {
         color="neutral"
         variant="subtle"
         icon="i-lucide-siren"
+        size="lg"
+        class="min-h-12"
         data-test="link-emergency"
       >
         Emergency card
+      </UButton>
+      <UButton
+        to="/tonight/board"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-radio"
+        size="lg"
+        class="min-h-12"
+        data-test="link-board"
+      >
+        Backstage board
       </UButton>
     </div>
 

@@ -35,3 +35,54 @@ export const boardJoinForm = z.object({
 })
 
 export type BoardJoinInput = z.output<typeof boardJoinForm>
+
+// Milestones, presets and free text (E-121). One row per message, but which of the three a
+// caller means is always exactly one of these three shapes, never a mix.
+
+export const FREE_TEXT_LIMIT = 500
+
+export const postMessageForm = z.object({
+  milestoneTypeId: z.string().min(1).nullable().default(null),
+  presetId: z.string().min(1).nullable().default(null),
+  body: z.string().trim().min(1).max(FREE_TEXT_LIMIT).nullable().default(null),
+  // The device's own clock at the moment of composing, carried through an offline queue
+  // unchanged (criterion 6); never trusted for ordering, only for display.
+  composedAt: z.number().int().positive(),
+// Load-bearing for retention: a milestone row's body is null by construction, so the 30-day
+// purge can never be asked to keep crew free text alive under cover of a kept milestone.
+}).refine(
+  data => [data.milestoneTypeId, data.presetId, data.body].filter(value => value !== null).length === 1,
+  'Send exactly one of a milestone, a preset, or free text',
+)
+
+export type PostMessageInput = z.output<typeof postMessageForm>
+
+// A correction names a different milestone; nothing else is ever superseded (criterion 5).
+export const supersedeMessageForm = z.object({
+  milestoneTypeId: z.string().min(1),
+  composedAt: z.number().int().positive(),
+})
+
+export type SupersedeMessageInput = z.output<typeof supersedeMessageForm>
+
+const CONFIG_LABEL_LIMIT = 100
+const PRESET_BODY_LIMIT = 200
+
+export const milestoneTypeForm = z.object({
+  label: z.string().trim().min(1).max(CONFIG_LABEL_LIMIT),
+  sort: z.number().int(),
+})
+
+export type MilestoneTypeInput = z.output<typeof milestoneTypeForm>
+
+export const presetForm = z.object({
+  label: z.string().trim().min(1).max(CONFIG_LABEL_LIMIT),
+  body: z.string().trim().min(1).max(PRESET_BODY_LIMIT),
+  sort: z.number().int(),
+})
+
+export type PresetInput = z.output<typeof presetForm>
+
+// Purged after this many days, milestone events excepted, which are night-report data and
+// persist forever (E-122 criterion 4).
+export const MESSAGE_RETENTION_DAYS = 30

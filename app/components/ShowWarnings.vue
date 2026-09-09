@@ -72,7 +72,8 @@ async function save(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
-    await $fetch(`/api/admin/shows/${props.showId}/warnings`, {
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
+    await $fetch<unknown>(`/api/admin/shows/${props.showId}/warnings`, {
       method: 'PUT',
       body: {
         confirmedNone: assessedClear.value,

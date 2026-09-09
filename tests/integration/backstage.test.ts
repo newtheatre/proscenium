@@ -1,10 +1,28 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  acknowledgeStatement,
+  acknowledgementsForNightQuery,
   ensureNightStatement,
+  insertMilestoneTypeStatement,
+  insertPresetStatement,
   joinDeviceStatement,
+  messagesForNightQuery,
+  milestoneTypesQuery,
   nightRowQuery,
+  postMessageStatement,
+  presetsQuery,
+  purgeStaleMessagesStatement,
   recordFailedAttemptStatement,
   recordSuccessStatement,
+  purgeStaleDevicesStatement,
+  resetNightStatement,
+  retireMilestoneTypeStatement,
+  retirePresetStatement,
+  revokeDevicesStatement,
+  staleDevicesQuery,
+  staleMessagesQuery,
+  supersedeMessageStatement,
+  updateMilestoneTypeStatement,
 } from '#server/utils/backstage'
 import { MAX_FAILED_ATTEMPTS } from '#shared/utils/backstage'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
@@ -113,6 +131,323 @@ describe('a joined device (criterion 1)', () => {
 
       expect(() => database.batch([['INSERT INTO backstage_devices (id, night_id, label, token_hash, joined_epoch) VALUES (?, ?, ?, ?, ?)',
         'bd-2', 'bn-1', 'Stage right', 'a'.repeat(64), 0]])).toThrow()
+    })
+  })
+})
+
+function person(database: TestDatabase, id: string): string {
+  database.batch([['INSERT OR IGNORE INTO users (id, name, email, verified) VALUES (?, ?, ?, 1)',
+    id, `Someone ${id}`, `${id}@e2e.newtheatre.org.uk`]])
+  return id
+}
+
+describe('the six named milestone types are seeded, committee-configurable from there (E-121 criterion 1)', () => {
+  test('all six exist, none retired', async () => {
+    await withDatabase((database) => {
+      const found = run(database, milestoneTypesQuery(false))
+      expect(found).toHaveLength(6)
+      expect(found.map(row => row.label)).toEqual(
+        ['Clearance', 'House open', 'Curtain up', 'Interval', 'Restart', 'End'])
+    })
+  })
+
+  test('the committee can add a seventh without a migration', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer')
+      run(database, insertMilestoneTypeStatement('Fire check', 6, officer, 'mt-7'))
+      expect(run(database, milestoneTypesQuery(false))).toHaveLength(7)
+    })
+  })
+
+  test('editing or retiring one does not remove it, only hides it from new stamps', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer')
+      const [clearance] = run(database, milestoneTypesQuery(false))
+      run(database, updateMilestoneTypeStatement(clearance!.id as string, 'Clearance given', 0, officer))
+      run(database, retireMilestoneTypeStatement(clearance!.id as string, false, officer))
+
+      expect(run(database, milestoneTypesQuery(false))).toHaveLength(5)
+      expect(run(database, milestoneTypesQuery(true))).toHaveLength(6)
+    })
+  })
+})
+
+describe('presets are committee configuration, none seeded (criterion 2)', () => {
+  test('added, read, and retired without disappearing', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer')
+      expect(run(database, presetsQuery(false))).toHaveLength(0)
+
+      run(database, insertPresetStatement('5 minutes', 'Five minutes please', 0, officer, 'p-1'))
+      expect(run(database, presetsQuery(false))).toHaveLength(1)
+
+      run(database, retirePresetStatement('p-1', false, officer))
+      expect(run(database, presetsQuery(false))).toHaveLength(0)
+      expect(run(database, presetsQuery(true))).toHaveLength(1)
+    })
+  })
+})
+
+describe('posting a message (criteria 1, 2)', () => {
+  function nightAndDevice(database: TestDatabase): { nightId: string, deviceId: string } {
+    const venue = testVenue(database)
+    run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+    run(database, joinDeviceStatement('bn-1', 'Stage left', 'a'.repeat(64), 0, 'bd-1'))
+    return { nightId: 'bn-1', deviceId: 'bd-1' }
+  }
+
+  test('a milestone message is stamped with a poster and a composed time', async () => {
+    await withDatabase((database) => {
+      const { nightId, deviceId } = nightAndDevice(database)
+      const [clearance] = run(database, milestoneTypesQuery(false))
+
+      run(database, postMessageStatement(nightId, deviceId, clearance!.id as string, 'Clearance', 1700000000, 'msg-1'))
+
+      const [found] = run(database, messagesForNightQuery(nightId))
+      expect(found).toMatchObject({ posterLabel: 'Stage left', milestoneLabel: 'Clearance', body: 'Clearance', composedAt: 1700000000 })
+    })
+  })
+
+  test('a preset or free-text message carries no milestone', async () => {
+    await withDatabase((database) => {
+      const { nightId, deviceId } = nightAndDevice(database)
+      run(database, postMessageStatement(nightId, deviceId, null, 'Five minutes please', 1700000000, 'msg-1'))
+
+      const [found] = run(database, messagesForNightQuery(nightId))
+      expect(found).toMatchObject({ milestoneTypeId: null, milestoneLabel: null, body: 'Five minutes please' })
+    })
+  })
+
+  test('newest first', async () => {
+    await withDatabase((database) => {
+      const { nightId, deviceId } = nightAndDevice(database)
+      run(database, postMessageStatement(nightId, deviceId, null, 'First', 1700000000, 'msg-1'))
+      run(database, postMessageStatement(nightId, deviceId, null, 'Second', 1700000100, 'msg-2'))
+
+      const found = run(database, messagesForNightQuery(nightId))
+      expect(found.map(row => row.body)).toEqual(['Second', 'First'])
+    })
+  })
+
+  test('the table refuses an edit outright: only a correction changes what was said', async () => {
+    await withDatabase((database) => {
+      const { nightId, deviceId } = nightAndDevice(database)
+      run(database, postMessageStatement(nightId, deviceId, null, 'First', 1700000000, 'msg-1'))
+
+      expect(() => database.batch([['UPDATE backstage_messages SET body = ? WHERE id = ?', 'Changed', 'msg-1']])).toThrow()
+    })
+  })
+})
+
+describe('correcting a milestone (criterion 5)', () => {
+  function milestoneMessage(database: TestDatabase): { nightId: string, deviceId: string, milestoneTypeId: string } {
+    const venue = testVenue(database)
+    run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+    run(database, joinDeviceStatement('bn-1', 'Stage left', 'a'.repeat(64), 0, 'bd-1'))
+    const [interval] = run(database, milestoneTypesQuery(false)).filter(row => row.label === 'Interval')
+    run(database, postMessageStatement('bn-1', 'bd-1', interval!.id as string, 'Interval', 1700000000, 'msg-1'))
+    return { nightId: 'bn-1', deviceId: 'bd-1', milestoneTypeId: interval!.id as string }
+  }
+
+  test('a milestone can be corrected to a different one', async () => {
+    await withDatabase((database) => {
+      const { nightId, deviceId } = milestoneMessage(database)
+      const [restart] = run(database, milestoneTypesQuery(false)).filter(row => row.label === 'Restart')
+
+      const written = run(database, supersedeMessageStatement(nightId, 'msg-1', deviceId, restart!.id as string, 'Restart', 1700000100, 'msg-2'))
+      expect(written).toHaveLength(1)
+
+      const found = run(database, messagesForNightQuery(nightId))
+      expect(found.find(row => row.id === 'msg-1')).toMatchObject({ milestoneLabel: 'Interval' })
+      expect(found.find(row => row.id === 'msg-2')).toMatchObject({ milestoneLabel: 'Restart', supersedesId: 'msg-1' })
+    })
+  })
+
+  test('a second correction on the same entry matches nothing', async () => {
+    await withDatabase((database) => {
+      const { nightId, deviceId, milestoneTypeId } = milestoneMessage(database)
+      run(database, supersedeMessageStatement(nightId, 'msg-1', deviceId, milestoneTypeId, 'Interval', 1700000100, 'msg-2'))
+
+      const second = run(database, supersedeMessageStatement(nightId, 'msg-1', deviceId, milestoneTypeId, 'Interval', 1700000200, 'msg-3'))
+      expect(second).toHaveLength(0)
+    })
+  })
+
+  test('free text and presets are never superseded', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Stage left', 'a'.repeat(64), 0, 'bd-1'))
+      run(database, postMessageStatement('bn-1', 'bd-1', null, 'Chatter', 1700000000, 'msg-1'))
+      const [clearance] = run(database, milestoneTypesQuery(false))
+
+      const written = run(database, supersedeMessageStatement('bn-1', 'msg-1', 'bd-1', clearance!.id as string, 'Clearance', 1700000100, 'msg-2'))
+      expect(written).toHaveLength(0)
+    })
+  })
+})
+
+describe('acknowledging a message (criterion 4)', () => {
+  test('two devices acknowledge independently, a repeat changes nothing', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Stage left', 'a'.repeat(64), 0, 'bd-1'))
+      run(database, joinDeviceStatement('bn-1', 'Stage right', 'b'.repeat(64), 0, 'bd-2'))
+      run(database, postMessageStatement('bn-1', 'bd-1', null, 'Ready?', 1700000000, 'msg-1'))
+
+      run(database, acknowledgeStatement('msg-1', 'bd-1', 'ack-1'))
+      run(database, acknowledgeStatement('msg-1', 'bd-2', 'ack-2'))
+      run(database, acknowledgeStatement('msg-1', 'bd-1', 'ack-3'))
+
+      const found = run(database, acknowledgementsForNightQuery('bn-1'))
+      expect(found).toHaveLength(2)
+      expect(found.map(row => row.deviceId).sort()).toEqual(['bd-1', 'bd-2'])
+    })
+  })
+})
+
+describe('a reset (E-122 criterion 1)', () => {
+  test('every joined device is revoked and the epoch moves, in one batch', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Stage left', 'a'.repeat(64), 0, 'bd-1'))
+      run(database, joinDeviceStatement('bn-1', 'Stage right', 'b'.repeat(64), 0, 'bd-2'))
+
+      run(database, revokeDevicesStatement('bn-1'))
+      run(database, resetNightStatement('bn-1'))
+
+      const devices = rows<{ revoked_at: number | null }>(database, 'SELECT revoked_at FROM backstage_devices WHERE night_id = ?', 'bn-1')
+      expect(devices.every(row => row.revoked_at !== null)).toBe(true)
+      expect(run(database, nightRowQuery(venue.id, NIGHT))[0]).toMatchObject({ epoch: 1, failedAttempts: 0 })
+    })
+  })
+
+  test('a device that joins after the reset is not revoked by it', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, revokeDevicesStatement('bn-1'))
+      run(database, resetNightStatement('bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Stage left', 'a'.repeat(64), 1, 'bd-1'))
+
+      const [device] = rows<{ revoked_at: number | null }>(database, 'SELECT revoked_at FROM backstage_devices WHERE id = ?', 'bd-1')
+      expect(device?.revoked_at).toBeNull()
+    })
+  })
+})
+
+describe('retention (E-122 criterion 4)', () => {
+  test('a milestone is never counted as stale, whatever its age', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Stage left', 'a'.repeat(64), 0, 'bd-1'))
+      const [clearance] = run(database, milestoneTypesQuery(false))
+      run(database, postMessageStatement('bn-1', 'bd-1', clearance!.id as string, 'Clearance', 0, 'msg-1'))
+
+      expect(run(database, staleMessagesQuery(9_999_999_999))).toHaveLength(0)
+    })
+  })
+
+  test('free text past the cutoff is stale; free text before it is not', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Stage left', 'a'.repeat(64), 0, 'bd-1'))
+      run(database, postMessageStatement('bn-1', 'bd-1', null, 'Old chatter', 1000, 'msg-old'))
+      run(database, postMessageStatement('bn-1', 'bd-1', null, 'Recent chatter', 5000, 'msg-recent'))
+
+      const stale = run(database, staleMessagesQuery(3000))
+      expect(stale.map(row => row.id)).toEqual(['msg-old'])
+    })
+  })
+
+  test('purging removes only what is stale and not a milestone', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Stage left', 'a'.repeat(64), 0, 'bd-1'))
+      const [clearance] = run(database, milestoneTypesQuery(false))
+      run(database, postMessageStatement('bn-1', 'bd-1', clearance!.id as string, 'Clearance', 1000, 'msg-milestone'))
+      run(database, postMessageStatement('bn-1', 'bd-1', null, 'Old chatter', 1000, 'msg-old'))
+
+      run(database, purgeStaleMessagesStatement(3000))
+
+      const remaining = run(database, messagesForNightQuery('bn-1'))
+      expect(remaining.map(row => row.id)).toEqual(['msg-milestone'])
+    })
+  })
+
+  test('the trigger refuses to delete a milestone directly, purge statement or not', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Stage left', 'a'.repeat(64), 0, 'bd-1'))
+      const [clearance] = run(database, milestoneTypesQuery(false))
+      run(database, postMessageStatement('bn-1', 'bd-1', clearance!.id as string, 'Clearance', 0, 'msg-1'))
+
+      expect(() => database.batch([['DELETE FROM backstage_messages WHERE id = ?', 'msg-1']])).toThrow()
+    })
+  })
+
+  // `joined_at` defaults to the real clock, so an "old" device is backdated by hand: the point
+  // under test is the cutoff, not what `joinDeviceStatement` itself can express.
+  function backdateJoin(database: TestDatabase, deviceId: string, at: number): void {
+    database.batch([['UPDATE backstage_devices SET joined_at = ? WHERE id = ?', at, deviceId]])
+  }
+
+  test('a device with nothing left referencing it is stale once it also joined before the cutoff', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Only ever chatted', 'a'.repeat(64), 0, 'bd-1'))
+      backdateJoin(database, 'bd-1', 1000)
+      run(database, postMessageStatement('bn-1', 'bd-1', null, 'Old chatter', 1000, 'msg-old'))
+
+      expect(run(database, staleDevicesQuery(3000))).toHaveLength(0)
+      run(database, purgeStaleMessagesStatement(3000))
+      expect(run(database, staleDevicesQuery(3000)).map(row => row.id)).toEqual(['bd-1'])
+
+      run(database, purgeStaleDevicesStatement(3000))
+      expect(rows(database, 'SELECT id FROM backstage_devices WHERE id = ?', 'bd-1')).toHaveLength(0)
+    })
+  })
+
+  test('a device that ever posted a milestone is never stale, whatever else it did', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Called clearance once', 'a'.repeat(64), 0, 'bd-1'))
+      backdateJoin(database, 'bd-1', 1000)
+      const [clearance] = run(database, milestoneTypesQuery(false))
+      run(database, postMessageStatement('bn-1', 'bd-1', clearance!.id as string, 'Clearance', 1000, 'msg-milestone'))
+      run(database, postMessageStatement('bn-1', 'bd-1', null, 'Old chatter', 1000, 'msg-old'))
+
+      run(database, purgeStaleMessagesStatement(3000))
+      expect(run(database, staleDevicesQuery(3000))).toHaveLength(0)
+    })
+  })
+
+  test('a device that joined before the cutoff and never posted is stale too: silence for 30 days is not activity', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Joined, said nothing', 'a'.repeat(64), 0, 'bd-1'))
+      backdateJoin(database, 'bd-1', 1000)
+
+      expect(run(database, staleDevicesQuery(3000))).toHaveLength(1)
+    })
+  })
+
+  test('a device that joined after the cutoff is protected even with nothing referencing it: recent join is not staleness', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Just joined tonight', 'a'.repeat(64), 0, 'bd-1'))
+
+      expect(run(database, staleDevicesQuery(1))).toHaveLength(0)
     })
   })
 })

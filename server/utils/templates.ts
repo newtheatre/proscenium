@@ -482,6 +482,24 @@ Open the safety officer's list to read and close it.
 The Nottingham New Theatre`,
   }),
 
+  // Never the new code: it travels by voice only, so nothing here can leak it by being read
+  // over someone's shoulder or forwarded (E-122 criterion 2).
+  'board-reset': (context: TemplateContext): Rendered => ({
+    subject: `The backstage board at ${context.venueName} was reset`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>The backstage board at ${context.venueName} was reset tonight. Every joined device was
+disconnected and the join code changed.</p>
+<p>The new code is not in this message: get it from tonight's duty manager.</p>`),
+    text: `Hello ${context.name},
+
+The backstage board at ${context.venueName} was reset tonight. Every joined device was
+disconnected and the join code changed.
+
+The new code is not in this message: get it from tonight's duty manager.
+
+The Nottingham New Theatre`,
+  }),
+
   // Good news, so it leads with it. The way out is in the same breath as the place, because a
   // place nobody uses is one somebody else was waiting for.
   'training-session-promoted': (context: TemplateContext): Rendered => {

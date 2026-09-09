@@ -83,6 +83,10 @@ export const PERMISSIONS = [
   // Exporting the licensing register's history. A shift alone reads tonight's entries; taking a
   // copy of the whole register for an inspection is the standing officer's (E-119 criterion 4).
   'age-checks.export',
+  // The backstage board's milestone types and presets: committee configuration, planned ahead
+  // like the checklist's, not the join or the reset, which are tonight's own (E-121, E-122).
+  'board.read',
+  'board.write',
   // The one exception to the rule above, and it is named, bounded and audited: a designated
   // officer opens tonight's screens without a shift, and every use is recorded (0044, E-111).
   'night.door',
@@ -112,7 +116,7 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   BOX_OFFICE: ['ticketing.read', 'ticketing.write'],
   // Administers the rota in advance, and opens the door and duty manager screens without a shift
   // tonight. The till is the bar manager's (0044, 0046, E-101 criterion 2).
-  FOH_MANAGER: ['night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export'],
+  FOH_MANAGER: ['night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write'],
   FRONT_OF_HOUSE: [],
   // Owns the bar's catalogue and its stock, and opens the till without a bar shift. Nothing in
   // the old estate grants this role, so the import cannot reach it (0044, F-101 criterion 1).

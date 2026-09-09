@@ -381,6 +381,22 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // `incidents.body` (docs/known-issues.md).
     why: 'Who closed a follow-up. The safety record survives and must answer for itself.',
   },
+  {
+    name: 'backstage_milestone_types',
+    column: 'updated_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    why: 'Who last edited a milestone type. It describes the configuration, not the person who set it up.',
+  },
+  {
+    name: 'backstage_presets',
+    column: 'updated_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    why: 'Who last edited a preset. It describes the configuration, not the person who set it up.',
+  },
 
   // Module F: bar
 

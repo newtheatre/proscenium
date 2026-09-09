@@ -44,6 +44,7 @@ const settled = useDebounced(searchTerm, 250)
 const instance = useId()
 const { data, status } = await useAsyncData(
   () => `person-picker-${instance}-${settled.value}`,
+  // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
   () => settled.value.trim().length < 2
     ? Promise.resolve({ items: [] } as Listing)
     : $fetch<Listing>('/api/admin/accounts', {

@@ -19,7 +19,8 @@ async function answer(code: string): Promise<void> {
   notice.value = null
 
   try {
-    await $fetch('/api/auth/mfa/challenge', { method: 'POST', body: { attemptId: attempt.value, code } })
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
+    await $fetch<unknown>('/api/auth/mfa/challenge', { method: 'POST', body: { attemptId: attempt.value, code } })
     emit('answered')
   }
   catch (error) {

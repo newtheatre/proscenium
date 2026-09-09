@@ -13,7 +13,9 @@ const atTheHub = computed(() => route.path === '/tonight')
 // since a shift holder resolves only one (0044). Best effort: no shift, nothing to prime.
 onMounted(async () => {
   try {
-    const card = await $fetch<unknown>('/api/tonight/emergency')
+    // Both generics load-bearing: the second, widened to string, keeps this under tsc's depth
+    // limit once enough routes exist (0053 amendment).
+    const card = await $fetch<unknown, string>('/api/tonight/emergency')
     await primeNightCache(nightCacheKey({ screen: 'emergency-card', night: currentShowNight(), wholeNight: true }), () => card)
   }
   catch { /* nothing to prime */ }

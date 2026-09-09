@@ -14,7 +14,8 @@ defineProps<{ stacked?: boolean }>()
 const shells = computed(() => SHELL_NAV.filter(entry => can(viewer.value, entry.ability)))
 
 async function signOut(): Promise<void> {
-  await $fetch('/api/auth/sign-out', { method: 'POST' })
+  // @ts-expect-error an options-carrying call has no working generic form yet (0053).
+  await $fetch<unknown>('/api/auth/sign-out', { method: 'POST' })
   await refresh()
   await navigateTo('/')
 }
