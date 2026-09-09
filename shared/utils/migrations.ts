@@ -159,3 +159,22 @@ export function snapshotBefore<T>(beforeNumber: number, snapshots: { number: num
   }
   return best?.data
 }
+
+export interface SnapshotLink { file: string, id: string, prevId: string }
+
+// Drizzle-kit's sentinel for "no prior snapshot", carried by the first one only.
+const ROOT_PREV_ID = '00000000-0000-0000-0000-000000000000'
+
+// A snapshot missing from the journal is fine (a hand-authored migration); a snapshot that
+// exists but does not link to another that does starves `snapshotBefore` of a baseline (0052).
+export function snapshotChainProblems(links: SnapshotLink[]): string[] {
+  const knownIds = new Set(links.map(link => link.id))
+  const problems: string[] = []
+  for (const link of links) {
+    if (link.prevId === ROOT_PREV_ID || knownIds.has(link.prevId)) continue
+    problems.push(`${link.file} expects a prior snapshot with id \`${link.prevId}\`, and no `
+      + `snapshot on disk has it. Every rebuild between the missing snapshot and here is checked `
+      + `with no real baseline, so a restrict-dependent or copying-column defect there passes silently.`)
+  }
+  return problems
+}

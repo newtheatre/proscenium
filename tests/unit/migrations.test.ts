@@ -7,6 +7,7 @@ import {
   pendingMigrations,
   rebuildDependentProblems,
   snapshotBefore,
+  snapshotChainProblems,
   unresolvedCopyProblems,
 } from '#shared/utils/migrations'
 
@@ -212,5 +213,38 @@ describe('a rebuild refuses a copying column that does not resolve (0052)', () =
     expect(snapshotBefore(73, snapshots)).toBe('seventy-two')
     expect(snapshotBefore(71, snapshots)).toBe('seventy')
     expect(snapshotBefore(70, snapshots)).toBeUndefined()
+  })
+})
+
+// The real 0062-0064 chain: 0063 was lost once to a conflict resolution that took main's
+// version of every `meta/*_snapshot.json`, including the stream's own newly generated one.
+const CHAIN_0062 = { file: '0062_snapshot.json', id: '7e6ddab5-9b7f-4666-a8d5-4fc636f96a42', prevId: '00000000-0000-0000-0000-000000000000' }
+const CHAIN_0063 = { file: '0063_snapshot.json', id: 'df15a09e-a95a-409b-b317-07d617743f55', prevId: '7e6ddab5-9b7f-4666-a8d5-4fc636f96a42' }
+const CHAIN_0064 = { file: '0064_snapshot.json', id: '3883ed6b-a556-43c1-8df8-a76365da6689', prevId: 'df15a09e-a95a-409b-b317-07d617743f55' }
+
+describe('the snapshot chain links up (0052)', () => {
+  test('an unbroken chain has nothing to say', () => {
+    expect(snapshotChainProblems([CHAIN_0062, CHAIN_0063, CHAIN_0064])).toEqual([])
+  })
+
+  // The regression case itself: removing 0063 is exactly what the lost file did to main.
+  test('removing a snapshot from the middle of the chain is refused, naming both ends', () => {
+    const problems = snapshotChainProblems([CHAIN_0062, CHAIN_0064])
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('0064_snapshot.json')
+    expect(problems[0]).toContain(CHAIN_0063.id)
+  })
+
+  test('the first snapshot in the whole history is never flagged for its own sentinel prevId', () => {
+    const root = { file: '0000_snapshot.json', id: 'bf2d481d-63b0-41e6-8d47-4fe0dabf1212', prevId: '00000000-0000-0000-0000-000000000000' }
+    expect(snapshotChainProblems([root])).toEqual([])
+  })
+
+  // A hand-authored trigger-only migration (0007, 0016) generates no snapshot at all, so the
+  // next real snapshot links straight to the one before it: that gap is not a broken link.
+  test('a gap left by a migration with no snapshot of its own is not a broken link', () => {
+    const before = { file: '0006_snapshot.json', id: 'aaa', prevId: '00000000-0000-0000-0000-000000000000' }
+    const after = { file: '0008_snapshot.json', id: 'bbb', prevId: 'aaa' }
+    expect(snapshotChainProblems([before, after])).toEqual([])
   })
 })
