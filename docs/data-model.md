@@ -524,8 +524,9 @@ once, ever, and that a line can only exist for a reservation the same batch actu
 so a lost race aborts the whole transaction rather than posting money for nothing (0001, I-102
 criterion 6); `check:migrations` refuses a rebuild of `ledger_lines` against a `restrict`
 dependent for exactly this reason, so the guard is index and trigger only. `COMP` needs a reason
-and is
-self-approved by the collecting officer; D-117's own request-and-approval authority is not built.
+and is refused outright without `ticketing.manage` (committee decision): an ordinary desk officer
+cannot self-approve one, though whoever does hold the permission still approves their own; D-117's
+own request-and-approval workflow, which replaces this gate rather than removing it, is not built.
 Editing an unpaid booking (D-110) and refunding a collected one (D-116) are the other two-thirds
 of the same boundary invariant, neither built here; nothing currently offers a way to attempt
 either, so "un-collecting" has no route to refuse it yet (`docs/known-issues.md`).

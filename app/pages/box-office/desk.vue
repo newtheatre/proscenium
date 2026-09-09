@@ -3,6 +3,12 @@ import { DESK_TENDERS } from '#shared/utils/desk'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { DeskTender } from '#shared/utils/desk'
 
+const { account } = useAccount()
+// The route refuses regardless; this only saves an operator who cannot comp the round trip of
+// finding that out (D-114 committee decision, comp gated behind ticketing.manage).
+const canComp = computed(() => account.value.permissions.includes('ticketing.manage'))
+const tenderOptions = computed(() => (canComp.value ? [...DESK_TENDERS] : DESK_TENDERS.filter(t => t !== 'COMP')))
+
 definePageMeta({ layout: 'console', title: 'Desk', middleware: 'console' })
 
 interface DeskPerformance {
@@ -346,7 +352,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
             <UFormField label="Tender">
               <USelect
                 v-model="tender"
-                :items="[...DESK_TENDERS]"
+                :items="tenderOptions"
                 data-test="desk-tender"
               />
             </UFormField>

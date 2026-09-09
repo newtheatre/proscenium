@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, forgetSpentStep, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import { showNightOf } from '#shared/utils/show-night'
+import { codeForStep, stepFor } from '#shared/utils/totp'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -18,6 +19,7 @@ const CASE_TIMEOUT_MS = 120_000
 let app: AppUnderTest
 let officer: TestMember
 let boxOffice: TestMember
+let manager: TestMember
 let venueId: string
 
 beforeAll(async () => {
@@ -27,6 +29,23 @@ beforeAll(async () => {
 
   boxOffice = await registerMember(app, 'boxoffice', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, officer.cookie)
+
+  // Both roles, plus MFA: MANAGER is privileged (0037/A-112), so requirePermission also needs
+  // a confirmed second factor before ticketing.manage, the comp gate, is honoured (D-114).
+  const managerPassword = generatePassword()
+  manager = await registerMember(app, 'manager', managerPassword)
+  await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'BOX_OFFICE' }, officer.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'MANAGER' }, officer.cookie)
+
+  const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, manager.cookie)).json() as { secret: string }
+  await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, manager.cookie)
+  forgetSpentStep(app, manager.email)
+  const { attemptId } = await (await request(app, 'POST', '/api/auth/sign-in', { email: manager.email, password: managerPassword })).json() as { attemptId: string }
+  const managerAnswered = await request(app, 'POST', '/api/auth/mfa/challenge', {
+    attemptId,
+    code: await codeForStep(secret, stepFor(new Date())),
+  })
+  manager = { ...manager, cookie: (managerAnswered.headers.get('set-cookie') ?? '').split(';')[0]! }
 
   venueId = venue()
 }, BOOT_TIMEOUT_MS)
@@ -217,7 +236,7 @@ describe.skipIf(skip !== null)('collection is the payment boundary (criteria 2, 
       expectedTotalPence: 0,
       tender: 'COMP',
       compReason: 'Reviewer',
-    })
+    }, manager.cookie)
     expect(collected.status).toBe(200)
 
     const line = query<{ amountPence: number, unitPricePence: number }>(
@@ -234,8 +253,35 @@ describe.skipIf(skip !== null)('collection is the payment boundary (criteria 2, 
     const refused = await send('POST', `/api/box-office/desk/reservations/${id}/collect`, {
       expectedTotalPence: 0,
       tender: 'COMP',
-    })
+    }, manager.cookie)
     expect(refused.status).toBe(400)
+  }, CASE_TIMEOUT_MS)
+
+  test('a comp is refused without ticketing.manage, even with a well-formed body (committee decision)', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow(900)
+    const { id } = await bookedReservation(performanceId, ticketTypeId)
+
+    const refused = await send('POST', `/api/box-office/desk/reservations/${id}/collect`, {
+      expectedTotalPence: 0,
+      tender: 'COMP',
+      compReason: 'Reviewer',
+    })
+    expect(refused.status).toBe(403)
+    expect(await refused.text()).toContain('manager')
+
+    const row = query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', id)
+    expect(row?.status).toBe('PENDING')
+  }, CASE_TIMEOUT_MS)
+
+  test('the same booking, the same body: a card collection by an ordinary officer still works', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow(900)
+    const { id } = await bookedReservation(performanceId, ticketTypeId)
+
+    const collected = await send('POST', `/api/box-office/desk/reservations/${id}/collect`, {
+      expectedTotalPence: 900,
+      tender: 'CARD',
+    })
+    expect(collected.status).toBe(200)
   }, CASE_TIMEOUT_MS)
 
   test('two attempts at the same booking leave exactly one collection and one ledger entry', async () => {

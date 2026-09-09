@@ -223,7 +223,7 @@ ledger holds no night column and gains none.
 | Money path | Posts when | Module | Source | Tender | Kind |
 | --- | --- | --- | --- | --- | --- |
 | Desk collection | The reader is paid at collection, never at reservation (D-114) | ticketing | `DESK` | `CARD` | `TICKET_COLLECTION` |
-| Comp admission | An approved comp is issued (D-117) | ticketing | `DESK` | `COMP` | `TICKET_COLLECTION` |
+| Comp admission | A comp is issued at collection (D-114), gated behind `ticketing.manage` rather than plain desk access; D-117's own request-and-approval workflow, still owed, replaces that gate rather than removing it | ticketing | `DESK` | `COMP` | `TICKET_COLLECTION` |
 | Walk-up sale | Reservation and payment in one desk flow (D-115) | ticketing | `DESK` | `CARD`, `COMP` | `WALK_UP` |
 | Refund | The money is handed back, one entry per ticket (D-116) | ticketing | `DESK` | `CARD` | `REFUND` |
 | Pass sale | A pass is issued and paid for at the desk (D-124) | ticketing | `DESK` | `CARD` | `PASS_SALE` |

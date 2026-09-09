@@ -7,6 +7,12 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const input = await readValidatedBodyOrThrow(event, collectForm)
 
+  // Desk access is not comp authority: an ordinary volunteer collects, but only a manager
+  // self-approves one, until D-117's own request-and-approval flow replaces this gate.
+  if (input.tender === 'COMP' && !resolved.permissions.has('ticketing.manage')) {
+    throw createError({ statusCode: 403, statusMessage: 'A manager must approve a comp' })
+  }
+
   const reservation = await deskReservation(id)
   if (!reservation) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
 
