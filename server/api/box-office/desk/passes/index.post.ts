@@ -52,5 +52,5 @@ export default defineEventHandler(async (event) => {
     priceLabel: price.label,
   }, result.passId!)
 
-  return { ok: true, reference: result.reference, passId: result.passId }
+  return { ok: true, reference: result.reference, passId: result.passId, qrToken: await passQrTokenFor(result.passId!) }
 })

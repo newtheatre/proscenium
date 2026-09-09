@@ -4,17 +4,15 @@ import { createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
 // D-124 criterion 4: the cap is asked atomically at issue, not at request. Split from
-// races-refund.test.ts since it is a separate invariant on a separate table (K-105's own
-// "split by invariant" convention).
+// races-refund.test.ts, a separate invariant on a separate table (K-105's own convention).
 
-// Mirrors server/utils/pass-issue.ts's exact shape: the pass insert's own predicate is the
-// arbiter, and the ledger entry rides its `changes()`, exactly as D-116's refund does.
+// Mirrors server/utils/pass-issue.ts's exact shape (claim, then `changes()`, then EXISTS).
 function attemptIssue(database: TestDatabase, passId: string, entryId: string, lineId: string): { status: number } {
   database.batch([
     [`INSERT INTO passes (id, reference, pass_type_id, pass_type_price_id, user_id, price_paid, status, issued_by)
       SELECT ?, ?, 'pt-1', 'price-1', 'u-buyer', 4500, 'ACTIVE', 'u-officer'
       WHERE (SELECT count(*) FROM passes WHERE pass_type_id = 'pt-1' AND status != 'CANCELLED') < 1`,
-      passId, passId.toUpperCase().slice(0, 6)],
+    passId, passId.toUpperCase().slice(0, 6)],
     [`INSERT INTO ledger_entries (id, happened_at, london_day, source, tender, actor_id, total_pence)
       SELECT ?, ?, '2026-09-09', 'DESK', 'CARD', 'u-officer', 4500
       WHERE changes() = 1`, entryId, 1_780_000_000],
@@ -43,10 +41,10 @@ describe('issuing a pass past its cap: concurrent issues leave exactly one (I-10
 
       expectOneWinner(answers)
 
-      const passes = rows<{ total: number }>(database, "SELECT count(*) AS total FROM passes WHERE pass_type_id = 'pt-1'")
+      const passes = rows<{ total: number }>(database, 'SELECT count(*) AS total FROM passes WHERE pass_type_id = \'pt-1\'')
       expect(passes[0]?.total).toBe(1)
 
-      const lines = rows<{ total: number }>(database, "SELECT count(*) AS total FROM ledger_lines WHERE kind = 'PASS_SALE'")
+      const lines = rows<{ total: number }>(database, 'SELECT count(*) AS total FROM ledger_lines WHERE kind = \'PASS_SALE\'')
       expect(lines[0]?.total).toBe(1)
     }
     finally {
