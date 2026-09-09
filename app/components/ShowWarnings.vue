@@ -68,11 +68,12 @@ function confirmNone(value: boolean): void {
   if (value) chosen.value = new Map()
 }
 
+// Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
 async function save(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
-    await $fetch(`/api/admin/shows/${props.showId}/warnings`, {
+    await $fetch<unknown>(`/api/admin/shows/${props.showId}/warnings`, {
       method: 'PUT',
       body: {
         confirmedNone: assessedClear.value,

@@ -14,10 +14,6 @@ interface Message {
 }
 interface Acknowledgement { messageId: string, deviceId: string }
 
-// Cast to a plain function type before calling: matching the route against Nitro's typed route
-// map to infer a return type grows too deep for tsc once enough routes exist (TS2589).
-const request = useRequestFetch() as unknown as (route: string) => Promise<{ messages: Message[], acknowledgements: Acknowledgement[] }>
-const post = $fetch as unknown as (route: string, options: { method: 'POST' }) => Promise<unknown>
 const toast = useToast()
 
 const messages = ref<Message[]>([])
@@ -26,9 +22,10 @@ const syncedAt = ref<Date | null>(null)
 const busy = ref(true)
 const failure = ref<string | null>(null)
 
+// Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
 async function load(): Promise<void> {
   try {
-    const answered = await request('/api/tonight/board/messages')
+    const answered = await useRequestFetch()<{ messages: Message[], acknowledgements: Acknowledgement[] }>('/api/tonight/board/messages')
     messages.value = answered.messages
     acknowledgements.value = answered.acknowledgements
     syncedAt.value = new Date()
@@ -75,7 +72,7 @@ async function reset(): Promise<void> {
   resetting.value = true
   resetFailure.value = null
   try {
-    await post('/api/tonight/board/reset', { method: 'POST' })
+    await $fetch<unknown>('/api/tonight/board/reset', { method: 'POST' })
     confirmingReset.value = false
     toast.add({ title: 'Board reset', description: 'Every device was disconnected. Read the new code out loud.', icon: 'i-lucide-check', color: 'success' })
     await load()

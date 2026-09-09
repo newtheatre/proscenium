@@ -30,20 +30,18 @@ watch(held, value => chosen.value = [...value], { immediate: true })
 async function apply(next: string[]): Promise<void> {
   const added = next.filter(id => !held.value.includes(id))
   const dropped = props.prerequisites.filter(need => !next.includes(need.requiresId))
-  // Cast before calling: matching the route against Nitro's typed map to check the method and
-  // body shape grows too deep for tsc once enough routes exist (TS2589).
-  const send = $fetch as unknown as (route: string, options: { method: 'POST' | 'DELETE', body?: unknown }) => Promise<unknown>
 
   working.value = true
   try {
+    // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
     for (const requiresId of added) {
-      await send(`/api/admin/training/modules/${props.moduleId}/prerequisites`, {
+      await $fetch<unknown>(`/api/admin/training/modules/${props.moduleId}/prerequisites`, {
         method: 'POST',
         body: { requiresId },
       })
     }
     for (const need of dropped) {
-      await send(`/api/admin/training/prerequisites/${need.id}`, { method: 'DELETE' })
+      await $fetch<unknown>(`/api/admin/training/prerequisites/${need.id}`, { method: 'DELETE' })
     }
     emit('changed')
   }

@@ -6,24 +6,20 @@ definePageMeta({ layout: 'console', title: 'Backstage board', middleware: 'conso
 interface MilestoneType { id: string, label: string, sort: number, active: boolean }
 interface Preset { id: string, label: string, body: string, sort: number, active: boolean }
 
-// Cast to a plain function type before calling: matching the route against Nitro's typed route
-// map to check the body shape grows too deep for tsc once enough routes exist (TS2589).
-const request = useRequestFetch() as unknown as (route: string) => Promise<unknown>
-const put = $fetch as unknown as (route: string, options: { method: 'PUT', body: unknown }) => Promise<unknown>
-const post = $fetch as unknown as (route: string, options: { method: 'POST', body: unknown }) => Promise<unknown>
 const toast = useToast()
 const writes = computed(() => can(useViewer().value, manageBoardConfig))
 const failure = ref<string | null>(null)
 
+// Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
 const { data: typesData, status: typesStatus, refresh: refreshTypes } = await useAsyncData(
   'backstage-milestone-types',
-  () => request('/api/admin/backstage/milestone-types') as Promise<{ types: MilestoneType[] }>,
+  () => useRequestFetch()<{ types: MilestoneType[] }>('/api/admin/backstage/milestone-types'),
   { default: (): { types: MilestoneType[] } => ({ types: [] }) },
 )
 
 const { data: presetsData, status: presetsStatus, refresh: refreshPresets } = await useAsyncData(
   'backstage-presets',
-  () => request('/api/admin/backstage/presets') as Promise<{ presets: Preset[] }>,
+  () => useRequestFetch()<{ presets: Preset[] }>('/api/admin/backstage/presets'),
   { default: (): { presets: Preset[] } => ({ presets: [] }) },
 )
 
@@ -52,8 +48,8 @@ async function saveType(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
-    if (editingType.value) await put(`/api/admin/backstage/milestone-types/${editingType.value.id}`, { method: 'PUT', body: typeState })
-    else await post('/api/admin/backstage/milestone-types', { method: 'POST', body: typeState })
+    if (editingType.value) await $fetch<unknown>(`/api/admin/backstage/milestone-types/${editingType.value.id}`, { method: 'PUT', body: typeState })
+    else await $fetch<unknown>('/api/admin/backstage/milestone-types', { method: 'POST', body: typeState })
     toast.add({ title: editingType.value ? 'Milestone type changed' : 'Milestone type added', icon: 'i-lucide-check', color: 'success' })
     typeOpen.value = false
     await refreshTypes()
@@ -69,7 +65,7 @@ async function saveType(): Promise<void> {
 async function setTypeActive(type: MilestoneType, active: boolean): Promise<void> {
   failure.value = null
   try {
-    await post(`/api/admin/backstage/milestone-types/${type.id}/status`, { method: 'POST', body: { active } })
+    await $fetch<unknown>(`/api/admin/backstage/milestone-types/${type.id}/status`, { method: 'POST', body: { active } })
     toast.add({ title: active ? 'Milestone type reinstated' : 'Milestone type retired', icon: 'i-lucide-check', color: 'success' })
     await refreshTypes()
   }
@@ -101,8 +97,8 @@ async function savePreset(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
-    if (editingPreset.value) await put(`/api/admin/backstage/presets/${editingPreset.value.id}`, { method: 'PUT', body: presetState })
-    else await post('/api/admin/backstage/presets', { method: 'POST', body: presetState })
+    if (editingPreset.value) await $fetch<unknown>(`/api/admin/backstage/presets/${editingPreset.value.id}`, { method: 'PUT', body: presetState })
+    else await $fetch<unknown>('/api/admin/backstage/presets', { method: 'POST', body: presetState })
     toast.add({ title: editingPreset.value ? 'Preset changed' : 'Preset added', icon: 'i-lucide-check', color: 'success' })
     presetOpen.value = false
     await refreshPresets()
@@ -118,7 +114,7 @@ async function savePreset(): Promise<void> {
 async function setPresetActive(preset: Preset, active: boolean): Promise<void> {
   failure.value = null
   try {
-    await post(`/api/admin/backstage/presets/${preset.id}/status`, { method: 'POST', body: { active } })
+    await $fetch<unknown>(`/api/admin/backstage/presets/${preset.id}/status`, { method: 'POST', body: { active } })
     toast.add({ title: active ? 'Preset reinstated' : 'Preset retired', icon: 'i-lucide-check', color: 'success' })
     await refreshPresets()
   }

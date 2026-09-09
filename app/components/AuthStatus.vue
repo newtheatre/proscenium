@@ -13,11 +13,9 @@ defineProps<{ stacked?: boolean }>()
 
 const shells = computed(() => SHELL_NAV.filter(entry => can(viewer.value, entry.ability)))
 
-// Cast to a plain function type before calling: matching the route against Nitro's typed route
-// map to check the method option grows too deep for tsc once enough routes exist (TS2589).
+// Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
 async function signOut(): Promise<void> {
-  const postSignOut = $fetch as unknown as (route: string, options: { method: 'POST' }) => Promise<unknown>
-  await postSignOut('/api/auth/sign-out', { method: 'POST' })
+  await $fetch<unknown>('/api/auth/sign-out', { method: 'POST' })
   await refresh()
   await navigateTo('/')
 }
