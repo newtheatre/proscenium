@@ -1,20 +1,22 @@
 import { londonDayOf } from '#shared/utils/ledger'
 import { saleForm } from '#shared/utils/sale'
 
-// The submission boundary (F-104) and, once it matches, the atomic commit (F-105): a mismatch
-// refuses quoting both figures; a match writes the ledger entry, lines and stock in one batch.
+// The submission boundary (F-104), the atomic commit (F-105), and an inline Challenge 25 outcome
+// batched with it when the basket needs one (F-106): a mismatch refuses quoting both figures.
 export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, saleForm)
   const resolved = await requireNightAuthority(event, 'BAR', { venueId: input.venueId, performanceId: input.performanceId })
   const session = requireOpenSession(await openSessionFor(resolved.venueId, resolved.night))
 
-  const entry = auditEntry({
+  const committed = await commitSale(input.lines, londonDayOf(new Date()), input.expectedTotalPence, input.ageCheck, {
     actorId: resolved.account.id,
-    action: 'bar.till.sale',
-    target: `till-session:${session.id}`,
-    detail: { venueId: resolved.venueId, night: resolved.night, lines: input.lines.length },
+    sessionId: session.id,
+    venueId: resolved.venueId,
+    night: resolved.night,
+    // A basket sells for the whole night, not one performance; naming one is only honest when the
+    // till's own authority resolved to exactly one (E-118 criterion 4's nullable performance_id).
+    performanceId: resolved.performanceIds.length === 1 ? resolved.performanceIds[0]! : null,
   })
-  const committed = await commitSale(input.lines, londonDayOf(new Date()), resolved.account.id, input.expectedTotalPence, entry)
 
   return { ok: true, ...committed }
 })

@@ -668,7 +668,10 @@ correction per entry) · `created_at`. CHECK `age_checks_outcome_shape` ties `id
 `reason` to `outcome` so exactly one is ever set, never both, never neither. Split from a
 single `reason` column the original outline carried: criterion 1 asks for the ID type and the
 refusal reason as two distinct pieces of information, not one column doing both jobs
-(E-118). The licensing register; exports span CSV and PDF (E-119, not yet built).
+(E-118). The licensing register; exports span CSV and PDF (E-119, not yet built). A row can
+also come from `POST /api/till/sale`'s inline prompt (F-106): `performance_id` there is the
+till's own resolved authority, null when it spans more than one performance, and `product`
+names the basket's restricted lines rather than something staff types.
 
 ### checklist_items
 `id` PK · `venue_id` → venues cascade · `phase` CHECK `PRE|POST` · `label` · `sort` · `required`
