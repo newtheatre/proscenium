@@ -52,7 +52,11 @@ export function journalProblems(entries: JournalEntry[], files: string[]): strin
 const quoted = (name: string): string => `\`${name}\``
 
 export interface SnapshotForeignKey { onDelete?: string, tableTo: string }
-export interface SnapshotTable { name: string, foreignKeys?: Record<string, SnapshotForeignKey> }
+export interface SnapshotTable {
+  name: string
+  foreignKeys?: Record<string, SnapshotForeignKey>
+  columns?: Record<string, unknown>
+}
 export interface RebuildDependent { table: string, onDelete: string }
 
 // Every table with an incoming foreign key, keyed by the table it points at, however the key is
@@ -90,4 +94,68 @@ export function rebuildDependentProblems(file: string, table: string, dependents
       + `enforced, so the whole migration aborts the moment a referencing row exists.`)
   }
   return problems
+}
+
+export interface RebuildCopy { targetTable: string, sourceTable: string, selected: string[] }
+
+// The copying INSERT ... SELECT ... FROM every rebuild in `sql` runs, in order. The target
+// table's own column list is not read: only what the SELECT names matters here.
+const COPY_INSERT = /INSERT INTO `__new_(\w+)`\s*\([^)]*\)\s*SELECT\s+([\s\S]*?)\s+FROM\s+`?(\w+)`?/gi
+
+function splitSelectList(list: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let current = ''
+  for (const char of list) {
+    if (char === '(') depth++
+    else if (char === ')') depth--
+    if (char === ',' && depth === 0) {
+      parts.push(current.trim())
+      current = ''
+    }
+    else {
+      current += char
+    }
+  }
+  if (current.trim()) parts.push(current.trim())
+  return parts
+}
+
+export function copyingInserts(sql: string): RebuildCopy[] {
+  return [...sql.matchAll(COPY_INSERT)].map(match => ({
+    targetTable: match[1]!,
+    sourceTable: match[3]!,
+    selected: splitSelectList(match[2]!),
+  }))
+}
+
+// Only a double-quoted token has SQLite's string-literal fallback (0052); other quoting styles
+// fail loudly instead, which the existing scratch-database tests already catch.
+const DOUBLE_QUOTED = /^"([^"]+)"$/
+
+// A copying SELECT naming a column `sourceColumns` does not have: drizzle-kit emits this for a
+// column the rebuild adds, expecting a real expression in its place (0052).
+export function unresolvedCopyProblems(file: string, copy: RebuildCopy, sourceColumns: Set<string>): string[] {
+  const problems: string[] = []
+  for (const expression of copy.selected) {
+    const match = DOUBLE_QUOTED.exec(expression)
+    if (!match) continue
+    const name = match[1]!
+    if (sourceColumns.has(name)) continue
+    problems.push(`${file}: the copying INSERT for \`${copy.targetTable}\` selects "${name}" from `
+      + `\`${copy.sourceTable}\`, which has no such column. SQLite cannot resolve an unrecognised `
+      + `double-quoted identifier as a column, so it falls back to reading it as the string literal `
+      + `"${name}" instead, and every copied row silently gets that text rather than a real value.`)
+  }
+  return problems
+}
+
+// The schema just before `beforeNumber`: the highest-numbered snapshot below it, since a
+// hand-authored migration between two drizzle-kit ones leaves no snapshot of its own.
+export function snapshotBefore<T>(beforeNumber: number, snapshots: { number: number, data: T }[]): T | undefined {
+  let best: { number: number, data: T } | undefined
+  for (const snapshot of snapshots) {
+    if (snapshot.number < beforeNumber && (!best || snapshot.number > best.number)) best = snapshot
+  }
+  return best?.data
 }
