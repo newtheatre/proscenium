@@ -608,10 +608,11 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     name: 'notification_log',
     column: 'user_id',
     section: 'messages',
-    columns: ['type', 'channel', 'subject', 'status', 'sent_at'],
+    columns: ['type', 'channel', 'subject', 'status', 'attempts', 'sent_at'],
     erasure: 'scrub',
-    // The subject is rendered with the account name, so it carries one.
-    scrub: ['subject', 'error'],
+    // The subject is rendered with the account name, so it carries one, and the retry payload is
+    // the whole message body while a retry is still owed (0055).
+    scrub: ['subject', 'error', 'retry_payload'],
     why: 'What was sent and whether it arrived is an operational count; the subject line is not.',
   },
   {
