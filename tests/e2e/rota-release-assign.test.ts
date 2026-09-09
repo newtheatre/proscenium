@@ -168,7 +168,7 @@ describe.skipIf(skip !== null)('releasing a shift (E-107 criterion 1)', () => {
 })
 
 describe.skipIf(skip !== null)('dismissing a declined claim (E-114)', () => {
-  test('the declined claimant clears it off their own list', async () => {
+  test('the declined claimant clears it off their own list, and the position stays fillable', async () => {
     const holder = await registerMember(app, 'dismiss-holder', generatePassword())
     const house = performance(7, 'dismiss-own')
     claim(house.shiftId, holder.id, 'DECLINED', 'Not eligible after all')
@@ -181,7 +181,13 @@ describe.skipIf(skip !== null)('dismissing a declined claim (E-114)', () => {
 
     const after = await send('GET', '/api/rota/mine', undefined, holder.cookie)
     expect((await after.json() as { items: { shiftId: string }[] }).items.map(item => item.shiftId)).not.toContain(house.shiftId)
-    expect(read<{ status: string }>('SELECT status FROM shifts WHERE id = ?', house.shiftId)?.status).toBe('CANCELLED')
+    expect(read<{ status: string, user_id: string | null }>('SELECT status, user_id FROM shifts WHERE id = ?', house.shiftId))
+      .toMatchObject({ status: 'OPEN', user_id: null })
+
+    const member = await registerMember(app, 'dismiss-then-assign', generatePassword())
+    await award(member.id)
+    const assigned = await send('POST', `/api/admin/rota/shifts/${house.shiftId}/assign`, { userId: member.id }, foh.cookie)
+    expect(assigned.status).toBe(200)
   })
 
   test('somebody else cannot dismiss it', async () => {

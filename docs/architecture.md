@@ -641,8 +641,9 @@ built yet; and `noShowHoldsReleased()` can never clear itself in production unti
 door to move a reservation off `PENDING`/`COLLECTED`.
 
 **Also closes a standing gap from E-106/E-107**: `POST /api/rota/shifts/[id]/dismiss` lets a
-member clear a declined claim off their own `/rota` list, cancelling it the same way an
-officer's reassignment already would; the known-issues row asking whether this was a member's
+member clear a declined claim off their own `/rota` list. It returns the shift to `OPEN`, naming
+nobody, exactly as `releaseShiftStatement` does, not `CANCELLED`: the position stays fillable,
+only the member's own name comes off it. The known-issues row asking whether this was a member's
 call or an officer's is resolved in the member's favour and removed.
 
 ## The programme (build-order contract d, 0043)
