@@ -42,11 +42,11 @@ function run(database: TestDatabase, statement: SQL): unknown[] {
   return database.raw.prepare(query).all(...parameters as never[]) as unknown[]
 }
 
-interface Shift { id: string, performance_id: string, role: string, slot: number, user_id: string | null, status: string }
+interface Shift { id: string, performance_id: string, role: string, slot: number, user_id: string | null, status: string, claimed_at: number | null, confirmed_at: number | null, decline_reason: string | null }
 
 function shiftsOn(database: TestDatabase, performanceId: string): Shift[] {
   return rows<Shift>(database,
-    'SELECT id, performance_id, role, slot, user_id, status FROM shifts WHERE performance_id = ? ORDER BY role, slot',
+    'SELECT id, performance_id, role, slot, user_id, status, claimed_at, confirmed_at, decline_reason FROM shifts WHERE performance_id = ? ORDER BY role, slot',
     performanceId)
 }
 
@@ -860,7 +860,7 @@ describe('releasing a held shift (E-107 criterion 1)', () => {
 })
 
 describe('dismissing a declined claim (E-114)', () => {
-  test('a declined claim cancels, naming who dismissed it by holding user_id', async () => {
+  test('a declined claim returns to OPEN, naming nobody, exactly as a release would', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       const who = person(database, 'declined')
@@ -868,7 +868,24 @@ describe('dismissing a declined claim (E-114)', () => {
         'shift-declined', tonight.performanceId, 'DOOR', who, 'DECLINED', 'Not eligible']])
 
       expect(run(database, dismissShiftStatement('shift-declined', who))).toHaveLength(1)
-      expect(shiftsOn(database, tonight.performanceId)[0]).toMatchObject({ status: 'CANCELLED', user_id: who })
+      expect(shiftsOn(database, tonight.performanceId)[0]).toMatchObject({
+        status: 'OPEN', user_id: null, claimed_at: null, confirmed_at: null, decline_reason: null,
+      })
+    })
+  })
+
+  test('the position stays fillable: an officer can assign it after the member dismisses it', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const officer = person(database, 'officer')
+      const who = person(database, 'declined')
+      const other = person(database, 'other')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status, decline_reason) VALUES (?, ?, ?, 1, ?, ?, ?)',
+        'shift-declined', tonight.performanceId, 'DOOR', who, 'DECLINED', 'Not eligible']])
+
+      expect(run(database, dismissShiftStatement('shift-declined', who))).toHaveLength(1)
+      expect(run(database, assignShiftStatement('shift-declined', other, officer))).toHaveLength(1)
+      expect(shiftsOn(database, tonight.performanceId)[0]).toMatchObject({ status: 'CONFIRMED', user_id: other })
     })
   })
 

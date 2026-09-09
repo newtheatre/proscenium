@@ -1,8 +1,8 @@
 import { changes } from '#shared/utils/audit'
 import { dismissRefusal } from '#shared/utils/rota'
 
-// Clear a declined claim off your own "what you hold" list. Cancelled, not deleted, the same
-// terminal state E-107's reassignment already leaves (E-114).
+// Clear a declined claim off your own "what you hold" list. Returned to OPEN, not cancelled: the
+// position is still fillable, exactly as a release leaves it (E-114).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const account = await requireAccount(event)
@@ -16,11 +16,11 @@ export default defineEventHandler(async (event) => {
     actorId: account.id,
     action: 'shift.dismissed',
     target: `shift:${id}`,
-    detail: changes({ status: [held.status, 'CANCELLED'] }),
+    detail: changes({ status: [held.status, 'OPEN'] }),
   })
 
   const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(dismissShiftStatement(id, account.id)), entry))
   if (!applied) throw createError({ statusCode: 409, statusMessage: dismissRefusal() })
 
-  return { ok: true, status: 'CANCELLED' }
+  return { ok: true, status: 'OPEN' }
 })
