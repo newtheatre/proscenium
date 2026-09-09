@@ -1,10 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  copyingInserts,
   dependentsByTable,
   journalProblems,
   normaliseMigrationTag,
   pendingMigrations,
   rebuildDependentProblems,
+  snapshotBefore,
+  unresolvedCopyProblems,
 } from '#shared/utils/migrations'
 
 describe('pending migrations (K-107)', () => {
@@ -134,5 +137,80 @@ describe('a table rebuild is refused against every kind of dependent (0010)', ()
       { table: 'tickets', onDelete: 'restrict' },
       { table: 'show_ticket_overrides', onDelete: 'no action' },
     ])
+  })
+})
+
+// The #760 case, pinned before its hand correction: the old venue_emergency_info had no `id`
+// column, its primary key was venue_id, and drizzle-kit copied "id" into the new column anyway.
+const UNCORRECTED_0073 = 'INSERT INTO `__new_venue_emergency_info`("id", "venue_id", "assembly_point", '
+  + '"exits", "isolation_points", "what3words", "notes", "updated_by", "updated_at") '
+  + 'SELECT "id", "venue_id", "assembly_point", "exits", "isolation_points", "what3words", '
+  + '"notes", "updated_by", "updated_at" FROM `venue_emergency_info`;'
+
+const CORRECTED_0073 = 'INSERT INTO `__new_venue_emergency_info`("id", "venue_id", "assembly_point", '
+  + '"exits", "isolation_points", "what3words", "notes", "updated_by", "updated_at") '
+  + 'SELECT lower(hex(randomblob(16))), "venue_id", "assembly_point", "exits", "isolation_points", '
+  + '"what3words", "notes", "updated_by", "updated_at" FROM `venue_emergency_info`;'
+
+const OLD_VENUE_EMERGENCY_COLUMNS = new Set([
+  'venue_id', 'assembly_point', 'exits', 'isolation_points', 'what3words', 'notes', 'updated_by', 'updated_at',
+])
+
+describe('a rebuild refuses a copying column that does not resolve (0052)', () => {
+  test('copyingInserts reads the source table and the SELECT list off a real migration', () => {
+    const [copy] = copyingInserts(UNCORRECTED_0073)
+    expect(copy).toEqual({
+      targetTable: 'venue_emergency_info',
+      sourceTable: 'venue_emergency_info',
+      selected: [
+        '"id"', '"venue_id"', '"assembly_point"', '"exits"',
+        '"isolation_points"', '"what3words"', '"notes"', '"updated_by"', '"updated_at"',
+      ],
+    })
+  })
+
+  // The regression case itself: this is what let #760 through before a human caught it.
+  test('the uncorrected #760 migration is refused for "id"', () => {
+    const [copy] = copyingInserts(UNCORRECTED_0073)
+    const problems = unresolvedCopyProblems('0073_venue_emergency.sql', copy!, OLD_VENUE_EMERGENCY_COLUMNS)
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('"id"')
+    expect(problems[0]).toContain('`venue_emergency_info`')
+    expect(problems[0]).toContain('string literal')
+  })
+
+  test('the corrected #760 migration, a real expression in place of "id", is not refused', () => {
+    const [copy] = copyingInserts(CORRECTED_0073)
+    expect(unresolvedCopyProblems('0073_venue_emergency.sql', copy!, OLD_VENUE_EMERGENCY_COLUMNS)).toEqual([])
+  })
+
+  test('a double-quoted column the source table actually has is never flagged', () => {
+    const problems = unresolvedCopyProblems('0001_rebuild.sql',
+      { targetTable: 'x', sourceTable: 'x', selected: ['"venue_id"'] },
+      new Set(['venue_id']))
+    expect(problems).toEqual([])
+  })
+
+  // A backtick, a bracket or a bare word has no string-literal fallback: an unresolvable one
+  // fails the migration outright, which the scratch-database tests already catch (0052).
+  test('a non-double-quoted identifier is never flagged, whatever it names', () => {
+    const problems = unresolvedCopyProblems('0001_rebuild.sql',
+      { targetTable: 'x', sourceTable: 'x', selected: ['`nonexistent`', 'nonexistent', '[nonexistent]'] },
+      new Set())
+    expect(problems).toEqual([])
+  })
+
+  test('an expression, however it is shaped, is never flagged', () => {
+    const problems = unresolvedCopyProblems('0001_rebuild.sql',
+      { targetTable: 'x', sourceTable: 'x', selected: ['lower(hex(randomblob(16)))', '\'a literal\'', '0', 'NULL'] },
+      new Set())
+    expect(problems).toEqual([])
+  })
+
+  test('snapshotBefore finds the highest-numbered snapshot below the migration, skipping a gap', () => {
+    const snapshots = [{ number: 70, data: 'seventy' }, { number: 72, data: 'seventy-two' }, { number: 73, data: 'seventy-three' }]
+    expect(snapshotBefore(73, snapshots)).toBe('seventy-two')
+    expect(snapshotBefore(71, snapshots)).toBe('seventy')
+    expect(snapshotBefore(70, snapshots)).toBeUndefined()
   })
 })

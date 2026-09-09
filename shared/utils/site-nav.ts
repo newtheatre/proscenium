@@ -1,6 +1,7 @@
 import {
   anybody,
   decideRoomRequests,
+  exportAgeChecks,
   reachConsole,
   runTrainingSessions,
   signedIn,
@@ -18,6 +19,7 @@ import {
   viewProgramme,
   viewRooms,
   viewRota,
+  viewSafety,
   viewSettings,
   viewTicketTypes,
   viewTrainingCatalogue,
@@ -70,6 +72,8 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Unfilled shifts', icon: 'i-lucide-user-round-x', to: '/rota/manage/shifts', ability: viewRota },
       { label: 'Checklists', icon: 'i-lucide-list-checks', to: '/rota/manage/checklists', ability: viewChecklist },
       { label: 'Emergency cards', icon: 'i-lucide-siren', to: '/rota/manage/emergency', ability: viewEmergencyCard },
+      { label: 'Safety', icon: 'i-lucide-shield-alert', to: '/rota/manage/safety', ability: viewSafety },
+      { label: 'Age-check register', icon: 'i-lucide-file-down', to: '/rota/manage/age-checks', ability: exportAgeChecks },
     ],
   },
 

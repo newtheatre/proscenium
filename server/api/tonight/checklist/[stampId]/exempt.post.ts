@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     db.all<{ id: string }>(exemptStatement(stampId, resolved.venueId, resolved.night, reason, resolved.account.id)),
     entry,
   )
-  if (!exempted) throw createError({ statusCode: 409, statusMessage: 'That item cannot be exempted: it may already be ticked or exempted' })
+  if (!exempted) throw createError({ statusCode: 409, statusMessage: 'That item cannot be exempted: it may already be ticked, exempted, or system-verified' })
 
   return { ok: true }
 })

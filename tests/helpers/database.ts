@@ -30,17 +30,25 @@ async function migrationTags(): Promise<string[]> {
   return (parsed.entries ?? []).map(entry => entry.tag)
 }
 
+// One migration's own compiled SQL, applied in isolation: what a test seeding the schema as it
+// stood right before a specific rebuild uses to apply that rebuild alone (0052).
+export async function applyMigration(raw: Database, tag: string): Promise<void> {
+  const file = Bun.file(join(MIGRATIONS_DIR, `${tag}.sql`))
+  if (!await file.exists()) throw new Error(`migration ${tag} is in the journal but has no .sql file`)
+  // Drizzle separates statements with this marker; splitting on `;` breaks triggers.
+  for (const statement of (await file.text()).split('--> statement-breakpoint')) {
+    const trimmed = statement.trim()
+    if (trimmed) raw.exec(trimmed)
+  }
+}
+
 // Applies the compiled migrations in journal order, which is the order production applies them.
-export async function applyMigrations(raw: Database): Promise<string[]> {
+// Stopping before a tag leaves the schema as it stood right when that migration is next (0052).
+export async function applyMigrations(raw: Database, stopBefore?: string): Promise<string[]> {
   const applied: string[] = []
   for (const tag of await migrationTags()) {
-    const file = Bun.file(join(MIGRATIONS_DIR, `${tag}.sql`))
-    if (!await file.exists()) throw new Error(`migration ${tag} is in the journal but has no .sql file`)
-    // Drizzle separates statements with this marker; splitting on `;` breaks triggers.
-    for (const statement of (await file.text()).split('--> statement-breakpoint')) {
-      const trimmed = statement.trim()
-      if (trimmed) raw.exec(trimmed)
-    }
+    if (tag === stopBefore) break
+    await applyMigration(raw, tag)
     applied.push(tag)
   }
   return applied

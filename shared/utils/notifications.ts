@@ -293,6 +293,13 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'shift-reminder',
   },
+  // Transactional: a serious incident is not a preference a safety officer may mute (E-116
+  // criterion 2).
+  'incident.follow-up-required': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'incident-follow-up-required',
+  },
 
   // Module F: bar
 

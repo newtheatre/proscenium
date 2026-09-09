@@ -57,3 +57,4 @@ afterwards, only superseded.
 | 0049 | A status change audits itself atomically, the predicate on the write, the log and the caller both on `changes()` | why a losing racer's audit stays silent and its caller is refused, not told it succeeded |
 | 0051 | Editorial content ships as markdown, and copy the committee has not supplied is marked as a placeholder | the deferred editing surface, and why nothing invented reaches the public site |
 | 0050 | An access profile's special category payload is one encrypted blob | why nine flags are not nine columns, and what a worker secret does that a Secrets Store binding would not |
+| 0052 | A table rebuild refuses a copying column that does not resolve | the silent string-literal fallback drizzle-kit's own generated SQL can trigger, and why only the double-quoted form needs a static check |

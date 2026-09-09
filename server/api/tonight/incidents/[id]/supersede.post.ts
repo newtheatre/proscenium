@@ -34,5 +34,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'That entry has already been corrected: correct the correction instead' })
   }
 
+  // A correction can move severity into follow-up territory (or out of it): only the new
+  // entry's own severity is ever checked, matching how the log already reads it (E-116).
+  await notifySafetyOfficersIfNeeded(event, write.id, input.category, input.severity)
+
   return { ok: true, id: write.id }
 })

@@ -603,6 +603,57 @@ inside `body`; and no "safety officer" role exists in `shared/utils/roles.ts` to
 historical, cross-night read separate from tonight's own log, which is why the read endpoint
 here is tonight-only, the same scope E-118's register already carries.
 
+### Severity routing to follow-up (E-116)
+
+`incident_severity_config` is committee configuration, one row per severity, seeded by the
+migration with `requires_follow_up = false` on all four: nothing routes until a committee
+member deliberately opts a severity in, deliberately not the generic `CONFIG_KEYS` system,
+which would 503 on every incident write until all four keys were configured by hand
+(criterion 1). `PUT /api/admin/safety/severities/[severity]` flips one, guarded by
+`safety.write` (a new standing permission on a new `SAFETY_OFFICER` role); the route is always
+an UPDATE, never a create, since every severity already exists.
+
+`notifySafetyOfficersIfNeeded()` (`server/utils/incident-safety.ts`) is called once, after the
+write, from the three places an incident's severity can land or change:
+`POST /api/tonight/incidents`, `POST /api/tonight/incidents/near-miss` (against the fixed
+`NEAR_MISS` severity E-117 always writes) and `POST /api/tonight/incidents/[id]/supersede`
+(against the correction's own severity, so a correction can move an incident into follow-up
+territory or out of it; only the new entry's severity is ever checked). It reads
+`incident_severity_config`, and if the severity is routed, notifies every live holder of
+`safety.write` (`safetyOfficers()`, mirroring `rotaOfficers()`'s established shape) as a
+transactional message with no incident free text in it, per 0011 (criterion 2).
+
+`GET /api/admin/safety/open-items` is the safety officer's list: every incident at a routed
+severity with no closure yet, across every night, not scoped to tonight. `POST
+/api/admin/safety/incidents/[id]/close` requires a resolution note and writes
+`incident_followup_closures`, append-only and `UNIQUE(incident_id)`: a second closure attempt
+matches nothing and 409s, the same predicated-write shape as everywhere else in this codebase
+(0049, criterion 3). Flagging an open or closed follow-up on the night report (criterion 4)
+waits on `night_reports` (E-123, `docs/known-issues.md`).
+
+### The licensing export (E-119)
+
+`GET /api/admin/age-checks/export` is gated on `age-checks.export`, a new standing permission
+on `FOH_MANAGER` alone: an officer role, never a shift, per criterion 4; the bar manager who
+can log a check cannot export the register. `exportQuery()` (`server/utils/age-checks-export.ts`)
+takes a half-open `[from, to)` range in epoch seconds (`startOfLondonDay()` on each edge) and
+left-joins `performances`/`venues` so a bar-only check with no performance still appears, with
+its venue name null rather than dropped; every superseded entry and its correction both appear,
+linked by `supersedesId`/`supersededBy`, nothing filtered out (criteria 1, 2).
+
+CSV goes through `toCsv()`/`csvField()` (`server/utils/csv.ts`), the codebase's one
+formula-injection guard (D-129), not `admin/audit/export.get.ts`'s own older, unguarded `cell()`
+helper. PDF goes through a new hand-built table renderer on `pdf-lib`
+(`server/utils/pdf.ts`, `buildTablePdf()`): pure JS, no native bindings, so it runs on Workers,
+paginating rather than overflowing past its first page. Its content streams compress
+(`FlateDecode`), so nothing in the codebase or its tests should string-search the raw PDF bytes
+for drawn text; `PDFDocument.load(bytes)` and pdf-lib's own API is the only way to inspect one.
+Both formats state venue (or venues, deduplicated, falling back to "Bar (no performance)" for a
+null one), period and generation date in the header, and cover exactly the same rows, since the
+output format is the point of the story: an inspector opens either without explanation
+(criterion 1). Every export writes an `age-checks.exported` audit entry naming the actor, the
+range, the format and the row count, before the file body is built (criterion 3).
+
 ### The pre and post-show checklist (E-114)
 
 `checklist_items` is the committee's own configuration, one row per venue and phase, mutable
