@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { letters, skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
@@ -79,6 +79,18 @@ describe.skipIf(skip !== null)('the notification centre (H-101, H-103, H-107)', 
     expect(log).toHaveLength(1)
     expect(log[0]).toMatchObject({ type: 'account.verify', status: 'SENT' })
     expect(log[0]!.subject).toBeTruthy()
+  })
+
+  // The reproduction for the dev-mode guard: a registration is the shortest path to a send, and
+  // a development send must land in the mailbox rather than at a provider.
+  test('a development send is written where it can be read, not handed over', async () => {
+    const person = syntheticPerson(Math.floor(Math.random() * 1_000_000) + 4)
+    const deliverable = { ...person, email: `mailbox-${Math.random().toString(36).slice(2)}@${E2E_DOMAIN}` }
+    await register(deliverable)
+
+    const letter = (await letters(app)).find(body => body.includes(deliverable.email))
+    expect(letter).toBeDefined()
+    expect(letter).toContain('Subject:')
   })
 
   // Registration refuses an undeliverable address outright (A-101 criterion 3), so the account

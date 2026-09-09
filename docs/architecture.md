@@ -959,13 +959,22 @@ is the mechanism K-103 set the precedent for landing ahead of the screens that n
 
 | | Database | Email | Payments |
 | --- | --- | --- | --- |
-| Local | D1 local SQLite under `.data/` | logged, and written to `.data/mail` so a link can be followed | dev tender stub |
+| Local | D1 local SQLite under `.data/` | logged, and written to `$NUXT_HUB_DIR/mail` (`.data/mail` unset) so a link can be followed | dev tender stub |
 | Preview (branch builds) | isolated preview D1 | logged | stub |
 | Production | D1 `unified` | Email Service | the physical SumUp reader, always (0005) |
 
 Development never hands a message to a provider, whatever bindings the emulator supplies, and every
 emailed link is built from `NUXT_PUBLIC_BASE_URL`, which defaults to the local port in development
-so a verification link in `.data/mail` is one that works.
+so a verification link in the mailbox is one that works.
+
+**That guard rests on `import.meta.dev`, and it MUST be read as the bare literal.** Nitro replaces
+that exact expression at build; read through a type assertion it compiles to
+`globalThis._importMeta_.dev`, and the dev bundle defines `_importMeta_` as `{ url, env }` only, so
+the flag is undefined and both halves lift silently: the emulator's `EMAIL` binding is used and
+the mailbox is never written. A unit test refuses the assertion form anywhere under `server/`,
+`app/` and `shared/`, and reads the dev bundle for `_importMeta_.dev` when one has been built.
+`server/utils/mailbox.ts` is the only place the mailbox path is spelled; the dev tools read it back
+from there rather than restating it, and the end-to-end suites read it from `app.mailDir`.
 
 Seed scripts generate credentials at runtime, print once, and refuse to run against remote
 databases. `/dev` is the local developer surface: it seeds personas and signs in as any of them

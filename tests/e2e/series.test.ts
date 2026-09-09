@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { londonClock, londonParts } from '#shared/utils/london'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -465,8 +465,7 @@ describe.skipIf(skip !== null)('one message for a series, not one per week (C-11
     await send('POST', `/api/rooms/bookings/${held[0]!.id}/cancel`, { scope: 'series' }, who.cookie)
     expect(sentTo(who.id, 'room.series.cancelled') - before).toBe(1)
 
-    const files = [...new Bun.Glob('*.txt').scanSync({ cwd: '.data/mail', onlyFiles: true })]
-    const bodies = await Promise.all(files.map(name => Bun.file(`.data/mail/${name}`).text()))
+    const bodies = await letters(app)
     const message = bodies.find(body => body.includes('Cancelled: 4 bookings') && body.includes(who.email))
     expect(message).toBeDefined()
   })

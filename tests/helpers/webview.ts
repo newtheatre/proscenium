@@ -68,7 +68,22 @@ async function alreadyServing(): Promise<boolean> {
 export interface AppUnderTest {
   baseURL: string
   databaseFile: string
+  // Where a development send is written instead of being sent. Beside the database, because the
+  // server reads the same `NUXT_HUB_DIR` for both (`server/utils/mailbox.ts`).
+  mailDir: string
   stop: () => Promise<void>
+}
+
+// Every message the development transport wrote: the log records the outcome, never the content.
+// An unwritten mailbox reads as none, so an assertion fails plainly rather than as a glob's stack.
+export async function letters(app: AppUnderTest): Promise<string[]> {
+  try {
+    const names = [...new Bun.Glob('*.txt').scanSync({ cwd: app.mailDir, onlyFiles: true })]
+    return await Promise.all(names.map(name => Bun.file(`${app.mailDir}/${name}`).text()))
+  }
+  catch {
+    return []
+  }
 }
 
 // Bun buffers a file's console output until the file ends, so a run has no live progress at all.
@@ -169,6 +184,7 @@ export async function startApp(): Promise<AppUnderTest> {
     const adopted: AppUnderTest = {
       baseURL: BASE_URL,
       databaseFile: `${hubDirFor(port)}/db/sqlite.db`,
+      mailDir: `${hubDirFor(port)}/mail`,
       stop: async () => {
         removeClaimedProfiles()
         await Promise.resolve()
@@ -197,6 +213,7 @@ export async function startApp(): Promise<AppUnderTest> {
   const app: AppUnderTest = {
     baseURL: BASE_URL,
     databaseFile: `${hubDir}/db/sqlite.db`,
+    mailDir: `${hubDir}/mail`,
     // The server outlives the suite; what a suite owns is its data and its browser profiles.
     stop: async () => {
       removeClaimedProfiles()

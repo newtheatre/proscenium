@@ -4,6 +4,7 @@ import { eq, inArray } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { findById } from './accounts'
+import { MAILBOX, writeToMailbox } from './mailbox'
 import { render } from './templates'
 import { undeliverableReason } from '#shared/utils/deliverability'
 import { deliversOn, messageType } from '#shared/utils/notifications'
@@ -15,9 +16,9 @@ import type { H3Event } from 'h3'
 // The only thing in this application that hands a message to a provider (0013, H-101). A CI
 // check refuses the binding anywhere else, so there is one place these rules can be skipped.
 
-// Nitro's own extension to `import.meta`, absent from Bun's; read through a local shape so
-// this file still typechecks under `tests/`, where nothing is auto-imported (CONTRIBUTING).
-const isDev = (): boolean => Boolean((import.meta as { dev?: boolean }).dev)
+// MUST stay the bare literal: read through a type assertion it compiles to
+// `globalThis._importMeta_.dev`, which no bundle sets, and every guard below silently lifts.
+const isDev = (): boolean => Boolean(import.meta.dev)
 
 export interface Attachment {
   filename: string
@@ -43,30 +44,15 @@ interface EmailBinding {
   send: (message: Outbound) => Promise<{ messageId?: string }>
 }
 
-// Local mail is written to .data/mail as well as logged, because the dev server does not reliably
-// surface a handler's console output and a message nobody can read has not been delivered.
-const MAILBOX = '.data/mail'
-
-// The dev server runs on Node and does not surface a handler's console output, so a message with
-// nowhere to go was being recorded as sent while nobody could read it.
-async function writeToMailbox(message: Outbound): Promise<void> {
+// A message nobody can read has not been delivered, so a failure here is said out loud rather
+// than swallowed: the mailbox is the only copy of a development send.
+async function toMailbox(message: Outbound): Promise<void> {
   if (!isDev()) return
   try {
-    const { mkdir, writeFile } = await import('node:fs/promises')
-    await mkdir(MAILBOX, { recursive: true })
-    const stamp = new Date().toISOString().replaceAll(':', '-')
-    await writeFile(`${MAILBOX}/${stamp}-${message.to.replace(/[^a-z0-9]+/gi, '-')}.txt`, [
-      `To: ${message.to}`,
-      `From: ${message.from}`,
-      `Subject: ${message.subject}`,
-      ...(message.attachments ?? []).map(file => `Attachment: ${file.filename} (${file.contentType})`),
-      '',
-      message.text,
-      ...(message.attachments ?? []).flatMap(file => ['', `--- ${file.filename} ---`, file.content]),
-    ].join('\n'))
+    await writeToMailbox(message)
   }
   catch (error) {
-    consola.warn('[notify] could not write to the local mailbox', error)
+    consola.warn(`[notify] could not write to the local mailbox at ${MAILBOX}`, error)
   }
 }
 
@@ -76,7 +62,7 @@ const consoleTransport: Transport = {
     // consola, not console.info: the dev server keeps info-level console output below its
     // threshold, so the transport was logging where nobody could see it.
     consola.info(`[notify] to ${message.to}: ${message.subject}\n${message.text}`)
-    await writeToMailbox(message)
+    await toMailbox(message)
   },
 }
 
