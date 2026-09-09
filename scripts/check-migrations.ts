@@ -9,6 +9,7 @@ import {
   journalProblems,
   rebuildDependentProblems,
   snapshotBefore,
+  snapshotChainProblems,
   unresolvedCopyProblems,
 } from '../shared/utils/migrations'
 import type { JournalEntry, SnapshotTable } from '../shared/utils/migrations'
@@ -37,14 +38,32 @@ if (!newest) {
   process.exit(0)
 }
 
-interface Snapshot { tables?: Record<string, SnapshotTable> }
+interface Snapshot { tables?: Record<string, SnapshotTable>, id?: string, prevId?: string }
 
 // Every snapshot, numbered, so a rebuild can be checked against the schema as it stood right
 // before it ran rather than only against the newest one.
 const snapshots = await Promise.all(snapshotFiles.map(async (file) => {
   const data: Snapshot = await Bun.file(join(META, file)).json()
-  return { number: Number(file.slice(0, 4)), data }
+  return { number: Number(file.slice(0, 4)), file, data }
 }))
+
+const chainProblems = snapshotChainProblems(snapshots.map(s => ({
+  file: s.file,
+  id: s.data.id ?? '',
+  prevId: s.data.prevId ?? '',
+})))
+
+if (chainProblems.length) {
+  console.error('check-migrations: the snapshot chain is broken.\n')
+  for (const problem of chainProblems) console.error(`  ${problem}`)
+  console.error('\nEvery other check here reads the schema as it stood immediately before a given')
+  console.error('migration off the previous snapshot. Where the chain is broken, that comparison')
+  console.error('has no real baseline and is silently skipped rather than refused, at exactly the')
+  console.error('migrations where a wrong baseline is most dangerous. Restore the missing snapshot')
+  console.error('from history (`git show <commit>:path/to/the_snapshot.json`), rather than')
+  console.error('regenerating one, so it links up exactly as it originally did. See docs/decisions/0052.')
+  process.exit(1)
+}
 
 const latest = snapshots.find(s => s.number === Number(newest.slice(0, 4)))?.data ?? {}
 const dependentsOnto = dependentsByTable(latest.tables ?? {})
@@ -151,4 +170,5 @@ if (disagreements.length) {
 const guarded = [...dependentsOnto.keys()].length
 console.log(`check-migrations: ${guarded} tables have foreign keys guarding a rebuild and `
   + `${liveTriggers.size} triggers are live, none dropped or bypassed. `
-  + `${(journal.entries ?? []).length} journal entries match their files.`)
+  + `${(journal.entries ?? []).length} journal entries match their files. `
+  + `${snapshots.length} snapshots chain unbroken.`)
