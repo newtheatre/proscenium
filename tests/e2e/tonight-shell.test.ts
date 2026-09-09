@@ -141,7 +141,10 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
         return true
       })()`)
       await click(view, '[data-test="night-action"]')
-      await waitFor(view, `document.querySelector('[data-test="night-stale"]').innerText !== ${JSON.stringify(before)}`)
+      // Not just "changed": a transient "Syncing" during the refetch also differs from `before`
+      // and would satisfy that alone, racing ahead of the settled label this assertion reads.
+      await waitFor(view, `/Last synced \\d\\d:\\d\\d/.test(document.querySelector('[data-test="night-stale"]')?.innerText ?? '') `
+      + `&& document.querySelector('[data-test="night-stale"]').innerText !== ${JSON.stringify(before)}`)
       expect(acceptableLabels(SKEW_MS)).toContain(await textOf(view, '[data-test="night-stale"]'))
     }
     finally {
