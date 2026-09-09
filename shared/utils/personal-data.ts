@@ -275,6 +275,8 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     scrub: ['customer_notes', 'staff_notes'],
     why: 'Booking and sales statistics must survive erasure; free text about the booker need not (D-104).',
   },
+  // passes, pass_admissions and pass_requests join this registry with the migration that
+  // creates them (D-124): eraseAccount() batches unconditionally, so registering one early breaks every erasure.
 
   // Module E: show night
 
