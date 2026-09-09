@@ -16,8 +16,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'This booking has nothing paid to refund from here' })
   }
 
+  // Same refusal, and the same status, whether it was refunded a moment ago or never existed on
+  // this booking at all: `deskReservation` already excludes a refunded ticket from the list.
   const ticket = reservation.tickets.find(one => one.ticketId === ticketId)
-  if (!ticket) throw createError({ statusCode: 404, statusMessage: 'No such ticket on this booking, or it is already refunded' })
+  if (!ticket) throw createError({ statusCode: 409, statusMessage: 'This ticket has already been refunded, or is not on this booking' })
 
   if (ticket.pricePaid !== input.expectedTotalPence) {
     throw createError({

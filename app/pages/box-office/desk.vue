@@ -167,6 +167,54 @@ async function collect(): Promise<void> {
   }
 }
 
+const refundingTicketId = ref<string | null>(null)
+const refundFailure = ref<string | null>(null)
+const cancelling = ref(false)
+const cancelFailure = ref<string | null>(null)
+
+// D-116 criterion 5: refunded tickets leave this list the instant the write commits, since the
+// route that reads it already filters to what is still unrefunded.
+async function refundTicket(ticket: TicketLine): Promise<void> {
+  if (!selected.value) return
+  refundingTicketId.value = ticket.ticketId
+  refundFailure.value = null
+  try {
+    await $fetch(`/api/box-office/desk/reservations/${selected.value.id}/tickets/${ticket.ticketId}/refund`, {
+      method: 'POST',
+      body: { expectedTotalPence: ticket.pricePaid },
+    })
+    toast.add({ title: 'Ticket refunded', icon: 'i-lucide-check', color: 'success' })
+    selected.value = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${selected.value.id}`)
+    await search()
+  }
+  catch (error) {
+    refundFailure.value = refusalText(error)
+  }
+  finally {
+    refundingTicketId.value = null
+  }
+}
+
+// Criterion 6: the button only ever asks for a cancel once nothing is stranded; the route
+// refuses regardless, since a screen that briefly disagrees is not the enforcement.
+async function cancelCollected(): Promise<void> {
+  if (!selected.value) return
+  cancelling.value = true
+  cancelFailure.value = null
+  try {
+    await $fetch(`/api/box-office/desk/reservations/${selected.value.id}/cancel`, { method: 'POST' })
+    toast.add({ title: 'Booking cancelled', icon: 'i-lucide-check', color: 'success' })
+    open.value = false
+    await search()
+  }
+  catch (error) {
+    cancelFailure.value = refusalText(error)
+  }
+  finally {
+    cancelling.value = false
+  }
+}
+
 const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> = {
   PENDING: 'warning',
   COLLECTED: 'success',
@@ -381,6 +429,62 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
               @click="collect"
             >
               Collect
+            </UButton>
+          </template>
+          <template v-else-if="selected.status === 'COLLECTED'">
+            <UAlert
+              v-if="refundFailure"
+              color="error"
+              variant="subtle"
+              :description="refundFailure"
+            />
+
+            <ul
+              v-if="selected.tickets.length > 0"
+              class="space-y-2 text-sm"
+            >
+              <li
+                v-for="ticket in selected.tickets"
+                :key="ticket.ticketId"
+                class="flex items-center justify-between"
+              >
+                <span>{{ ticket.ticketTypeName }} · {{ saysPrice(ticket.pricePaid) }}</span>
+                <UButton
+                  size="xs"
+                  color="error"
+                  variant="subtle"
+                  :loading="refundingTicketId === ticket.ticketId"
+                  :data-test="`desk-refund-${ticket.ticketId}`"
+                  @click="refundTicket(ticket)"
+                >
+                  Refund
+                </UButton>
+              </li>
+            </ul>
+            <p
+              v-else
+              class="text-sm text-muted"
+              data-test="desk-nothing-owing"
+            >
+              Every ticket on this booking has been refunded.
+            </p>
+
+            <UAlert
+              v-if="cancelFailure"
+              color="error"
+              variant="subtle"
+              :description="cancelFailure"
+            />
+
+            <UButton
+              v-if="selected.tickets.length === 0"
+              color="neutral"
+              variant="subtle"
+              :loading="cancelling"
+              data-test="desk-cancel-collected"
+              @click="cancelCollected"
+            >
+              Cancel booking
             </UButton>
           </template>
           <p

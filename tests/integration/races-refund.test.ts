@@ -7,10 +7,8 @@ import type { TestDatabase } from '#tests/helpers/database'
 // I-102 criterion 2, K-121: the double refund. Split from races-capacity.test.ts since it is a
 // separate invariant on a separate table (K-105's own "split by invariant" convention).
 
-// Mirrors server/utils/refunds.ts's exact shape: the ticket's own conditional claim is the
-// arbiter, the ledger entry rides its `changes()`, and the line rides the entry's own existence.
-// An in-process SQLite serialises these, so this proves the claim writes once, not that it is
-// atomic under true concurrency (0022); the atomicity is `db.batch`'s own, unit-tested elsewhere.
+// Mirrors server/utils/refunds.ts's exact shape (claim, then `changes()`, then EXISTS). An
+// in-process SQLite serialises this, so it proves the claim writes once, not true atomicity (0022).
 function attemptRefund(database: TestDatabase, ticketId: string, reservationId: string, entryId: string, lineId: string, at: number): { status: number } {
   // One transaction, claim first: `changes()` here is SQLite's own, reading the immediately
   // preceding statement, exactly as `postEntry`'s `guard` parameter does in production.
@@ -43,7 +41,7 @@ describe('the double refund: concurrent refunds of one ticket produce exactly on
       ])
 
       const now = Math.floor(Date.now() / 1000)
-      const answers = await race(2, async (index) =>
+      const answers = await race(2, async index =>
         attemptRefund(database, 't-1', 'r-1', `entry-${index}`, `line-${index}`, now))
 
       expectOneWinner(answers)
@@ -51,7 +49,7 @@ describe('the double refund: concurrent refunds of one ticket produce exactly on
       const ticket = rows<{ refundedAt: number | null }>(database, 'SELECT refunded_at AS refundedAt FROM tickets WHERE id = ?', 't-1')[0]
       expect(ticket?.refundedAt).toBe(now)
 
-      const lines = rows<{ total: number }>(database, "SELECT count(*) AS total FROM ledger_lines WHERE ticket_id = ? AND kind = 'REFUND'", 't-1')
+      const lines = rows<{ total: number }>(database, 'SELECT count(*) AS total FROM ledger_lines WHERE ticket_id = ? AND kind = \'REFUND\'', 't-1')
       expect(lines[0]?.total).toBe(1)
 
       const entries = rows<{ total: number }>(database, 'SELECT count(*) AS total FROM ledger_entries')
