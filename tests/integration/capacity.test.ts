@@ -6,7 +6,10 @@ import {
   heldSeatsColumn,
   heldSeatsQuery,
   loweringPredicate,
+  reservationIsPending,
+  ticketAdditionQueries,
   ticketInsertQueries,
+  ticketRemovalQueries,
 } from '#server/utils/capacity'
 import { performanceSoldColumn, performanceSoldQuery, showSoldColumn } from '#server/utils/programme'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
@@ -343,5 +346,85 @@ describe('lowering capacity rides the update that lowers it (D-105 criterion 4)'
     finally {
       database.close()
     }
+  })
+})
+
+describe('D-110: an edit\'s additions and removals share one guard (criterion 2)', () => {
+  test('a mixed add-and-remove request applies in full when capacity allows it', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database, { capacityOverride: 5 })
+      const reservation = reserve(database, 'r-1', seeded.performanceId)
+      run(database, ticketInsertQueries([
+        ticket('t-1', seeded.performanceId, reservation),
+        ticket('t-2', seeded.performanceId, reservation),
+      ], null))
+
+      // Desired: drop to 1 standard, i.e. one removal and no addition, still guarded identically.
+      const guard = sql`${capacityAllows(seeded.performanceId, 5, 1, reservation)} AND ${reservationIsPending(reservation)}`
+      run(database, ticketRemovalQueries(reservation, [{ ticketTypeId: 'tt-standard', quantity: 1 }], guard))
+
+      expect(heldSeats(database, seeded.performanceId)).toBe(1)
+    })
+  })
+
+  test('an increase with no room refuses the whole request, removals included', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database, { capacityOverride: 3 })
+      const first = reserve(database, 'r-1', seeded.performanceId)
+      run(database, ticketInsertQueries([ticket('t-1', seeded.performanceId, first)], 3))
+      const editing = reserve(database, 'r-2', seeded.performanceId)
+      run(database, ticketInsertQueries([
+        ticket('t-2', seeded.performanceId, editing),
+        ticket('t-3', seeded.performanceId, editing),
+      ], 3))
+      expect(heldSeats(database, seeded.performanceId)).toBe(3)
+
+      // r-2 wants to go from 2 to 3 (short by one, since r-1 already holds the house's last seat):
+      // the desired total of 3 is what the guard is asked against, not the delta of 1.
+      const guard = sql`${capacityAllows(seeded.performanceId, 3, 3, editing)} AND ${reservationIsPending(editing)}`
+      run(database, ticketAdditionQueries([ticket('t-4', seeded.performanceId, editing)], guard))
+
+      expect(rows<{ id: string }>(database, 'SELECT id FROM tickets WHERE id = ?', 't-4')).toEqual([])
+      expect(heldSeats(database, seeded.performanceId)).toBe(3)
+    })
+  })
+
+  test('a reservation no longer PENDING refuses every statement sharing its guard', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database, { capacityOverride: 5 })
+      const reservation = reserve(database, 'r-1', seeded.performanceId, 'COLLECTED')
+
+      const guard = sql`${capacityAllows(seeded.performanceId, 5, 1, reservation)} AND ${reservationIsPending(reservation)}`
+      run(database, ticketAdditionQueries([ticket('t-1', seeded.performanceId, reservation)], guard))
+
+      expect(rows<{ id: string }>(database, 'SELECT id FROM tickets')).toEqual([])
+    })
+  })
+
+  test('a removal names no particular row: any unrefunded ticket of that type goes', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database, { capacityOverride: 5 })
+      const reservation = reserve(database, 'r-1', seeded.performanceId)
+      run(database, ticketInsertQueries([
+        ticket('t-1', seeded.performanceId, reservation),
+        ticket('t-2', seeded.performanceId, reservation),
+        ticket('t-3', seeded.performanceId, reservation),
+      ], null))
+
+      const guard = sql`${capacityAllows(seeded.performanceId, 5, 2, reservation)} AND ${reservationIsPending(reservation)}`
+      run(database, ticketRemovalQueries(reservation, [{ ticketTypeId: 'tt-standard', quantity: 1 }], guard))
+
+      expect(rows<{ id: string }>(database, 'SELECT id FROM tickets')).toHaveLength(2)
+    })
+  })
+
+  test('no statement binds a parameter per row removed', async () => {
+    await withDatabase((database) => {
+      const guard = sql`1 = 1`
+      for (const statement of ticketRemovalQueries('r-1', [{ ticketTypeId: 'tt-standard', quantity: 200 }], guard)) {
+        const [, ...parameters] = boundStatement(database, statement)
+        expect(parameters.length).toBeLessThanOrEqual(MAX_BOUND_PARAMETERS)
+      }
+    })
   })
 })

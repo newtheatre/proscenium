@@ -3,6 +3,7 @@ import { HOLDING_STATUSES } from '#shared/utils/capacity'
 import { performanceSoldQuery, soldReferences } from './programme'
 import type { TicketPriceSource } from '#shared/utils/ticket-types'
 import type { PerformanceReference } from './programme'
+import type { TicketTypeCount } from '#shared/utils/reservations'
 import type { TicketTypeReference } from './ticket-types'
 import type { SQL } from 'drizzle-orm'
 
@@ -74,6 +75,12 @@ export const TICKETS_ARE_A_SALE: TicketTypeReference = {
   why: 'a seat sold under this type, so the type resolves for it forever and may only be archived',
 }
 
+// True while `reservationId` is still an open, unpaid hold: the guard every self-service write
+// shares, so a race that collects or cancels mid-edit loses the edit rather than corrupting it.
+export function reservationIsPending(reservationId: string): SQL {
+  return sql`EXISTS (SELECT 1 FROM ${sql.raw(RESERVATIONS)} WHERE id = ${reservationId} AND status = 'PENDING')`
+}
+
 export interface TicketToWrite {
   id: string
   reservationId: string
@@ -104,6 +111,32 @@ export function ticketInsertQueries(tickets: TicketToWrite[], capacity: number |
     SELECT ${ticket.id}, ${ticket.reservationId}, ${ticket.performanceId}, ${ticket.ticketTypeId},
            ${ticket.pricePaid}, ${ticket.priceSource}
     WHERE ${capacityAllows(ticket.performanceId, capacity, tickets.length, ticket.reservationId)}
+    RETURNING id
+  `)
+}
+
+// D-110's edit: every added and removed line shares one guard, precomputed by the caller against
+// the desired total rather than the delta, so a mixed add-and-remove request is all or nothing.
+export function ticketAdditionQueries(tickets: TicketToWrite[], guard: SQL): SQL[] {
+  return tickets.map(ticket => sql`
+    INSERT INTO ${sql.raw(TICKETS)} (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source)
+    SELECT ${ticket.id}, ${ticket.reservationId}, ${ticket.performanceId}, ${ticket.ticketTypeId},
+           ${ticket.pricePaid}, ${ticket.priceSource}
+    WHERE ${guard}
+    RETURNING id
+  `)
+}
+
+// A subquery-scoped id list, never an `IN` list built from a result set (0001): the rows removed
+// are whichever unrefunded tickets of that type happen to exist, since none is distinguished.
+export function ticketRemovalQueries(reservationId: string, removals: TicketTypeCount[], guard: SQL): SQL[] {
+  return removals.map(removal => sql`
+    DELETE FROM ${sql.raw(TICKETS)}
+    WHERE id IN (
+      SELECT id FROM ${sql.raw(TICKETS)}
+      WHERE reservation_id = ${reservationId} AND ticket_type_id = ${removal.ticketTypeId} AND refunded_at IS NULL
+      LIMIT ${removal.quantity}
+    ) AND ${guard}
     RETURNING id
   `)
 }

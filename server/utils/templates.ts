@@ -1204,6 +1204,28 @@ Open your booking: ${url}
 The Nottingham New Theatre`,
     }
   },
+  // D-110 criterion 3: the confirmation this undoes, so the wording answers the same three
+  // questions (which booking, which show, who cancelled it) rather than inventing a fourth shape.
+  'reservation-cancelled': (context: TemplateContext): Rendered => {
+    const reference = String(context.reference)
+    const show = String(context.show)
+    const when = String(context.when)
+    return {
+      subject: `Your reservation for ${show} is cancelled`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Reference <strong>${reference}</strong> for ${show}, ${when}, is now cancelled at your request.
+Nothing was charged: the reservation was still unpaid.</p>
+<p>Changed your mind? Book again from the show's page while seats remain.</p>`),
+      text: `Hello ${context.name},
+
+Reference ${reference} for ${show}, ${when}, is now cancelled at your request. Nothing was
+charged: the reservation was still unpaid.
+
+Changed your mind? Book again from the show's page while seats remain.
+
+The Nottingham New Theatre`,
+    }
+  },
   'health-alert': (context: TemplateContext): Rendered => {
     const since = String(context.since)
     return {

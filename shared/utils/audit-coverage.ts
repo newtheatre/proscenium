@@ -188,6 +188,17 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/performances/[id]/booking.get.ts', exempt: 'reads what the booking form needs; nothing is written' },
   { route: 'server/api/reservations/resend.post.ts', exempt: 'sends a message; the send is recorded in notification_log' },
   { route: 'server/routes/qr/[token].get.ts', exempt: 'exchanges a token for a cookie; nothing is written' },
+  { route: 'server/api/qr/edit-options.get.ts', exempt: 'reads what the edit form needs; nothing is written' },
+  {
+    route: 'server/api/qr/tickets.put.ts',
+    actions: ['reservation.tickets-changed'],
+    via: ['server/utils/reservations.ts'],
+  },
+  {
+    route: 'server/api/qr/cancel.post.ts',
+    actions: ['reservation.cancelled'],
+    via: ['server/utils/reservations.ts'],
+  },
   { route: 'server/api/box-office/desk/performances.get.ts', exempt: 'reads tonight\'s programme; nothing is written' },
   { route: 'server/api/box-office/desk/search.get.ts', exempt: 'reads bookings against a performance; nothing is written' },
   { route: 'server/api/box-office/desk/scan.post.ts', exempt: 'resolves a scanned code to a booking; nothing is written' },
