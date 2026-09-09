@@ -82,14 +82,15 @@ describe('a venue is its own row, never a flagged room (0043)', () => {
 })
 
 describe('the emergency card belongs to its venue (E-113 criterion 1)', () => {
-  test('one card per venue, and it goes when the venue does', async () => {
+  // Append-only, so an edit is a second row, not a rewrite of the first: this table's own
+  // detail lives in `tests/integration/venue-emergency.test.ts`.
+  test('a venue with a card refuses deletion rather than losing its history', async () => {
     await withDatabase((database) => {
+      insert(database, 'users', { id: 'u1', email: 'officer@example.invalid', name: 'An Officer' })
       insert(database, 'venues', { id: 'v1', name: 'The Theatre' })
-      insert(database, 'venue_emergency_info', { venue_id: 'v1', assembly_point: 'The car park', updated_at: 1 })
-      expect(() => insert(database, 'venue_emergency_info', { venue_id: 'v1', updated_at: 2 })).toThrow()
+      insert(database, 'venue_emergency_info', { id: 'vei-1', venue_id: 'v1', assembly_point: 'The car park', updated_by: 'u1' })
 
-      database.batch([[`DELETE FROM venues WHERE id = 'v1'`]])
-      expect(count(database, 'venue_emergency_info')).toBe(0)
+      expect(() => database.batch([[`DELETE FROM venues WHERE id = 'v1'`]])).toThrow()
     })
   })
 
@@ -97,7 +98,7 @@ describe('the emergency card belongs to its venue (E-113 criterion 1)', () => {
     await withDatabase((database) => {
       insert(database, 'users', { id: 'u1', email: 'officer@example.invalid', name: 'An Officer' })
       insert(database, 'venues', { id: 'v1', name: 'The Theatre' })
-      insert(database, 'venue_emergency_info', { venue_id: 'v1', exits: 'Two, both stage left', updated_by: 'u1', updated_at: 1 })
+      insert(database, 'venue_emergency_info', { id: 'vei-1', venue_id: 'v1', exits: 'Two, both stage left', updated_by: 'u1' })
       expect(count(database, 'venue_emergency_info', 'updated_by = ?', 'u1')).toBe(1)
     })
   })

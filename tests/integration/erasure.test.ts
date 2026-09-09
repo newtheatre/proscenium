@@ -64,10 +64,10 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
     // The card this person last edited. It describes the building, so an erasure leaves all of
     // it, including the reference to the tombstone the account became.
     ['INSERT INTO venues (id, name, room_id) VALUES (?, ?, ?)', `venue-${id}`, 'The Theatre', `room-${id}`],
-    [`INSERT INTO venue_emergency_info (venue_id, assembly_point, exits, notes, updated_by, updated_at)
+    [`INSERT INTO venue_emergency_info (id, venue_id, assembly_point, exits, notes, updated_by)
       VALUES (?, ?, ?, ?, ?, ?)`,
-    `venue-${id}`, 'The car park behind the building', 'Two, both stage left',
-    'The isolation point is behind the bar', id, now],
+    `vei-${id}`, `venue-${id}`, 'The car park behind the building', 'Two, both stage left',
+    'The isolation point is behind the bar', id],
     // Stock this person moved. The movement is financial evidence and holds no free text at all,
     // which is why it survives an erasure with only the tombstone's reference in it (F-114).
     ['INSERT INTO bar_items (id, name, unit) VALUES (?, ?, ?)', `bi-${id}`, 'House red', 'ML'],

@@ -266,6 +266,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/checklist/items/index.post.ts', actions: ['checklist-item.created'] },
   { route: 'server/api/admin/checklist/items/[id]/index.put.ts', actions: ['checklist-item.updated'] },
   { route: 'server/api/admin/checklist/items/[id]/status.post.ts', actions: ['checklist-item.retired', 'checklist-item.reinstated'] },
+  { route: 'server/api/admin/venues/emergency.get.ts', exempt: 'reads every venue\'s current emergency card, including a venue with none' },
+  { route: 'server/api/admin/venues/[id]/emergency.put.ts', actions: ['emergency-card.updated'] },
+  {
+    route: 'server/api/tonight/emergency.get.ts',
+    actions: ['night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
   { route: 'server/api/admin/rota/templates/index.get.ts', exempt: 'reads every venue\'s template, including the venues that have none' },
   {
     route: 'server/api/admin/rota/templates/[venueId]/index.put.ts',

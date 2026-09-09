@@ -68,6 +68,10 @@ export const PERMISSIONS = [
   // never operational (0009, E-114).
   'checklist.read',
   'checklist.write',
+  // The venue emergency card: committee-editable, cached for reading, never a standing grant
+  // over anything operational (E-113).
+  'emergency-card.read',
+  'emergency-card.write',
   // The one exception to the rule above, and it is named, bounded and audited: a designated
   // officer opens tonight's screens without a shift, and every use is recorded (0044, E-111).
   'night.door',
@@ -97,7 +101,7 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   BOX_OFFICE: ['ticketing.read', 'ticketing.write'],
   // Administers the rota in advance, and opens the door and duty manager screens without a shift
   // tonight. The till is the bar manager's (0044, 0046, E-101 criterion 2).
-  FOH_MANAGER: ['night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write'],
+  FOH_MANAGER: ['night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write'],
   FRONT_OF_HOUSE: [],
   // Owns the bar's catalogue and its stock, and opens the till without a bar shift. Nothing in
   // the old estate grants this role, so the import cannot reach it (0044, F-101 criterion 1).

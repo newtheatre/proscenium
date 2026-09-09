@@ -179,6 +179,7 @@ const CATALOGUE = {
   'checklist.ticked': { label: 'Checklist item ticked', module: 'show-night' },
   'checklist.exempted': { label: 'Checklist item closed over with a reason', module: 'show-night' },
   'checklist.closed': { label: 'Night closed', module: 'show-night' },
+  'emergency-card.updated': { label: 'Venue emergency card updated', module: 'show-night' },
 
   // Module F: bar
 

@@ -286,6 +286,15 @@ function houseLine(house: Performance['house']): string {
       >
         Checklist
       </UButton>
+      <UButton
+        to="/tonight/emergency"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-siren"
+        data-test="link-emergency"
+      >
+        Emergency card
+      </UButton>
     </div>
 
     <template #actions>
