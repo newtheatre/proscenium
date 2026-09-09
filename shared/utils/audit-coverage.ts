@@ -186,6 +186,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/reservations.ts'],
   },
   { route: 'server/api/performances/[id]/booking.get.ts', exempt: 'reads what the booking form needs; nothing is written' },
+  { route: 'server/api/reservations/resend.post.ts', exempt: 'sends a message; the send is recorded in notification_log' },
+  { route: 'server/routes/qr/[token].get.ts', exempt: 'exchanges a token for a cookie; nothing is written' },
 
   // Module E: show night
 
@@ -264,6 +266,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/checklist/items/index.post.ts', actions: ['checklist-item.created'] },
   { route: 'server/api/admin/checklist/items/[id]/index.put.ts', actions: ['checklist-item.updated'] },
   { route: 'server/api/admin/checklist/items/[id]/status.post.ts', actions: ['checklist-item.retired', 'checklist-item.reinstated'] },
+  { route: 'server/api/admin/venues/emergency.get.ts', exempt: 'reads every venue\'s current emergency card, including a venue with none' },
+  { route: 'server/api/admin/venues/[id]/emergency.put.ts', actions: ['emergency-card.updated'] },
+  {
+    route: 'server/api/tonight/emergency.get.ts',
+    actions: ['night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
   { route: 'server/api/admin/rota/templates/index.get.ts', exempt: 'reads every venue\'s template, including the venues that have none' },
   {
     route: 'server/api/admin/rota/templates/[venueId]/index.put.ts',
@@ -328,7 +337,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/till/products.get.ts', exempt: 'reads what the till may sell right now, writing nothing' },
   { route: 'server/api/till/tab-holders.get.ts', exempt: 'reads who the till may charge a sale to, writing nothing' },
   { route: 'server/api/till/price.post.ts', exempt: 'prices a basket against live prices; nothing is written until F-104 and F-105 land the sale write' },
-  { route: 'server/api/till/sale.post.ts', actions: ['bar.till.sale', 'bar.tab.cap-overridden'], via: ['server/utils/sale.ts'] },
+  { route: 'server/api/till/sale.post.ts', actions: ['bar.till.sale', 'age-check.logged', 'bar.tab.cap-overridden'], via: ['server/utils/sale.ts'] },
 
   // Module G: training
 

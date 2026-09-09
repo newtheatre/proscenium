@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { londonClock } from '#shared/utils/london'
+import { ID_TYPES, REFUSAL_REASONS, saysIdType, saysRefusalReason } from '#shared/utils/age-checks'
 import { says, saysMoney } from '#shared/utils/bar'
 import { MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
 import { nightCacheKey } from '#shared/utils/night-cache'
 import { currentShowNight } from '#shared/utils/show-night'
-import type { PricedBasket, SaleCatalogue, SaleChoice, SaleProduct, SaleReceipt, SaleVariant } from '#shared/utils/sale'
+import type { IdType, InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
+import type { PricedBasket, PricedLine, SaleCatalogue, SaleChoice, SaleProduct, SaleReceipt, SaleVariant } from '#shared/utils/sale'
 import type { TillSession } from '#shared/utils/till'
 
 definePageMeta({ layout: 'tonight' })
@@ -213,12 +215,42 @@ watch(basket, () => {
 
 const charging = ref(false)
 const chargeFailure = ref<string | null>(null)
-const charged = ref<{ totalPence: number, tab: SaleReceipt['tab'] } | null>(null)
+const charged = ref<{ totalPence: number, tab: SaleReceipt['tab'], refusedLines: PricedLine[] } | null>(null)
 
-// The submission step (F-104, 0004, 0005 criteria 1, 2). A tab holder chosen below charges
-// credit instead of the reader (F-108).
-async function charge(): Promise<void> {
+// A restricted line is the product's flag, already on the catalogue this screen holds: no second
+// lookup, and no route sells one without an outcome on record first (F-106 criteria 1, 5).
+function isRestricted(line: BasketLine): boolean {
+  return products.value.some(product => product.ageRestricted && product.variants.some(variant => variant.id === line.variantId))
+}
+const needsAgeCheck = computed(() => basket.value.some(isRestricted))
+
+type AgeCheckStep = 'closed' | 'choose' | 'refuse'
+const ageCheckStep = ref<AgeCheckStep>('closed')
+const ageCheckReason = ref<RefusalReason | null>(null)
+const ageCheckDescription = ref('')
+const ageCheckError = ref<string | null>(null)
+
+function resetAgeCheck(): void {
+  ageCheckStep.value = 'closed'
+  ageCheckReason.value = null
+  ageCheckDescription.value = ''
+  ageCheckError.value = null
+}
+
+// The submission step (F-104, F-105, 0004). A restricted line with no outcome yet opens the
+// Challenge 25 prompt (F-106); a tab holder chosen below charges credit, not the reader (F-108).
+async function charge(ageCheck: InlineAgeCheckInput | null = null): Promise<void> {
   if (!priced.value || !venueId.value || basket.value.length === 0) return
+  if (!ageCheck && needsAgeCheck.value) {
+    ageCheckStep.value = 'choose'
+    return
+  }
+  // A refusal drops the restricted lines: what the screen expects to be charged has to shrink to
+  // match, or the server's own cross-check would refuse a total nobody asked for (F-104, F-106).
+  const expectedTotalPence = ageCheck?.outcome === 'REFUSED'
+    ? priced.value.lines.filter((_, index) => !isRestricted(basket.value[index]!)).reduce((sum, line) => sum + line.amountPence, 0)
+    : priced.value.totalPence
+
   charging.value = true
   chargeFailure.value = null
   try {
@@ -227,14 +259,17 @@ async function charge(): Promise<void> {
       body: {
         venueId: venueId.value,
         lines: basket.value.map(line => ({ variantId: line.variantId, qty: line.qty, choiceItemId: line.choiceItemId })),
-        expectedTotalPence: priced.value.totalPence,
+        expectedTotalPence,
+        ageCheck,
         tabHolderId: selectedTabHolderId.value,
       },
     })
-    charged.value = { totalPence: answered.totalPence, tab: answered.tab }
+    charged.value = { totalPence: answered.totalPence, tab: answered.tab, refusedLines: answered.refusedLines }
+    resetAgeCheck()
   }
   catch (refused) {
     chargeFailure.value = refusalText(refused)
+    resetAgeCheck()
     // The refusal already names the true figure; catch the total up to it too, so what is shown
     // under the message is the one a retry would now send (F-104 criterion 3, no bypass).
     await recomputeTotal()
@@ -244,12 +279,32 @@ async function charge(): Promise<void> {
   }
 }
 
+// Two taps for the routine pass case (F-106 criterion 2): the ID type button both records the
+// outcome and submits, with a description staff can edit before choosing it if it matters here.
+function acceptAgeCheck(idType: IdType): void {
+  void charge({ outcome: 'ACCEPTED', idType, reason: null, description: ageCheckDescription.value.trim() || 'Checked at the till', notes: null })
+}
+
+function refuseAgeCheck(): void {
+  if (!ageCheckReason.value) {
+    ageCheckError.value = 'Say why, because a refusal needs a reason on the record'
+    return
+  }
+  if (!ageCheckDescription.value.trim()) {
+    ageCheckError.value = 'Describe who you checked, never by name'
+    return
+  }
+  ageCheckError.value = null
+  void charge({ outcome: 'REFUSED', idType: null, reason: ageCheckReason.value, description: ageCheckDescription.value.trim(), notes: null })
+}
+
 function nextSale(): void {
   basket.value = []
   priced.value = null
   charged.value = null
   chargeFailure.value = null
   selectedTabHolderId.value = null
+  resetAgeCheck()
 }
 
 // Editing the basket after a refusal is the correction; the message it was reading no longer
@@ -496,6 +551,13 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             :description="charged ? saysMoney(charged.totalPence) : ''"
           />
           <UAlert
+            v-if="charged && charged.refusedLines.length"
+            data-test="age-check-refused-note"
+            color="warning"
+            variant="subtle"
+            :description="`Not sold, on the ID refusal: ${charged.refusedLines.map(line => line.productName).join(', ')}`"
+          />
+          <UAlert
             v-if="charged?.tab"
             data-test="tab-balance-note"
             color="info"
@@ -528,7 +590,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           :icon="selectedTabHolderId ? 'i-lucide-book-user' : 'i-lucide-credit-card'"
           :disabled="pricing"
           :loading="charging"
-          @press="charge"
+          @press="() => charge()"
         />
         <NightAction
           v-if="session"
@@ -590,6 +652,92 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
         >
           {{ allergenOpen.note }}
         </p>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="ageCheckStep !== 'closed'"
+      title="Challenge 25"
+      description="This basket has an age-restricted line."
+      @update:open="resetAgeCheck"
+    >
+      <template #body>
+        <div
+          v-if="ageCheckStep === 'choose'"
+          class="space-y-3"
+        >
+          <p class="text-sm text-muted">
+            What ID was shown?
+          </p>
+          <div class="grid grid-cols-2 gap-2">
+            <UButton
+              v-for="idType in ID_TYPES"
+              :key="idType"
+              color="neutral"
+              variant="subtle"
+              class="min-h-12"
+              :loading="charging"
+              :data-test="`age-check-id-${idType}`"
+              @click="acceptAgeCheck(idType)"
+            >
+              {{ saysIdType(idType) }}
+            </UButton>
+          </div>
+          <UButton
+            block
+            color="error"
+            variant="subtle"
+            class="min-h-12"
+            data-test="age-check-refuse"
+            @click="ageCheckStep = 'refuse'"
+          >
+            Refused
+          </UButton>
+        </div>
+
+        <div
+          v-else
+          class="space-y-3"
+        >
+          <p class="text-sm text-muted">
+            Why was it refused?
+          </p>
+          <div class="grid grid-cols-2 gap-2">
+            <UButton
+              v-for="reason in REFUSAL_REASONS"
+              :key="reason"
+              color="neutral"
+              :variant="ageCheckReason === reason ? 'solid' : 'subtle'"
+              class="min-h-12"
+              :data-test="`age-check-reason-${reason}`"
+              @click="ageCheckReason = reason"
+            >
+              {{ saysRefusalReason(reason) }}
+            </UButton>
+          </div>
+          <UTextarea
+            v-model="ageCheckDescription"
+            placeholder="Describe who you checked, never by name"
+            data-test="age-check-description"
+          />
+          <UAlert
+            v-if="ageCheckError"
+            data-test="age-check-error"
+            color="error"
+            variant="subtle"
+            :description="ageCheckError"
+          />
+          <UButton
+            block
+            color="error"
+            class="min-h-12"
+            :loading="charging"
+            data-test="age-check-confirm-refuse"
+            @click="refuseAgeCheck"
+          >
+            Confirm refusal
+          </UButton>
+        </div>
       </template>
     </UModal>
   </div>

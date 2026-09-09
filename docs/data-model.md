@@ -209,10 +209,14 @@ effect is that the venue's performances apply blackouts to that room (0043).
 Feature vocabulary and junction (both cascade). Not yet built: no story reads them, and the
 Wave 0 contract does not list them.
 
-### venue_emergency_info
-`venue_id` PK → venues cascade · `assembly_point` · `exits` · `isolation_points` ·
+### venue_emergency_info  APPEND-ONLY
+`id` PK · `venue_id` → venues restrict · `assembly_point` · `exits` · `isolation_points` ·
 `what3words` · `notes` (free text, safe: describes the building, never a person) ·
-`updated_by` → users set null · `updated_at`.
+`updated_by` → users restrict · `updated_at`. Versioned, not a single row per venue (E-113
+criterion 1): an edit is a new row, and the latest per venue by `updated_at` is the current
+card. Rebuilt from a single-row-per-venue shape in migration 0071, which also hand-corrects a
+`drizzle-kit` bug in the generated copy-forward `INSERT` (it named a column, `id`, the old
+table never had) and adds the append-only triggers by hand, as every table in this family does.
 
 ### seasons
 `id` PK · `name` UNIQUE · `starts_on` · `ends_on` · `sort` · `archived` bool. The financial
@@ -383,7 +387,8 @@ stateDiagram-v2
 
 ### ticket_types
 `id` PK · `name` UNIQUE global · `description` · `price` pence (base) · `kind` CHECK
-`SINGLE|PASS_ADMISSION` · `access_kind` CHECK `ACCESS|COMPANION` NULL · `archived` bool ·
+`SINGLE|PASS_ADMISSION` · `access_kind` CHECK `ACCESS|COMPANION` NULL · `restricted_to` CHECK
+`MEMBER` NULL (D-109; set once at creation, like `kind` and `access_kind`) · `archived` bool ·
 `active_by_default` bool.
 Archive, never delete, once sold (FK restrict from tickets). Built by Wave 0 contract (d) with
 the two override tables below; everything else in this module is unbuilt.
@@ -418,6 +423,15 @@ of a price change live in the audit trail as `ticket-type.price.changed`.
 drops archived types and every flagged one, and allow-lists `id`, `name`, `description` and
 `price`. An entitled booker's access types are D-128's own resolution, never a widening of this.
 
+**Entitlement (D-109).** `restricted_to = 'MEMBER'` drops a type from what
+`GET /api/performances/[id]/booking` and `POST /api/reservations` offer a caller who is not
+currently a member (`hasCurrentMembership()`, checked fresh at each, since a membership can lapse
+between the two). Concession has no committee-agreed eligibility evidence yet (open question,
+`docs/backlog/D-ticketing.md`), so it is not a value here: a concession type stays open online and
+is checked at collection instead. Entitlement is read from a session-scoped call, never folded
+into the cacheable public listing (`/api/whats-on`, `/api/shows/[slug]`), so those stay
+viewer-independent.
+
 ### show_ticket_overrides / performance_ticket_overrides
 `id` PK · parent (`show_id` → shows cascade, or `performance_id` → performances cascade) ·
 `ticket_type_id` → ticket_types restrict · UNIQUE (parent, ticket_type) · `price` NULL =
@@ -445,9 +459,10 @@ credential) · `performance_id` → performances restrict · `user_id` → users
 `WEB|DESK|DOOR` (the door writes DOOR, fixing the old blur) · `hold_expires_at` (set while
 PENDING; the release sweep moves PENDING to EXPIRED and records it for no-show statistics) ·
 `cancelled_by` CHECK `CUSTOMER|STAFF` NULL · `customer_notes` scrub · `staff_notes` scrub ·
-`qr_token_hash` (the one stable QR credential, D-108) · `window_bypassed` bool, true only for a
-desk reservation made after the customer window had already closed (D-112 criterion 3; nothing
-yet writes DESK, so this stays false until a desk-side creation route does) · timestamps.
+`qr_token_hash` unused, superseded by a stateless signed token that needs no storage (D-108,
+below) · `window_bypassed` bool, true only for a desk reservation made after the customer window
+had already closed (D-112 criterion 3; nothing yet writes DESK, so this stays false until a
+desk-side creation route does) · timestamps.
 Indexes: (`performance_id`, `status`), (`user_id`, `created_at`), `hold_expires_at`.
 
 **Booking (D-104).** `POST /api/reservations` is the one write path, deliberately public: a
@@ -476,6 +491,23 @@ the old claim already spent: the expiry is part of the key. Reminders read
 `docs/workshops.md`). A booking whose hold would already be due for release the moment it is
 made is refused outright at the write path, quoting the box office as the alternative, rather
 than held and released minutes later (committee decision).
+
+**A stable QR (D-108).** The token is `reservationId + "." + base64url(HMAC-SHA-256(reservationId))`,
+signed with the worker secret `NUXT_QR_TOKEN_SECRET` (`server/utils/qr-tokens.ts`), fully
+recomputable from the id alone: nothing is stored, so a resend reproduces the identical code and
+nothing sits in `qr_token_hash` to leak. `GET /qr/[token]` verifies the signature, exchanges it for
+a short-lived (60 minute) httpOnly cookie and redirects to `/qr`, so the token stops appearing in
+the address bar or a referrer header after the first open. `GET /api/qr/current` reads that cookie
+and answers the booking's live state (unpaid with the amount due, paid, admitted, cancelled naming
+who, or lapsed), never anything saved earlier; "exchanged" and "wrong night" have no state to
+report until D-111 and D-126 exist (`docs/known-issues.md`). `POST /api/reservations/resend`
+re-sends the same confirmation, rate limited (`RESERVATION_RESEND_ATTEMPTS`,
+`RESERVATION_RESEND_WINDOW_MINUTES`, both by IP and by reference) and enumeration-safe: it answers
+identically whether or not the reference and address match, and only actually sends while the
+reservation is still `PENDING`, since the template's wording assumes unpaid. Saving the QR to
+Apple Wallet or Google Wallet (criterion 3) needs credentials this environment does not have; the
+QR still renders as an image on the confirmation email and `/qr`, which can be saved or
+screenshotted (`docs/known-issues.md`).
 
 ### tickets
 `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances
@@ -640,7 +672,10 @@ correction per entry) · `created_at`. CHECK `age_checks_outcome_shape` ties `id
 `reason` to `outcome` so exactly one is ever set, never both, never neither. Split from a
 single `reason` column the original outline carried: criterion 1 asks for the ID type and the
 refusal reason as two distinct pieces of information, not one column doing both jobs
-(E-118). The licensing register; exports span CSV and PDF (E-119, not yet built).
+(E-118). The licensing register; exports span CSV and PDF (E-119, not yet built). A row can
+also come from `POST /api/till/sale`'s inline prompt (F-106): `performance_id` there is the
+till's own resolved authority, null when it spans more than one performance, and `product`
+names the basket's restricted lines rather than something staff types.
 
 ### checklist_items
 `id` PK · `venue_id` → venues cascade · `phase` CHECK `PRE|POST` · `label` · `sort` · `required`
