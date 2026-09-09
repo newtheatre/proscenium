@@ -170,6 +170,7 @@ describe('the movement kinds cover what the bar does (criterion 3)', () => {
   test('one stocktake line posts one movement', async () => {
     await withDatabase((database) => {
       bottle(database)
+      move(database, { qty: 50, kind: 'DELIVERY' })
       move(database, { qty: -25, kind: 'STOCKTAKE', ref_table: 'stocktake_lines', ref_id: 'stl-1' })
       expect(() => move(database, { qty: -25, kind: 'STOCKTAKE', ref_table: 'stocktake_lines', ref_id: 'stl-1' })).toThrow()
       // The same id under a different document is a different thing entirely.
@@ -266,6 +267,7 @@ describe('a movement stamps who, when and what document (criterion 5)', () => {
   test('a source document is a table and an id, or neither', async () => {
     await withDatabase((database) => {
       bottle(database)
+      move(database, { qty: 750, kind: 'DELIVERY' })
       expect(() => move(database, { qty: -175, kind: 'SALE', ref_table: 'bar_sale_lines' })).toThrow()
       expect(() => move(database, { qty: -175, kind: 'SALE', ref_id: 'line-1' })).toThrow()
       move(database, { qty: -175, kind: 'SALE', ref_table: 'bar_sale_lines', ref_id: 'line-1' })

@@ -260,7 +260,8 @@ describe('a variant that has sold is retired, never deleted (F-112 criterion 5)'
           if (key.table === 'product_variants') pointing.push(`${name}.${key.from}`)
         }
       }
-      expect(pointing.sort()).toEqual(VARIANT_REFERENCES.map(reference => `${reference.table}.${reference.column}`).sort())
+      const expected = VARIANT_REFERENCES.filter(reference => reference.hasForeignKey !== false)
+      expect(pointing.sort()).toEqual(expected.map(reference => `${reference.table}.${reference.column}`).sort())
     })
   })
 })

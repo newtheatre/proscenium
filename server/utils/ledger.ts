@@ -10,6 +10,9 @@ export interface PostedEntry {
   id: string
   totalPence: number
   statements: BatchItem<'sqlite'>[]
+  // In the same order as `entry.lines`, so a caller needing to cite a line (a stock movement
+  // against the sale line that caused it, F-105 criterion 3) knows its id before the batch runs.
+  lineIds: string[]
 }
 
 // Statements rather than a write: money and the thing it paid for commit in one batch or not at
@@ -35,9 +38,12 @@ export function postEntry(input: EntryInput, at = new Date()): PostedEntry {
     }),
   ]
 
+  const lineIds: string[] = []
   for (const line of entry.lines) {
+    const lineId = newId()
+    lineIds.push(lineId)
     statements.push(db.insert(schema.ledgerLines).values({
-      id: newId(),
+      id: lineId,
       entryId: id,
       kind: line.kind,
       amountPence: line.amountPence,
@@ -52,7 +58,7 @@ export function postEntry(input: EntryInput, at = new Date()): PostedEntry {
     }))
   }
 
-  return { id, totalPence, statements }
+  return { id, totalPence, statements, lineIds }
 }
 
 // What an entry and everything correcting it come to. Never stored: a total is read from the rows
