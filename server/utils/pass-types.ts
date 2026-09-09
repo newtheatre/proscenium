@@ -180,3 +180,10 @@ export async function passTypeBySlug(slug: string, exceptId?: string): Promise<P
   `)
   return row ? read(row) : undefined
 }
+
+// D-124 criterion 4: the cap is asked at the statement that issues, over the same "not
+// cancelled" count `sellablePassTypes()` shows, never a count read earlier and trusted.
+export function passCapAllows(passTypeId: string, maxIssued: number | null): SQL {
+  if (maxIssued === null) return sql`1 = 1`
+  return sql`(SELECT count(*) FROM passes WHERE pass_type_id = ${passTypeId} AND status != 'CANCELLED') < ${maxIssued}`
+}

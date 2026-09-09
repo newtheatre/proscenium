@@ -91,6 +91,14 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Months a verified access profile stays current before the door stops seeing it and re-verification is needed (D-127).',
   },
+  // Proposed and unconfirmed, per docs/workshops.md: shipped rather than left unset, so the sweep
+  // that lapses stale requests runs from day one (0019, D-124 criterion 3).
+  PASS_REQUEST_EXPIRE_BATCH_CAP: {
+    schema: z.number().int().positive(),
+    default: 200,
+    workshop: 'money-and-box-office',
+    describes: 'The most pass requests one sweep run may expire past their product\'s sales window closing, the same batching D-106\'s hold release uses.',
+  },
 
   // Module F: bar
 
