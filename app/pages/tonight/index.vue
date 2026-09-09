@@ -58,9 +58,12 @@ async function load(): Promise<void> {
     isDutyManager.value = true
   }
   else {
-    // Not tonight's duty manager: the fallback hub below, not a failure banner.
+    // Not tonight's duty manager: the fallback hub below, not a failure banner. Still a definite
+    // answer from the server, so it still counts as synced (NightStale is never hidden).
     if (refusalStatus(dutyManager.reason) === 403 || refusalStatus(dutyManager.reason) === 401) {
       isDutyManager.value = false
+      syncedAt.value = new Date()
+      staleness.value = null
     }
     // Anything else, including a dropped connection: the last-fetched values stay on screen,
     // and NightStale is what says they are no longer current. Never a spinner (criterion 3).
