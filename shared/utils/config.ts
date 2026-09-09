@@ -444,6 +444,21 @@ export const CONFIG_KEYS = {
     describes: 'How far ahead of its own expiry a membership is reminded. Each person has their own date, so this is not a year-end chase.',
   },
 
+  ROLE_LAPSE_NOTICE_DAYS: {
+    schema: z.number().int().positive(),
+    default: 14,
+    workshop: 'people-and-communications',
+    describes: 'How far ahead of a grant lapsing its holder is warned, so a handover is planned rather than discovered (A-119).',
+  },
+  // Housekeeping rather than enforcement: a lapsed grant has granted nothing since the instant
+  // it expired, because authority is read-time (0009).
+  ROLE_GRANT_PRUNE_DAYS: {
+    schema: z.number().int().positive(),
+    default: 90,
+    workshop: 'people-and-communications',
+    describes: 'Days after a grant lapsed that its row is tidied away. The audit trail keeps the history; the row itself is what goes.',
+  },
+
   UNVERIFIED_ACCOUNT_DAYS: {
     schema: z.number().int().positive(),
     default: 30,
@@ -617,6 +632,8 @@ export const ENFORCED_KEYS = [
   'ROOM_NO_SHOW_RECORD_AT',
   'ROOM_NO_SHOW_PREAPPROVAL_AT',
   'MEMBERSHIP_RENEWAL_NOTICE_DAYS',
+  'ROLE_LAPSE_NOTICE_DAYS',
+  'ROLE_GRANT_PRUNE_DAYS',
   'PRIVILEGED_ROLES',
   'PUBLIC_ORDER_SEAT_CAP',
   'REFUND_PAID_REQUIRES_MANAGER',

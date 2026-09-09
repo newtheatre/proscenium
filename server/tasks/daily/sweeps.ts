@@ -1,9 +1,9 @@
-// Nightly tidy of rows that have expired unused, and of the accounts whose address was never
-// proved (0026, docs/architecture.md, Scheduled tasks).
+// Nightly tidy of rows that have expired unused, of the accounts whose address was never proved,
+// and of the grants that lapsed (0026, A-119, docs/architecture.md, Scheduled tasks).
 export default defineTask({
   meta: {
     name: 'daily:sweeps',
-    description: 'Tidy lapsed rows, expire unverified accounts, and remind memberships that are running out',
+    description: 'Tidy lapsed rows, expire unverified accounts, and warn what is about to run out',
   },
   async run() {
     const before = new Date()
@@ -14,6 +14,7 @@ export default defineTask({
     const renewals = await remindExpiringMemberships(undefined, before)
     const withdrawnAccessProfiles = await sweepWithdrawnAccessProfiles(before)
     const backstage = await purgeStaleMessages(before)
-    return { result: { attempts, tokens, unverified, renewals, withdrawnAccessProfiles, backstage } }
+    const roleLapses = await sweepRoleLapses(undefined, before)
+    return { result: { attempts, tokens, unverified, renewals, withdrawnAccessProfiles, backstage, roleLapses } }
   },
 })

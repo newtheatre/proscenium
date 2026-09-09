@@ -68,6 +68,10 @@ const CATALOGUE = {
 
   'role.granted': { label: 'Role granted', module: 'identity' },
   'role.revoked': { label: 'Role revoked', module: 'identity' },
+  // Written by the nightly sweep with no actor, which is what attributes it to system (A-119
+  // criterion 5). Neither changes what anybody holds: expiry is enforced at read time (0009).
+  'role.lapse-warned': { label: 'Role expiry warning sent', module: 'identity' },
+  'role.pruned': { label: 'Lapsed role grant tidied away', module: 'identity' },
   // Written by scripts/grant-admin.ts, which is the one writer outside a request (K-122).
   'role.granted.bootstrap': { label: 'Administrator bootstrapped', module: 'identity' },
 
