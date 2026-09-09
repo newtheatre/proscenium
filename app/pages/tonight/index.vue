@@ -374,9 +374,22 @@ function hideCode(): void {
         color="neutral"
         variant="subtle"
         icon="i-lucide-siren"
+        size="lg"
+        class="min-h-12"
         data-test="link-emergency"
       >
         Emergency card
+      </UButton>
+      <UButton
+        to="/tonight/board"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-radio"
+        size="lg"
+        class="min-h-12"
+        data-test="link-board"
+      >
+        Backstage board
       </UButton>
     </div>
 

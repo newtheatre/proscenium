@@ -1,11 +1,14 @@
-import { db } from '@nuxthub/db'
-import { sql } from 'drizzle-orm'
+import { db, schema } from '@nuxthub/db'
+import { and, eq, inArray, sql } from 'drizzle-orm'
+import { createError, getCookie } from 'h3'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { newId } from './accounts'
 import { performancesOnNight } from './performances'
-import { MAX_FAILED_ATTEMPTS, deriveBoardCode } from '#shared/utils/backstage'
+import { MAX_FAILED_ATTEMPTS, MESSAGE_RETENTION_DAYS, deriveBoardCode } from '#shared/utils/backstage'
+import { PERMISSION_MAP, ROLES } from '#shared/utils/roles'
 import type { SQL } from 'drizzle-orm'
+import type { H3Event } from 'h3'
 
 // The backstage board's join (E-120). Nothing here ever writes or logs the code itself, only
 // the epoch and the attempt count that decide it.
@@ -103,15 +106,241 @@ export async function currentCode(secret: string, venueId: string, night: string
   return { code: await deriveBoardCode(secret, night, venueId, row.epoch), venueId, night }
 }
 
-export interface DeviceHolder { deviceId: string, venueId: string, night: string, label: string }
+export interface DeviceHolder { deviceId: string, nightId: string, venueId: string, night: string, label: string, revokedAt: number | null }
 
 // A joined device's own credential, matched by hashing what it presents, the same shape a
 // feed token is matched by (C-104).
 export async function deviceByToken(token: string): Promise<DeviceHolder | undefined> {
   const [row] = await db.all<DeviceHolder>(sql`
-    SELECT d.id AS deviceId, n.venue_id AS venueId, n.night AS night, d.label AS label
+    SELECT d.id AS deviceId, n.id AS nightId, n.venue_id AS venueId, n.night AS night, d.label AS label, d.revoked_at AS revokedAt
     FROM backstage_devices d JOIN backstage_nights n ON n.id = d.night_id
     WHERE d.token_hash = ${await hashToken(token)}
   `)
   return row
+}
+
+export const DEVICE_TOKEN_COOKIE = 'nnt-backstage-token'
+
+// The board's own credential: no session, so a device proves itself with the cookie it was
+// handed on joining, refused the moment a reset has revoked it (E-121, E-122 criterion 1).
+export async function requireDevice(event: H3Event): Promise<DeviceHolder> {
+  const token = getCookie(event, DEVICE_TOKEN_COOKIE)
+  if (!token) throw createError({ statusCode: 401, statusMessage: 'Join the board first' })
+
+  const device = await deviceByToken(token)
+  if (!device) throw createError({ statusCode: 401, statusMessage: 'That device is not recognised' })
+  if (device.revokedAt !== null) throw createError({ statusCode: 401, statusMessage: 'The board was reset: join again with the new code' })
+
+  return device
+}
+
+// Every non-revoked device on tonight's board at this venue, so a message poster's presence
+// list and a reset's own count both read the same roster.
+export function activeDevicesQuery(nightId: string): SQL {
+  return sql`SELECT id AS deviceId, label AS label FROM backstage_devices WHERE night_id = ${nightId} AND revoked_at IS NULL`
+}
+
+export async function activeDevices(nightId: string): Promise<{ deviceId: string, label: string }[]> {
+  return db.all(activeDevicesQuery(nightId))
+}
+
+// A reset: every currently-connected device is revoked in the same batch the epoch moves in,
+// so nothing observes a moved epoch next to a still-valid device (E-122 criterion 1).
+export function revokeDevicesStatement(nightId: string): SQL {
+  return sql`UPDATE backstage_devices SET revoked_at = unixepoch() WHERE night_id = ${nightId} AND revoked_at IS NULL`
+}
+
+export function resetNightStatement(nightId: string): SQL {
+  return sql`UPDATE backstage_nights SET epoch = epoch + 1, failed_attempts = 0, updated_at = unixepoch() WHERE id = ${nightId}`
+}
+
+export async function venueName(venueId: string): Promise<string | undefined> {
+  const [row] = await db.all<{ name: string }>(sql`SELECT name AS name FROM venues WHERE id = ${venueId}`)
+  return row?.name
+}
+
+// Told a reset happened, never the new code, which travels by voice only (E-122 criterion 2).
+// The same live-role-grant shape `safetyOfficers()` uses: whoever stands to administer tonight.
+export async function boardResetRecipients(): Promise<{ id: string }[]> {
+  const roles = ROLES.filter(role => PERMISSION_MAP[role].includes('night.manage'))
+  if (roles.length === 0) return []
+
+  const now = Math.floor(Date.now() / 1000)
+  return db.selectDistinct({ id: schema.users.id })
+    .from(schema.roleGrants)
+    .innerJoin(schema.users, eq(schema.users.id, schema.roleGrants.userId))
+    .where(and(
+      inArray(schema.roleGrants.role, roles),
+      sql`(${schema.roleGrants.expiresAt} IS NULL OR ${schema.roleGrants.expiresAt} > ${now})`,
+      eq(schema.users.disabled, false),
+    ))
+}
+
+const MESSAGE_COLUMNS = sql`
+  m.id AS id, m.night_id AS nightId, m.device_id AS deviceId, d.label AS posterLabel,
+  m.milestone_type_id AS milestoneTypeId, mt.label AS milestoneLabel, m.body AS body,
+  m.supersedes_id AS supersedesId, m.composed_at AS composedAt, m.created_at AS createdAt
+`
+
+export interface MessageRow {
+  id: string
+  nightId: string
+  deviceId: string
+  posterLabel: string
+  milestoneTypeId: string | null
+  milestoneLabel: string | null
+  body: string
+  supersedesId: string | null
+  composedAt: number
+  createdAt: number
+}
+
+// Every message on tonight's board at this venue, newest first; a poll re-fetches the lot,
+// since one night's board is never large enough to page (criterion 3).
+export function messagesForNightQuery(nightId: string): SQL {
+  return sql`
+    SELECT ${MESSAGE_COLUMNS}
+    FROM backstage_messages m
+    JOIN backstage_devices d ON d.id = m.device_id
+    LEFT JOIN backstage_milestone_types mt ON mt.id = m.milestone_type_id
+    WHERE m.night_id = ${nightId}
+    ORDER BY m.composed_at DESC, m.created_at DESC
+  `
+}
+
+export async function messagesForNight(nightId: string): Promise<MessageRow[]> {
+  return db.all(messagesForNightQuery(nightId))
+}
+
+export function postMessageStatement(
+  nightId: string, deviceId: string, milestoneTypeId: string | null, body: string, composedAt: number, id: string,
+): SQL {
+  return sql`
+    INSERT INTO backstage_messages (id, night_id, device_id, milestone_type_id, body, composed_at)
+    VALUES (${id}, ${nightId}, ${deviceId}, ${milestoneTypeId}, ${body}, ${composedAt})
+    RETURNING id
+  `
+}
+
+// Only a milestone message is ever superseded (criterion 5); the predicate refuses a caller
+// trying it against free text or a preset, or against one already corrected.
+export function supersedeMessageStatement(
+  nightId: string, entryId: string, deviceId: string, milestoneTypeId: string, body: string, composedAt: number, id: string,
+): SQL {
+  return sql`
+    INSERT INTO backstage_messages (id, night_id, device_id, milestone_type_id, body, supersedes_id, composed_at)
+    SELECT ${id}, ${nightId}, ${deviceId}, ${milestoneTypeId}, ${body}, ${entryId}, ${composedAt}
+    WHERE EXISTS (SELECT 1 FROM backstage_messages WHERE id = ${entryId} AND night_id = ${nightId} AND milestone_type_id IS NOT NULL)
+      AND NOT EXISTS (SELECT 1 FROM backstage_messages WHERE supersedes_id = ${entryId})
+    RETURNING id
+  `
+}
+
+const ACK_COLUMNS = sql`a.message_id AS messageId, a.device_id AS deviceId, a.acknowledged_at AS acknowledgedAt`
+
+export function acknowledgementsForNightQuery(nightId: string): SQL {
+  return sql`
+    SELECT ${ACK_COLUMNS}
+    FROM backstage_acknowledgements a
+    JOIN backstage_messages m ON m.id = a.message_id
+    WHERE m.night_id = ${nightId}
+  `
+}
+
+export interface AcknowledgementRow { messageId: string, deviceId: string, acknowledgedAt: number }
+
+export async function acknowledgementsForNight(nightId: string): Promise<AcknowledgementRow[]> {
+  return db.all(acknowledgementsForNightQuery(nightId))
+}
+
+export function acknowledgeStatement(messageId: string, deviceId: string, id: string): SQL {
+  return sql`
+    INSERT INTO backstage_acknowledgements (id, message_id, device_id)
+    VALUES (${id}, ${messageId}, ${deviceId})
+    ON CONFLICT (message_id, device_id) DO NOTHING
+    RETURNING id
+  `
+}
+
+// The committee's own milestone types and presets (criteria 1, 2), mutable like
+// `checklist_items`: a message snapshots the label, so editing one changes nothing already sent.
+
+export interface MilestoneTypeRow { id: string, label: string, sort: number, active: boolean, updatedAt: number }
+
+export function milestoneTypesQuery(includeRetired: boolean): SQL {
+  const predicate = includeRetired ? sql`` : sql` WHERE active = 1`
+  return sql`SELECT id AS id, label AS label, sort AS sort, active AS active, updated_at AS updatedAt FROM backstage_milestone_types${predicate} ORDER BY sort, label COLLATE NOCASE`
+}
+
+export async function milestoneTypes(includeRetired = false): Promise<MilestoneTypeRow[]> {
+  const rows = await db.all<{ active: number } & Omit<MilestoneTypeRow, 'active'>>(milestoneTypesQuery(includeRetired))
+  return rows.map(row => ({ ...row, active: row.active === 1 }))
+}
+
+export function insertMilestoneTypeStatement(label: string, sort: number, updatedBy: string, id: string): SQL {
+  return sql`INSERT INTO backstage_milestone_types (id, label, sort, updated_by) VALUES (${id}, ${label}, ${sort}, ${updatedBy})`
+}
+
+export function updateMilestoneTypeStatement(id: string, label: string, sort: number, updatedBy: string): SQL {
+  return sql`UPDATE backstage_milestone_types SET label = ${label}, sort = ${sort}, updated_by = ${updatedBy}, updated_at = unixepoch() WHERE id = ${id}`
+}
+
+export function retireMilestoneTypeStatement(id: string, active: boolean, updatedBy: string): SQL {
+  return sql`UPDATE backstage_milestone_types SET active = ${active ? 1 : 0}, updated_by = ${updatedBy}, updated_at = unixepoch() WHERE id = ${id}`
+}
+
+export interface PresetRow { id: string, label: string, body: string, sort: number, active: boolean, updatedAt: number }
+
+export function presetsQuery(includeRetired: boolean): SQL {
+  const predicate = includeRetired ? sql`` : sql` WHERE active = 1`
+  return sql`SELECT id AS id, label AS label, body AS body, sort AS sort, active AS active, updated_at AS updatedAt FROM backstage_presets${predicate} ORDER BY sort, label COLLATE NOCASE`
+}
+
+export async function presets(includeRetired = false): Promise<PresetRow[]> {
+  const rows = await db.all<{ active: number } & Omit<PresetRow, 'active'>>(presetsQuery(includeRetired))
+  return rows.map(row => ({ ...row, active: row.active === 1 }))
+}
+
+export function insertPresetStatement(label: string, body: string, sort: number, updatedBy: string, id: string): SQL {
+  return sql`INSERT INTO backstage_presets (id, label, body, sort, updated_by) VALUES (${id}, ${label}, ${body}, ${sort}, ${updatedBy})`
+}
+
+export function updatePresetStatement(id: string, label: string, body: string, sort: number, updatedBy: string): SQL {
+  return sql`UPDATE backstage_presets SET label = ${label}, body = ${body}, sort = ${sort}, updated_by = ${updatedBy}, updated_at = unixepoch() WHERE id = ${id}`
+}
+
+export function retirePresetStatement(id: string, active: boolean, updatedBy: string): SQL {
+  return sql`UPDATE backstage_presets SET active = ${active ? 1 : 0}, updated_by = ${updatedBy}, updated_at = unixepoch() WHERE id = ${id}`
+}
+
+// A milestone type or a preset, resolved server-side rather than trusted from the client: what
+// gets snapshotted onto the message is the committee's own current wording (criteria 1, 2).
+export async function milestoneLabel(id: string): Promise<string | undefined> {
+  const [row] = await db.all<{ label: string }>(sql`SELECT label AS label FROM backstage_milestone_types WHERE id = ${id} AND active = 1`)
+  return row?.label
+}
+
+export async function presetBody(id: string): Promise<string | undefined> {
+  const [row] = await db.all<{ body: string }>(sql`SELECT body AS body FROM backstage_presets WHERE id = ${id} AND active = 1`)
+  return row?.body
+}
+
+// Free text and preset messages purge at 30 days; a milestone is night-report data and is
+// never touched here, enforced again at the trigger layer, not only by this predicate (0010).
+export function staleMessagesQuery(beforeEpoch: number): SQL {
+  return sql`SELECT id AS id FROM backstage_messages WHERE milestone_type_id IS NULL AND composed_at < ${beforeEpoch}`
+}
+
+export function purgeStaleMessagesStatement(beforeEpoch: number): SQL {
+  return sql`DELETE FROM backstage_messages WHERE milestone_type_id IS NULL AND composed_at < ${beforeEpoch}`
+}
+
+// Counted before deleting: a scheduled sweep reports what it did, and a raw DELETE's affected
+// count is not something every driver here is trusted to report back accurately.
+export async function purgeStaleMessages(now = new Date()): Promise<number> {
+  const cutoff = Math.floor(now.getTime() / 1000) - MESSAGE_RETENTION_DAYS * 24 * 60 * 60
+  const stale = await db.all<{ id: string }>(staleMessagesQuery(cutoff))
+  if (stale.length === 0) return 0
+  await db.run(purgeStaleMessagesStatement(cutoff))
+  return stale.length
 }

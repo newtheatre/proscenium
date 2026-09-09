@@ -11,6 +11,7 @@ import {
   viewBackups,
   viewBarCatalogue,
   viewBarStock,
+  viewBoardConfig,
   viewChecklist,
   viewEmergencyCard,
   viewFellows,
@@ -74,6 +75,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Emergency cards', icon: 'i-lucide-siren', to: '/rota/manage/emergency', ability: viewEmergencyCard },
       { label: 'Safety', icon: 'i-lucide-shield-alert', to: '/rota/manage/safety', ability: viewSafety },
       { label: 'Age-check register', icon: 'i-lucide-file-down', to: '/rota/manage/age-checks', ability: exportAgeChecks },
+      { label: 'Backstage board', icon: 'i-lucide-radio', to: '/rota/manage/backstage', ability: viewBoardConfig },
     ],
   },
 

@@ -789,15 +789,42 @@ night, venue_id, epoch)` (`shared/utils/backstage.ts`) recomputes it from a work
 
 ### backstage_devices
 `id` PK · `night_id` → backstage_nights cascade · `label` (whatever the crew member typed, never
-validated as a name) · `token_hash` UNIQUE · `joined_epoch` · `joined_at` · `last_seen_at` NULL.
-No account and no personal data (criterion 1): there is no `user_id` column at all. A rotation
-moves `backstage_nights.epoch` and stops a new join with the old code; it revokes nothing
-already joined, since `joined_epoch` is a record of when, not a live check on how (criterion 4).
+validated as a name) · `token_hash` UNIQUE · `joined_epoch` · `joined_at` · `last_seen_at` NULL ·
+`revoked_at` NULL. No account and no personal data (E-120 criterion 1): there is no `user_id`
+column at all. The failed-attempt rotation moves `backstage_nights.epoch` and stops a new join
+with the old code; it revokes nothing already joined, since `joined_epoch` is a record of when,
+not a live check on how (E-120 criterion 4). A manual reset is the only thing that sets
+`revoked_at`, and it does so for every currently-connected device in the same batch the epoch
+moves in: `requireDevice()` (`server/utils/backstage.ts`) refuses a revoked device's cookie
+outright (E-122 criterion 1).
 
-### backstage_messages / backstage_presets
-Not built. E-121's own tables: milestones, calls and acknowledgements over a joined device's
-connection. A manual reset, the 30-day free-text purge and the night report's timeline are
-E-122's; E-120 only ever gets a device onto the board.
+### backstage_milestone_types
+`id` PK · `label` UNIQUE · `sort` · `active` bool · `updated_by` set null · `updated_at`. The
+committee's own configuration, seeded with the six the story names (clearance, house open,
+curtain up, interval, restart, end) and extensible without a migration; mutable like
+`checklist_items`, since a message snapshots the label at send time (E-121 criterion 1).
+
+### backstage_presets
+`id` PK · `label` (the one-tap button's own text) · `body` (what is actually sent) · `sort` ·
+`active` bool · `updated_by` set null · `updated_at`. The committee's own routine-call texts,
+none seeded (E-121 criterion 2).
+
+### backstage_messages  APPEND-ONLY
+`id` PK · `night_id` → backstage_nights restrict · `device_id` → backstage_devices restrict (the
+poster) · `milestone_type_id` → backstage_milestone_types restrict, NULL (a preset or free-text
+message) · `body` (the milestone label, the preset body, or what was typed, snapshotted at send
+time either way) · `supersedes_id` NULL self-FK, UNIQUE (one correction per entry) ·
+`composed_at` (the device's own clock the instant it was composed, kept through an offline
+queue unchanged) · `created_at` (when the server actually received it). Never edited, only
+superseded, and only a milestone is ever superseded (E-121 criterion 5). A milestone row is
+night-report data and is never deleted; everything else purges at 30 days
+(`purgeStaleMessagesStatement()`, part of `daily:sweeps`), enforced by a trigger that refuses to
+delete a row naming a milestone type, not only by the sweep's own predicate (E-122 criterion 4).
+
+### backstage_acknowledgements
+`id` PK · `message_id` → backstage_messages restrict · `device_id` → backstage_devices restrict ·
+`acknowledged_at`. UNIQUE (`message_id`, `device_id`): one acknowledgement per device per
+message, `ON CONFLICT DO NOTHING` makes a repeat harmless (E-121 criterion 4).
 
 ### foh_contacts
 `id` PK · `kind` CHECK `COMMITTEE|VENUE|SECURITY|TAXI|OTHER` · `label` · `phone` · `note` ·

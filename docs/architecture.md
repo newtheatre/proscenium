@@ -91,7 +91,7 @@ namespace, and asks the owner for one anywhere else.
 | Stream | Routes and files owned |
 | --- | --- |
 | Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/qr` (retrieval, resend and self-service edit and cancel while unpaid: D-108, D-110), `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/`, `app/pages/[...slug].vue` (the content catch-all, D-103) |
-| Show night | `/rota` and `/rota/manage/**` (templates, rota administration and the venue emergency card at `/rota/manage/venues/[id]/emergency`), the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**`, `/api/admin/rota/**` and `server/utils/night-authority.ts`. The console screens sit under `/rota/manage`, never `/admin`: `/tonight` is the phone-first shell rather than a console prefix (0040, 0046). |
+| Show night | `/rota` and `/rota/manage/**` (templates, rota administration, the venue emergency card and the backstage board's own milestone types and presets at `/rota/manage/backstage`), the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**`, `/api/admin/rota/**`, `/api/admin/backstage/**`, `/api/board/**` and `server/utils/night-authority.ts`. The console screens sit under `/rota/manage`, never `/admin`: `/tonight` is the phone-first shell rather than a console prefix (0040, 0046). |
 | Bar | `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**` |
 | Platform | `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`, `tests/helpers/race.ts` |
 
@@ -756,8 +756,56 @@ venue they were closest to. `GET /api/tonight/board/code` is the opposite: guard
 only from the duty manager's own `/tonight`, revealed on tap rather than shown by default or
 polled (criterion 5).
 
-Not built here, and not this story's: `backstage_messages`, `backstage_presets`, a manual reset
-and the 30-day free-text purge are all E-121's and E-122's (`docs/data-model.md`).
+### Milestones, presets and acknowledgements (E-121)
+
+`POST /api/board/messages` is one route for all three of a milestone, a preset and free text,
+distinguished by `postMessageForm`'s own refinement (exactly one of `milestoneTypeId`,
+`presetId` or `body`), rather than three routes: the write is identical either way, only where
+the wording comes from differs. The wording itself is resolved server-side
+(`milestoneLabel()`/`presetBody()`), never trusted from the caller, so a message always carries
+the committee's current copy at the moment it was sent, and a retired or unknown id refuses
+before anything is written.
+
+`requireDevice()` is the board's own guard, `getCookie(event, 'nnt-backstage-token')` resolved
+against `backstage_devices` the same way a QR reservation cookie resolves against
+`requireQrReservationId()` (D-108): no session, so the cookie is the only credential there is. A
+revoked device (E-122) is refused at this one point rather than at every route that calls it.
+
+Only a milestone is ever corrected (`supersedeMessageStatement()`'s own predicate refuses
+anything else), matching criterion 5's own wording; free text and presets are not, since nothing
+in the story asks a "5 minutes please" tap to be retracted. Acknowledgement
+(`backstage_acknowledgements`) is `INSERT ... ON CONFLICT DO NOTHING`, the same idempotent shape
+a repeated tap anywhere else in this codebase gets, and exempted from the audit trail: a
+high-volume presence fact is not the kind of privileged mutation the trail exists for.
+
+The board polls both the message feed and the duty manager's own read of it (`/tonight/board`)
+every five seconds, the contract criterion 3 states directly rather than a configuration key.
+Ordered by `composed_at`, not `created_at`: a message that queued offline and arrived late still
+slots into the position it was actually composed at, which is the whole reason criterion 6 asks
+`composed_at` to survive the queue. The client side rides `useWriteQueue` (K-104), unconsumed
+until now: a tap enqueues, drains in order, and a genuine refusal (a retired preset) is
+distinguished from a dropped connection by status code, never retried blindly.
+
+### Board reset and retention (E-122)
+
+`POST /api/tonight/board/reset` revokes every currently-unrevoked device on the night
+(`backstage_devices.revoked_at`) and bumps `backstage_nights.epoch` in the same batch, so no
+caller ever observes a moved epoch next to a device that can still act on the old one (criterion
+1). The automatic ten-failed-attempt rotation shares the same `epoch` column but never touches
+`revoked_at`: that asymmetry is deliberate, restated from E-120's own note, because a rotation
+deters guessing and a reset ends a compromised night, and conflating the two would silently
+change what a lockout does. `boardResetRecipients()` mirrors `safetyOfficers()`'s shape exactly,
+every live holder of `night.manage`; the notification template never names the new code, which
+travels by voice only (criterion 2).
+
+Retention is two different rules on one table, both against `backstage_messages`. A milestone
+row (`milestone_type_id IS NOT NULL`) is night-report data and is kept forever; everything else
+purges after 30 days, both the sweep's own predicate and a hand-added trigger that refuses to
+delete a milestone row outright, so a bug in the sweep cannot silently take night-report data
+with it (0010's own reasoning, extended to a table that purges by design rather than never
+deleting at all). `purgeStaleMessages()` folds into `daily:sweeps`
+(`server/tasks/daily/sweeps.ts`) rather than a new cron entry, since it is exactly the "tidy
+lapsed rows" job that task already runs nightly.
 
 ## The programme (build-order contract d, 0043)
 

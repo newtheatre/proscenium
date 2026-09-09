@@ -13,6 +13,7 @@ export default defineTask({
     const unverified = await expireUnverifiedAccounts(before)
     const renewals = await remindExpiringMemberships(undefined, before)
     const withdrawnAccessProfiles = await sweepWithdrawnAccessProfiles(before)
-    return { result: { attempts, tokens, unverified, renewals, withdrawnAccessProfiles } }
+    const staleBackstageMessages = await purgeStaleMessages(before)
+    return { result: { attempts, tokens, unverified, renewals, withdrawnAccessProfiles, staleBackstageMessages } }
   },
 })

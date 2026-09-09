@@ -86,6 +86,10 @@ export const manageSafety = defineAbility((viewer: Viewer) => holds(viewer, 'saf
 // The Challenge 25 register's licensing export, an officer duty rather than a shift one (E-119).
 export const exportAgeChecks = defineAbility((viewer: Viewer) => holds(viewer, 'age-checks.export'))
 
+// The backstage board's milestone types and presets, committee configuration (E-121).
+export const viewBoardConfig = defineAbility((viewer: Viewer) => holds(viewer, 'board.read'))
+export const manageBoardConfig = defineAbility((viewer: Viewer) => holds(viewer, 'board.write'))
+
 // Tonight is derived from a confirmed shift and expires at 04:00 with nothing to revoke (0014,
 // E-111), so it is read from the request rather than from anything the viewer holds.
 export const workTonight = defineAbility((viewer: Viewer) => viewer.onShiftTonight)
@@ -133,6 +137,8 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewSafety: 'safety.read',
   manageSafety: 'safety.write',
   exportAgeChecks: 'age-checks.export',
+  viewBoardConfig: 'board.read',
+  manageBoardConfig: 'board.write',
   workTheDoor: 'night.door',
   workTheTill: 'night.till',
   manageTonight: 'night.manage',

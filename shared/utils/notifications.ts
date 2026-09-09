@@ -309,6 +309,12 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'incident-follow-up-required',
   },
+  // Says a reset happened, never the new code, which travels by voice only (E-122 criterion 2).
+  'board.reset': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'board-reset',
+  },
 
   // Module F: bar
 
