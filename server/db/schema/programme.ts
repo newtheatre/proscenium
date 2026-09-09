@@ -28,18 +28,21 @@ export const venues = sqliteTable('venues', {
   check('venues_capacity_positive', sql`${table.capacity} IS NULL OR ${table.capacity} > 0`),
 ])
 
-// The card front of house reads in the dark (E-113). Every column describes the building, so
-// none of it is personal data whoever last edited it.
+// The card front of house reads in the dark, append-only (E-113 criterion 1). The latest row
+// per venue is the current card; nothing here is personal data, whoever last edited it.
 export const venueEmergencyInfo = sqliteTable('venue_emergency_info', {
-  venueId: text('venue_id').primaryKey().references(() => venues.id, { onDelete: 'cascade' }),
+  id: id(),
+  venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),
   assemblyPoint: text('assembly_point'),
   exits: text('exits'),
   isolationPoints: text('isolation_points'),
   what3words: text('what3words'),
   notes: text('notes'),
-  updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  updatedBy: text('updated_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
   updatedAt: integer('updated_at').notNull().default(now),
-})
+}, table => [
+  index('venue_emergency_info_venue_created').on(table.venueId, table.updatedAt),
+])
 
 // The financial season runs 1 August to 31 July, which is the committee year.
 export const seasons = sqliteTable('seasons', {

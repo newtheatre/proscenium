@@ -216,6 +216,16 @@ export const MESSAGE_TYPES = {
     sender: 'BOX_OFFICE',
   },
 
+  // Transactional (the booking exists because of this message, not despite a preference), and
+  // reaches an unverified account, which every guest is (D-108 criterion 2).
+  'reservation.confirmed': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'reservation-confirmed',
+    reachesUnverified: true,
+    sender: 'BOX_OFFICE',
+  },
+
   // Module E: show night
 
   // Transactional, so no rota preference can silence it: somebody who turned shift email off

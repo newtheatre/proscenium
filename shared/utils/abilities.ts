@@ -75,6 +75,10 @@ export const manageRota = defineAbility((viewer: Viewer) => holds(viewer, 'rota.
 export const viewChecklist = defineAbility((viewer: Viewer) => holds(viewer, 'checklist.read'))
 export const manageChecklist = defineAbility((viewer: Viewer) => holds(viewer, 'checklist.write'))
 
+// The venue emergency card, committee-edited the same way (E-113).
+export const viewEmergencyCard = defineAbility((viewer: Viewer) => holds(viewer, 'emergency-card.read'))
+export const manageEmergencyCard = defineAbility((viewer: Viewer) => holds(viewer, 'emergency-card.write'))
+
 // Tonight is derived from a confirmed shift and expires at 04:00 with nothing to revoke (0014,
 // E-111), so it is read from the request rather than from anything the viewer holds.
 export const workTonight = defineAbility((viewer: Viewer) => viewer.onShiftTonight)
@@ -117,6 +121,8 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   manageRota: 'rota.write',
   viewChecklist: 'checklist.read',
   manageChecklist: 'checklist.write',
+  viewEmergencyCard: 'emergency-card.read',
+  manageEmergencyCard: 'emergency-card.write',
   workTheDoor: 'night.door',
   workTheTill: 'night.till',
   manageTonight: 'night.manage',

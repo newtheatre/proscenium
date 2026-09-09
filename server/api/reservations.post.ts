@@ -69,9 +69,10 @@ export default defineEventHandler(async (event) => {
   const capRefusal = overCapReason(input.lines, cap)
   if (capRefusal) throw createError({ statusCode: 400, statusMessage: capRefusal })
 
-  // Resolved against the performance, never the show alone: a performance-level override can
-  // price or retire a type the show still offers.
-  const resolved = new Map((await bookableTicketTypes(input.performanceId, performance.showId)).map(type => [type.id, type]))
+  // Re-checked here, not trusted from the booking screen's own read: a membership can lapse
+  // between the two (D-109 criterion 1).
+  const isMember = account ? await hasCurrentMembership(event, account.id, new Date()) : false
+  const resolved = new Map((await bookableTicketTypes(input.performanceId, performance.showId, isMember)).map(type => [type.id, type]))
 
   const lines = input.lines.map((line) => {
     const type = resolved.get(line.ticketTypeId)
@@ -101,11 +102,24 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const qrToken = await qrTokenFor(result.id)
+
+  // The batch committed, so the booking is real: send after, never before (0003).
+  await sendReservationConfirmation(event, {
+    userId: booker.id,
+    reference: result.reference,
+    showTitle: performance.showTitle,
+    startsAt: performance.startsAt,
+    totalPence: result.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0),
+    qrToken,
+  })
+
   return {
     reference: result.reference,
     status: 'PENDING' as const,
     performanceId: input.performanceId,
     tickets: result.tickets,
     totalPence: result.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0),
+    qrToken,
   }
 })
