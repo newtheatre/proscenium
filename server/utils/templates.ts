@@ -548,6 +548,36 @@ ${context.note}
 The Nottingham New Theatre`,
   }),
 
+  // Distinct subject from a human sign-off's own template (E-125 criterion 3), so a search or a
+  // glance tells the two apart without opening either.
+  'night-report-auto-closed': (context: TemplateContext): Rendered => ({
+    subject: `Night auto-closed, no signatory: ${context.venueName}, ${context.night}`,
+    html: layout(`<p>Tonight's report at ${context.venueName} closed itself, twenty-four hours after the show
+night ended with nobody signing it off.</p>
+<p>${context.closingNote}</p>`),
+    text: `Tonight's report at ${context.venueName} closed itself, twenty-four hours after the show night
+ended with nobody signing it off.
+
+${context.closingNote}
+
+The Nottingham New Theatre`,
+  }),
+
+  // The FOH officer's own copy (E-125 criterion 3), a real greeting: this reaches an account,
+  // never a committee-configured address the way the report's own distribution does.
+  'night-auto-closed': (context: TemplateContext): Rendered => ({
+    subject: `Unclosed night: ${context.venueName}, ${context.night}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Tonight's report at ${context.venueName} closed itself: nobody signed it off within
+twenty-four hours of the show night ending.</p>`),
+    text: `Hello ${context.name},
+
+Tonight's report at ${context.venueName} closed itself: nobody signed it off within twenty-four
+hours of the show night ending.
+
+The Nottingham New Theatre`,
+  }),
+
   // Good news, so it leads with it. The way out is in the same breath as the place, because a
   // place nobody uses is one somebody else was waiting for.
   'training-session-promoted': (context: TemplateContext): Rendered => {

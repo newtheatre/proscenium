@@ -98,6 +98,46 @@ describe('signOffStatement (criterion 1)', () => {
   })
 })
 
+describe('a SYSTEM auto-close carries no signatory (E-125 criterion 2, 0090)', () => {
+  test('signedBy null and signedVia SYSTEM inserts cleanly', async () => {
+    await withDatabase((database) => {
+      const { performanceId, venueId, night } = house(database, 'signoff-system')
+
+      const inserted = run(database, signOffStatement({
+        id: 'report-system', performanceId, venueId, night, closingNote: 'Closed automatically', report: { ...REPORT, performanceId },
+        signedBy: null, signedVia: 'SYSTEM',
+      }))
+      expect(inserted).toHaveLength(1)
+
+      const [stored] = rows<{ signed_by: string | null, signed_via: string }>(database, 'SELECT signed_by, signed_via FROM night_reports WHERE performance_id = ?', performanceId)
+      expect(stored).toEqual({ signed_by: null, signed_via: 'SYSTEM' })
+    })
+  })
+
+  test('a human signature and SYSTEM together are refused by the shape check', async () => {
+    await withDatabase((database) => {
+      const dm = person(database, 'signer-system-shape')
+      const { performanceId, venueId, night } = house(database, 'signoff-system-shape')
+
+      expect(() => database.raw.exec(`
+        INSERT INTO night_reports (id, performance_id, venue_id, night, closing_note, report, signed_by, signed_via)
+        VALUES ('bad-1', '${performanceId}', '${venueId}', '${night}', 'x', '{}', '${dm}', 'SYSTEM')
+      `)).toThrow(/night_reports_system_has_no_signatory/)
+    })
+  })
+
+  test('SHIFT or OFFICER with no signatory is refused by the same shape check', async () => {
+    await withDatabase((database) => {
+      const { performanceId, venueId, night } = house(database, 'signoff-missing-shape')
+
+      expect(() => database.raw.exec(`
+        INSERT INTO night_reports (id, performance_id, venue_id, night, closing_note, report, signed_via)
+        VALUES ('bad-2', '${performanceId}', '${venueId}', '${night}', 'x', '{}', 'SHIFT')
+      `)).toThrow(/night_reports_system_has_no_signatory/)
+    })
+  })
+})
+
 describe('reportForPerformanceQuery', () => {
   test('joins the signer\'s name onto the frozen row', async () => {
     await withDatabase((database) => {
@@ -111,6 +151,20 @@ describe('reportForPerformanceQuery', () => {
 
       const [row] = run(database, reportForPerformanceQuery(performanceId))
       expect(row).toMatchObject({ id: 'report-named', signedByName: 'Sam Signer', signedVia: 'SHIFT' })
+    })
+  })
+
+  // An INNER JOIN on `signed_by` would silently drop a SYSTEM row from every read (E-125).
+  test('a SYSTEM row still reads back, with a null signer and a null name', async () => {
+    await withDatabase((database) => {
+      const { performanceId, venueId, night } = house(database, 'signoff-system-read')
+      run(database, signOffStatement({
+        id: 'report-system-read', performanceId, venueId, night, closingNote: 'Closed automatically', report: { ...REPORT, performanceId },
+        signedBy: null, signedVia: 'SYSTEM',
+      }))
+
+      const [row] = run(database, reportForPerformanceQuery(performanceId))
+      expect(row).toMatchObject({ id: 'report-system-read', signedBy: null, signedByName: null, signedVia: 'SYSTEM' })
     })
   })
 })

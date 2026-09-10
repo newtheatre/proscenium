@@ -349,6 +349,13 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'docs-drift-reported',
   },
+  // An unclosed night is a visible event, not a silent repair (E-125 criterion 3): transactional
+  // like `shift.rota-unstaffed`, the officer's own precedent, never a preference to mute.
+  'night.auto-closed': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'night-auto-closed',
+  },
 
   // Module F: bar
 

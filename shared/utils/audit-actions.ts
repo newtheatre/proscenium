@@ -204,6 +204,7 @@ const CATALOGUE = {
   'checklist.closed': { label: 'Night closed', module: 'show-night' },
   'night-report.signed': { label: 'Night report signed off and frozen', module: 'show-night' },
   'night-report.addendum': { label: 'Night report corrected by addendum', module: 'show-night' },
+  'night-report.auto-closed': { label: 'Night report closed automatically, no signatory', module: 'show-night' },
   'emergency-card.updated': { label: 'Venue emergency card updated', module: 'show-night' },
   'incident-severity.routing-changed': { label: 'Severity follow-up routing changed', module: 'show-night' },
   'incident-followup.closed': { label: 'Incident follow-up closed', module: 'show-night' },

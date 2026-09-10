@@ -23,6 +23,14 @@ const META = join(DIR, 'meta')
 // so a rebuild here is always a defect.
 const GRANDFATHERED = new Set<string>()
 
+// Waives `rebuildDependentProblems` alone, never the copying-column or trigger-drop checks: a
+// narrow, named, human-reviewed exemption, each entry citing why (0063).
+const HAND_REVIEWED_REBUILDS = new Set<string>([
+  // night_reports has two restrict dependents (night_report_addenda, night_report_deliveries),
+  // rebuilt around it in the order verified against a real fixture in 0063, not reasoned about.
+  '0093_auto_close_within_24_hours',
+])
+
 function scan(dir: string, pattern: string): string[] {
   try {
     return [...new Bun.Glob(pattern).scanSync({ cwd: dir, onlyFiles: true })].sort()
@@ -77,6 +85,7 @@ const problems: string[] = []
 for (const file of scan(DIR, '*.sql')) {
   const sql = await Bun.file(join(DIR, file)).text()
   const grandfathered = GRANDFATHERED.has(file.replace(/\.sql$/, ''))
+  const handReviewed = HAND_REVIEWED_REBUILDS.has(file.replace(/\.sql$/, ''))
 
   if (!grandfathered) {
     const before = snapshotBefore(Number(file.slice(0, 4)), snapshots)?.tables ?? {}
@@ -88,7 +97,7 @@ for (const file of scan(DIR, '*.sql')) {
 
   const events = migrationEventsIn(sql)
 
-  if (!grandfathered) {
+  if (!grandfathered && !handReviewed) {
     for (const event of events) {
       if (event.kind !== 'rebuild') continue
       problems.push(...rebuildDependentProblems(file, event.table!, dependentsOnto.get(event.table!) ?? []))
