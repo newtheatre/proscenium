@@ -15,7 +15,9 @@ Stories: 24. Phases: 19 MVP, 0 V2, 0 Later, 5 resolved.
   predicate-and-assert work in the old estate's proven style: conditional writes, unique
   indexes and batch atomicity. The stories were written mechanism-neutral and hold as written.
 - Answered 26 August: there is no legacy training import (K-117 and G-127 resolved); the
-  records do not map to the current module system.
+  records do not map to the current module system. Amended 10 September: both named the
+  Heroku-era archive `rehearsal` already absorbed once, not `rehearsal`'s own live database,
+  which the training transform imports the same way bookings and money already do (0065).
 - Whether historical pass revenue is backfilled into the ledger or documented as a pre-migration
   gap (K-114); the old estate never wrote pass-sale transactions.
 - Whether offline tolerance (K-103, K-104) is built on a service worker, and if so what its
