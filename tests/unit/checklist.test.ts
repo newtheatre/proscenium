@@ -3,6 +3,7 @@ import {
   PHASES,
   SYSTEM_CHECKS,
   checklistItemForm,
+  checklistScopeForm,
   exemptForm,
   saysPhase,
   saysSystemCheck,
@@ -41,6 +42,17 @@ describe('the exception path names a reason (criterion 5)', () => {
   test('a reason is required', () => {
     expect(exemptForm.safeParse({ reason: '' }).success).toBe(false)
     expect(exemptForm.safeParse({ reason: 'The bar manager left before signing off; confirmed by phone' }).success).toBe(true)
+  })
+
+  test('naming a performance is optional, tonight\'s one running is the common case (E-128)', () => {
+    expect(exemptForm.parse({ reason: 'Reason' }).performanceId).toBeUndefined()
+    expect(exemptForm.parse({ reason: 'Reason', performanceId: 'performance-1' }).performanceId).toBe('performance-1')
+  })
+})
+
+describe('a bare scope names a performance or nothing (E-128)', () => {
+  test('an empty body resolves to tonight\'s one performance', () => {
+    expect(checklistScopeForm.safeParse({}).success).toBe(true)
   })
 })
 
