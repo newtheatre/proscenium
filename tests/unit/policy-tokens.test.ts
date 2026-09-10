@@ -34,6 +34,17 @@ describe('finding the tokens on a page (criteria 1, 3)', () => {
     expect(tokensInTree(body).sort()).toEqual(['ROOM_ACTIVE_BOOKINGS_PER_MEMBER', 'ROOM_MAX_BOOKING_HOURS'])
   })
 
+  // What the markdown parser actually produces: MDC reads `{{KEY}}` as its own interpolation and
+  // turns it into a binding node, which renders as blank unless something resolves it.
+  test('a token parsed into a binding node is found too', () => {
+    const body = tree(['p', {}, 'up to ', ['binding', { value: 'ROOM_MAX_BOOKING_HOURS' }], ' at a time'])
+    expect(tokensInTree(body)).toEqual(['ROOM_MAX_BOOKING_HOURS'])
+  })
+
+  test('a binding that is not a configuration key is left alone', () => {
+    expect(tokensInTree(tree(['p', {}, ['binding', { value: 'somethingElse' }]]))).toEqual([])
+  })
+
   test('the same token twice on a page is named once', () => {
     expect(tokensInTree(tree(['p', {}, '{{ROOM_FEED_WEEKS}} and {{ROOM_FEED_WEEKS}}']))).toEqual(['ROOM_FEED_WEEKS'])
   })
@@ -167,6 +178,27 @@ describe('what a page renders (criteria 2, 4, 5)', () => {
     const rendered = JSON.stringify(resolved)
     expect(rendered).toContain('policy-unenforced')
     expect(rendered).toContain('not enforced yet')
+  })
+
+  test('a binding node becomes the live value, not a blank', () => {
+    const resolved = resolvePolicyTree(
+      tree(['p', {}, 'up to ', ['binding', { value: 'ROOM_MAX_BOOKING_HOURS' }], ' at a time']),
+      values,
+    )
+    const rendered = JSON.stringify(resolved)
+    expect(rendered).toContain('4 hours')
+    expect(rendered).toContain('policy-value')
+    expect(rendered).not.toContain('binding')
+  })
+
+  test('an unresolvable binding renders the same visible error a text token does', () => {
+    const resolved = resolvePolicyTree(tree(['p', {}, ['binding', { value: 'RETENTION_WARNING_DAYS' }]]), values)
+    expect(JSON.stringify(resolved)).toContain('policy-error')
+  })
+
+  test('a binding nobody registered is left as it was, for whatever else uses one', () => {
+    const original = tree(['p', {}, ['binding', { value: 'somethingElse' }]])
+    expect(resolvePolicyTree(original, values)).toEqual(original)
   })
 
   test('a page with no token is handed on unchanged', () => {

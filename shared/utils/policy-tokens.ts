@@ -27,6 +27,16 @@ function isTree(value: unknown): value is Tree {
   return typeof value === 'object' && value !== null && Array.isArray((value as Tree).value)
 }
 
+// The markdown parser reads `{{KEY}}` as MDC interpolation and leaves a binding node, which
+// renders as blank unless something resolves it: the failure criterion 4 exists to forbid.
+const KEY_SHAPED = /^[A-Z0-9_]+$/
+
+function bindingKey(node: Node): string | null {
+  if (typeof node === 'string' || node[0] !== 'binding') return null
+  const value = (node[1] as { value?: unknown } | undefined)?.value
+  return typeof value === 'string' && KEY_SHAPED.test(value) ? value : null
+}
+
 export function tokensInTree(tree: unknown): string[] {
   if (!isTree(tree)) return []
   const found = new Set<string>()
@@ -34,6 +44,11 @@ export function tokensInTree(tree: unknown): string[] {
   const walk = (node: Node): void => {
     if (typeof node === 'string') {
       for (const token of tokensInText(node)) found.add(token)
+      return
+    }
+    const bound = bindingKey(node)
+    if (bound) {
+      found.add(bound)
       return
     }
     for (const child of node.slice(2) as Node[]) walk(child)
@@ -160,6 +175,10 @@ export function resolvePolicyTree<T>(tree: T, values: PolicyValues): T {
 
   const walk = (node: Node): Node[] => {
     if (typeof node === 'string') return splitText(node, values)
+
+    const bound = bindingKey(node)
+    if (bound) return [nodesFor(bound, values)]
+
     const [tag, props, ...children] = node as [string, unknown, ...Node[]]
     return [[tag, props, ...children.flatMap(walk)]]
   }
