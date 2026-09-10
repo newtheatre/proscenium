@@ -283,6 +283,10 @@ Stories: 24. Phases: 19 MVP, 0 V2, 0 Later, 5 resolved.
      0015, amended): the source-to-new id mapping lives only in the migration tooling's working
      artefacts, kept with the read-only old estate and archived with it, so historical
      questions trace through the reconciliation reports rather than the database.
+  4. Added 10 September 2026: every writer keyed to a person refuses to write over one already
+     anonymised in the target, on its conflict branch at minimum (0059). `migration/load.ts` and
+     `migration/bookings.ts` already do; a module gaining its own import under this story wires
+     through the same guard rather than reinventing or omitting it.
 - Source: Prompt Book P1; audit EW-2 (shared canonical ids); Get-In part 3 ("a keyed merge, not
   entity resolution")
 

@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { UNRECORDED_PURPOSE } from '#shared/utils/bookings'
+import { erasureStatements } from '#shared/utils/erasure'
 import { STATUS_MAP, reconcile, transformBookings } from '#migration/bookings'
-import { createTestDatabase, rows } from '#tests/helpers/database'
+import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
 // C-118, proved against a source shaped like the real old rooms schema and the real migrations
@@ -71,13 +72,18 @@ async function targetWithEstate(): Promise<TestDatabase> {
   return target
 }
 
-function run(source: Database, target: TestDatabase, accounts = new Map([['old-user-1', 'new-user-1']])): ReturnType<typeof transformBookings> {
+function run(
+  source: Database,
+  target: TestDatabase,
+  accounts = new Map([['old-user-1', 'new-user-1']]),
+  bookingIds = new Map<string, string>(),
+): ReturnType<typeof transformBookings> {
   return transformBookings({
     source,
     accounts,
     rooms: new Map([['room:1', 'new-studio']]),
     spaces: new Map([['venue:7', 'new-su']]),
-    bookingIds: new Map(),
+    bookingIds,
     seriesIds: new Map(),
     externalIds: new Map(),
     target: (target as unknown as { raw: Database }).raw ?? (target as unknown as Database),
@@ -281,6 +287,39 @@ describe('nothing is invented (criterion 3)', () => {
         target, `SELECT name, anonymised_at FROM users WHERE id = 'new-ghost'`)
       expect(ghost?.name).toBe('Deleted user')
       expect(ghost?.anonymised_at).toBe(1_700_000_000)
+    }
+    finally {
+      target.close()
+    }
+  })
+
+  // 0011: erasure's own scrub of an existing booking must survive a later re-import from a
+  // source that has not heard about it (K-113: the same guard as a keyed identity import).
+  test('a booking already scrubbed by erasure does not regain its original notes', async () => {
+    const source = oldEstate()
+    place(source, { id: 1, over: { notes: 'Need extra chairs for a relative' } })
+    const target = await targetWithEstate()
+    // Persisted across both calls, the way out/booking-id-map.tsv is week to week: the same
+    // booking keeps the same id, so the second run is a conflict, not a second row.
+    const bookingIds = new Map<string, string>()
+
+    try {
+      // First import, before the person was erased: the real notes land, same as any other.
+      run(source, target, undefined, bookingIds)
+      expect(rows<{ notes: string | null }>(target, 'SELECT notes FROM room_bookings')[0]?.notes)
+        .toBe('Need extra chairs for a relative')
+
+      // Erased since: erasureStatements scrubs this exact booking's title and notes.
+      target.batch(erasureStatements('new-user-1', 1_780_000_000).map(statement => boundStatement(target, statement)))
+      expect(rows<{ title: string }>(target, 'SELECT title FROM room_bookings')[0]?.title).toBe('Erased booking')
+
+      // The old estate never heard about the erasure: its export still has the real notes.
+      run(source, target, undefined, bookingIds)
+      expect(rows(target, 'SELECT id FROM room_bookings')).toHaveLength(1)
+
+      const after = rows<{ title: string, notes: string | null }>(target, 'SELECT title, notes FROM room_bookings')[0]!
+      expect(after.title).toBe('Erased booking')
+      expect(after.notes).toBeNull()
     }
     finally {
       target.close()

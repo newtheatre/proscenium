@@ -48,6 +48,14 @@ export function ensureOut(): void {
   mkdirSync(OUT, { recursive: true })
 }
 
+// Every migration writer keyed to a person guards its conflict branch with this: the source
+// cannot know they were erased here, so the guard, not the source, is what stops a re-import
+// from writing over an anonymised row (0011, K-112, K-113). A fresh row for that person is not
+// blocked, because utilisation and sales statistics survive an erasure; only overwriting an
+// existing one, which is where a scrub erasure already applied would be undone, is.
+export const NOT_ANONYMISED = (table: string): string =>
+  `NOT EXISTS (SELECT 1 FROM users WHERE id = ${table}.user_id AND anonymised_at IS NOT NULL)`
+
 const ALPHABET = 'useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict'
 export function nanoid(size = 21): string {
   const bytes = crypto.getRandomValues(new Uint8Array(size))
