@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "aee58812-27a1-49a6-ba11-aeeffe26c36e",
-  "prevId": "b1a4ceb8-a41c-4dce-8df4-ce6f662bd803",
+  "id": "c4451018-493c-49c8-8226-72a03b0c50d5",
+  "prevId": "8d52f0de-d3ad-477d-a0bd-521dabaddbd4",
   "tables": {
     "access_profiles": {
       "name": "access_profiles",
@@ -1614,8 +1614,15 @@
           "notNull": true,
           "autoincrement": false
         },
-        "performance_id": {
-          "name": "performance_id",
+        "venue_id": {
+          "name": "venue_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "night": {
+          "name": "night",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -1638,21 +1645,22 @@
         }
       },
       "indexes": {
-        "checklist_closes_performance": {
-          "name": "checklist_closes_performance",
+        "checklist_closes_venue_night": {
+          "name": "checklist_closes_venue_night",
           "columns": [
-            "performance_id"
+            "venue_id",
+            "night"
           ],
           "isUnique": true
         }
       },
       "foreignKeys": {
-        "checklist_closes_performance_id_performances_id_fk": {
-          "name": "checklist_closes_performance_id_performances_id_fk",
+        "checklist_closes_venue_id_venues_id_fk": {
+          "name": "checklist_closes_venue_id_venues_id_fk",
           "tableFrom": "checklist_closes",
-          "tableTo": "performances",
+          "tableTo": "venues",
           "columnsFrom": [
-            "performance_id"
+            "venue_id"
           ],
           "columnsTo": [
             "id"
@@ -1816,8 +1824,15 @@
           "notNull": true,
           "autoincrement": false
         },
-        "performance_id": {
-          "name": "performance_id",
+        "venue_id": {
+          "name": "venue_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "night": {
+          "name": "night",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -1918,29 +1933,31 @@
         }
       },
       "indexes": {
-        "checklist_stamps_performance": {
-          "name": "checklist_stamps_performance",
+        "checklist_stamps_venue_night": {
+          "name": "checklist_stamps_venue_night",
           "columns": [
-            "performance_id"
+            "venue_id",
+            "night"
           ],
           "isUnique": false
         },
-        "checklist_stamps_performance_item": {
-          "name": "checklist_stamps_performance_item",
+        "checklist_stamps_venue_night_item": {
+          "name": "checklist_stamps_venue_night_item",
           "columns": [
-            "performance_id",
+            "venue_id",
+            "night",
             "item_id"
           ],
           "isUnique": true
         }
       },
       "foreignKeys": {
-        "checklist_stamps_performance_id_performances_id_fk": {
-          "name": "checklist_stamps_performance_id_performances_id_fk",
+        "checklist_stamps_venue_id_venues_id_fk": {
+          "name": "checklist_stamps_venue_id_venues_id_fk",
           "tableFrom": "checklist_stamps",
-          "tableTo": "performances",
+          "tableTo": "venues",
           "columnsFrom": [
-            "performance_id"
+            "venue_id"
           ],
           "columnsTo": [
             "id"
@@ -5207,102 +5224,6 @@
         }
       }
     },
-    "notification_digest_entries": {
-      "name": "notification_digest_entries",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "topic": {
-          "name": "topic",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "subject": {
-          "name": "subject",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "body": {
-          "name": "body",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "digest_log_id": {
-          "name": "digest_log_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        }
-      },
-      "indexes": {
-        "notification_digest_entries_due": {
-          "name": "notification_digest_entries_due",
-          "columns": [
-            "topic",
-            "user_id",
-            "digest_log_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "notification_digest_entries_user_id_users_id_fk": {
-          "name": "notification_digest_entries_user_id_users_id_fk",
-          "tableFrom": "notification_digest_entries",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "notification_digest_entries_topic": {
-          "name": "notification_digest_entries_topic",
-          "value": "\"notification_digest_entries\".\"topic\" IN ('BOOKINGS', 'SHIFTS', 'TRAINING', 'ROOMS', 'ANNOUNCEMENTS')"
-        }
-      }
-    },
     "notification_log": {
       "name": "notification_log",
       "columns": {
@@ -6715,180 +6636,6 @@
         "performances_external_url_not_empty": {
           "name": "performances_external_url_not_empty",
           "value": "\"performances\".\"external_booking_url\" IS NULL OR length(\"performances\".\"external_booking_url\") > 0"
-        }
-      }
-    },
-    "period_locks": {
-      "name": "period_locks",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "from_day": {
-          "name": "from_day",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "to_day": {
-          "name": "to_day",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "action": {
-          "name": "action",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "actor_id": {
-          "name": "actor_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        }
-      },
-      "indexes": {
-        "period_locks_range": {
-          "name": "period_locks_range",
-          "columns": [
-            "from_day",
-            "to_day",
-            "created_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "period_locks_actor_id_users_id_fk": {
-          "name": "period_locks_actor_id_users_id_fk",
-          "tableFrom": "period_locks",
-          "tableTo": "users",
-          "columnsFrom": [
-            "actor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "period_locks_action": {
-          "name": "period_locks_action",
-          "value": "\"period_locks\".\"action\" IN ('CLOSED', 'REOPENED')"
-        },
-        "period_locks_range_order": {
-          "name": "period_locks_range_order",
-          "value": "\"period_locks\".\"to_day\" >= \"period_locks\".\"from_day\""
-        }
-      }
-    },
-    "periods": {
-      "name": "periods",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "from_day": {
-          "name": "from_day",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "to_day": {
-          "name": "to_day",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        }
-      },
-      "indexes": {
-        "periods_range": {
-          "name": "periods_range",
-          "columns": [
-            "from_day",
-            "to_day"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "periods_created_by_users_id_fk": {
-          "name": "periods_created_by_users_id_fk",
-          "tableFrom": "periods",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "periods_range_order": {
-          "name": "periods_range_order",
-          "value": "\"periods\".\"to_day\" >= \"periods\".\"from_day\""
         }
       }
     },
@@ -9756,180 +9503,6 @@
         "stocktakes_applies_after_it_opens": {
           "name": "stocktakes_applies_after_it_opens",
           "value": "\"stocktakes\".\"applied_at\" IS NULL OR \"stocktakes\".\"applied_at\" >= \"stocktakes\".\"opened_at\""
-        }
-      }
-    },
-    "ticket_comp_requests": {
-      "name": "ticket_comp_requests",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "reservation_id": {
-          "name": "reservation_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "performance_id": {
-          "name": "performance_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "requested_by": {
-          "name": "requested_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "reason": {
-          "name": "reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'PENDING'"
-        },
-        "decided_by": {
-          "name": "decided_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "decided_at": {
-          "name": "decided_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "decline_reason": {
-          "name": "decline_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "entry_id": {
-          "name": "entry_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        }
-      },
-      "indexes": {
-        "ticket_comp_requests_reservation": {
-          "name": "ticket_comp_requests_reservation",
-          "columns": [
-            "reservation_id"
-          ],
-          "isUnique": false
-        },
-        "ticket_comp_requests_performance": {
-          "name": "ticket_comp_requests_performance",
-          "columns": [
-            "performance_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "ticket_comp_requests_reservation_id_reservations_id_fk": {
-          "name": "ticket_comp_requests_reservation_id_reservations_id_fk",
-          "tableFrom": "ticket_comp_requests",
-          "tableTo": "reservations",
-          "columnsFrom": [
-            "reservation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ticket_comp_requests_performance_id_performances_id_fk": {
-          "name": "ticket_comp_requests_performance_id_performances_id_fk",
-          "tableFrom": "ticket_comp_requests",
-          "tableTo": "performances",
-          "columnsFrom": [
-            "performance_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ticket_comp_requests_requested_by_users_id_fk": {
-          "name": "ticket_comp_requests_requested_by_users_id_fk",
-          "tableFrom": "ticket_comp_requests",
-          "tableTo": "users",
-          "columnsFrom": [
-            "requested_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ticket_comp_requests_decided_by_users_id_fk": {
-          "name": "ticket_comp_requests_decided_by_users_id_fk",
-          "tableFrom": "ticket_comp_requests",
-          "tableTo": "users",
-          "columnsFrom": [
-            "decided_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "ticket_comp_requests_status_values": {
-          "name": "ticket_comp_requests_status_values",
-          "value": "\"ticket_comp_requests\".\"status\" IN ('PENDING', 'APPROVED', 'DECLINED')"
-        },
-        "ticket_comp_requests_decided_shape": {
-          "name": "ticket_comp_requests_decided_shape",
-          "value": "\n    (\"ticket_comp_requests\".\"status\" = 'PENDING' AND \"ticket_comp_requests\".\"decided_by\" IS NULL AND \"ticket_comp_requests\".\"decided_at\" IS NULL)\n    OR (\"ticket_comp_requests\".\"status\" <> 'PENDING' AND \"ticket_comp_requests\".\"decided_by\" IS NOT NULL AND \"ticket_comp_requests\".\"decided_at\" IS NOT NULL)\n  "
-        },
-        "ticket_comp_requests_decline_reason_shape": {
-          "name": "ticket_comp_requests_decline_reason_shape",
-          "value": "(\"ticket_comp_requests\".\"status\" = 'DECLINED') = (\"ticket_comp_requests\".\"decline_reason\" IS NOT NULL)"
-        },
-        "ticket_comp_requests_entry_needs_approval": {
-          "name": "ticket_comp_requests_entry_needs_approval",
-          "value": "\"ticket_comp_requests\".\"entry_id\" IS NULL OR \"ticket_comp_requests\".\"status\" = 'APPROVED'"
         }
       }
     },
