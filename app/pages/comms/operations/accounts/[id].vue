@@ -2,6 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { formatLondon } from '#shared/utils/london'
 import type { PersonHistoryRow } from '#shared/utils/notification-log'
+import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Send history', middleware: 'console' })
@@ -17,6 +18,7 @@ interface History {
 }
 
 const page = ref(1)
+const type = ref('')
 const listing = ref<History | null>(null)
 const loading = ref(false)
 const failure = ref<string | null>(null)
@@ -25,7 +27,9 @@ async function load(): Promise<void> {
   loading.value = true
   failure.value = null
   try {
-    listing.value = await $fetch<History>(`/api/admin/comms/accounts/${id}/history`, { query: { page: page.value } })
+    listing.value = await $fetch<History>(`/api/admin/comms/accounts/${id}/history`, {
+      query: { page: page.value, type: type.value || undefined },
+    })
   }
   catch (error) {
     failure.value = refusalText(error)
@@ -36,6 +40,14 @@ async function load(): Promise<void> {
 }
 
 watch(page, load)
+watch(type, () => {
+  page.value = 1
+  void load()
+})
+
+function clearType(): void {
+  type.value = ''
+}
 
 const when = (at: number | null): string => at ? formatLondon(new Date(at * 1000), { dateStyle: 'medium', timeStyle: 'short' }) : 'Not sent'
 
@@ -50,6 +62,9 @@ const columns: TableColumn<PersonHistoryRow>[] = [
   { id: 'createdAt', header: 'Enqueued', cell: ({ row }) => formatLondon(new Date(row.original.createdAt * 1000), { dateStyle: 'medium', timeStyle: 'short' }) },
   { id: 'sentAt', header: 'Sent', cell: ({ row }) => when(row.original.sentAt) },
 ]
+
+const activeFilters = computed<ActiveFilter[]>(() =>
+  type.value ? [{ key: 'type', label: `Type ${type.value}`, icon: 'i-lucide-tag', clear: clearType }] : [])
 
 onMounted(load)
 </script>
@@ -84,6 +99,15 @@ onMounted(load)
     <p class="text-sm text-muted">
       Types, dates and outcomes only. Never a message body, which might carry somebody else's data.
     </p>
+
+    <AdminToolbar
+      v-model:search="type"
+      placeholder="A message type, such as shift.reminder"
+      :active="activeFilters"
+      :filterable="false"
+      :loading="loading"
+      @clear="clearType"
+    />
 
     <UTable
       :data="listing?.history.items ?? []"

@@ -43,6 +43,12 @@ export interface PersonHistoryRow {
   sentAt: number | null
 }
 
+export const personHistoryFilters = pageQuery.extend({
+  type: z.string().trim().min(1).max(100).optional(),
+})
+
+export type PersonHistoryFilters = z.output<typeof personHistoryFilters>
+
 export interface DailyCount {
   day: string
   type: string

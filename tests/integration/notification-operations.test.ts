@@ -128,13 +128,27 @@ describe('one person\'s history (criterion 3)', () => {
       logged(database, { userId: alice, type: 'shift.reminder', status: 'SENT', subject: 'Alice-only subject', createdAt: 1_700_000_000 })
       logged(database, { userId: bob, type: 'shift.reminder', status: 'SENT', subject: 'Bob-only subject', createdAt: 1_700_000_001 })
 
-      const history = read<{ id: string, type: string, channel: string, status: string }>(database, personHistoryQuery(alice, 25, 0))
+      const history = read<{ id: string, type: string, channel: string, status: string }>(database, personHistoryQuery(alice, undefined, 25, 0))
       expect(history).toHaveLength(1)
       // The row carries no `subject` and no `error` column at all: never a message body that
       // could name somebody else, matching what the query itself selects.
       expect(Object.keys(history[0]!).sort()).toEqual(['channel', 'createdAt', 'id', 'sentAt', 'status', 'type'].sort())
 
-      const [{ total }] = read<{ total: number }>(database, countPersonHistoryQuery(alice))
+      const [{ total }] = read<{ total: number }>(database, countPersonHistoryQuery(alice, undefined))
+      expect(total).toBe(1)
+    })
+  })
+
+  test('narrows to one type, the same way the general log does', async () => {
+    await withDatabase(async (database) => {
+      const alice = person(database, 'u-alice')
+      logged(database, { userId: alice, type: 'shift.reminder', status: 'SENT', createdAt: 1_700_000_000 })
+      logged(database, { userId: alice, type: 'training.expiry.window', status: 'SENT', createdAt: 1_700_000_001 })
+
+      const narrowed = read(database, personHistoryQuery(alice, 'shift.reminder', 25, 0))
+      expect(narrowed).toHaveLength(1)
+
+      const [{ total }] = read<{ total: number }>(database, countPersonHistoryQuery(alice, 'shift.reminder'))
       expect(total).toBe(1)
     })
   })

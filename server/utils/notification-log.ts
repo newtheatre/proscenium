@@ -74,27 +74,27 @@ export async function countSendLog(filters: SendLogFilters): Promise<number> {
 
 // Types, dates and outcomes only, matching criterion 3: never the subject or the provider error,
 // either of which can carry what the message was actually about.
-export function personHistoryQuery(userId: string, limit: number, offset: number): SQL {
+export function personHistoryQuery(userId: string, type: string | undefined, limit: number, offset: number): SQL {
   return sql`
     SELECT l.id AS id, l.type AS type, l.channel AS channel, l.status AS status,
            l.created_at AS createdAt, l.sent_at AS sentAt
     FROM notification_log l
-    WHERE l.user_id = ${userId}
+    WHERE l.user_id = ${userId}${type ? sql` AND l.type = ${type}` : sql``}
     ORDER BY l.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export function countPersonHistoryQuery(userId: string): SQL {
-  return sql`SELECT count(*) AS total FROM notification_log WHERE user_id = ${userId}`
+export function countPersonHistoryQuery(userId: string, type: string | undefined): SQL {
+  return sql`SELECT count(*) AS total FROM notification_log WHERE user_id = ${userId}${type ? sql` AND type = ${type}` : sql``}`
 }
 
-export async function personHistory(userId: string, limit: number, offset: number): Promise<PersonHistoryRow[]> {
-  return db.all<PersonHistoryRow>(personHistoryQuery(userId, limit, offset))
+export async function personHistory(userId: string, type: string | undefined, limit: number, offset: number): Promise<PersonHistoryRow[]> {
+  return db.all<PersonHistoryRow>(personHistoryQuery(userId, type, limit, offset))
 }
 
-export async function countPersonHistory(userId: string): Promise<number> {
-  const [row] = await db.all<{ total: number }>(countPersonHistoryQuery(userId))
+export async function countPersonHistory(userId: string, type: string | undefined): Promise<number> {
+  const [row] = await db.all<{ total: number }>(countPersonHistoryQuery(userId, type))
   return Number(row?.total ?? 0)
 }
 

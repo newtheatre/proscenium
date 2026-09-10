@@ -1,3 +1,5 @@
+import { personHistoryFilters } from '#shared/utils/notification-log'
+
 // One person's send history: types, dates and outcomes, to answer "did the reminder go out"
 // without a message body ever naming somebody else (H-106 criterion 3). Every view is audited.
 export default defineEventHandler(async (event) => {
@@ -7,11 +9,11 @@ export default defineEventHandler(async (event) => {
   const account = await findById(id)
   if (!account) throw createError({ statusCode: 404, statusMessage: 'No such account' })
 
-  const { page, pageSize } = await getValidatedQueryOrThrow(event, pageQuery)
+  const { page, pageSize, type } = await getValidatedQueryOrThrow(event, personHistoryFilters)
 
   const [items, total] = await Promise.all([
-    personHistory(id, pageSize, offsetFor(page, pageSize)),
-    countPersonHistory(id),
+    personHistory(id, type, pageSize, offsetFor(page, pageSize)),
+    countPersonHistory(id, type),
   ])
 
   await db.insert(schema.auditLog).values(auditEntry({
