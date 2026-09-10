@@ -117,6 +117,9 @@ export const PERMISSIONS = [
   // Taking a copy of a period shaped for the SU's own accounting: general finance reading is
   // not enough, echoing D-129's own distinct `ticketing.export` (I-108).
   'finance.export',
+  // Cross-season incident, attendance and staffing trends: aggregate figures over the operational
+  // tables, never a standing grant over any one night's own screens (E-126).
+  'reports.read',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
@@ -141,7 +144,7 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   BOX_OFFICE: ['ticketing.read', 'ticketing.write', 'ticketing.export'],
   // Administers the rota in advance, and opens the door and duty manager screens without a shift
   // tonight. The till is the bar manager's (0044, 0046, E-101 criterion 2).
-  FOH_MANAGER: ['night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write'],
+  FOH_MANAGER: ['night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write', 'reports.read'],
   FRONT_OF_HOUSE: [],
   // Owns the bar's catalogue and its stock, and opens the till without a bar shift. Nothing in
   // the old estate grants this role, so the import cannot reach it (0044, F-101 criterion 1).
@@ -151,12 +154,13 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   ACCESSIBILITY_OFFICER: ['access.verify'],
   // Configures which severities route to them, and reads and closes the open-items list.
   // Nothing in the old estate grants this role, so the import cannot reach it (E-116).
-  SAFETY_OFFICER: ['safety.read', 'safety.write'],
+  SAFETY_OFFICER: ['safety.read', 'safety.write', 'reports.read'],
   // Reads the ledger and everything built on it. Nothing in the old estate grants this role, so
   // the import cannot reach it (I-103).
   TREASURER: ['finance.read', 'finance.write', 'finance.export'],
-  // Season aggregates only, never the entry-level drill-down (I-105 criterion 5).
-  COMMITTEE: ['finance.summary'],
+  // Season aggregates only, matching `finance.summary`'s own reasoning: trends across a season
+  // (E-126), never the entry-level drill-down into one night (I-105 criterion 5).
+  COMMITTEE: ['finance.summary', 'reports.read'],
 }
 
 // Any role holding a permission no other role does; losing the last holder locks everyone out.

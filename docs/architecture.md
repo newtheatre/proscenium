@@ -762,6 +762,33 @@ sticky action slot, which K-102 criterion 2 reserves for the one primary action 
 reporting reaches through a second tap on the incident log screen rather than a first tap from
 `/tonight` itself, an interpretation of E-117 criterion 1 recorded in the known issue.
 
+### Cross-season report queries (E-126)
+
+Two result sets, both scoped by `periodBounds` (`server/utils/season-dashboard.ts`, I-103
+through I-107), reused as-is rather than a second resolver of when a season starts: the risk
+0009 and this story both depend on is three answers to that question, not the absence of a
+helper. `GET /api/admin/reports/incidents` groups `incidents` by category, severity and venue
+inside the range, with each dimension an optional filter; `GET /api/admin/reports/performances`
+reads one row per performance, `sold` from `heldSeatsSubquery` the same way `tonight.ts` does,
+`admitted` and `noShows` from `reservations.status`, `unfilledSlots` from any `shifts` row still
+`OPEN` or `DECLINED`, and `officerBypass`/`autoClosed` from `audit_log` and `night_reports.
+signed_via` respectively. Both page in SQL (`shared/utils/pagination.ts`) and export to CSV
+through `toCsv()`, which already carries the formula-injection guard D-129 built.
+
+Criterion 3's "officers and administrators" is `reports.read`, held by `FOH_MANAGER`,
+`SAFETY_OFFICER` and `COMMITTEE`; `ADMIN` holds it automatically like every permission. Every
+figure reads live from the operational tables, never the frozen `night_reports.report` blob:
+`incidents`, `age_checks` and `shifts` are already performance-keyed and queryable directly,
+where the frozen report is one night's own snapshot rather than a queryable history. "Erased
+identities anonymised" needs no special-casing: `eraseAccount()` overwrites `users.name` to
+`TOMBSTONE_NAME` in place, so any join already reads it back that way.
+
+Criterion 4, historical night reports imported from the old estate, is resolved rather than
+unbuilt: K-115's withdrawal (26 August 2026) already established that the old estate's incident
+log, Challenge 25 register and night reports hold no entries, the same fact E-118's own
+criterion 5 was resolved against. There is nothing of this shape to import, and no `source`
+column exists on any of these tables to mark one with, since none is needed yet (0015).
+
 ### Two shows, one venue, one day (E-127)
 
 All six criteria: 2, 5, 6, and 1 for everything except the checklist here; criterion 4 (the

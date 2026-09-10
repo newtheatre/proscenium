@@ -386,6 +386,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/safety/open-items.get.ts', exempt: 'reads the open-items list, gated by the safety officer\'s own permission' },
   { route: 'server/api/admin/safety/incidents/[id]/close.post.ts', actions: ['incident-followup.closed'] },
   { route: 'server/api/admin/age-checks/export.get.ts', actions: ['age-checks.exported'] },
+  { route: 'server/api/admin/reports/incidents/export.get.ts', actions: ['reports.exported'] },
+  { route: 'server/api/admin/reports/performances/export.get.ts', actions: ['reports.exported'] },
   { route: 'server/api/admin/night-reports/addenda.post.ts', actions: ['night-report.addendum'] },
   {
     route: 'server/api/tonight/board/code.get.ts',
