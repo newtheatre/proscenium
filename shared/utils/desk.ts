@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { guestDetailsForm } from './reservations'
 import { pageQuery } from './pagination'
 import { saysPrice } from './ticket-types'
 
@@ -53,6 +54,34 @@ export function uncollectableReason(status: string): string | null {
       return `This booking is ${status.toLowerCase()} and cannot be collected.`
   }
 }
+
+// D-115 criterion 3: a structural ceiling on one line, not a workshop number; the order total
+// carries no cap at all, which is the whole point of a walk-up sale.
+export const DESK_SALE_LINE_QUANTITY_CAP = 20
+const MAX_DESK_SALE_LINES = 20
+
+export const deskSaleLineForm = z.object({
+  ticketTypeId: z.string().trim().min(1),
+  quantity: z.number().int().positive().max(DESK_SALE_LINE_QUANTITY_CAP),
+})
+
+// A name and an email, the same two fields D-104's guest checkout takes: nothing about a walk-up
+// needs to be anonymous, and it is what keeps this reservation findable by search like any other.
+export const deskSaleForm = z.strictObject({
+  performanceId: z.string().trim().min(1),
+  lines: z.array(deskSaleLineForm).min(1).max(MAX_DESK_SALE_LINES)
+    .refine(
+      lines => new Set(lines.map(line => line.ticketTypeId)).size === lines.length,
+      'A ticket type appears once; add to its quantity instead of a second line',
+    ),
+  guest: guestDetailsForm,
+  expectedTotalPence: z.number().int().min(0),
+  // COMP is excluded here: D-117's request-and-approval workflow names an existing reservation,
+  // which a walk-up does not have until this write creates one.
+  tender: z.literal('CARD'),
+})
+
+export type DeskSaleInput = z.output<typeof deskSaleForm>
 
 // A comp records nothing charged; the reader takes the real figure. Either way this is what the
 // screen shows as due before the officer confirms it (criterion 3).

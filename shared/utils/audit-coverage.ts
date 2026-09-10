@@ -249,6 +249,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['reservation.collected'],
     via: ['server/utils/desk-collection.ts'],
   },
+  {
+    route: 'server/api/box-office/desk/reservations/index.post.ts',
+    actions: ['account.created.guest', 'reservation.collected'],
+    via: ['server/utils/reservations.ts', 'server/utils/desk-sale.ts', 'server/utils/desk-collection.ts'],
+  },
   { route: 'server/api/box-office/desk/comp-requests/index.get.ts', exempt: 'reads tonight\'s pending comp requests, writing nothing' },
   {
     route: 'server/api/box-office/desk/comp-requests/index.post.ts',

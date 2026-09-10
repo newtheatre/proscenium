@@ -82,8 +82,8 @@ export const ledgerLines = sqliteTable('ledger_lines', {
   index('ledger_lines_entry').on(table.entryId),
   index('ledger_lines_kind').on(table.kind),
   index('ledger_lines_performance').on(table.performanceId),
-  // A ticket is collected once, ever: the guard is the index, not application code, so a retry
-  // or a second officer never posts a second entry for the same seat (D-114 criterion 2).
-  uniqueIndex('ledger_lines_ticket_collection_once').on(table.ticketId).where(sql`kind = 'TICKET_COLLECTION'`),
+  // A ticket is collected once, ever, whichever of the two money paths that collection was
+  // (D-114 criterion 2, D-115): the guard is the index, not application code.
+  uniqueIndex('ledger_lines_ticket_collection_once').on(table.ticketId).where(sql`kind IN ('TICKET_COLLECTION', 'WALK_UP')`),
   uniqueIndex('ledger_lines_settles_once').on(table.settlesEntryId).where(sql`${table.settlesEntryId} IS NOT NULL`),
 ])
