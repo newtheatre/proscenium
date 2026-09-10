@@ -851,11 +851,28 @@ against the data the check names, never stored (E-114 criterion 3).
 own close. The close-night action itself (E-114 criterion 4); blocked while a required item
 across either phase is neither ticked nor exempted.
 
-### night_reports
-`performance_id` PK → performances restrict · `payload` JSON (attendance, takings by tender,
-incidents, milestones, staffing, bar summary, access counts only) · `closing_note` ·
-`closed_by` NULL (auto-close) · `auto_closed` bool · `closed_at` · `emailed_at` NULL = retry
-queue. UNIQUE by PK makes closing idempotent.
+### night_reports  APPEND-ONLY
+`id` PK · `performance_id` → performances restrict, UNIQUE · `venue_id` → venues restrict ·
+`night` · `closing_note` · `report` JSON, snapshotted at sign-off (attendance, takings by
+tender, incidents, milestones, staffing, bar summary, access counts only), never recomputed ·
+`signed_by` → users restrict · `signed_via` CHECK `SHIFT|OFFICER` · `signed_at`. The UNIQUE on
+`performance_id` makes sign-off idempotent: a second attempt for the same performance inserts
+nothing (E-124 criterion 1). E-125's auto-close, still unbuilt, will need `signed_by` to accept
+no human signatory; that is its own migration, not guessed ahead of it here.
+
+### night_report_addenda  APPEND-ONLY
+`id` PK · `report_id` → night_reports restrict · `note` · `added_by` → users restrict ·
+`added_at`. A correction to a frozen report is a new row naming what it corrects, never an edit
+to `night_reports` itself (E-124 criterion 5); more than one addendum is allowed.
+
+### night_report_deliveries  APPEND-ONLY
+`id` PK · `report_id` → night_reports restrict · `addendum_id` → night_report_addenda restrict,
+NULL (the original send has none) · `recipient` (an email address, not a `users` FK: the
+configured standing list and the closer's own address both land here) · `status` CHECK
+`SENT|FAILED` · `error` NULL · `sent_at` NULL · `created_at`. One row per delivery attempt per
+recipient, never updated: a retry is a new row, the same shape as every other append-only trail
+in this module (E-124 criterion 4). Automatic retry-until-delivered and the operations-dashboard
+surfacing are H-105 and H-106's own build; today a failed send stops after the one attempt.
 
 ### backstage_nights
 `id` PK · `venue_id` → venues restrict · `night` · `epoch` (starts at 0, only ever increases) ·
@@ -1924,14 +1941,36 @@ setting (0025).
 ### notification_log
 `id` PK · `user_id` NULL = set null on erasure · `type` · `channel` CHECK `EMAIL|INBOX|PUSH` ·
 `subject` · `record_id` · `session_id` · `claim` · `status` CHECK
-`PENDING|SENT|FAILED|RETRYING|SUPPRESSED_PREFERENCE|SKIPPED_UNDELIVERABLE` · `sent_at` · `error` ·
-`created_at`. Indexed on user, type, status, `record_id` and `created_at`.
+`PENDING|SENT|FAILED|RETRYING|FAILED_FINAL|SUPPRESSED_PREFERENCE|SKIPPED_UNDELIVERABLE` ·
+`sent_at` · `error` · `attempts` · `retry_payload` · `created_at`. Indexed on user, type, status,
+`record_id` and `created_at`.
 
 **The status set is `NOTIFICATION_STATUSES` in `shared/utils/notifications.ts`,** and a unit test
 holds the CHECK to it. `SUPPRESSED_PREFERENCE` is a topic the member switched off and is written
 with `error` null, because the status is the reason; `SKIPPED_UNDELIVERABLE` is an address the
 provider must never see and carries the reason in `error` (0054, H-102 criterion 3, H-107).
-`RETRYING` is in the check and unused until H-105.
+`SENT`, `FAILED_FINAL`, `SUPPRESSED_PREFERENCE` and `SKIPPED_UNDELIVERABLE` are terminal;
+`TERMINAL_STATUSES` says so in one place, and no sweep may pick a terminal row up again.
+
+**Retries are attempts on the same row, never new rows (H-105, 0056).** `attempts` counts provider
+attempts, the first included, so a refusal that never reached a provider spends none. The next
+attempt is due at `created_at + backoff * (2^attempts - 1)`, computed in the sweep's predicate
+rather than stored, so nothing can disagree with the count beside it. `notifications:retry` claims
+a row by moving it to `RETRYING` conditionally on it still being `FAILED`, so two overlapping runs
+cannot send the same message. When `attempts` reaches `NOTIFICATION_MAX_ATTEMPTS` the row is
+`FAILED_FINAL` and is what H-106's queue lists.
+
+**`retry_payload` is the rendered message and is held only while a retry is owed.** It is
+`{ subject, html, text }` as JSON, written when a send fails with attempts left, and cleared by
+every terminal outcome, so a row at rest carries no message body. It is scrubbed on erasure and
+appears in no customer or operator response (0056; H-106 criterion 3). A message carrying an
+attachment is never retried, because the attachment is not here to send again: it goes straight to
+`FAILED_FINAL` with the reason on the row.
+
+**Rows are pruned at `NOTIFICATION_LOG_RETENTION_MONTHS`, shipped at 24 months**, by the nightly
+`daily:sweeps`. The prune is scoped by subquery and capped at 500 rows a run, so the first run
+after a long gap drains over several nights. The log feeds a subject access request, which is why
+the period is a retention decision rather than a tidy-up (H-105 criterion 5).
 
 **A claimed send is one row, not two (0048).** `claimNotification()` writes `PENDING`; `notify()`
 updates that same row, matched on `claim`, to its outcome. No trigger sits on this table, so the

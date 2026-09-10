@@ -32,6 +32,12 @@ export const notificationLog = sqliteTable('notification_log', {
   claim: text('claim'),
   sentAt: integer('sent_at'),
   error: text('error'),
+  // Attempts made, the first one included. The retry due time is computed from this and
+  // `created_at` rather than stored, so the two can never disagree (H-105).
+  attempts: integer('attempts').notNull().default(0),
+  // The rendered message, held only while a failed send is still owed a retry and cleared the
+  // moment it reaches a terminal status. Never in a customer or operator response (H-105, 0056).
+  retryPayload: text('retry_payload'),
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
   index('notification_log_user').on(table.userId),
@@ -42,7 +48,7 @@ export const notificationLog = sqliteTable('notification_log', {
   uniqueIndex('notification_log_claim').on(table.claim).where(sql`claim is not null`),
   // Kept in step with NOTIFICATION_STATUSES in shared/utils/notifications.ts, which a unit test
   // holds to this list: a status the check refuses is a send nothing can record (H-102, H-105).
-  check('notification_log_status', sql`${table.status} IN ('PENDING', 'SENT', 'FAILED', 'RETRYING', 'SUPPRESSED_PREFERENCE', 'SKIPPED_UNDELIVERABLE')`),
+  check('notification_log_status', sql`${table.status} IN ('PENDING', 'SENT', 'FAILED', 'RETRYING', 'FAILED_FINAL', 'SUPPRESSED_PREFERENCE', 'SKIPPED_UNDELIVERABLE')`),
   check('notification_log_channel', sql`${table.channel} IN ('EMAIL', 'INBOX', 'PUSH')`),
 ])
 

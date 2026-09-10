@@ -227,3 +227,54 @@ export const incidentFollowupClosures = sqliteTable('incident_followup_closures'
 }, table => [
   uniqueIndex('incident_followup_closures_incident').on(table.incidentId),
 ])
+
+// The night report's sign-off and freeze (E-124), append-only like `incidents`. One row per
+// performance, so a second sign-off for the same one is impossible (criterion 1).
+export const nightReports = sqliteTable('night_reports', {
+  id: id(),
+  performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),
+  venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),
+  night: text('night').notNull(),
+  closingNote: text('closing_note').notNull(),
+  // Snapshotted at sign-off, never recomputed: a later correction addends what was actually
+  // signed, not what the live queries would say today.
+  report: text('report', { mode: 'json' }).notNull(),
+  signedBy: text('signed_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  // Flagged rather than hidden when an officer closes instead of the duty manager, the same
+  // instinct 0044 encodes for a bypass (criterion 2).
+  signedVia: text('signed_via').notNull(),
+  signedAt: integer('signed_at').notNull().default(now),
+}, table => [
+  uniqueIndex('night_reports_performance').on(table.performanceId),
+  index('night_reports_venue_night').on(table.venueId, table.night),
+  check('night_reports_signed_via_values', sql`${table.signedVia} IN ('SHIFT', 'OFFICER')`),
+])
+
+// A correction to a frozen report (criterion 5): a new row naming what it corrects, never an
+// edit to the report itself.
+export const nightReportAddenda = sqliteTable('night_report_addenda', {
+  id: id(),
+  reportId: text('report_id').notNull().references(() => nightReports.id, { onDelete: 'restrict' }),
+  note: text('note').notNull(),
+  addedBy: text('added_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  addedAt: integer('added_at').notNull().default(now),
+}, table => [
+  index('night_report_addenda_report').on(table.reportId),
+])
+
+// One row per distribution attempt (criterion 4): never updated, so a retry once H-105 exists
+// is a new row, the same shape as every other append-only trail here.
+export const nightReportDeliveries = sqliteTable('night_report_deliveries', {
+  id: id(),
+  reportId: text('report_id').notNull().references(() => nightReports.id, { onDelete: 'restrict' }),
+  addendumId: text('addendum_id').references(() => nightReportAddenda.id, { onDelete: 'restrict' }),
+  recipient: text('recipient').notNull(),
+  status: text('status').notNull(),
+  error: text('error'),
+  sentAt: integer('sent_at'),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  index('night_report_deliveries_report').on(table.reportId),
+  index('night_report_deliveries_status').on(table.status),
+  check('night_report_deliveries_status_values', sql`${table.status} IN ('SENT', 'FAILED')`),
+])

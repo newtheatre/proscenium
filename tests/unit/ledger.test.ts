@@ -20,7 +20,7 @@ describe('money is integer pence, and nothing else', () => {
     expect(entryForm.safeParse({
       source: 'DESK',
       tender: 'CARD',
-      lines: [{ kind: 'TICKET_COLLECTION', amountPence: 750, qty: 1 }],
+      lines: [{ kind: 'TICKET_COLLECTION', amountPence: 750, qty: 1, performanceId: 'p-1' }],
     }).success).toBe(true)
   })
 
@@ -28,7 +28,7 @@ describe('money is integer pence, and nothing else', () => {
     expect(entryForm.safeParse({
       source: 'DESK',
       tender: 'CARD',
-      lines: [{ kind: 'TICKET_COLLECTION', amountPence: 7.5, qty: 1 }],
+      lines: [{ kind: 'TICKET_COLLECTION', amountPence: 7.5, qty: 1, performanceId: 'p-1' }],
     }).success).toBe(false)
   })
 
@@ -78,7 +78,7 @@ describe('a correction supersedes and never overwrites', () => {
       tender: 'CARD',
       id: 'a',
       reversesEntryId: 'a',
-      lines: [{ kind: 'REFUND', amountPence: -750, qty: 1 }],
+      lines: [{ kind: 'REFUND', amountPence: -750, qty: 1, performanceId: 'p-1' }],
     }).success).toBe(false)
   })
 })

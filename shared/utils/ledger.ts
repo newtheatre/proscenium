@@ -47,6 +47,10 @@ export function describeKind(name: string): string {
 
 const pence = z.number().int()
 
+// A kind that is always one ticket for one performance: there is no legitimate case where one
+// of these has no performanceId, unlike BAR_ITEM, whose till may have no show on (0058).
+export const PERFORMANCE_REQUIRED_KINDS: readonly LineKind[] = ['TICKET_COLLECTION', 'WALK_UP', 'PASS_ADMISSION', 'REFUND']
+
 export const lineForm = z.object({
   kind: z.enum(KIND_NAMES),
   // What actually moved: net of any discount, and negative on a reversal. Zero is a comp, which
@@ -67,7 +71,10 @@ export const lineForm = z.object({
   discountPence: pence.nullish(),
   // The charge this line settles, one per charge, unique so a charge settles once (F-109).
   settlesEntryId: z.string().max(64).nullish(),
-})
+}).refine(
+  line => !PERFORMANCE_REQUIRED_KINDS.includes(line.kind) || line.performanceId != null,
+  { path: ['performanceId'], message: 'This kind of line always belongs to one performance (0058)' },
+)
 
 export type LineInput = z.input<typeof lineForm>
 

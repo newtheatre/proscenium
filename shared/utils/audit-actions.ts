@@ -195,6 +195,8 @@ const CATALOGUE = {
   'checklist.ticked': { label: 'Checklist item ticked', module: 'show-night' },
   'checklist.exempted': { label: 'Checklist item closed over with a reason', module: 'show-night' },
   'checklist.closed': { label: 'Night closed', module: 'show-night' },
+  'night-report.signed': { label: 'Night report signed off and frozen', module: 'show-night' },
+  'night-report.addendum': { label: 'Night report corrected by addendum', module: 'show-night' },
   'emergency-card.updated': { label: 'Venue emergency card updated', module: 'show-night' },
   'incident-severity.routing-changed': { label: 'Severity follow-up routing changed', module: 'show-night' },
   'incident-followup.closed': { label: 'Incident follow-up closed', module: 'show-night' },

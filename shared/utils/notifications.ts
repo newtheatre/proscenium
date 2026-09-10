@@ -477,11 +477,42 @@ export const NOTIFICATION_STATUSES = [
   'SENT',
   'FAILED',
   'RETRYING',
+  'FAILED_FINAL',
   'SUPPRESSED_PREFERENCE',
   'SKIPPED_UNDELIVERABLE',
 ] as const
 
 export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number]
+
+// Nothing retries these: a send either arrived, or was refused before a provider saw it, or has
+// run out of attempts. `FAILED` and `RETRYING` are the two the retry machinery owns (H-105).
+export const TERMINAL_STATUSES = [
+  'SENT',
+  'FAILED_FINAL',
+  'SUPPRESSED_PREFERENCE',
+  'SKIPPED_UNDELIVERABLE',
+] as const satisfies readonly NotificationStatus[]
+
+export function isTerminal(status: string): boolean {
+  return (TERMINAL_STATUSES as readonly string[]).includes(status)
+}
+
+// Doubling from the first failure, computed from the enqueue time and the attempt count rather
+// than stored, so a due time cannot disagree with the attempts beside it (H-105 criterion 2).
+export function retryDueAt(createdAt: number, attempts: number, backoffMinutes: number): number {
+  return createdAt + backoffMinutes * 60 * (2 ** attempts - 1)
+}
+
+// A send that has run out of attempts is failed for good; one with attempts left waits for the
+// next sweep. The first attempt counts, so a maximum of one means no retry at all.
+export function outOfAttempts(attempts: number, maxAttempts: number): boolean {
+  return attempts >= maxAttempts
+}
+
+// The same approximation the retention threshold uses, where a year is 365.25 days.
+export function logRetentionCutoff(nowEpoch: number, months: number): number {
+  return nowEpoch - Math.round(months * (365.25 / 12) * 86_400)
+}
 
 export const TOPIC_LABELS: Record<NotificationTopic, string> = {
   BOOKINGS: 'Bookings',
