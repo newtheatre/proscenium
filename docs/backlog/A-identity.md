@@ -10,7 +10,7 @@ password; there is one unified app, so the old cross-app session contract does n
 passkeys enrolled against the old relying-party id cannot cross to the new one (SP-4 found one
 affected account, so no re-enrolment flow is built).
 
-**Counts: 26 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
+**Counts: 28 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
 
 Open questions for the committee:
 
@@ -432,6 +432,59 @@ Open questions for the committee:
   time, and the committee is asked to confirm. Shipped that way on 30 August 2026 and recorded in
   known issues, so the question has somewhere to be answered rather than being lost in a story.
 - Source: Committee direction, 26 August 2026; decision 0023.
+
+## A-128: Claim a membership bought at the SU
+
+- Role: Member
+- Phase: MVP
+- Story: As a member who has just bought a membership at the Students' Union, I want to tell the
+  theatre so that it is recorded on my account without waiting for the next roster import.
+- Depends on: A-117, H-101
+- Acceptance criteria:
+  1. A signed-in person submits a claim carrying their student number, the purchase date (never
+     in the future) and the term (one or three years). One open claim per account, enforced by a
+     partial unique index rather than by the form; an open claim can be withdrawn.
+  2. A claim creates no membership. An officer holding `members.write` records it from the
+     register at `/people/members`, which gains an awaiting-record filter paged in SQL.
+     Recording writes the student number to the account through `recordStudentId`, inserts the
+     membership by the A-117 path with source `MANUAL` and the claim as its evidence, and closes
+     the claim, all in one batch.
+  3. Declining needs a reason, which the member sees. The decision is notified through the
+     H-101 mechanism.
+  4. `/account/membership` shows the current membership, its grace and expiry, and either the
+     claim form or the open claim's state. It is a `MEMBER_NAV` entry.
+  5. Recording and declining are audited with the claim id and never the student number or the
+     reason (0011).
+  6. Erasure anonymises claims and is idempotent; a claim on an anonymised account is refused.
+  7. Nothing here sells anything: SUMS remains the system of record (0005, 0031, A-202).
+- Source: Pre-cutover review, 10 September 2026. The migration carries no memberships
+  (`migration/identity.ts`), so at cutover every member reads as lapsed until recorded; this is
+  the member-facing half of what A-201 does by upload.
+
+## A-129: Membership is a fact the viewer carries
+
+- Role: Member
+- Phase: MVP
+- Story: As a member whose membership has lapsed, I want the members area to tell me what needs a
+  current membership and where to put that right so that I am refused with a reason rather than
+  hidden from.
+- Depends on: A-117, A-128
+- Acceptance criteria:
+  1. The `Viewer` carries `hasMembership` (current or in grace, from `hasCurrentMembership`),
+     resolved by both resolvers the way `leadsDepartment` and `isTrainer` are (0040), with
+     abilities `member` and `memberOrGrace` as one-liners over it.
+  2. Navigation is not filtered by membership and no membership middleware exists. A lapsed
+     member sees every member screen; an action that needs a membership renders refused with the
+     policy's own refusal text and a link to `/account/membership`. Guards stay server side and
+     fail closed (0040).
+  3. `docs/access-matrix.md` lists every member-facing route and API with its ability, its
+     refusal and where a lapsed member is sent, and a unit test fails when a member-facing page
+     is missing from it.
+  4. The account menu shows membership state: current, in grace until a date, or lapsed.
+  5. Member prices on a public show page say they need a current membership.
+  6. Every member-facing response is column allow-listed; any that is not is fixed in the same
+     change or recorded in known issues.
+- Source: Pre-cutover review, 10 September 2026; 0009 (authority derives from facts), 0031, 0040.
 
 ## A-201: Import an SU membership list by hand
 

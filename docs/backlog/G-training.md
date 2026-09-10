@@ -2,7 +2,7 @@
 
 Training was the old estate's best module, and this backlog carries its judgement wholesale: records are append-only with validity derived at read time, marking a register is the single act that awards records for taught sessions, and clockwork notices expiry but never enacts anything. The unified system removes the API seam between records and the surfaces they gate (shifts, the till, kit loans), so a gate reads live competence with nothing to fail open. New in this system are delivery modes: in-person, self-directed online, or hybrid; mode and external material links are MVP schema, while quiz assessment, hybrid completion and the question channel are V2, and a safety-critical module can never be fully self-directed.
 
-Counts: 25 MVP stories (G-101 to G-123, G-125, G-128), 11 V2 stories (G-201 to G-211), 2 Later stubs (G-301, G-302), 3 resolved (G-124 and G-126 withdrawn, G-127 won't build). 41 total.
+Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 11 V2 stories (G-201 to G-211), 2 Later stubs (G-301, G-302), 3 resolved (G-124 and G-126 withdrawn, G-127 won't build). 42 total.
 
 ## Open questions
 
@@ -415,6 +415,25 @@ Counts: 25 MVP stories (G-101 to G-123, G-125, G-128), 11 V2 stories (G-201 to G
   6. The pages carry a title and a description for search, and stay inside the public shell's budget of one marquee, one sticker and one spotlight per view.
   7. The member-only catalogue is replaced rather than duplicated, and its old address still resolves.
 - Source: Committee direction, 2 September 2026; 0040 (the public shell); G-103 (the member catalogue this replaces)
+
+## G-129: A browsable catalogue and a split editor
+
+- Role: Visitor
+- Phase: MVP
+- Story: As somebody browsing what the theatre teaches, I want the catalogue laid out by
+  department with what each module needs and leads to so that I see a path rather than a list.
+- Depends on: G-128
+- Acceptance criteria:
+  1. `/training/modules` groups modules by department, with cards carrying level, duration,
+     prerequisites and the next scheduled session, and keeps every G-128 criterion: readable
+     signed out, drafts hidden, at most one spotlight.
+  2. A signed-in member sees which modules they hold and can request one from its card through
+     the existing module request path.
+  3. `/training/catalogue` still resolves to the public catalogue.
+  4. `app/pages/training/manage/index.vue` is split into components (catalogue table, module
+     editor, department filter) with no behaviour change: the existing tests pass untouched.
+  5. Before-and-after captures from `bun run shots` are attached to the pull request.
+- Source: Pre-cutover review, 10 September 2026.
 
 ## G-201: Self-directed module delivery
 
