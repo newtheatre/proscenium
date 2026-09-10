@@ -5,6 +5,7 @@ import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -229,11 +230,16 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2)', () => {
     const database = new Database(app.databaseFile)
     let seeded: { performanceId: string, night: string }
     try {
+      // Booking closes at curtain (no override set here), so curtain must sit ahead of whatever
+      // time this suite happens to run, not the fixture's usual fixed 19:30.
+      const night = currentShowNight()
+      const hoursIntoNight = (Date.now() - showNightBounds(night).from.getTime()) / 3_600_000
+      const curtainHoursAfterNightStart = Math.min(23.9, hoursIntoNight + 0.1)
       seeded = tonightsPerformance({
         batch: statements => database.transaction(() => {
           for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
         })(),
-      }, { suffix: crypto.randomUUID().slice(0, 8) })
+      }, { suffix: crypto.randomUUID().slice(0, 8), night, curtainHoursAfterNightStart })
     }
     finally {
       database.close()
