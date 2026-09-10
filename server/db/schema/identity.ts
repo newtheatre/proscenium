@@ -173,3 +173,25 @@ export const authTokens = sqliteTable('auth_tokens', {
   unique('auth_tokens_user_kind').on(table.userId, table.kind),
   check('auth_tokens_kind', sql`${table.kind} IN ('EMAIL_VERIFY', 'PASSWORD_RESET', 'MAGIC_LINK', 'SET_PASSWORD')`),
 ])
+
+// Special category data (D-127, 0011): the needs, note and companion count live only inside
+// `encryptedPayload`, never as their own columns. `status`, consent and expiry stay in the clear
+// because the officer queue and the door predicate both filter on them.
+export const accessProfiles = sqliteTable('access_profiles', {
+  userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('PENDING'),
+  // base64(iv || AES-256-GCM ciphertext) of an AccessProfilePayload (shared/utils/access-profile.ts).
+  encryptedPayload: text('encrypted_payload').notNull(),
+  // The patron's own explicit consent for the door to see the agreed wording. Null: sees nothing.
+  consentForhAt: integer('consent_foh_at'),
+  verifiedBy: text('verified_by').references(() => users.id, { onDelete: 'set null' }),
+  verifiedAt: integer('verified_at'),
+  expiresAt: integer('expires_at'),
+  // Set on withdrawal; the row is deleted outright once the 30-day tombstone runs out.
+  withdrawnAt: integer('withdrawn_at'),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  check('access_profiles_status', sql`${table.status} IN ('PENDING', 'VERIFIED', 'DECLINED', 'WITHDRAWN')`),
+  index('access_profiles_status').on(table.status),
+])
