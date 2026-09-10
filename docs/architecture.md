@@ -715,11 +715,10 @@ manager covering both houses still wants both in view.
 
 `incidents`, `age_checks` and `shifts` were already performance-keyed before this story; E-123's
 own report reads `performance_id` throughout. `tests/integration/night-keying.test.ts` checks this
-against the real schema rather than trusting the claim: every operational table this story can
-confirm carries `performance_id`, and a second describe block pins that `checklist_stamps` and
-`checklist_closes` still carry `venue_id` and `night` instead, deliberately not rebuilt here.
-Criterion 4 needs a decision (a migration reworking already-shipped E-114 tables) before that
-second block can be deleted rather than pinned.
+against the real schema rather than trusting the claim. Criterion 4, `checklist_stamps` and
+`checklist_closes` still carrying `venue_id` and `night`, was deliberately deferred rather than
+rebuilt here, and closed separately once E-128's own migration rebuilt both by hand
+(`docs/decisions/0063-hand-authored-table-rebuilds.md`).
 
 `GET /api/tonight/report` (E-123) already refuses ambiguity when asked with no `performanceId` and
 more than one performance is running, so the "every scan, admit and register entry lands against
@@ -859,16 +858,18 @@ range, the format and the row count, before the file body is built (criterion 3)
 `checklist_items` is the committee's own configuration, one row per venue and phase, mutable
 like `shift_templates` rather than append-only: ticking a box is a state a duty manager moves
 through once, not a record a correction supersedes. `checklist_stamps` is the E-101 pattern
-applied a second time: `ensureStamped()` snapshots every active item onto a venue's night the
-first time `GET /api/tonight/checklist` reads it, so an edit to `checklist_items` afterwards
-changes nothing already stamped (criterion 1). Ticking (`POST .../tick`) and exempting
-(`POST .../exempt`) are both predicated `UPDATE`s decided from `RETURNING` via `auditedWrite()`
-(0049); a system-verified stamp's `system_check IS NULL` predicate is what refuses a hand-tick
-outright, matched by its own CHECK at the schema layer too.
+applied a second time: `ensureStamped()` snapshots every active item onto a performance the
+first time `GET /api/tonight/checklist` reads it, resolving the venue's active items through
+the performance it is given (criterion 1, keyed to a performance since E-128, never a venue and
+a night). An edit to `checklist_items` afterwards changes nothing already stamped. Ticking
+(`POST .../tick`) and exempting (`POST .../exempt`) are both predicated `UPDATE`s decided from
+`RETURNING` via `auditedWrite()` (0049); a system-verified stamp's `system_check IS NULL`
+predicate is what refuses a hand-tick outright, matched by its own CHECK at the schema layer too.
 
 A system-verified item's done state is never stored: `noShowHoldsReleased()` and
-`incidentsReviewed()` (`server/utils/checklist.ts`) run live against `reservations` and
-`incidents`/`audit_log` on every read. Reviewing an incident (`POST
+`incidentsReviewed()` (`server/utils/checklist.ts`) run live against this performance's own
+`reservations` and `incidents`/`audit_log` on every read, so a matinee's checklist never waits
+on the evening's data (E-128). Reviewing an incident (`POST
 /api/tonight/incidents/[id]/review`) writes an `incident.reviewed` audit entry rather than a
 column on `incidents`, which cannot be touched post-insert; acknowledgement, not E-116's later
 severity-routed resolution, which is a separate workflow this does not build.
@@ -878,7 +879,9 @@ neither ticked nor exempted refuses with a 409 naming it by label (criterion 4),
 close reads back the first's `checklist_closes` row rather than refusing (idempotent, matching
 `night_reports`' own PK guarantee). `/tonight` shows a warning banner for incomplete required
 pre-show items from house open, `doors_at` where a performance sets one, curtain otherwise
-(criterion 6).
+(criterion 6). None of the four routes carries a performance picker yet (`docs/known-issues.md`),
+so a matinee day falls back to the same single-performance resolution `GET /api/tonight/report`
+uses and refuses ambiguity outright once a second performance is running.
 
 `/rota/manage/checklists` is the committee's own screen; `/tonight/checklist` is the duty
 manager's. Both, and the pure statement and query builders they call, are guarded the same way
@@ -887,10 +890,10 @@ their siblings are: `checklist.read`/`checklist.write` (a new, paired standing p
 'DUTY_MANAGER')` for the tonight screen, since criterion 1 names the checklist as the duty
 manager's own, unlike the incident log's wider `BAR`/`DOOR`/`DUTY_MANAGER` reach.
 
-Two gaps recorded in `docs/known-issues.md`: criterion 5's exception reason has nowhere to be
-read except the database, since neither `night_reports` (E-123) nor an FOH digest (E-124) is
-built yet; and `noShowHoldsReleased()` can never clear itself in production until D-126 builds a
-door to move a reservation off `PENDING`/`COLLECTED`.
+Two gaps recorded in `docs/known-issues.md`: criterion 5's exception reason now prints in the
+report `compileNightReport()` builds (E-123) and the frozen row E-124 signs, but still has no
+FOH digest of its own; and `noShowHoldsReleased()` can never clear itself in production until
+D-126 builds a door to move a reservation off `PENDING`/`COLLECTED`.
 
 **Also closes a standing gap from E-106/E-107**: `POST /api/rota/shifts/[id]/dismiss` lets a
 member clear a declined claim off their own `/rota` list. It returns the shift to `OPEN`, naming
@@ -1042,10 +1045,9 @@ distribution attempt).
 Sign-off is `requireNightAuthority(event, 'DUTY_MANAGER', ...)`, the same shift-or-officer guard
 `GET /api/tonight/report` itself uses, so `signedVia` is exactly `resolved.via`: `SHIFT` or
 `OFFICER`, flagging an officer standing in for the duty manager without a separate column
-(criterion 2). It refuses with 409 until `checklist_closes` carries a row for tonight's venue and
-night (criterion 1, E-114's own gate; venue-and-night scoped rather than performance-scoped, the
-E-127 criterion 4 gap this inherits rather than fixes). The insert is `signOffStatement`'s own
-predicate, `WHERE NOT EXISTS`, so two concurrent sign-offs for the same performance produce
+(criterion 2). It refuses with 409 until `checklist_closes` carries a row for this performance
+(criterion 1, E-114's own gate, performance-scoped since E-128). The insert is `signOffStatement`'s
+own predicate, `WHERE NOT EXISTS`, so two concurrent sign-offs for the same performance produce
 exactly one row and the loser reads 409, the same race-safety a checklist or till close already
 carries.
 

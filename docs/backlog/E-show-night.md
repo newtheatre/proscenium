@@ -7,7 +7,7 @@ auto-closing night reports), while the fail-open eligibility seam to the trainin
 into internal queries that fail closed. Show night is hostile territory: every screen here is
 phone-first, one-handed, and degrades to cached read-only rather than a spinner.
 
-Counts: 27 MVP stories (E-101 to E-127), 4 V2 stories (E-201 to E-204), 1 Later epic stub (E-301).
+Counts: 28 MVP stories (E-101 to E-128), 4 V2 stories (E-201 to E-204), 1 Later epic stub (E-301).
 31 total.
 
 ## Open questions
@@ -397,6 +397,22 @@ Counts: 27 MVP stories (E-101 to E-127), 4 V2 stories (E-201 to E-204), 1 Later 
   5. The bar may run one session spanning the day's performances (module F, one open session per venue per night); its takings reconcile by the day while attendance and door figures stay per performance.
   6. An automated test covers a matinee-and-evening fixture end to end: two rotas, two registers, two reports, one bar session.
 - Source: Committee direction 26 August; Prompt Book E-2, E-5; audit PR-9 (the old tonight view already listed multiple performances; this pins the behaviour).
+
+## E-128: Re-key the checklist tables to a performance
+
+- Role: Shift authority
+- Phase: MVP
+- Story: As the duty manager on a matinee day, I want each performance to have its own checklist so that closing the matinee does not close the evening.
+- Depends on: E-114, E-127
+- Context: E-127 shipped in #791 with criterion 4 deliberately incomplete. `checklist_stamps` and `checklist_closes` were built by E-114 keyed on `venue_id` and `night`, so two performances in one venue on one day share one checklist. That is documented in `docs/architecture.md` and pinned by `tests/integration/night-keying.test.ts` under a describe block named for the exception. This story closes it. Scheduled by Matt on 10 September 2026.
+- Acceptance criteria:
+  1. `checklist_stamps` and `checklist_closes` key on a performance, in line with the rule that everything record-like keys to a performance and never to a day or a venue.
+  2. Existing rows are carried forward rather than dropped: every stamp and close already recorded resolves to the performance it belonged to, and where a night held exactly one performance that resolution is unambiguous. Where a night held more than one, the migration states in its own comment which performance it chose and why.
+  3. A hand-built, hand-reviewed migration does the rebuild. `scripts/check-migrations.ts` refuses any table rebuild and its grandfather list is empty, so this migration is written by hand and reviewed line by line, never generated and accepted. The copying `INSERT` names every column (0052).
+  4. A decision record explains why these two tables were rebuilt when the rule is that a rebuild is a defect, and records that they are mutable rather than append-only, so 0010's refusal was never what governed them.
+  5. The describe block in `tests/integration/night-keying.test.ts` that pins the current behaviour is replaced by one asserting the new keying, and the matinee-and-evening fixture covers two checklists closing independently.
+  6. The known-issue row recording the gap is removed in the same pull request.
+- Source: E-127 criterion 4, deferred at merge and scheduled separately.
 
 ## E-201: Door offline queue refinements
 

@@ -3,7 +3,7 @@ import { createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
 // E-127 criterion 1: everything operational keys to a performance, never a day or a venue.
-// Checked against the real schema, not asserted in prose, the way this found `checklist_stamps` wrong.
+// Checked against the real schema, the way this found `checklist_stamps` wrong; E-128 fixed it.
 
 function columnsOf(database: TestDatabase, table: string): string[] {
   return rows<{ name: string }>(database, `SELECT name FROM pragma_table_info('${table}')`).map(column => column.name)
@@ -15,6 +15,8 @@ describe('every operational table keys to a performance (criterion 1)', () => {
     'incidents',
     // Nullable by design: bar checks age outside a show as well as inside one (E-118).
     'age_checks',
+    'checklist_stamps',
+    'checklist_closes',
   ])('%s carries performance_id', async (table) => {
     const database = await createTestDatabase()
     try {
@@ -36,15 +38,14 @@ describe('every operational table keys to a performance (criterion 1)', () => {
   })
 })
 
-describe('the one exception this story found, deferred rather than built around', () => {
-  test('checklist_stamps and checklist_closes still key to venue_id and night, not performance_id', async () => {
+describe('the checklist tables no longer carry the old keying (E-128)', () => {
+  test('checklist_stamps and checklist_closes carry neither venue_id nor night', async () => {
     const database = await createTestDatabase()
     try {
       for (const table of ['checklist_stamps', 'checklist_closes']) {
         const columns = columnsOf(database, table)
-        expect(columns).toContain('venue_id')
-        expect(columns).toContain('night')
-        expect(columns).not.toContain('performance_id')
+        expect(columns).not.toContain('venue_id')
+        expect(columns).not.toContain('night')
       }
     }
     finally {

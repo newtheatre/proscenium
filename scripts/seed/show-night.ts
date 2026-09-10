@@ -191,17 +191,16 @@ export async function seedShowNight(
 // Tonight part way through, and the night that is over closed off: the two states the screen and
 // the night report each need (E-115, E-125).
 function seedChecklistStamps(target: SeedTarget, people: People, programme: Programme, now: number): number {
-  const house = programme.venues.get('house')!
   const officer = personIn(people, 'rowan').id
   const statements: BoundStatement[] = []
   let stamped = 0
 
-  const nights: [string, 'PART' | 'DONE'][] = [
-    [programme.performances.get('the-seagull/tonight')!.night, 'PART'],
-    [programme.performances.get('the-seagull/past')!.night, 'DONE'],
+  const performances: [string, 'PART' | 'DONE'][] = [
+    [programme.performances.get('the-seagull/tonight')!.id, 'PART'],
+    [programme.performances.get('the-seagull/past')!.id, 'DONE'],
   ]
 
-  for (const [night, how] of nights) {
+  for (const [performanceId, how] of performances) {
     for (const [sort, item] of CHECKLIST.entries()) {
       // Tonight: the pre-show list ticked bar one, and nothing after the show yet.
       const ticked = how === 'DONE'
@@ -214,9 +213,8 @@ function seedChecklistStamps(target: SeedTarget, people: People, programme: Prog
       const byHand = ticked && item.systemCheck === undefined
 
       statements.push(insert('checklist_stamps', {
-        id: seedId('checkstamp', night, item.slug),
-        venue_id: house,
-        night,
+        id: seedId('checkstamp', performanceId, item.slug),
+        performance_id: performanceId,
         item_id: seedId('checkitem', item.slug),
         phase: item.phase,
         label: item.label,
@@ -234,11 +232,10 @@ function seedChecklistStamps(target: SeedTarget, people: People, programme: Prog
     }
   }
 
-  // Only the night that is over is closed; tonight is still open, which is the point of it.
+  // Only the performance that is over is closed; tonight's is still open, which is the point.
   statements.push(insert('checklist_closes', {
-    id: seedId('checkclose', nights[1]![0]),
-    venue_id: house,
-    night: nights[1]![0],
+    id: seedId('checkclose', performances[1]![0]),
+    performance_id: performances[1]![0],
     closed_by: officer,
     closed_at: now - 6 * DAY + 4 * 3600,
   }))

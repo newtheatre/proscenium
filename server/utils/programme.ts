@@ -58,6 +58,18 @@ export const PERFORMANCE_REFERENCES: PerformanceReference[] = [
     why: 'a Challenge 25 entry: licensing evidence, and nobody has bought a seat (E-118)',
   },
   {
+    table: 'checklist_stamps',
+    column: 'performance_id',
+    sold: false,
+    why: 'a stamped checklist item: routine configuration, and nobody has bought a seat (E-128)',
+  },
+  {
+    table: 'checklist_closes',
+    column: 'performance_id',
+    sold: false,
+    why: 'the close-night record: who closed it, and nobody has bought a seat (E-128)',
+  },
+  {
     table: 'incidents',
     column: 'performance_id',
     sold: false,
