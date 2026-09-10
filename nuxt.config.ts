@@ -44,7 +44,9 @@ export default defineNuxtConfig({
     image: {
       provider: 'cloudflare',
       cloudflare: {
-        baseURL: 'https://newtheatre.org.uk/',
+        // Relative, so the pre-cutover host transforms its own files rather than asking the old
+        // site for pictures it does not hold (K-126).
+        baseURL: '/',
       },
     },
   },
@@ -52,6 +54,16 @@ export default defineNuxtConfig({
   // Off under the end-to-end harness: nineteen suites each boot a dev server, and DevTools is
   // build time nobody in that run will ever open.
   devtools: { enabled: !process.env.E2E_BASE_URL },
+
+  app: {
+    head: {
+      link: [
+        { rel: 'icon', type: 'image/png', href: '/favicon.png' },
+        { rel: 'icon', href: '/favicon.ico', sizes: '16x16 32x32 48x48' },
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+      ],
+    },
+  },
 
   css: ['~/assets/css/theme.css'],
 

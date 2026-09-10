@@ -5,7 +5,9 @@ useSeoMeta({ title: 'The Nottingham New Theatre' })
 </script>
 
 <template>
-  <UPageHero
+  <PhotoHero
+    src="/images/nnt-front.webp"
+    alt="The front of the Nottingham New Theatre on a bright winter day"
     title="The Nottingham New Theatre"
     description="The country's only entirely student-run theatre."
   >
@@ -47,5 +49,5 @@ useSeoMeta({ title: 'The Nottingham New Theatre' })
         My bookings
       </UButton>
     </template>
-  </UPageHero>
+  </PhotoHero>
 </template>

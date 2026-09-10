@@ -2,6 +2,8 @@
 title: Our history
 description: How the Nottingham New Theatre came to be, and what has happened since.
 placeholder: true
+banner: /images/banners/alumni.webp
+bannerAlt: The auditorium seating, photographed in black and white
 ---
 
 This page is a placeholder. The headings below mark out what belongs on it; none of the prose
