@@ -3,6 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { accountsList } from '#shared/utils/accounts-list'
 import { formatLondon } from '#shared/utils/london'
 import { ROLES } from '#shared/utils/roles'
+import type { FieldKey } from '#shared/utils/list-filters'
 import type { Role } from '#shared/utils/roles'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -52,7 +53,7 @@ const failure = ref<string | null>(null)
 const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The accounts could not be read.') : null))
 
 // A banner's "show them" is the same question as the filter it names, asked through the URL.
-const show = (key: string): void => set(key, { key, operator: 'is', values: ['true'] })
+const show = (key: FieldKey<typeof accountsList>): void => set(key, { key, operator: 'is', values: ['true'] })
 
 const inviting = ref(false)
 const invitation = reactive({ email: '', name: '', roles: [] as Role[] })

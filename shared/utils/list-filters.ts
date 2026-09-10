@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { formatLondon, startOfLondonDay } from './london'
 import { pageQuery } from './pagination'
+import { isShowNight } from './show-night'
 
 // One declaration per console list derives the endpoint's query schema, the toolbar's builder and
 // the chips (K-129, 0032). The server half, whereFrom, is server/utils/list-filters.ts.
@@ -50,6 +51,8 @@ export interface FilterField {
   icon?: string
   // A date column holds either a YYYY-MM-DD day or unix seconds; the predicate differs.
   dateAs?: 'day' | 'unix'
+  // What a yes-or-no chip says when the answer is no, where "Not ..." would misread.
+  negated?: string
 }
 
 export interface SortField {
@@ -66,6 +69,10 @@ export interface ListSpec {
   sort: { fields: readonly SortField[], default: string, direction?: SortDirection }
   search?: { placeholder: string, maxLength?: number }
 }
+
+// The keys a declaration written `as const satisfies ListSpec` names, so a page cannot ask for
+// a field the declaration does not have.
+export type FieldKey<S extends ListSpec> = S['fields'][number]['key']
 
 export interface FilterCondition {
   key: string
@@ -88,18 +95,17 @@ export function fieldOf(spec: ListSpec, key: string): FilterField | undefined {
   return spec.fields.find(field => field.key === key)
 }
 
-const DAY = /^(\d{4})-(\d{2})-(\d{2})$/
+// How many values an operator takes; undefined is "one or more, up to the cap".
+export function valuesWanted(operator: FilterOperator): number | undefined {
+  if (operator === 'empty') return 0
+  if (operator === 'between') return 2
+  if (operator === 'any') return undefined
+  return 1
+}
+
 const NUMBER = /^-?\d+(\.\d+)?$/
 const REFERENCE = /^[\w.-]{1,80}$/
 const RAW = /^(is|not|any|between|before|after|empty)(?::(.*))?$/s
-
-function isDay(value: string): boolean {
-  const match = DAY.exec(value)
-  if (!match) return false
-  const [year, month, day] = match.slice(1).map(Number) as [number, number, number]
-  const date = new Date(Date.UTC(year, month - 1, day))
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
-}
 
 function valueIssue(field: FilterField, value: string): string | undefined {
   switch (field.kind) {
@@ -108,7 +114,8 @@ function valueIssue(field: FilterField, value: string): string | undefined {
     case 'yes-no':
       return ['true', 'false', '1', '0'].includes(value) ? undefined : 'takes yes or no'
     case 'date-range':
-      return isDay(value) ? undefined : `"${value}" is not a day`
+      // A show night is written as a day, so its validator is the day validator (0014).
+      return isShowNight(value) ? undefined : `"${value}" is not a day`
     case 'number-range':
       return NUMBER.test(value) ? undefined : `"${value}" is not a number`
     default:
@@ -127,8 +134,8 @@ export function parseCondition(field: FilterField, raw: string): { condition: Fi
   if (!operatorsOf(field).includes(operator)) return { issue: `cannot be filtered with "${operator}"` }
 
   const values = operator === 'empty' ? [] : (rest ?? '').split(',').map(value => value.trim()).filter(Boolean)
-  const expected = operator === 'empty' ? 0 : operator === 'between' ? 2 : operator === 'any' ? undefined : 1
-  if (expected !== undefined && values.length !== expected) return { issue: expected === 0 ? 'takes no value' : `needs ${expected === 1 ? 'a value' : 'two values'}` }
+  const wanted = valuesWanted(operator)
+  if (wanted !== undefined && values.length !== wanted) return { issue: wanted === 0 ? 'takes no value' : `needs ${wanted === 1 ? 'a value' : 'two values'}` }
   if (operator === 'any' && values.length === 0) return { issue: 'needs at least one value' }
   if (operator === 'any' && values.length > capOf(field)) return { issue: `lists at most ${capOf(field)} values` }
 
@@ -161,7 +168,8 @@ function baseSchema(spec: ListSpec) {
 export type ListQuery = z.output<ReturnType<typeof baseSchema>>
 
 // The endpoint's Zod query, on top of the shared page query. Each field is one key holding one
-// condition; the fields are read back with conditionsOf.
+// condition, read back with conditionsOf. Strict: a key the list does not declare is refused,
+// so an obsolete link is told so rather than shown a plausible unfiltered listing.
 export function filterQuerySchema(spec: ListSpec): ReturnType<typeof baseSchema> {
   const fields: Record<string, z.ZodType> = {}
   for (const field of spec.fields) {
@@ -175,7 +183,7 @@ export function filterQuerySchema(spec: ListSpec): ReturnType<typeof baseSchema>
       return parsed.condition
     })
   }
-  return baseSchema(spec).extend(fields) as ReturnType<typeof baseSchema>
+  return baseSchema(spec).extend(fields).strict() as ReturnType<typeof baseSchema>
 }
 
 export function conditionsOf(spec: ListSpec, query: object): FilterCondition[] {
@@ -190,12 +198,8 @@ export function conditionsOf(spec: ListSpec, query: object): FilterCondition[] {
 // The worst case a declaration can bind: paging, the search patterns, and each field at its widest
 // operator. A property of the declaration, so a test can hold it under the chunk limit (0006).
 export function maxBoundParameters(spec: ListSpec): number {
-  const widest = (field: FilterField): number => Math.max(...operatorsOf(field).map((operator) => {
-    if (operator === 'any') return capOf(field)
-    if (operator === 'between') return 2
-    if (operator === 'empty') return 0
-    return 1
-  }))
+  const widest = (field: FilterField): number =>
+    Math.max(...operatorsOf(field).map(operator => valuesWanted(operator) ?? capOf(field)))
   return 2 + (spec.search ? MAX_SEARCH_COLUMNS : 0) + spec.fields.reduce((sum, field) => sum + widest(field), 0)
 }
 
@@ -214,30 +218,23 @@ export function saysOperator(kind: FilterKind, operator: FilterOperator): string
 export const saysDay = (day: string): string =>
   formatLondon(startOfLondonDay(day), { day: 'numeric', month: 'short', year: 'numeric' })
 
-function saysValues(field: FilterField, values: string[], options?: readonly FilterOption[]): string {
-  const named = options ?? field.options
-  const each = values.map((value) => {
-    if (field.kind === 'date-range') return saysDay(value)
-    if (field.kind === 'number-range') return value
-    return named?.find(option => option.value === value)?.label
-  })
-  if (field.kind === 'date-range' || field.kind === 'number-range' || each.every(Boolean)) {
-    return values.length === 2 && field.kind !== 'list' && field.kind !== 'search-list' ? `${each[0]} and ${each[1]}` : each.join(', ')
-  }
-  // A reference the page has no name for yet, after a refresh: say that rather than print an id.
-  return values.length === 1 ? 'chosen' : `${values.length} chosen`
+function saysValue(field: FilterField, value: string, options?: readonly FilterOption[]): string | undefined {
+  if (field.kind === 'date-range') return saysDay(value)
+  if (field.kind === 'number-range') return value
+  return (options ?? field.options)?.find(option => option.value === value)?.label
 }
 
 // The chip's text: the field, the operator in words and the values by their labels.
 export function saysCondition(field: FilterField, condition: FilterCondition, options?: readonly FilterOption[]): string {
   if (field.kind === 'yes-no') {
-    return condition.values[0] === 'true' ? field.label : `Not ${field.label.charAt(0).toLowerCase()}${field.label.slice(1)}`
+    if (condition.values[0] === 'true') return field.label
+    return field.negated ?? `Not ${field.label.charAt(0).toLowerCase()}${field.label.slice(1)}`
   }
   if (condition.operator === 'empty') return `${field.label} is empty`
+  const named = condition.values.map(value => saysValue(field, value, options))
+  if (condition.operator === 'between') return `${field.label} between ${named[0]} and ${named[1]}`
   const words = saysOperator(field.kind, condition.operator)
-  if (condition.operator === 'between') {
-    const [from, to] = condition.values.map(value => field.kind === 'date-range' ? saysDay(value) : value)
-    return `${field.label} between ${from} and ${to}`
-  }
-  return `${field.label} ${words} ${saysValues(field, condition.values, options)}`
+  if (named.every(Boolean)) return `${field.label} ${words} ${named.join(', ')}`
+  // A reference the page has no name for yet, after a refresh: say that rather than print an id.
+  return `${field.label} ${words} ${condition.values.length === 1 ? 'chosen' : `${condition.values.length} chosen`}`
 }

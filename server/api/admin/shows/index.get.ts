@@ -3,8 +3,7 @@ import { showsList } from '#shared/utils/shows-list'
 
 const query = filterQuerySchema(showsList)
 
-// Every show, drafts included, with how many performances each has and how many are on sale,
-// filtered and ordered by its declaration (K-129).
+// Every show, drafts included, with its counts, filtered and ordered by its declaration (K-129).
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'ticketing.read')
   const input = await getValidatedQueryOrThrow(event, query)

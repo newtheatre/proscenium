@@ -131,6 +131,8 @@ export interface AdminShow {
   latecomerPolicy: LatecomerPolicy | null
   categoryId: string | null
   seasonId: string | null
+  // Read with the row, so the list never has to fetch every season to name one (D-131).
+  seasonName: string | null
   bookingClosesHoursBefore: number | null
   status: ShowStatus
   performanceCount: number
@@ -210,6 +212,11 @@ export function publicShow(show: PublicShow & { status: ShowStatus }): PublicSho
 // never been on sale and is nobody's business yet (D-121 criteria 1 and 5).
 export function isPublicPerformance(performance: { status: PerformanceStatus }): boolean {
   return performance.status !== 'DRAFT'
+}
+
+// A retired season or category still names the shows it holds; the picker says so (D-131).
+export function saysReferenceName(one: { name: string, archived: boolean }): string {
+  return one.archived ? `${one.name} (retired)` : one.name
 }
 
 export function saysShowStatus(status: string): string {

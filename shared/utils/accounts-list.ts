@@ -3,7 +3,7 @@ import type { ListSpec } from './list-filters'
 
 // The account directory's declaration (K-129, A-121). A role and a membership are not columns:
 // both are answered from other rows at query time by accountsClause (0009, 0031).
-export const accountsList: ListSpec = {
+export const accountsList = {
   key: 'accounts',
   search: { placeholder: 'A name, an address or a student number', maxLength: 200 },
   fields: [
@@ -12,9 +12,12 @@ export const accountsList: ListSpec = {
       label: 'Role',
       kind: 'list',
       options: ROLES.map(role => ({ value: role, label: saysRole(role) })),
+      // "Holds no role" is the field below, so one question has one answer.
+      operators: ['is', 'not', 'any'],
       cap: ROLES.length,
       icon: 'i-lucide-shield',
     },
+    { key: 'holdsRole', label: 'Holds a role', kind: 'yes-no', negated: 'Holds no role', icon: 'i-lucide-shield' },
     {
       key: 'membership',
       label: 'Membership',
@@ -27,14 +30,13 @@ export const accountsList: ListSpec = {
       operators: ['is'],
       icon: 'i-lucide-id-card',
     },
-    { key: 'holdsRole', label: 'Holds a role', kind: 'yes-no', icon: 'i-lucide-shield' },
-    { key: 'verified', label: 'Address verified', kind: 'yes-no', column: 'verified' },
+    { key: 'verified', label: 'Address verified', kind: 'yes-no', column: 'verified', negated: 'Address unverified' },
     { key: 'disabled', label: 'Disabled', kind: 'yes-no', column: 'disabled' },
     { key: 'anonymised', label: 'Anonymised', kind: 'yes-no' },
-    { key: 'authenticator', label: 'Authenticator enrolled', kind: 'yes-no' },
-    { key: 'privilegedWithoutFactor', label: 'Privileged, no authenticator', kind: 'yes-no' },
+    { key: 'authenticator', label: 'Authenticator enrolled', kind: 'yes-no', negated: 'No authenticator' },
+    { key: 'privilegedWithoutFactor', label: 'Privileged, no authenticator', kind: 'yes-no', negated: 'Not privileged, or has an authenticator' },
     { key: 'approachingRetention', label: 'Approaching retention', kind: 'yes-no' },
-    { key: 'neverSignedIn', label: 'Never signed in', kind: 'yes-no' },
+    { key: 'neverSignedIn', label: 'Never signed in', kind: 'yes-no', negated: 'Has signed in' },
     { key: 'lastLoginAt', label: 'Last seen', kind: 'date-range', column: 'last_login_at', dateAs: 'unix', icon: 'i-lucide-clock' },
   ],
   sort: {
@@ -45,4 +47,4 @@ export const accountsList: ListSpec = {
     ],
     default: 'name',
   },
-}
+} as const satisfies ListSpec

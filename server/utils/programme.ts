@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 // A function import only: `capacity.ts` imports `soldReferences` from this file, and importing a
 // constant back would be a circular value that is not there yet the first time either module runs.
 import { heldSeatsSubquery } from './capacity'
-import { aliasColumns, whereFrom } from './list-filters'
+import { aliasColumns, whereFrom, yesNo } from './list-filters'
 import { showsList } from '#shared/utils/shows-list'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
@@ -156,16 +156,13 @@ export function showsClause(query: ListQuery): ListClause {
     column: aliasColumns('s'),
     search: [sql`s.title`, sql`s.slug`],
     fields: {
-      unassessed: condition => (condition.values[0] === 'true' ? sql`(${UNASSESSED})` : sql`not (${UNASSESSED})`),
-      onSale: condition => (condition.values[0] === 'true' ? ON_SALE : sql`not ${ON_SALE}`),
+      unassessed: yesNo(UNASSESSED),
+      onSale: yesNo(ON_SALE),
     },
   })
 }
 
-const predicate = (clause: Partial<ListClause>): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
-
-const ordering = (clause: Partial<ListClause>): SQL =>
-  (clause.orderBy?.length ? sql.join(clause.orderBy, sql`, `) : sql`s.status, s.title COLLATE NOCASE`)
+const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
 
 const SHOW_COLUMNS = sql`
   s.id AS id,
@@ -178,6 +175,7 @@ const SHOW_COLUMNS = sql`
   s.latecomer_policy AS latecomerPolicy,
   s.category_id AS categoryId,
   s.season_id AS seasonId,
+  (SELECT se.name FROM seasons se WHERE se.id = s.season_id) AS seasonName,
   s.booking_closes_hours_before AS bookingClosesHoursBefore,
   s.warnings_confirmed_none AS warningsConfirmedNone,
   s.status AS status
@@ -200,11 +198,11 @@ const UNASSESSED = sql`
 
 const ON_SALE = sql`exists (SELECT 1 FROM performances p WHERE p.show_id = s.id AND p.status = 'ON_SALE')`
 
-export function showsQuery(clause: Partial<ListClause>, limit: number, offset: number, references = soldReferences()): SQL {
+export function showsQuery(clause: ListClause, limit: number, offset: number, references = soldReferences()): SQL {
   return sql`
     SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s', references)} AS soldTickets
     FROM shows s${predicate(clause)}
-    ORDER BY ${ordering(clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }

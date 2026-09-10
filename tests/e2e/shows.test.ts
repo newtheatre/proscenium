@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, fillDate, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillDate, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -452,6 +452,17 @@ describe.skipIf(skip !== null)('the screen', () => {
 
     // The console shell renders no <main>, so the screen names an element of its own.
     await visit(view, `${app.baseURL}/box-office/shows`, '[data-test="shows-table"]')
+    expect(await textOf(view, '[data-test="shows-table"]')).toContain(title)
+
+    // The builder's operator and value are chosen from real dropdowns, the condition becomes a
+    // chip, and the URL carries it (K-129 criteria 3 and 4).
+    await click(view, '[data-test="toolbar-filters"]')
+    await waitFor(view, `document.querySelector('[data-test="filter-status-operator"]')`)
+    await pickOption(view, '[data-test="filter-status-operator"]', 'Is')
+    await waitFor(view, `document.querySelector('[data-test="filter-status-value"]')`)
+    await pickOption(view, '[data-test="filter-status-value"]', 'Draft')
+    await waitFor(view, `document.querySelector('[data-test="toolbar-active"]')?.innerText.includes('Status is Draft')`)
+    await waitFor(view, `new URLSearchParams(location.search).get('status') === 'is:DRAFT'`)
     expect(await textOf(view, '[data-test="shows-table"]')).toContain(title)
 
     await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="performances-table"]')

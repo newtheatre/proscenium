@@ -1,12 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 import { sql } from 'drizzle-orm'
 import { accountsList } from '#shared/utils/accounts-list'
-import { filterQuerySchema } from '#shared/utils/list-filters'
+import { filterQuerySchema, operatorsOf } from '#shared/utils/list-filters'
 import { daysAfter, londonDay } from '#shared/utils/membership'
 import { ROLES } from '#shared/utils/roles'
 import { accountsClause } from '#server/utils/directory'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { AccountsContext } from '#server/utils/directory'
+import type { FilterField } from '#shared/utils/list-filters'
+import type { FilterField } from '#shared/utils/list-filters'
 import type { TestDatabase } from '#tests/helpers/database'
 
 // The account directory through its declaration (K-129 criteria 1 and 5). A role is not a
@@ -68,7 +70,7 @@ describe('a role is a filter though it is not a column (criterion 1)', () => {
       expect(ids(database, { role: 'is:TREASURER' })).toEqual(['treasurer'])
       expect(ids(database, { role: 'not:ADMIN' })).toEqual(['guest', 'lapsed', 'member', 'treasurer'])
       expect(ids(database, { role: 'any:ADMIN,TREASURER' })).toEqual(['admin', 'treasurer'])
-      expect(ids(database, { role: 'empty' })).toEqual(['guest', 'lapsed', 'member'])
+      expect(ids(database, { holdsRole: 'false' })).toEqual(['guest', 'lapsed', 'member'])
       expect(ids(database, { holdsRole: 'true' })).toEqual(['admin', 'treasurer'])
       expect(ids(database, { holdsRole: 'true', role: 'not:ADMIN' })).toEqual(['treasurer'])
     })
@@ -122,6 +124,22 @@ describe('the triage questions the directory is asked', () => {
       expect(ids(database, { search: 'ada' })).toEqual(['admin'])
       expect(ids(database, { search: 'tre@' })).toEqual(['treasurer'])
       expect(ids(database, { search: 's1234' })).toEqual(['member'])
+    })
+  })
+})
+
+// A declared field the binding cannot answer would be a 500 on the first click; caught here.
+describe('every field the declaration names is answered', () => {
+  test('each field without a column has a binding, for every operator it offers', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      for (const field of accountsList.fields as readonly FilterField[]) {
+        for (const operator of operatorsOf(field)) {
+          const value = field.kind === 'yes-no' ? 'true' : (field.options?.[0]?.value ?? '2026-01-01')
+          const raw = operator === 'empty' ? 'empty' : operator === 'between' ? `between:${value},${value}` : `${operator}:${value}`
+          expect(() => ids(database, { [field.key]: raw })).not.toThrow()
+        }
+      }
     })
   })
 })

@@ -199,6 +199,7 @@ describe('search runs over the columns the endpoint names', () => {
       seedPeople(database)
       const on = (search: string): string[] => select(database, 'users', whereFrom(people, parsed(people, { search }), usersBinding))
       expect(on('ALICE')).toEqual(['u-alice'])
+      expect(on('Ash')).toEqual(['u-alice'])
       expect(on('example.test')).toEqual(['u-alice', 'u-bob', 'u-cara', 'u-dan'])
       expect(on('100%')).toEqual(['u-dan'])
       expect(on('_x')).toEqual(['u-dan'])

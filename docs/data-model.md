@@ -250,6 +250,14 @@ listing and `ticketing.write` for the rest:
 | `DELETE /api/admin/reference-data/venues/[id]` | Deletes a venue nothing has ever used. One in use is a 409 naming retirement as the way and what is holding it open. |
 | `GET /api/admin/reference-data/rooms` | Active rooms, id and name only, for the venue form's room picker; a narrower read than the rooms module's own screen, so box office needs no `rooms.read`. |
 
+**The directory (A-121, K-129).** `/people/accounts`, over these routes, `accounts.read` for the
+listing and `accounts.create` for adding somebody:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/admin/accounts` | The paged envelope, allow-listed columns only, anonymised rows hidden unless `includeAnonymised=true` (the picker's flag) or the `anonymised` field asks for them, with the two triage banner counts. Filtered by its declaration (`shared/utils/accounts-list.ts`): `role`, `holdsRole`, `membership`, `verified`, `disabled`, `anonymised`, `authenticator`, `privilegedWithoutFactor`, `approachingRetention`, `neverSignedIn` and `lastLoginAt`, with `search` over name, address and student number and `sort` by name, last seen or joined. A key it does not declare is a 400. |
+| `POST /api/admin/accounts` | Creates an account with no password and sends a set-password link; a Workspace address gets none (0008). Roles may be granted in the same action. |
+
 **"In use" is a count over rows, never a column.** `VENUE_REFERENCES` in `server/utils/venues.ts`
 declares every table that points at `venues`: `performances`, `venue_emergency_info`,
 `shift_templates`, `checklist_items`, `night_reports`, `backstage_nights`, `comp_requests` and

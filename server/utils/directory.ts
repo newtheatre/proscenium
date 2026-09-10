@@ -2,7 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { and, count, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING, 0055).
-import { tableColumns, whereFrom } from './list-filters'
+import { tableColumns, whereFrom, yes, yesNo } from './list-filters'
 import { accountsList } from '#shared/utils/accounts-list'
 import { conditionsOf } from '#shared/utils/list-filters'
 import { londonDay } from '#shared/utils/membership'
@@ -89,16 +89,12 @@ export interface AccountsQuery extends ListQuery {
   includeAnonymised?: boolean
 }
 
-const yes = (condition: FilterCondition): boolean => condition.values[0] === 'true'
-const either = (condition: FilterCondition, when: SQL): SQL => (yes(condition) ? when : sql`not (${when})`)
-
 function roleCondition(condition: FilterCondition, now: number): SQL {
   const [role] = condition.values
   switch (condition.operator) {
     case 'is': return holdsLiveRole(now, role)
     case 'not': return sql`not ${holdsLiveRole(now, role)}`
-    case 'any': return holdsAnyLiveRole(now, condition.values)
-    default: return sql`not ${holdsLiveRole(now)}`
+    default: return holdsAnyLiveRole(now, condition.values)
   }
 }
 
@@ -116,13 +112,13 @@ export function accountsClause(query: AccountsQuery, context: AccountsContext): 
     search: [schema.users.name, schema.users.email, sql`coalesce(${schema.users.studentId}, '')`],
     fields: {
       role: condition => roleCondition(condition, context.now),
-      holdsRole: condition => either(condition, holdsLiveRole(context.now)),
+      holdsRole: yesNo(holdsLiveRole(context.now)),
       membership: condition => membershipCondition(condition, context.graceDays),
       anonymised: condition => (yes(condition) ? isNotNull(schema.users.anonymisedAt) : isNull(schema.users.anonymisedAt)),
-      authenticator: condition => either(condition, hasConfirmedFactor()),
-      privilegedWithoutFactor: condition => either(condition, privilegedWithoutFactor(context.privilegedRoles, context.now)),
-      approachingRetention: condition => either(condition, insideRetentionWindow(context.retentionYears, context.now)),
-      neverSignedIn: condition => either(condition, neverSignedIn()),
+      authenticator: yesNo(hasConfirmedFactor()),
+      privilegedWithoutFactor: yesNo(privilegedWithoutFactor(context.privilegedRoles, context.now)),
+      approachingRetention: yesNo(insideRetentionWindow(context.retentionYears, context.now)),
+      neverSignedIn: yesNo(neverSignedIn()),
     },
   })
 

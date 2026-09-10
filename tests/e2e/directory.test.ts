@@ -210,6 +210,8 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
 
   test('an unknown filter value, an undeclared sort or an oversized page is refused', async () => {
     expect((await send('GET', '/api/admin/accounts?role=is:nonsense', null, cookie)).status).toBe(400)
+    // An obsolete triage link is refused, never answered with a plausible unfiltered listing.
+    expect((await send('GET', '/api/admin/accounts?filter=anonymised', null, cookie)).status).toBe(400)
     expect((await send('GET', '/api/admin/accounts?sort=email', null, cookie)).status).toBe(400)
     expect((await send('GET', '/api/admin/accounts?pageSize=5000', null, cookie)).status).toBe(400)
   })

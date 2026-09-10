@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { saysShowStatus, showForm, toSlug } from '#shared/utils/programme'
+import { saysReferenceName, saysShowStatus, showForm, toSlug } from '#shared/utils/programme'
 import { showsList } from '#shared/utils/shows-list'
+import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import type { TableColumn } from '@nuxt/ui'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { AdminShow } from '#shared/utils/programme'
@@ -21,17 +22,16 @@ interface Named { items: { id: string, name: string, archived: boolean }[] }
 
 const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
-// The season and category pickers read the reference data once; a retired one still labels a
-// show that belongs to it (D-131).
+// The season and category pickers read the reference data once, the largest page of each;
+// the table names a show's own season from its row, so nothing here limits what it can say.
 const { data: reference } = await useAsyncData(
   'box-office-shows-reference',
   async () => {
     const [seasons, categories] = await Promise.all([
-      request<Named>('/api/admin/reference-data/seasons', { query: { pageSize: 100 } }),
-      request<Named>('/api/admin/reference-data/show-categories', { query: { pageSize: 100 } }),
+      request<Named>('/api/admin/reference-data/seasons', { query: { pageSize: MAX_PAGE_SIZE } }),
+      request<Named>('/api/admin/reference-data/show-categories', { query: { pageSize: MAX_PAGE_SIZE } }),
     ])
-    const named = (rows: Named): FilterOption[] =>
-      rows.items.map(row => ({ value: row.id, label: row.archived ? `${row.name} (retired)` : row.name }))
+    const named = (rows: Named): FilterOption[] => rows.items.map(row => ({ value: row.id, label: saysReferenceName(row) }))
     return { seasonId: named(seasons), categoryId: named(categories) }
   },
   { default: (): Record<string, FilterOption[]> => ({ seasonId: [], categoryId: [] }) },
@@ -108,8 +108,7 @@ const columns: TableColumn<AdminShow>[] = [
     id: 'season',
     header: 'Season',
     meta: { class: { td: 'whitespace-nowrap' } },
-    cell: ({ row }) => h('span', { class: 'text-sm text-muted' },
-      reference.value.seasonId?.find(season => season.value === row.original.seasonId)?.label ?? 'None'),
+    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.seasonName ?? 'None'),
   },
   {
     id: 'performances',

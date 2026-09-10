@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { filterQuerySchema } from '#shared/utils/list-filters'
+import { capOf, fieldOf, filterQuerySchema, operatorsOf } from '#shared/utils/list-filters'
 import { showsList } from '#shared/utils/shows-list'
 import {
   PERFORMANCE_REFERENCES,
@@ -12,6 +12,8 @@ import {
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import type { PerformanceReference } from '#server/utils/programme'
+import type { FilterField } from '#shared/utils/list-filters'
+import type { FilterField } from '#shared/utils/list-filters'
 import type { TestDatabase } from '#tests/helpers/database'
 
 // D-121 and D-112 on the real migrations. "Has sold tickets" is what criterion 5 turns on, and it
@@ -42,6 +44,15 @@ function statuses(database: TestDatabase, showId: string): string[] {
     database, 'SELECT id, status FROM performances WHERE show_id = ? ORDER BY id', showId,
   ).map(row => `${row.id}:${row.status}`)
 }
+
+const showsSchema = filterQuerySchema(showsList)
+const parsedShows = (raw: Record<string, string>) => {
+  const result = showsSchema.safeParse(raw)
+  if (!result.success) throw new Error(result.error.issues.map(issue => issue.message).join('; '))
+  return result.data
+}
+// The list with nothing asked of it: the default sort and no predicate.
+const everyShow = () => showsClause(parsedShows({}))
 
 // What D-104 will add, stood up here so the predicate can be proved against rows that do not
 // exist yet.
@@ -82,7 +93,7 @@ describe('a show and its performances carry a booking window at both levels (D-1
       const seeded = tonightsPerformance(database, { bookingClosesHoursBefore: 3 })
       database.batch([['UPDATE shows SET booking_closes_hours_before = ? WHERE id = ?', 2, seeded.showId]])
 
-      const [show] = read<{ bookingClosesHoursBefore: number }>(database, showsQuery({}, 25, 0))
+      const [show] = read<{ bookingClosesHoursBefore: number }>(database, showsQuery(everyShow(), 25, 0))
       expect(show?.bookingClosesHoursBefore).toBe(2)
 
       const [performance] = read<{ bookingClosesHoursBefore: number }>(database, showPerformancesQuery(seeded.showId))
@@ -221,13 +232,13 @@ describe('"has sold tickets" is a count over rows, never a flag (D-121 criterion
       withFutureTickets(database)
       sellTicket(database, 'ticket-1', seeded.performanceId)
 
-      const [statement, ...parameters] = boundStatement(database, showsQuery({}, 25, 0))
+      const [statement, ...parameters] = boundStatement(database, showsQuery(everyShow(), 25, 0))
       expect(parameters).toEqual([25, 0])
       // 0006 forbids an IN list built from a result set; `tickets`' own fixed, literal status
       // enum is not one, so the check is for a bound-parameter IN list specifically (0003).
       expect(statement).not.toContain(' IN (?')
 
-      const counted = read<{ id: string, soldTickets: number }>(database, showsQuery({}, 25, 0, [FUTURE_TICKETS]))
+      const counted = read<{ id: string, soldTickets: number }>(database, showsQuery(everyShow(), 25, 0, [FUTURE_TICKETS]))
       expect(counted.find(row => row.id === seeded.showId)?.soldTickets).toBe(1)
     })
   })
@@ -236,14 +247,9 @@ describe('"has sold tickets" is a count over rows, never a flag (D-121 criterion
 // The shows list through its declaration (K-129 criteria 1 and 5): a season is a column and
 // "unassessed" and "on sale" are questions about other rows, all answered by one clause.
 describe('the shows list filters by its declaration (K-129)', () => {
-  const schema = filterQuerySchema(showsList)
-  const parsed = (raw: Record<string, string>) => {
-    const result = schema.safeParse(raw)
-    if (!result.success) throw new Error(result.error.issues.map(issue => issue.message).join('; '))
-    return result.data
-  }
+  const schema = showsSchema
   const listed = (database: TestDatabase, raw: Record<string, string>): string[] =>
-    read<{ id: string }>(database, showsQuery(showsClause(parsed(raw)), 25, 0)).map(row => row.id)
+    read<{ id: string }>(database, showsQuery(showsClause(parsedShows(raw)), 25, 0)).map(row => row.id)
 
   function seedSeasons(database: TestDatabase): void {
     tonightsPerformance(database, { showStatus: 'PUBLISHED', status: 'ON_SALE' })
@@ -280,10 +286,31 @@ describe('the shows list filters by its declaration (K-129)', () => {
 
   test('a season list past its cap is refused before any statement is built', async () => {
     await withDatabase(() => {
-      const cap = showsList.fields.find(field => field.key === 'seasonId')!.cap!
+      const cap = capOf(fieldOf(showsList, 'seasonId')!)
       const many = Array.from({ length: cap + 1 }, (_, index) => `season-${index}`)
       expect(schema.safeParse({ seasonId: `any:${many.slice(0, cap).join(',')}` }).success).toBe(true)
       expect(schema.safeParse({ seasonId: `any:${many.join(',')}` }).success).toBe(false)
+    })
+  })
+
+  test('each field without a column has a binding, for every operator it offers', async () => {
+    await withDatabase((database) => {
+      seedSeasons(database)
+      for (const field of showsList.fields as readonly FilterField[]) {
+        for (const operator of operatorsOf(field)) {
+          const value = field.kind === 'yes-no' ? 'false' : (field.options?.[0]?.value ?? 'season-autumn')
+          const raw = operator === 'empty' ? 'empty' : operator === 'between' ? `between:${value},${value}` : `${operator}:${value}`
+          expect(() => listed(database, { [field.key]: raw })).not.toThrow()
+        }
+      }
+    })
+  })
+
+  test('a show names its own season from its row', async () => {
+    await withDatabase((database) => {
+      seedSeasons(database)
+      const named = read<{ id: string, seasonName: string | null }>(database, showsQuery(everyShow(), 25, 0))
+      expect(named.map(row => `${row.id}:${row.seasonName}`)).toEqual(['show-b:Spring', 'show-c:null', 'show-a:Autumn'])
     })
   })
 

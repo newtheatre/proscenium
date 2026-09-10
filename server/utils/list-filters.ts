@@ -3,18 +3,20 @@ import { and, getTableColumns, sql } from 'drizzle-orm'
 import { MAX_SEARCH_COLUMNS, capOf, conditionsOf, fieldOf } from '#shared/utils/list-filters'
 import { endOfLondonDay, startOfLondonDay } from '#shared/utils/london'
 import type { Column, SQL, Table } from 'drizzle-orm'
-import type { FilterCondition, FilterField, ListQuery, ListSpec, SortField } from '#shared/utils/list-filters'
+import type { FilterCondition, FilterField, ListQuery, ListSpec, SortDirection, SortField } from '#shared/utils/list-filters'
 
 // The server half of a list declaration (K-129 criterion 5): predicates and an order clause from
 // a validated query. A binding names the columns and answers the fields that are not columns.
 
 export type Reference = SQL | Column
 
+export type FieldAnswer = (condition: FilterCondition) => SQL | undefined
+
 export interface ListBinding {
   column?: (name: string) => Reference | undefined
   // The text columns the search box runs over; the endpoint names them (criterion 2).
   search?: Reference[]
-  fields?: Record<string, (condition: FilterCondition) => SQL | undefined>
+  fields?: Record<string, FieldAnswer>
 }
 
 export interface ListClause {
@@ -22,10 +24,19 @@ export interface ListClause {
   orderBy: SQL[]
 }
 
+export const seconds = (at: Date): number => Math.floor(at.getTime() / 1000)
+
+const columnsByTable = new Map<Table, Column[]>()
+
 // Columns by their SQL name on a Drizzle table, for a query-builder endpoint.
 export function tableColumns(table: Table): (name: string) => Column | undefined {
-  const columns = Object.values(getTableColumns(table))
-  return name => columns.find(column => column.name === name)
+  let columns = columnsByTable.get(table)
+  if (!columns) {
+    columns = Object.values(getTableColumns(table))
+    columnsByTable.set(table, columns)
+  }
+  const known = columns
+  return name => known.find(column => column.name === name)
 }
 
 // Columns through an alias, for an endpoint written in raw SQL (`s.season_id`).
@@ -38,27 +49,24 @@ export function containsPattern(term: string): string {
   return `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
 }
 
+// LIKE folds ASCII case itself; folding in JavaScript first would fold what SQLite's lower()
+// cannot, and the two would disagree on a name like Émile.
 export function searchAcross(term: string, columns: Reference[]): SQL {
   if (columns.length > MAX_SEARCH_COLUMNS) throw new Error(`search runs over at most ${MAX_SEARCH_COLUMNS} columns (0006)`)
-  const pattern = containsPattern(term.toLowerCase())
-  return sql`(${sql.join(columns.map(column => sql`lower(${column}) LIKE ${pattern} ESCAPE '\\'`), sql` OR `)})`
+  const pattern = containsPattern(term)
+  return sql`(${sql.join(columns.map(column => sql`${column} LIKE ${pattern} ESCAPE '\\'`), sql` OR `)})`
 }
 
-const seconds = (at: Date): number => Math.floor(at.getTime() / 1000)
+export const yes = (condition: FilterCondition): boolean => condition.values[0] === 'true'
 
-function datePredicate(field: FilterField, condition: FilterCondition, column: Reference): SQL {
-  const [first, second] = condition.values as [string, string]
-  if (field.dateAs === 'unix') {
-    const from = (day: string): number => seconds(startOfLondonDay(day))
-    const to = (day: string): number => seconds(endOfLondonDay(day))
-    switch (condition.operator) {
-      case 'is': return sql`${column} >= ${from(first)} AND ${column} <= ${to(first)}`
-      case 'before': return sql`${column} < ${from(first)}`
-      case 'after': return sql`${column} > ${to(first)}`
-      case 'between': return sql`${column} >= ${from(first)} AND ${column} <= ${to(second)}`
-      default: return sql`${column} IS NULL`
-    }
-  }
+// A yes-or-no answered by an expression over other rows: the binding gives the "when" and the
+// negation, with its parentheses, lives here.
+export function yesNo(when: SQL): FieldAnswer {
+  return condition => (yes(condition) ? when : sql`not (${when})`)
+}
+
+// Values bound as given: a number or a YYYY-MM-DD day, both of which compare as themselves.
+function rangePredicate(condition: FilterCondition, column: Reference, first: unknown, second: unknown): SQL {
   switch (condition.operator) {
     case 'is': return sql`${column} = ${first}`
     case 'before': return sql`${column} < ${first}`
@@ -68,13 +76,16 @@ function datePredicate(field: FilterField, condition: FilterCondition, column: R
   }
 }
 
-function numberPredicate(condition: FilterCondition, column: Reference): SQL {
-  const [first, second] = condition.values.map(Number) as [number, number]
+// A unix column against London day boundaries: the day itself lies inside "is" and "between".
+function unixDayPredicate(condition: FilterCondition, column: Reference): SQL {
+  const [first, second] = condition.values as [string, string]
+  const from = (day: string): number => seconds(startOfLondonDay(day))
+  const to = (day: string): number => seconds(endOfLondonDay(day))
   switch (condition.operator) {
-    case 'is': return sql`${column} = ${first}`
-    case 'before': return sql`${column} < ${first}`
-    case 'after': return sql`${column} > ${first}`
-    case 'between': return sql`${column} >= ${first} AND ${column} <= ${second}`
+    case 'is': return sql`${column} >= ${from(first)} AND ${column} <= ${to(first)}`
+    case 'before': return sql`${column} < ${from(first)}`
+    case 'after': return sql`${column} > ${to(first)}`
+    case 'between': return sql`${column} >= ${from(first)} AND ${column} <= ${to(second)}`
     default: return sql`${column} IS NULL`
   }
 }
@@ -91,20 +102,21 @@ function valuePredicate(condition: FilterCondition, column: Reference): SQL {
 }
 
 function columnPredicate(field: FilterField, condition: FilterCondition, column: Reference): SQL {
+  const [first, second] = condition.values
   switch (field.kind) {
-    case 'yes-no': return sql`${column} = ${condition.values[0] === 'true' ? 1 : 0}`
-    case 'date-range': return datePredicate(field, condition, column)
-    case 'number-range': return numberPredicate(condition, column)
+    case 'yes-no': return sql`${column} = ${yes(condition) ? 1 : 0}`
+    case 'date-range': return field.dateAs === 'unix' ? unixDayPredicate(condition, column) : rangePredicate(condition, column, first, second)
+    case 'number-range': return rangePredicate(condition, column, Number(first), Number(second))
     default: return valuePredicate(condition, column)
   }
 }
 
-function orderTerm(field: SortField, direction: string, binding: ListBinding): SQL {
+// The direction is one of two literals chosen here, never text spliced into the statement.
+function orderTerm(field: SortField, direction: SortDirection, binding: ListBinding): SQL {
   const column = binding.column?.(field.column)
   if (!column) throw new Error(`sort field ${field.key} names a column the binding does not have`)
-  return field.collate === 'nocase'
-    ? sql`${column} collate nocase ${sql.raw(direction)}`
-    : sql`${column} ${sql.raw(direction)}`
+  const sorted = field.collate === 'nocase' ? sql`${column} collate nocase` : sql`${column}`
+  return direction === 'desc' ? sql`${sorted} desc` : sql`${sorted} asc`
 }
 
 export function whereFrom(spec: ListSpec, query: ListQuery, binding: ListBinding): ListClause {

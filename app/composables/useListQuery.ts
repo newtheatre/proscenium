@@ -1,6 +1,6 @@
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import { encodeCondition, fieldOf, parseCondition, saysCondition } from '#shared/utils/list-filters'
-import type { FilterCondition, FilterOption, ListSpec, SortDirection } from '#shared/utils/list-filters'
+import type { FieldKey, FilterCondition, FilterOption, ListSpec, SortDirection } from '#shared/utils/list-filters'
 import type { MaybeRefOrGetter } from 'vue'
 
 // A console list's search, filters, sort and page live in the route query, so a filtered list
@@ -16,15 +16,22 @@ export interface ListQueryOptions {
   options?: MaybeRefOrGetter<Record<string, FilterOption[]> | undefined>
 }
 
-export function useListQuery(spec: ListSpec, settings: ListQueryOptions = {}) {
+const RESERVED = ['page', 'pageSize', 'search', 'sort', 'direction']
+
+export function useListQuery<S extends ListSpec>(spec: S, settings: ListQueryOptions = {}) {
   const route = useRoute()
   const router = useRouter()
 
-  const one = (key: string): string | undefined => {
-    const value = route.query[key]
-    const first = Array.isArray(value) ? value[0] : value
-    return typeof first === 'string' ? first : undefined
-  }
+  // The route query as one string per key; a repeated key keeps its first value.
+  const current = computed<Record<string, string>>(() => {
+    const flat: Record<string, string> = {}
+    for (const [key, value] of Object.entries(route.query)) {
+      const first = Array.isArray(value) ? value[0] : value
+      if (typeof first === 'string') flat[key] = first
+    }
+    return flat
+  })
+  const one = (key: string): string | undefined => current.value[key]
 
   // A value the schema would refuse is dropped here too, so the request never carries it.
   const conditions = computed<FilterCondition[]>(() => spec.fields.flatMap((field) => {
@@ -38,20 +45,17 @@ export function useListQuery(spec: ListSpec, settings: ListQueryOptions = {}) {
 
   const sort = computed<ListSort>(() => {
     const key = one('sort')
+    const direction = one('direction')
     return {
       key: spec.sort.fields.some(field => field.key === key) ? key! : spec.sort.default,
-      direction: one('direction') === 'desc' ? 'desc' : one('direction') === 'asc' ? 'asc' : defaultDirection,
+      direction: direction === 'desc' || direction === 'asc' ? direction : defaultDirection,
     }
   })
 
-  const current = (): Record<string, string> => Object.fromEntries(
-    Object.keys(route.query).flatMap(key => (one(key) === undefined ? [] : [[key, one(key)!]])),
-  )
-
   function write(patch: Record<string, string | undefined>, mode: 'push' | 'replace'): void {
-    const merged: Record<string, string | undefined> = { ...current(), ...patch }
+    const merged: Record<string, string | undefined> = { ...current.value, ...patch }
     const next = Object.fromEntries(Object.entries(merged).filter((entry): entry is [string, string] => entry[1] !== undefined))
-    if (JSON.stringify(next) === JSON.stringify(current())) return
+    if (JSON.stringify(next) === JSON.stringify(current.value)) return
     void router[mode]({ query: next })
   }
 
@@ -77,7 +81,7 @@ export function useListQuery(spec: ListSpec, settings: ListQueryOptions = {}) {
     if (value !== search.value.trim()) search.value = value
   })
 
-  function set(key: string, condition: FilterCondition | null): void {
+  function set(key: FieldKey<S>, condition: FilterCondition | null): void {
     write({ [key]: condition ? encodeCondition(condition) : undefined, page: undefined }, 'push')
   }
 
@@ -100,13 +104,19 @@ export function useListQuery(spec: ListSpec, settings: ListQueryOptions = {}) {
     write({ ...fields, search: undefined, page: undefined }, 'push')
   }
 
-  // What the endpoint is asked: the same encoding the URL holds, so one schema reads both.
-  const query = computed<Record<string, string | number>>(() => {
+  // What the endpoint is asked, the same encoding the URL holds. A key the page does not own is
+  // passed through, so an obsolete link is refused by the schema rather than quietly widened.
+  const encoded = computed<string>(() => {
     const asked: Record<string, string | number> = { page: page.value, sort: sort.value.key, direction: sort.value.direction }
     if (settledSearch.value) asked.search = settledSearch.value
     for (const condition of conditions.value) asked[condition.key] = encodeCondition(condition)
-    return asked
+    for (const [key, value] of Object.entries(current.value)) {
+      if (!RESERVED.includes(key) && !fieldOf(spec, key)) asked[key] = value
+    }
+    return JSON.stringify(asked)
   })
+  // Keyed on the string, so a watcher on it fires only when the question actually changes.
+  const query = computed<Record<string, string | number>>(() => JSON.parse(encoded.value) as Record<string, string | number>)
 
   const active = computed<ActiveFilter[]>(() => {
     const chips: ActiveFilter[] = []
@@ -120,7 +130,7 @@ export function useListQuery(spec: ListSpec, settings: ListQueryOptions = {}) {
         key: condition.key,
         label: saysCondition(field, condition, labels?.[condition.key]),
         icon: field.icon ?? 'i-lucide-filter',
-        clear: () => set(condition.key, null),
+        clear: () => set(condition.key as FieldKey<S>, null),
       })
     }
     return chips

@@ -4,6 +4,7 @@ import {
   DEFAULT_ANY_CAP,
   conditionsOf,
   encodeCondition,
+  fieldOf,
   filterQuerySchema,
   maxBoundParameters,
   operatorsOf,
@@ -111,6 +112,12 @@ describe('the schema is derived from the declaration (criterion 1)', () => {
     expect(parse({ pageSize: '5000' }).success).toBe(false)
     expect(parse({ page: '0' }).success).toBe(false)
   })
+
+  // An obsolete link is told so, rather than shown a plausible listing with no chip.
+  test('a key the list does not declare is refused, not stripped', () => {
+    expect(parse({ filter: 'anonymised' }).success).toBe(false)
+    expect(parse({ colour: 'is:RED', extra: '1' }).success).toBe(false)
+  })
 })
 
 describe('sorting is by a declared field only (criterion 5)', () => {
@@ -196,19 +203,23 @@ describe('a chip says what it filters in words (criterion 3)', () => {
     expect(saysCondition(spec.fields[1]!, { key: 'owner', operator: 'is', values: ['u1'] })).toBe('owner is chosen')
   })
 
-  test('a yes or no reads as the label or its negation', () => {
+  test('a yes or no reads as the label, its negation, or the wording the field gives for no', () => {
     expect(saysCondition(spec.fields[4]!, { key: 'live', operator: 'is', values: ['true'] })).toBe('live')
     expect(saysCondition(spec.fields[4]!, { key: 'live', operator: 'is', values: ['false'] })).toBe('Not live')
+    const worded = { ...spec.fields[4]!, negated: 'Retired' }
+    expect(saysCondition(worded, { key: 'live', operator: 'is', values: ['false'] })).toBe('Retired')
   })
 })
 
 describe('the two migrated declarations (criteria 1 and 6)', () => {
   test('accounts filters on a role, which is not a column, and shows on a season, which is', () => {
-    const role = accountsList.fields.find(one => one.key === 'role')
+    const role = fieldOf(accountsList, 'role')
     expect(role?.column).toBeUndefined()
     expect(role?.kind).toBe('list')
     expect(role?.cap).toBeGreaterThan(0)
-    const season = showsList.fields.find(one => one.key === 'seasonId')
+    // One question, one field: "holds no role" is holdsRole, so role does not also offer empty.
+    expect(operatorsOf(role!)).not.toContain('empty')
+    const season = fieldOf(showsList, 'seasonId')
     expect(season?.column).toBe('season_id')
   })
 

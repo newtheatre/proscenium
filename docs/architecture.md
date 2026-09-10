@@ -406,8 +406,10 @@ reaches it anyway, and `maxBoundParameters(spec)` is the declaration's worst cas
 (`dateAs: 'unix'`) compare against London day boundaries (0014); "is not X" includes rows with no
 value at all, and "is empty" finds them.
 
-Migration runs one module per pull request; `tests/unit/admin-conventions.test.ts` holds the
-migrated pages to the declaration now and the whole console once the last module lands.
+The two endpoints migrated first are `GET /api/admin/accounts` and `GET /api/admin/shows`, both
+documented in `docs/data-model.md` beside their tables. Migration runs one module per pull
+request; `tests/unit/admin-conventions.test.ts` holds the migrated pages to the declaration now
+and the whole console once the last module lands.
 
 ## Scheduled tasks
 

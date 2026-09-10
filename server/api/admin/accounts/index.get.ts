@@ -3,7 +3,7 @@ import { accountsList } from '#shared/utils/accounts-list'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { envelope, offsetFor } from '#shared/utils/pagination'
 import { accountsClause, directoryTotal, insideRetentionWindow, privilegedWithoutFactor } from '#server/utils/directory'
-import type { H3Event } from 'h3'
+import type { AccountsContext } from '#server/utils/directory'
 
 // The picker's flag rides beside the declared fields: a tombstone is a valid target for some
 // things (A-121 criterion 4).
@@ -16,13 +16,13 @@ export default defineEventHandler(async (event) => {
   await requirePermission(event, 'accounts.read')
   const input = await getValidatedQueryOrThrow(event, query)
 
-  const now = Math.floor(Date.now() / 1000)
-  const { where, orderBy } = accountsClause(input, {
-    now,
+  const context: AccountsContext = {
+    now: Math.floor(Date.now() / 1000),
     graceDays: await configValue(event, 'MEMBERSHIP_GRACE_DAYS'),
     privilegedRoles: await configValue(event, 'PRIVILEGED_ROLES'),
     retentionYears: await configValue(event, 'RETENTION_FULL_ACCOUNT_YEARS'),
-  })
+  }
+  const { where, orderBy } = accountsClause(input, context)
   const total = await directoryTotal(where)
 
   // An explicit column list: without one the ORM returns the password hash and the Google
@@ -49,19 +49,16 @@ export default defineEventHandler(async (event) => {
 
   return {
     ...envelope(items, total, input.page, input.pageSize),
-    banners: await banners(event, now),
+    banners: await banners(context),
   }
 })
 
 // Both counts in one statement: D1 caps compound selects low, and a query per banner per page
 // load is two round trips where one will do (0006).
-async function banners(event: H3Event, now: number): Promise<{ privilegedWithoutFactor: number, insideRetentionWindow: number }> {
-  const privileged = await configValue(event, 'PRIVILEGED_ROLES')
-  const years = await configValue(event, 'RETENTION_FULL_ACCOUNT_YEARS')
-
+async function banners(context: AccountsContext): Promise<{ privilegedWithoutFactor: number, insideRetentionWindow: number }> {
   const [row] = await db.select({
-    privilegedWithoutFactor: sql<number>`sum(case when ${privilegedWithoutFactor(privileged, now)} then 1 else 0 end)`,
-    insideRetentionWindow: sql<number>`sum(case when ${insideRetentionWindow(years, now)} then 1 else 0 end)`,
+    privilegedWithoutFactor: sql<number>`sum(case when ${privilegedWithoutFactor(context.privilegedRoles, context.now)} then 1 else 0 end)`,
+    insideRetentionWindow: sql<number>`sum(case when ${insideRetentionWindow(context.retentionYears, context.now)} then 1 else 0 end)`,
   })
     .from(schema.users)
     .where(sql`${schema.users.anonymisedAt} is null`)

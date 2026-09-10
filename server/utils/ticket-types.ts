@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 // Safe to import at runtime: `capacity.ts` only imports types from this file, so no cycle exists
 // the way one would if this pulled a constant back from `programme.ts` (see that file's note).
 import { TICKETS_ARE_A_SALE } from './capacity'
+import { containsPattern } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 import type { TicketType } from '#shared/utils/ticket-types'
 
@@ -88,9 +89,6 @@ export interface TicketTypeFilters {
   search?: string
 }
 
-// A typed percent sign is a character somebody is looking for, not a wildcard.
-const contains = (term: string): string => `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
-
 // Two bound parameters at most, whatever the filters and however many types there are (0003).
 function predicate(filters: TicketTypeFilters): SQL {
   // The system row D-125's redemption ensures the first time any pass is redeemed is nobody's
@@ -99,7 +97,7 @@ function predicate(filters: TicketTypeFilters): SQL {
   if (!filters.includeArchived) terms.push(sql`archived = 0`)
   // SQLite's LIKE is case-insensitive over ASCII already, and a COLLATE here would bind to the
   // escape character rather than to the comparison.
-  if (filters.search) terms.push(sql`name LIKE ${contains(filters.search)} ESCAPE '\\'`)
+  if (filters.search) terms.push(sql`name LIKE ${containsPattern(filters.search)} ESCAPE '\\'`)
   return terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``
 }
 
