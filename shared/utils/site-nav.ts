@@ -4,6 +4,7 @@ import {
   exportAgeChecks,
   reachConsole,
   runTrainingSessions,
+  sendAnnouncements,
   signedIn,
   verifyAccessProfiles,
   viewAccounts,
@@ -170,7 +171,15 @@ export const CONSOLE_NAV: NavGroup[] = [
   },
 
   // Module H: communications
-  { key: 'comms', label: 'Communications', icon: 'i-lucide-send', prefix: '/comms', items: [] },
+  {
+    key: 'comms',
+    label: 'Communications',
+    icon: 'i-lucide-send',
+    prefix: '/comms',
+    items: [
+      { label: 'Announce', icon: 'i-lucide-megaphone', to: '/comms/announce', ability: sendAnnouncements },
+    ],
+  },
 
   // Module J: governance
   {

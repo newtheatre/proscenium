@@ -553,6 +553,12 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['notifications.preference.changed'],
     via: ['server/utils/notification-preferences.ts'],
   },
+  { route: 'server/api/admin/comms/announcements/preview.post.ts', exempt: 'resolves a count and renders a preview; nothing sends' },
+  {
+    route: 'server/api/admin/comms/announcements/index.post.ts',
+    actions: ['comms.announcement.sent'],
+    via: ['server/utils/announcements.ts'],
+  },
 
   // Module I: finance
 

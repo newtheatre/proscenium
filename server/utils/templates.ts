@@ -27,6 +27,16 @@ function expiry(at: Date): string {
   return formatLondon(at, { dateStyle: 'full', timeStyle: 'short' })
 }
 
+// Every other template's free text is a short, code-written phrase; an announcement's body is an
+// officer's own paragraphs, so this is the one place raw input reaches the HTML part at all.
+function escapeHtml(value: string): string {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+}
+
+function paragraphs(body: string): string {
+  return body.split(/\n{2,}/).map(part => `<p>${escapeHtml(part).replaceAll('\n', '<br>')}</p>`).join('\n')
+}
+
 const TEMPLATES = {
   'account-verify': (context: TemplateContext): Rendered => {
     const url = String(context.url)
@@ -1453,6 +1463,23 @@ The Nottingham New Theatre`,
 ${warnings}
 
 ${line}
+
+The Nottingham New Theatre`,
+    }
+  },
+
+  // The officer's own subject and body, addressed and signed the same as every other message
+  // (H-108). The only template whose body is free text rather than code-composed (H-109).
+  'admin-announcement': (context: TemplateContext): Rendered => {
+    const subject = String(context.subject)
+    const body = String(context.body)
+    return {
+      subject,
+      html: layout(`<p>Hello ${context.name},</p>
+${paragraphs(body)}`),
+      text: `Hello ${context.name},
+
+${body}
 
 The Nottingham New Theatre`,
     }
