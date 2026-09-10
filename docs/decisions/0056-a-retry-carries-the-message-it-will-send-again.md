@@ -55,6 +55,21 @@ reason on the row, because a ticket sent without its ticket is worse than a visi
 the attachment is not in the log to send again. H-106's manual re-send goes back through the route
 that built the attachment in the first place, which is the only place that can rebuild it.
 
+**A send with no account is a first-class send, and is retried the same way.** `notifyAddress()`
+takes a literal recipient, logs a row with `user_id` null, and on failure stores the address inside
+the same payload as the rendered message, because no account will resolve one at the next attempt.
+The retry judges such a row on its address alone: the deliverability rules still apply (H-107), and
+the account, verification and preference guards are skipped because there is nobody to ask. It
+still needs a registered type, since an account-less send is not an untyped one (H-101 criterion 2).
+This exists because E-124's night report goes to `NIGHT_REPORT_RECIPIENTS`, configured addresses
+rather than accounts, and without it that story's sends could never be retried at all.
+
+**A suppression is terminal and never enters the retry machinery.** A muted topic is not a message
+that failed to arrive: there is nothing to send again, retrying it would send exactly what the
+member switched off, and it would double the per-type counts 0048 exists to keep honest. The sweep
+selects `FAILED` alone, the claim is conditional on that status, and a preference switched off
+between two attempts settles the entry as `SUPPRESSED_PREFERENCE` with its payload cleared.
+
 **The sweep claims a row before working on it.** `UPDATE ... SET status = 'RETRYING' WHERE id = ?
 AND status = 'FAILED'` returning a row is the claim, so two overlapping runs cannot both send the
 same message (0003, 0049). `RETRYING`, which has sat unused in the status check since the table was

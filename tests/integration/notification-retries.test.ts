@@ -124,6 +124,37 @@ describe('what the sweep picks up (criterion 2)', () => {
       expect(due(database)).toEqual([])
     })
   })
+
+  // The one a reader might expect retryable: a muted topic is not a message that failed to
+  // arrive, and retrying it would double the per-type counts 0048 keeps honest (H-102 criterion 3).
+  test('a message suppressed by preference is never retried, however old it is', async () => {
+    await withDatabase((database) => {
+      seedUser(database)
+      const id = seedFailed(database, { status: 'SUPPRESSED_PREFERENCE', createdAt: NOW - 400 * 24 * 3600 })
+
+      expect(due(database, NOW + 400 * 24 * 3600)).toEqual([])
+      // And it cannot be claimed even if something reached past the predicate for it.
+      expect(claim(database, id)).toBe(false)
+      expect(one<{ status: string, attempts: number }>(database, `SELECT status, attempts FROM notification_log`))
+        .toEqual({ status: 'SUPPRESSED_PREFERENCE', attempts: 1 })
+    })
+  })
+
+  // A preference switched off between two attempts settles the entry rather than failing it:
+  // the send is not owed any more, so nothing is kept and nothing is tried again.
+  test('a retry the preference has since silenced settles and keeps nothing', async () => {
+    await withDatabase((database) => {
+      seedUser(database)
+      const id = seedFailed(database, { attempts: 1, createdAt: NOW - 3600 })
+      claim(database, id)
+      resolve(database, id, 'SUPPRESSED_PREFERENCE')
+
+      expect(one<{ status: string, retry_payload: string | null }>(
+        database, `SELECT status, retry_payload FROM notification_log`,
+      )).toEqual({ status: 'SUPPRESSED_PREFERENCE', retry_payload: null })
+      expect(due(database, NOW + 10 * 24 * 3600)).toEqual([])
+    })
+  })
 })
 
 describe('an attempt is appended to the entry it belongs to (criteria 2 and 3)', () => {
@@ -212,6 +243,41 @@ describe('an attempt is appended to the entry it belongs to (criteria 2 and 3)',
   })
 })
 
+// The type here is the one E-124 will register for the night report. A send still has to carry a
+// registered type: an account-less one is not an untyped one (H-101 criterion 2).
+describe('an account-less send is retried like any other (E-124)', () => {
+  // A configured recipient has no account to resolve an address from at the next attempt, so
+  // the address rides on the payload and is cleared with it (0055).
+  test('a row with no user_id is due like any other failure', async () => {
+    await withDatabase((database) => {
+      const id = `a-${Math.random().toString(36).slice(2, 10)}`
+      database.raw.prepare(
+        `INSERT INTO notification_log (id, user_id, type, channel, status, subject, attempts, retry_payload, created_at)
+         VALUES (?, NULL, 'night.report', 'EMAIL', 'FAILED', 'Night report', 1, ?, ?)`,
+      ).run(id, JSON.stringify({ subject: 'Night report', html: '<p>x</p>', text: 'x', to: 'reports@newtheatre.org.uk' }), NOW - 3600)
+
+      expect(due(database)).toEqual([id])
+    })
+  })
+
+  test('the recipient rides on the payload and goes when the entry settles', async () => {
+    await withDatabase((database) => {
+      const id = `a-${Math.random().toString(36).slice(2, 10)}`
+      database.raw.prepare(
+        `INSERT INTO notification_log (id, user_id, type, channel, status, subject, attempts, retry_payload, created_at)
+         VALUES (?, NULL, 'night.report', 'EMAIL', 'FAILED', 'Night report', 1, ?, ?)`,
+      ).run(id, JSON.stringify({ subject: 'Night report', html: '<p>x</p>', text: 'x', to: 'reports@newtheatre.org.uk' }), NOW - 3600)
+
+      claim(database, id)
+      resolve(database, id, 'SENT')
+
+      expect(one<{ user_id: string | null, retry_payload: string | null, attempts: number }>(
+        database, `SELECT user_id, retry_payload, attempts FROM notification_log`,
+      )).toEqual({ user_id: null, retry_payload: null, attempts: 2 })
+    })
+  })
+})
+
 describe('the log is pruned past its retention period (criterion 5)', () => {
   // Exactly pruneNotificationLog(): scoped by subquery and capped, never an id list from a
   // result set (0003, 0006).
@@ -243,6 +309,19 @@ describe('the log is pruned past its retention period (criterion 5)', () => {
 
       expect(prune(database, NOW, 2)).toBe(2)
       expect(rows(database, `SELECT id FROM notification_log`)).toHaveLength(3)
+    })
+  })
+
+  // Age alone, on every status: nothing here is kept indefinitely the way a backstage milestone
+  // row is, which is its own purge's exemption by predicate and trigger, not this one's (0010).
+  test('a terminal row prunes by age like any other, whatever its status', async () => {
+    await withDatabase((database) => {
+      seedUser(database)
+      seedFailed(database, { id: 'sent', status: 'SENT', payload: null, createdAt: NOW - 800 * 24 * 3600 })
+      seedFailed(database, { id: 'suppressed', status: 'SUPPRESSED_PREFERENCE', payload: null, createdAt: NOW - 800 * 24 * 3600 })
+
+      expect(prune(database, NOW - 730 * 24 * 3600)).toBe(2)
+      expect(rows(database, `SELECT id FROM notification_log`)).toEqual([])
     })
   })
 })

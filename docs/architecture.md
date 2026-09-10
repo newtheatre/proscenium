@@ -349,7 +349,17 @@ the first one wrote, so a count of messages of a type is still a count of rows (
 is cleared by every terminal outcome, so a row at rest holds no message body, and a send carrying
 an attachment is never retried because the attachment was the caller's and is not on the row.
 `resend()` in the centre is the only thing that sends a stored payload, and it re-runs every guard
-`notify()` ran.
+`notify()` ran. A suppression is terminal and never enters the sweep: the predicate is `FAILED`
+alone, and retrying a muted topic would send the thing a member switched off.
+
+`notifyAddress()` is the way to send to a configured address rather than an account (E-124's night
+report recipients). It logs a row with no `user_id`, carries the recipient inside the retry payload
+because no account will resolve one next time, and is retried exactly like any other send, judged
+on its address alone. It still needs a registered type.
+
+The prune deletes from `notification_log` and nothing else. Nothing in that table is kept
+indefinitely, which is what makes age the whole rule here; the backstage board's own purge is the
+one that must exclude milestone rows, and it does so by predicate and by trigger (0010).
 
 Order inside `notify()`, which is what the criteria turn on: resolve the account, render, write
 the inbox entry, then judge the email. A topic switched off is logged `SUPPRESSED_PREFERENCE` and

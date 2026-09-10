@@ -24,8 +24,8 @@ export interface RetryOutcome {
   gaveUp: number
 }
 
-// Due when the doubling window since enqueue has passed, computed in SQL from the same two
-// values `retryDueAt()` uses: `(1 << attempts) - 1` is `2^attempts - 1` without a POWER().
+// FAILED only, never a terminal status: a muted topic (SUPPRESSED_PREFERENCE) has nothing to
+// retry. Due when `(1 << attempts) - 1` minutes, the same doubling window `retryDueAt()` uses, have passed.
 export async function dueForRetry(nowEpoch: number, backoffMinutes: number, maxAttempts: number, limit = BATCH_CAP): Promise<string[]> {
   const rows = await db.all<{ id: string }>(sql`
     SELECT id FROM notification_log
