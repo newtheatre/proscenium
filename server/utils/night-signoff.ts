@@ -8,8 +8,12 @@ import type { NightAuthorityVia } from '#shared/utils/night-authority'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
-// Sign-off, freeze and distribution (E-124). `night_reports` is append-only and one row per
-// performance; a correction is an addendum, never an edit to the frozen row.
+// Sign-off, freeze and distribution (E-124), and the SYSTEM auto-close beside it (E-125).
+// `night_reports` is append-only, one row per performance; a correction is an addendum.
+
+// SYSTEM never carries a shift or an officer bypass, so it is this file's own vocabulary
+// rather than a fourth value on `NightAuthorityVia`, which E-111 alone governs.
+export type NightReportSignedVia = NightAuthorityVia | 'SYSTEM'
 
 export interface NightReportRow {
   id: string
@@ -18,9 +22,10 @@ export interface NightReportRow {
   night: string
   closingNote: string
   report: NightReport
-  signedBy: string
-  signedByName: string
-  signedVia: NightAuthorityVia
+  // NULL only alongside `signedVia: 'SYSTEM'` (0089's shape check keeps the two together).
+  signedBy: string | null
+  signedByName: string | null
+  signedVia: NightReportSignedVia
   signedAt: number
 }
 
@@ -30,10 +35,12 @@ const REPORT_COLUMNS = sql`
   nr.signed_via AS signedVia, nr.signed_at AS signedAt
 `
 
+// A left join: a SYSTEM row's `signed_by` is NULL, and an inner join would silently drop it
+// from every read (E-125).
 export function reportForPerformanceQuery(performanceId: string): SQL {
   return sql`
     SELECT ${REPORT_COLUMNS}
-    FROM night_reports nr JOIN users u ON u.id = nr.signed_by
+    FROM night_reports nr LEFT JOIN users u ON u.id = nr.signed_by
     WHERE nr.performance_id = ${performanceId}
   `
 }
@@ -55,8 +62,8 @@ export interface NightSignOffInput {
   night: string
   closingNote: string
   report: NightReport
-  signedBy: string
-  signedVia: NightAuthorityVia
+  signedBy: string | null
+  signedVia: NightReportSignedVia
 }
 
 // Predicated on no existing row for this performance, `closeStatement`'s own shape (E-114): a
@@ -110,15 +117,15 @@ async function configuredRecipients(event: H3Event | undefined): Promise<string[
 }
 
 // One best-effort send per recipient, each outcome its own row (criterion 4's "records each
-// distribution outcome"); retry-until-delivered and the dashboard are H-105 and H-106's own build.
+// distribution outcome"). `closerEmail` is null for a SYSTEM auto-close: nobody closed it (E-125).
 export async function distributeReport(
   event: H3Event | undefined,
   reportId: string,
   addendumId: string | null,
-  closerEmail: string,
+  closerEmail: string | null,
   message: { subject: string, html: string, text: string },
 ): Promise<void> {
-  const recipients = [...new Set([...(await configuredRecipients(event)), closerEmail])]
+  const recipients = [...new Set([...(await configuredRecipients(event)), ...(closerEmail ? [closerEmail] : [])])]
   for (const recipient of recipients) {
     const outcome = await sendRaw(event, { to: recipient, ...message })
     await db.run(deliveryStatement({
