@@ -199,6 +199,8 @@ const SHOTS: Shot[] = [
   })()` },
   { name: '10c-rooms-filters', path: '/admin/rooms', marker: '[data-test="rooms-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '10d-requests', path: '/admin/requests', marker: '[data-test="requests-table"]' },
+  { name: '10d1-shows', path: '/box-office/shows', marker: '[data-test="shows-table"]' },
+  { name: '10d2-shows-filters', path: '/box-office/shows?status=is:DRAFT', marker: '[data-test="toolbar-active"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '10e-other-rooms', path: '/admin/other-rooms', marker: '[data-test="spaces-table"]' },
   { name: '10f-requests-unlisted', path: '/admin/requests?kind=unlisted', marker: '[data-test="requests-table"]' },
   { name: '11-config', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },

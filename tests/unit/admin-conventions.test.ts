@@ -57,6 +57,28 @@ describe('filters sit in a toolbar at a fixed width (0032)', () => {
   })
 })
 
+// Every console list declares its filters once and reads them through useListQuery (K-129
+// criterion 6). Flipped on by the last module's migration; until then only the migrated hold.
+const FILTERS_DECLARED_EVERYWHERE = false
+
+describe('a console list filters by its declaration (K-129)', () => {
+  const lists = async () => (await screens()).filter(screen => screen.source.includes('<UTable'))
+
+  test('a list that has migrated does not also hand-write its chips or its filter refs', async () => {
+    const migrated = (await lists()).filter(screen => screen.source.includes('<ConsoleFilters'))
+    expect(migrated.length).toBeGreaterThan(0)
+    expect(migrated.filter(screen => !screen.source.includes('useListQuery(')).map(screen => screen.path)).toEqual([])
+    expect(migrated.filter(screen => /ActiveFilter\[\]/.test(screen.source)).map(screen => screen.path)).toEqual([])
+  })
+
+  test.skipIf(!FILTERS_DECLARED_EVERYWHERE)('every list has a declaration and no hand-written chip list', async () => {
+    const undeclared = (await lists()).filter(screen => !screen.source.includes('useListQuery('))
+    expect(undeclared.map(screen => screen.path)).toEqual([])
+    const handWritten = (await lists()).filter(screen => /ActiveFilter\[\]/.test(screen.source))
+    expect(handWritten.map(screen => screen.path)).toEqual([])
+  })
+})
+
 describe('feedback goes where it belongs (0032)', () => {
   // A confirmation the reader does not have to act on is a toast, not something that sits on the
   // page until it is dismissed.

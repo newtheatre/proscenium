@@ -1,9 +1,12 @@
 import { describe, expect, test } from 'bun:test'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { showsList } from '#shared/utils/shows-list'
 import {
   PERFORMANCE_REFERENCES,
   cascadeOnSaleQuery,
   performanceSoldQuery,
   showPerformancesQuery,
+  showsClause,
   showsQuery,
 } from '#server/utils/programme'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
@@ -226,6 +229,70 @@ describe('"has sold tickets" is a count over rows, never a flag (D-121 criterion
 
       const counted = read<{ id: string, soldTickets: number }>(database, showsQuery({}, 25, 0, [FUTURE_TICKETS]))
       expect(counted.find(row => row.id === seeded.showId)?.soldTickets).toBe(1)
+    })
+  })
+})
+
+// The shows list through its declaration (K-129 criteria 1 and 5): a season is a column and
+// "unassessed" and "on sale" are questions about other rows, all answered by one clause.
+describe('the shows list filters by its declaration (K-129)', () => {
+  const schema = filterQuerySchema(showsList)
+  const parsed = (raw: Record<string, string>) => {
+    const result = schema.safeParse(raw)
+    if (!result.success) throw new Error(result.error.issues.map(issue => issue.message).join('; '))
+    return result.data
+  }
+  const listed = (database: TestDatabase, raw: Record<string, string>): string[] =>
+    read<{ id: string }>(database, showsQuery(showsClause(parsed(raw)), 25, 0)).map(row => row.id)
+
+  function seedSeasons(database: TestDatabase): void {
+    tonightsPerformance(database, { showStatus: 'PUBLISHED', status: 'ON_SALE' })
+    tonightsPerformance(database, { suffix: 'b', showStatus: 'DRAFT', status: 'DRAFT' })
+    database.batch([
+      ['INSERT INTO seasons (id, name, starts_on, ends_on) VALUES (?, ?, ?, ?)', 'season-autumn', 'Autumn', '2026-09-20', '2026-12-10'],
+      ['INSERT INTO seasons (id, name, starts_on, ends_on) VALUES (?, ?, ?, ?)', 'season-spring', 'Spring', '2027-01-20', '2027-04-10'],
+      ['INSERT INTO shows (id, slug, title, status) VALUES (?, ?, ?, ?)', 'show-c', 'no-season', 'Unplaced', 'DRAFT'],
+      ['UPDATE shows SET season_id = ? WHERE id = ?', 'season-autumn', 'show-a'],
+      ['UPDATE shows SET season_id = ? WHERE id = ?', 'season-spring', 'show-b'],
+    ])
+  }
+
+  test('a season is, is not, is any of and is empty', async () => {
+    await withDatabase((database) => {
+      seedSeasons(database)
+      expect(listed(database, { seasonId: 'is:season-autumn' })).toEqual(['show-a'])
+      expect(listed(database, { seasonId: 'any:season-autumn,season-spring' })).toEqual(['show-b', 'show-a'])
+      expect(listed(database, { seasonId: 'empty' })).toEqual(['show-c'])
+      expect(listed(database, { seasonId: 'not:season-autumn' })).toEqual(['show-b', 'show-c'])
+    })
+  })
+
+  test('unassessed and on sale are answered from other rows, and combine with a season by AND', async () => {
+    await withDatabase((database) => {
+      seedSeasons(database)
+      expect(listed(database, { unassessed: 'true' })).toEqual(['show-a'])
+      expect(listed(database, { onSale: 'true' })).toEqual(['show-a'])
+      expect(listed(database, { onSale: 'false' })).toEqual(['show-b', 'show-c'])
+      expect(listed(database, { onSale: 'true', seasonId: 'is:season-spring' })).toEqual([])
+      expect(listed(database, { status: 'is:DRAFT', search: 'test' })).toEqual(['show-b'])
+    })
+  })
+
+  test('a season list past its cap is refused before any statement is built', async () => {
+    await withDatabase(() => {
+      const cap = showsList.fields.find(field => field.key === 'seasonId')!.cap!
+      const many = Array.from({ length: cap + 1 }, (_, index) => `season-${index}`)
+      expect(schema.safeParse({ seasonId: `any:${many.slice(0, cap).join(',')}` }).success).toBe(true)
+      expect(schema.safeParse({ seasonId: `any:${many.join(',')}` }).success).toBe(false)
+    })
+  })
+
+  test('the sort is a declared field and the default order is status then title', async () => {
+    await withDatabase((database) => {
+      seedSeasons(database)
+      expect(listed(database, {})).toEqual(['show-b', 'show-c', 'show-a'])
+      expect(listed(database, { sort: 'title', direction: 'desc' })).toEqual(['show-c', 'show-b', 'show-a'])
+      expect(schema.safeParse({ sort: 'slug' }).success).toBe(false)
     })
   })
 })

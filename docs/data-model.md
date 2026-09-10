@@ -379,7 +379,7 @@ for the two that read and `ticketing.write` for the rest:
 
 | Route | What it does |
 | --- | --- |
-| `GET /api/admin/shows` | The paged envelope, drafts included, each row carrying its performance count, how many are on sale, how many tickets have sold and how many content warnings it carries. `unassessed=true` narrows it to published shows nobody has assessed. |
+| `GET /api/admin/shows` | The paged envelope, drafts included, each row carrying its performance count, how many are on sale, how many tickets have sold and how many content warnings it carries. Filtered by its declaration (`shared/utils/shows-list.ts`, K-129): status, season, category, `unassessed` and `onSale`, with `search` over title and address and `sort` by status or title. `unassessed=true` narrows it to published shows nobody has assessed. |
 | `POST /api/admin/shows` | Adds one, always DRAFT. The address is refused if it is already held. |
 | `GET /api/admin/shows/[id]` | One show, every performance of it, the venues a performance may be put in, the category and season pickers (D-131), the warnings it carries and the vocabulary it may pick from. |
 | `PUT /api/admin/shows/[id]` | Changes the copy, the address, the age guidance, the latecomer policy and the booking window default. It does not take the status. |

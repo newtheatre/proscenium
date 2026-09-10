@@ -90,6 +90,9 @@ application is the cautionary tale.
 - No personal free text in audit detail; erasure must never need to reach the audit trail's
   content.
 - Every list endpoint paginates in SQL and returns an envelope, never a bare array.
+- A console list declares its filters once, in `shared/utils/`, and that declaration derives the
+  endpoint's query schema, the toolbar's builder and the chips; filters, search, sort and page
+  live in the URL (K-129, 0032, `docs/architecture.md` §Console list filters).
 - Customer-facing responses are column allow-listed.
 - Validation with Zod on every request body and query string.
 

@@ -1,35 +1,17 @@
 import { db, schema } from '@nuxthub/db'
-import { and, count, eq, gt, inArray, isNotNull, isNull, like, ne, or, sql } from 'drizzle-orm'
+import { and, count, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING, 0055).
-import { configValue } from './configuration'
+import { tableColumns, whereFrom } from './list-filters'
+import { accountsList } from '#shared/utils/accounts-list'
+import { conditionsOf } from '#shared/utils/list-filters'
 import { londonDay } from '#shared/utils/membership'
+import type { ListClause } from './list-filters'
+import type { FilterCondition, ListQuery } from '#shared/utils/list-filters'
 import type { SQL } from 'drizzle-orm'
-import type { H3Event } from 'h3'
 
-// The questions the unified system actually raises about an account (A-121 criterion 1). Two of
-// them cannot be answered yet, and say so rather than returning an empty list that looks broken.
-export const DIRECTORY_FILTERS = [
-  'everyone',
-  'members-current',
-  'members-lapsed',
-  'guests-unclaimed',
-  'role-holders',
-  'privileged-without-mfa',
-  'unverified',
-  'disabled',
-  'anonymised',
-  'retention-window',
-] as const
-
-export type DirectoryFilter = (typeof DIRECTORY_FILTERS)[number]
-
-// A filter whose data has no writer yet. It runs and returns nothing, which is the truth.
-export const AWAITING: Partial<Record<DirectoryFilter, string>> = {
-  'members-current': 'A-117',
-  'members-lapsed': 'A-117',
-  'guests-unclaimed': 'A-116',
-}
+// The account directory's predicates (A-121), answered from its declaration (K-129). A role and a
+// membership are questions about other rows, read at query time and never a flag (0009, 0031).
 
 const live = (now: number): SQL => or(
   isNull(schema.roleGrants.expiresAt),
@@ -41,6 +23,13 @@ export const holdsLiveRole = (now: number, role?: string): SQL => sql`exists (
   select 1 from ${schema.roleGrants}
   where ${schema.roleGrants.userId} = ${schema.users.id}
     and ${role ? sql`${schema.roleGrants.role} = ${role}` : sql`1 = 1`}
+    and ${live(now)}
+)`
+
+const holdsAnyLiveRole = (now: number, roles: string[]): SQL => sql`exists (
+  select 1 from ${schema.roleGrants}
+  where ${schema.roleGrants.userId} = ${schema.users.id}
+    and ${inArray(schema.roleGrants.role, roles)}
     and ${live(now)}
 )`
 
@@ -56,12 +45,7 @@ export function privilegedWithoutFactor(privileged: string[], now: number): SQL 
   if (privileged.length === 0) return sql`1 = 0`
   return and(
     isNotNull(schema.users.password),
-    sql`exists (
-      select 1 from ${schema.roleGrants}
-      where ${schema.roleGrants.userId} = ${schema.users.id}
-        and ${inArray(schema.roleGrants.role, privileged)}
-        and ${live(now)}
-    )`,
+    holdsAnyLiveRole(now, privileged),
     sql`not ${hasConfirmedFactor()}`,
   )!
 }
@@ -73,15 +57,6 @@ export function insideRetentionWindow(years: number, now: number): SQL {
   return sql`coalesce(${schema.users.lastLoginAt}, ${schema.users.createdAt}) < ${cutoff}`
 }
 
-export interface DirectoryQuery {
-  filter: DirectoryFilter
-  role?: string
-  search?: string
-  includeAnonymised: boolean
-}
-
-const graceDays = (event: H3Event): Promise<number> => configValue(event, 'MEMBERSHIP_GRACE_DAYS')
-
 // Current means today is inside the term or its grace window, read at query time (0009, 0031).
 // Exported for the retention sweep too (K-111): an active member is exempt.
 export function currentMembership(grace: number): SQL {
@@ -91,61 +66,72 @@ export function currentMembership(grace: number): SQL {
       and date(${schema.memberships.expiresOn}, ${`+${grace} days`}) >= ${londonDay(new Date())})`
 }
 
-export async function directoryPredicate(event: H3Event, query: DirectoryQuery): Promise<SQL> {
-  const now = Math.floor(Date.now() / 1000)
-  const parts: SQL[] = []
+const everHeldMembership = (): SQL =>
+  sql`exists (select 1 from ${schema.memberships} where ${schema.memberships.userId} = ${schema.users.id})`
 
-  // Anonymised rows are hidden unless explicitly asked for (criterion 4).
-  if (!query.includeAnonymised && query.filter !== 'anonymised') {
-    parts.push(isNull(schema.users.anonymisedAt))
-  }
+const neverSignedIn = (): SQL => and(
+  isNull(schema.users.password),
+  isNull(schema.users.googleSub),
+  isNull(schema.users.lastLoginAt),
+)!
 
-  switch (query.filter) {
-    case 'members-current':
-      parts.push(currentMembership(await graceDays(event)))
-      break
-    case 'members-lapsed':
-      parts.push(sql`exists (select 1 from ${schema.memberships} where ${schema.memberships.userId} = ${schema.users.id})`)
-      parts.push(sql`not ${currentMembership(await graceDays(event))}`)
-      break
-    case 'guests-unclaimed':
-      parts.push(isNull(schema.users.password), isNull(schema.users.googleSub), isNull(schema.users.lastLoginAt))
-      break
-    case 'role-holders':
-      parts.push(holdsLiveRole(now, query.role))
-      break
-    case 'privileged-without-mfa':
-      parts.push(privilegedWithoutFactor(await configValue(event, 'PRIVILEGED_ROLES'), now))
-      break
-    case 'unverified':
-      parts.push(eq(schema.users.verified, false))
-      break
-    case 'disabled':
-      parts.push(eq(schema.users.disabled, true))
-      break
-    case 'anonymised':
-      parts.push(isNotNull(schema.users.anonymisedAt))
-      break
-    case 'retention-window':
-      parts.push(insideRetentionWindow(await configValue(event, 'RETENTION_FULL_ACCOUNT_YEARS'), now))
-      break
-    case 'everyone':
-      break
-  }
-
-  if (query.search) {
-    const term = `%${query.search.toLowerCase()}%`
-    parts.push(or(
-      like(sql`lower(${schema.users.name})`, term),
-      like(schema.users.email, term),
-      like(sql`lower(coalesce(${schema.users.studentId}, ''))`, term),
-    )!)
-  }
-
-  return parts.length > 0 ? and(...parts)! : ne(schema.users.id, '')
+// What the declaration's derived fields need, resolved by the endpoint from configuration so
+// this file stays free of Nitro and a test can drive it with plain values.
+export interface AccountsContext {
+  now: number
+  graceDays: number
+  privilegedRoles: string[]
+  retentionYears: number
 }
 
-export async function directoryTotal(where: SQL): Promise<number> {
+export interface AccountsQuery extends ListQuery {
+  // The picker's flag: a tombstone is a valid target for some things, so it may ask for them.
+  includeAnonymised?: boolean
+}
+
+const yes = (condition: FilterCondition): boolean => condition.values[0] === 'true'
+const either = (condition: FilterCondition, when: SQL): SQL => (yes(condition) ? when : sql`not (${when})`)
+
+function roleCondition(condition: FilterCondition, now: number): SQL {
+  const [role] = condition.values
+  switch (condition.operator) {
+    case 'is': return holdsLiveRole(now, role)
+    case 'not': return sql`not ${holdsLiveRole(now, role)}`
+    case 'any': return holdsAnyLiveRole(now, condition.values)
+    default: return sql`not ${holdsLiveRole(now)}`
+  }
+}
+
+function membershipCondition(condition: FilterCondition, grace: number): SQL {
+  switch (condition.values[0]) {
+    case 'current': return currentMembership(grace)
+    case 'lapsed': return and(everHeldMembership(), sql`not ${currentMembership(grace)}`)!
+    default: return sql`not ${everHeldMembership()}`
+  }
+}
+
+export function accountsClause(query: AccountsQuery, context: AccountsContext): ListClause {
+  const clause = whereFrom(accountsList, query, {
+    column: tableColumns(schema.users),
+    search: [schema.users.name, schema.users.email, sql`coalesce(${schema.users.studentId}, '')`],
+    fields: {
+      role: condition => roleCondition(condition, context.now),
+      holdsRole: condition => either(condition, holdsLiveRole(context.now)),
+      membership: condition => membershipCondition(condition, context.graceDays),
+      anonymised: condition => (yes(condition) ? isNotNull(schema.users.anonymisedAt) : isNull(schema.users.anonymisedAt)),
+      authenticator: condition => either(condition, hasConfirmedFactor()),
+      privilegedWithoutFactor: condition => either(condition, privilegedWithoutFactor(context.privilegedRoles, context.now)),
+      approachingRetention: condition => either(condition, insideRetentionWindow(context.retentionYears, context.now)),
+      neverSignedIn: condition => either(condition, neverSignedIn()),
+    },
+  })
+
+  // Anonymised rows are hidden unless explicitly asked for (A-121 criterion 4).
+  const asked = query.includeAnonymised || conditionsOf(accountsList, query).some(condition => condition.key === 'anonymised')
+  return asked ? clause : { ...clause, where: and(isNull(schema.users.anonymisedAt), clause.where) }
+}
+
+export async function directoryTotal(where: SQL | undefined): Promise<number> {
   const [row] = await db.select({ total: count() }).from(schema.users).where(where)
   return row?.total ?? 0
 }

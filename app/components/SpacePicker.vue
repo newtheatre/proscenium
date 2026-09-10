@@ -14,6 +14,9 @@ interface Space {
 
 const model = defineModel<string | undefined>()
 
+// The name as well as the id, for a screen collecting rooms rather than holding one.
+const emit = defineEmits<{ chosen: [{ id: string, name: string } | null] }>()
+
 const props = withDefaults(defineProps<{
   // What the room is wanted for, so each result can say whether it suits.
   purpose?: string | null
@@ -52,6 +55,7 @@ const options = computed(() => shown.value.map(space => ({ ...space, value: spac
 function choose(option: { value: string } | undefined): void {
   model.value = option?.value
   chosen.value = shown.value.find(space => space.id === option?.value) ?? null
+  emit('chosen', chosen.value ? { id: chosen.value.id, name: chosen.value.name } : null)
 }
 
 // The warning follows the chosen room and the purpose, so changing either re-asks.

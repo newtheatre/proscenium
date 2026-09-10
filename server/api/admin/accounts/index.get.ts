@@ -1,23 +1,28 @@
-import { asc, sql } from 'drizzle-orm'
-import { z } from 'zod'
-import { ROLES } from '#shared/utils/roles'
-import { envelope, offsetFor, pageQuery } from '#shared/utils/pagination'
-import { AWAITING, DIRECTORY_FILTERS, directoryPredicate, directoryTotal, insideRetentionWindow, privilegedWithoutFactor } from '#server/utils/directory'
+import { sql } from 'drizzle-orm'
+import { accountsList } from '#shared/utils/accounts-list'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { envelope, offsetFor } from '#shared/utils/pagination'
+import { accountsClause, directoryTotal, insideRetentionWindow, privilegedWithoutFactor } from '#server/utils/directory'
 import type { H3Event } from 'h3'
 
-const query = pageQuery.extend({
-  filter: z.enum(DIRECTORY_FILTERS).default('everyone'),
-  role: z.enum(ROLES).optional(),
-  search: z.string().trim().max(200).optional(),
-  includeAnonymised: z.coerce.boolean().default(false),
+// The picker's flag rides beside the declared fields: a tombstone is a valid target for some
+// things (A-121 criterion 4).
+const query = filterQuerySchema(accountsList).extend({
+  includeAnonymised: yesOrNo.default(false),
 })
 
-// The account directory: search, filter and triage (A-121).
+// The account directory: search, filter and triage (A-121), through its declaration (K-129).
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'accounts.read')
   const input = await getValidatedQueryOrThrow(event, query)
 
-  const where = await directoryPredicate(event, input)
+  const now = Math.floor(Date.now() / 1000)
+  const { where, orderBy } = accountsClause(input, {
+    now,
+    graceDays: await configValue(event, 'MEMBERSHIP_GRACE_DAYS'),
+    privilegedRoles: await configValue(event, 'PRIVILEGED_ROLES'),
+    retentionYears: await configValue(event, 'RETENTION_FULL_ACCOUNT_YEARS'),
+  })
   const total = await directoryTotal(where)
 
   // An explicit column list: without one the ORM returns the password hash and the Google
@@ -38,21 +43,19 @@ export default defineEventHandler(async (event) => {
   })
     .from(schema.users)
     .where(where)
-    .orderBy(asc(schema.users.name))
+    .orderBy(...orderBy)
     .limit(input.pageSize)
     .offset(offsetFor(input.page, input.pageSize))
 
   return {
     ...envelope(items, total, input.page, input.pageSize),
-    awaiting: AWAITING[input.filter] ?? null,
-    banners: await banners(event),
+    banners: await banners(event, now),
   }
 })
 
 // Both counts in one statement: D1 caps compound selects low, and a query per banner per page
 // load is two round trips where one will do (0006).
-async function banners(event: H3Event): Promise<{ privilegedWithoutFactor: number, insideRetentionWindow: number }> {
-  const now = Math.floor(Date.now() / 1000)
+async function banners(event: H3Event, now: number): Promise<{ privilegedWithoutFactor: number, insideRetentionWindow: number }> {
   const privileged = await configValue(event, 'PRIVILEGED_ROLES')
   const years = await configValue(event, 'RETENTION_FULL_ACCOUNT_YEARS')
 
