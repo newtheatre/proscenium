@@ -8,8 +8,10 @@ import { reconcile as reconcileBookings, transformBookings } from './bookings'
 import { buildLoad as buildMoneyLoad, reconcileMoney, transformMoney } from './money'
 import { reconcileTraining, transformTraining } from './training'
 import { reconcile as reconcileProgramme, transformProgramme } from './programme'
+import { reconcile as reconcileReservations, transformReservations } from './reservations'
 import { count } from './lib'
 import { createTestDatabase } from '../tests/helpers/database'
+import { ticketTypeFixture } from '../tests/helpers/programme'
 import type { TicketRow } from './money'
 
 const failures: string[] = []
@@ -191,6 +193,33 @@ function syntheticProscenium(): Database {
   return db
 }
 
+// Reservations as records (module I): the booking each sale belonged to, distinct from the money
+// alone K-114 already imports. Old ids are text throughout `proscenium`, not a number.
+function syntheticReservations(): Database {
+  const db = new Database(':memory:')
+  db.exec(`
+    CREATE TABLE reservations (
+      id TEXT PRIMARY KEY, user_id TEXT, performance_id TEXT,
+      status TEXT NOT NULL, source TEXT NOT NULL,
+      customer_notes TEXT, staff_notes TEXT, cancelled_by TEXT, created_at INTEGER NOT NULL);
+    CREATE TABLE tickets (
+      id TEXT PRIMARY KEY, reservation_id TEXT NOT NULL, ticket_type_id TEXT,
+      price_paid INTEGER NOT NULL, refunded_at INTEGER, created_at INTEGER NOT NULL,
+      price_confidence TEXT NOT NULL DEFAULT 'EXACT');
+
+    INSERT INTO reservations (id, user_id, performance_id, status, source, customer_notes, staff_notes, cancelled_by, created_at)
+    VALUES
+      ('r-1', 'a-officer', 'p-1', 'COLLECTED', 'WEB', NULL, NULL, NULL, 1700000000),
+      -- No entry in the performance map for this one: the exact case a reservation cannot
+      -- become a row over, since performance_id is not nullable.
+      ('r-2', 'a-officer', 'p-999', 'COLLECTED', 'WEB', NULL, NULL, NULL, 1700000000);
+
+    INSERT INTO tickets (id, reservation_id, ticket_type_id, price_paid, refunded_at, created_at, price_confidence)
+    VALUES ('t-r1', 'r-1', 'tt-1', 900, NULL, 1700000000, 'EXACT');
+  `)
+  return db
+}
+
 // --- Stage 1: identity, with every mirror populated, unlike every existing test (K-112, K-113).
 
 const auth = syntheticAuth()
@@ -295,6 +324,7 @@ check('money reconciliation is green', moneyCheck.ok, moneyCheck.problems.join('
 // performances, because every later insert is a real foreign key (0043).
 
 const prosceniumSource = syntheticProscenium()
+const performanceIds = new Map<string, string>()
 const programmeResult = transformProgramme({
   source: prosceniumSource,
   venueIds: new Map(),
@@ -302,7 +332,7 @@ const programmeResult = transformProgramme({
   categoryIds: new Map(),
   showIds: new Map(),
   warningIds: new Map(),
-  performanceIds: new Map(),
+  performanceIds,
   target: rehearsal.raw,
 })
 const programmeCheck = reconcileProgramme(prosceniumSource, rehearsal.raw, programmeResult.summary)
@@ -335,10 +365,33 @@ check(
 )
 check('programme reconciliation is green', programmeCheck.ok, programmeCheck.problems.join('; ') || 'no problems')
 
-// --- Stage 7: what this dry run cannot cover, named rather than left implicit.
+// --- Stage 7: reservations and tickets as structured records, reading `performanceIds` straight
+// from the programme stage above, not a hand-rolled stand-in.
 
+ticketTypeFixture(rehearsal)
+const reservationsSource = syntheticReservations()
+const reservationsResult = transformReservations({
+  source: reservationsSource,
+  accounts: idMap,
+  performances: performanceIds,
+  ticketTypes: new Map([['tt-1', 'tt-standard']]),
+  reservationIds: new Map(),
+  ticketIds: new Map(),
+  target: rehearsal.raw,
+})
+const reservationsCheck = reconcileReservations(reservationsSource, rehearsal.raw, reservationsResult.summary)
+check('a mapped reservation and its ticket write', reservationsResult.summary.written === 1 && reservationsResult.summary.ticketsWritten === 1, `${reservationsResult.summary.written} reservation, ${reservationsResult.summary.ticketsWritten} ticket`)
+check(
+  'a reservation with no mapped performance is an exception, not a guess',
+  reservationsResult.exceptions.some(exception => exception.includes('no performance')),
+  reservationsResult.exceptions.find(exception => exception.includes('no performance')) ?? 'no such exception was raised',
+)
+check('reservations reconciliation is green', reservationsCheck.ok, reservationsCheck.problems.join('; ') || 'no problems')
+
+// --- Stage 8: what this dry run cannot cover, named rather than left implicit.
+
+notes.push('note reservations: the ticket-type map is a reference map (out/ticket-type-map.tsv), same as room-map.tsv, not built yet; the performance map above is the programme transform\'s own real output')
 notes.push('note export.sh, inventory.ts and reconcile.ts read real files (migration/dumps/, migration/out/) and are not exercised here: this proves the transforms, not the file-handling CLI wrappers around them')
-notes.push('note reservations-as-records still has no transform: this harness cannot exercise what does not exist')
 
 console.log(notes.join('\n'))
 if (failures.length) {
@@ -350,6 +403,7 @@ if (failures.length) {
   trainingSource.close()
   ticketsDb.close()
   prosceniumSource.close()
+  reservationsSource.close()
   process.exit(1)
 }
 console.log('\nSynthetic dry run green: every transform ran end to end, and every exception path this harness can reach without real dumps fired correctly.')
@@ -360,3 +414,4 @@ roomsSource.close()
 trainingSource.close()
 ticketsDb.close()
 prosceniumSource.close()
+reservationsSource.close()

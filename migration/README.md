@@ -26,9 +26,10 @@ flowchart LR
   GRM --> B[transform-bookings.ts, the same target]
   L --> TR[transform-training.ts, the same target, catalogue authored first]
   L --> N[transform-programme.ts, the same target]
+  N --> S[transform-reservations.ts, reads out/performance-map.tsv]
   B --> W[Weekly rehearsal recorded on epic 338]
   TR --> W
-  N --> W
+  S --> W
   G -- no --> F[Fix the transform, never the numbers]
 ```
 
@@ -51,17 +52,18 @@ bun migration/transform-bookings.ts /tmp/rehearsal.db   # the old rooms history,
 bun migration/transform-training.ts /tmp/rehearsal.db   # training history, catalogue authored first
 bun migration/transform-money.ts /tmp/rehearsal.db      # ticket revenue, same target
 bun migration/transform-programme.ts /tmp/rehearsal.db  # venues, shows, performances, same target
+bun migration/transform-reservations.ts /tmp/rehearsal.db  # reservations and tickets, reads the programme output above
 ```
 
 ## Proving the pipeline without a real export
 
-`bun migration/dry-run-synthetic.ts` runs identity, load, bookings, money and programme end to
-end against synthetic data built in the script itself, never against `dumps/` or `out/`. It
-exists because no existing test populated `identity.ts`'s `mirrors` with real content or seeded
-an unmapped account in `bookings.ts`, so K-113's own exception paths, cited in `identity.ts`'s own
-comments, had never actually fired anywhere. It does not exercise `export.sh`, `inventory.ts` or
-`reconcile.ts` themselves, which read real files; it proves the transforms, not the file-handling
-around them.
+`bun migration/dry-run-synthetic.ts` runs identity, load, bookings, money, programme and
+reservations end to end against synthetic data built in the script itself, never against `dumps/`
+or `out/`. It exists because no existing test populated `identity.ts`'s `mirrors` with real
+content or seeded an unmapped account in `bookings.ts`, so K-113's own exception paths, cited in
+`identity.ts`'s own comments, had never actually fired anywhere. It does not exercise `export.sh`,
+`inventory.ts` or `reconcile.ts` themselves, which read real files; it proves the transforms, not
+the file-handling around them.
 
 **`transform-bookings.ts`, `transform-training.ts` and `transform-money.ts` take the target as an
 argument and refuse to run without one, on purpose.** Unlike identity, `room_bookings.room_id` and
@@ -170,10 +172,10 @@ step is offline against the dumps.
   without it. `ticket_types` is not read here, and this transform writes no
   `out/ticket-type-map.tsv`: `ticket_types` is authored fresh through D-119's admin screen, the
   same way `departments` and `modules` are for training, never migrated (`docs/data-model.md`
-  names it "built by Wave 0 contract... everything else in this module is unbuilt"). Whether the
-  reservations transform actually needs a ticket type reference map is confirmed with that
-  stream directly rather than built speculatively; if it does, it is a reference map drafted the
-  same way `out/room-map.tsv` and `out/space-map.tsv` are (below), not written from nothing.
+  names it "built by Wave 0 contract... everything else in this module is unbuilt"). The
+  reservations transform does need a ticket type reference map, confirmed rather than built
+  speculatively: it is drafted the same way `out/room-map.tsv` and `out/space-map.tsv` are
+  (below), not written from nothing. See "Reservations as records" below.
 
 ## Two kinds of map, and only one is written by hand
 
@@ -209,6 +211,28 @@ already be authored in the unified system before `generate-reference-maps.ts` ru
 is mostly blank and `transform-bookings.ts` correctly refuses. On the very first rehearsal, before
 anyone has used the room admin screen, that is expected, not broken.
 
+- **Reservations as records** (module I): the booking each ticket belonged to, distinct from the
+  ledger totals `transform-money.ts` already carries. `reservations.performance_id` is not
+  nullable, so an old row naming no performance, or naming one the programme transform has not
+  mapped, cannot become a row here at all; it is skipped and named in
+  `out/reservation-exceptions.txt` rather than left reading as missing money, since the ledger
+  total for the same ticket may already have imported independently. The same is true of a
+  ticket naming a ticket type `out/ticket-type-map.tsv` has not mapped: the ticket is skipped,
+  its reservation still lands. `out/performance-map.tsv` is the programme transform's own output,
+  read here the same way `bookings.ts` reads `room-map.tsv`, keyed on the old estate's own id with
+  no prefix. `out/ticket-type-map.tsv` is a reference map, the same kind `room-map.tsv` and
+  `space-map.tsv` are (above): `generate-reference-maps.ts` will draft it against
+  `ticket_types.name` once the mechanism covers ticket types, confirmed rather than invented,
+  since `ticket_types` is authored fresh, not migrated. Both maps are empty until they exist,
+  which every row here accounts for as an exception rather than a guess. A guest account imports
+  exactly like a full one (K-112): nothing here tests for a password, only whether the id
+  resolved; an old reservation naming nobody, or naming somebody whose account never came across,
+  imports with `user_id` left null rather than invented, since the column allows it. Erasure
+  scrubs `customer_notes` and `staff_notes` rather than deleting the row, so only the conflict
+  branch is guarded against one already anonymised (0059); tickets carry no personal-data.ts
+  entry of their own and need no guard. The reconciliation checksums the total price paid across
+  surviving tickets, not just row counts.
+
 ## Why the same person keeps the same id
 
 `out/id-map.tsv` is an input as well as an output. The transform reads it before minting anything,
@@ -219,6 +243,7 @@ the rehearsal database and start again.
 
 The old estate's audit history is deliberately not imported (decision 0030).
 
-The remaining transform, reservations as records (#840), follows the same shape, one file per
-module. Bar has nothing to transform: production holds no
-stock-movement history to import (K-116, `docs/backlog/K-platform.md`).
+Every module now has a transform; the weekly rehearsals proceed in dependency order, programme
+before reservations, since `transform-reservations.ts` reads `out/performance-map.tsv`. Bar has
+nothing to transform: production holds no stock-movement history to import (K-116,
+`docs/backlog/K-platform.md`).
