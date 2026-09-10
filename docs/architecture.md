@@ -425,6 +425,40 @@ every other message goes through. There is no open-items list yet, the way safet
 health's own alerting have one; today "visible to the IT Manager" means an immediate notification
 and a permanent line in the trail, not a triaged, closeable queue (criterion 4, `known-issues.md`).
 
+## Settings, and a wide-blast-radius save (J-104, J-105)
+
+`CONFIG_KEYS` (`shared/utils/config.ts`) declares every operational number: a Zod schema, a
+default where the workshop register proposed one, and the workshop it belongs to.
+`configValue(event, key)` reads a `config` row if one exists, the default otherwise, and 503s a
+key with neither (J-104). `PUT /api/admin/config/[key]` and the read side, `GET
+/api/admin/config`, are the whole surface; `/admin/settings.vue` renders every key from the second
+and writes through the first.
+
+**A key named in `WIDE_BLAST_RADIUS_KEYS`**, itself a `config` row and so itself audited (criterion
+5), needs a live preview and a typed echo before it saves (criteria 1, 2). `blastRadiusPreview()`
+(`server/utils/blast-radius.ts`) is one function per key: `REFUND_PAID_REQUIRES_MANAGER` counts
+box office officers who would gain or lose self-approval, `RETENTION_ARMED` counts accounts
+already due anonymisation, read with no side effect at all
+(`dueForAnonymisation()`, `server/utils/retention-candidates.ts`). `GET
+/api/admin/config/[key]/blast-radius` answers with the count and its category; `PUT` requires a
+`confirmation` field matching the key's own name or the previewed count
+(`confirmationMatches()`, `shared/utils/blast-radius.ts`, pure and shared with the client), 400ing
+otherwise. `RETENTION_ARMED` additionally refuses arming until a dry-run digest has actually sent
+(`hasSentRetentionDigest()`), criterion 4, built before this pull request.
+
+**Any setting reverts in one action** (criterion 3), `POST /api/admin/config/[key]/revert`: no
+second history table, `priorConfigValue()` reads the value a key stood at immediately before its
+own last `config.changed` audit entry, ordered by `created_at` then `rowid` to break a same-second
+tie, the way `bar.ts`'s own effective-price lookups already do. A sensitive key's audit detail is
+a hash pair (0024), which cannot be reverted to, and priorConfigValue says so (409) rather than
+guessing. A save and a revert are one write path, `writeConfigValue()`
+(`server/utils/config-write.ts`): both run the digest gate and the pair rules, so a revert cannot
+bypass what a save must satisfy.
+
+`retention-candidates.ts` exists apart from `retention.ts` so a reader of only the candidate query
+never pulls `retention.ts`'s own `useRuntimeConfig` usage into the Bun compile graph behind it
+(0057): `tests/` reaches the first file and never the second.
+
 ## The show night (0014, E-110)
 
 The operational day runs 04:00 to 04:00 Europe/London, and `shared/utils/show-night.ts` is its

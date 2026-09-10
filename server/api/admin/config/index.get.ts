@@ -16,6 +16,7 @@ export default defineEventHandler(async (event) => {
     .leftJoin(schema.users, eq(schema.users.id, schema.config.updatedBy))
 
   const overrides = new Map(rows.map(row => [row.key, row]))
+  const wideBlastRadius = new Set(await configValue(event, 'WIDE_BLAST_RADIUS_KEYS'))
 
   return {
     settings: CONFIG_KEY_NAMES.map((key) => {
@@ -32,6 +33,8 @@ export default defineEventHandler(async (event) => {
         // A rule the committee can record and the system does not yet enforce, said plainly (0012).
         enforced: isEnforced(key),
         sensitive: isSensitive(key),
+        // Needs its own preview and a typed echo before it saves, and its own audited flag (J-105).
+        wideBlastRadius: wideBlastRadius.has(key),
         updatedAt: row?.updatedAt ?? null,
         updatedBy: row?.editorId ? { id: row.editorId, name: row.editorName } : null,
       }

@@ -156,6 +156,14 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Month and day the season closes, London. Roles expire at the last London instant of it.',
   },
+  // The keys a save must preview and a typed echo before it takes (J-105 criteria 1, 2, 5).
+  // Itself configuration, so naming a key here is an administrator's audited act, not a deploy.
+  WIDE_BLAST_RADIUS_KEYS: {
+    schema: z.array(z.string()),
+    default: ['REFUND_PAID_REQUIRES_MANAGER', 'RETENTION_ARMED'],
+    workshop: 'people-and-communications',
+    describes: 'Settings that need a blast-radius preview and a typed confirmation before saving.',
+  },
 
   // Module C: spaces
 
@@ -731,6 +739,7 @@ export const ENFORCED_KEYS = [
   'PUBLIC_ORDER_SEAT_CAP',
   'SEASON_START',
   'SEASON_END',
+  'WIDE_BLAST_RADIUS_KEYS',
   'REFUND_PAID_REQUIRES_MANAGER',
   'HOLD_RELEASE_MINUTES_BEFORE',
   'HOLD_REMINDER_MINUTES_BEFORE',
