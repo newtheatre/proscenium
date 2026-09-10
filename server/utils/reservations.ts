@@ -407,7 +407,7 @@ export async function cancelReservation(reservationId: string, actorId: string |
   )
 }
 
-export interface ReinstateReservationInput {
+export interface ReinstateWriteInput {
   reservationId: string
   performanceId: string
   actorId: string
@@ -415,13 +415,13 @@ export interface ReinstateReservationInput {
   ticketCount: number
   capacity: number | null
   freshHoldExpiresAt: number
-  // What the row held a moment before this write, carried onto the history row so D-106's own
-  // record of the lapse is not lost by this write overwriting it (criterion 2).
+  // Carried onto the history row so D-106's own record of the lapse survives this write
+  // overwriting the columns it came from (criterion 2).
   previousStatus: string
   previousHoldExpiresAt: number | null
 }
 
-export interface ReinstateReservationResult {
+export interface ReinstateWriteResult {
   applied: boolean
 }
 
@@ -446,7 +446,7 @@ export function reinstateReservationStatement(
 
 // The claim, not the read, decides (0003): the capacity predicate rides the same UPDATE that
 // flips status, so a house that filled while the officer was deciding writes nothing at all.
-export async function reinstateReservation(input: ReinstateReservationInput): Promise<ReinstateReservationResult> {
+export async function reinstateReservation(input: ReinstateWriteInput): Promise<ReinstateWriteResult> {
   const historyId = newId()
 
   const update = reinstateReservationStatement(
