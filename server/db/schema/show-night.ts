@@ -237,7 +237,9 @@ export const nightReports = sqliteTable('night_reports', {
   // Snapshotted at sign-off, never recomputed: a later correction addends what was actually
   // signed, not what the live queries would say today.
   report: text('report', { mode: 'json' }).notNull(),
-  signedBy: text('signed_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  // NULL only for a SYSTEM auto-close (E-125 criterion 2): an honestly empty column, never a
+  // seeded account standing in for one.
+  signedBy: text('signed_by').references(() => users.id, { onDelete: 'restrict' }),
   // Flagged rather than hidden when an officer closes instead of the duty manager, the same
   // instinct 0044 encodes for a bypass (criterion 2).
   signedVia: text('signed_via').notNull(),
@@ -245,7 +247,11 @@ export const nightReports = sqliteTable('night_reports', {
 }, table => [
   uniqueIndex('night_reports_performance').on(table.performanceId),
   index('night_reports_venue_night').on(table.venueId, table.night),
-  check('night_reports_signed_via_values', sql`${table.signedVia} IN ('SHIFT', 'OFFICER')`),
+  check('night_reports_signed_via_values', sql`${table.signedVia} IN ('SHIFT', 'OFFICER', 'SYSTEM')`),
+  // No human signatory is exactly SYSTEM, never merely absent (E-125 criterion 2).
+  check('night_reports_system_has_no_signatory', sql`
+    (${table.signedVia} = 'SYSTEM' AND ${table.signedBy} IS NULL) OR (${table.signedVia} != 'SYSTEM' AND ${table.signedBy} IS NOT NULL)
+  `),
 ])
 
 // A correction to a frozen report (criterion 5): a new row naming what it corrects, never an
