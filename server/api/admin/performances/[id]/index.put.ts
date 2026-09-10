@@ -17,6 +17,11 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, performanceForm)
   const venue = (await listVenues()).find(one => one.id === input.venueId)
   if (!venue) throw createError({ statusCode: 400, statusMessage: 'No such venue' })
+  // Moving a performance to a different venue is new work; keeping its own already-retired venue
+  // is not (D-131 criterion 5).
+  if (venue.archived && venue.id !== held.venueId) {
+    throw createError({ statusCode: 409, statusMessage: `${venue.name} is retired and cannot be booked for a new performance` })
+  }
 
   // The capacity that will apply, so clearing the override or moving to a smaller venue is checked
   // as well as lowering the number. Refusing quotes both figures (D-105 criterion 4).

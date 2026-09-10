@@ -231,11 +231,34 @@ Built by build-order Wave 0 contract (d). Every table below exists; the utilitie
 them are `server/utils/performances.ts` (`architecture.md`).
 
 ### venues
-`id` PK · `name` UNIQUE · `address` · `capacity` int NULL = uncapped · `is_external` bool ·
-`image_key` (R2) · `description` · `room_id` → rooms set null · `created_at`. General admission
-only; no seat-map tables exist and nothing may assume them (constraint 4). A venue is its own
-row, never a flagged room: `room_id` says which rehearsal room the venue occupies, and its only
-effect is that the venue's performances apply blackouts to that room (0043).
+`id` PK · `name` UNIQUE, case-insensitive UNIQUE too (`venues_name_nocase`) · `address` ·
+`capacity` int NULL = uncapped · `is_external` bool · `image_key` (R2) · `description` ·
+`room_id` → rooms set null · `archived` bool · `created_at`. General admission only; no seat-map
+tables exist and nothing may assume them (constraint 4). A venue is its own row, never a flagged
+room: `room_id` says which rehearsal room the venue occupies, and its only effect is that the
+venue's performances apply blackouts to that room (0043).
+
+**Administration (D-131).** `/box-office/venues`, over these routes, `ticketing.read` for the
+listing and `ticketing.write` for the rest:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/admin/reference-data/venues` | The paged envelope, retired venues included by default, each row carrying whether it is in use. |
+| `POST /api/admin/reference-data/venues` | Adds one. The name is refused if already held, without regard to capitals. |
+| `PUT /api/admin/reference-data/venues/[id]` | Changes everything except `archived`, which is its own action. |
+| `POST /api/admin/reference-data/venues/[id]/archive` | Retires a venue, or brings one back. A retired venue cannot be chosen for a new performance and still serves every record already pointing at it. |
+| `DELETE /api/admin/reference-data/venues/[id]` | Deletes a venue nothing has ever used. One in use is a 409 naming retirement as the way and what is holding it open. |
+| `GET /api/admin/reference-data/rooms` | Active rooms, id and name only, for the venue form's room picker; a narrower read than the rooms module's own screen, so box office needs no `rooms.read`. |
+
+**"In use" is a count over rows, never a column.** `VENUE_REFERENCES` in `server/utils/venues.ts`
+declares every table that points at `venues`: `performances`, `venue_emergency_info`,
+`shift_templates`, `checklist_items`, `night_reports`, `backstage_nights`, `comp_requests` and
+`till_sessions`. Any one of them holding a row refuses deletion; retirement is always available.
+`GET /api/admin/venues` (unpaginated, `listVenues()`) stays the picker several other screens
+already use to choose a venue for a show, a performance or a rota template; it now carries
+`archived`, and a picker for new work filters that out itself rather than being handed a
+narrower query, so a performance or template already pointing at a retired venue still resolves
+it.
 
 ### venue_features / venues_to_features
 Feature vocabulary and junction (both cascade). Not yet built: no story reads them, and the
@@ -251,11 +274,44 @@ card. Rebuilt from a single-row-per-venue shape in migration 0071, which also ha
 table never had) and adds the append-only triggers by hand, as every table in this family does.
 
 ### seasons
-`id` PK · `name` UNIQUE · `starts_on` · `ends_on` · `sort` · `archived` bool. The financial
-season is 1 August to 31 July. CHECK `ends_on` > `starts_on`.
+`id` PK · `name` UNIQUE, case-insensitive UNIQUE too (`seasons_name_nocase`) · `starts_on` ·
+`ends_on` · `sort` · `archived` bool. The financial season is 1 August to 31 July. CHECK
+`ends_on` > `starts_on`.
+
+**Administration (D-131).** `/box-office/seasons`, over these routes, `ticketing.read` for the
+listing and `ticketing.write` for the rest:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/admin/reference-data/seasons` | The paged envelope, retired seasons included by default, each row carrying whether a show belongs to it. |
+| `POST /api/admin/reference-data/seasons` | Adds one. The name is refused if already held, without regard to capitals. |
+| `PUT /api/admin/reference-data/seasons/[id]` | Changes everything except `archived`, which is its own action. |
+| `POST /api/admin/reference-data/seasons/[id]/archive` | Retires a season, or brings one back. A retired season cannot be chosen for a new show and still names every show that already carries it. |
+| `DELETE /api/admin/reference-data/seasons/[id]` | Deletes a season no show belongs to. One with shows is a 409 naming retirement as the way. |
+
+**"In use" is `EXISTS (SELECT 1 FROM shows WHERE season_id = ...)`, never a column.** A show's
+own picker (embedded in `GET /api/admin/shows/[id]`, `listSeasonOptions()`) carries a retired
+season the show already holds, so it never blanks out from under an existing choice; a fresh
+pick excludes retired ones. Publishing a show whose season was retired after it was drafted
+refuses, naming the season (D-131 criterion 5).
 
 ### show_categories
-`id` PK · `name` UNIQUE · `sort`.
+`id` PK · `name` UNIQUE, case-insensitive UNIQUE too (`show_categories_name_nocase`) · `sort` ·
+`archived` bool.
+
+**Administration (D-131).** `/box-office/show-categories`, over these routes, `ticketing.read`
+for the listing and `ticketing.write` for the rest:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/admin/reference-data/show-categories` | The paged envelope, retired categories included by default, each row carrying whether a show belongs to it. |
+| `POST /api/admin/reference-data/show-categories` | Adds one. The name is refused if already held, without regard to capitals. |
+| `PUT /api/admin/reference-data/show-categories/[id]` | Changes everything except `archived`, which is its own action. |
+| `POST /api/admin/reference-data/show-categories/[id]/archive` | Retires a category, or brings one back. A retired category cannot be chosen for a new show and still names every show that already carries it. |
+| `DELETE /api/admin/reference-data/show-categories/[id]` | Deletes a category no show belongs to. One with shows is a 409 naming retirement as the way. |
+
+The same "in use is a query, never a column" and publish-time retirement refusal apply as for
+seasons, above (`SHOW_CATEGORY_REFERENCES` in `server/utils/show-categories.ts`).
 
 ### shows
 `id` PK · `slug` UNIQUE · `title` · `subtitle` · `description` · `long_description` ·
@@ -325,7 +381,7 @@ for the two that read and `ticketing.write` for the rest:
 | --- | --- |
 | `GET /api/admin/shows` | The paged envelope, drafts included, each row carrying its performance count, how many are on sale, how many tickets have sold and how many content warnings it carries. `unassessed=true` narrows it to published shows nobody has assessed. |
 | `POST /api/admin/shows` | Adds one, always DRAFT. The address is refused if it is already held. |
-| `GET /api/admin/shows/[id]` | One show, every performance of it, the venues a performance may be put in, the warnings it carries and the vocabulary it may pick from. |
+| `GET /api/admin/shows/[id]` | One show, every performance of it, the venues a performance may be put in, the category and season pickers (D-131), the warnings it carries and the vocabulary it may pick from. |
 | `PUT /api/admin/shows/[id]` | Changes the copy, the address, the age guidance, the latecomer policy and the booking window default. It does not take the status. |
 | `POST /api/admin/shows/[id]/publish` | Publishes or unpublishes. `cascadePerformances` takes DRAFT performances on sale in the same batch; CANCELLED ones are skipped by predicate. |
 | `DELETE /api/admin/shows/[id]` | Deletes a show nothing has sold under, with its performances and prices. A show with sold tickets is a 409 naming unpublishing and cancelling as the way. |
@@ -334,7 +390,7 @@ for the two that read and `ticketing.write` for the rest:
 | `POST /api/admin/performances/[id]/sale` | On sale or off sale, per performance. A cancelled or externally ticketed performance is a 409. |
 | `POST /api/admin/performances/[id]/cancel` | Cancels one, and answers with how many tickets are owed a refund. |
 | `DELETE /api/admin/performances/[id]` | Deletes a performance nothing has sold for. One that has is a 409 naming cancelling as the way. |
-| `GET /api/admin/venues` | The venues a performance may be put in. Venue administration has no MVP story. |
+| `GET /api/admin/venues` | The venues a performance may be put in, retired ones included. Venue administration itself is `/box-office/venues` (D-131), above. |
 
 **Unpublishing touches no performance and no ticket.** It moves `shows.status` alone; sales close
 because `saleRefusal()` refuses an unpublished show, so republishing restores the same programme.

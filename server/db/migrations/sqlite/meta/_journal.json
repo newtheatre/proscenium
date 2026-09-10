@@ -687,6 +687,13 @@
       "when": 1789040227944,
       "tag": "0097_normal_lady_ursula",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "6",
+      "when": 1789043893736,
+      "tag": "0098_tiresome_mauler",
+      "breakpoints": true
     }
   ]
 }

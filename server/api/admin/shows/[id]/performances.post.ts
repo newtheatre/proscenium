@@ -12,6 +12,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, performanceForm)
   const venue = (await listVenues()).find(one => one.id === input.venueId)
   if (!venue) throw createError({ statusCode: 400, statusMessage: 'No such venue' })
+  if (venue.archived) throw createError({ statusCode: 409, statusMessage: `${venue.name} is retired and cannot be booked for a new performance` })
 
   const id = newId()
 
