@@ -125,15 +125,31 @@ describe('revenue by source (criterion 2)', () => {
 })
 
 describe('refunds (criterion 2)', () => {
-  test('a card refund reads as a positive magnitude', async () => {
+  // Exactly refundTicket()'s own shape (server/utils/refunds.ts): no reverses_entry_id set,
+  // the same as every real refund the running system posts.
+  test('a card refund reads as a positive magnitude, with no reverses_entry_id set', async () => {
     await withDatabase(async (database) => {
       const original = entry(database, 'DESK', 'CARD', 1000, '2026-09-15', null, 1000)
       line(database, original, 'WALK_UP', 1000)
-      const refund = entry(database, 'DESK', 'CARD', 1100, '2026-09-15', original, -400)
+      const refund = entry(database, 'DESK', 'CARD', 1100, '2026-09-15', null, -400)
       line(database, refund, 'REFUND', -400)
 
       const [row] = read<{ refundsPence: number }>(database, seasonRefundsQuery(0, 2000))
       expect(row?.refundsPence).toBe(400)
+    })
+  })
+
+  test('an entry that sets reverses_entry_id but carries no REFUND line does not count', async () => {
+    await withDatabase(async (database) => {
+      const original = entry(database, 'DESK', 'CARD', 1000, '2026-09-15', null, 1000)
+      line(database, original, 'WALK_UP', 1000)
+      // The shape migration/money.ts writes for imported history: reverses_entry_id set, but
+      // kind IMPORT rather than REFUND, so it is deliberately outside this live-season figure.
+      const imported = entry(database, 'IMPORT', 'CARD', 1100, '2026-09-15', original, -400)
+      line(database, imported, 'IMPORT', -400)
+
+      const [row] = read<{ refundsPence: number }>(database, seasonRefundsQuery(0, 2000))
+      expect(row?.refundsPence ?? 0).toBe(0)
     })
   })
 })

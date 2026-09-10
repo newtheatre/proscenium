@@ -145,6 +145,20 @@ async function scan(): Promise<void> {
         :description="refusal"
         data-test="door-refused"
       />
+
+      <!-- Standalone reachability from the door, the half E-118 criterion 4 was still missing
+           until this screen existed (issue 457). -->
+      <UButton
+        to="/tonight/age-checks"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-id-card"
+        size="lg"
+        class="min-h-12 w-full"
+        data-test="link-age-checks"
+      >
+        Challenge 25
+      </UButton>
     </div>
 
     <template #actions>

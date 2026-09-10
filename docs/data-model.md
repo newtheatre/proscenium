@@ -134,13 +134,17 @@ never rewritten.
 `id` PK · `user_id` → users restrict · `awarded_on` (date, London) · `awarded_by` (the
 committee or meeting that resolved it, not an individual) · `citation` (the public wording of
 what it was awarded for) · `revoked_at` NULL · `revoked_by` NULL · `revocation_reason` scrub ·
-`created_at`. `pass_id` → passes (the lifetime entitlement, 0023) arrives with module D as a
-nullable column: the roll is recorded first, because the committee assembles it before the box
-office exists.
+`created_at`. No `pass_id` column: D-130 finds the entitlement by `passes.user_id` and
+`pass_types.slug = 'fellowship'` rather than a direct foreign key, so awarding needs no migration
+on this already-shipped table and the fellowship and the pass can be read independently.
 UNIQUE (`user_id`): a person is a Fellow once. `restrict` rather than `cascade` on purpose, so
 deleting a user cannot silently remove an award from the theatre's own record; erasure
 anonymises the person and the award stands.
-A revoked fellowship stops future admissions and rewrites nothing (0023).
+A revoked fellowship stops future admissions and rewrites nothing (0023): awarding writes
+`server/utils/fellowship-pass.ts`'s pass insert in the same batch as the fellowship
+(A-127 criterion 3); revoking cancels that pass in the same batch as the revocation
+(`cancelFellowshipPassStatement`), and an anonymised holder never admits on it either way
+(0062). Every admission already taken stands, append-only and untouched (0010).
 
 ### role_grants
 `id` PK · `user_id` → users cascade · `role` (namespace-free officer role, validated against

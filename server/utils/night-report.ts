@@ -11,7 +11,16 @@ import type { SQL } from 'drizzle-orm'
 // The night report compiler (E-123). Every figure derives from the ledger and the registers at
 // read time, so a draft read before close and a frozen read after it (E-124) run identically.
 
-export interface ReportAttendance { sold: number, admitted: number, noShows: number, walkUps: number, passAdmissions: number }
+export interface ReportAttendance {
+  sold: number
+  admitted: number
+  noShows: number
+  walkUps: number
+  passAdmissions: number
+  // fellowshipAdmissions is passAdmissions' own subset (D-130 criterion 5); its value is always
+  // nought, the same reasoning architecture.md gives an ordinary pass admission's own line.
+  fellowshipAdmissions: number
+}
 
 // "Sold" rides `heldSeatsSubquery` (D-105 criterion 2); a walk-up is a door-source reservation.
 // `passAdmissions` is `admitted`'s own subset (D-126 criterion 3), never a second count of seats.
@@ -25,13 +34,19 @@ export function reportAttendanceQuery(performanceId: string): SQL {
       (SELECT count(*) FROM reservations r
        JOIN tickets t ON t.reservation_id = r.id
        JOIN pass_admissions a ON a.ticket_id = t.id
-       WHERE r.performance_id = ${performanceId} AND r.status = 'DOOR') AS passAdmissions
+       WHERE r.performance_id = ${performanceId} AND r.status = 'DOOR') AS passAdmissions,
+      (SELECT count(*) FROM reservations r
+       JOIN tickets t ON t.reservation_id = r.id
+       JOIN pass_admissions a ON a.ticket_id = t.id
+       JOIN passes p ON p.id = a.pass_id
+       JOIN pass_types pt ON pt.id = p.pass_type_id
+       WHERE r.performance_id = ${performanceId} AND r.status = 'DOOR' AND pt.slug = 'fellowship') AS fellowshipAdmissions
   `
 }
 
 export async function reportAttendance(performanceId: string): Promise<ReportAttendance> {
   const [row] = await db.all<ReportAttendance>(reportAttendanceQuery(performanceId))
-  return row ?? { sold: 0, admitted: 0, noShows: 0, walkUps: 0, passAdmissions: 0 }
+  return row ?? { sold: 0, admitted: 0, noShows: 0, walkUps: 0, passAdmissions: 0, fellowshipAdmissions: 0 }
 }
 
 export interface TenderTotal { tender: string, totalPence: number }

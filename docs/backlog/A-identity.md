@@ -416,10 +416,9 @@ Open questions for the committee:
      form.
   3. Awarding issues the lifetime entitlement in the same batch as the record, so a Fellow can
      never exist without one or an entitlement without an award (0023). Amended 30 August 2026: the
-     roll is recorded first and the entitlement issues when the pass model exists, because passes
-     need pass types, prices and the ledger behind them and the committee assembles the roll for
-     30 September. The batch invariant applies from the moment there is a pass to issue, which is
-     before the door opens on 12 October.
+     roll was recorded first and the entitlement issued once the pass model existed; wired in the
+     same batch by D-130 (`server/utils/fellowship-pass.ts`), landing before the door opens on
+     12 October as promised.
   4. A fellowship can be revoked with a reason; revocation stops future admissions and rewrites
      nothing, so the award, the revocation and every admission already taken all stand.
   5. Awarding and revoking are audited, and the audit detail carries the fellowship id and never

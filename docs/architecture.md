@@ -320,8 +320,8 @@ never from `london_day`; the ledger holds no night column and gains none.
 | Comp admission | A comp is issued at collection (D-114); gated behind an approved `ticket_comp_requests` row, claimed atomically at collection, rather than the `ticketing.manage` permission it once was (D-117) | ticketing | `DESK` | `COMP` | `TICKET_COLLECTION` |
 | Walk-up sale | Reservation and payment in one desk flow (D-115) | ticketing | `DESK` | `CARD`, `COMP` | `WALK_UP` |
 | Refund | The money is handed back, one entry per ticket (D-116) | ticketing | `DESK` | `CARD` | `REFUND` |
-| Pass sale | A pass is issued and paid for at the desk (D-124) | ticketing | `DESK` | `CARD` | `PASS_SALE` |
-| Pass admission | A pass covers a seat, online or at the door (D-125, D-126) | ticketing | `SELF_SERVE`, `DESK` | `NONE` | `PASS_ADMISSION` |
+| Pass sale | A pass is issued and paid for at the desk (D-124); or a Fellowship is awarded, which issues one at zero value in the same batch, nobody at a desk (D-130, 0023) | ticketing | `DESK`, `SYSTEM` | `CARD`, `NONE` | `PASS_SALE` |
+| Pass admission | A pass covers a seat, online or at the door (D-125, D-126); a Fellow's own entitlement rides the identical path (D-130) | ticketing | `SELF_SERVE`, `DESK` | `NONE` | `PASS_ADMISSION` |
 | Bar item | The sale, its lines and its stock movements commit together (F-105); a sale after midnight is the calendar day it happened on, not the night's; a discount, if any, is net into `amount_pence` and snapshotted alongside it (F-117) | bar | `TILL` | `CARD`, `COMP`, `TAB` | `BAR_ITEM` |
 | Tab charge | Credit extended, not money taken (F-108); the entry stamps the debtor and stays outstanding until settled, capped per holder unless a duty manager or bar manager overrides it | bar | `TILL` | `TAB` | `BAR_ITEM` |
 | Comp given | Requires a prior request with a reason, approved by tonight's duty manager or the bar manager, never the requester (F-110); the same policy D-117 states for a comp admission, that giving away value takes more than the operational access that lets you sell. `amount_pence` is zero and `unit_price_pence` stays the retail price, so the foregone value is queryable | bar | `TILL` | `COMP` | `BAR_ITEM` |
@@ -847,10 +847,10 @@ against, which is how criterion 4's "bar can check outside a show" is read here:
 itself never has to name a performance, even on a night that has one.
 
 `/tonight/age-checks` is criterion 4's standalone half from the tonight screen: log a check,
-correct one, and read tonight's register, linked from `/tonight`. The criterion's other two
-halves stay open on issue #457: the till-inline reachability is F-106's, and the door half
-waits on a door screen existing at all, which no story has built yet and which is not this
-screen's work to start.
+correct one, and read tonight's register, linked from `/tonight`. The till-inline half is
+F-106's, folding an outcome into a sale. The door half waited on a door screen existing at all
+(issue #457); `/tonight/door` links to the register the same way `/tonight` already does, once
+D-126 and E-127 criterion 3 gave it something to link from and into.
 
 ### The incident log and near-miss reporting (E-115, E-117)
 

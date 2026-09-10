@@ -22,7 +22,7 @@ flowchart LR
   U --> R
   R --> G{Green?}
   G -- yes --> L[load.ts, applied to a target with the real schema]
-  L --> GRM[generate-reference-maps.ts: draft room-map.tsv and space-map.tsv]
+  L --> GRM[generate-reference-maps.ts: draft room, space and ticket-type maps]
   GRM --> B[transform-bookings.ts, the same target]
   L --> TR[transform-training.ts, the same target, catalogue authored first]
   L --> N[transform-programme.ts, the same target]
@@ -46,8 +46,8 @@ bun migration/inventory.ts     # loads dumps locally, writes out/manifest.json +
 bun migration/transform-identity.ts   # builds the unified identity core in out/unified.sqlite
 bun migration/reconcile.ts     # verifies counts and invariants; non-zero exit on failure
 bun migration/load.ts /tmp/rehearsal.db          # writes out/load.sql and applies it
-bun migration/generate-reference-maps.ts /tmp/rehearsal.db  # drafts room-map.tsv, space-map.tsv;
-                                                              # authored rooms and venues confirm
+bun migration/generate-reference-maps.ts /tmp/rehearsal.db  # drafts room, space and ticket-type
+                                                              # maps; authored ones confirm
 bun migration/transform-bookings.ts /tmp/rehearsal.db   # the old rooms history, same target
 bun migration/transform-training.ts /tmp/rehearsal.db   # training history, catalogue authored first
 bun migration/transform-money.ts /tmp/rehearsal.db      # ticket revenue, same target
@@ -168,14 +168,13 @@ step is offline against the dumps.
   `performance-map.tsv` each map an old id to the unified one, read back before minting so a
   rehearsal updates last week's rows. The reconciliation checksums total scheduled seconds across
   every performance, the same discipline `bookings.ts` applies to its own times. **Run this before
-  the reservations transform** (#840), which reads `out/performance-map.tsv` and cannot run
-  without it. `ticket_types` is not read here, and this transform writes no
-  `out/ticket-type-map.tsv`: `ticket_types` is authored fresh through D-119's admin screen, the
-  same way `departments` and `modules` are for training, never migrated (`docs/data-model.md`
-  names it "built by Wave 0 contract... everything else in this module is unbuilt"). The
-  reservations transform does need a ticket type reference map, confirmed rather than built
-  speculatively: it is drafted the same way `out/room-map.tsv` and `out/space-map.tsv` are
-  (below), not written from nothing. See "Reservations as records" below.
+  the reservations transform** (#840), which reads `out/performance-map.tsv`, keyed on the raw
+  old id with no prefix, and cannot run without it. `ticket_types` is not read here: it is
+  authored fresh through D-119's admin screen, the same way `departments` and `modules` are for
+  training, never migrated (`docs/data-model.md` names it "built by Wave 0 contract... everything
+  else in this module is unbuilt"). Confirmed directly with the reservations stream that it does
+  need one: `out/ticket-type-map.tsv` is a reference map, drafted by `generate-reference-maps.ts`
+  the same way `out/room-map.tsv` and `out/space-map.tsv` are (below), not written from nothing.
 
 ## Two kinds of map, and only one is written by hand
 
@@ -190,26 +189,28 @@ old id to new, and reads the file back before minting anything, so a rehearsal u
 week's rows rather than importing a second copy of the estate. Nothing to confirm: the transform
 created both sides of the mapping in the same run.
 
-**Reference maps** (`room-map.tsv`, `space-map.tsv`, and a `ticket-type-map.tsv` if the
-reservations transform turns out to need one) point at rows a transform does **not** create,
-because rooms and ticket types are authored fresh through their own admin screens rather than
-migrated (the same reasoning training's catalogue and programme's `ticket_types` already follow).
-A transform cannot mint one of these the way it mints an id, but it does not follow that a human
-must invent the mapping from nothing either: `generate-reference-maps.ts` drafts it, matching
-each old row to a target row by an exact name match on a column the target already keeps unique
-(`rooms.name`, `external_spaces.name`), which is as reliable as matching by id. A confident match
-is pre-filled; an old row with no name match is left blank and named in the console output,
-never guessed and never given the nearest name. `transform-bookings.ts` refuses to run while
-either file still has a blank line. Filling one in by hand, or authoring the missing room or
-venue and rerunning the draft, are the only two ways a blank resolves; the transform never
+**Reference maps** (`room-map.tsv`, `space-map.tsv`, `ticket-type-map.tsv`) point at rows a
+transform does **not** create, because rooms, union venues and ticket types are authored fresh
+through their own admin screens rather than migrated (the same reasoning training's catalogue
+and programme's non-import of `ticket_types` already follow). A transform cannot mint one of
+these the way it mints an id, but it does not follow that a human must invent the mapping from
+nothing either: `generate-reference-maps.ts` drafts it, matching each old row to a target row by
+name on a column the target already keeps unique (`rooms.name`, `external_spaces.name`, both
+case-sensitive; `ticket_types.name`, matched case-insensitively, the stronger of its two unique
+indexes), which is as reliable as matching by id. A confident match is pre-filled; an old row
+with no name match is left blank and named in the console output, never guessed and never given
+the nearest name. `transform-bookings.ts` refuses to run while `room-map.tsv` or `space-map.tsv`
+still has a blank line; the reservations transform (#840) does the same for
+`ticket-type-map.tsv`. Filling a blank in by hand, or authoring the missing room, venue or
+ticket type and rerunning the draft, are the only two ways it resolves; the generator never
 creates one itself, which would bypass the admin screen's own validation. A row the file has
 already seen, confirmed or still blank, is never touched by a later draft: only a new old row
 gets a fresh line.
 
-**Ordering this implies for a rehearsal**: rooms and union venues (and, later, ticket types) must
-already be authored in the unified system before `generate-reference-maps.ts` runs, or the draft
-is mostly blank and `transform-bookings.ts` correctly refuses. On the very first rehearsal, before
-anyone has used the room admin screen, that is expected, not broken.
+**Ordering this implies for a rehearsal**: rooms, union venues and ticket types must already be
+authored in the unified system before `generate-reference-maps.ts` runs, or the draft is mostly
+blank and the consuming transform correctly refuses. On the very first rehearsal, before anyone
+has used the room or ticket type admin screens, that is expected, not broken.
 
 - **Reservations as records** (module I): the booking each ticket belonged to, distinct from the
   ledger totals `transform-money.ts` already carries. `reservations.performance_id` is not

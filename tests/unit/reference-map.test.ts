@@ -79,4 +79,18 @@ describe('a reference map confirms against what is already authored, and never i
     expect(resolved.get('room:1')).toBe('new-studio')
     expect(resolved.get('room:2')).toBe('new-room-2')
   })
+
+  // ticket_types carries a case-insensitive unique index alongside its case-sensitive one
+  // (ticket_types_name_nocase); generate-reference-maps.ts folds case before calling here.
+  test('a caller folding case before matching gets a case-insensitive result, with no prefix', async () => {
+    const result = await draftReferenceMap(
+      'ticket-type-map.tsv', '',
+      [{ id: 'old-adult', name: 'adult' }],
+      new Map([['adult', 'new-adult']]),
+      dir,
+    )
+    expect(result).toMatchObject({ written: 1, matched: 1, blank: 0 })
+    const { resolved } = await readReferenceMap('ticket-type-map.tsv', dir)
+    expect(resolved.get('old-adult')).toBe('new-adult')
+  })
 })

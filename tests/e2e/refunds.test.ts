@@ -6,6 +6,7 @@ import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
+import { committeeYearOf } from '#shared/utils/london'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -346,5 +347,22 @@ describe.skipIf(skip !== null)('cancelling a collected booking (criterion 6)', (
 
     const cancelled = await send('POST', `/api/box-office/desk/reservations/${reservationId}/cancel`, {})
     expect(cancelled.status).toBe(200)
+  }, CASE_TIMEOUT_MS)
+})
+
+describe.skipIf(skip !== null)('a real refund reaches the season dashboard (I-102 audit: seasonRefundsQuery)', () => {
+  test('the season summary reflects a refund posted through the real route, not a fixture that agrees with the query', async () => {
+    const { reservationId, ticketId } = await collectedBooking(900)
+    const before = await send('GET', `/api/admin/finance/season?kind=SEASON&year=${committeeYearOf(new Date())}`, undefined, officer.cookie)
+    const beforeSummary = await before.json() as { summary: { refundsPence: number } }
+
+    const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, {
+      expectedTotalPence: 900,
+    }, manager.cookie)
+    expect(refunded.status).toBe(200)
+
+    const after = await send('GET', `/api/admin/finance/season?kind=SEASON&year=${committeeYearOf(new Date())}`, undefined, officer.cookie)
+    const afterSummary = await after.json() as { summary: { refundsPence: number } }
+    expect(afterSummary.summary.refundsPence).toBe(beforeSummary.summary.refundsPence + 900)
   }, CASE_TIMEOUT_MS)
 })
