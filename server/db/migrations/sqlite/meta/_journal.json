@@ -673,6 +673,13 @@
       "when": 1789036825807,
       "tag": "0095_neat_living_mummy",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "6",
+      "when": 1789039056153,
+      "tag": "0096_simple_tombstone",
+      "breakpoints": true
     }
   ]
 }
