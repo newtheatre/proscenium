@@ -303,6 +303,8 @@ export interface DoorReservationRow {
   showTitle: string
   startsAt: number
   totalPence: number
+  exchangedToShowTitle: string | null
+  exchangedToStartsAt: number | null
 }
 
 // By reference alone, not scoped to the performance selected at the door (E-127 criterion 3): a
@@ -311,10 +313,14 @@ export function reservationForDoorQuery(reference: string): SQL {
   return sql`
     SELECT r.id AS id, r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
            r.performance_id AS performanceId, s.title AS showTitle, p.starts_at AS startsAt,
-           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence
+           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence,
+           xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
     JOIN shows s ON s.id = p.show_id
+    LEFT JOIN reservations x ON x.id = r.exchanged_to_reservation_id
+    LEFT JOIN performances xp ON xp.id = x.performance_id
+    LEFT JOIN shows xs ON xs.id = xp.show_id
     WHERE r.reference = ${reference.toUpperCase()}
   `
 }

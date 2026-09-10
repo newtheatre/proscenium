@@ -197,6 +197,16 @@ describe('the door\'s own fifth state, wrong performance (E-127 criterion 3, D-1
     expect(doorTicketOutcome('EXPIRED', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Lapsed')
     expect(doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Admitted')
   })
+
+  test('an exchanged ticket points at where it went, not a plain cancellation (D-111)', () => {
+    const outcome = doorTicketOutcome(
+      'CANCELLED', 'CUSTOMER', 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null,
+      { showTitle: 'The Cherry Orchard', when: 'Saturday, 7:30pm' },
+    )
+    expect(outcome.headline).toBe('Exchanged')
+    expect(outcome.detail).toContain('The Cherry Orchard')
+    expect(outcome.admit).toBe(false)
+  })
 })
 
 describe('a resend is asked for by reference and email, not a token (criterion 2)', () => {

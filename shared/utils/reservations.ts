@@ -250,10 +250,11 @@ export function doorTicketOutcome(
   showTitle: string,
   when: string,
   totalDue: string | null,
+  exchangedTo: QrExchangedTo | null = null,
 ): DoorTicketOutcome {
   if (performanceId !== selectedPerformanceId && (status === 'PENDING' || status === 'COLLECTED')) {
     return { headline: 'Wrong performance', detail: `This ticket is for ${showTitle}, ${when}.`, admit: false }
   }
   if (status === 'COLLECTED') return { headline: 'Admit', detail: null, admit: true }
-  return { ...qrStatusDisplay(status, cancelledBy, totalDue), admit: false }
+  return { ...qrStatusDisplay(status, cancelledBy, totalDue, exchangedTo), admit: false }
 }
