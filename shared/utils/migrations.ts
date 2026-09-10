@@ -178,3 +178,59 @@ export function snapshotChainProblems(links: SnapshotLink[]): string[] {
   }
   return problems
 }
+
+export interface MigrationEvent { at: number, kind: 'create' | 'drop' | 'rebuild' | 'rename', name?: string, table?: string }
+
+// The table a trigger fires on, read from its body: the name prefix is a
+// convention nothing enforces, and the filenames already diverge from it.
+const CREATE_TRIGGER = /create\s+trigger\s+(?:if\s+not\s+exists\s+)?`?(\w+)`?\s+(?:before|after|instead\s+of)\s+(?:update(?:\s+of\s+[^]*?)?|delete|insert)\s+on\s+`?(\w+)`?/gi
+const DROP_TRIGGER = /drop\s+trigger\s+(?:if\s+exists\s+)?`?(\w+)`?/gi
+const REBUILD = /CREATE TABLE `__new_(\w+)`/g
+const RENAME = /ALTER TABLE `__new_(\w+)` RENAME TO `\1`/g
+
+// Every statement a rebuild or a trigger check cares about, in the order the migration runs them.
+export function migrationEventsIn(sql: string): MigrationEvent[] {
+  const events: MigrationEvent[] = []
+  for (const m of sql.matchAll(CREATE_TRIGGER)) events.push({ at: m.index, kind: 'create', name: m[1], table: m[2] })
+  for (const m of sql.matchAll(DROP_TRIGGER)) events.push({ at: m.index, kind: 'drop', name: m[1] })
+  for (const m of sql.matchAll(REBUILD)) events.push({ at: m.index, kind: 'rebuild', table: m[1] })
+  for (const m of sql.matchAll(RENAME)) events.push({ at: m.index, kind: 'rename', table: m[1] })
+  return events.sort((a, b) => a.at - b.at)
+}
+
+// A rebuild's `DROP TABLE` takes every trigger on that table with it, and no snapshot carries one
+// to re-emit. Mutates `liveTriggers`, so the caller replays the whole directory in order (0010).
+export function triggerDropProblems(
+  file: string,
+  events: MigrationEvent[],
+  liveTriggers: Map<string, string>,
+  grandfathered: boolean,
+): string[] {
+  const rebuilt = new Map<string, string[]>()
+
+  for (const event of events) {
+    if (event.kind === 'create') {
+      liveTriggers.set(event.name!, event.table!)
+      continue
+    }
+    if (event.kind === 'drop') {
+      liveTriggers.delete(event.name!)
+      continue
+    }
+    if (event.kind === 'rebuild') continue
+    // rename: the preceding `DROP TABLE t` takes every trigger on `t` with it. Only a CREATE
+    // placed after the rename in this file restores one; an earlier one belonged to the doomed table.
+    const lost = [...liveTriggers].filter(([, table]) => table === event.table).map(([name]) => name)
+    for (const name of lost) liveTriggers.delete(name)
+    if (!grandfathered && lost.length) rebuilt.set(event.table!, lost)
+  }
+
+  const problems: string[] = []
+  for (const [table, lost] of rebuilt) {
+    const dropped = lost.filter(name => liveTriggers.get(name) !== table)
+    if (!dropped.length) continue
+    problems.push(`${file}: rebuilds \`${table}\`, and dropping it drops its triggers `
+      + `${dropped.map(name => `\`${name}\``).join(', ')}, which no snapshot carries and no regenerate re-emits.`)
+  }
+  return problems
+}

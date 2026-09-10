@@ -80,6 +80,28 @@ Applying and deploying cannot be sequenced from CI: the migration job and Worker
 from the same push and race. The health check below is what makes losing that race visible rather
 than silent. **Anything destructive is applied by hand, before merging.**
 
+### Applying a destructive migration by hand (K-107 criterion 3)
+
+`check-migrations` refuses a generated rebuild outright (0010, 0052). Splitting the change so no
+rebuild is needed is the default fix; where one is genuinely unavoidable, the file is
+hand-corrected the way 0052's `venue_emergency_info` migration was, and applied against
+production before the pull request merges, because `migrate.yml` only runs after a push to `main`
+and never reviews anything first.
+
+Run it with the same tool and the same restore point the automated job takes, by hand with
+production credentials instead of by CI:
+
+```bash
+export NUXT_HUB_CLOUDFLARE_ACCOUNT_ID=... NUXT_HUB_CLOUDFLARE_API_TOKEN=... \
+       NUXT_HUB_CLOUDFLARE_DATABASE_ID=02c35a27-b6dc-47b0-8d9b-7a526324aca1
+bunx wrangler d1 time-travel info unified                     # take the bookmark first
+NODE_ENV=production ./node_modules/.bin/nuxt-db migrate --verbose
+./.github/scripts/pending-migrations.sh                       # confirm the ledger agrees
+```
+
+Merge only once the ledger confirms nothing is pending. `migrate.yml` then finds the migration
+already applied on its next run and does nothing further; it is not skipped, only a no-op.
+
 ## Importing the old estate
 
 The identity import is rehearsed weekly and applied once, at cutover. Everything but the export

@@ -7,9 +7,11 @@ import {
   copyingInserts,
   dependentsByTable,
   journalProblems,
+  migrationEventsIn,
   rebuildDependentProblems,
   snapshotBefore,
   snapshotChainProblems,
+  triggerDropProblems,
   unresolvedCopyProblems,
 } from '../shared/utils/migrations'
 import type { JournalEntry, SnapshotTable } from '../shared/utils/migrations'
@@ -68,25 +70,6 @@ if (chainProblems.length) {
 const latest = snapshots.find(s => s.number === Number(newest.slice(0, 4)))?.data ?? {}
 const dependentsOnto = dependentsByTable(latest.tables ?? {})
 
-// The table a trigger fires on, read from its body: the name prefix is a
-// convention nothing enforces, and the filenames already diverge from it.
-const CREATE_TRIGGER = /create\s+trigger\s+(?:if\s+not\s+exists\s+)?`?(\w+)`?\s+(?:before|after|instead\s+of)\s+(?:update(?:\s+of\s+[^]*?)?|delete|insert)\s+on\s+`?(\w+)`?/gi
-const DROP_TRIGGER = /drop\s+trigger\s+(?:if\s+exists\s+)?`?(\w+)`?/gi
-const REBUILD = /CREATE TABLE `__new_(\w+)`/g
-const RENAME = /ALTER TABLE `__new_(\w+)` RENAME TO `\1`/g
-
-interface MigrationEvent { at: number, kind: 'create' | 'drop' | 'rebuild' | 'rename', name?: string, table?: string }
-
-// Every statement this check cares about, in the order the migration runs them.
-function eventsIn(sql: string): MigrationEvent[] {
-  const events: MigrationEvent[] = []
-  for (const m of sql.matchAll(CREATE_TRIGGER)) events.push({ at: m.index, kind: 'create', name: m[1], table: m[2] })
-  for (const m of sql.matchAll(DROP_TRIGGER)) events.push({ at: m.index, kind: 'drop', name: m[1] })
-  for (const m of sql.matchAll(REBUILD)) events.push({ at: m.index, kind: 'rebuild', table: m[1] })
-  for (const m of sql.matchAll(RENAME)) events.push({ at: m.index, kind: 'rename', table: m[1] })
-  return events.sort((a, b) => a.at - b.at)
-}
-
 // Triggers live across migrations, so replay the whole directory in order.
 const liveTriggers = new Map<string, string>()
 const problems: string[] = []
@@ -94,7 +77,6 @@ const problems: string[] = []
 for (const file of scan(DIR, '*.sql')) {
   const sql = await Bun.file(join(DIR, file)).text()
   const grandfathered = GRANDFATHERED.has(file.replace(/\.sql$/, ''))
-  const rebuilt = new Map<string, string[]>()
 
   if (!grandfathered) {
     const before = snapshotBefore(Number(file.slice(0, 4)), snapshots)?.tables ?? {}
@@ -104,33 +86,16 @@ for (const file of scan(DIR, '*.sql')) {
     }
   }
 
-  for (const event of eventsIn(sql)) {
-    if (event.kind === 'create') {
-      liveTriggers.set(event.name!, event.table!)
-      continue
-    }
-    if (event.kind === 'drop') {
-      liveTriggers.delete(event.name!)
-      continue
-    }
-    if (event.kind === 'rebuild') {
-      if (grandfathered) continue
+  const events = migrationEventsIn(sql)
+
+  if (!grandfathered) {
+    for (const event of events) {
+      if (event.kind !== 'rebuild') continue
       problems.push(...rebuildDependentProblems(file, event.table!, dependentsOnto.get(event.table!) ?? []))
-      continue
     }
-    // `DROP TABLE t` takes the table's triggers with it. Only a CREATE after
-    // the rename restores one: an earlier one attaches to the doomed table.
-    const lost = [...liveTriggers].filter(([, table]) => table === event.table).map(([name]) => name)
-    for (const name of lost) liveTriggers.delete(name)
-    if (!grandfathered && lost.length) rebuilt.set(event.table!, lost)
   }
 
-  for (const [table, lost] of rebuilt) {
-    const dropped = lost.filter(name => liveTriggers.get(name) !== table)
-    if (!dropped.length) continue
-    problems.push(`${file}: rebuilds \`${table}\`, and dropping it drops its triggers `
-      + `${dropped.map(t => `\`${t}\``).join(', ')}, which no snapshot carries and no regenerate re-emits.`)
-  }
+  problems.push(...triggerDropProblems(file, events, liveTriggers, grandfathered))
 }
 
 if (problems.length) {
