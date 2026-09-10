@@ -134,6 +134,9 @@ export async function offerWaitingList(event: H3Event | undefined, performanceId
     const claimed = await db.all<{ id: string }>(offerEntryStatement(candidate.id, now, expiresAt))
     if (claimed.length === 0) continue
 
+    const entry = auditEntry({ actorId: null, action: 'waiting-list.offered', target: `waiting-list-entry:${candidate.id}` })
+    await db.run(sql`INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${entry.detail !== null ? JSON.stringify(entry.detail) : null})`)
+
     remaining -= candidate.partySize
     offered.push({ id: candidate.id, userId: candidate.userId, showTitle: performance.showTitle, startsAt: performance.startsAt, expiresAt })
   }
@@ -359,6 +362,14 @@ export async function claimWaitingListOffer(event: H3Event, entry: WaitingListEn
   }
 
   await db.run(sql`UPDATE waiting_list SET claimed_reservation_id = ${result.id}, updated_at = unixepoch() WHERE id = ${entry.id} AND status = 'CLAIMED'`)
+
+  const claimEntry = auditEntry({
+    actorId: entry.userId,
+    action: 'waiting-list.claimed',
+    target: `waiting-list-entry:${entry.id}`,
+    detail: { reservationId: result.id },
+  })
+  await db.run(sql`INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (${claimEntry.id}, ${claimEntry.actorId}, ${claimEntry.action}, ${claimEntry.target}, ${JSON.stringify(claimEntry.detail)})`)
 
   return { applied: true, reservation: result }
 }

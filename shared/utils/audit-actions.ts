@@ -164,6 +164,11 @@ const CATALOGUE = {
   'pass.issued': { label: 'Pass issued at the desk', module: 'ticketing' },
   'pass.request.created': { label: 'Pass requested', module: 'ticketing', self: true },
   'pass.request.fulfilled': { label: 'Pass request fulfilled at issue', module: 'ticketing' },
+  'waiting-list.joined': { label: 'Joined a waiting list', module: 'ticketing', self: true },
+  'waiting-list.offered': { label: 'Waiting-list offer made', module: 'ticketing' },
+  'waiting-list.offer-lapsed': { label: 'Waiting-list offer lapsed unclaimed', module: 'ticketing' },
+  'waiting-list.claimed': { label: 'Waiting-list offer claimed', module: 'ticketing', self: true },
+  'waiting-list.removed': { label: 'Left a waiting list', module: 'ticketing', self: true },
   'pass.request.expired': { label: 'Pass request lapsed unfulfilled', module: 'ticketing' },
   // Not `self`: D-126 and D-130 both write this for an officer acting on somebody else's pass.
   'pass.redeemed': { label: 'Pass redeemed for a performance', module: 'ticketing' },
