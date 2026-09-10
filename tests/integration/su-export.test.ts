@@ -67,6 +67,21 @@ function read<T>(database: TestDatabase, statement: SQL): T[] {
   return rows<T>(database, query, ...parameters)
 }
 
+// Exactly lockStatement()'s insert (period-locks.ts).
+function lock(database: TestDatabase, id: string, fromDay: string, toDay: string, action: 'CLOSED' | 'REOPENED', at = 0): void {
+  database.raw.prepare(
+    'INSERT INTO period_locks (id, from_day, to_day, action, actor_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+  ).run(id, fromDay, toDay, action, ACTOR, at)
+}
+
+// Exactly isRangeClosed()'s query.
+function rangeClosed(database: TestDatabase, fromDay: string, toDay: string): boolean {
+  const [row] = rows<{ action: string }>(database, `
+    SELECT action FROM period_locks WHERE from_day <= ? AND to_day >= ? ORDER BY created_at DESC, id DESC LIMIT 1
+  `, fromDay, toDay)
+  return row?.action === 'CLOSED'
+}
+
 describe('the nominal mapping seed (I-108 criterion 1)', () => {
   test('every posting pair is seeded, unmapped', async () => {
     await withDatabase((database) => {
@@ -174,6 +189,47 @@ describe('never disagreeing with I-106 for the same money (shared query, not a s
       const [season] = read<{ grossPence: number, refundedPence: number }>(
         database, seasonTicketRevenueQuery(AT, AT + oneMonth))
       expect(exportNet).toBe(season!.grossPence - season!.refundedPence)
+    })
+  })
+})
+
+describe('whether an exported range is still open to a correction (I-108)', () => {
+  test('no lock at all is open', () => {
+    return withDatabase((database) => {
+      expect(rangeClosed(database, '2026-09-01', '2026-09-30')).toBe(false)
+    })
+  })
+
+  test('a range closed exactly is closed', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      lock(database, 'lock-1', '2026-09-01', '2026-09-30', 'CLOSED')
+      expect(rangeClosed(database, '2026-09-01', '2026-09-30')).toBe(true)
+    })
+  })
+
+  test('a range only partly covered by a close is open, not closed', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      lock(database, 'lock-1', '2026-09-01', '2026-09-15', 'CLOSED')
+      expect(rangeClosed(database, '2026-09-01', '2026-09-30')).toBe(false)
+    })
+  })
+
+  test('a range wholly inside a wider close is closed', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      lock(database, 'lock-1', '2026-08-01', '2026-12-31', 'CLOSED')
+      expect(rangeClosed(database, '2026-09-01', '2026-09-30')).toBe(true)
+    })
+  })
+
+  test('reopening the exact range makes it open again', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      lock(database, 'lock-1', '2026-09-01', '2026-09-30', 'CLOSED', 0)
+      lock(database, 'lock-2', '2026-09-01', '2026-09-30', 'REOPENED', 1)
+      expect(rangeClosed(database, '2026-09-01', '2026-09-30')).toBe(false)
     })
   })
 })

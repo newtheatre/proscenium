@@ -289,6 +289,14 @@ has no mapping still exports, on its own row with an explicit `UNMAPPED` code (c
 never dropped. The row count is capped (`SU_EXPORT_ROW_CAP`) and the nominal code column runs
 through `toCsv`'s formula-injection guard (D-129) like every other user-typed export cell.
 
+**An open period exports anyway, permitted but marked, never refused.** A treasurer may need a
+figure before closing (a return is due, a close is still being prepared), and refusing until
+close would make I-108 depend on a close that has its own separate warnings and workflow
+(I-107). `isRangeClosed()` checks the requested range against `period_locks` the same way a day
+is checked, and the response carries the answer as `x-period-status: closed|open` rather than a
+CSV column, so the file itself stays exactly the shape the SU's own import expects. A range only
+partly closed reads as open: nothing here assumes a term is closed in one row.
+
 ### The money paths
 
 The triple every path posts under. A module adding a money path adds a row here in the same pull

@@ -866,6 +866,8 @@ the row: nothing here computes a total that could disagree with I-106's gross, r
 figures for the same range, because nothing here computes a total at all. Rows are capped at
 `SU_EXPORT_ROW_CAP` (`shared/utils/su-export.ts`), refused before the CSV is built rather than
 truncated silently. The export is audited (`finance.exported`) with who, when and the range.
+An open range exports anyway, permitted rather than refused: the `x-period-status` response
+header says `closed` or `open`, read from `period_locks` the same way a single day is (I-107).
 
 ## Show night (module E)
 
