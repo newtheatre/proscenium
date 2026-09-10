@@ -62,7 +62,10 @@ cautionary tale.
   naming, because auto-import covers values and not types. **Except** a value a test reaches
   transitively: `tests/` typechecks the file under Bun, which auto-imports nothing, so that
   value needs a real import there. Discovered per file, by a red `typecheck:bun`; the pattern
-  and why it is not fixed at the boundary are decision 0055.
+  and why it is not fixed at the boundary are decision 0055. **A value that only exists inside a
+  real Nitro build, such as `useRuntimeConfig`, is not fixed by naming it, static or dynamic**:
+  resolve it outside the Bun graph and take it as a parameter, or keep the code that needs it in a
+  file `tests/` never reaches (decision 0057).
 - Outside the application, in `tests/` and `scripts/`, nothing is auto-imported: reach in by
   alias, `#shared/utils/...`, `#server/...`, `#tests/...`. Those paths are declared twice, by
   Nuxt for the application and in `tsconfig.bun.json` for the Bun projects, so one spelling
