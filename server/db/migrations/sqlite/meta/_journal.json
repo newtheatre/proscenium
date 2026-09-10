@@ -666,6 +666,13 @@
       "when": 1789034881116,
       "tag": "0094_su_nominal_mappings_seeded_from_the_posting_table",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "6",
+      "when": 1789036825807,
+      "tag": "0095_neat_living_mummy",
+      "breakpoints": true
     }
   ]
 }

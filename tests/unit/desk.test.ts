@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  DESK_SALE_LINE_QUANTITY_CAP,
   REINSTATE_REASON_LIMIT,
   amountDueFor,
   collectForm,
+  deskSaleForm,
   deskSearchForm,
   refundTicketForm,
   reinstateRefusal,
@@ -121,5 +123,34 @@ describe('a reinstatement is a reason, nothing else (D-118 criterion 4)', () => 
 
   test('a stray field is refused: nothing else belongs on this request', () => {
     expect(reinstateReservationForm.safeParse({ reason: 'Fine', extra: 'no' }).success).toBe(false)
+  })
+})
+
+describe('a walk-up sale allows up to 20 a line and no order total cap (D-115 criterion 3)', () => {
+  const base = { performanceId: 'p-1', guest: { name: 'Door Sale', email: 'door@example.invalid' }, expectedTotalPence: 900, tender: 'CARD' as const }
+
+  test(`exactly ${DESK_SALE_LINE_QUANTITY_CAP} on one line is fine`, () => {
+    const result = deskSaleForm.safeParse({ ...base, lines: [{ ticketTypeId: 'tt-1', quantity: DESK_SALE_LINE_QUANTITY_CAP }] })
+    expect(result.success).toBe(true)
+  })
+
+  test('one over the line cap is refused', () => {
+    const result = deskSaleForm.safeParse({ ...base, lines: [{ ticketTypeId: 'tt-1', quantity: DESK_SALE_LINE_QUANTITY_CAP + 1 }] })
+    expect(result.success).toBe(false)
+  })
+
+  test('many lines each at the cap are fine: nothing caps the order total', () => {
+    const lines = Array.from({ length: 10 }, (_, index) => ({ ticketTypeId: `tt-${index}`, quantity: DESK_SALE_LINE_QUANTITY_CAP }))
+    expect(deskSaleForm.safeParse({ ...base, lines }).success).toBe(true)
+  })
+
+  test('COMP is not a walk-up tender: D-117 names an existing reservation this write has not made yet', () => {
+    const result = deskSaleForm.safeParse({ ...base, lines: [{ ticketTypeId: 'tt-1', quantity: 1 }], tender: 'COMP' })
+    expect(result.success).toBe(false)
+  })
+
+  test('a name and an email are required, the same as a guest booking online', () => {
+    const result = deskSaleForm.safeParse({ ...base, lines: [{ ticketTypeId: 'tt-1', quantity: 1 }], guest: undefined })
+    expect(result.success).toBe(false)
   })
 })

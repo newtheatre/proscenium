@@ -311,3 +311,87 @@ describe.skipIf(skip !== null)('collection is the payment boundary (criteria 2, 
     expect(entries).toHaveLength(1)
   }, CASE_TIMEOUT_MS)
 })
+
+describe.skipIf(skip !== null)('a walk-up sale is one flow, source DOOR from creation (D-115)', () => {
+  test('creates the reservation, takes payment and posts the ledger in one request', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow(900)
+
+    const sold = await send('POST', '/api/box-office/desk/reservations', {
+      performanceId,
+      lines: [{ ticketTypeId, quantity: 2 }],
+      guest: { name: 'Walk Up', email: registrableAddress('walkup') },
+      expectedTotalPence: 1800,
+      tender: 'CARD',
+    })
+    expect(sold.status).toBe(200)
+    const body = await sold.json() as { reference: string, totalPence: number }
+    expect(body.totalPence).toBe(1800)
+
+    const row = query<{ status: string, source: string, windowBypassed: number }>(
+      'SELECT status, source, window_bypassed AS windowBypassed FROM reservations WHERE reference = ?', body.reference,
+    )
+    expect(row).toEqual({ status: 'COLLECTED', source: 'DOOR', windowBypassed: 0 })
+
+    const lines = queryAll<{ kind: string, amountPence: number, performanceId: string }>(
+      `SELECT l.kind AS kind, l.amount_pence AS amountPence, l.performance_id AS performanceId
+       FROM ledger_lines l JOIN tickets t ON t.id = l.ticket_id
+       JOIN reservations r ON r.id = t.reservation_id WHERE r.reference = ?`, body.reference,
+    )
+    expect(lines).toEqual([
+      { kind: 'WALK_UP', amountPence: 900, performanceId },
+      { kind: 'WALK_UP', amountPence: 900, performanceId },
+    ])
+  }, CASE_TIMEOUT_MS)
+
+  test('a mismatch is refused quoting both figures, and nothing is created (criterion 4)', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow(900)
+
+    const wrong = await send('POST', '/api/box-office/desk/reservations', {
+      performanceId,
+      lines: [{ ticketTypeId, quantity: 1 }],
+      guest: { name: 'Walk Up', email: registrableAddress('walkup') },
+      expectedTotalPence: 500,
+      tender: 'CARD',
+    })
+    expect(wrong.status).toBe(409)
+    const text = await wrong.text()
+    expect(text).toContain('£5.00')
+    expect(text).toContain('£9.00')
+
+    const count = query<{ n: number }>('SELECT count(*) AS n FROM reservations WHERE performance_id = ?', performanceId)
+    expect(count?.n).toBe(0)
+  }, CASE_TIMEOUT_MS)
+
+  test('sells past the customer window, and records that it did (D-112, D-115 criterion 3)', async () => {
+    const title = named('The Seagull')
+    const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) }, officer.cookie)
+    const showId = (await show.json() as { id: string }).id
+
+    const startsAt = Math.floor(Date.now() / 1000) + weekOffsetSeconds
+    const performance = await send('POST', `/api/admin/shows/${showId}/performances`, {
+      venueId, startsAt, bookingClosesHoursBefore: 24 * 8,
+    }, officer.cookie)
+    const performanceId = (await performance.json() as { id: string }).id
+
+    const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 }, officer.cookie)
+    const ticketTypeId = (await type.json() as { id: string }).id
+    expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true }, officer.cookie)).status).toBe(200)
+
+    const onSale = await send('GET', `/api/box-office/desk/performances?night=${showNightOf(new Date(startsAt * 1000))}`)
+    expect((await onSale.json() as { performances: { id: string }[] }).performances.some(p => p.id === performanceId)).toBe(true)
+
+    const sold = await send('POST', '/api/box-office/desk/reservations', {
+      performanceId,
+      lines: [{ ticketTypeId, quantity: 1 }],
+      guest: { name: 'Walk Up', email: registrableAddress('walkup') },
+      expectedTotalPence: 900,
+      tender: 'CARD',
+    })
+    expect(sold.status).toBe(200)
+
+    const row = query<{ windowBypassed: number }>(
+      'SELECT window_bypassed AS windowBypassed FROM reservations WHERE performance_id = ?', performanceId,
+    )
+    expect(row?.windowBypassed).toBe(1)
+  }, CASE_TIMEOUT_MS)
+})
