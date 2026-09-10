@@ -24,8 +24,10 @@ flowchart LR
   G -- yes --> L[load.ts, applied to a target with the real schema]
   L --> B[transform-bookings.ts, the same target]
   L --> TR[transform-training.ts, the same target, catalogue authored first]
+  L --> N[transform-programme.ts, the same target]
   B --> W[Weekly rehearsal recorded on epic 338]
   TR --> W
+  N --> W
   G -- no --> F[Fix the transform, never the numbers]
 ```
 
@@ -45,16 +47,18 @@ bun migration/load.ts /tmp/rehearsal.db          # writes out/load.sql and appli
 bun migration/transform-bookings.ts /tmp/rehearsal.db   # the old rooms history, same target
 bun migration/transform-training.ts /tmp/rehearsal.db   # training history, catalogue authored first
 bun migration/transform-money.ts /tmp/rehearsal.db      # ticket revenue, same target
+bun migration/transform-programme.ts /tmp/rehearsal.db  # venues, shows, performances, same target
 ```
 
 ## Proving the pipeline without a real export
 
-`bun migration/dry-run-synthetic.ts` runs identity, load, bookings and money end to end against
-synthetic data built in the script itself, never against `dumps/` or `out/`. It exists because no
-existing test populated `identity.ts`'s `mirrors` with real content or seeded an unmapped account
-in `bookings.ts`, so K-113's own exception paths, cited in `identity.ts`'s own comments, had never
-actually fired anywhere. It does not exercise `export.sh`, `inventory.ts` or `reconcile.ts`
-themselves, which read real files; it proves the transforms, not the file-handling around them.
+`bun migration/dry-run-synthetic.ts` runs identity, load, bookings, money and programme end to
+end against synthetic data built in the script itself, never against `dumps/` or `out/`. It
+exists because no existing test populated `identity.ts`'s `mirrors` with real content or seeded
+an unmapped account in `bookings.ts`, so K-113's own exception paths, cited in `identity.ts`'s own
+comments, had never actually fired anywhere. It does not exercise `export.sh`, `inventory.ts` or
+`reconcile.ts` themselves, which read real files; it proves the transforms, not the file-handling
+around them.
 
 **`transform-bookings.ts`, `transform-training.ts` and `transform-money.ts` take the target as an
 argument and refuse to run without one, on purpose.** Unlike identity, `room_bookings.room_id` and
@@ -120,11 +124,11 @@ step is offline against the dumps.
   gross figure and the net stay reconstructable from ledger rows (0004, 0010). A ticket whose
   `price_confidence` reads anything but `EXACT` still imports, and is named in the exceptions
   report rather than silently trusted. `performance_id`, `reservation_id` and `ticket_id` are left
-  unset on every imported line: no programme transform exists yet to map the old performance ids
-  to new ones, and 0015 forbids carrying the old ones through unmapped. The total is unaffected;
-  attributing a historical sale to its performance is recoverable later, but only for as long as
-  `out/id-map.tsv` and the archived old estate exist (0015), which is why the mapping lives in the
-  ticket id kept in `out/money-id-map.tsv`, not a column on the entry.
+  unset on every imported line: `transform-money.ts` does not read `out/performance-map.tsv`,
+  which `transform-programme.ts` now writes, so attributing an old sale to its new performance id
+  is possible but not yet wired up. The total is unaffected; that attribution is recoverable for as
+  long as `out/id-map.tsv` and the archived old estate exist (0015), which is why the mapping lives
+  in the ticket id kept in `out/money-id-map.tsv`, not a column on the entry, until it is wired up.
 - **Training** (K-113, `migration/training.ts`): who led a department, who ran and attended a
   session, who asked to be taught, and every training record, from `rehearsal`'s live database.
   Not a revival of G-127's withdrawn Heroku-era import: G-127 and K-117 named the archive
@@ -142,6 +146,30 @@ step is offline against the dumps.
   the old app; an imported one gets the committee year end following the grant, the same policy a
   live grant already gets, rather than the standing authority a bare `NULL` would otherwise confer
   on an assignment years out of date.
+- **Programme** (K-113): venues, seasons, show categories, shows, the content-warning vocabulary
+  and performances, from the old proscenium database. Venues, seasons and shows insert or update
+  by id exactly as bookings do; nothing here is keyed to a person, so 0059's `NOT_ANONYMISED`
+  guard has nothing to guard, checked against `shared/utils/personal-data.ts` rather than assumed.
+  A season's `starts_at`/`ends_at` are read in London, not UTC, the same discipline every date in
+  this estate uses (0014): the old estate's last instant of 31 July BST is still 31 July in
+  London, one second before midnight, not already the first second of August. The old latecomer
+  vocabulary has four values and the new one three; `SUITABLE_BREAK` and `ANY_TIME` both narrow to
+  `ADMITTED`, counted rather than silently collapsed. A show's `external_url` and `programme_url`
+  have no unified column: dropped, and counted. A show naming a category, season or venue that did
+  not import lands with that reference null rather than broken, named in the exceptions; the same
+  is true of a performance naming a show or venue, and a warning link naming a show or warning,
+  neither of which is written at all when its reference is missing. `out/venue-id-map.tsv`,
+  `season-id-map.tsv`, `category-id-map.tsv`, `show-id-map.tsv`, `warning-id-map.tsv` and
+  `performance-map.tsv` each map an old id to the unified one, read back before minting so a
+  rehearsal updates last week's rows. The reconciliation checksums total scheduled seconds across
+  every performance, the same discipline `bookings.ts` applies to its own times. **Run this before
+  the reservations transform** (#840), which reads `out/performance-map.tsv` and cannot run
+  without it. `ticket_types` is not read here, and this transform writes no
+  `out/ticket-type-map.tsv`: `ticket_types` is authored fresh through D-119's admin screen, the
+  same way `departments` and `modules` are for training, never migrated (`docs/data-model.md`
+  names it "built by Wave 0 contract... everything else in this module is unbuilt"). If a
+  reservation's ticket type needs resolving against the old estate, that map is written by hand,
+  the same way `out/room-map.tsv` and `out/space-map.tsv` are, not generated by a transform.
 
 ## Why the same person keeps the same id
 
@@ -153,6 +181,6 @@ the rehearsal database and start again.
 
 The old estate's audit history is deliberately not imported (decision 0030).
 
-Remaining transforms (programme, reservations as records) follow the same shape, one file per
-module, as the weekly rehearsals proceed. Bar has nothing to transform: production holds no
+The remaining transform, reservations as records (#840), follows the same shape, one file per
+module. Bar has nothing to transform: production holds no
 stock-movement history to import (K-116, `docs/backlog/K-platform.md`).
