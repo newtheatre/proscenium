@@ -30,9 +30,8 @@ export async function reportAttendance(performanceId: string): Promise<ReportAtt
 
 export interface TenderTotal { tender: string, totalPence: number }
 
-// A performance's own lines for the desk, and the whole show night's for the bar: a bar line
-// never carries a performance_id (F-105 posts a basket for the night, not one house), so the
-// same join that works for the desk always reads zero for the till (F-118).
+// A performance's own lines for the desk; the whole show night's for the bar, since a basket
+// sells for the night and a matinee-plus-evening leaves performance_id null (F-118, E-127).
 type TakingsScope = { performanceId: string } | { night: string }
 
 function scopeWindow(scope: TakingsScope): SQL {

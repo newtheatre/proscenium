@@ -1032,6 +1032,9 @@ change never restates a past sale (criterion 4).
 set with `closed_by` together or not at all, never before `opened_at` (F-102). `expected_total_pence`,
 `actual_z_pence`, `variance_pence` NULL → set together with the close itself, never separately;
 `variance_note` NULL unless the two disagree, in which case it is required (F-118 criterion 3).
+`close.post.ts` is the only writer and enforces both rules; no CHECK does, since one referencing
+these columns would force a rebuild whose generated copying INSERT cannot resolve a column the old
+table never had (0052).
 Partial UNIQUE (`venue_id`, `night`) WHERE `closed_at IS NULL`: at most one *open* session per
 venue per night, so a session once closed stays closed and a fresh one opening later that night is
 a row of its own rather than a reuse. Keys to the night rather than a performance, so one session

@@ -32,7 +32,7 @@ afterAll(async () => {
 const send = (method: string, path: string, body?: unknown, as = bar.cookie): Promise<Response> =>
   fetch(`${app.baseURL}${path}`, {
     method,
-    headers: { 'content-type': 'application/json', cookie: as },
+    headers: { 'content-type': 'application/json', 'cookie': as },
     ...(method === 'GET' ? {} : { body: JSON.stringify(body ?? {}) }),
   })
 

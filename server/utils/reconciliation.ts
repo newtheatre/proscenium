@@ -4,10 +4,8 @@ import { showNightBounds } from '#shared/utils/show-night'
 import type { SQL } from 'drizzle-orm'
 import type { BarReconciliation, NightReconciliation } from '#shared/utils/reconciliation'
 
-// Reconciliation to the expected SumUp Z figure (F-118). Every figure is a query over the ledger
-// for the show night, run fresh, the same discipline F-119's reports keep (criterion 1). Each
-// figure is its own exported query, the night-report's own convention, so a test can run one
-// against an isolated database and the night report (criterion 4) can share the exact SQL.
+// Reconciliation to the expected SumUp Z figure (F-118), run fresh from the ledger for the show
+// night (criterion 1). Each figure is its own exported query, so the night report can share it too.
 
 function windowOf(night: string): { fromAt: number, toAt: number } {
   const { from, to } = showNightBounds(night)

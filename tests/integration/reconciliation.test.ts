@@ -12,9 +12,8 @@ import { boundStatement, createTestDatabase, rows } from '#tests/helpers/databas
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// Reconciliation to the expected SumUp Z figure (F-118), against the real migrations: every
-// figure is its own query over the ledger for the show night, proved here against the schema
-// rather than assumed from the shape of the SQL (0052).
+// Reconciliation to the expected SumUp Z figure (F-118), against the real migrations: proved
+// here against the schema rather than assumed from the shape of the SQL.
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()
