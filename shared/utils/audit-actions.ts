@@ -297,6 +297,9 @@ const CATALOGUE = {
   // Module I: finance
 
   'finance.z-reading.recorded': { label: 'Daily Z reading recorded', module: 'finance' },
+  'finance.period.defined': { label: 'Term defined', module: 'finance' },
+  'finance.period.closed': { label: 'Period closed', module: 'finance' },
+  'finance.period.reopened': { label: 'Period reopened', module: 'finance' },
 
   // Module J: governance
 

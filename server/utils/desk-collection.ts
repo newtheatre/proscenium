@@ -1,7 +1,7 @@
 import { db, schema } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
-import { postEntry } from './ledger'
+import { postEntry, runLedgerBatch } from './ledger'
 import { claimTicketCompRequestForCollection, releaseTicketCompRequestClaim } from './ticket-comps'
 import { auditEntry } from '#shared/utils/audit'
 import { amountDueFor } from '#shared/utils/desk'
@@ -77,7 +77,7 @@ export async function collect(
   ]
 
   try {
-    await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+    await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
   }
   catch (error) {
     // Frees the request rather than losing it to a claim that never became a collection: the

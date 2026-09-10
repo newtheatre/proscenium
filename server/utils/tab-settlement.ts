@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
-import { postEntry } from '#server/utils/ledger'
+import { postEntry, runLedgerBatch } from '#server/utils/ledger'
 import { saysMoney } from '#shared/utils/bar'
 import { MAX_SETTLEMENT_CHARGES } from '#shared/utils/tab-settlement'
 import type { ItemisedTab, TabCharge } from '#shared/utils/tab-settlement'
@@ -164,7 +164,7 @@ export async function settleTab(
   })))
 
   try {
-    await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+    await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
   }
   catch (error) {
     if (error instanceof Error && error.message.includes('ledger_lines.settles_entry_id')) {
@@ -246,7 +246,7 @@ export async function voidTabCharge(
   })))
 
   try {
-    await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+    await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
   }
   catch (error) {
     if (error instanceof Error && (error.message.includes('ledger_entries.void_of_entry_id') || error.message.includes('stock_movements.reverses_id'))) {

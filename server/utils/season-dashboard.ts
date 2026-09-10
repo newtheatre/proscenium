@@ -43,6 +43,12 @@ export function periodBounds(period: PeriodInput): Bounds {
     const to = period.month === 12 ? fromLondonWallClock(period.year + 1, 1, 1) : fromLondonWallClock(period.year, period.month + 1, 1)
     return { fromAt: seconds(from), toAt: seconds(to), fromDay: londonDayOf(from), toDay: londonDayOf(new Date(to.getTime() - 1000)) }
   }
+  if (period.kind === 'TERM') {
+    // The range itself, already resolved by the caller from I-107's own defined term (criterion
+    // 4 of that story): a term has no fixed rule, unlike every other kind here.
+    const toDayExclusive = addDays(period.toDay, 1)
+    return { fromAt: seconds(startOfLondonDay(period.fromDay)), toAt: seconds(startOfLondonDay(toDayExclusive)), fromDay: period.fromDay, toDay: period.toDay }
+  }
   // SEASON: 1 August to 31 July, named by the year it ends in (criterion 1, 0009).
   const from = fromLondonWallClock(period.year - 1, 8, 1)
   const to = new Date(committeeYearEnd(period.year).getTime() + 1)

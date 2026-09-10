@@ -635,8 +635,15 @@
     {
       "idx": 90,
       "version": "6",
-      "when": 1789027892691,
-      "tag": "0090_nasty_winter_soldier",
+      "when": 1789028149000,
+      "tag": "0090_period_locks_are_a_fact_not_a_flag_on_the_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "6",
+      "when": 1789028155875,
+      "tag": "0091_ledger_entries_refuses_a_closed_period",
       "breakpoints": true
     }
   ]

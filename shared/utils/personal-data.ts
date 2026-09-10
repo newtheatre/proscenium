@@ -675,6 +675,24 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // Holds no free text naming anyone: who typed in the reader's figure, and why it differed.
     why: 'Who recorded a day\'s reconciliation is the accountable record (I-104); the tombstone still answers for it.',
   },
+  {
+    name: 'periods',
+    column: 'created_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // The label names a term, not a person: "Autumn term 2026", never a reason or a note.
+    why: 'Who defined a term is the accountable record (I-107); the tombstone still answers for it.',
+  },
+  {
+    name: 'period_locks',
+    column: 'actor_id',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // No free text: from_day, to_day and action are the whole of a close or reopen's own record.
+    why: 'Who closed or reopened a period is the accountable record (I-107); the tombstone still answers for it.',
+  },
 
   // Module J: governance
 

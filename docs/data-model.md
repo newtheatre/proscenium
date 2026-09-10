@@ -813,8 +813,36 @@ F-118's own bar reconciliation (`server/utils/reconciliation.ts`) rather than a 
 of the same figures, adding only the desk's own itemised breakdown.
 
 ### periods
-`id` PK · `kind` CHECK `TERM|SEASON` · `starts_on` · `ends_on` · `closed_at` NULL ·
-`closed_by`. A closed period locks its ledger days; corrections post into the open period.
+`id` PK · `label` · `from_day`, `to_day` (`london_day` format, both inclusive; CHECK
+`to_day >= from_day`) · `created_by` → users restrict · `created_at`. Indexed on
+`(from_day, to_day)`.
+
+**A named term, and only a term: a season needs no row here.** A season's range is computed
+from `committeeYearEnd` (`shared/utils/london.ts`), never stored, the boundary E-126 also reuses
+rather than resolving its own (I-107). A term has no fixed formula, so it is named once, ahead
+of closing it: `POST /api/admin/finance/terms` defines the range, `GET` lists every one, and the
+season dashboard's `TERM` period kind (I-105) reads its bounds from here. Closing a period does
+not reference this table: a lock names a range directly, whether or not that range was ever
+defined as a term.
+
+### period_locks
+`id` PK · `from_day`, `to_day` (`london_day` format, both inclusive; CHECK `to_day >= from_day`) ·
+`label` NULL · `action` CHECK `CLOSED|REOPENED` · `actor_id` → users restrict · `created_at`.
+Indexed on `(from_day, to_day, created_at)`.
+
+**A close is a row appended, never a flag on the ledger it covers (I-107).** Whether a day is
+locked is read off the latest row (by `created_at`) whose range covers it: `CLOSED` refuses,
+`REOPENED` allows, and no row at all is open. Reopening inserts a new `REOPENED` row for the
+same range rather than editing the `CLOSED` one it reopens, and re-closing after that is another
+new row; nothing here supersedes by reference; the "latest row wins" rule already answers which
+one governs.
+
+**`ledger_entries_refuses_a_closed_period`, `BEFORE INSERT ON ledger_entries`, is the actual
+enforcement.** It reads `period_locks` for `NEW.london_day` and raises where the answer is
+`CLOSED`; `server/utils/ledger.ts`'s `runLedgerBatch()` is what every `postEntry()` caller uses
+instead of `db.batch()`, and it is what turns that raise into a 409. A correction posts under
+today's date, in the open period, exactly as any other entry does; only `NEW.london_day` is
+judged, never what a correction names in `reverses_entry_id`.
 
 ## Show night (module E)
 

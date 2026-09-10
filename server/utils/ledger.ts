@@ -2,10 +2,12 @@ import { db, schema } from '@nuxthub/db'
 import { asc, eq, inArray, sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
+import { createError } from 'h3'
 import { newId } from './accounts'
 import { entryForm, londonDayOf, netPence, totalOf } from '#shared/utils/ledger'
+import { CLOSED_PERIOD_TRIGGER } from '#shared/utils/period-locks'
 import type { EntryInput, NettableEntry } from '#shared/utils/ledger'
-import type { BatchItem } from 'drizzle-orm/batch'
+import type { BatchItem, BatchResponse } from 'drizzle-orm/batch'
 import type { SQL } from 'drizzle-orm'
 
 // The only writer of the ledger: `check ledger` refuses any other file that inserts into its
@@ -119,4 +121,18 @@ export async function netOf(entryId: string): Promise<number> {
     .orderBy(asc(schema.ledgerEntries.happenedAt))
 
   return netPence([...rows, ...corrections] as NettableEntry[])
+}
+
+// Every caller batching postEntry()'s statements runs them through this, not db.batch()
+// directly, so a closed period is a 409 everywhere (I-107); anything else rethrows unchanged.
+export async function runLedgerBatch<T extends readonly [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]>(statements: T): Promise<BatchResponse<T>> {
+  try {
+    return await db.batch(statements)
+  }
+  catch (error) {
+    if (error instanceof Error && error.message.includes(CLOSED_PERIOD_TRIGGER)) {
+      throw createError({ statusCode: 409, statusMessage: 'This period is closed: post a correction in the open period instead.' })
+    }
+    throw error
+  }
 }

@@ -237,6 +237,41 @@ Two columns the entry form does not yet carry, because the module that fills the
 F-117 writes. Both are on `ledger_entries` already, so adding them is a change to the form and
 the helper, never to the table (0010).
 
+Every caller batches `postEntry()`'s statements through `runLedgerBatch()`, not `db.batch()`
+directly, so a closed period refuses with a 409 wherever the write is attempted rather than in
+whichever call site remembered to catch it (I-107, and see "Period close" below).
+
+### Period close (I-107)
+
+A period (a term, a season, any range the treasurer names) closes as a row in `period_locks`,
+never as a flag on the entries it covers: closing cannot mutate what it closes, the same rule
+that keeps the ledger itself append-only (0010). The enforcement is a single trigger,
+`ledger_entries_refuses_a_closed_period`, `BEFORE INSERT ON ledger_entries`: a day is locked if
+the latest `period_locks` row covering it (ordered by `created_at`) is `CLOSED`, whatever its
+close and reopen history. `runLedgerBatch()` catches the trigger's refusal and turns it into a
+409; every one of the six modules that call `postEntry()` now goes through it, so a closed period
+is refused at the write for the whole estate, not for whichever caller remembered to check.
+
+Reopening (criterion 4, an administrator only, `finance.reopen`) inserts a new `REOPENED` row for
+the same range rather than editing the `CLOSED` one; re-closing after that is another new row.
+Nothing is ever superseded by reference, because "the latest row for this range" is already a
+well-defined answer without one. The typed confirmation is the range itself, read back from the
+lock being reopened and compared against what the caller submits, the same shape A-123's merge
+confirmation uses.
+
+Closing warns before it commits (criterion 5): `blockingConditionsFor()` lists nights in the
+range with no Z reading at all, and nights whose reading still carries an open variance, both
+read from I-104's own outstanding-night queries rather than reimplemented. A warning is not a
+refusal; the treasurer closes past it if that is the right call.
+
+A term, unlike a season, has no fixed formula, so `periods` (`POST /api/admin/finance/terms`)
+names one ahead of closing it: a label and a range, defined once. `shared/utils/season-dashboard.ts`'s
+`periodBounds()` gains a `TERM` kind that takes the range directly, the same as `DAY` and `WEEK`
+already do, so the file stays a pure function reading nothing from the database itself; the
+caller resolves a term's dates from `GET /api/admin/finance/terms` before asking for its bounds.
+Closing a term reads its range from that same list and posts it through the ordinary close, which
+has no notion of "term" at all: a lock is a range and an optional label, whatever named it.
+
 ### The money paths
 
 The triple every path posts under. A module adding a money path adds a row here in the same pull

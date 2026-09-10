@@ -2,7 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { auditedWrite } from './audit'
 import { configValue } from './configuration'
-import { postEntry } from './ledger'
+import { postEntry, runLedgerBatch } from './ledger'
 import { requireNightAuthority } from './night-authority'
 import { auditEntry } from '#shared/utils/audit'
 import type { Authority } from './authorise'
@@ -67,7 +67,7 @@ export async function refundTicket(input: RefundTicketWriteInput, at = new Date(
     detail: { ticketId: input.ticketId, amountPence: input.pricePaid },
   })
 
-  const [claimed] = await db.batch([
+  const [claimed] = await runLedgerBatch([
     db.all<{ id: string }>(claim),
     ...posted.statements,
     db.run(sql`
