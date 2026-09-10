@@ -522,6 +522,18 @@ natural-key lookup that makes a builder re-runnable is not available. Both doors
 `shared/utils/personas.ts` registry and write the same `personas.json` map, so they agree
 whichever runs first.
 
+## Sending an announcement (H-108)
+
+`/comms/announce`, behind `comms.announce`, composes to an audience resolved fresh from live
+data at send time: all current members, holders of a named role, tonight's rota, or a training
+session's sign-ups (the last taken by id, typed in, since no session picker exists yet). Preview
+before sending: it renders the message and counts the audience without sending anything. Sending
+is one `notify()` call per recipient, so nobody on the list ever sees another's address, and
+writes one audit entry naming the sender, the audience and the count, never the subject or body.
+
+Flagging a safety notice sends it as a different, transactional message type: it ignores the
+announcements preference entirely, the same as a ticket or a refund would.
+
 ## Not built yet
 
 Named here so nobody looks for it: the operator documentation published in-app (J-109), which is
