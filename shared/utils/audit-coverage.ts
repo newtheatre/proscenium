@@ -266,6 +266,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['reservation.cancelled.staff'],
     via: ['server/utils/refunds.ts'],
   },
+  {
+    route: 'server/api/box-office/desk/reservations/[id]/reinstate.post.ts',
+    actions: ['reservation.reinstated'],
+    via: ['server/utils/reservations.ts'],
+  },
 
   // Module E: show night
 

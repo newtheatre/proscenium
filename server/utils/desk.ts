@@ -99,6 +99,10 @@ export interface DeskReservationDetail {
   id: string
   reference: string
   status: string
+  // Null except for a `CANCELLED` booking (D-118 criterion 5): a staff cancellation only ever
+  // follows a refund, so it is never a hold to bring back the way a customer's own is.
+  cancelledBy: string | null
+  holdExpiresAt: number | null
   performanceId: string
   showTitle: string
   startsAt: number
@@ -117,7 +121,8 @@ export interface DeskReservationDetail {
 // what it costs, priced from what each ticket actually snapshotted (D-104), never recomputed.
 export function deskReservationQuery(id: string): SQL {
   return sql`
-    SELECT r.id AS id, r.reference AS reference, r.status AS status, p.id AS performanceId,
+    SELECT r.id AS id, r.reference AS reference, r.status AS status,
+           r.cancelled_by AS cancelledBy, r.hold_expires_at AS holdExpiresAt, p.id AS performanceId,
            s.title AS showTitle, p.starts_at AS startsAt,
            r.user_id AS bookerUserId, u.name AS bookerName, u.email AS bookerEmail
     FROM reservations r

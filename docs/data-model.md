@@ -612,6 +612,25 @@ ticket still holds unrefunded money, quoting the amount (criterion 6); once ever
 refunded it cancels with `cancelled_by = 'STAFF'`. Refunded tickets leave `deskReservation()`'s
 own ticket list immediately (criterion 5), the same filter that already frees capacity.
 
+**Reinstating a lapsed or self-cancelled hold (D-118).** `POST
+/api/box-office/desk/reservations/[id]/reinstate` flips a booking straight back to `PENDING`,
+its tickets never having left the table, so the reference and the QR (D-108) are exactly what
+they always were. The eligible shape is `status = 'EXPIRED' OR (status = 'CANCELLED' AND
+cancelled_by = 'CUSTOMER')`, carried on the same `UPDATE` that also re-checks capacity
+(`capacityAllows()`), so an officer deciding while the house fills loses the write rather than
+the seat (criterion 1, 0003). A staff cancellation is never eligible: D-116's own
+`cancelCollectedReservation` only ever follows a refund, so bringing one back would restore a
+sale already handed back (criterion 5). `reservation_reinstatements` is a new append-only table
+(`reservationId`, `actorId`, `reason`, `previousStatus`, `previousHoldExpiresAt`, `createdAt`),
+chained onto the `UPDATE`'s own `changes()` the same way `postEntry`'s guarded line is, so a
+refused reinstatement leaves neither a history row nor an audit one (criterion 4); the previous
+status and expiry ride onto it so D-106's own record of the lapse is not lost by this write
+overwriting the columns it read from (criterion 2). The fresh hold expiry is computed the same
+way a booking's first one is (`holdExpiresAt()` against `HOLD_RELEASE_MINUTES_BEFORE`). No
+waiting list exists yet to name in criterion 3's refusal: once one does, a claimed offer is
+already an ordinary reservation holding ordinary tickets, which the same live capacity check
+already refuses over, with nothing further to build.
+
 **Self-service while unpaid (D-110).** The QR cookie D-108 already issues is the only credential:
 `PUT /api/qr/tickets` and `POST /api/qr/cancel` act on whichever reservation the cookie names, no
 account session required, since a guest booker has none. Editing sends desired totals per type,
