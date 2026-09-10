@@ -3,7 +3,8 @@ import { Database } from 'bun:sqlite'
 import { buildLoad, applyLoad, loadedCounts } from '#migration/load'
 import { createCore, transformIdentity } from '#migration/identity'
 import { Scrypt } from '@adonisjs/hash/drivers/scrypt'
-import { createTestDatabase, rows } from '#tests/helpers/database'
+import { erasureStatements, tombstoneEmail } from '#shared/utils/erasure'
+import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
 // The import proved on a source it can assert about, against the real schema the migrations build
@@ -220,6 +221,47 @@ describe('the identity import lands in the application schema (K-112)', () => {
     try {
       await importInto(source, target)
       expect(loadedCounts(target.raw)).toMatchObject({ users: 1, role_grants: 0, totp_secrets: 0, recovery_codes: 0 })
+    }
+    finally {
+      target.close()
+      source.close()
+    }
+  })
+
+  // 0011: an anonymised row must never be written back over. The old estate does not know this
+  // person was erased here, so a weekly export still shows them live with their old credentials.
+  test('a person erased here stays erased on the next weekly import, credentials included', async () => {
+    const source = sourceEstate()
+    addPerson(source, { id: 'old-1', email: 'erased-independently@example.invalid' })
+    source.query('INSERT INTO totp_secrets VALUES (?, ?, ?, ?, ?)')
+      .run('old-1', 'SECRET', 1700000000, null, 1700000000)
+    source.query('INSERT INTO mfa_recovery_codes VALUES (?, ?, ?)')
+      .run('old-1', 'hash-of-a-recovery-code', null)
+    source.query('INSERT INTO user_roles VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('old-1', 'auth:ADMIN', null, null, 1700000000, null, null)
+
+    const target = await createTestDatabase()
+    try {
+      const first = await importInto(source, target)
+      const userId = rows<{ id: string }>(target, 'SELECT id FROM users')[0]!.id
+      expect(rows(target, 'SELECT 1 FROM totp_secrets WHERE user_id = ?', userId)).toHaveLength(1)
+      expect(rows(target, 'SELECT 1 FROM recovery_codes WHERE user_id = ?', userId)).toHaveLength(1)
+
+      // Erased in the unified system, entirely independent of the old estate, which never hears
+      // about it: this is what a tombstone looks like when the source has not caught up.
+      target.batch(erasureStatements(userId, 1780000000).map(statement => boundStatement(target, statement)))
+
+      // The same, unchanged source: the old estate still has the live secret and recovery code.
+      await importInto(source, target, first.ids)
+
+      const person = rows<{ email: string, name: string, anonymised: number | null }>(
+        target, 'SELECT email, name, anonymised_at AS anonymised FROM users WHERE id = ?', userId,
+      )[0]!
+      expect(person.anonymised).toBe(1780000000)
+      expect(person.email).toBe(tombstoneEmail(userId))
+      expect(person.name).toBe('Deleted user')
+      expect(rows(target, 'SELECT 1 FROM totp_secrets WHERE user_id = ?', userId)).toHaveLength(0)
+      expect(rows(target, 'SELECT 1 FROM recovery_codes WHERE user_id = ?', userId)).toHaveLength(0)
     }
     finally {
       target.close()

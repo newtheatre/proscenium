@@ -101,7 +101,12 @@ step is offline against the dumps.
 - **Load** (K-112 criterion 4): turns the core into `out/load.sql`, upserts keyed on identity, and
   applies it to a local target when given one. It never deletes, so a person or a grant that
   vanished upstream stays until somebody decides; and it never touches production, which is applied
-  by hand from the runbook in `docs/operations.md`.
+  by hand from the runbook in `docs/operations.md`. **It never writes to a person already
+  anonymised in the target** (K-112 criterion 3, 0011): every generated statement, for every
+  table the loader owns, carries `WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = ... AND
+  anonymised_at IS NOT NULL)`, so a rehearsal or a weekly run that reads a stale, pre-erasure
+  export from the old estate cannot reinstate a deleted `totp_secrets` or `recovery_codes` row,
+  or rewrite the `users` row itself, for someone erased here since the export was taken.
 - **Money** (K-114, I-109): six years of ticket revenue as opening ledger history, from `tickets`,
   never `transactions`, which the old estate holds one row in across its whole life; the price
   lived on the ticket (`price_paid`), not in a separate ledger table. `reservations` is not read:
