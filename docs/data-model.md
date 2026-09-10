@@ -839,11 +839,28 @@ against the data the check names, never stored (E-114 criterion 3).
 own close. The close-night action itself (E-114 criterion 4); blocked while a required item
 across either phase is neither ticked nor exempted.
 
-### night_reports
-`performance_id` PK → performances restrict · `payload` JSON (attendance, takings by tender,
-incidents, milestones, staffing, bar summary, access counts only) · `closing_note` ·
-`closed_by` NULL (auto-close) · `auto_closed` bool · `closed_at` · `emailed_at` NULL = retry
-queue. UNIQUE by PK makes closing idempotent.
+### night_reports  APPEND-ONLY
+`id` PK · `performance_id` → performances restrict, UNIQUE · `venue_id` → venues restrict ·
+`night` · `closing_note` · `report` JSON, snapshotted at sign-off (attendance, takings by
+tender, incidents, milestones, staffing, bar summary, access counts only), never recomputed ·
+`signed_by` → users restrict · `signed_via` CHECK `SHIFT|OFFICER` · `signed_at`. The UNIQUE on
+`performance_id` makes sign-off idempotent: a second attempt for the same performance inserts
+nothing (E-124 criterion 1). E-125's auto-close, still unbuilt, will need `signed_by` to accept
+no human signatory; that is its own migration, not guessed ahead of it here.
+
+### night_report_addenda  APPEND-ONLY
+`id` PK · `report_id` → night_reports restrict · `note` · `added_by` → users restrict ·
+`added_at`. A correction to a frozen report is a new row naming what it corrects, never an edit
+to `night_reports` itself (E-124 criterion 5); more than one addendum is allowed.
+
+### night_report_deliveries  APPEND-ONLY
+`id` PK · `report_id` → night_reports restrict · `addendum_id` → night_report_addenda restrict,
+NULL (the original send has none) · `recipient` (an email address, not a `users` FK: the
+configured standing list and the closer's own address both land here) · `status` CHECK
+`SENT|FAILED` · `error` NULL · `sent_at` NULL · `created_at`. One row per delivery attempt per
+recipient, never updated: a retry is a new row, the same shape as every other append-only trail
+in this module (E-124 criterion 4). Automatic retry-until-delivered and the operations-dashboard
+surfacing are H-105 and H-106's own build; today a failed send stops after the one attempt.
 
 ### backstage_nights
 `id` PK · `venue_id` → venues restrict · `night` · `epoch` (starts at 0, only ever increases) ·
