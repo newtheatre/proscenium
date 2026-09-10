@@ -1497,6 +1497,26 @@ ${body}
 The Nottingham New Theatre`,
     }
   },
+
+  // One topic's coalesced entries, every change kept individually visible even though the send
+  // is one (H-104 criterion 1). `entries` is what the sweep claimed off notification_digest_entries.
+  'notification-digest': (context: TemplateContext): Rendered => {
+    const entries = context.entries as { subject: string, body: string }[]
+    const noun = String(context.noun)
+    return {
+      subject: plural(entries.length, noun.charAt(0).toUpperCase() + noun.slice(1)),
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${plural(entries.length, noun)} since the last email:</p>
+<ul>${entries.map(entry => `<li><strong>${entry.subject}</strong><br>${entry.body.replace(/\n/g, '<br>')}</li>`).join('')}</ul>`),
+      text: `Hello ${context.name},
+
+${plural(entries.length, noun)} since the last email:
+
+${entries.map(entry => `- ${entry.subject}\n  ${entry.body.split('\n').join('\n  ')}`).join('\n\n')}
+
+The Nottingham New Theatre`,
+    }
+  },
 } as const
 
 export type TemplateName = keyof typeof TEMPLATES

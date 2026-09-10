@@ -9,9 +9,10 @@ import { MAILBOX, writeToMailbox } from './mailbox'
 import { preferenceDefaults, storedPreferences } from './notification-preferences'
 import { render } from './templates'
 import { undeliverableReason } from '#shared/utils/deliverability'
-import { deliversOn, isMessageType, isTransactional, messageType, outOfAttempts } from '#shared/utils/notifications'
+import { deliversOn, isMessageType, isTransactional, joinsDigest, messageType, outOfAttempts } from '#shared/utils/notifications'
 import { formatSender, senderForTopic, SENDERS } from '#shared/utils/senders'
 import type { Channel, MessageType, NotificationStatus } from '#shared/utils/notifications'
+import type { NotificationTopic } from '#shared/utils/senders'
 import type { TemplateContext } from '#server/utils/templates'
 import type { H3Event } from 'h3'
 
@@ -93,13 +94,21 @@ export interface Notification {
   // The key(s) claimNotification() was called with. Present, notify() updates that row (or, for
   // a digest, every claimed row) to its outcome instead of inserting a second one (0048).
   claim?: string | string[]
+  // The row id a caller already reserved, so an unclaimed insert lands at a known id: only the
+  // digest sweep uses this, claiming entries against the id before sending under it (H-104).
+  id?: string
 }
 
 // The terminal outcomes of one send. `PENDING` is claimNotification()'s and `RETRYING` is
 // H-105's, so neither is an answer notify() ever returns (0048).
 type Status = Exclude<NotificationStatus, 'PENDING' | 'RETRYING'>
 
+// A coalescible message that joined a digest instead of sending writes no send-log row of its
+// own; the digest entry is where it lives until the digest sends (H-104 criterion 5).
+export type Outcome = Status | 'HELD_FOR_DIGEST'
+
 interface Recorded {
+  id?: string
   userId: string | null
   type: string
   channel: Channel
@@ -139,12 +148,25 @@ async function record(entry: Recorded): Promise<void> {
   }
 
   await db.insert(schema.notificationLog).values({
-    id: crypto.randomUUID().replaceAll('-', ''),
+    id: entry.id ?? crypto.randomUUID().replaceAll('-', ''),
     userId: entry.userId,
     type: entry.type,
     channel: entry.channel,
     attempts: spent,
     ...shared,
+  })
+}
+
+// Held for the next digest send rather than emailed now: an entry the sweep will claim once the
+// topic's window has passed (H-104 criteria 1, 2).
+async function holdForDigest(entry: { userId: string, topic: NotificationTopic, type: string, subject: string, body: string }): Promise<void> {
+  await db.insert(schema.notificationDigestEntries).values({
+    id: crypto.randomUUID().replaceAll('-', ''),
+    userId: entry.userId,
+    topic: entry.topic,
+    type: entry.type,
+    subject: entry.subject,
+    body: entry.body,
   })
 }
 
@@ -377,13 +399,13 @@ export async function claimHeld(key: string): Promise<boolean> {
 
 // Sends one message. Every outcome is logged, including the ones that never reach a provider,
 // so a silence is always explained somewhere.
-export async function notify(event: H3Event | undefined, notification: Notification): Promise<Status> {
+export async function notify(event: H3Event | undefined, notification: Notification): Promise<Outcome> {
   const type = messageType(notification.type)
 
   // Read at send time, not at enqueue: an address changed in between reaches the new one
   // (H-101 criterion 5).
   const account = await findById(notification.userId)
-  const logged = { userId: notification.userId, type: notification.type, channel: 'EMAIL' as Channel, claim: notification.claim }
+  const logged = { id: notification.id, userId: notification.userId, type: notification.type, channel: 'EMAIL' as Channel, claim: notification.claim }
 
   if (!account) {
     await record({ ...logged, userId: null, status: 'SKIPPED_UNDELIVERABLE', error: 'no-account' })
@@ -415,6 +437,17 @@ export async function notify(event: H3Event | undefined, notification: Notificat
   if (!await emailIsWanted(event, type, account.id)) {
     await record({ ...logged, status: 'SUPPRESSED_PREFERENCE' })
     return 'SUPPRESSED_PREFERENCE'
+  }
+
+  if (joinsDigest(type, Boolean(notification.claim), Boolean(notification.attachments?.length))) {
+    await holdForDigest({
+      userId: account.id,
+      topic: type.topic!,
+      type: notification.type,
+      subject: rendered.subject,
+      body: rendered.text,
+    })
+    return 'HELD_FOR_DIGEST'
   }
 
   const attachments = notification.attachments ?? []

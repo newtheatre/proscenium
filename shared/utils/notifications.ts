@@ -430,6 +430,14 @@ export const MESSAGE_TYPES = {
     template: 'admin-announcement',
   },
 
+  // One per topic, never coalesced itself: `topic: null` keeps a digest out of `notify()`'s own
+  // hold branch, and no INBOX channel, since those entries already went out individually (H-104).
+  'digest.bookings': { topic: null, channels: ['EMAIL'], template: 'notification-digest', sender: 'BOX_OFFICE' },
+  'digest.shifts': { topic: null, channels: ['EMAIL'], template: 'notification-digest', sender: 'ANNOUNCEMENTS' },
+  'digest.training': { topic: null, channels: ['EMAIL'], template: 'notification-digest', sender: 'TRAINING' },
+  'digest.rooms': { topic: null, channels: ['EMAIL'], template: 'notification-digest', sender: 'ROOMS' },
+  'digest.announcements': { topic: null, channels: ['EMAIL'], template: 'notification-digest', sender: 'ANNOUNCEMENTS' },
+
   // Module I: finance
 
   // Module J: governance
@@ -483,6 +491,12 @@ export function isTransactional(type: MessageType): boolean {
   return type.topic === null
 }
 
+// `topic: null` means a deadline a digest interval would eat (a hold, an offer), so transactional
+// never coalesces; a claim or an attachment bypass it for their own reasons (H-104, 0061).
+export function joinsDigest(type: MessageType, hasClaim: boolean, hasAttachment: boolean): boolean {
+  return !hasClaim && !isTransactional(type) && !hasAttachment
+}
+
 export interface Preference {
   topic: NotificationTopic
   email: boolean
@@ -492,6 +506,24 @@ export interface Preference {
 // The five topics, in the order the preference screen shows them. Changing the list is a
 // migration, not a setting: the topic check is on the table (0025, H-102 criterion 1).
 export const NOTIFICATION_TOPICS = ['BOOKINGS', 'SHIFTS', 'TRAINING', 'ROOMS', 'ANNOUNCEMENTS'] as const satisfies readonly NotificationTopic[]
+
+// The one registered digest type per topic, and the noun a coalesced subject line names
+// (H-104 criterion 1).
+export const DIGEST_TYPE_FOR_TOPIC: Record<NotificationTopic, MessageTypeName> = {
+  BOOKINGS: 'digest.bookings',
+  SHIFTS: 'digest.shifts',
+  TRAINING: 'digest.training',
+  ROOMS: 'digest.rooms',
+  ANNOUNCEMENTS: 'digest.announcements',
+}
+
+export const DIGEST_TOPIC_NOUN: Record<NotificationTopic, string> = {
+  BOOKINGS: 'booking update',
+  SHIFTS: 'shift update',
+  TRAINING: 'training update',
+  ROOMS: 'room booking update',
+  ANNOUNCEMENTS: 'announcement',
+}
 
 // Every outcome a send-log row may hold. The status carries the outcome; `error` carries the
 // provider's own words where there are any (H-102 criterion 3, H-105 criterion 1).
