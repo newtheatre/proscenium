@@ -86,14 +86,16 @@ The identity import is rehearsed weekly and applied once, at cutover. Everything
 runs offline against dumps, and nothing in `migration/` can write to a remote database
 (`migration/README.md`).
 
-A rehearsal, which is what `bun run migration:dry-run` does after `bun run migration:export`:
+A rehearsal, which is what `bun run migration:dry-run <target>` does after `bun run migration:export`,
+against a target that already carries the real application schema (`migration/README.md`):
 
 1. `inventory.ts` records per-table counts and domain checksums from the dumps.
 2. `transform-identity.ts` builds `out/unified.sqlite`, reusing `out/id-map.tsv` so the same person
    keeps the id they were given last week.
 3. `reconcile.ts` verifies the counts and the invariants, and **exits non-zero** on any failure.
-4. `load.ts` writes `out/load.sql` and, given a local path, applies it there and reports the row
-   count per table.
+4. `load.ts` writes `out/load.sql` and applies it to the target, reporting the row count per table.
+5. `transform-bookings.ts` and `transform-money.ts` run against the same target, now that the
+   users `room_bookings` and `ledger_entries` key to already exist there.
 
 The load upserts on identity and **never deletes**: a person or a grant that disappeared upstream
 stays until somebody decides what should happen to them.
