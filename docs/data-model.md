@@ -756,10 +756,22 @@ reasoning `product_variant_id` carries.
 Which source, tender and kind each money path posts under is the table in `architecture.md`
 under Money and the ledger. A path not in that table has not been agreed.
 
-### z_readings
-`london_day` PK · `reader_pence` (typed from the SumUp display) · `expected_pence` (computed
-at entry, snapshot) · `variance_pence` · `entered_by` · `note` · `created_at`. The daily
-reconciliation record (I-104); a variance is a fact to explain, not an error to suppress.
+### z_readings  APPEND-ONLY
+`id` PK · `night` (the show night, 04:00 to 04:00 London, the same label `till_sessions.night`
+carries: the reader is read once a night, not once a calendar day, so this is never
+`ledger_entries.london_day`) · `reader_pence` (typed from the SumUp display) · `expected_pence`
+(computed at entry, snapshot, never recomputed later) · `variance_pence`
+(`reader_pence - expected_pence`) · `entered_by` → users restrict · `note` NULL, mandatory
+whenever `variance_pence` is not zero · `supersedes_id` NULL, no foreign key (the same
+append-only reasoning as the ledger's own self-references), unique where not null so a reading
+resolves once · `written_off` (a real, nonzero variance accepted rather than restated as zero;
+always names what it resolves) · `created_at`. The daily reconciliation record (I-104); a
+variance is a fact to explain, not an error to suppress, and a correction or a write-off is a
+new row naming the one it resolves, never an edit (0010). Unique where `supersedes_id IS NULL`,
+one per `night`, so a racing second first-reading for a night collides rather than forking the
+chain. `server/utils/night-reconciliation.ts` builds the whole-night expected figure from
+F-118's own bar reconciliation (`server/utils/reconciliation.ts`) rather than a second account
+of the same figures, adding only the desk's own itemised breakdown.
 
 ### periods
 `id` PK · `kind` CHECK `TERM|SEASON` · `starts_on` · `ends_on` · `closed_at` NULL ·
