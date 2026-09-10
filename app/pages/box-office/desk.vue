@@ -37,6 +37,7 @@ interface TicketLine {
   ticketId: string
   ticketTypeName: string
   pricePaid: number
+  accessKind: 'ACCESS' | 'COMPANION' | null
 }
 
 interface ReservationDetail {
@@ -48,6 +49,7 @@ interface ReservationDetail {
   bookerName: string
   bookerEmail: string
   tickets: TicketLine[]
+  doorWording: string | null
 }
 
 const toast = useToast()
@@ -385,13 +387,32 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
             :description="collectFailure"
           />
 
+          <UAlert
+            v-if="selected.doorWording"
+            color="info"
+            variant="subtle"
+            icon="i-lucide-accessibility"
+            :description="selected.doorWording"
+            data-test="desk-door-wording"
+          />
+
           <ul class="space-y-1 text-sm">
             <li
               v-for="ticket in selected.tickets"
               :key="ticket.ticketId"
               class="flex justify-between"
             >
-              <span>{{ ticket.ticketTypeName }}</span>
+              <span>
+                {{ ticket.ticketTypeName }}
+                <UBadge
+                  v-if="ticket.accessKind"
+                  size="sm"
+                  variant="subtle"
+                  color="info"
+                >
+                  {{ ticket.accessKind === 'ACCESS' ? 'Access' : 'Companion' }}
+                </UBadge>
+              </span>
               <span>{{ saysPrice(ticket.pricePaid) }}</span>
             </li>
           </ul>

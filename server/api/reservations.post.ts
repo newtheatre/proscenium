@@ -1,3 +1,4 @@
+import { accessEntitlementRefusal, isEntitledToAccessTickets } from '#shared/utils/access-profiles'
 import { saleRefusal } from '#shared/utils/programme'
 import {
   RESERVATION_EMAIL_LIMIT,
@@ -70,15 +71,29 @@ export default defineEventHandler(async (event) => {
   if (capRefusal) throw createError({ statusCode: 400, statusMessage: capRefusal })
 
   // Re-checked here, not trusted from the booking screen's own read: a membership can lapse
-  // between the two (D-109 criterion 1).
+  // between the two (D-109 criterion 1). A guest never holds a profile, so never entitled.
   const isMember = account ? await hasCurrentMembership(event, account.id, new Date()) : false
-  const resolved = new Map((await bookableTicketTypes(input.performanceId, performance.showId, isMember)).map(type => [type.id, type]))
+  const now = Math.floor(Date.now() / 1000)
+  const profile = account ? await accessEntitlementProfile(account.id) : null
+  const entitled = isEntitledToAccessTickets(profile, now)
+  const resolved = new Map((await bookableTicketTypes(input.performanceId, performance.showId, isMember, entitled)).map(type => [type.id, type]))
 
   const lines = input.lines.map((line) => {
     const type = resolved.get(line.ticketTypeId)
     if (!type) throw createError({ statusCode: 400, statusMessage: 'No such ticket type for this performance' })
-    return { ticketTypeId: type.id, quantity: line.quantity, pricePaid: type.price, priceSource: type.source }
+    return { ticketTypeId: type.id, quantity: line.quantity, pricePaid: type.price, priceSource: type.source, accessKind: type.accessKind }
   })
+
+  const requestedAccess = { access: 0, companion: 0 }
+  for (const line of lines) {
+    if (line.accessKind === 'ACCESS') requestedAccess.access += line.quantity
+    if (line.accessKind === 'COMPANION') requestedAccess.companion += line.quantity
+  }
+  if (requestedAccess.access > 0 || requestedAccess.companion > 0) {
+    const held = await heldAccessCounts(account!.id, input.performanceId)
+    const entitlementRefusal = accessEntitlementRefusal(requestedAccess, held, profile?.companions ?? 0)
+    if (entitlementRefusal) throw createError({ statusCode: 409, statusMessage: entitlementRefusal })
+  }
 
   const capacity = effectiveCapacity(performance)
   const booker = account ? { id: account.id } : await guestAccount(email, name)

@@ -10,6 +10,12 @@ interface BookableTicketType {
   name: string
   description: string | null
   price: number
+  accessKind: 'ACCESS' | 'COMPANION' | null
+}
+
+interface AccessEntitlement {
+  access: number
+  companion: number
 }
 
 interface BookingInfo {
@@ -18,6 +24,7 @@ interface BookingInfo {
   refusal: { reason: string, says: string, closedAt?: number, externalBookingUrl?: string } | null
   cap: number
   ticketTypes: BookableTicketType[]
+  accessEntitlement: AccessEntitlement | null
 }
 
 interface Confirmation {
@@ -46,6 +53,15 @@ const lines = computed(() => Object.entries(quantities)
   .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity })))
 
 const capReason = computed(() => (data.value ? overCapReason(lines.value, data.value.cap) : null))
+
+// An access or companion row's own remaining entitlement, never the general order cap: the
+// whole point is a limit of one and a limit of the verified number (D-128 criteria 1, 2).
+function maxFor(type: BookableTicketType): number {
+  const entitlement = data.value?.accessEntitlement
+  if (type.accessKind === 'ACCESS' && entitlement) return Math.min(data.value!.cap, entitlement.access)
+  if (type.accessKind === 'COMPANION' && entitlement) return Math.min(data.value!.cap, entitlement.companion)
+  return data.value!.cap
+}
 
 const totalPence = computed(() => lines.value.reduce((total, line) => {
   const type = data.value?.ticketTypes.find(one => one.id === line.ticketTypeId)
@@ -176,6 +192,15 @@ useSeoMeta({ title: 'Book tickets' })
         Book elsewhere
       </UButton>
 
+      <UAlert
+        v-if="data!.accessEntitlement"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-accessibility"
+        :description="`Your access entitlement: ${data!.accessEntitlement.access} access ticket and up to ${data!.accessEntitlement.companion} companion ticket(s) still available for this performance.`"
+        data-test="access-entitlement"
+      />
+
       <UCard>
         <template #header>
           <h2 class="font-semibold">
@@ -193,6 +218,14 @@ useSeoMeta({ title: 'Book tickets' })
             <div>
               <p class="font-medium">
                 {{ type.name }}
+                <UBadge
+                  v-if="type.accessKind"
+                  size="sm"
+                  variant="subtle"
+                  color="info"
+                >
+                  {{ type.accessKind === 'ACCESS' ? 'Access' : 'Companion' }}
+                </UBadge>
               </p>
               <p
                 v-if="type.description"
@@ -207,7 +240,7 @@ useSeoMeta({ title: 'Book tickets' })
             <UInputNumber
               v-model="quantities[type.id]"
               :min="0"
-              :max="data!.cap"
+              :max="maxFor(type)"
               class="w-28"
               :data-test="`quantity-${type.id}`"
             />

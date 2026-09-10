@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   bookableTicketTypesQuery,
   currentTicketLinesQuery,
+  heldAccessCountsQuery,
   namedTicketLinesQuery,
   reservationCurrentStateQuery,
   reservationForResendQuery,
@@ -44,22 +45,38 @@ describe('bookableTicketTypesQuery reads restricted_to alongside the price chain
         ['INSERT INTO ticket_types (id, name, price, kind, restricted_to) VALUES (?, ?, ?, ?, ?)', 'tt-member', 'Member', 500, 'SINGLE', 'MEMBER'],
       ])
 
-      const found = read<BookableTicketTypeRow>(database, bookableTicketTypesQuery(seeded.performanceId, seeded.showId))
+      const found = read<BookableTicketTypeRow>(database, bookableTicketTypesQuery(seeded.performanceId, seeded.showId, false))
       expect(found.map(row => row.id).sort()).toEqual(['tt-member', 'tt-standard'])
       expect(found.find(row => row.id === 'tt-member')?.restrictedTo).toBe('MEMBER')
       expect(found.find(row => row.id === 'tt-standard')?.restrictedTo).toBeNull()
     })
   })
 
-  test('an access or companion type never appears, whatever it is restricted to', async () => {
+  test('an access or companion type never appears for a caller with no entitlement, whatever it is restricted to', async () => {
     await withDatabase((database) => {
       const seeded = tonightsPerformance(database)
       database.batch([
         ['INSERT INTO ticket_types (id, name, price, kind, access_kind) VALUES (?, ?, ?, ?, ?)', 'tt-access', 'Access', 0, 'SINGLE', 'ACCESS'],
       ])
 
-      const found = read<BookableTicketTypeRow>(database, bookableTicketTypesQuery(seeded.performanceId, seeded.showId))
+      const found = read<BookableTicketTypeRow>(database, bookableTicketTypesQuery(seeded.performanceId, seeded.showId, false))
       expect(found).toEqual([])
+    })
+  })
+
+  test('an access or companion type appears once the caller is entitled to be offered one (D-128 criterion 1)', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind, access_kind) VALUES (?, ?, ?, ?, ?)', 'tt-access', 'Access', 700, 'SINGLE', 'ACCESS'],
+        ['INSERT INTO ticket_types (id, name, price, kind, access_kind) VALUES (?, ?, ?, ?, ?)', 'tt-companion', 'Companion', 0, 'SINGLE', 'COMPANION'],
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
+      ])
+
+      const found = read<BookableTicketTypeRow>(database, bookableTicketTypesQuery(seeded.performanceId, seeded.showId, true))
+      expect(found.map(row => row.id).sort()).toEqual(['tt-access', 'tt-companion', 'tt-standard'])
+      expect(found.find(row => row.id === 'tt-access')?.accessKind).toBe('ACCESS')
+      expect(found.find(row => row.id === 'tt-companion')?.accessKind).toBe('COMPANION')
     })
   })
 
@@ -72,9 +89,44 @@ describe('bookableTicketTypesQuery reads restricted_to alongside the price chain
           'po-1', seeded.performanceId, 'tt-standard', 500],
       ])
 
-      const [found] = read<BookableTicketTypeRow>(database, bookableTicketTypesQuery(seeded.performanceId, seeded.showId))
+      const [found] = read<BookableTicketTypeRow>(database, bookableTicketTypesQuery(seeded.performanceId, seeded.showId, false))
       expect(found?.performancePrice).toBe(500)
       expect(found?.showPrice).toBeNull()
+    })
+  })
+})
+
+describe('what a booker already holds against a performance, any source (D-128 criterion 2)', () => {
+  test('access and companion tickets are counted separately, refunded and non-holding ones excluded', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'booker@example.invalid')
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind, access_kind) VALUES (?, ?, ?, ?, ?)', 'tt-access', 'Access', 700, 'SINGLE', 'ACCESS'],
+        ['INSERT INTO ticket_types (id, name, price, kind, access_kind) VALUES (?, ?, ?, ?, ?)', 'tt-companion', 'Companion', 0, 'SINGLE', 'COMPANION'],
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-1', 'AB1234', seeded.performanceId, 'u-1', 'PENDING', 'WEB'],
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+          't-1', 'r-1', seeded.performanceId, 'tt-access', 700, 'BASE'],
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+          't-2', 'r-1', seeded.performanceId, 'tt-companion', 0, 'BASE'],
+        // A desk-sourced reservation counts too: entitlement is channel-blind (criterion 2).
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-2', 'CD5678', seeded.performanceId, 'u-1', 'COLLECTED', 'DESK'],
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+          't-3', 'r-2', seeded.performanceId, 'tt-companion', 0, 'BASE'],
+        // A refunded ticket and a cancelled reservation's ticket hold nothing.
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-3', 'EF9012', seeded.performanceId, 'u-1', 'CANCELLED', 'WEB'],
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+          't-4', 'r-3', seeded.performanceId, 'tt-companion', 0, 'BASE'],
+      ])
+      database.query('UPDATE tickets SET refunded_at = ? WHERE id = ?').run(1_800_000_000, 't-2')
+
+      const found = read<{ accessKind: string, n: number }>(database, heldAccessCountsQuery('u-1', seeded.performanceId))
+      const byKind = Object.fromEntries(found.map(row => [row.accessKind, Number(row.n)]))
+      expect(byKind.ACCESS).toBe(1)
+      expect(byKind.COMPANION).toBe(1)
     })
   })
 })

@@ -73,6 +73,24 @@ describe('kind and access kind are set once (criterion 2)', () => {
   })
 })
 
+describe('a companion ticket is always free (D-128 criterion 3)', () => {
+  test('a companion type at any price above nought is refused', () => {
+    expect(newTicketTypeForm.safeParse({ name: 'Companion', price: 1, accessKind: 'COMPANION' }).success).toBe(false)
+  })
+
+  test('a companion type priced at nought is accepted', () => {
+    expect(newTicketTypeForm.safeParse({ name: 'Companion', price: 0, accessKind: 'COMPANION' }).success).toBe(true)
+  })
+
+  test('an access type carries no such restriction', () => {
+    expect(newTicketTypeForm.safeParse({ name: 'Access', price: 700, accessKind: 'ACCESS' }).success).toBe(true)
+  })
+
+  test('an ordinary type carries no such restriction', () => {
+    expect(newTicketTypeForm.safeParse({ name: 'Standard', price: 700 }).success).toBe(true)
+  })
+})
+
 describe('an access or companion type is never in a public payload (criterion 4)', () => {
   const types = [
     type(),

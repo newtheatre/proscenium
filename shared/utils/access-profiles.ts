@@ -110,6 +110,41 @@ export function effectiveStatus(row: { status: AccessProfileStatus, expiresAt: n
   return row.status
 }
 
+// Booking eligibility is the door's own three gates, minus the wording itself (D-128 criterion
+// 1): verified, consented and unexpired, the same three `doorWording` asks before it answers.
+export function isEntitledToAccessTickets(profile: {
+  status: AccessProfileStatus
+  consentFohAt: number | null
+  expiresAt: number | null
+} | null, now: number): boolean {
+  if (!profile) return false
+  if (effectiveStatus(profile, now) !== 'VERIFIED') return false
+  return profile.consentFohAt !== null
+}
+
+export const MAX_ACCESS_TICKETS_PER_PERFORMANCE = 1
+
+export interface AccessEntitlementCounts {
+  access: number
+  companion: number
+}
+
+// Named, never the profile's contents (D-128 criterion 5): refuses on the number the desk or the
+// booking form already quoted, whichever gate the requested lines would cross first.
+export function accessEntitlementRefusal(
+  requested: AccessEntitlementCounts,
+  held: AccessEntitlementCounts,
+  maxCompanions: number,
+): string | null {
+  if (requested.access + held.access > MAX_ACCESS_TICKETS_PER_PERFORMANCE) {
+    return `Only ${MAX_ACCESS_TICKETS_PER_PERFORMANCE} access ticket may be held for this performance.`
+  }
+  if (requested.companion + held.companion > maxCompanions) {
+    return `Only ${maxCompanions} companion ticket${maxCompanions === 1 ? '' : 's'} may be held for this performance.`
+  }
+  return null
+}
+
 // What a stored row's `status` column reads as: a CHECK constraint holds it to the five values
 // at write time, so a cast here only ever restates what the database has already enforced.
 export function asAccessProfileStatus(value: string): AccessProfileStatus {

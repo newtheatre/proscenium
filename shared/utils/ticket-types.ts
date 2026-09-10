@@ -36,7 +36,10 @@ export const newTicketTypeForm = ticketTypeForm.extend({
   kind: z.enum(TICKET_TYPE_KINDS).default('SINGLE'),
   accessKind: z.enum(TICKET_TYPE_ACCESS_KINDS).nullish(),
   restrictedTo: z.enum(TICKET_TYPE_RESTRICTIONS).nullish(),
-})
+}).refine(
+  input => input.accessKind !== 'COMPANION' || input.price === 0,
+  { message: 'A companion ticket is always free', path: ['price'] },
+)
 
 export const archiveTicketTypeForm = z.object({
   archived: z.boolean(),
