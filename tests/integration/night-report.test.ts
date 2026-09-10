@@ -127,7 +127,7 @@ describe('takings (criteria 1, 2)', () => {
       entry(database, 'e-bar-discount', 'TILL', 'CARD')
       line(database, 'l-bar-discount', 'e-bar-discount', tonight.performanceId, 380, 20)
 
-      const [row] = read<{ compsPence: number, discountsPence: number }>(database, reportForegoneQuery(tonight.performanceId, 'TILL'))
+      const [row] = read<{ compsPence: number, discountsPence: number }>(database, reportForegoneQuery({ night: tonight.night }, 'TILL'))
       expect(row).toMatchObject({ compsPence: 450, discountsPence: 20 })
     })
   })
