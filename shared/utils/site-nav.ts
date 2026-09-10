@@ -14,6 +14,7 @@ import {
   viewBarStock,
   viewBoardConfig,
   viewChecklist,
+  viewCommsOperations,
   viewEmergencyCard,
   viewFellows,
   viewFinanceReports,
@@ -178,6 +179,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     prefix: '/comms',
     items: [
       { label: 'Announce', icon: 'i-lucide-megaphone', to: '/comms/announce', ability: sendAnnouncements },
+      { label: 'Send log', icon: 'i-lucide-list', to: '/comms/operations', ability: viewCommsOperations },
     ],
   },
 
