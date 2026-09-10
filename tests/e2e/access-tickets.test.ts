@@ -114,14 +114,14 @@ async function bookableShow(): Promise<{ showId: string, performanceId: string, 
   return { showId, performanceId, ticketTypeId, accessTypeId, companionTypeId }
 }
 
-function ledgerLineForType(ticketTypeId: string): { amountPence: number } | undefined {
+function ledgerLineForType(ticketTypeId: string): { amountPence: number, performanceId: string | null } | undefined {
   const database = new Database(app.databaseFile, { readonly: true })
   try {
     return database.query(`
-      SELECT l.amount_pence AS amountPence FROM ledger_lines l
+      SELECT l.amount_pence AS amountPence, l.performance_id AS performanceId FROM ledger_lines l
       JOIN tickets t ON t.id = l.ticket_id
       WHERE t.ticket_type_id = ?
-    `).get(ticketTypeId) as { amountPence: number } | undefined
+    `).get(ticketTypeId) as { amountPence: number, performanceId: string | null } | undefined
   }
   finally {
     database.close()
@@ -186,7 +186,11 @@ describe.skipIf(skip !== null)('companion tickets price at zero (criterion 3)', 
     const collected = await send('POST', `/api/box-office/desk/reservations/${results[0]!.id}/collect`, { expectedTotalPence: totalPence, tender: 'CARD' }, boxOffice.cookie)
     expect(collected.status).toBe(200)
 
-    expect(ledgerLineForType(companionTypeId)?.amountPence).toBe(0)
+    const line = ledgerLineForType(companionTypeId)
+    expect(line?.amountPence).toBe(0)
+    // Everything record-like keys to a performance (CLAUDE.md): a companion admission is exactly
+    // that, and must be findable by the night it covers, not just by its ticket.
+    expect(line?.performanceId).toBe(performanceId)
   }, CASE_TIMEOUT_MS)
 })
 

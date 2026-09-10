@@ -121,7 +121,7 @@ describe('what a booker already holds against a performance, any source (D-128 c
         ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
           't-4', 'r-3', seeded.performanceId, 'tt-companion', 0, 'BASE'],
       ])
-      database.query('UPDATE tickets SET refunded_at = ? WHERE id = ?').run(1_800_000_000, 't-2')
+      database.batch([['UPDATE tickets SET refunded_at = ? WHERE id = ?', 1_800_000_000, 't-2']])
 
       const found = read<{ accessKind: string, n: number }>(database, heldAccessCountsQuery('u-1', seeded.performanceId))
       const byKind = Object.fromEntries(found.map(row => [row.accessKind, Number(row.n)]))

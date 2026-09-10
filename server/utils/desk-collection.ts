@@ -18,7 +18,7 @@ export interface CollectResult {
 
 // The payment boundary (criterion 2): the reservation's conditional UPDATE and its ledger entry
 // are one batch, guarded by a trigger that refuses a line whose reservation is not COLLECTED (0001).
-export async function collect(input: CollectInput, actorId: string, tickets: DeskTicketLine[]): Promise<CollectResult> {
+export async function collect(input: CollectInput, actorId: string, tickets: DeskTicketLine[], performanceId: string): Promise<CollectResult> {
   const ticketTotalPence = tickets.reduce((total, ticket) => total + ticket.pricePaid, 0)
   const totalPence = amountDueFor(input.tender, ticketTotalPence)
 
@@ -28,6 +28,8 @@ export async function collect(input: CollectInput, actorId: string, tickets: Des
     actorId,
     compReason: input.tender === 'COMP' ? input.compReason : undefined,
     compApprovedBy: input.tender === 'COMP' ? actorId : undefined,
+    // Without this a matinee collection is invisible to its own night report (E-127 criterion 6,
+    // the same gap #791 fixed for a bar sale).
     lines: tickets.map(ticket => ({
       kind: 'TICKET_COLLECTION',
       amountPence: input.tender === 'COMP' ? 0 : ticket.pricePaid,
@@ -35,6 +37,7 @@ export async function collect(input: CollectInput, actorId: string, tickets: Des
       unitPricePence: ticket.pricePaid,
       reservationId: input.reservationId,
       ticketId: ticket.ticketId,
+      performanceId,
     })),
   })
 
