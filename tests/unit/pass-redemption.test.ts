@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { passRedemptionRefusal, redeemPassForm } from '#shared/utils/passes'
+import { doorPassScanForm, passRedemptionRefusal, redeemPassForm } from '#shared/utils/passes'
 import type { PassRedemptionState } from '#shared/utils/passes'
 
 // D-125 as pure rules. The database enforcement is tests/integration/races-pass-redemption.test.ts;
@@ -56,5 +56,15 @@ describe('redeeming names only which performance (criterion 1)', () => {
 
   test('an empty performance id is refused', () => {
     expect(redeemPassForm.safeParse({ performanceId: '' }).success).toBe(false)
+  })
+})
+
+describe('the door scans a reference, not a QR token (D-126)', () => {
+  test('a reference and a performance id parse', () => {
+    expect(doorPassScanForm.safeParse({ reference: 'K7M4PQ', performanceId: 'performance-1' }).success).toBe(true)
+  })
+
+  test('an empty reference is refused', () => {
+    expect(doorPassScanForm.safeParse({ reference: '', performanceId: 'performance-1' }).success).toBe(false)
   })
 })

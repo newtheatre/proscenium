@@ -89,3 +89,12 @@ export function passRedemptionRefusal(pass: PassRedemptionState, now: number): s
   if (!pass.coversShow) return 'This pass does not cover this show.'
   return null
 }
+
+// D-126: the door reads a pass the same way a desk search reads a reservation, by its own
+// no-look-alike reference, never a QR token scheme built for the holder's own phone.
+export const doorPassScanForm = z.strictObject({
+  reference: z.string().trim().min(1),
+  performanceId: z.string().trim().min(1),
+})
+
+export type DoorPassScanInput = z.output<typeof doorPassScanForm>

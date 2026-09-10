@@ -435,6 +435,12 @@ function hideCode(): void {
 
     <template #actions>
       <NightAction
+        label="Door"
+        icon="i-lucide-door-open"
+        color="neutral"
+        to="/tonight/door"
+      />
+      <NightAction
         label="Till"
         icon="i-lucide-store"
         color="neutral"

@@ -39,6 +39,20 @@ export async function passRedemptionState(passId: string, showId: string): Promi
   return row
 }
 
+// D-126's own lookup: the door reads a pass by its reference, the same no-look-alike code a desk
+// search reads a reservation by, never the holder's own QR cookie scheme.
+export async function passRedemptionStateByReference(reference: string, showId: string): Promise<PassRedemptionStateRow | undefined> {
+  const [row] = await db.all<PassRedemptionStateRow>(sql`
+    SELECT p.id AS id, p.user_id AS userId, p.status AS status, t.name AS passTypeName, t.status AS passTypeStatus,
+           t.valid_from AS validFrom, t.valid_until AS validUntil,
+           EXISTS (SELECT 1 FROM pass_type_shows s WHERE s.pass_type_id = t.id AND s.show_id = ${showId}) AS coversShow
+    FROM passes p
+    JOIN pass_types t ON t.id = p.pass_type_id
+    WHERE p.reference = ${reference.toUpperCase()}
+  `)
+  return row
+}
+
 export interface RedeemablePass {
   id: string
   reference: string
@@ -74,6 +88,25 @@ export async function alreadyAdmittedForPerformance(passId: string, performanceI
     SELECT EXISTS (SELECT 1 FROM pass_admissions WHERE pass_id = ${passId} AND performance_id = ${performanceId}) AS found
   `)
   return row?.found === 1
+}
+
+export interface PassAdmissionForPerformance {
+  ticketId: string
+  reservationId: string
+  reservationStatus: string
+}
+
+// D-126 criterion 1's other branch: a pass already redeemed for tonight, so the door's job is
+// admitting the seat that exists rather than spending a new one.
+export async function admissionForPerformance(passId: string, performanceId: string): Promise<PassAdmissionForPerformance | undefined> {
+  const [row] = await db.all<PassAdmissionForPerformance>(sql`
+    SELECT a.ticket_id AS ticketId, t.reservation_id AS reservationId, r.status AS reservationStatus
+    FROM pass_admissions a
+    JOIN tickets t ON t.id = a.ticket_id
+    JOIN reservations r ON r.id = t.reservation_id
+    WHERE a.pass_id = ${passId} AND a.performance_id = ${performanceId}
+  `)
+  return row
 }
 
 // Criteria 2 and 3 as one predicate: once-per-performance and the pass's own terms, re-asked here
@@ -116,6 +149,9 @@ export interface RedeemPassWriteInput {
   // The pass holder redeems their own (null); an officer scanning one at the door names themself.
   admittedBy: string | null
   actorId: string | null
+  // True only for D-126's on-the-spot redemption: the seat and the physical admission are one
+  // gesture, so the reservation is born already checked in rather than PENDING (E-112's `admitted`).
+  admitImmediately?: boolean
 }
 
 export interface RedeemPassResult {
@@ -137,7 +173,7 @@ export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): 
 
   const reservationInsert = sql`
     INSERT INTO reservations (id, reference, performance_id, user_id, status, source, window_bypassed, hold_expires_at)
-    VALUES (${reservationId}, ${reference}, ${input.performanceId}, ${input.userId}, 'PENDING', ${input.source}, 0, NULL)
+    VALUES (${reservationId}, ${reference}, ${input.performanceId}, ${input.userId}, ${input.admitImmediately ? 'DOOR' : 'PENDING'}, ${input.source}, 0, NULL)
   `
 
   const ticketInsert = passAdmissionTicketInsert(
@@ -189,9 +225,9 @@ export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): 
   const applied = ticketRows.length > 0
 
   // A refused redemption holds nothing, so the empty reservation it left says so rather than
-  // sitting as a PENDING row no sweep has reason to touch (`writeReservation`'s own shape, D-104).
+  // sitting as an open-looking row no sweep has reason to touch (`writeReservation`'s own shape, D-104).
   if (!applied) {
-    await db.run(sql`UPDATE reservations SET status = 'CANCELLED', updated_at = unixepoch() WHERE id = ${reservationId} AND status = 'PENDING'`)
+    await db.run(sql`UPDATE reservations SET status = 'CANCELLED', updated_at = unixepoch() WHERE id = ${reservationId} AND status IN ('PENDING', 'DOOR')`)
   }
 
   return applied
