@@ -3,11 +3,13 @@ import {
   copyingInserts,
   dependentsByTable,
   journalProblems,
+  migrationEventsIn,
   normaliseMigrationTag,
   pendingMigrations,
   rebuildDependentProblems,
   snapshotBefore,
   snapshotChainProblems,
+  triggerDropProblems,
   unresolvedCopyProblems,
 } from '#shared/utils/migrations'
 
@@ -246,5 +248,122 @@ describe('the snapshot chain links up (0052)', () => {
     const before = { file: '0006_snapshot.json', id: 'aaa', prevId: '00000000-0000-0000-0000-000000000000' }
     const after = { file: '0008_snapshot.json', id: 'bbb', prevId: 'aaa' }
     expect(snapshotChainProblems([before, after])).toEqual([])
+  })
+})
+
+// Real drizzle-kit rebuild shape (0073's own migration file): CREATE __new_x, the copying
+// INSERT, DROP x, then the rename.
+function rebuildSql(table: string): string {
+  return `CREATE TABLE \`__new_${table}\` (\`id\` text primary key not null);\n`
+    + `--> statement-breakpoint\n`
+    + `INSERT INTO \`__new_${table}\` ("id") SELECT "id" FROM \`${table}\`;\n`
+    + `--> statement-breakpoint\n`
+    + `DROP TABLE \`${table}\`;\n`
+    + `--> statement-breakpoint\n`
+    + `ALTER TABLE \`__new_${table}\` RENAME TO \`${table}\`;\n`
+}
+
+function triggerSql(name: string, table: string): string {
+  return `CREATE TRIGGER ${name}\nBEFORE DELETE ON ${table}\nBEGIN\n`
+    + `  SELECT RAISE(ABORT, '${table} is append-only');\nEND;\n`
+}
+
+describe('migrationEventsIn reads a real rebuild\'s statements in order', () => {
+  test('a rebuild, its copying insert and the rename are ordered create, then rebuild, then rename', () => {
+    const events = migrationEventsIn(rebuildSql('incident_log'))
+    expect(events.map(e => e.kind)).toEqual(['rebuild', 'rename'])
+    expect(events[0]).toMatchObject({ kind: 'rebuild', table: 'incident_log' })
+    expect(events[1]).toMatchObject({ kind: 'rename', table: 'incident_log' })
+  })
+
+  test('a trigger create and drop are read with the name and the table they act on', () => {
+    const events = migrationEventsIn(triggerSql('incident_log_no_update', 'incident_log')
+      + 'DROP TRIGGER incident_log_no_update;\n')
+    expect(events).toEqual([
+      { at: expect.any(Number), kind: 'create', name: 'incident_log_no_update', table: 'incident_log' },
+      { at: expect.any(Number), kind: 'drop', name: 'incident_log_no_update', table: undefined },
+    ])
+  })
+})
+
+// Drizzle's snapshot has no concept of a trigger, so a rebuild's own DROP TABLE takes every
+// trigger on that table with it and nothing regenerates what was never captured (0010).
+describe('a table rebuild is refused for dropping a trigger it does not restore (0010)', () => {
+  test('a trigger live before the rebuild, never recreated, is reported', () => {
+    const live = new Map([['incident_log_no_delete', 'incident_log']])
+    const events = migrationEventsIn(rebuildSql('incident_log'))
+    const problems = triggerDropProblems('0080_rebuild.sql', events, live, false)
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('`incident_log`')
+    expect(problems[0]).toContain('`incident_log_no_delete`')
+    expect(live.has('incident_log_no_delete')).toBe(false)
+  })
+
+  test('a trigger recreated after the rename, exactly as the fix message asks for, is not reported', () => {
+    const live = new Map([['incident_log_no_delete', 'incident_log']])
+    const sql = rebuildSql('incident_log') + triggerSql('incident_log_no_delete', 'incident_log')
+    const events = migrationEventsIn(sql)
+    const problems = triggerDropProblems('0080_rebuild.sql', events, live, false)
+    expect(problems).toEqual([])
+    expect(live.get('incident_log_no_delete')).toBe('incident_log')
+  })
+
+  // The trap the code comment names directly: a CREATE earlier in the same file already ran by
+  // the time the rename wipes every trigger the rebuild's table currently carries.
+  test('a trigger recreated before the rename in the same file is still reported as dropped', () => {
+    const live = new Map<string, string>()
+    const sql = triggerSql('incident_log_no_delete', 'incident_log') + rebuildSql('incident_log')
+    const events = migrationEventsIn(sql)
+    const problems = triggerDropProblems('0080_rebuild.sql', events, live, false)
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('`incident_log_no_delete`')
+  })
+
+  test('only the trigger not recreated is named, when a table carries more than one', () => {
+    const live = new Map([
+      ['incident_log_no_update', 'incident_log'],
+      ['incident_log_no_delete', 'incident_log'],
+    ])
+    const sql = rebuildSql('incident_log') + triggerSql('incident_log_no_update', 'incident_log')
+    const events = migrationEventsIn(sql)
+    const problems = triggerDropProblems('0080_rebuild.sql', events, live, false)
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('`incident_log_no_delete`')
+    expect(problems[0]).not.toContain('`incident_log_no_update`')
+  })
+
+  test('a trigger on a table nobody rebuilt this migration is untouched', () => {
+    const live = new Map([['ledger_no_update', 'ledger_entries']])
+    const events = migrationEventsIn(rebuildSql('incident_log'))
+    const problems = triggerDropProblems('0080_rebuild.sql', events, live, false)
+    expect(problems).toEqual([])
+    expect(live.get('ledger_no_update')).toBe('ledger_entries')
+  })
+
+  test('a rebuild with no live trigger on its table has nothing to refuse', () => {
+    const events = migrationEventsIn(rebuildSql('incident_log'))
+    expect(triggerDropProblems('0080_rebuild.sql', events, new Map(), false)).toEqual([])
+  })
+
+  // The estate's own two grandfathered rebuilds predate this rule (0010); nothing since is exempt.
+  test('a grandfathered migration is never reported, whatever it drops', () => {
+    const live = new Map([['incident_log_no_delete', 'incident_log']])
+    const events = migrationEventsIn(rebuildSql('incident_log'))
+    expect(triggerDropProblems('0001_grandfathered.sql', events, live, true)).toEqual([])
+  })
+
+  // Triggers live across the whole migration directory (0010's own note), so a trigger from an
+  // earlier file must still be seen as dropped by a rebuild several files later.
+  test('a trigger created in an earlier file is still tracked when a later file rebuilds its table', () => {
+    const live = new Map<string, string>()
+    const fileA = migrationEventsIn(triggerSql('incident_log_no_delete', 'incident_log'))
+    expect(triggerDropProblems('0010_add_trigger.sql', fileA, live, false)).toEqual([])
+    expect(live.get('incident_log_no_delete')).toBe('incident_log')
+
+    const fileB = migrationEventsIn(rebuildSql('incident_log'))
+    const problems = triggerDropProblems('0080_rebuild.sql', fileB, live, false)
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('0080_rebuild.sql')
+    expect(problems[0]).toContain('`incident_log_no_delete`')
   })
 })
