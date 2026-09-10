@@ -15,6 +15,7 @@ export default defineTask({
     const withdrawnAccessProfiles = await sweepWithdrawnAccessProfiles(before)
     const backstage = await purgeStaleMessages(before)
     const roleLapses = await sweepRoleLapses(undefined, before)
-    return { result: { attempts, tokens, unverified, renewals, withdrawnAccessProfiles, backstage, roleLapses } }
+    const sendLog = await pruneNotificationLog(undefined, before)
+    return { result: { attempts, tokens, unverified, renewals, withdrawnAccessProfiles, backstage, roleLapses, sendLog } }
   },
 })

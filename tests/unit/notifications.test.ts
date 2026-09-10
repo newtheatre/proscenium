@@ -4,14 +4,19 @@ import {
   MESSAGE_TYPES,
   NOTIFICATION_STATUSES,
   NOTIFICATION_TOPICS,
+  TERMINAL_STATUSES,
   TOPIC_DESCRIPTIONS,
   TOPIC_LABELS,
   defaultFor,
   deliversOn,
+  isTerminal,
   isTransactional,
+  logRetentionCutoff,
   messageType,
+  outOfAttempts,
   preferenceForm,
   preferenceIsSettable,
+  retryDueAt,
 } from '#shared/utils/notifications'
 import { CONFIG_KEYS } from '#shared/utils/config'
 import type { MessageType, Preference, PreferenceDefaults } from '#shared/utils/notifications'
@@ -149,7 +154,7 @@ describe('per-topic preferences (H-102)', () => {
     expect([...NOTIFICATION_STATUSES]).toContain('SKIPPED_UNDELIVERABLE')
   })
 
-  test('the status registry and the table check say the same thing', async () => {
+  test('the status registry and the table check say the same thing (H-105)', async () => {
     const schema = await Bun.file('server/db/schema/notifications.ts').text()
     const check = /notification_log_status.*?IN \(([^)]*)\)/s.exec(schema)?.[1] ?? ''
     const listed = [...check.matchAll(/'([A-Z_]+)'/g)].map(match => match[1])
@@ -197,5 +202,65 @@ describe('addresses that must never reach the provider (H-107)', () => {
 
   test('the judgement is case-insensitive and ignores surrounding space', () => {
     expect(undeliverableReason({ email: '  Deleted-ABC@Anonymised.Invalid ', anonymisedAt: null })).toBe('placeholder-address')
+  })
+})
+
+describe('the send log retries with backoff (H-105)', () => {
+  const HOUR = 3600
+
+  // Criterion 2: the wait doubles, and it is computed from the enqueue time and the attempts so
+  // no stored due time can disagree with the count beside it.
+  test('the wait doubles from the first failure', () => {
+    const enqueued = 1_000_000
+    expect(retryDueAt(enqueued, 1, 10)).toBe(enqueued + 10 * 60)
+    expect(retryDueAt(enqueued, 2, 10)).toBe(enqueued + 30 * 60)
+    expect(retryDueAt(enqueued, 3, 10)).toBe(enqueued + 70 * 60)
+    expect(retryDueAt(enqueued, 4, 10)).toBe(enqueued + 150 * 60)
+  })
+
+  // The shipped values, said out loud once: five attempts over about two and a half hours.
+  test('the shipped values give up about two and a half hours after enqueue', () => {
+    const window = retryDueAt(0, CONFIG_KEYS.NOTIFICATION_MAX_ATTEMPTS.default - 1, CONFIG_KEYS.NOTIFICATION_RETRY_BACKOFF_MINUTES.default)
+    expect(window).toBeGreaterThan(2 * HOUR)
+    expect(window).toBeLessThan(3 * HOUR)
+  })
+
+  test('nothing waits when the first attempt was also the last', () => {
+    expect(retryDueAt(500, 0, 10)).toBe(500)
+  })
+
+  // The first attempt counts, so a maximum of one is a system with no retries at all.
+  test('a maximum of one attempt means no retry', () => {
+    expect(outOfAttempts(1, 1)).toBe(true)
+    expect(outOfAttempts(1, 5)).toBe(false)
+    expect(outOfAttempts(5, 5)).toBe(true)
+    expect(outOfAttempts(6, 5)).toBe(true)
+  })
+
+  // Criterion 2: an exhausted entry is failed for good, and criterion 3: nothing else may edit
+  // an outcome, so what counts as settled has to be stated somewhere both can read.
+  test('the terminal statuses are the ones no sweep may pick up again', () => {
+    expect([...TERMINAL_STATUSES].sort()).toEqual(['FAILED_FINAL', 'SENT', 'SKIPPED_UNDELIVERABLE', 'SUPPRESSED_PREFERENCE'])
+    expect(isTerminal('FAILED')).toBe(false)
+    expect(isTerminal('RETRYING')).toBe(false)
+    expect(isTerminal('PENDING')).toBe(false)
+    expect(isTerminal('FAILED_FINAL')).toBe(true)
+  })
+
+  test('failed-final is a status of its own, and the table accepts it', () => {
+    expect([...NOTIFICATION_STATUSES]).toContain('FAILED_FINAL')
+  })
+
+  // Criterion 5: the period is configuration and the sweep reads it, so a change is a settings
+  // change rather than a release.
+  test('the retention cutoff is a whole period back from now', () => {
+    const now = 1_700_000_000
+    const cutoff = logRetentionCutoff(now, 24)
+    expect(now - cutoff).toBe(Math.round(24 * (365.25 / 12) * 86_400))
+    expect(logRetentionCutoff(now, 1)).toBeGreaterThan(cutoff)
+  })
+
+  test('the retention period ships as a configured number of months', () => {
+    expect(CONFIG_KEYS.NOTIFICATION_LOG_RETENTION_MONTHS.default).toBe(24)
   })
 })

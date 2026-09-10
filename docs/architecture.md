@@ -312,6 +312,7 @@ without naming it).
 | --- | --- | --- |
 | `*/10 * * * *` | `holds:release` | Sends pre-expiry hold reminders (`HOLD_REMINDER_MINUTES_BEFORE`, 60 by default), then releases expired reservation holds (D-106, D-107). The one task that changes booking state, and only ever in the direction the customer was warned about. The waiting-list cascade is D-113's, not yet built. |
 | `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). The CI-side "after every deploy" half of criterion 3 is `.github/workflows/health-watch.yml` and a step at the end of `migrate.yml`, both outside the application. |
+| `*/10 * * * *` | `notifications:retry` | Sends failed messages again, one claimed row at a time, when the doubling backoff since enqueue has passed (`NOTIFICATION_RETRY_BACKOFF_MINUTES`, 10 by default); marks an entry `FAILED_FINAL` once `NOTIFICATION_MAX_ATTEMPTS` is spent, so five attempts span about two and a half hours. Every guard runs again on each attempt, so an address change, a preference change or an erasure in between is honoured (H-105, 0056). Capped at 100 rows a run. |
 | `0 6 * * *` | `training:expiry-sweep` | Expiry warnings and digests (dry-run gated). |
 | `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or an unconfirmed duty manager, the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |
@@ -320,7 +321,7 @@ without naming it).
 | `0 11 * * *` | `passes:expire-requests` | Lapses a pending pass request once its product's own sales window has closed unfulfilled, capped per run like `holds:release` (`PASS_REQUEST_EXPIRE_BATCH_CAP`, D-124 criterion 3). |
 | `0 17 * * *` | `rooms:remind` | Tomorrow's room bookings, one message per member however many they hold, with the calendar file attached (C-113). Idempotent: a second run the same London day sends nothing, read from `notification_log` rather than a column. |
 | `12 0 * * *` | `nights:close` | Auto-closes unsigned night reports inside 24 hours, retries unsent report emails. |
-| `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, notification retries, unverified account expiry (0026), and the role-lapse work: one warning per holder covering every grant of theirs inside `ROLE_LAPSE_NOTICE_DAYS`, claimed per grant and expiry so moving a date re-arms it; a monthly digest to administrators on the first, carrying what is lapsing, what lapsed inside the prune window and every permanent grant; and the tidying of grants lapsed longer ago than `ROLE_GRANT_PRUNE_DAYS`. Both the warning and the tidy write the trail with no actor, which is what attributes them to system (A-119, 0009). |
+| `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, the send-log prune at `NOTIFICATION_LOG_RETENTION_MONTHS` (H-105 criterion 5, and retries are `notifications:retry`'s rather than this task's), unverified account expiry (0026), and the role-lapse work: one warning per holder covering every grant of theirs inside `ROLE_LAPSE_NOTICE_DAYS`, claimed per grant and expiry so moving a date re-arms it; a monthly digest to administrators on the first, carrying what is lapsing, what lapsed inside the prune window and every permanent grant; and the tidying of grants lapsed longer ago than `ROLE_GRANT_PRUNE_DAYS`. Both the warning and the tidy write the trail with no actor, which is what attributes them to system (A-119, 0009). |
 | `0 5 * * 1` | `backup` | A row-count and ledger-total manifest to R2 (the `BLOB` binding), independent of D1. A failure audits `backup.export-failed` rather than only logging. Point-in-time restore is D1 Time Travel, already automatic; the restore drill and its cadence are administered at `/admin/backups` (K-108, J-107). |
 | `0 4 1 * *` | `retention:sweep` | Two independent warnings (window and final) for an account approaching its inactivity threshold, a sign-in re-arming the claim by carrying `lastLoginAt` in its key; exempts a current member, a live role holder and an unsettled tab debtor; warns neither an unverified address nor an unclaimed guest, which are anonymised on their own clock without ever being written to; anonymises what is past its threshold, reusing `eraseAccount()`. Warnings and anonymisations carry a cap each (`RETENTION_WARNING_CAP`, `RETENTION_SWEEP_CAP`), and a run that hits one reports the figure in the digest rather than deferring the surplus. The digest always sends, dry-run or armed, since it is what the IT Manager reviews before arming (0011, A-126, K-111). |
 
@@ -338,6 +339,27 @@ member has chosen. An absent row means the configured default
 (`NOTIFICATION_EMAIL_DEFAULT_TOPICS`, `NOTIFICATION_PUSH_DEFAULT_TOPICS`), which is why nothing is
 seeded at registration: a workshop changing a default still reaches everybody who never chose.
 The screen is `/account/notifications` and shows every cell with its default beside it.
+
+### Retries (H-105, 0056)
+
+A failed send keeps the rendered message on its own row in `retry_payload` and is sent again by
+`notifications:retry` when the doubling backoff has passed, up to `NOTIFICATION_MAX_ATTEMPTS`
+attempts, after which it is `FAILED_FINAL` and waits for a person. Every attempt updates the row
+the first one wrote, so a count of messages of a type is still a count of rows (0048). The payload
+is cleared by every terminal outcome, so a row at rest holds no message body, and a send carrying
+an attachment is never retried because the attachment was the caller's and is not on the row.
+`resend()` in the centre is the only thing that sends a stored payload, and it re-runs every guard
+`notify()` ran. A suppression is terminal and never enters the sweep: the predicate is `FAILED`
+alone, and retrying a muted topic would send the thing a member switched off.
+
+`notifyAddress()` is the way to send to a configured address rather than an account (E-124's night
+report recipients). It logs a row with no `user_id`, carries the recipient inside the retry payload
+because no account will resolve one next time, and is retried exactly like any other send, judged
+on its address alone. It still needs a registered type.
+
+The prune deletes from `notification_log` and nothing else. Nothing in that table is kept
+indefinitely, which is what makes age the whole rule here; the backstage board's own purge is the
+one that must exclude milestone rows, and it does so by predicate and by trigger (0010).
 
 Order inside `notify()`, which is what the criteria turn on: resolve the account, render, write
 the inbox entry, then judge the email. A topic switched off is logged `SUPPRESSED_PREFERENCE` and
