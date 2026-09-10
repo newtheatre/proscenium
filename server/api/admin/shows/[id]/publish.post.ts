@@ -19,6 +19,19 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Publishing onto a category or season retired after this show was drafted is new work, so it
+  // refuses and names which, rather than publish against retired vocabulary (D-131 criterion 5).
+  if (published) {
+    const category = held.categoryId ? await showCategoryById(held.categoryId) : undefined
+    if (category?.archived) {
+      throw createError({ statusCode: 409, statusMessage: `${held.title} cannot publish: its category, ${category.name}, has been retired` })
+    }
+    const season = held.seasonId ? await seasonById(held.seasonId) : undefined
+    if (season?.archived) {
+      throw createError({ statusCode: 409, statusMessage: `${held.title} cannot publish: its season, ${season.name}, has been retired` })
+    }
+  }
+
   // Draft performances only, so a cancelled one is never quietly put back on sale. Counted before
   // the batch because the statement's own row count is not read back.
   const cascading = published && cascadePerformances

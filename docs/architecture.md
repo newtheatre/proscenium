@@ -1209,6 +1209,16 @@ that point at them, declared in `server/utils/ticket-types.ts` and `server/utils
 proved against the live foreign keys, never a column on the row itself. A pass product's "ever
 issued" and "live coverage" are the same shape, declared in `server/utils/pass-types.ts`.
 
+The vocabulary a show is published against, venues, seasons and show categories, is administered
+at `/box-office/venues`, `/box-office/seasons` and `/box-office/show-categories` (D-131), the
+same "authored fresh through an admin screen" pattern ticket types and `content_warnings` already
+follow. Each is retired rather than deleted once anything points at it: `VENUE_REFERENCES` in
+`server/utils/venues.ts` declares every table a venue may be in use through (a performance, an
+emergency card, a shift template, a checklist, a closed night, the backstage board, a comp or a
+till session); a season or a category is in use through `shows.season_id` or `shows.category_id`
+alone. `GET /api/admin/shows/[id]` carries the category and season pickers the show screen uses,
+and publishing refuses a show whose category or season was retired after it was drafted.
+
 Access profiles are declared at `/account/access` and verified at `/box-office/access-profiles`
 (D-127), the one screen `access.verify` gates rather than any of the box office's ordinary
 permissions: an accessibility officer, never general box office. The special-category payload is

@@ -169,7 +169,11 @@ step is offline against the dumps.
   rehearsal updates last week's rows. The reconciliation checksums total scheduled seconds across
   every performance, the same discipline `bookings.ts` applies to its own times. **Run this before
   the reservations transform** (#840), which reads `out/performance-map.tsv`, keyed on the raw
-  old id with no prefix, and cannot run without it. `ticket_types` is not read here: it is
+  old id with no prefix, and cannot run without it. Venues, seasons and show categories gained
+  their own admin screens once D-131 landed (`/box-office/venues`, `/box-office/seasons`,
+  `/box-office/show-categories`), for anything the committee adds or retires after cutover; unlike
+  `ticket_types` below, this transform still mints all three from the old estate, matched by id
+  rather than by name, so none of the three needs a reference map. `ticket_types` is not read here: it is
   authored fresh through D-119's admin screen, the same way `departments` and `modules` are for
   training, never migrated (`docs/data-model.md` names it "built by Wave 0 contract... everything
   else in this module is unbuilt"). Confirmed directly with the reservations stream that it does

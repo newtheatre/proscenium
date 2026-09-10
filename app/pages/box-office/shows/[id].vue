@@ -28,11 +28,14 @@ const request = useRequestFetch()
 const toast = useToast()
 const id = computed(() => String(route.params.id))
 
-interface Venue { id: string, name: string, capacity: number | null }
+interface Venue { id: string, name: string, capacity: number | null, archived: boolean }
+interface Option { id: string, name: string, archived: boolean }
 interface Detail {
   show: AdminShow
   performances: AdminPerformance[]
   venues: Venue[]
+  categories: Option[]
+  seasons: Option[]
   warnings: ShowContentWarning[]
   vocabulary: ContentWarning[]
 }
@@ -47,6 +50,8 @@ const { data, error, refresh } = await useAsyncData(
 
 const show = computed(() => data.value?.show ?? null)
 const venues = computed(() => data.value?.venues ?? [])
+const categories = computed(() => data.value?.categories ?? [])
+const seasons = computed(() => data.value?.seasons ?? [])
 const warnings = computed(() => data.value?.warnings ?? [])
 const vocabulary = computed(() => data.value?.vocabulary ?? [])
 
@@ -59,8 +64,6 @@ const copy = reactive({
   ageGuidance: '',
   latecomerPolicy: null as LatecomerPolicy | null,
   bookingClosesHoursBefore: null as number | null,
-  // Carried through rather than edited: no story administers the category or season vocabulary,
-  // and a full replace that dropped them would silently clear a seeded or imported show.
   categoryId: null as string | null,
   seasonId: null as string | null,
 })
@@ -219,7 +222,7 @@ function editPerformance(one: AdminPerformance | null): void {
   editingPerformance.value = one
   failure.value = null
   Object.assign(form, {
-    venueId: one?.venueId ?? venues.value[0]?.id ?? '',
+    venueId: one?.venueId ?? bookableVenues.value[0]?.id ?? '',
     day: one ? dayOf(one.startsAt) : '',
     clock: one ? clockOf(one.startsAt) : '19:30',
     doorsClock: one?.doorsAt ? clockOf(one.doorsAt) : '',
@@ -344,7 +347,26 @@ const policyOptions = [
   ...LATECOMER_POLICIES.map(one => ({ label: saysLatecomerPolicy(one), value: one })),
 ]
 
-const venueOptions = computed(() => venues.value.map(one => ({ label: one.name, value: one.id })))
+// A retired category or season cannot be chosen for new work; one already carried by this show
+// stays offered so the picker never blanks out from under it (D-131 criterion 5).
+function pickerOptions(all: Option[], current: string | null): { label: string, value: string | null }[] {
+  return [
+    { label: 'None', value: null },
+    ...all
+      .filter(one => !one.archived || one.id === current)
+      .map(one => ({ label: one.archived ? `${one.name} (retired)` : one.name, value: one.id })),
+  ]
+}
+
+const categoryOptions = computed(() => pickerOptions(categories.value, copy.categoryId))
+const seasonOptions = computed(() => pickerOptions(seasons.value, copy.seasonId))
+
+// A retired venue cannot be chosen for a new performance; one already booked into it keeps
+// showing so the picker never blanks out from under an existing edit (D-131 criterion 5).
+const venueOptions = computed(() => venues.value
+  .filter(one => !one.archived || one.id === editingPerformance.value?.venueId)
+  .map(one => ({ label: one.name, value: one.id })))
+const bookableVenues = computed(() => venues.value.filter(one => !one.archived))
 
 const statusOptions = [
   { label: 'Every performance', value: 'ALL' },
@@ -654,6 +676,30 @@ const columns: TableColumn<AdminPerformance>[] = [
                 data-test="copy-window"
               />
             </UFormField>
+
+            <UFormField
+              label="Category"
+              name="categoryId"
+            >
+              <USelect
+                v-model="copy.categoryId"
+                :items="categoryOptions"
+                class="w-full"
+                data-test="copy-category"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Season"
+              name="seasonId"
+            >
+              <USelect
+                v-model="copy.seasonId"
+                :items="seasonOptions"
+                class="w-full"
+                data-test="copy-season"
+              />
+            </UFormField>
           </div>
 
           <UButton
@@ -700,7 +746,7 @@ const columns: TableColumn<AdminPerformance>[] = [
           <UButton
             data-test="add-performance"
             icon="i-lucide-plus"
-            :disabled="venues.length === 0"
+            :disabled="bookableVenues.length === 0"
             @click="editPerformance(null)"
           >
             Add a performance

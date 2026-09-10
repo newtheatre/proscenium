@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import { check, index, integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { rooms } from './rooms'
 import { users } from './identity'
 
@@ -21,9 +21,15 @@ export const venues = sqliteTable('venues', {
   imageKey: text('image_key'),
   description: text('description'),
   roomId: text('room_id').references(() => rooms.id, { onDelete: 'set null' }),
+  // A retired venue keeps serving the performances, emergency cards and shifts that already
+  // point at it; it just stops being offered for new work (D-131 criteria 1 and 5).
+  archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
   unique('venues_name').on(table.name),
+  // Standard and standard are one venue to everybody who reads a report, so the database says
+  // so rather than the write path alone (D-131, echoing D-119's own ticket_types index).
+  uniqueIndex('venues_name_nocase').on(sql`${table.name} COLLATE NOCASE`),
   index('venues_room').on(table.roomId),
   check('venues_capacity_positive', sql`${table.capacity} IS NULL OR ${table.capacity} > 0`),
 ])
@@ -54,6 +60,7 @@ export const seasons = sqliteTable('seasons', {
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
 }, table => [
   unique('seasons_name').on(table.name),
+  uniqueIndex('seasons_name_nocase').on(sql`${table.name} COLLATE NOCASE`),
   check('seasons_order', sql`${table.endsOn} > ${table.startsOn}`),
 ])
 
@@ -61,8 +68,10 @@ export const showCategories = sqliteTable('show_categories', {
   id: id(),
   name: text('name').notNull(),
   sort: integer('sort').notNull().default(0),
+  archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
 }, table => [
   unique('show_categories_name').on(table.name),
+  uniqueIndex('show_categories_name_nocase').on(sql`${table.name} COLLATE NOCASE`),
 ])
 
 export const shows = sqliteTable('shows', {
