@@ -3,6 +3,7 @@ import { formatLondon } from '#shared/utils/london'
 import { saysWarningLevel } from '#shared/utils/content-warnings'
 import { saysLatecomerPolicy } from '#shared/utils/programme'
 import { saysShiftRole } from '#shared/utils/rota'
+import { activePerformanceId } from '#shared/utils/tonight'
 import type { ShiftRole } from '#shared/utils/rota'
 
 definePageMeta({ layout: 'tonight' })
@@ -86,6 +87,14 @@ const houseOpen = computed(() => {
 })
 const incompletePre = computed(() => checklist.value.filter(item => item.phase === 'PRE' && item.required && !item.done))
 
+// The one unmistakable "which house" answer a matinee day needs (E-127 criterion 2); a single
+// performance has nothing to switch between, so the badge and the tab bar both stay hidden.
+const activeId = computed(() => activePerformanceId(data.value?.performances ?? [], Date.now() / 1000))
+
+function jumpTo(performanceId: string): void {
+  document.querySelector(`[data-test="performance-${performanceId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 onMounted(() => {
   load()
   timer = setInterval(load, POLL_MS)
@@ -163,15 +172,45 @@ function hideCode(): void {
       class="space-y-6"
       data-test="duty-manager-screen"
     >
+      <!-- Running order, one tap to the active house (E-127 criterion 2); a single performance
+           has nothing to switch between, so this stays out of the way entirely. -->
+      <div
+        v-if="data.performances.length > 1"
+        class="flex flex-wrap gap-2"
+        data-test="performance-switcher"
+      >
+        <UButton
+          v-for="performance in data.performances"
+          :key="performance.performanceId"
+          size="sm"
+          :color="performance.performanceId === activeId ? 'primary' : 'neutral'"
+          :variant="performance.performanceId === activeId ? 'solid' : 'subtle'"
+          :data-test="`jump-${performance.performanceId}`"
+          @click="jumpTo(performance.performanceId)"
+        >
+          {{ performance.showTitle }}, {{ timeOf(performance.startsAt) }}
+        </UButton>
+      </div>
+
       <section
         v-for="performance in data.performances"
         :key="performance.performanceId"
-        class="space-y-4 rounded-lg border border-default p-4"
+        class="space-y-4 rounded-lg border p-4"
+        :class="performance.performanceId === activeId ? 'border-primary' : 'border-default'"
         :data-test="`performance-${performance.performanceId}`"
       >
         <div>
-          <p class="nnt-headline text-lg">
+          <p class="nnt-headline flex items-center gap-2 text-lg">
             {{ performance.showTitle }}
+            <UBadge
+              v-if="performance.performanceId === activeId && data.performances.length > 1"
+              color="primary"
+              variant="subtle"
+              size="sm"
+              data-test="active-now"
+            >
+              Active now
+            </UBadge>
           </p>
           <p class="text-sm text-muted">
             {{ spanOf(performance.startsAt) }}

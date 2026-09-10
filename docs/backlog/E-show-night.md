@@ -388,7 +388,7 @@ Counts: 27 MVP stories (E-101 to E-127), 4 V2 stories (E-201 to E-204), 1 Later 
 - Role: Shift authority
 - Phase: MVP
 - Story: As the duty manager on a matinee day, I want every show-night surface to handle multiple performances in one venue on one day so that a matinee and an evening never blur into one record.
-- Depends on: E-108, E-113
+- Depends on: E-108, E-113, D-126 (criterion 3 refuses a wrong-performance scan at the door, which needs a door screen to refuse into; omitted from this line originally, corrected once building the story found it)
 - Acceptance criteria:
   1. Every operational record is keyed to a performance, never to a day or a venue: shifts, checklists, incidents, age checks, night reports and door state all belong to exactly one performance, and the same person may hold shifts on both performances of the day.
   2. The tonight view lists every performance inside the 04:00 boundary in running order and makes the active one unmistakable; switching between them is one tap, and every scan, admit and register entry lands against the performance selected at that moment.

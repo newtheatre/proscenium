@@ -381,6 +381,8 @@ export async function commitSale(
         discountId: discount?.id ?? null,
         discountPercent: discount?.percent ?? null,
         discountPence: soldPriced[index]!.discountPence || null,
+        // Without this a matinee sale is invisible to its own report (E-127 criterion 6).
+        performanceId: context.performanceId,
       })),
     })
     statements.push(...posted.statements)
@@ -550,6 +552,7 @@ export async function commitCompSale(
       productVariantId: line.variant.id,
       priceRef: priceRef(line.variant.priceSource, line.variant.priceRowId),
       choices: line.choiceItemId ? { choiceItemId: line.choiceItemId, choiceItemName: line.choiceItemName } : null,
+      performanceId: context.performanceId,
     })),
   })
   statements.push(...posted.statements)

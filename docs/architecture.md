@@ -542,6 +542,44 @@ sticky action slot, which K-102 criterion 2 reserves for the one primary action 
 reporting reaches through a second tap on the incident log screen rather than a first tap from
 `/tonight` itself, an interpretation of E-117 criterion 1 recorded in the known issue.
 
+### Two shows, one venue, one day (E-127)
+
+Four of the six criteria: 2, 5, 6, and 1 for everything except the checklist. `shared/utils/tonight.ts`'s
+`activePerformanceId(performances, at)` is the one pure function underneath criterion 2: a
+performance is active from its own doors (or curtain, with none set) until the next one's doors
+begin, so it needs no duration estimate, and the edges resolve to "next one to come" before the
+first door and "still closing" after the last. `/tonight` lists every performance already
+(`GET /api/tonight/duty-manager`'s own `performances` array, in `performancesOnNight`'s running
+order); a venue running more than one gets a tab bar above the list, the active one filled and
+badged, and a tap scrolls to its section rather than filtering the others away, since a duty
+manager covering both houses still wants both in view.
+
+`incidents`, `age_checks` and `shifts` were already performance-keyed before this story; E-123's
+own report reads `performance_id` throughout. `tests/integration/night-keying.test.ts` checks this
+against the real schema rather than trusting the claim: every operational table this story can
+confirm carries `performance_id`, and a second describe block pins that `checklist_stamps` and
+`checklist_closes` still carry `venue_id` and `night` instead, deliberately not rebuilt here.
+Criterion 4 needs a decision (a migration reworking already-shipped E-114 tables) before that
+second block can be deleted rather than pinned.
+
+`GET /api/tonight/report` (E-123) already refuses ambiguity when asked with no `performanceId` and
+more than one performance is running, so the "every scan, admit and register entry lands against
+the performance selected" half of criterion 2 is answered wherever a screen resolves its own
+performance: `/tonight/incidents` and `/tonight/age-checks` already carry a picker when
+`performanceIds.length > 1` (E-115, E-118, predating this story). `POST /api/till/sale` accepts and
+correctly narrows on `performanceId` too, but `/tonight/till` never sends one yet, so a bar sale on
+a day with more than one performance currently lands unattributed to either report's bar summary,
+even though the shared till session itself is correct by design (criterion 5, `till_sessions` keyed
+to `venue_id` and `night` exactly as the criterion asks). Recorded in `docs/known-issues.md` for
+bar's own stream, since the fix is a picker on a page this stream does not own.
+
+Criterion 3 (a wrong-performance scan refuses loudly, naming the correct one) has no door screen
+to refuse into: D-126 is unbuilt, corrected onto this story's own dependency line, which omitted
+it. `tests/e2e/night-two-performances.test.ts` is criterion 6's own fixture: one venue, a matinee
+and an evening, the same person holding a shift on both (criterion 1's own clause), two age checks,
+one till session, a sale named to the matinee, and two independently-read reports proving neither
+crosses into the other.
+
 ### The Challenge 25 register (E-118)
 
 `server/db/schema/show-night.ts` adds `age_checks`, append-only like `incidents` (0010): hand-
