@@ -50,7 +50,8 @@ export default defineEventHandler(async (event) => {
     .from(schema.membershipClaims)
     .innerJoin(schema.users, eq(schema.users.id, schema.membershipClaims.userId))
     .where(where)
-    .orderBy(asc(schema.membershipClaims.createdAt), asc(schema.membershipClaims.id))
+    // Two claims in one second tie on created_at; insertion order is what oldest-first means.
+    .orderBy(asc(schema.membershipClaims.createdAt), asc(sql`${schema.membershipClaims}.rowid`))
     .limit(input.pageSize)
     .offset(offsetFor(input.page, input.pageSize))
 

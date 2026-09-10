@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 
 export interface OwnClaim {
   id: string
@@ -27,7 +27,8 @@ export async function ownClaim(userId: string): Promise<OwnClaim | null> {
   })
     .from(schema.membershipClaims)
     .where(eq(schema.membershipClaims.userId, userId))
-    .orderBy(desc(schema.membershipClaims.createdAt), desc(schema.membershipClaims.id))
+    // A claim declined and re-made within one second ties on created_at; insertion order decides.
+    .orderBy(desc(schema.membershipClaims.createdAt), desc(sql`${schema.membershipClaims}.rowid`))
     .limit(1)
   return row ?? null
 }
