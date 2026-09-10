@@ -1,3 +1,4 @@
+import { queryCollection } from '@nuxt/content/nitro'
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { isCrawlable } from '#shared/utils/seo'
