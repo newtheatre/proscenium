@@ -163,6 +163,7 @@ const CATALOGUE = {
   'pass.request.created': { label: 'Pass requested', module: 'ticketing', self: true },
   'pass.request.fulfilled': { label: 'Pass request fulfilled at issue', module: 'ticketing' },
   'pass.request.expired': { label: 'Pass request lapsed unfulfilled', module: 'ticketing' },
+  'tickets.exported': { label: 'Ticket export downloaded', module: 'ticketing' },
 
   // Module E: show night
 
