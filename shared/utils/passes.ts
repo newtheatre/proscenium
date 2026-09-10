@@ -63,9 +63,8 @@ export function passSaleRefusal(type: PassTypeSaleState, now: number): string | 
   return null
 }
 
-// D-125: a pass redeems while reserving, D-126 at the door, D-130 for a Fellow's own pass. All
-// three read this before writing; the database predicate that actually decides is
-// server/utils/pass-redemption.ts's `passAdmissionAllows`, this is only what the refusal says.
+// D-125 redeems while reserving, D-126 at the door, D-130 for a Fellow's own pass: all three
+// share this shape. server/utils/pass-redemption.ts's `passAdmissionAllows` is what decides.
 export const redeemPassForm = z.strictObject({
   performanceId: z.string().trim().min(1),
 })
@@ -81,8 +80,7 @@ export interface PassRedemptionState {
 }
 
 // Criterion 1: covered, inside the validity window, and a live product. Once-per-performance and
-// capacity are not asked here: both are contended, so the database predicate is what decides them
-// (0003), and a race that this function would have allowed still refuses at the write.
+// capacity are contended, so the database predicate decides those, never a read taken here (0003).
 export function passRedemptionRefusal(pass: PassRedemptionState, now: number): string | null {
   if (pass.status !== 'ACTIVE') return 'This pass is not active.'
   if (pass.passTypeStatus === 'CLOSED') return 'This pass has been archived and no longer admits.'

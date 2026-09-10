@@ -115,6 +115,18 @@ export function ticketInsertQueries(tickets: TicketToWrite[], capacity: number |
   `)
 }
 
+// One seat, one guard beyond capacity: D-125's `passAdmissionAllows` names the pass's own terms
+// and the once-per-performance rule, this file's job is only ever the seat itself (D-105 criterion 2).
+export function passAdmissionTicketInsert(ticket: TicketToWrite, extraGuard: SQL, capacity: number | null): SQL {
+  return sql`
+    INSERT INTO ${sql.raw(TICKETS)} (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source)
+    SELECT ${ticket.id}, ${ticket.reservationId}, ${ticket.performanceId}, ${ticket.ticketTypeId},
+           ${ticket.pricePaid}, ${ticket.priceSource}
+    WHERE ${capacityAllows(ticket.performanceId, capacity, 1, ticket.reservationId)} AND ${extraGuard}
+    RETURNING id
+  `
+}
+
 // D-110's edit: every added and removed line shares one guard, precomputed by the caller against
 // the desired total rather than the delta, so a mixed add-and-remove request is all or nothing.
 export function ticketAdditionQueries(tickets: TicketToWrite[], guard: SQL): SQL[] {

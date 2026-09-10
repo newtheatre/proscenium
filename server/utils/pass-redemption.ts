@@ -1,15 +1,14 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { newId } from './accounts'
-import { capacityAllows } from './capacity'
+import { passAdmissionTicketInsert } from './capacity'
 import { postEntry } from './ledger'
 import { auditEntry } from '#shared/utils/audit'
 import { generateReservationReference } from '#shared/utils/reservations'
 import type { SQL } from 'drizzle-orm'
 
-// D-125: redeeming a pass while reserving online, self-serve. `redeemPass()` below is also
-// D-126's door path and D-130's Fellow admission: both write through it with a different
-// `source` and `admittedBy`, never a second copy of the once-per-performance or capacity guard.
+// D-125: redeeming a pass while reserving online. `redeemPass()` is also D-126's door path and
+// D-130's Fellow admission, both with a different `source` and `admittedBy`.
 
 export interface PassRedemptionStateRow {
   id: string
@@ -22,8 +21,8 @@ export interface PassRedemptionStateRow {
   coversShow: number
 }
 
-// Everything a caller needs to decide criterion 1's refusal, read live rather than trusted from
-// an earlier request (the same shape `saleRefusal` reads for an ordinary reservation).
+// What a caller needs to decide criterion 1's refusal, read live (the same shape `saleRefusal`
+// reads for an ordinary reservation).
 export function passRedemptionStateQuery(passId: string, showId: string): SQL {
   return sql`
     SELECT p.id AS id, p.user_id AS userId, p.status AS status, t.name AS passTypeName, t.status AS passTypeStatus,
@@ -46,9 +45,8 @@ export interface RedeemablePass {
   passTypeName: string
 }
 
-// The pass a booking screen offers automatically (criterion 1): active, on sale, inside its
-// window, covering this show, and not already redeemed for this exact performance. Oldest first,
-// so a holder of more than one eligible pass is offered the one closest to lapsing.
+// What a booking screen offers automatically (criterion 1): eligible and not already redeemed
+// for this performance. Oldest first, so a holder of more than one offers the one nearest lapsing.
 export function redeemablePassQuery(userId: string, performanceId: string, showId: string, now: number): SQL {
   return sql`
     SELECT p.id AS id, p.reference AS reference, t.name AS passTypeName
@@ -70,8 +68,7 @@ export async function redeemablePassFor(userId: string, performanceId: string, s
   return row
 }
 
-// What a lost race quotes (criterion 2): read after the write already decided, never trusted
-// from a check taken before it, so this is only what the refusal says.
+// What a lost race quotes (criterion 2): read after the write already decided.
 export async function alreadyAdmittedForPerformance(passId: string, performanceId: string): Promise<boolean> {
   const [row] = await db.all<{ found: number }>(sql`
     SELECT EXISTS (SELECT 1 FROM pass_admissions WHERE pass_id = ${passId} AND performance_id = ${performanceId}) AS found
@@ -79,14 +76,11 @@ export async function alreadyAdmittedForPerformance(passId: string, performanceI
   return row?.found === 1
 }
 
-// Criterion 2 and criterion 3, both contended, both on the one statement that spends the seat
-// (0003): once-per-performance is a fact about this exact pair, capacity a fact about the house,
-// and the pass's own terms re-asked here rather than trusted from a read taken earlier, because
-// a status can change between that read and this write.
-export function passAdmissionAllows(passId: string, performanceId: string, showId: string, now: number, capacity: number | null, exceptReservationId: string): SQL {
+// Criteria 2 and 3 as one predicate: once-per-performance and the pass's own terms, re-asked here
+// rather than trusted from a read taken earlier (0003). Capacity is `passAdmissionTicketInsert`'s own.
+export function passAdmissionAllows(passId: string, performanceId: string, showId: string, now: number): SQL {
   return sql`
-    ${capacityAllows(performanceId, capacity, 1, exceptReservationId)}
-    AND NOT EXISTS (SELECT 1 FROM pass_admissions WHERE pass_id = ${passId} AND performance_id = ${performanceId})
+    NOT EXISTS (SELECT 1 FROM pass_admissions WHERE pass_id = ${passId} AND performance_id = ${performanceId})
     AND EXISTS (
       SELECT 1 FROM passes p JOIN pass_types t ON t.id = p.pass_type_id
       WHERE p.id = ${passId} AND p.status = 'ACTIVE' AND t.status != 'CLOSED'
@@ -94,6 +88,21 @@ export function passAdmissionAllows(passId: string, performanceId: string, showI
         AND EXISTS (SELECT 1 FROM pass_type_shows s WHERE s.pass_type_id = t.id AND s.show_id = ${showId})
     )
   `
+}
+
+// The one row every redeemed pass ticket shares, created once and read every time after
+// (`ON CONFLICT` on the same name D-119 already protects, so a race leaves exactly one).
+export async function ensurePassAdmissionTicketType(): Promise<string> {
+  const [existing] = await db.all<{ id: string }>(sql`SELECT id FROM ticket_types WHERE kind = 'PASS_ADMISSION' LIMIT 1`)
+  if (existing) return existing.id
+
+  const id = newId()
+  await db.run(sql`
+    INSERT INTO ticket_types (id, name, price, kind) VALUES (${id}, 'Pass admission', 0, 'PASS_ADMISSION')
+    ON CONFLICT (name) DO NOTHING
+  `)
+  const [row] = await db.all<{ id: string }>(sql`SELECT id FROM ticket_types WHERE kind = 'PASS_ADMISSION' LIMIT 1`)
+  return row!.id
 }
 
 export interface RedeemPassWriteInput {
@@ -109,25 +118,6 @@ export interface RedeemPassWriteInput {
   actorId: string | null
 }
 
-// The one contended statement (criteria 2, 3), exported on its own so a racing test runs the
-// exact statement production runs rather than a hand-copied shape (tests/integration/races-pass-redemption.test.ts).
-// Zero-price and never collected at a desk, so there is nothing D-106's release sweep should ever
-// touch: `hold_expires_at` stays NULL, the same state a desk-collected booking ends in.
-export function passAdmissionTicketInsert(
-  input: Pick<RedeemPassWriteInput, 'passId' | 'performanceId' | 'showId' | 'capacity'>,
-  reservationId: string,
-  ticketId: string,
-  now: number,
-): SQL {
-  return sql`
-    INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source)
-    SELECT ${ticketId}, ${reservationId}, ${input.performanceId},
-           (SELECT id FROM ticket_types WHERE kind = 'PASS_ADMISSION' LIMIT 1), 0, 'BASE'
-    WHERE ${passAdmissionAllows(input.passId, input.performanceId, input.showId, now, input.capacity, reservationId)}
-    RETURNING id
-  `
-}
-
 export interface RedeemPassResult {
   applied: boolean
   reservationId?: string
@@ -135,34 +125,29 @@ export interface RedeemPassResult {
   ticketId?: string
 }
 
-// Race-safe (criterion 2): the once-per-performance and capacity predicates are the ticket
-// insert's own WHERE, so two concurrent redemptions of the same pass for the same performance
-// leave exactly one ticket, one admission and one ledger line (0001, D-105's own pattern).
+// Race-safe (criteria 2, 3): the contended guard rides the ticket insert's own WHERE
+// (`passAdmissionTicketInsert`, server/utils/capacity.ts), so a lost race writes nothing at all.
 export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): Promise<RedeemPassResult> {
   const reservationId = newId()
   const reference = generateReservationReference()
   const ticketId = newId()
   const admissionId = newId()
-  // Only used the first time any pass is ever redeemed; every later call's own INSERT matches
-  // nothing and writes no row (`WHERE NOT EXISTS`), so no seed step or migration owns this row.
-  const systemTicketTypeId = newId()
   const now = Math.floor(at.getTime() / 1000)
-
-  const ensureTicketType = sql`
-    INSERT INTO ticket_types (id, name, price, kind)
-    SELECT ${systemTicketTypeId}, 'Pass admission', 0, 'PASS_ADMISSION'
-    WHERE NOT EXISTS (SELECT 1 FROM ticket_types WHERE kind = 'PASS_ADMISSION')
-  `
+  const ticketTypeId = await ensurePassAdmissionTicketType()
 
   const reservationInsert = sql`
     INSERT INTO reservations (id, reference, performance_id, user_id, status, source, window_bypassed, hold_expires_at)
     VALUES (${reservationId}, ${reference}, ${input.performanceId}, ${input.userId}, 'PENDING', ${input.source}, 0, NULL)
   `
 
-  const ticketInsert = passAdmissionTicketInsert(input, reservationId, ticketId, now)
+  const ticketInsert = passAdmissionTicketInsert(
+    { id: ticketId, reservationId, performanceId: input.performanceId, ticketTypeId, pricePaid: 0, priceSource: 'BASE' },
+    passAdmissionAllows(input.passId, input.performanceId, input.showId, now),
+    input.capacity,
+  )
 
-  // Guarded on the ticket insert's own `changes()`: a ticket the guard above refused leaves
-  // nothing here to admit either, so a lost race writes neither (D-124's own `issuePass` shape).
+  // Guarded on the ticket insert's own `changes()`: a refused ticket leaves nothing to admit
+  // (D-124's own `issuePass` shape).
   const admissionInsert = sql`
     INSERT INTO pass_admissions (id, pass_id, performance_id, ticket_id, admitted_by)
     SELECT ${admissionId}, ${input.passId}, ${input.performanceId}, ${ticketId}, ${input.admittedBy}
@@ -174,8 +159,7 @@ export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): 
     source: input.source === 'DOOR' ? 'DESK' : 'SELF_SERVE',
     tender: 'NONE',
     actorId: input.actorId,
-    // Money that did not move, and still a fact (architecture.md): the pass is the price
-    // reference, so per-admission utilisation is queryable per pass (criterion 5).
+    // Zero-value: money that did not move, and still a fact (architecture.md, criterion 5).
     lines: [{
       kind: 'PASS_ADMISSION', amountPence: 0, qty: 1, unitPricePence: 0,
       reservationId, performanceId: input.performanceId, ticketId, priceRef: input.passId,
@@ -190,7 +174,6 @@ export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): 
   })
 
   const results = await db.batch([
-    db.run(ensureTicketType),
     db.run(reservationInsert),
     db.all<{ id: string }>(ticketInsert),
     db.all<{ id: string }>(admissionInsert),
@@ -202,12 +185,11 @@ export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): 
     `),
   ])
 
-  const ticketRows = results[2] as { id: string }[]
+  const ticketRows = results[1] as { id: string }[]
   const applied = ticketRows.length > 0
 
-  // A refused redemption holds nothing, so the empty reservation it left behind says so rather
-  // than sitting as a PENDING row no sweep has any reason to ever touch (writeReservation's own
-  // shape, D-104).
+  // A refused redemption holds nothing, so the empty reservation it left says so rather than
+  // sitting as a PENDING row no sweep has reason to touch (`writeReservation`'s own shape, D-104).
   if (!applied) {
     await db.run(sql`UPDATE reservations SET status = 'CANCELLED', updated_at = unixepoch() WHERE id = ${reservationId} AND status = 'PENDING'`)
   }

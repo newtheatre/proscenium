@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 import { sql } from 'drizzle-orm'
-import { passAdmissionTicketInsert } from '#server/utils/pass-redemption'
+import { passAdmissionTicketInsert } from '#server/utils/capacity'
+import { passAdmissionAllows } from '#server/utils/pass-redemption'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// D-125 criteria 2 and 3: once-per-performance and capacity are both asked on the ticket
-// insert's own WHERE (`passAdmissionTicketInsert`), so a race against either leaves exactly one
-// admission. Run directly against the database, the same reasoning tests/integration/races-shifts.test.ts gives.
+// D-125 criteria 2 and 3: once-per-performance and capacity are both on the ticket insert's own
+// WHERE, so a race against either leaves exactly one admission (tests/integration/races-shifts.test.ts's shape).
 
 function run(database: TestDatabase, statement: SQL): unknown[] {
   const [query, ...parameters] = boundStatement(database, statement)
@@ -74,8 +74,9 @@ describe('redeeming a pass: once-per-performance under a race (D-125 criterion 2
         const ticketId = `ticket-${index}`
         reservation(database, reservationId, tonight.performanceId, 'holder')
         const written = run(database, passAdmissionTicketInsert(
-          { passId: 'pass-race', performanceId: tonight.performanceId, showId: tonight.showId, capacity: 100 },
-          reservationId, ticketId, now,
+          { id: ticketId, reservationId, performanceId: tonight.performanceId, ticketTypeId: 'tt-pass-admission', pricePaid: 0, priceSource: 'BASE' },
+          passAdmissionAllows('pass-race', tonight.performanceId, tonight.showId, now),
+          100,
         ))
         admit(database, 'pass-race', tonight.performanceId, ticketId)
         return { status: written.length === 1 ? 200 : 409 }
@@ -111,9 +112,11 @@ describe('redeeming a pass: capacity still applies in full under a race (D-125 c
         const holder = index === 0 ? 'holder-one' : 'holder-two'
         const reservationId = `reservation-cap-${index}`
         reservation(database, reservationId, tonight.performanceId, holder)
+        const ticketId = `ticket-cap-${index}`
         const written = run(database, passAdmissionTicketInsert(
-          { passId, performanceId: tonight.performanceId, showId: tonight.showId, capacity: 1 },
-          reservationId, `ticket-cap-${index}`, now,
+          { id: ticketId, reservationId, performanceId: tonight.performanceId, ticketTypeId: 'tt-pass-admission', pricePaid: 0, priceSource: 'BASE' },
+          passAdmissionAllows(passId, tonight.performanceId, tonight.showId, now),
+          1,
         ))
         return { status: written.length === 1 ? 200 : 409 }
       })

@@ -2,9 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { passRedemptionRefusal, redeemPassForm } from '#shared/utils/passes'
 import type { PassRedemptionState } from '#shared/utils/passes'
 
-// D-125 as pure rules. The database enforcement (once-per-performance, capacity, both under a
-// race) is in tests/integration/races-pass-redemption.test.ts; the full flow is
-// tests/e2e/pass-redemption.test.ts.
+// D-125 as pure rules. The database enforcement is tests/integration/races-pass-redemption.test.ts;
+// the full flow is tests/e2e/pass-redemption.test.ts.
 
 const eligible: PassRedemptionState = {
   status: 'ACTIVE',
