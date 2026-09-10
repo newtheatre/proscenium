@@ -116,20 +116,42 @@ describe('reportForPerformanceQuery', () => {
 })
 
 describe('addAddendumStatement and addendaForReportQuery (criterion 5)', () => {
-  test('more than one addendum is allowed, returned oldest first', async () => {
+  test('inserts a correction, readable back with its author\'s name', async () => {
     await withDatabase((database) => {
       const dm = person(database, 'signer-addenda')
+      database.batch([['UPDATE users SET name = ? WHERE id = ?', 'Alex Addendum', dm]])
       const { performanceId, venueId, night } = house(database, 'signoff-addenda')
       run(database, signOffStatement({
         id: 'report-addenda', performanceId, venueId, night, closingNote: 'Note', report: { ...REPORT, performanceId },
         signedBy: dm, signedVia: 'SHIFT',
       }))
 
-      database.raw.exec(`UPDATE night_reports SET signed_at = 1000000000 WHERE id = 'report-addenda'`)
-      run(database, addAddendumStatement({ id: 'addendum-1', reportId: 'report-addenda', note: 'First correction', addedBy: dm }))
-      run(database, addAddendumStatement({ id: 'addendum-2', reportId: 'report-addenda', note: 'Second correction', addedBy: dm }))
+      run(database, addAddendumStatement({ id: 'addendum-1', reportId: 'report-addenda', note: 'A correction', addedBy: dm }))
 
-      const entries = run(database, addendaForReportQuery('report-addenda'))
+      const [entry] = run(database, addendaForReportQuery('report-addenda'))
+      expect(entry).toMatchObject({ note: 'A correction', addedByName: 'Alex Addendum' })
+    })
+  })
+
+  test('more than one addendum is allowed, returned oldest first', async () => {
+    await withDatabase((database) => {
+      const dm = person(database, 'signer-addenda-order')
+      const { performanceId, venueId, night } = house(database, 'signoff-addenda-order')
+      run(database, signOffStatement({
+        id: 'report-addenda-order', performanceId, venueId, night, closingNote: 'Note', report: { ...REPORT, performanceId },
+        signedBy: dm, signedVia: 'SHIFT',
+      }))
+
+      // Explicit, distinct timestamps: `addAddendumStatement` defaults to `unixepoch()`, too
+      // coarse to separate two inserts made in the same test.
+      database.batch([
+        ['INSERT INTO night_report_addenda (id, report_id, note, added_by, added_at) VALUES (?, ?, ?, ?, ?)',
+          'addendum-order-1', 'report-addenda-order', 'First correction', dm, 1000],
+        ['INSERT INTO night_report_addenda (id, report_id, note, added_by, added_at) VALUES (?, ?, ?, ?, ?)',
+          'addendum-order-2', 'report-addenda-order', 'Second correction', dm, 2000],
+      ])
+
+      const entries = run(database, addendaForReportQuery('report-addenda-order'))
       expect(entries.map(entry => entry.note)).toEqual(['First correction', 'Second correction'])
     })
   })

@@ -943,7 +943,7 @@ refuses ambiguity with (E-127 criterion 1).
 
 ### Sign-off, freeze and distribution (E-124)
 
-`POST /api/tonight/report/sign-off`, `POST /api/tonight/report/addenda` and
+`POST /api/tonight/report/sign-off`, `POST /api/admin/night-reports/addenda` and
 `server/utils/night-signoff.ts`, over three tables, each append-only and trigger-enforced like
 `incidents` (0010): `night_reports` (one row per performance, `UNIQUE` on `performance_id`),
 `night_report_addenda` (a correction, never an edit) and `night_report_deliveries` (one row per
@@ -965,14 +965,18 @@ deduplicated, one `sendRaw()` per recipient and one `night_report_deliveries` ro
 `SENT` or `FAILED` (criterion 4). `sendRaw()` is `notify.ts`'s one sanctioned raw-address path:
 the standing list is committee configuration, not necessarily an account, so this bypasses
 `notify()`'s per-user preference and topic machinery entirely. Automatic retry until delivered
-and the operations-dashboard surfacing criterion 4 also asks for are H-105 and H-106's own build;
-today a failed send stops after the one attempt, recorded as `FAILED`.
+and the operations-dashboard surfacing criterion 4 also asks for are H-105 and H-106's own scope,
+not this route's: H-105 has since shipped `notifyAddress()` for exactly this shape of send, but
+this file predates it and is not yet wired to it (`docs/known-issues.md`), so a failed send here
+stops after the one attempt, recorded as `FAILED` rather than retried.
 
-An addendum (`POST /api/tonight/report/addenda`) is not shift-scoped: a correction can be found
+An addendum (`POST /api/admin/night-reports/addenda`) is not shift-scoped: a correction can be found
 days after the night ends, when nobody holds a live shift on it any more, so the guard is the
-standing permission `night.manage` rather than `requireNightAuthority` (criterion 5). It
-distributes the same way, `addendumId` on its own `night_report_deliveries` rows distinguishing
-it from the original send.
+standing permission `night.manage` rather than `requireNightAuthority` (criterion 5). It lives
+under `/api/admin`, not `/api/tonight`, because that guard is the property `tests/unit/night-authority.test.ts`
+enforces of every route in the latter namespace (E-111 criterion 5): a route that cannot use
+`requireNightAuthority` does not belong there. It distributes the same way, `addendumId` on its
+own `night_report_deliveries` rows distinguishing it from the original send.
 
 `GET /api/tonight/report` reads `night_reports` first: once a performance is signed off, the
 frozen `report` column is what returns, verbatim, with `signedOff` and `addenda` alongside it,

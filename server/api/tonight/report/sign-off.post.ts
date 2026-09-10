@@ -1,9 +1,9 @@
-import { signOffForm } from '#shared/utils/night-signoff'
+import { nightSignOffForm } from '#shared/utils/night-signoff'
 
 // Sign off tonight's report: the checklist gate, then the freeze (E-124 criteria 1, 2, 3).
 // A second sign-off for the same performance refuses, race-safe by predicate (0006).
 export default defineEventHandler(async (event) => {
-  const input = await readValidatedBodyOrThrow(event, signOffForm)
+  const input = await readValidatedBodyOrThrow(event, nightSignOffForm)
   const resolved = await requireNightAuthority(event, 'DUTY_MANAGER', input.performanceId ? { performanceId: input.performanceId } : {})
 
   const target = input.performanceId ?? resolved.performanceIds[0]

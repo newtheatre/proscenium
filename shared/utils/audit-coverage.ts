@@ -263,6 +263,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
   {
+    route: 'server/api/tonight/report/sign-off.post.ts',
+    actions: ['night-report.signed', 'night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+  {
     route: 'server/api/tonight/age-checks/index.get.ts',
     actions: ['night.officer-bypass'],
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
@@ -339,6 +344,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/safety/open-items.get.ts', exempt: 'reads the open-items list, gated by the safety officer\'s own permission' },
   { route: 'server/api/admin/safety/incidents/[id]/close.post.ts', actions: ['incident-followup.closed'] },
   { route: 'server/api/admin/age-checks/export.get.ts', actions: ['age-checks.exported'] },
+  { route: 'server/api/admin/night-reports/addenda.post.ts', actions: ['night-report.addendum'] },
   {
     route: 'server/api/tonight/board/code.get.ts',
     actions: ['night.officer-bypass'],

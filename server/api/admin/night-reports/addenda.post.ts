@@ -1,9 +1,9 @@
-import { addendumForm } from '#shared/utils/night-signoff'
+import { nightAddendumForm } from '#shared/utils/night-signoff'
 
 // A correction to a frozen report: a new row naming what it corrects, never an edit (criterion
 // 5). Not shift-scoped like sign-off itself: a correction may be found days after the night.
 export default defineEventHandler(async (event) => {
-  const input = await readValidatedBodyOrThrow(event, addendumForm)
+  const input = await readValidatedBodyOrThrow(event, nightAddendumForm)
   const resolved = await requirePermission(event, 'night.manage')
 
   const row = await reportForPerformance(input.performanceId)

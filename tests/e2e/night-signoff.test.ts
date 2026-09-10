@@ -189,7 +189,7 @@ describe.skipIf(skip !== null)('the report freezes (E-123 criterion 4, E-124 cri
 describe.skipIf(skip !== null)('addenda (criterion 5)', () => {
   test('refuses a correction to a performance nobody has signed off yet', async () => {
     const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'addendum-unsigned' }))
-    const refused = await send('POST', '/api/tonight/report/addenda', { performanceId, note: 'Too soon' })
+    const refused = await send('POST', '/api/admin/night-reports/addenda', { performanceId, note: 'Too soon' })
     expect(refused.status).toBe(404)
   })
 
@@ -200,7 +200,7 @@ describe.skipIf(skip !== null)('addenda (criterion 5)', () => {
     closeChecklist(venueId, night, dm.id, 'addendum')
     await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Original note' }, dm.cookie)
 
-    const added = await send('POST', '/api/tonight/report/addenda', { performanceId, note: 'The bar float was miscounted' })
+    const added = await send('POST', '/api/admin/night-reports/addenda', { performanceId, note: 'The bar float was miscounted' })
     expect(added.status).toBe(200)
 
     const after = await send('GET', `/api/tonight/report?performanceId=${performanceId}`, undefined, dm.cookie)
@@ -223,7 +223,7 @@ describe.skipIf(skip !== null)('addenda (criterion 5)', () => {
     closeChecklist(venueId, night, dm.id, 'addendum-guard')
     await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Note' }, dm.cookie)
 
-    const refused = await send('POST', '/api/tonight/report/addenda', { performanceId, note: 'Not my call' }, stranger.cookie)
+    const refused = await send('POST', '/api/admin/night-reports/addenda', { performanceId, note: 'Not my call' }, stranger.cookie)
     expect(refused.status).toBe(403)
   })
 })
