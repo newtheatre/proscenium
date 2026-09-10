@@ -44,6 +44,15 @@ bun migration/transform-bookings.ts /tmp/rehearsal.db   # the old rooms history,
 bun migration/transform-money.ts /tmp/rehearsal.db      # ticket revenue, same target
 ```
 
+## Proving the pipeline without a real export
+
+`bun migration/dry-run-synthetic.ts` runs identity, load, bookings and money end to end against
+synthetic data built in the script itself, never against `dumps/` or `out/`. It exists because no
+existing test populated `identity.ts`'s `mirrors` with real content or seeded an unmapped account
+in `bookings.ts`, so K-113's own exception paths, cited in `identity.ts`'s own comments, had never
+actually fired anywhere. It does not exercise `export.sh`, `inventory.ts` or `reconcile.ts`
+themselves, which read real files; it proves the transforms, not the file-handling around them.
+
 **`transform-bookings.ts` and `transform-money.ts` take the target as an argument and refuse to
 run without one, on purpose.** Unlike identity, `room_bookings.room_id` and
 `external_requests`' own room reference are real foreign keys onto rooms administered through the
