@@ -1,6 +1,5 @@
-// Lapses offers past their window, then re-offers the seat each lapse just gave back to the next
-// entry in the queue (D-113 criteria 2, 3). Every other freeing event offers inline, at the point
-// that frees the seat; this is the one that has no such point to hook.
+// Lapses offers past their window, then re-offers the seat each lapse gives back (D-113 criteria
+// 2, 3). Every other freeing event offers inline; this is the one with no such point to hook.
 export default defineTask({
   meta: {
     name: 'waiting-list:sweep',

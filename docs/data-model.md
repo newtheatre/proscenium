@@ -341,10 +341,10 @@ because `saleRefusal()` refuses an unpublished show, so republishing restores th
 
 **"Has sold tickets" is a count over rows, never a column.** `PERFORMANCE_REFERENCES` in
 `server/utils/programme.ts` declares every table that points at `performances` and whether a row
-there means a seat is held. The price overrides are configuration and are not; `reservations`
-holds nothing itself, and `tickets` is the one classified `sold: true` (D-104). `waiting_list`
-will be, when D-113 builds it. An integration test reads the live foreign keys and fails when a
-new referencing table is not classified.
+there means a seat is held. The price overrides are configuration and are not; `reservations` and
+`waiting_list` hold nothing themselves, and `tickets` is the one classified `sold: true` (D-104).
+An integration test reads the live foreign keys and fails when a new referencing table is not
+classified.
 
 **The public programme (D-101).** `/whats-on` is the listing and `/shows/[slug]` is one show, over
 two routes that take no session at all:
@@ -666,11 +666,50 @@ the UPDATE that lowers it (`loweringPredicate()`), so a booking landing mid-requ
 under the new figure. Index (`performance_id`, `refunded_at`).
 
 ### waiting_list
-`id` PK · `performance_id` → performances cascade · `user_id` NULL → users · `email`
-(guests) · `joined_at` · `status` CHECK `WAITING|OFFERED|CLAIMED|LAPSED|LEFT` ·
-`offered_at` · `offer_expires_at` · `claimed_reservation_id` NULL.
-Partial UNIQUE (`performance_id`, `email`) WHERE status IN ('WAITING','OFFERED'). Offers
-cascade in join order; the claim is a conditional write.
+`id` PK · `performance_id` → performances restrict · `user_id` → users restrict, a real or guest
+account exactly as `reservations.user_id` is, never a bare email column · `party_size` CHECK
+1–10 · `status` CHECK `WAITING|OFFERED|CLAIMED|LAPSED|REMOVED` · `offered_at` / `offer_expires_at`,
+set and cleared together · `claimed_reservation_id` → reservations set null · timestamps.
+Partial UNIQUE (`performance_id`, `user_id`) WHERE `status IN ('WAITING', 'OFFERED')` is
+criterion 1's refusal: a second join is simply not inserted, never checked first (0006). No CHECK
+pairs `status = 'CLAIMED'` with `claimed_reservation_id`: the claim marks `CLAIMED` in its own
+race-safe statement first, and only learns the reservation id afterward from a separate batch.
+
+**Offering (D-113 criterion 2).** `offerWaitingList()` in `server/utils/waiting-list.ts` walks
+`WAITING` entries oldest first, budgeted against `capacity` minus what `heldSeatsQuery()` already
+reports held, and stops the moment the next entry's party does not fit rather than skipping ahead
+to a smaller one further down the queue. Each offer's window is
+`WAITING_LIST_OFFER_WINDOW_MINUTES`, capped at the performance's own `starts_at` so an offer never
+promises a seat for a show already under way. Every seat-freeing write offers inline once it
+commits: `releaseExpiredHolds()` (D-106), the self-service cancel (`POST /api/qr/cancel`, D-110),
+a desk refund (`POST /api/box-office/desk/reservations/[id]/tickets/[ticketId]/refund`, D-116) and
+a raised capacity (`PUT /api/admin/performances/[id]`). The `waiting-list:sweep` task (every ten
+minutes) lapses offers past their window and re-offers the seat each lapse gives back, the one
+freeing event with no write of its own to hook (criterion 3).
+
+**The claim (criterion 2, 3).** `claimEntryStatement()` is the race: `UPDATE ... SET status =
+'CLAIMED' WHERE status = 'OFFERED' AND offer_expires_at > now`, so only one of two concurrent
+claims on the same offer can ever return a row. `claimWaitingListOffer()` then resolves bookable
+ticket types the same way the public booking screen does and calls `writeReservation()`, D-104's
+own write path, unmodified: the claim becomes an ordinary `PENDING` reservation, capacity-checked
+again at that exact moment. A failed write (capacity gone in the interim) reopens the entry as
+`OFFERED` rather than leaving it stranded `CLAIMED`.
+
+**Tokens and routes.** `waitingListTokenFor()`/`verifyWaitingListToken()`
+(`server/utils/waiting-list-tokens.ts`) are D-108's QR scheme again, HMAC over the entry id alone
+(`NUXT_WAITING_LIST_TOKEN_SECRET`). `POST /api/performances/[id]/waiting-list` joins; `GET
+/api/waiting-list/[token]` shows the entry's state and, while an offer stands, the ticket types it
+may be claimed against; `POST /api/waiting-list/[token]/claim` claims; `POST
+/api/waiting-list/[token]/remove` leaves the list, accepted at any time except once claimed, and
+the same link every waiting-list email carries. The desk's own view, `GET
+/api/box-office/desk/performances/[id]/waiting-list`, is the length and next entries (criterion
+5); `POST .../waiting-list/offer` runs the identical offering rule on demand.
+
+**Purging (criterion 4).** `waiting-list:purge` (daily) deletes every entry for a performance
+once its whole show night has ended (0014), not merely after curtain: `showNightBounds()` decides
+in application code, scoped per performance so the deleted-row count never binds one parameter
+per person who joined (0006). Not append-only, unlike the ledger or audit log: nothing else reads
+a waiting-list row once it is gone.
 
 ### pass_types / pass_type_prices / pass_type_shows
 As the old model: product (`slug` UNIQUE, `status` CHECK `DRAFT|ON_SALE|CLOSED`, validity and

@@ -3,8 +3,7 @@ import { formatLondon } from '#shared/utils/london'
 import type { H3Event } from 'h3'
 
 // Kept apart from server/utils/waiting-list.ts, which `tests/` imports directly under Bun:
-// `useRuntimeConfig()` needs a real Nitro runtime, so nothing reachable from a unit test may call it
-// (reservation-confirmation.ts, pass-confirmation.ts, the same split for the same reason).
+// `useRuntimeConfig()` needs a real Nitro runtime (reservation-confirmation.ts, the same split).
 
 export interface WaitingListJoinedContext {
   userId: string
@@ -25,7 +24,7 @@ export async function sendWaitingListJoined(event: H3Event | undefined, context:
       show: context.showTitle,
       when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       partySize: context.partySize,
-      removeUrl: `${useRuntimeConfig(event).public.baseURL}/waiting-list/${context.token}/remove`,
+      removeUrl: `${useRuntimeConfig(event).public.baseURL}/waiting-list/leave/${context.token}`,
     },
   })
 }
@@ -50,8 +49,8 @@ export async function sendWaitingListOffered(event: H3Event | undefined, context
       show: context.showTitle,
       when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       expires: formatLondon(new Date(context.expiresAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
-      claimUrl: `${base}/waiting-list/${context.token}`,
-      removeUrl: `${base}/waiting-list/${context.token}/remove`,
+      claimUrl: `${base}/waiting-list/entry/${context.token}`,
+      removeUrl: `${base}/waiting-list/leave/${context.token}`,
     },
   })
 }

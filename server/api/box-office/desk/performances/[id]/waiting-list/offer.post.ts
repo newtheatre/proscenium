@@ -1,6 +1,5 @@
 // A manual offer, triggered by an officer rather than the automatic sweep, for example after an
-// informal return the sweep has no way to see yet (D-113 criterion 5). The same offering rule
-// either way: capacity-budgeted, strict join order.
+// informal return the sweep cannot see (D-113 criterion 5). Same rule either way: budgeted, in order.
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'ticketing.write')
   const id = getRouterParam(event, 'id') ?? ''

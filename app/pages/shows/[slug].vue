@@ -286,6 +286,15 @@ function saysInterval(performance: Listed): string {
             >
               Book
             </UButton>
+            <UButton
+              v-else-if="performance.availability === 'SOLD_OUT'"
+              :to="`/waiting-list/${performance.id}`"
+              variant="subtle"
+              size="sm"
+              :data-test="`waiting-${performance.id}`"
+            >
+              Join the waiting list
+            </UButton>
           </div>
         </div>
 

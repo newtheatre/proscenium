@@ -51,9 +51,8 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Seats one public order may hold. The box office is uncapped.',
   },
-  // Open in the backlog (docs/backlog/D-ticketing.md): whether the window should shorten on the
-  // day of the performance is unresolved. Shipped as a proposed value rather than left unset, so
-  // the feature is live rather than dormant (0019); the window never outlives curtain regardless.
+  // Whether the window should shorten nearer the performance is an open backlog question (0019);
+  // it never outlives curtain regardless (docs/backlog/D-ticketing.md).
   WAITING_LIST_OFFER_WINDOW_MINUTES: {
     schema: z.number().int().positive(),
     default: 120,

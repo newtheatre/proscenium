@@ -339,6 +339,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'keep',
     why: 'Who reinstated a lapsed hold and why is what the booking\'s own history audits to; the tombstone still answers for it.',
   },
+  {
+    name: 'waiting_list',
+    column: 'user_id',
+    section: 'waiting-list',
+    columns: ['performance_id', 'party_size', 'status', 'created_at'],
+    erasure: 'keep',
+    // No free text anywhere on this row: the reference resolves to the tombstone the user row
+    // became, the same as room_no_shows (D-113).
+    why: 'How many people were waiting for a performance must survive; nothing here names them beyond the account itself.',
+  },
 
   // Module E: show night
 

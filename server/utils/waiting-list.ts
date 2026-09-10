@@ -5,8 +5,7 @@ import { auditedWrite } from './audit'
 import { hasCurrentMembership } from './bookings'
 import { heldSeatsQuery } from './capacity'
 import { configValue } from './configuration'
-import { effectiveCapacity } from './performances'
-import { performanceNight } from './performances'
+import { effectiveCapacity, performanceNight } from './performances'
 import { performanceById } from './programme'
 import { bookableTicketTypes, writeReservation } from './reservations'
 import { auditEntry } from '#shared/utils/audit'
@@ -105,9 +104,8 @@ export interface OfferedWaitingListEntry {
 
 export interface OfferWaitingListRun {
   eligible: number
-  // What just went out, for the caller to notify: minting a token and sending a message both
-  // need a live Nitro runtime, so neither happens in this file (`server/utils/waiting-list-notify.ts`
-  // does it instead, the same split `qrTokenFor` and `writeReservation` already keep, D-104).
+  // What just went out, for the caller to notify: minting a token needs a live Nitro runtime,
+  // so `server/utils/waiting-list-notify.ts` does it, the split `qrTokenFor` already keeps.
   offered: OfferedWaitingListEntry[]
 }
 
@@ -173,9 +171,8 @@ export interface LapseOffersRun {
   performanceIds: string[]
 }
 
-// `auditedWrite` is 0049's shape, the same one `releaseExpiredHolds` uses for the identical
-// unpaid-hold sweep: a row already moved by something else writes no trail for a lapse that
-// did not happen.
+// `auditedWrite` is 0049's shape, the one `releaseExpiredHolds` uses too: a row already moved
+// writes no trail for a lapse that did not happen.
 export async function lapseExpiredOffers(at: Date, cap: number): Promise<LapseOffersRun> {
   const now = Math.floor(at.getTime() / 1000)
   const candidates = await db.all<ExpiredOfferRow>(expiredOffersQuery(now, cap))
@@ -301,8 +298,7 @@ export function claimEntryStatement(entryId: string, at: number): SQL {
 }
 
 // Criterion 2 and 3: the claim, race-safe. `claimEntryStatement` is the arbiter of "claimed
-// twice": only one concurrent claim can win it, and everything after runs at most once.
-// Always called from a route, never a task, so the event is real (`hasCurrentMembership` needs one).
+// twice"; always called from a route, so the event is real (`hasCurrentMembership` needs one).
 export async function claimWaitingListOffer(event: H3Event, entry: WaitingListEntryForToken, input: ClaimWaitingListOfferInput): Promise<ClaimWaitingListOfferResult> {
   const now = new Date()
   const nowSeconds = Math.floor(now.getTime() / 1000)
@@ -390,9 +386,8 @@ export function purgeCandidatesQuery(before: number, cap: number): SQL {
   `
 }
 
-// Criterion 4: purged once that performance's whole night has ended (0014), not merely after
-// curtain, and scoped by performance rather than by entry: the bound parameter count follows how
-// many nights just ended, never how many people joined a list (0006).
+// Criterion 4: purged once the whole night has ended (0014), not merely after curtain, scoped
+// by performance so the parameter count follows nights ending, never people who joined (0006).
 export async function purgeWaitingListForEndedNights(at: Date, cap: number): Promise<PurgeWaitingListRun> {
   const now = Math.floor(at.getTime() / 1000)
   const candidates = await db.all<PurgeCandidateRow>(purgeCandidatesQuery(now, cap))

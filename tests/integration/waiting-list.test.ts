@@ -13,9 +13,8 @@ import { boundStatement, createTestDatabase, rows } from '#tests/helpers/databas
 import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 
-// D-113 against the real migrations. `offerWaitingList`, `claimWaitingListOffer` and friends read
-// live config and the real `db` binding, so what is tested here is the statement each one runs:
-// the same split tests/integration/holds.test.ts uses for D-106.
+// D-113 against the real migrations. The async functions read live config and the real `db`
+// binding, so what is tested is the statement each one runs, as tests/integration/holds.test.ts does.
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()
@@ -217,8 +216,8 @@ describe('purge candidates are performances at or past curtain (criterion 4)', (
       const seeded = tonightsPerformance(database)
       join(database, 'w-1', seeded.performanceId, 'u-1')
       join(database, 'w-2', seeded.performanceId, 'u-2')
-      const found = rows<{ performanceId: string }>(database, ...boundStatement(database, purgeCandidatesQuery(seeded.startsAt + 100_000, 10)))
-      expect(found).toEqual([{ performanceId: seeded.performanceId }])
+      const found = rows<{ performanceId: string, startsAt: number }>(database, ...boundStatement(database, purgeCandidatesQuery(seeded.startsAt + 100_000, 10)))
+      expect(found).toEqual([{ performanceId: seeded.performanceId, startsAt: seeded.startsAt }])
     })
   })
 })

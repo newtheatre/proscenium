@@ -1,6 +1,5 @@
 // Deletes waiting-list entries once their performance's whole show night has ended (D-113
-// criterion 4). Not append-only, unlike the ledger or audit log: nothing else depends on these
-// rows surviving (CLAUDE.md).
+// criterion 4). Not append-only, unlike the ledger or audit log (CLAUDE.md).
 export default defineTask({
   meta: {
     name: 'waiting-list:purge',
