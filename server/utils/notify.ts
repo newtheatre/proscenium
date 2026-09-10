@@ -203,12 +203,16 @@ async function resolveById(id: string, status: Status, error: string | null, pay
 
 interface Rendered { subject: string, html: string, text: string }
 
-function storedMessage(payload: string | null): Rendered | null {
+// A send with no account carries its recipient here, because there is no account to resolve one
+// from at the next attempt. Cleared with the rest of the payload the moment it settles (0055).
+interface StoredMessage extends Rendered { to?: string }
+
+function storedMessage(payload: string | null): StoredMessage | null {
   if (!payload) return null
   try {
-    const parsed = JSON.parse(payload) as Partial<Rendered>
+    const parsed = JSON.parse(payload) as Partial<StoredMessage>
     if (!parsed.subject || !parsed.text) return null
-    return { subject: parsed.subject, html: parsed.html ?? '', text: parsed.text }
+    return { subject: parsed.subject, html: parsed.html ?? '', text: parsed.text, ...(parsed.to ? { to: parsed.to } : {}) }
   }
   catch {
     return null
@@ -234,9 +238,18 @@ export async function resend(event: H3Event | undefined, id: string, maxAttempts
   // A type retired from the catalogue between the attempts cannot be rendered or judged, so the
   // row says so rather than throwing inside a sweep.
   const type = isMessageType(row.type) ? messageType(row.type) : null
-  const account = row.userId ? await findById(row.userId) : undefined
-  if (!type || !account) {
-    await resolveById(id, 'SKIPPED_UNDELIVERABLE', type ? 'no-account' : 'unregistered-type', null)
+  if (!type) {
+    await resolveById(id, 'SKIPPED_UNDELIVERABLE', 'unregistered-type', null)
+    return 'SKIPPED_UNDELIVERABLE'
+  }
+
+  // A configured recipient has no account, no preference and no address to re-resolve, so it is
+  // judged on the address it carries and nothing else (E-124, 0055).
+  if (!row.userId) return await resendToAddress(event, id, type, message, row.attempts, maxAttempts)
+
+  const account = await findById(row.userId)
+  if (!account) {
+    await resolveById(id, 'SKIPPED_UNDELIVERABLE', 'no-account', null)
     return 'SKIPPED_UNDELIVERABLE'
   }
 
@@ -259,7 +272,7 @@ export async function resend(event: H3Event | undefined, id: string, maxAttempts
   const sender = type.sender ? SENDERS[type.sender] : type.topic ? senderForTopic(type.topic) : SENDERS.ACCOUNTS
 
   try {
-    await transportFor(event).send({ to: account.email, from: formatSender(sender), ...message })
+    await transportFor(event).send({ to: account.email, from: formatSender(sender), ...withoutRecipient(message) })
     await resolveById(id, 'SENT', null, null)
     return 'SENT'
   }
@@ -268,6 +281,88 @@ export async function resend(event: H3Event | undefined, id: string, maxAttempts
     const spent = outOfAttempts(row.attempts + 1, maxAttempts)
     await resolveById(id, spent ? 'FAILED_FINAL' : 'FAILED', said, spent ? null : row.payload)
     return spent ? 'FAILED_FINAL' : 'FAILED'
+  }
+}
+
+// The recipient rides on the payload for an account-less send, and is not part of the message.
+function withoutRecipient(message: StoredMessage): Rendered {
+  return { subject: message.subject, html: message.html, text: message.text }
+}
+
+async function resendToAddress(event: H3Event | undefined, id: string, type: MessageType, message: StoredMessage, attempts: number, maxAttempts: number): Promise<Status> {
+  if (!message.to) {
+    await resolveById(id, 'FAILED_FINAL', 'no recipient on the row', null)
+    return 'FAILED_FINAL'
+  }
+
+  const undeliverable = undeliverableReason({ email: message.to, anonymisedAt: null })
+  if (undeliverable) {
+    await resolveById(id, 'SKIPPED_UNDELIVERABLE', undeliverable, null)
+    return 'SKIPPED_UNDELIVERABLE'
+  }
+
+  const sender = type.sender ? SENDERS[type.sender] : type.topic ? senderForTopic(type.topic) : SENDERS.ACCOUNTS
+
+  try {
+    await transportFor(event).send({ to: message.to, from: formatSender(sender), ...withoutRecipient(message) })
+    await resolveById(id, 'SENT', null, null)
+    return 'SENT'
+  }
+  catch (error) {
+    const said = error instanceof Error ? error.message : String(error)
+    const spent = outOfAttempts(attempts + 1, maxAttempts)
+    await resolveById(id, spent ? 'FAILED_FINAL' : 'FAILED', said, spent ? null : JSON.stringify(message))
+    return spent ? 'FAILED_FINAL' : 'FAILED'
+  }
+}
+
+export interface AddressedNotification {
+  type: string
+  // A configured operational address rather than an account: a night report's recipient list,
+  // for instance. No preference and no verification apply, because there is nobody to ask.
+  to: string
+  context: TemplateContext
+  claim?: string
+}
+
+// Sends to a configured address, logging a row with no `user_id` that the retry sweep drives
+// exactly like any other. The one path for a recipient the system holds no account for (E-124).
+export async function notifyAddress(event: H3Event | undefined, notification: AddressedNotification): Promise<Status> {
+  const type = messageType(notification.type)
+  const logged = { userId: null, type: notification.type, channel: 'EMAIL' as Channel, claim: notification.claim }
+
+  const undeliverable = undeliverableReason({ email: notification.to, anonymisedAt: null })
+  if (undeliverable) {
+    await record({ ...logged, status: 'SKIPPED_UNDELIVERABLE', error: undeliverable })
+    return 'SKIPPED_UNDELIVERABLE'
+  }
+
+  const sender = type.sender ? SENDERS[type.sender] : type.topic ? senderForTopic(type.topic) : SENDERS.ACCOUNTS
+  const rendered = render(type.template, notification.context)
+
+  try {
+    await transportFor(event).send({ to: notification.to, from: formatSender(sender), ...rendered })
+    await record({ ...logged, status: 'SENT', subject: rendered.subject, attempted: true })
+    return 'SENT'
+  }
+  catch (error) {
+    const said = error instanceof Error ? error.message : String(error)
+    const maxAttempts = await configValue(event, 'NOTIFICATION_MAX_ATTEMPTS')
+    if (outOfAttempts(1, maxAttempts)) {
+      await record({ ...logged, status: 'FAILED_FINAL', subject: rendered.subject, error: said, attempted: true })
+      return 'FAILED_FINAL'
+    }
+
+    // The recipient rides with the message, because no account will resolve one next time.
+    await record({
+      ...logged,
+      status: 'FAILED',
+      subject: rendered.subject,
+      error: said,
+      attempted: true,
+      payload: JSON.stringify({ ...rendered, to: notification.to }),
+    })
+    return 'FAILED'
   }
 }
 
