@@ -47,10 +47,8 @@ function upsert(table: string, row: Record<string, unknown>): string {
   const values = columns.map(column => literal(row[column])).join(', ')
   const keys = CONFLICT[table]!
   const personId = literal(row[PERSON_COLUMN[table]!])
-  // An anonymised person is never written back over (0011): the source cannot know they were
-  // erased here, so the guard, not the source, is what stops the credential this table holds
-  // for them from being reinstated. A false guard means the SELECT yields no row, so neither
-  // the insert nor the conflict update below ever runs.
+  // An anonymised person is never written back over (0011, 0059): a false guard means the
+  // SELECT yields no row, so neither the insert nor the conflict update below ever runs.
   const guard = `NOT EXISTS (SELECT 1 FROM users WHERE id = ${personId} AND anonymised_at IS NOT NULL)`
   const insert = `INSERT INTO ${table} (${columns.join(', ')}) SELECT ${values} WHERE ${guard}`
   if (!keys.length) return `${insert};`
