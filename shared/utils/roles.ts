@@ -111,6 +111,9 @@ export const PERMISSIONS = [
   // The season dashboard's aggregate figures, without the entry-level drill-down `finance.read`
   // carries (I-105 criterion 5): the committee sees how the season is doing, not who rang it in.
   'finance.summary',
+  // Reopening a closed period. Deliberately not TREASURER's: I-107 criterion 4 asks for an
+  // administrator, so ADMIN's automatic grant of every permission is what answers it.
+  'finance.reopen',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

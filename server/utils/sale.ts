@@ -6,7 +6,7 @@ import { createError } from 'h3'
 import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, resolvedPriceColumns } from '#server/utils/bar'
 import { ageCheckConstraintRefusal } from '#shared/utils/age-checks'
 import { discountedPence } from '#shared/utils/discounts'
-import { postEntry } from '#server/utils/ledger'
+import { postEntry, runLedgerBatch } from '#server/utils/ledger'
 import { isDutyOrBarManager } from '#server/utils/bar-authority'
 import { authorisedTabHolder, outstandingTabBalance } from '#server/utils/tab-holders'
 import { claimCompRequestForSale, compRequestById, compRequestLines, releaseCompRequestClaim } from '#server/utils/comps'
@@ -451,7 +451,7 @@ export async function commitSale(
   }
 
   try {
-    await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+    await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
   }
   catch (error) {
     // The trigger's predicate is what refuses an oversell (0070); a read-then-check here would
@@ -601,7 +601,7 @@ export async function commitCompSale(
   }
 
   try {
-    await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+    await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
   }
   catch (error) {
     // Frees the request rather than losing it to a claim that never became a sale: a restock and a

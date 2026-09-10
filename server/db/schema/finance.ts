@@ -38,3 +38,24 @@ export const zReadings = sqliteTable('z_readings', {
   // names what it resolves (criterion 4): nothing is written off that nothing else named first.
   check('z_readings_write_off_resolves_a_variance', sql`${table.writtenOff} = 0 OR (${table.variancePence} <> 0 AND ${table.supersedesId} IS NOT NULL)`),
 ])
+
+// A period close (I-107): a fact appended, never a flag flipped on the entries it covers.
+// `ledger_entries_refuses_a_closed_period` is what actually stops a write; this is the record.
+
+export const periodLocks = sqliteTable('period_locks', {
+  id: id(),
+  // Both inclusive, `london_day` format: what a period covers is a calendar range, the same
+  // grouping every month and season total already uses, never the show night (architecture.md).
+  fromDay: text('from_day').notNull(),
+  toDay: text('to_day').notNull(),
+  label: text('label'),
+  action: text('action').notNull(),
+  actorId: text('actor_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  // Locked status for a day is read off the latest row covering it; unbounded by range count
+  // rather than by row count, since a season's history is a handful of closes, not a scan (0001).
+  index('period_locks_range').on(table.fromDay, table.toDay, table.createdAt),
+  check('period_locks_action', sql`${table.action} IN ('CLOSED', 'REOPENED')`),
+  check('period_locks_range_order', sql`${table.toDay} >= ${table.fromDay}`),
+])
