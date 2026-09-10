@@ -26,6 +26,7 @@ export interface RefundTicketWriteInput {
   ticketId: string
   pricePaid: number
   actorId: string
+  performanceId: string
 }
 
 export interface RefundTicketResult {
@@ -53,6 +54,9 @@ export async function refundTicket(input: RefundTicketWriteInput, at = new Date(
       unitPricePence: input.pricePaid,
       reservationId: input.reservationId,
       ticketId: input.ticketId,
+      // Without this a refund is invisible to its own night report (0058, the same gap #791
+      // and #795 each found and fixed for a bar sale and a collection).
+      performanceId: input.performanceId,
     }],
   }, at, sql`changes() = 1`)
 

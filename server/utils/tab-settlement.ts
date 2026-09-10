@@ -198,8 +198,8 @@ export async function voidTabCharge(
     throw createError({ statusCode: 409, statusMessage: 'That charge is already settled: correct it by refund policy, not a void' })
   }
 
-  const lines = await db.all<{ id: string, kind: LineKind, amountPence: number, qty: number, unitPricePence: number | null, productVariantId: string | null, priceRef: string | null }>(sql`
-    SELECT id, kind, amount_pence AS amountPence, qty, unit_price_pence AS unitPricePence, product_variant_id AS productVariantId, price_ref AS priceRef
+  const lines = await db.all<{ id: string, kind: LineKind, amountPence: number, qty: number, unitPricePence: number | null, productVariantId: string | null, priceRef: string | null, performanceId: string | null }>(sql`
+    SELECT id, kind, amount_pence AS amountPence, qty, unit_price_pence AS unitPricePence, product_variant_id AS productVariantId, price_ref AS priceRef, performance_id AS performanceId
     FROM ledger_lines WHERE entry_id = ${entryId}
   `)
   const movements = await db.all<{ id: string, itemId: string, qty: number }>(sql`
@@ -222,6 +222,9 @@ export async function voidTabCharge(
       unitPricePence: line.unitPricePence,
       productVariantId: line.productVariantId,
       priceRef: line.priceRef,
+      // Carried from the charge being voided, not recomputed: the credit belongs to the same
+      // performance the charge did, or to none if the charge itself named none (0058).
+      performanceId: line.performanceId,
     })),
   }, new Date(), guard)
 
