@@ -239,6 +239,23 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['reservation.collected'],
     via: ['server/utils/desk-collection.ts'],
   },
+  { route: 'server/api/box-office/desk/comp-requests/index.get.ts', exempt: 'reads tonight\'s pending comp requests, writing nothing' },
+  {
+    route: 'server/api/box-office/desk/comp-requests/index.post.ts',
+    actions: ['ticketing.comp-request.created'],
+    via: ['server/utils/ticket-comps.ts'],
+  },
+  { route: 'server/api/box-office/desk/comp-requests/[id]/index.get.ts', exempt: 'reads one comp request\'s outcome; nothing is written' },
+  {
+    route: 'server/api/box-office/desk/comp-requests/[id]/approve.post.ts',
+    actions: ['ticketing.comp-request.approved'],
+    via: ['server/utils/ticket-comps.ts'],
+  },
+  {
+    route: 'server/api/box-office/desk/comp-requests/[id]/decline.post.ts',
+    actions: ['ticketing.comp-request.declined'],
+    via: ['server/utils/ticket-comps.ts'],
+  },
   {
     route: 'server/api/box-office/desk/reservations/[id]/tickets/[ticketId]/refund.post.ts',
     actions: ['ticket.refunded'],

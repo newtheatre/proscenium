@@ -571,10 +571,30 @@ index and a trigger on `ledger_lines` (`ledger_lines_ticket_collection_once`,
 once, ever, and that a line can only exist for a reservation the same batch actually collected,
 so a lost race aborts the whole transaction rather than posting money for nothing (0001, I-102
 criterion 6); `check migrations` refuses a rebuild of `ledger_lines` against a `restrict`
-dependent for exactly this reason, so the guard is index and trigger only. `COMP` needs a reason
-and is refused outright without `ticketing.manage` (committee decision): an ordinary desk officer
-cannot self-approve one, though whoever does hold the permission still approves their own; D-117's
-own request-and-approval workflow, which replaces this gate rather than removing it, is not built.
+dependent for exactly this reason, so the guard is index and trigger only. `COMP` names an
+approved `ticket_comp_requests` row rather than a typed reason (D-117, below); the request itself
+carries the reason and the approver's identity, which `collect()` reads onto `comp_reason` and
+`comp_approved_by` rather than trusting whoever happens to be collecting.
+
+**Comps, requested and approved before anything is collected (D-117).** `ticket_comp_requests`
+mirrors `comp_requests` below exactly, for a reservation already held at the desk rather than a
+basket: `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances
+restrict · `requested_by` → users restrict · `reason` · `status` CHECK
+`PENDING|APPROVED|DECLINED` · `decided_by` NULL → users restrict, `decided_at` NULL, set together
+or not at all · `decline_reason` NULL, set exactly when declined · `entry_id`, no foreign key, set
+once the approval is spent at collection (criterion 2's atomic claim, the same reasoning
+`comp_requests.entry_id` below is not one). `POST /api/box-office/desk/comp-requests` is open to
+any `ticketing.write` desk user, since nothing moves until it is approved; deciding one
+(`POST .../[id]/approve`, `.../[id]/decline`) needs tonight's confirmed duty manager for that
+performance or `ticketing.manage` (`isDutyManagerOrTicketingManager()`, the same shape
+`isDutyOrBarManager()` already takes for F-110), never the requester, and a pending request
+lapses after `COMP_REQUEST_EXPIRY_MINUTES` (10 by default, reused from F-110's own key), derived
+at read time from `created_at` rather than swept. `collect()` claims the request's `entry_id` with
+the ledger entry's own pre-generated id before posting, so two collections racing one approval
+settle to one (criterion 2); the claim releases if the batch then fails for any other reason. A
+comped ticket is an ordinary ticket collected at nought, so it counts against capacity exactly
+like a paid one (criterion 4, `heldSeatsSubquery`), and I-103's own `foregoneQuery` (`tender =
+'COMP'`) already reports it, split from paid revenue, with no code of its own to add.
 
 **Refunds and cancelling a paid booking (D-116).** `POST
 /api/box-office/desk/reservations/[id]/tickets/[ticketId]/refund` hands money back one ticket at

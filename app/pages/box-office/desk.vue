@@ -3,11 +3,9 @@ import { DESK_TENDERS } from '#shared/utils/desk'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { DeskTender } from '#shared/utils/desk'
 
-const { account } = useAccount()
-// The route refuses regardless; this only saves an operator who cannot comp the round trip of
-// finding that out (D-114 committee decision, comp gated behind ticketing.manage).
-const canComp = computed(() => account.value.permissions.includes('ticketing.manage'))
-const tenderOptions = computed(() => (canComp.value ? [...DESK_TENDERS] : DESK_TENDERS.filter(t => t !== 'COMP')))
+// Comp authority is the request and its approval now, not a permission the desk screen checks
+// itself (D-117): every tender is always offered, and the route is what actually decides.
+const tenderOptions = [...DESK_TENDERS]
 
 definePageMeta({ layout: 'console', title: 'Desk', middleware: 'console' })
 
@@ -40,6 +38,14 @@ interface TicketLine {
   accessKind: 'ACCESS' | 'COMPANION' | null
 }
 
+interface ReservationCompRequest {
+  id: string
+  status: 'PENDING' | 'APPROVED' | 'DECLINED'
+  expired: boolean
+  declineReason: string | null
+  decidedByName: string | null
+}
+
 interface ReservationDetail {
   id: string
   reference: string
@@ -50,6 +56,7 @@ interface ReservationDetail {
   bookerEmail: string
   tickets: TicketLine[]
   doorWording: string | null
+  compRequest: ReservationCompRequest | null
 }
 
 const toast = useToast()
@@ -106,17 +113,22 @@ watch(performanceId, () => {
 const selected = ref<ReservationDetail | null>(null)
 const open = ref(false)
 const tender = ref<DeskTender>('CARD')
-const compReason = ref('')
+const compRequestReason = ref('')
+const requestingComp = ref(false)
+const compRequestFailure = ref<string | null>(null)
 const collecting = ref(false)
 const collectFailure = ref<string | null>(null)
 
 const ticketTotalPence = computed(() => selected.value?.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0) ?? 0)
 const dueNow = computed(() => (tender.value === 'COMP' ? 0 : ticketTotalPence.value))
+// D-117: only an approved, unexpired, unspent request lets a comp be collected.
+const compApproved = computed(() => selected.value?.compRequest?.status === 'APPROVED' && !selected.value.compRequest.expired)
 
 async function open2(id: string): Promise<void> {
   collectFailure.value = null
   tender.value = 'CARD'
-  compReason.value = ''
+  compRequestReason.value = ''
+  compRequestFailure.value = null
   selected.value = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${id}`)
   open.value = true
 }
@@ -131,7 +143,8 @@ async function scan(): Promise<void> {
       body: { scanned: scanned.value.trim() },
     })
     tender.value = 'CARD'
-    compReason.value = ''
+    compRequestReason.value = ''
+    compRequestFailure.value = null
     collectFailure.value = null
     open.value = true
     scanned.value = ''
@@ -141,6 +154,26 @@ async function scan(): Promise<void> {
   }
   finally {
     scanning.value = false
+  }
+}
+
+async function requestComp(): Promise<void> {
+  if (!selected.value || !compRequestReason.value.trim()) return
+  requestingComp.value = true
+  compRequestFailure.value = null
+  try {
+    await $fetch('/api/box-office/desk/comp-requests', {
+      method: 'POST',
+      body: { reservationId: selected.value.id, reason: compRequestReason.value.trim() },
+    })
+    selected.value = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${selected.value.id}`)
+    toast.add({ title: 'Comp requested', description: 'Waiting on tonight\'s duty manager.', icon: 'i-lucide-clock', color: 'info' })
+  }
+  catch (error) {
+    compRequestFailure.value = refusalText(error)
+  }
+  finally {
+    requestingComp.value = false
   }
 }
 
@@ -154,7 +187,7 @@ async function collect(): Promise<void> {
       body: {
         expectedTotalPence: dueNow.value,
         tender: tender.value,
-        compReason: tender.value === 'COMP' ? compReason.value.trim() : undefined,
+        compRequestId: tender.value === 'COMP' ? selected.value.compRequest?.id : undefined,
       },
     })
     toast.add({ title: 'Booking collected', icon: 'i-lucide-check', color: 'success' })
@@ -426,16 +459,62 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
               />
             </UFormField>
 
-            <UFormField
-              v-if="tender === 'COMP'"
-              label="Comp reason"
-              required
-            >
-              <UInput
-                v-model="compReason"
-                data-test="desk-comp-reason"
+            <template v-if="tender === 'COMP'">
+              <UAlert
+                v-if="compApproved"
+                color="success"
+                variant="subtle"
+                icon="i-lucide-check"
+                :description="`Approved by ${selected.compRequest?.decidedByName}.`"
+                data-test="desk-comp-approved"
               />
-            </UFormField>
+              <UAlert
+                v-else-if="selected.compRequest?.status === 'PENDING' && !selected.compRequest.expired"
+                color="info"
+                variant="subtle"
+                icon="i-lucide-clock"
+                description="Waiting on tonight's duty manager to approve this."
+                data-test="desk-comp-pending"
+              />
+              <template v-else>
+                <UAlert
+                  v-if="selected.compRequest?.status === 'DECLINED'"
+                  color="error"
+                  variant="subtle"
+                  :description="`Declined: ${selected.compRequest.declineReason}`"
+                />
+                <UAlert
+                  v-else-if="selected.compRequest?.expired"
+                  color="warning"
+                  variant="subtle"
+                  description="That request lapsed; ask again."
+                />
+                <UFormField
+                  label="Reason for the comp"
+                  required
+                >
+                  <UInput
+                    v-model="compRequestReason"
+                    data-test="desk-comp-reason"
+                  />
+                </UFormField>
+                <UAlert
+                  v-if="compRequestFailure"
+                  color="error"
+                  variant="subtle"
+                  :description="compRequestFailure"
+                />
+                <UButton
+                  variant="subtle"
+                  :loading="requestingComp"
+                  :disabled="!compRequestReason.trim()"
+                  data-test="desk-request-comp"
+                  @click="requestComp"
+                >
+                  Ask tonight's duty manager
+                </UButton>
+              </template>
+            </template>
 
             <p
               class="text-lg font-semibold"
@@ -446,6 +525,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
 
             <UButton
               :loading="collecting"
+              :disabled="tender === 'COMP' && !compApproved"
               data-test="desk-collect"
               @click="collect"
             >
