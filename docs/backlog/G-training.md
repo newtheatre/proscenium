@@ -6,7 +6,7 @@ Counts: 25 MVP stories (G-101 to G-123, G-125, G-128), 11 V2 stories (G-201 to G
 
 ## Open questions
 
-1. Answered 26 August: there is no legacy import (G-127 resolved); legacy records do not map to the current module system, and history stays in the archived old estate.
+1. Answered 26 August: there is no legacy import (G-127 resolved); legacy records do not map to the current module system, and history stays in the archived old estate. Amended 10 September: this named the Heroku-era archive `rehearsal` already absorbed once (`legacy_module_map`), not `rehearsal`'s own live database, which K-113's training transform imports the same way bookings and money already do (0065).
 2. Certification auto-suspension when a constituent module lapses: the old system deliberately only flags. Does the committee ever want it to suspend, and if so with what notice?
 3. Moot from 2 September: who closes a practice window no longer arises, because there are no practice windows (0042, G-126 withdrawn). The question G-211 carries in its place is what qualifies somebody to enter practice mode: holding the module, or holding it currently.
 4. Answered 2 September: session running is scoped, but by competence rather than by department. Trainer standing is one cross-department certification (LEAD-CERT), and a trainer may teach only a module they currently hold a record for. A trainer may never sign off a certification, and a certification is not normally attached to a session at all, because it is issued on experience gained outside training; G-112 criterion 3's refusal of sign-off-only modules already covers that.
@@ -397,6 +397,7 @@ Counts: 25 MVP stories (G-101 to G-123, G-125, G-128), 11 V2 stories (G-201 to G
   1. Historical training standing starts clean in the unified system; anyone with current competence is re-recorded through sign-offs, sessions or external certificates against the real catalogue.
   2. The old data stays readable in the archived old estate for any historical question.
   3. The LEGACY record source stays in the schema vocabulary but nothing writes it; reviving it would need a superseding decision.
+- Amended 10 September 2026: this resolution named the Heroku-era archive `rehearsal` already absorbed once, before this migration's scope begins, not `rehearsal`'s own live database. K-113's training transform imports the latter, the same tier of import bookings and money already are; an old `ADMIN`-sourced record is what now writes `LEGACY`, since `rehearsal` never held a genuinely Heroku-era record to export (0065).
 - Source: Committee direction, 26 August; audit TR-10 (the import was never written in the old estate either).
 
 ## G-128: The public module catalogue

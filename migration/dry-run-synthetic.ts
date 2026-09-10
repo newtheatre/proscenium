@@ -6,6 +6,7 @@ import { createCore, transformIdentity } from './identity'
 import { buildLoad, applyLoad } from './load'
 import { reconcile as reconcileBookings, transformBookings } from './bookings'
 import { buildLoad as buildMoneyLoad, reconcileMoney, transformMoney } from './money'
+import { reconcileTraining, transformTraining } from './training'
 import { count } from './lib'
 import { createTestDatabase } from '../tests/helpers/database'
 import type { TicketRow } from './money'
@@ -87,6 +88,42 @@ function syntheticRooms(): Database {
   return db
 }
 
+function syntheticTraining(): Database {
+  const db = new Database(':memory:')
+  db.exec(`
+    CREATE TABLE department_leads (id TEXT PRIMARY KEY, department TEXT, user_id TEXT, granted_by TEXT, created_at INTEGER);
+    CREATE TABLE sessions (
+      id TEXT PRIMARY KEY, held_on TEXT, trainer_user_id TEXT, location TEXT, notes TEXT,
+      status TEXT, starts_at INTEGER, ends_at INTEGER, capacity INTEGER,
+      register_opened_at INTEGER, cancelled_at INTEGER, cancel_reason TEXT,
+      created_at INTEGER, updated_at INTEGER);
+    CREATE TABLE session_modules (id TEXT PRIMARY KEY, session_id TEXT, module_id TEXT);
+    CREATE TABLE session_attendees (
+      id TEXT PRIMARY KEY, session_id TEXT, user_id TEXT, status TEXT, signed_up_at INTEGER,
+      source TEXT, marked_at INTEGER, marked_by_user_id TEXT);
+    CREATE TABLE module_requests (
+      id TEXT PRIMARY KEY, user_id TEXT, module_id TEXT, note TEXT, status TEXT,
+      resolved_at INTEGER, resolved_by TEXT, decline_reason TEXT, created_at INTEGER);
+    CREATE TABLE records (
+      id TEXT PRIMARY KEY, user_id TEXT, module_id TEXT, awarded_at TEXT, expires_at TEXT,
+      expiry_overridden INTEGER, source TEXT, session_id TEXT, granted_by TEXT,
+      external_ref TEXT, revoked_at INTEGER, revoked_by TEXT, revoke_reason TEXT, created_at INTEGER);
+
+    INSERT INTO sessions (id, held_on, trainer_user_id, location, notes, status, starts_at, ends_at, capacity, created_at, updated_at)
+      VALUES ('ts-1', '2024-03-04', 'a-officer', 'Studio 1', 'Bring harnesses (synthetic)', 'DELIVERED',
+        ${MARCH}, ${MARCH + 2 * 3_600_000}, 12, ${MARCH - 86_400_000}, ${MARCH - 86_400_000});
+    INSERT INTO session_modules (id, session_id, module_id) VALUES ('tsm-1', 'ts-1', 'TECH-111');
+    INSERT INTO session_attendees (id, session_id, user_id, status, signed_up_at, source)
+      VALUES ('tsa-1', 'ts-1', 'a-officer', 'ATTENDED', ${MARCH - 3_600_000}, 'SELF');
+    INSERT INTO records (id, user_id, module_id, awarded_at, source, session_id, created_at)
+      VALUES ('tr-1', 'a-officer', 'TECH-111', '2024-03-04', 'SESSION', 'ts-1', ${MARCH});
+    -- No account survived the identity import for this one, the same exception shape bookings hits.
+    INSERT INTO records (id, user_id, module_id, awarded_at, source, created_at)
+      VALUES ('tr-2', 'somebody-erasure-removed', 'TECH-111', '2024-03-04', 'EXTERNAL', ${MARCH});
+  `)
+  return db
+}
+
 function syntheticTickets(): TicketRow[] {
   return [
     { id: 't-1', price_paid: 900, refunded_at: null, created_at: '2024-03-04 19:00:00', price_confidence: 'EXACT' },
@@ -148,7 +185,34 @@ check(
 )
 check('bookings reconciliation is green', bookingsCheck.ok, bookingsCheck.problems.join('; ') || 'no problems')
 
-// --- Stage 4: money, straight into the real ledger tables, no staging (K-114).
+// --- Stage 4: training, keyed on the same idMap identity minted, against a catalogue authored
+// here rather than migrated (K-113).
+
+rehearsal.batch([
+  ['INSERT INTO departments (code, name) VALUES (?, ?)', 'TECH', 'Technical'],
+  ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'TECH-111', 'TECH', 'MODULE', 'Working at height'],
+])
+const trainingSource = syntheticTraining()
+const trainingResult = transformTraining({
+  source: trainingSource,
+  accounts: idMap,
+  moduleIds: new Set(['TECH-111']),
+  departmentCodes: new Set(['TECH']),
+  sessionIds: new Map(),
+  requestIds: new Map(),
+  recordIds: new Map(),
+  target: rehearsal.raw,
+})
+const trainingCheck = reconcileTraining(rehearsal.raw, trainingResult.summary)
+check('a mapped session and its record write', trainingResult.summary.sessionsWritten === 1 && trainingResult.summary.recordsWritten === 1, `${trainingResult.summary.sessionsWritten} session, ${trainingResult.summary.recordsWritten} record`)
+check(
+  'K-113: a record with no canonical account is an exception, not a guess',
+  trainingResult.exceptions.some(exception => exception.includes('no canonical account')),
+  trainingResult.exceptions.find(exception => exception.includes('no canonical account')) ?? 'no such exception was raised',
+)
+check('training reconciliation is green', trainingCheck.ok, trainingCheck.problems.join('; ') || 'no problems')
+
+// --- Stage 5: money, straight into the real ledger tables, no staging (K-114).
 
 const tickets = syntheticTickets()
 const moneyResult = transformMoney(tickets, new Map(), new Map())
@@ -168,10 +232,10 @@ check(
 )
 check('money reconciliation is green', moneyCheck.ok, moneyCheck.problems.join('; ') || 'no problems')
 
-// --- Stage 5: what this dry run cannot cover, named rather than left implicit.
+// --- Stage 6: what this dry run cannot cover, named rather than left implicit.
 
-notes.push('note training: no transform exists yet; the mirror-consistency check above is the only thing synthetic "training" data exercises')
 notes.push('note export.sh, inventory.ts and reconcile.ts read real files (migration/dumps/, migration/out/) and are not exercised here: this proves the transforms, not the file-handling CLI wrappers around them')
+notes.push('note programme and reservations-as-records still have no transform: this harness cannot exercise what does not exist')
 
 console.log(notes.join('\n'))
 if (failures.length) {
@@ -180,6 +244,7 @@ if (failures.length) {
   auth.close()
   for (const mirror of mirrors) mirror.db.close()
   roomsSource.close()
+  trainingSource.close()
   ticketsDb.close()
   process.exit(1)
 }
@@ -188,4 +253,5 @@ rehearsal.close()
 auth.close()
 for (const mirror of mirrors) mirror.db.close()
 roomsSource.close()
+trainingSource.close()
 ticketsDb.close()

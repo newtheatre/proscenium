@@ -23,7 +23,9 @@ flowchart LR
   R --> G{Green?}
   G -- yes --> L[load.ts, applied to a target with the real schema]
   L --> B[transform-bookings.ts, the same target]
+  L --> TR[transform-training.ts, the same target, catalogue authored first]
   B --> W[Weekly rehearsal recorded on epic 338]
+  TR --> W
   G -- no --> F[Fix the transform, never the numbers]
 ```
 
@@ -41,6 +43,7 @@ bun migration/transform-identity.ts   # builds the unified identity core in out/
 bun migration/reconcile.ts     # verifies counts and invariants; non-zero exit on failure
 bun migration/load.ts /tmp/rehearsal.db          # writes out/load.sql and applies it
 bun migration/transform-bookings.ts /tmp/rehearsal.db   # the old rooms history, same target
+bun migration/transform-training.ts /tmp/rehearsal.db   # training history, catalogue authored first
 bun migration/transform-money.ts /tmp/rehearsal.db      # ticket revenue, same target
 ```
 
@@ -53,12 +56,13 @@ in `bookings.ts`, so K-113's own exception paths, cited in `identity.ts`'s own c
 actually fired anywhere. It does not exercise `export.sh`, `inventory.ts` or `reconcile.ts`
 themselves, which read real files; it proves the transforms, not the file-handling around them.
 
-**`transform-bookings.ts` and `transform-money.ts` take the target as an argument and refuse to
-run without one, on purpose.** Unlike identity, `room_bookings.room_id` and
+**`transform-bookings.ts`, `transform-training.ts` and `transform-money.ts` take the target as an
+argument and refuse to run without one, on purpose.** Unlike identity, `room_bookings.room_id` and
 `external_requests`' own room reference are real foreign keys onto rooms administered through the
 live app; no hand-maintained schema subset can ever hold real room ids, because rooms are never
 migrated, only referenced. `load.ts` has to run against the same target first, so the users these
-key to already exist there (`docs/known-issues.md`).
+key to already exist there (`docs/known-issues.md`). `transform-training.ts` additionally refuses
+a target with no training catalogue: `departments` and `modules` are authored, never migrated.
 
 `transform-money.ts` differs from the other two in one respect worth knowing: `ledger_entries` and `ledger_lines` are the application's own tables, so the money step writes into the real schema rather than staging through `out/unified.sqlite` the way identity and bookings do.
 
@@ -121,6 +125,23 @@ step is offline against the dumps.
   attributing a historical sale to its performance is recoverable later, but only for as long as
   `out/id-map.tsv` and the archived old estate exist (0015), which is why the mapping lives in the
   ticket id kept in `out/money-id-map.tsv`, not a column on the entry.
+- **Training** (K-113, `migration/training.ts`): who led a department, who ran and attended a
+  session, who asked to be taught, and every training record, from `rehearsal`'s live database.
+  Not a revival of G-127's withdrawn Heroku-era import: G-127 and K-117 named the archive
+  `rehearsal` had already absorbed once before this migration's scope begins, not `rehearsal`'s
+  own current data (0065). The catalogue (`departments`, `modules`) is authored fresh in the
+  unified system, the same way ticket types are, and is not read here; the transform refuses to
+  run against a target with no catalogue rather than invent one. `training_sessions` is
+  trainer-keyed for its erasure guard, not user-keyed like everything else this transform writes,
+  because that is the column `personal-data.ts` scrubs it on. `training_records` is append-only
+  (0010): every insert is `ON CONFLICT (id) DO NOTHING`, never `DO UPDATE`, which the
+  `training_records_named_edits_only` trigger would refuse outright; the id is kept in
+  `out/training-record-id-map.tsv` so the same historical award lands once. An old attendee
+  source of `SELF`/`LEAD` becomes `SIGNUP`/`WALK_IN`, and an old `ADMIN`-sourced record becomes
+  `LEGACY`, the vocabulary G-127 reserved and left unused. A department lead carries no expiry in
+  the old app; an imported one gets the committee year end following the grant, the same policy a
+  live grant already gets, rather than the standing authority a bare `NULL` would otherwise confer
+  on an assignment years out of date.
 
 ## Why the same person keeps the same id
 
@@ -132,6 +153,6 @@ the rehearsal database and start again.
 
 The old estate's audit history is deliberately not imported (decision 0030).
 
-Remaining transforms (programme, reservations as records, bar) follow the same shape, one file
-per module, as the weekly rehearsals proceed. Bar has nothing to transform: production holds no
+Remaining transforms (programme, reservations as records) follow the same shape, one file per
+module, as the weekly rehearsals proceed. Bar has nothing to transform: production holds no
 stock-movement history to import (K-116, `docs/backlog/K-platform.md`).
