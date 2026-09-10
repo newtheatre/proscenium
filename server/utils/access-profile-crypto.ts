@@ -1,9 +1,13 @@
+import { createError } from 'h3'
+import { useRuntimeConfig } from 'nitropack/runtime'
 import { decryptWithKey, encryptWithKey, importAccessProfileKey } from '#shared/utils/access-profile-crypto'
 import type { EncryptedPayload } from '#shared/utils/access-profile-crypto'
 import type { AccessProfilePayload } from '#shared/utils/access-profiles'
 
 // The worker secret that unlocks `shared/utils/access-profile-crypto.ts`'s pure functions.
 // Nothing else in this application touches `crypto.subtle` for this column (D-127, 0050).
+// Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
+// Bun, where nothing is auto-imported (CONTRIBUTING).
 
 let key: Promise<CryptoKey> | undefined
 
