@@ -3,13 +3,13 @@
 Cross-cutting requirements every other module assumes, plus the migration itself expressed as
 stories with acceptance criteria. Nothing here is optional polish: these are the conditions under
 which show night can trust one database, and the conditions under which four databases become one
-without losing a row that matters. The pre-cutover passes (K-125 to K-128) live here too: they are
+without losing a row that matters. The pre-cutover passes (K-125 to K-129) live here too: they are
 cross-cutting, each is a story with criteria rather than polish done by feel, and they land before
 the cutover rather than after it. Phasing follows the roadmap: the platform stories land in
 Phase 1, the migration stories rehearse weekly through Phase 2 and complete at the 31 October
 cutover.
 
-Stories: 28. Phases: 23 MVP, 0 V2, 0 Later, 5 resolved.
+Stories: 29. Phases: 24 MVP, 0 V2, 0 Later, 5 resolved.
 
 ## Open questions
 
@@ -630,3 +630,35 @@ Stories: 28. Phases: 23 MVP, 0 V2, 0 Later, 5 resolved.
   4. A unit test fails on an em dash or a banned spelling anywhere under `app/`, `shared/` and
      `content/`.
 - Source: Pre-cutover review, 10 September 2026; the workspace writing rules.
+
+## K-129: Declarative filters on every console list
+
+- Role: Administrator
+- Phase: MVP
+- Story: As an officer working a console list, I want to filter by any field, including ones the
+  table does not show, from one control that works the same on every screen so that finding the
+  rows I need never depends on which page I am on.
+- Depends on: K-123
+- Acceptance criteria:
+  1. Each list page has one filter declaration in `shared/`, naming every filterable field: its
+     key, label, kind (closed list, searchable list, date range, number range, yes or no,
+     reference to a person, room or show) and, where it is one, its column. A field need not be
+     a column. The one declaration derives the endpoint's Zod query schema, the toolbar's
+     filter builder and the active chips (0032: one schema, both ends).
+  2. Free text stays as it is: the toolbar search box searches across every text column the
+     endpoint names, and it is debounced with `useDebounced` rather than refetching on each
+     keystroke.
+  3. The builder adds one condition per field with operators fitting its kind (is, is not, is
+     any of, between, before, after, is empty), combines them with AND, and shows each as a chip
+     that clears it. Controls sit in the toolbar at fixed widths (0032).
+  4. Filter, search, sort and page live in the URL query, so a filtered list can be linked,
+     refreshed and returned to; changing a filter resets the page to one.
+  5. One server helper turns a declaration and a validated query into predicates and an order
+     clause. Lists page in SQL; an "is any of" list is capped at a declared size so no
+     statement's parameter count grows with the data (0006); sorting is by a declared field only.
+  6. Every console `UTable` page migrates, one module per pull request; when the last lands,
+     `tests/unit/admin-conventions.test.ts` fails on a table page without a declaration or with
+     a hand-written chip list.
+  7. Before-and-after captures from `bun run shots` are attached to each pull request.
+- Source: Pre-cutover review, 10 September 2026. Thirty-three console tables share one toolbar
+  and each hand-writes its filters; none keeps its state in the URL.

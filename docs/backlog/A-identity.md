@@ -433,7 +433,7 @@ Open questions for the committee:
   known issues, so the question has somewhere to be answered rather than being lost in a story.
 - Source: Committee direction, 26 August 2026; decision 0023.
 
-## A-128: Claim a membership bought at the SU
+## A-130: Claim a membership bought at the SU
 
 - Role: Member
 - Phase: MVP
@@ -468,7 +468,7 @@ Open questions for the committee:
 - Story: As a member whose membership has lapsed, I want the members area to tell me what needs a
   current membership and where to put that right so that I am refused with a reason rather than
   hidden from.
-- Depends on: A-117, A-128
+- Depends on: A-117, A-130
 - Acceptance criteria:
   1. The `Viewer` carries `hasMembership` (current or in grace, from `hasCurrentMembership`),
      resolved by both resolvers the way `leadsDepartment` and `isTrainer` are (0040), with
