@@ -537,6 +537,12 @@ export const AUDIT_COVERAGE: Coverage[] = [
   // Module H: communications
 
   { route: 'server/api/admin/notifications/trouble.get.ts', exempt: 'reads the message log' },
+  { route: 'server/api/account/notifications.get.ts', exempt: 'reads your own notification preferences and inbox' },
+  {
+    route: 'server/api/account/notifications.put.ts',
+    actions: ['notifications.preference.changed'],
+    via: ['server/utils/notification-preferences.ts'],
+  },
 
   // Module I: finance
 

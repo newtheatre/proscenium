@@ -40,7 +40,9 @@ export const notificationLog = sqliteTable('notification_log', {
   index('notification_log_record').on(table.recordId),
   index('notification_log_created_at').on(table.createdAt),
   uniqueIndex('notification_log_claim').on(table.claim).where(sql`claim is not null`),
-  check('notification_log_status', sql`${table.status} IN ('PENDING', 'SENT', 'FAILED', 'RETRYING', 'SKIPPED_UNDELIVERABLE')`),
+  // Kept in step with NOTIFICATION_STATUSES in shared/utils/notifications.ts, which a unit test
+  // holds to this list: a status the check refuses is a send nothing can record (H-102, H-105).
+  check('notification_log_status', sql`${table.status} IN ('PENDING', 'SENT', 'FAILED', 'RETRYING', 'SUPPRESSED_PREFERENCE', 'SKIPPED_UNDELIVERABLE')`),
   check('notification_log_channel', sql`${table.channel} IN ('EMAIL', 'INBOX', 'PUSH')`),
 ])
 

@@ -5,11 +5,12 @@ import { eq, inArray } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { findById } from './accounts'
 import { MAILBOX, writeToMailbox } from './mailbox'
+import { preferenceDefaults, storedPreferences } from './notification-preferences'
 import { render } from './templates'
 import { undeliverableReason } from '#shared/utils/deliverability'
-import { deliversOn, messageType } from '#shared/utils/notifications'
+import { deliversOn, isTransactional, messageType } from '#shared/utils/notifications'
 import { formatSender, senderForTopic, SENDERS } from '#shared/utils/senders'
-import type { Channel, Preference } from '#shared/utils/notifications'
+import type { Channel, MessageType, NotificationStatus } from '#shared/utils/notifications'
 import type { TemplateContext } from '#server/utils/templates'
 import type { H3Event } from 'h3'
 
@@ -93,7 +94,9 @@ export interface Notification {
   claim?: string | string[]
 }
 
-type Status = 'SENT' | 'FAILED' | 'SKIPPED_UNDELIVERABLE'
+// The terminal outcomes of one send. `PENDING` is claimNotification()'s and `RETRYING` is
+// H-105's, so neither is an answer notify() ever returns (0048).
+type Status = Exclude<NotificationStatus, 'PENDING' | 'RETRYING'>
 
 // A claim updates in place; an unclaimed send inserts fresh, exactly as before claims existed.
 async function record(userId: string | null, type: string, channel: Channel, status: Status, subject: string | null, error: string | null, claim?: string | string[]): Promise<void> {
@@ -113,6 +116,25 @@ async function record(userId: string | null, type: string, channel: Channel, sta
     sentAt,
     error,
   })
+}
+
+// The in-app channel. Never coalesced and never suppressed, so the individual entries stay
+// answerable per change (H-102 criterion 6, H-104 criterion 4).
+async function recordInbox(userId: string, type: string, title: string, body: string): Promise<void> {
+  await db.insert(schema.inboxItems).values({
+    id: crypto.randomUUID().replaceAll('-', ''),
+    userId,
+    type,
+    title,
+    body,
+  })
+}
+
+// A transactional type is not asked about at all, so a suppressed transactional message is not
+// a state this can reach (H-103 criterion 4).
+async function emailIsWanted(event: H3Event | undefined, type: MessageType, userId: string): Promise<boolean> {
+  if (isTransactional(type)) return true
+  return deliversOn(type, 'EMAIL', await storedPreferences(userId), await preferenceDefaults(event))
 }
 
 // The row and the unique index refuse a second attempt, so a caller never reads before writing
@@ -160,7 +182,17 @@ export async function notify(event: H3Event | undefined, notification: Notificat
     return 'SKIPPED_UNDELIVERABLE'
   }
 
+  const sender = type.sender ? SENDERS[type.sender] : type.topic ? senderForTopic(type.topic) : SENDERS.ACCOUNTS
+  const rendered = render(type.template, { ...notification.context, name: account.name })
+
   const undeliverable = undeliverableReason({ email: account.email, anonymisedAt: account.anonymisedAt })
+
+  // Written before the email is judged: a preference or a bounce must not make a message
+  // unfindable, and an anonymised account gets nothing (H-102 criterion 6, H-107).
+  if (undeliverable !== 'anonymised' && type.channels.includes('INBOX')) {
+    await recordInbox(account.id, notification.type, rendered.subject, rendered.text)
+  }
+
   if (undeliverable) {
     await record(account.id, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, undeliverable, notification.claim)
     return 'SKIPPED_UNDELIVERABLE'
@@ -172,19 +204,10 @@ export async function notify(event: H3Event | undefined, notification: Notificat
     return 'SKIPPED_UNDELIVERABLE'
   }
 
-  const preferences = await db.select({
-    topic: schema.notificationPreferences.topic,
-    email: schema.notificationPreferences.email,
-    push: schema.notificationPreferences.push,
-  }).from(schema.notificationPreferences).where(eq(schema.notificationPreferences.userId, account.id))
-
-  if (!deliversOn(type, 'EMAIL', preferences as Preference[])) {
-    await record(account.id, notification.type, 'EMAIL', 'SKIPPED_UNDELIVERABLE', null, 'preference', notification.claim)
-    return 'SKIPPED_UNDELIVERABLE'
+  if (!await emailIsWanted(event, type, account.id)) {
+    await record(account.id, notification.type, 'EMAIL', 'SUPPRESSED_PREFERENCE', null, null, notification.claim)
+    return 'SUPPRESSED_PREFERENCE'
   }
-
-  const sender = type.sender ? SENDERS[type.sender] : type.topic ? senderForTopic(type.topic) : SENDERS.ACCOUNTS
-  const rendered = render(type.template, { ...notification.context, name: account.name })
 
   try {
     await transportFor(event).send({

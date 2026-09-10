@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { NOTIFICATION_TOPICS } from './notifications'
 import { MODULE_ID } from './training'
 
 // Every operational rule with a number in it is a validated key enforced at the write path
@@ -482,6 +483,19 @@ export const CONFIG_KEYS = {
 
   // Module H: communications
 
+  NOTIFICATION_EMAIL_DEFAULT_TOPICS: {
+    schema: z.array(z.enum(NOTIFICATION_TOPICS)),
+    default: [...NOTIFICATION_TOPICS],
+    workshop: 'people-and-communications',
+    describes: 'Topics a new account is emailed about until it says otherwise. A topic left out starts switched off, and nobody is emailed about it unless they ask (H-102).',
+  },
+  NOTIFICATION_PUSH_DEFAULT_TOPICS: {
+    schema: z.array(z.enum(NOTIFICATION_TOPICS)),
+    default: [],
+    workshop: 'people-and-communications',
+    describes: 'Topics a new account starts subscribed to on push. Empty until push actually delivers, so consent is collected rather than assumed (H-101 criterion 6, H-204).',
+  },
+
   // Module K: platform
 
   RETENTION_FULL_ACCOUNT_YEARS: {
@@ -642,6 +656,8 @@ export const ENFORCED_KEYS = [
   'MEMBERSHIP_RENEWAL_NOTICE_DAYS',
   'ROLE_LAPSE_NOTICE_DAYS',
   'ROLE_GRANT_PRUNE_DAYS',
+  'NOTIFICATION_EMAIL_DEFAULT_TOPICS',
+  'NOTIFICATION_PUSH_DEFAULT_TOPICS',
   'PRIVILEGED_ROLES',
   'PUBLIC_ORDER_SEAT_CAP',
   'REFUND_PAID_REQUIRES_MANAGER',
