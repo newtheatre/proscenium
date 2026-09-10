@@ -114,9 +114,10 @@ describe('permissions come from live grants only', () => {
     expect(permissionsFor([{ role: 'FRONT_OF_HOUSE', expiresAt: null }], now).size).toBe(0)
   })
 
-  // The season dashboard's aggregates, and nothing else standing (I-105 criterion 5).
-  test('the committee holds the season summary and no entry-level drill-down', () => {
-    expect([...permissionsFor([{ role: 'COMMITTEE', expiresAt: null }], now)]).toEqual(['finance.summary'])
+  // The season dashboard's aggregates and the cross-season report, nothing else standing
+  // (I-105 criterion 5, E-126).
+  test('the committee holds the season summary, the cross-season report, and no entry-level drill-down', () => {
+    expect([...permissionsFor([{ role: 'COMMITTEE', expiresAt: null }], now)].sort()).toEqual(['finance.summary', 'reports.read'])
   })
 
   // The one named exception, and it stays one: an officer role opens tonight's screens and every
@@ -137,11 +138,11 @@ describe('permissions come from live grants only', () => {
   })
 
   // The front of house officer administers the rota, checklist, emergency card, licensing
-  // export and the backstage board's own configuration: standing permissions beside the bypass.
+  // export, the cross-season report and the backstage board's own configuration (E-126).
   test('the front of house officer holds that standing administration and nothing else', () => {
     const held = [...permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now)]
       .filter(permission => !OPERATIONAL_PERMISSIONS.includes(permission)).sort()
-    expect(held).toEqual(['age-checks.export', 'board.read', 'board.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'rota.read', 'rota.write'])
+    expect(held).toEqual(['age-checks.export', 'board.read', 'board.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'reports.read', 'rota.read', 'rota.write'])
   })
 
   // Nothing outside the three named ones may be operational, whatever a role picks up later.

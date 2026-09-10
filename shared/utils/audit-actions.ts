@@ -209,6 +209,7 @@ const CATALOGUE = {
   'incident-severity.routing-changed': { label: 'Severity follow-up routing changed', module: 'show-night' },
   'incident-followup.closed': { label: 'Incident follow-up closed', module: 'show-night' },
   'age-checks.exported': { label: 'Challenge 25 register exported', module: 'show-night' },
+  'reports.exported': { label: 'Cross-season report exported', module: 'show-night' },
   'board.joined': { label: 'A device joined the backstage board', module: 'show-night' },
   'board.message-posted': { label: 'A backstage board message was posted', module: 'show-night' },
   'board.message-superseded': { label: 'A backstage board milestone was corrected', module: 'show-night' },
