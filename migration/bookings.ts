@@ -1,5 +1,5 @@
 import { UNRECORDED_PURPOSE } from '../shared/utils/bookings'
-import { nanoid } from './lib'
+import { NOT_ANONYMISED, nanoid } from './lib'
 import type { Database } from 'bun:sqlite'
 
 // The old rooms app's booking history, keyed to the canonical account (C-118). Utilisation
@@ -144,9 +144,15 @@ export function transformBookings(input: TransformInput): { summary: BookingSumm
     const start = new Date(head.start_time)
     const seriesId = idFor(seriesIds, String(head.id))
     target.query(`
-      INSERT OR REPLACE INTO room_series
+      INSERT INTO room_series
         (id, user_id, room_id, title, frequency, weekdays, starts_on, clock_from, clock_to, occurrences, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (id) DO UPDATE SET
+        user_id = excluded.user_id, room_id = excluded.room_id, title = excluded.title,
+        frequency = excluded.frequency, weekdays = excluded.weekdays, starts_on = excluded.starts_on,
+        clock_from = excluded.clock_from, clock_to = excluded.clock_to, occurrences = excluded.occurrences,
+        updated_at = excluded.updated_at
+      WHERE ${NOT_ANONYMISED('room_series')}
     `).run(
       seriesId, userId, roomId, head.event_title, frequency,
       pattern.days_of_week ? String(JSON.parse(pattern.days_of_week)) : null,
@@ -188,10 +194,17 @@ export function transformBookings(input: TransformInput): { summary: BookingSumm
       const answered = status === 'CONFIRMED'
 
       target.query(`
-        INSERT OR REPLACE INTO external_requests
+        INSERT INTO external_requests
           (id, user_id, title, purpose, attendees, starts_at, ends_at, preferred_space_id,
            assigned_space_id, notes, status, rejection_reason, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (id) DO UPDATE SET
+          user_id = excluded.user_id, title = excluded.title, purpose = excluded.purpose,
+          attendees = excluded.attendees, starts_at = excluded.starts_at, ends_at = excluded.ends_at,
+          preferred_space_id = excluded.preferred_space_id, assigned_space_id = excluded.assigned_space_id,
+          notes = excluded.notes, status = excluded.status, rejection_reason = excluded.rejection_reason,
+          updated_at = excluded.updated_at
+        WHERE ${NOT_ANONYMISED('external_requests')}
       `).run(
         idFor(externalIds, String(row.id)), userIdEarly, row.event_title, UNRECORDED_PURPOSE,
         row.number_of_attendees,
@@ -232,10 +245,16 @@ export function transformBookings(input: TransformInput): { summary: BookingSumm
     const seriesId = head !== null ? seriesIds.get(String(head)) ?? null : null
 
     target.query(`
-      INSERT OR REPLACE INTO room_bookings
+      INSERT INTO room_bookings
         (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, status, notes,
          rejection_reason, series_id, occurrence, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'GENERAL', ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (id) DO UPDATE SET
+        room_id = excluded.room_id, user_id = excluded.user_id, title = excluded.title,
+        attendees = excluded.attendees, starts_at = excluded.starts_at, ends_at = excluded.ends_at,
+        status = excluded.status, notes = excluded.notes, rejection_reason = excluded.rejection_reason,
+        series_id = excluded.series_id, occurrence = excluded.occurrence, updated_at = excluded.updated_at
+      WHERE ${NOT_ANONYMISED('room_bookings')}
     `).run(
       idFor(bookingIds, String(row.id)), roomId, userId, row.event_title, row.number_of_attendees,
       seconds(row.start_time), seconds(row.end_time), status, row.notes, row.rejection_reason,

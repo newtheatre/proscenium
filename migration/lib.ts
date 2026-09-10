@@ -48,6 +48,11 @@ export function ensureOut(): void {
   mkdirSync(OUT, { recursive: true })
 }
 
+// Every migration writer keyed to a person guards its conflict branch with this, insert left
+// open where a table's own erasure only scrubs rather than deletes (0011, 0059).
+export const NOT_ANONYMISED = (table: string): string =>
+  `NOT EXISTS (SELECT 1 FROM users WHERE id = ${table}.user_id AND anonymised_at IS NOT NULL)`
+
 const ALPHABET = 'useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict'
 export function nanoid(size = 21): string {
   const bytes = crypto.getRandomValues(new Uint8Array(size))

@@ -77,7 +77,10 @@ step is offline against the dumps.
   and seconds here, so the reconciliation checksums total booked seconds as well as counting rows:
   a unit error puts the whole history in 1970 and no row count would catch it. Nothing is invented:
   a booking whose account or room did not come across is skipped and named in
-  `out/booking-exceptions.txt` rather than given one, and tombstones stay tombstones. Web push
+  `out/booking-exceptions.txt` rather than given one, and tombstones stay tombstones: a re-import
+  never restores what erasure already scrubbed from an existing booking, using the same
+  `NOT_ANONYMISED()` guard `load.ts` uses, on the conflict branch of every table this transform
+  writes (0011, 0059, K-113). Web push
   subscriptions are deliberately not read; push consent is re-collected when push works.
   `out/room-map.tsv` maps each old `room:<id>` to a unified room and `out/space-map.tsv` maps each
   `venue:<id>` to a union room; both are written by hand, because a wrong room silently rewrites

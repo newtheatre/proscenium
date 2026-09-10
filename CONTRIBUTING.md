@@ -44,8 +44,10 @@ Eleven steps, in `.github/workflows/ci.yml`. Run all of them before opening a pu
 rather than seconds.
 
 Documentation drift is a defect and fails review, but no script checks it: a change to behaviour
-without a change to its document is caught by a person. The old rooms application is the
-cautionary tale.
+without a change to its document is caught by a person. That includes the in-app operator
+documentation under `content/docs/` (J-109): a screen's behaviour changing without its matching
+page changing is the same defect as an engineering document falling behind. The old rooms
+application is the cautionary tale.
 
 ## Scripts and tooling
 
