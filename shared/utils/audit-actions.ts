@@ -231,6 +231,8 @@ const CATALOGUE = {
   'bar.discount.updated': { label: 'Bar discount changed', module: 'bar' },
   'bar.discount.status.changed': { label: 'Bar discount retired or put back', module: 'bar' },
   'bar.tab.cap-overridden': { label: 'A tab charge over the cap approved by a manager', module: 'bar' },
+  'bar.tab.settled': { label: 'A tab settled on the reader', module: 'bar' },
+  'bar.tab-charge.voided': { label: 'A tab charge voided', module: 'bar' },
   'bar.comp-request.created': { label: 'A comp requested at the till', module: 'bar' },
   'bar.comp-request.approved': { label: 'A comp request approved', module: 'bar' },
   'bar.comp-request.declined': { label: 'A comp request declined', module: 'bar' },

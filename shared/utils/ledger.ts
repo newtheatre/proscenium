@@ -65,6 +65,8 @@ export const lineForm = z.object({
   discountId: z.string().max(64).nullish(),
   discountPercent: z.number().int().positive().max(100).nullish(),
   discountPence: pence.nullish(),
+  // The charge this line settles, one per charge, unique so a charge settles once (F-109).
+  settlesEntryId: z.string().max(64).nullish(),
 })
 
 export type LineInput = z.input<typeof lineForm>
@@ -78,6 +80,10 @@ export const entryForm = z.object({
   compReason: z.string().max(200).nullish(),
   compApprovedBy: z.string().max(64).nullish(),
   tabDebtorId: z.string().max(64).nullish(),
+  // Names what this entry corrects; the reason is free text, on the record and off the audit
+  // trail (0011, F-109 criterion 4).
+  voidOfEntryId: z.string().max(64).nullish(),
+  voidReason: z.string().max(200).nullish(),
   lines: z.array(lineForm).min(1, 'An entry itemises to at least one line'),
 }).refine(
   entry => entry.id === undefined || entry.id !== entry.reversesEntryId,

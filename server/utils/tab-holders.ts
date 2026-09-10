@@ -28,12 +28,13 @@ export async function authorisedTabHolders(event: H3Event | undefined): Promise<
   `)
 }
 
-// The sum of everything charged and not yet settled: never cached, read fresh at every charge
-// (F-108 criterion 1, the same reasoning on-hand stock reads fresh, F-105 criterion 5).
+// Never cached, read fresh at every charge (F-108 criterion 1, the same reasoning on-hand stock
+// reads fresh). A charge is never marked settled on its own row (0010, F-109).
 export async function outstandingTabBalance(userId: string): Promise<number> {
   const [row] = await db.all<{ total: number }>(sql`
-    SELECT coalesce(sum(total_pence), 0) AS total FROM ledger_entries
-    WHERE tab_debtor_id = ${userId} AND tab_settled_at IS NULL AND reverses_entry_id IS NULL
+    SELECT coalesce(sum(e.total_pence), 0) AS total FROM ledger_entries e
+    WHERE e.tab_debtor_id = ${userId} AND e.reverses_entry_id IS NULL
+      AND NOT EXISTS (SELECT 1 FROM ledger_lines l WHERE l.settles_entry_id = e.id)
   `)
   return row?.total ?? 0
 }

@@ -668,9 +668,13 @@ a pass; `(status = 'FULFILLED') = (pass_id IS NOT NULL)` is a CHECK, not a conve
 users restrict NULL (system) · `total_pence` (0 on a COMP; negative on a reversal) ·
 `reverses_entry_id` NULL self-FK (a correction points at what it corrects) · `comp_reason`
 NULL, **no CHECK** until module D decides its values (0033) · `comp_approved_by` NULL · `discount_id` NULL · `discount_percent` /
-`discount_pence` snapshots · `tab_debtor_id` NULL → users restrict · `tab_settled_at` ·
-`tab_settlement_entry_id` NULL self-FK · `void_of_entry_id` NULL (tab charges only; a
-reversing entry, 0031's rule carried) · `created_at`.
+`discount_pence` snapshots · `tab_debtor_id` NULL → users restrict · `tab_settled_at` and
+`tab_settlement_entry_id`, declared but **never written**: the append-only trigger refuses an
+UPDATE outright, and a charge cannot know at insert time whether it will later be settled, so
+`ledger_lines.settles_entry_id` on the settlement's own lines is what actually answers it
+(F-109). `void_of_entry_id` NULL (tab charges only; a reversing entry, 0031's rule carried),
+unique where not null so a charge voids once · `void_reason` NULL, free text, on the record
+and off the audit trail (0011) · `created_at`.
 Exception to append-only: none. Even voids and refunds are new reversing rows, and
 `ledger_entries_no_self_reversal` refuses an entry that claims to reverse itself.
 `server/utils/ledger.ts` is the only writer; `check:ledger` fails the build on any other file
@@ -687,7 +691,10 @@ table can never be widened (0033):
 `unit_price_pence` · `price_ref` (which price row and level resolved, F-121) · `choices` JSON ·
 `discount_id` NULL, no foreign key (append-only, the same reasoning as the ids above) ·
 `discount_percent` NULL · `discount_pence` NULL, the cut this line took: snapshotted at the
-moment of sale, so a later edit to the `discounts` row never restates it (F-117 criterion 3).
+moment of sale, so a later edit to the `discounts` row never restates it (F-117 criterion 3) ·
+`settles_entry_id` NULL, the charge this settlement line covers, one line per charge, unique
+where not null so a charge settles once (F-109 criteria 2, 3): no foreign key, the same
+reasoning `product_variant_id` carries.
 Which source, tender and kind each money path posts under is the table in `architecture.md`
 under Money and the ledger. A path not in that table has not been agreed.
 
