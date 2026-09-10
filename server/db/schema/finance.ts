@@ -74,3 +74,17 @@ export const periodLocks = sqliteTable('period_locks', {
   check('period_locks_action', sql`${table.action} IN ('CLOSED', 'REOPENED')`),
   check('period_locks_range_order', sql`${table.toDay} >= ${table.fromDay}`),
 ])
+
+// SU nominal code mappings (I-108): one row per (kind, source) pair the ledger can post under
+// (architecture.md), seeded by migration and only ever UPDATEd, like `incident_severity_config`.
+
+export const suNominalMappings = sqliteTable('su_nominal_mappings', {
+  id: id(),
+  kind: text('kind').notNull(),
+  source: text('source').notNull(),
+  nominalCode: text('nominal_code'),
+  updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  uniqueIndex('su_nominal_mappings_kind_source').on(table.kind, table.source),
+])

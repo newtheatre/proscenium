@@ -21,7 +21,8 @@ export const ledgerEntries = sqliteTable('ledger_entries', {
   actorId: text('actor_id').references(() => users.id, { onDelete: 'restrict' }),
   // Zero on a comp, negative on a reversal. Always the sum of the entry's lines.
   totalPence: integer('total_pence').notNull(),
-  // A correction points at what it corrects; both rows stay (criterion 3).
+  // A correction points at what it corrects; both rows stay (criterion 3). Written only by the
+  // one-time historical import (migration/money.ts); a live refund keys reports off kind instead.
   reversesEntryId: text('reverses_entry_id'),
   // No CHECK: comps belong to module D and their reasons are not decided (0033).
   compReason: text('comp_reason'),

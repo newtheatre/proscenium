@@ -66,11 +66,13 @@ export function revenueBySourceQuery(fromAt: number, toAt: number): SQL {
   `
 }
 
+// Keyed off the line's own kind, matching revenue-by-show.ts and night-reconciliation.ts: a
+// live refund never sets `reverses_entry_id` (I-102), only the one-time historical import does.
 export function seasonRefundsQuery(fromAt: number, toAt: number): SQL {
   return sql`
-    SELECT coalesce(-sum(le.total_pence), 0) AS refundsPence
-    FROM ledger_entries le
-    WHERE le.tender = 'CARD' AND le.reverses_entry_id IS NOT NULL
+    SELECT coalesce(-sum(ll.amount_pence), 0) AS refundsPence
+    FROM ledger_lines ll JOIN ledger_entries le ON le.id = ll.entry_id
+    WHERE le.tender = 'CARD' AND ll.kind = 'REFUND'
       AND le.happened_at >= ${fromAt} AND le.happened_at < ${toAt}
   `
 }

@@ -134,13 +134,17 @@ never rewritten.
 `id` PK · `user_id` → users restrict · `awarded_on` (date, London) · `awarded_by` (the
 committee or meeting that resolved it, not an individual) · `citation` (the public wording of
 what it was awarded for) · `revoked_at` NULL · `revoked_by` NULL · `revocation_reason` scrub ·
-`created_at`. `pass_id` → passes (the lifetime entitlement, 0023) arrives with module D as a
-nullable column: the roll is recorded first, because the committee assembles it before the box
-office exists.
+`created_at`. No `pass_id` column: D-130 finds the entitlement by `passes.user_id` and
+`pass_types.slug = 'fellowship'` rather than a direct foreign key, so awarding needs no migration
+on this already-shipped table and the fellowship and the pass can be read independently.
 UNIQUE (`user_id`): a person is a Fellow once. `restrict` rather than `cascade` on purpose, so
 deleting a user cannot silently remove an award from the theatre's own record; erasure
 anonymises the person and the award stands.
-A revoked fellowship stops future admissions and rewrites nothing (0023).
+A revoked fellowship stops future admissions and rewrites nothing (0023): awarding writes
+`server/utils/fellowship-pass.ts`'s pass insert in the same batch as the fellowship
+(A-127 criterion 3); revoking cancels that pass in the same batch as the revocation
+(`cancelFellowshipPassStatement`), and an anonymised holder never admits on it either way
+(0062). Every admission already taken stands, append-only and untouched (0010).
 
 ### role_grants
 `id` PK · `user_id` → users cascade · `role` (namespace-free officer role, validated against
@@ -844,6 +848,30 @@ enforcement.** It reads `period_locks` for `NEW.london_day` and raises where the
 instead of `db.batch()`, and it is what turns that raise into a 409. A correction posts under
 today's date, in the open period, exactly as any other entry does; only `NEW.london_day` is
 judged, never what a correction names in `reverses_entry_id`.
+
+### su_nominal_mappings
+`id` PK · `kind`, `source` (a `ledger_lines.kind` / `ledger_entries.source` pair) · `nominal_code`
+NULL (unmapped) · `updated_by` → users set null · `updated_at`. Unique on `(kind, source)`.
+
+**One row per pair a ledger line can actually post under, seeded by migration and only ever
+`UPDATE`d (I-108), the same shape `incident_severity_config` already uses for committee
+configuration that is not a scalar setting.** Decision 0025 refuses a config key that holds a
+keyed record, so a mapping from every `(kind, source)` to an SU nominal code cannot live in
+`config`; this table is the alternative. Nothing here ever creates or removes a pair: the seed
+migration enumerates the posting table in `architecture.md`, and a change is an audited `UPDATE`
+(`finance.nominal-mapping.changed`, `server/utils/su-export.ts`'s `setNominalMapping`).
+`GET /api/admin/finance/nominal-mappings` lists it, `POST` changes one pair.
+
+**`GET /api/admin/finance/export?fromDay=...&toDay=...`** is one CSV row per ledger line in the
+range, `le.london_day BETWEEN fromDay AND toDay`, joined against this table: a line whose pair
+has no mapping still exports, with an explicit `UNMAPPED` nominal code rather than a dropped or
+blank row (criterion 3). Every figure is the line's own signed `amount_pence`, read straight off
+the row: nothing here computes a total that could disagree with I-106's gross, refunded and net
+figures for the same range, because nothing here computes a total at all. Rows are capped at
+`SU_EXPORT_ROW_CAP` (`shared/utils/su-export.ts`), refused before the CSV is built rather than
+truncated silently. The export is audited (`finance.exported`) with who, when and the range.
+An open range exports anyway, permitted rather than refused: the `x-period-status` response
+header says `closed` or `open`, read from `period_locks` the same way a single day is (I-107).
 
 ## Show night (module E)
 

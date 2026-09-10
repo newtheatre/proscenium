@@ -272,6 +272,31 @@ caller resolves a term's dates from `GET /api/admin/finance/terms` before asking
 Closing a term reads its range from that same list and posts it through the ordinary close, which
 has no notion of "term" at all: a lock is a range and an optional label, whatever named it.
 
+### SU accounting exports (I-108)
+
+A period export (`GET /api/admin/finance/export?fromDay=...&toDay=...`) is one CSV row per
+ledger line in the range, categorised against `su_nominal_mappings`. Decision 0025 refuses a
+config key that holds a record, so the mapping from a `(kind, source)` pair to an SU nominal code
+is its own table, seeded from the posting table below and only ever `UPDATE`d, the same shape
+`incident_severity_config` already uses: nothing here creates or removes a pair, only changes
+what one maps to, and every change is audited with the from and to values (`finance.nominal-mapping.changed`).
+
+Nothing in the export is a computed total. Each row carries a ledger line's own signed
+`amount_pence`, exactly as `ledger_lines` stores it; a refund line is already negative at the
+source (`server/utils/refunds.ts`), so summing a category's rows reaches the same net figure
+I-106 reports for the same lines without this route deriving it a second way. A line whose pair
+has no mapping still exports, on its own row with an explicit `UNMAPPED` code (criterion 3),
+never dropped. The row count is capped (`SU_EXPORT_ROW_CAP`) and the nominal code column runs
+through `toCsv`'s formula-injection guard (D-129) like every other user-typed export cell.
+
+**An open period exports anyway, permitted but marked, never refused.** A treasurer may need a
+figure before closing (a return is due, a close is still being prepared), and refusing until
+close would make I-108 depend on a close that has its own separate warnings and workflow
+(I-107). `isRangeClosed()` checks the requested range against `period_locks` the same way a day
+is checked, and the response carries the answer as `x-period-status: closed|open` rather than a
+CSV column, so the file itself stays exactly the shape the SU's own import expects. A range only
+partly closed reads as open: nothing here assumes a term is closed in one row.
+
 ### The money paths
 
 The triple every path posts under. A module adding a money path adds a row here in the same pull
@@ -295,8 +320,8 @@ never from `london_day`; the ledger holds no night column and gains none.
 | Comp admission | A comp is issued at collection (D-114); gated behind an approved `ticket_comp_requests` row, claimed atomically at collection, rather than the `ticketing.manage` permission it once was (D-117) | ticketing | `DESK` | `COMP` | `TICKET_COLLECTION` |
 | Walk-up sale | Reservation and payment in one desk flow (D-115) | ticketing | `DESK` | `CARD`, `COMP` | `WALK_UP` |
 | Refund | The money is handed back, one entry per ticket (D-116) | ticketing | `DESK` | `CARD` | `REFUND` |
-| Pass sale | A pass is issued and paid for at the desk (D-124) | ticketing | `DESK` | `CARD` | `PASS_SALE` |
-| Pass admission | A pass covers a seat, online or at the door (D-125, D-126) | ticketing | `SELF_SERVE`, `DESK` | `NONE` | `PASS_ADMISSION` |
+| Pass sale | A pass is issued and paid for at the desk (D-124); or a Fellowship is awarded, which issues one at zero value in the same batch, nobody at a desk (D-130, 0023) | ticketing | `DESK`, `SYSTEM` | `CARD`, `NONE` | `PASS_SALE` |
+| Pass admission | A pass covers a seat, online or at the door (D-125, D-126); a Fellow's own entitlement rides the identical path (D-130) | ticketing | `SELF_SERVE`, `DESK` | `NONE` | `PASS_ADMISSION` |
 | Bar item | The sale, its lines and its stock movements commit together (F-105); a sale after midnight is the calendar day it happened on, not the night's; a discount, if any, is net into `amount_pence` and snapshotted alongside it (F-117) | bar | `TILL` | `CARD`, `COMP`, `TAB` | `BAR_ITEM` |
 | Tab charge | Credit extended, not money taken (F-108); the entry stamps the debtor and stays outstanding until settled, capped per holder unless a duty manager or bar manager overrides it | bar | `TILL` | `TAB` | `BAR_ITEM` |
 | Comp given | Requires a prior request with a reason, approved by tonight's duty manager or the bar manager, never the requester (F-110); the same policy D-117 states for a comp admission, that giving away value takes more than the operational access that lets you sell. `amount_pence` is zero and `unit_price_pence` stays the retail price, so the foregone value is queryable | bar | `TILL` | `COMP` | `BAR_ITEM` |
@@ -708,7 +733,8 @@ query builders, each bound to one performance id and nothing that grows with a t
 `tonightPerformanceQuery` for the show and its warnings. "Sold" rides `heldSeatsSubquery` from
 `server/utils/capacity.ts`, never a second count of `tickets`, which
 `tests/unit/capacity-guard.test.ts` refuses outright (D-105 criterion 2); "admitted" is
-`reservations.status = 'DOOR'`, which reads honestly as nought until D-126 builds the door scan.
+`reservations.status = 'DOOR'`, set by a pass scan (D-126) or an ordinary ticket scan (E-127
+criterion 3) at `/tonight/door`, both below.
 
 `readTeamRow()` is the roster's pure half: `OPEN`, `DECLINED` and an unconfirmed `CLAIMED` all
 read as unfilled, because "who is actually coming" is the question the screen answers, never a
@@ -738,7 +764,9 @@ reporting reaches through a second tap on the incident log screen rather than a 
 
 ### Two shows, one venue, one day (E-127)
 
-Four of the six criteria: 2, 5, 6, and 1 for everything except the checklist. `shared/utils/tonight.ts`'s
+All six criteria: 2, 5, 6, and 1 for everything except the checklist here; criterion 4 (the
+checklist tables) closed separately by E-128, and criterion 3 (the wrong-performance door
+refusal) by the door-scan work below. `shared/utils/tonight.ts`'s
 `activePerformanceId(performances, at)` is the one pure function underneath criterion 2: a
 performance is active from its own doors (or curtain, with none set) until the next one's doors
 begin, so it needs no duration estimate, and the edges resolve to "next one to come" before the
@@ -766,9 +794,25 @@ even though the shared till session itself is correct by design (criterion 5, `t
 to `venue_id` and `night` exactly as the criterion asks). Recorded in `docs/known-issues.md` for
 bar's own stream, since the fix is a picker on a page this stream does not own.
 
-Criterion 3 (a wrong-performance scan refuses loudly, naming the correct one) has no door screen
-to refuse into: D-126 is unbuilt, corrected onto this story's own dependency line, which omitted
-it. `tests/e2e/night-two-performances.test.ts` is criterion 6's own fixture: one venue, a matinee
+Criterion 3 (a wrong-performance scan refuses loudly, naming the correct one) waited on D-126
+building `/tonight/door` at all, corrected onto this story's own dependency line, which omitted
+it; D-126 itself only ever scanned a pass. `POST /api/tonight/door/tickets/scan` is the ordinary
+ticket half: `reservationForDoorQuery()` reads a reservation by reference alone, not scoped to a
+performance, and `doorTicketOutcome()` (`shared/utils/reservations.ts`) asks whether it matches
+the door's own `performanceId` only when the reservation is still live (`PENDING` or
+`COLLECTED`); every other state, cancelled, lapsed, no-show or already admitted, explains itself
+regardless of which door asked. A mismatch answers `This ticket is for <show>, <when>.`, reusing
+the reservation's own joined columns rather than a second lookup. This is also D-108 criterion
+5's own fifth state, "wrong night", built at the door as that criterion always named it: four of
+its five states now read distinctly there, reusing `qrStatusDisplay()` for cancelled, unpaid and
+already-admitted; "exchanged" still reads as an ordinary cancellation until D-111 lands
+(`docs/known-issues.md`). `/tonight/door` tries the reference as a ticket first and falls back to
+a pass only on "no such booking", since the two share one reference alphabet and a scanner cannot
+tell them apart before asking. `tests/e2e/door-ticket-scan.test.ts` covers admission, the wrong-
+performance refusal (including against an unpaid ticket, where wrong performance still answers
+first), unpaid, cancelled, an unknown reference and the door role itself.
+
+`tests/e2e/night-two-performances.test.ts` is criterion 6's own fixture: one venue, a matinee
 and an evening, the same person holding a shift on both (criterion 1's own clause), two age checks,
 one till session, a sale named to the matinee, and two independently-read reports proving neither
 crosses into the other.
@@ -803,10 +847,10 @@ against, which is how criterion 4's "bar can check outside a show" is read here:
 itself never has to name a performance, even on a night that has one.
 
 `/tonight/age-checks` is criterion 4's standalone half from the tonight screen: log a check,
-correct one, and read tonight's register, linked from `/tonight`. The criterion's other two
-halves stay open on issue #457: the till-inline reachability is F-106's, and the door half
-waits on a door screen existing at all, which no story has built yet and which is not this
-screen's work to start.
+correct one, and read tonight's register, linked from `/tonight`. The till-inline half is
+F-106's, folding an outcome into a sale. The door half waited on a door screen existing at all
+(issue #457); `/tonight/door` links to the register the same way `/tonight` already does, once
+D-126 and E-127 criterion 3 gave it something to link from and into.
 
 ### The incident log and near-miss reporting (E-115, E-117)
 

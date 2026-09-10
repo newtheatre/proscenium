@@ -693,6 +693,14 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // No free text: from_day, to_day and action are the whole of a close or reopen's own record.
     why: 'Who closed or reopened a period is the accountable record (I-107); the tombstone still answers for it.',
   },
+  {
+    name: 'su_nominal_mappings',
+    column: 'updated_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    why: 'Who last changed the mapping. It describes the policy, not the person who set it up.',
+  },
 
   // Module J: governance
 

@@ -302,6 +302,8 @@ const CATALOGUE = {
   'finance.period.defined': { label: 'Term defined', module: 'finance' },
   'finance.period.closed': { label: 'Period closed', module: 'finance' },
   'finance.period.reopened': { label: 'Period reopened', module: 'finance' },
+  'finance.nominal-mapping.changed': { label: 'SU nominal code mapping changed', module: 'finance' },
+  'finance.exported': { label: 'SU accounting export downloaded', module: 'finance' },
 
   // Module J: governance
 

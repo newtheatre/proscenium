@@ -161,7 +161,7 @@ export async function ensureStamped(performanceId: string): Promise<void> {
 }
 
 // No reservation for this performance is left in a status a show should have resolved by its
-// own end (criterion 3). Needs a door scan D-126 does not build yet (docs/known-issues.md).
+// own end (criterion 3). Nothing marks a no-show yet (docs/known-issues.md).
 export function noShowHoldsReleasedQuery(performanceId: string): SQL {
   return sql`
     SELECT count(*) AS unresolved

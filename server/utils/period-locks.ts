@@ -104,6 +104,22 @@ export async function isDayLocked(day: string): Promise<boolean> {
   return row?.action === 'CLOSED'
 }
 
+// Whether a whole range is closed (I-108): the latest lock whose own range fully contains this
+// one. A range closed in two or more pieces reads as open rather than guessed at.
+function rangeCoveredByQuery(fromDay: string, toDay: string): SQL {
+  return sql`
+    SELECT action FROM period_locks
+    WHERE from_day <= ${fromDay} AND to_day >= ${toDay}
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+  `
+}
+
+export async function isRangeClosed(fromDay: string, toDay: string): Promise<boolean> {
+  const [row] = await db.all<{ action: PeriodLockAction }>(rangeCoveredByQuery(fromDay, toDay))
+  return row?.action === 'CLOSED'
+}
+
 // Criterion 5: what closing warns about before it proceeds. Nights, filtered to the range by
 // label, since that is what the reconciliation record this reads is keyed on (F-118).
 export async function blockingConditionsFor(fromDay: string, toDay: string): Promise<{ unreconciledNights: string[], openVarianceNights: string[] }> {

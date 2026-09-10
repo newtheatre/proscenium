@@ -40,10 +40,11 @@ recorded and fixed before the release goes out.
 - [ ] Turn the network off, and each screen still shows what it last held.
 - [ ] Every action tapped once did what it said the first time.
 
-Signed off by the person who walked it, named in the release notes with the date. Until the door
-(D-126) and the age check (E-118) are built, the steps naming them are skipped and recorded as
-skipped rather than ticked. The till's own step walks what F-103 and F-104 built; nothing is
-recorded as a sale until F-105 lands the atomic write.
+Signed off by the person who walked it, named in the release notes with the date. The door step
+now walks an ordinary ticket (E-127 criterion 3) or a pass (D-126) either way; until the age
+check (E-118) is reachable from the door, that step is skipped and recorded as skipped rather
+than ticked. The till's own step walks what F-103 and F-104 built; nothing is recorded as a sale
+until F-105 lands the atomic write.
 
 ## Applying migrations
 

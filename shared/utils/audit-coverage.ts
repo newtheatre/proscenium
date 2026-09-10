@@ -187,6 +187,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['pass.redeemed', 'reservation.admitted'],
     via: ['server/utils/pass-redemption.ts', 'server/utils/door.ts'],
   },
+  {
+    route: 'server/api/tonight/door/tickets/scan.post.ts',
+    actions: ['reservation.admitted'],
+    via: ['server/utils/door.ts'],
+  },
   { route: 'server/api/admin/programme/shows.get.ts', exempt: 'reads the show picker, drafts included' },
   { route: 'server/api/admin/venues/index.get.ts', exempt: 'reads the venues a performance may be put in' },
   { route: 'server/api/admin/shows/index.get.ts', exempt: 'reads the programme, drafts included' },
@@ -614,6 +619,9 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/finance/periods/[id]/reopen.post.ts', actions: ['finance.period.reopened'], via: ['server/utils/period-locks.ts'] },
   { route: 'server/api/admin/finance/terms/index.get.ts', exempt: 'reads defined terms, writing nothing' },
   { route: 'server/api/admin/finance/terms/index.post.ts', actions: ['finance.period.defined'], via: ['server/utils/period-locks.ts'] },
+  { route: 'server/api/admin/finance/nominal-mappings/index.get.ts', exempt: 'reads the mapping, writing nothing' },
+  { route: 'server/api/admin/finance/nominal-mappings/index.post.ts', actions: ['finance.nominal-mapping.changed'], via: ['server/utils/su-export.ts'] },
+  { route: 'server/api/admin/finance/export.get.ts', actions: ['finance.exported'] },
 
   // Module J: governance
 
@@ -624,7 +632,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['shared/utils/audit-actions.ts'],
   },
   { route: 'server/api/admin/fellowships/[id]/revoke.post.ts', actions: ['fellowship.revoked'] },
-  { route: 'server/api/admin/fellowships/index.post.ts', actions: ['fellowship.awarded'] },
+  {
+    route: 'server/api/admin/fellowships/index.post.ts',
+    actions: ['fellowship.awarded', 'pass.issued'],
+    via: ['server/utils/fellowship-pass.ts'],
+  },
   { route: 'server/api/admin/config/[key].put.ts', actions: ['config.changed'], via: ['server/utils/config-write.ts'] },
   { route: 'server/api/admin/config/[key]/blast-radius.get.ts', exempt: 'reads a live count; nothing is written' },
   { route: 'server/api/admin/config/[key]/revert.post.ts', actions: ['config.changed'], via: ['server/utils/config-write.ts'] },

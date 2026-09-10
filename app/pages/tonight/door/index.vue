@@ -3,7 +3,8 @@ definePageMeta({ layout: 'tonight' })
 useSeoMeta({ title: 'Door' })
 
 interface Authority { performanceIds: string[] }
-interface ScanResult { decision: 'ADMIT', passTypeName: string }
+interface TicketScanResult { decision: 'ADMIT', showTitle: string }
+interface PassScanResult { decision: 'ADMIT', passTypeName: string }
 
 const request = useRequestFetch()
 
@@ -37,26 +38,38 @@ onMounted(resolveAuthority)
 
 const performanceOptions = computed(() => performanceIds.value.map(id => ({ label: id, value: id })))
 
-// A pass reference is typed or read from a hardware scanner acting as a keyboard (no camera
-// scanner exists anywhere in this build yet, docs/known-issues.md); either way it lands here.
+// Typed or read from a hardware scanner acting as a keyboard (no camera scanner exists yet,
+// docs/known-issues.md); a ticket and a pass share one reference alphabet, so one box tries both.
 const reference = ref('')
 const scanning = ref(false)
-const result = ref<ScanResult | null>(null)
+const admitted = ref<string | null>(null)
 const refusal = ref<string | null>(null)
 
 async function scan(): Promise<void> {
   if (!reference.value.trim() || !performanceId.value) return
   scanning.value = true
-  result.value = null
+  admitted.value = null
   refusal.value = null
+  const body = { reference: reference.value.trim(), performanceId: performanceId.value }
   try {
-    result.value = await $fetch<ScanResult>(`/api/tonight/door/passes/scan`, {
-      method: 'POST',
-      body: { reference: reference.value.trim(), performanceId: performanceId.value },
-    })
+    const ticket = await $fetch<TicketScanResult>('/api/tonight/door/tickets/scan', { method: 'POST', body })
+    admitted.value = ticket.showTitle
   }
-  catch (refused) {
-    refusal.value = refusalText(refused)
+  catch (ticketRefused) {
+    // Only "no such booking" tries the reference as a pass instead; any other refusal (wrong
+    // performance, unpaid, already admitted) is the answer, whichever kind of reference it was.
+    if (refusalStatus(ticketRefused) !== 404) {
+      refusal.value = refusalText(ticketRefused)
+    }
+    else {
+      try {
+        const pass = await $fetch<PassScanResult>('/api/tonight/door/passes/scan', { method: 'POST', body })
+        admitted.value = pass.passTypeName
+      }
+      catch (passRefused) {
+        refusal.value = refusalStatus(passRefused) === 404 ? 'That reference is not recognised' : refusalText(passRefused)
+      }
+    }
   }
   finally {
     reference.value = ''
@@ -68,7 +81,7 @@ async function scan(): Promise<void> {
 <template>
   <NightScreen
     title="Door"
-    hint="Scan or type a pass's reference to admit it."
+    hint="Scan or type a ticket or pass reference to admit it."
     :stale="syncedAt"
     :busy="busy"
     data-test="door-screen"
@@ -102,7 +115,7 @@ async function scan(): Promise<void> {
         />
       </UFormField>
 
-      <UFormField label="Pass reference">
+      <UFormField label="Ticket or pass reference">
         <UInput
           v-model="reference"
           class="w-full"
@@ -115,12 +128,12 @@ async function scan(): Promise<void> {
       </UFormField>
 
       <UAlert
-        v-if="result"
+        v-if="admitted"
         color="success"
         variant="subtle"
         icon="i-lucide-check-circle"
         title="Admit"
-        :description="result.passTypeName"
+        :description="admitted"
         data-test="door-admit"
       />
       <UAlert
@@ -132,6 +145,20 @@ async function scan(): Promise<void> {
         :description="refusal"
         data-test="door-refused"
       />
+
+      <!-- Standalone reachability from the door, the half E-118 criterion 4 was still missing
+           until this screen existed (issue 457). -->
+      <UButton
+        to="/tonight/age-checks"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-id-card"
+        size="lg"
+        class="min-h-12 w-full"
+        data-test="link-age-checks"
+      >
+        Challenge 25
+      </UButton>
     </div>
 
     <template #actions>

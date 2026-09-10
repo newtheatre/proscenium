@@ -7,6 +7,7 @@ import { buildLoad, applyLoad } from './load'
 import { reconcile as reconcileBookings, transformBookings } from './bookings'
 import { buildLoad as buildMoneyLoad, reconcileMoney, transformMoney } from './money'
 import { reconcileTraining, transformTraining } from './training'
+import { reconcile as reconcileProgramme, transformProgramme } from './programme'
 import { count } from './lib'
 import { createTestDatabase } from '../tests/helpers/database'
 import type { TicketRow } from './money'
@@ -132,6 +133,64 @@ function syntheticTickets(): TicketRow[] {
   ]
 }
 
+// The old proscenium database's programme tables, including the shapes a happy-path fixture
+// never carries: an orphaned reference, and a latecomer policy the new vocabulary narrows.
+function syntheticProscenium(): Database {
+  const db = new Database(':memory:')
+  db.exec(`
+    CREATE TABLE venues (id TEXT PRIMARY KEY, name TEXT NOT NULL, address TEXT, capacity INTEGER, description TEXT, is_external INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE seasons (id TEXT PRIMARY KEY, name TEXT NOT NULL, starts_at INTEGER NOT NULL, ends_at INTEGER NOT NULL, sort INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE show_categories (id TEXT PRIMARY KEY, name TEXT NOT NULL, sort INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE shows (
+      id TEXT PRIMARY KEY, slug TEXT NOT NULL, title TEXT NOT NULL, subtitle TEXT, description TEXT,
+      long_description TEXT, external_url TEXT, category_id TEXT, season_id TEXT, age_guidance TEXT,
+      latecomer_policy TEXT, content_warning_notes TEXT, warnings_confirmed_none INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+    CREATE TABLE content_warnings (id TEXT PRIMARY KEY, slug TEXT NOT NULL, title TEXT NOT NULL, kind TEXT NOT NULL, category TEXT, description TEXT, icon TEXT, sort INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE show_content_warnings (id TEXT PRIMARY KEY, show_id TEXT NOT NULL, content_warning_id TEXT NOT NULL, level TEXT);
+    CREATE TABLE performances (
+      id TEXT PRIMARY KEY, show_id TEXT NOT NULL, venue_id TEXT NOT NULL, starts_at INTEGER NOT NULL,
+      doors_at INTEGER, duration_minutes INTEGER, interval_count INTEGER NOT NULL DEFAULT 0,
+      interval_minutes INTEGER, capacity_override INTEGER, booking_closes_hours_before INTEGER,
+      external_booking_url TEXT, status TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL);
+
+    INSERT INTO venues (id, name, address, capacity, description, is_external) VALUES
+      ('v-1', 'The Synthetic House', '1 Example Street', 120, 'The main house.', 0);
+
+    INSERT INTO seasons (id, name, starts_at, ends_at, sort, archived) VALUES
+      ('s-1', '2023/24 (synthetic)', ${Date.UTC(2023, 7, 1)}, ${Date.UTC(2024, 6, 31, 22, 59, 59)}, 0, 0);
+
+    INSERT INTO show_categories (id, name, sort) VALUES ('c-1', 'In House (synthetic)', 0);
+
+    INSERT INTO shows (id, slug, title, subtitle, description, long_description, external_url, category_id,
+      season_id, age_guidance, latecomer_policy, content_warning_notes, warnings_confirmed_none, status, created_at, updated_at)
+    VALUES
+      ('sh-1', 'a-synthetic-show', 'A Synthetic Show', NULL, 'Description.', NULL, NULL, 'c-1', 's-1',
+        NULL, 'SUITABLE_BREAK', NULL, 1, 'PUBLISHED', '2023-09-01 12:00:00', '2023-09-01 12:00:00'),
+      -- No surviving category, an external link nothing in the unified schema carries, and a
+      -- season nothing maps: exactly the "orphaned reference" shape K-113 asks every module to name.
+      ('sh-2', 'an-orphaned-show', 'An Orphaned Show', NULL, NULL, NULL, 'https://example.invalid/tickets',
+        'missing-category', NULL, NULL, NULL, NULL, 0, 'DRAFT', '2023-09-02 12:00:00', '2023-09-02 12:00:00');
+
+    INSERT INTO content_warnings (id, slug, title, kind, category, description, icon, sort, archived) VALUES
+      ('cw-1', 'strobe-lighting', 'Strobe lighting', 'TECHNICAL', NULL, NULL, NULL, 0, 0);
+
+    INSERT INTO show_content_warnings (id, show_id, content_warning_id, level) VALUES
+      ('scw-1', 'sh-1', 'cw-1', NULL),
+      -- The warning half of this link never imports (no such id above), the other shape K-113 asks for.
+      ('scw-2', 'sh-1', 'missing-warning', NULL);
+
+    INSERT INTO performances (id, show_id, venue_id, starts_at, doors_at, duration_minutes, interval_count,
+      interval_minutes, capacity_override, booking_closes_hours_before, external_booking_url, status, notes, created_at)
+    VALUES
+      ('p-1', 'sh-1', 'v-1', ${Date.UTC(2024, 2, 4, 19, 30)}, ${Date.UTC(2024, 2, 4, 19)}, 120, 1, 15,
+        NULL, 2, NULL, 'ON_SALE', NULL, '2023-09-01 12:00:00'),
+      -- No surviving show: the "performance whose show did not import" shape.
+      ('p-2', 'missing-show', 'v-1', ${Date.UTC(2024, 2, 5, 19, 30)}, NULL, 120, 0, NULL, NULL, NULL, NULL, 'ON_SALE', NULL, '2023-09-01 12:00:00');
+  `)
+  return db
+}
+
 // --- Stage 1: identity, with every mirror populated, unlike every existing test (K-112, K-113).
 
 const auth = syntheticAuth()
@@ -232,10 +291,54 @@ check(
 )
 check('money reconciliation is green', moneyCheck.ok, moneyCheck.problems.join('; ') || 'no problems')
 
-// --- Stage 6: what this dry run cannot cover, named rather than left implicit.
+// --- Stage 6: programme, straight into the real schema, venues and seasons before shows before
+// performances, because every later insert is a real foreign key (0043).
+
+const prosceniumSource = syntheticProscenium()
+const programmeResult = transformProgramme({
+  source: prosceniumSource,
+  venueIds: new Map(),
+  seasonIds: new Map(),
+  categoryIds: new Map(),
+  showIds: new Map(),
+  warningIds: new Map(),
+  performanceIds: new Map(),
+  target: rehearsal.raw,
+})
+const programmeCheck = reconcileProgramme(prosceniumSource, rehearsal.raw, programmeResult.summary)
+check('both shows import, orphaned category and all', count(rehearsal.raw, 'shows') === 2, `${count(rehearsal.raw, 'shows')} of 2`)
+check('the mapped performance writes', programmeResult.summary.performances === 1, `${programmeResult.summary.performances} of 1`)
+check(
+  'K-113: a performance whose show did not import is an exception, not a guess',
+  programmeResult.exceptions.some(exception => exception.includes('missing-show') || exception.includes('performance p-2')),
+  programmeResult.exceptions.find(exception => exception.includes('p-2')) ?? 'no such exception was raised',
+)
+check(
+  'K-113: a show naming a category that did not import is an exception, left uncategorised',
+  programmeResult.exceptions.some(exception => exception.includes('sh-2') && exception.includes('category')),
+  programmeResult.exceptions.find(exception => exception.includes('sh-2')) ?? 'no such exception was raised',
+)
+check(
+  'K-113: a warning link naming a warning that did not import is an exception, not a guess',
+  programmeResult.exceptions.some(exception => exception.includes('scw-2')),
+  programmeResult.exceptions.find(exception => exception.includes('scw-2')) ?? 'no such exception was raised',
+)
+check(
+  'a latecomer policy the new vocabulary narrows is counted, not silently collapsed',
+  programmeResult.summary.narrowedLatecomerPolicies === 1,
+  `${programmeResult.summary.narrowedLatecomerPolicies} of 1`,
+)
+check(
+  'a dropped external_url is counted, not silently lost',
+  programmeResult.summary.droppedExternalUrls === 1,
+  `${programmeResult.summary.droppedExternalUrls} of 1`,
+)
+check('programme reconciliation is green', programmeCheck.ok, programmeCheck.problems.join('; ') || 'no problems')
+
+// --- Stage 7: what this dry run cannot cover, named rather than left implicit.
 
 notes.push('note export.sh, inventory.ts and reconcile.ts read real files (migration/dumps/, migration/out/) and are not exercised here: this proves the transforms, not the file-handling CLI wrappers around them')
-notes.push('note programme and reservations-as-records still have no transform: this harness cannot exercise what does not exist')
+notes.push('note reservations-as-records still has no transform: this harness cannot exercise what does not exist')
 
 console.log(notes.join('\n'))
 if (failures.length) {
@@ -246,6 +349,7 @@ if (failures.length) {
   roomsSource.close()
   trainingSource.close()
   ticketsDb.close()
+  prosceniumSource.close()
   process.exit(1)
 }
 console.log('\nSynthetic dry run green: every transform ran end to end, and every exception path this harness can reach without real dumps fired correctly.')
@@ -255,3 +359,4 @@ for (const mirror of mirrors) mirror.db.close()
 roomsSource.close()
 trainingSource.close()
 ticketsDb.close()
+prosceniumSource.close()

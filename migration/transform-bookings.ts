@@ -5,6 +5,7 @@ import { Database } from 'bun:sqlite'
 import { join } from 'node:path'
 import { assertLocalTarget, assertNotProduction } from '../tests/helpers/seed'
 import { OUT, ensureOut, latestStamp, loadDump } from './lib'
+import { readReferenceMap } from './reference-map'
 import { reconcile, transformBookings } from './bookings'
 
 const stamp = await latestStamp()
@@ -45,15 +46,25 @@ const externalIds = await readMap('external-id-map.tsv')
 const source = await loadDump('rooms', stamp)
 const target = new Database(applyTo)
 
-// Written by hand for a rehearsal rather than guessed, because a wrong room silently rewrites
-// years of utilisation. Two files now: a venue is a union room, not a room we control (C-120).
-const rooms = await readMap('room-map.tsv')
-const spaces = await readMap('space-map.tsv')
-if (rooms.size === 0 || spaces.size === 0) {
-  console.error(`No ${join(OUT, 'room-map.tsv')} or ${join(OUT, 'space-map.tsv')}: map each`)
-  console.error('"room:<id>" to a unified room and each "venue:<id>" to a union room first.')
+// Confirmed against rooms and union venues already authored, never guessed (see
+// migration/README.md, "Two kinds of map"). A venue is a union room, not one we control (C-120).
+const roomsMap = await readReferenceMap('room-map.tsv')
+const spacesMap = await readReferenceMap('space-map.tsv')
+const blanks = [...roomsMap.blanks, ...spacesMap.blanks]
+if (roomsMap.resolved.size === 0 && spacesMap.resolved.size === 0 && blanks.length === 0) {
+  console.error(`No ${join(OUT, 'room-map.tsv')} or ${join(OUT, 'space-map.tsv')}: run`)
+  console.error('bun migration/generate-reference-maps.ts <target-database> first.')
   process.exit(1)
 }
+if (blanks.length > 0) {
+  console.error(`${blanks.length} room or venue in room-map.tsv or space-map.tsv is still unconfirmed:`)
+  for (const key of blanks) console.error(`  ${key}`)
+  console.error('Author it through its own admin screen and rerun generate-reference-maps.ts,')
+  console.error('or fill in the target id by hand if it already exists under a different name.')
+  process.exit(1)
+}
+const rooms = roomsMap.resolved
+const spaces = spacesMap.resolved
 
 const { summary, exceptions } = transformBookings({
   source, accounts, rooms, spaces, bookingIds, seriesIds, externalIds, target,
