@@ -72,7 +72,7 @@ migration. Roughly a week of work with a merge a day.
 | f | D-121 and D-112, publish flow and booking window | box office | Show and performance administration and the publish flow; the per-performance booking window. | D-101, D-102, D-122; E-102. |
 | g | E-111, the officer branch only | show night | `server/utils/night-authority.ts`: `NightRole` is `DUTY_MANAGER`, `DOOR` or `BAR`; `requireNightAuthority(event, role, scope?)` resolves `{ account, night, role, venueId, performanceIds, via, shiftId? }` where `via` is `SHIFT` or `OFFICER`; a refusal is a 403 naming what would unlock it. Only the `OFFICER` branch ships: permissions `night.door`, `night.till`, `night.manage` in `shared/utils/roles.ts`, dotted like every other permission, with the three abilities over them in `shared/utils/abilities.ts`, and an audit action `night.officer-bypass` written once per account per night per venue per role (the venue was added when the contract was built: two venues may run one night, and without it the second venue's night report looks clean, 0044). The seed gains a bar-manager and a FOH-officer persona. The bypass decision record. The `SHIFT` branch arrives in show night wave 3 with no change to the signature. | F-101 (BAR), D-126 (DOOR), every `/api/tonight/**` and `/api/till/**` route. |
 
-## The four streams
+## The streams
 
 One stream per area, each on its own branches, each opening small pull requests into the
 integration branch. Sizes: S is one point, M two, L three. Inside a wave, a "·" separates
@@ -85,6 +85,7 @@ pull request, titled in the repository's habit: a sentence, then the ids in pare
 | show night | 27 | `unified/show-night/` | 3012 | 3301 |
 | bar | 21 | `unified/bar/` | 3013 | 3401 |
 | platform | 32 | `unified/platform/` | 3014 | 3501 |
+| finance | 6 | `unified/finance/` | 3015 | 3601 |
 | seed | | `unified/seed/` | 3017 | 4101 |
 | the reviewer | | | 3001 | 3701 |
 
@@ -149,22 +150,32 @@ screens sit under `/bar`, not `/admin`: `/admin` means System and nothing else, 
 | Wave | Pull-request groups | Notes |
 | --- | --- | --- |
 | 1 | K-103 · K-105 harness + J-106 · K-108 + J-107 · K-112 · K-111 + A-126 | K-103 builds `useNightCache(key, loader)` against the placeholder and a seeded performance; show night and bar adopt it. K-105 here is only `tests/helpers/race.ts` and splitting `races.test.ts` and `money.test.ts` into per-invariant files, before D-105 and F-105 both try to fill the same file. J-106: verify the existing endpoint against its criteria and close. K-108 wakes `backup`; K-111 wakes `retention:sweep`. |
-| 2 | H-102 + H-104 · H-105 + H-106 · J-109 + J-110 · K-113 · I-106 | H-105's retries are what `nights:close` and D-107 lean on. J-110 makes `check:content-tokens` real: keep it small and early. I-106 needs D Wave 0 only and uses `IMPORT` rows until D-114 posts real ones. |
-| 3 | A-119 · H-108 · K-114 + I-109 · J-105 | K-114 and I-109 import from `tickets` and `reservations`, not the old estate's near-empty `transactions` table (verified against production, 6 September 2026). K-116 no longer needs a wave: it resolved without a pull request, on the same verification finding no stock-movement history to transform (`docs/backlog/K-platform.md`). |
-| 4 | A-123 · I-102 · K-104 | I-102 closes when D-114, D-116, D-124, F-105 and F-108 have each added their row to the checklist test, each in its own pull request; I-102's own pull request asserts the list is complete. K-104 needs a real door write and a real till write to reconcile against. |
-| 5 | I-103 + I-104 · I-105 · K-105 close | K-105 closes when the four racing tests (D-105, E-104, F-105, register marks) are in CI. |
-| 6 | I-107 + I-108 | K-119 no longer needs a wave: criteria 1, 2 and 4 are operational acts on the old estate, and criterion 3 resolved as the runbook in `docs/operations.md` (`docs/backlog/K-platform.md`). |
+| 2 | H-102 + H-104 · H-105 + H-106 · J-109 + J-110 · K-113 | H-105's retries are what `nights:close` and D-107 lean on. J-110 makes `check:content-tokens` real: keep it small and early. |
+| 3 | A-119 · H-108 · K-114 + I-109 · J-105 | K-114 and I-109 import from `tickets` and `reservations`, not the old estate's near-empty `transactions` table (verified against production, 6 September 2026). K-116 no longer needs a wave: it resolved without a pull request, on the same verification finding no stock-movement history to transform (`docs/backlog/K-platform.md`). I-109 stays platform's: it shares K-114's import pipeline rather than the finance stream's own reporting surface. |
+| 4 | A-123 · K-104 | K-104 needs a real door write and a real till write to reconcile against. |
 
-Routes and files owned: `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`,
+Routes and files owned: `/account/notifications`, `/comms/**`, `/policies/**`,
 `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`,
 `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`,
 `tests/helpers/race.ts`.
-The notification screens sit under `/comms` and the finance ones under `/money`, the prefixes
-their sidebar groups were declared with (0040). The four that stay under `/admin` are System,
-which is exactly what `/admin` means.
+The notification screens sit under `/comms`, the prefix its sidebar group was declared with
+(0040). The four that stay under `/admin` are System, which is exactly what `/admin` means.
 
-If platform falls behind, split finance (module I with K-112 to K-119) into a fifth stream.
-Nothing else in platform is on the critical path.
+Module I (finance, except I-109) split into its own stream once the finance tail started, below;
+nothing else in platform is on the critical path.
+
+### Finance (module I, except I-109)
+
+| Wave | Pull-request groups | Notes |
+| --- | --- | --- |
+| 1 | I-103 | Smallest: reads the ledger directly, no new table. Found and fixed in the same pull request: `reportForegoneQuery` (E-123) summed a comp line's `amount_pence`, which a real comp always posts as zero; the retail figure sits on `unit_price_pence` (I-103 criterion 1). |
+| 2 | I-104 | Depends on I-103. Reconciles by `london_day`, the plain London calendar day, never the show night: `architecture.md`'s money-path table already fixed this, because the reader's own Z is a calendar-day figure. Reads F-118's till-session close record when present and reconciles from the ledger alone otherwise. |
+| 3 | I-105 | Needs I-104's reconciliation for the open-variance total. |
+| 4 | I-106 | Needs I-102 (platform, closed) only; independent of I-103 to I-105, slotted here to match the order this stream was asked to work in. Imported history (`IMPORT` rows) carries no `performance_id` and cannot attribute to a show; reported as its own total, never folded into "no show" as if the money were missing. |
+| 5 | I-107 · I-108 | I-107 first, alone: I-108's export is period-scoped and reads more cleanly once a period can close. |
+
+Routes and files owned: `/money/**`, `/api/admin/finance/**`, `server/utils/finance-reports.ts`.
+The finance screens sit under `/money`, the prefix its sidebar group was declared with (0040).
 
 ## The critical path
 

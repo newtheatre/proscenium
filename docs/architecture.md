@@ -73,7 +73,7 @@ A prefix names the domain; the shell follows the posture of the work rather than
 | --- | --- | --- |
 | `/`, `/sign-in`, `/register`, `/verify`, `/reset`, `/magic`, every `content/*.md` path | `default` | Anybody |
 | `/rooms`, `/rooms/mine`, `/account/*` | `member` | A member, about themselves |
-| `/rooms/manage/*`, `/people/*`, `/box-office/*`, `/bar/*`, `/admin/*` | `console` | Somebody working for the theatre |
+| `/rooms/manage/*`, `/people/*`, `/box-office/*`, `/bar/*`, `/money/*`, `/admin/*` | `console` | Somebody working for the theatre |
 | `/tonight/*` | `tonight` | Somebody on shift, on a phone |
 
 A domain with both audiences puts the member's screens at the top and the console's under `manage`
@@ -93,8 +93,9 @@ namespace, and asks the owner for one anywhere else.
 | Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/qr` (retrieval, resend and self-service edit and cancel while unpaid: D-108, D-110), `/passes` (a pass's own QR retrieval, D-124), `/account/passes`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/`, `app/pages/[...slug].vue` (the content catch-all, D-103) |
 | Show night | `/rota` and `/rota/manage/**` (templates, rota administration, the venue emergency card and the backstage board's own milestone types and presets at `/rota/manage/backstage`), the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**`, `/api/admin/rota/**`, `/api/admin/backstage/**`, `/api/board/**` and `server/utils/night-authority.ts`. The console screens sit under `/rota/manage`, never `/admin`: `/tonight` is the phone-first shell rather than a console prefix (0040, 0046). |
 | Bar | `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**` |
-| Platform | `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`, `tests/helpers/race.ts` |
+| Platform | `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`, `tests/helpers/race.ts` |
 | Communications | `/account/notifications`, `/comms/**`, `server/utils/notify.ts`, `server/utils/notification-preferences.ts`, `shared/utils/notifications.ts`, `shared/utils/senders.ts` |
+| Finance | `/money/**`, `/api/admin/finance/**`, `server/utils/finance-reports.ts` (build-order.md split module I into its own stream once the finance tail started) |
 
 `/tonight` is the one prefix three streams write under, which is why the shell below is owned by
 one of them and settled before any of the screens are built. The hub page itself was written by

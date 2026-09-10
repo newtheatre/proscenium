@@ -66,6 +66,10 @@ export const verifyAccessProfiles = defineAbility((viewer: Viewer) => holds(view
 export const viewBarCatalogue = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read'))
 export const viewBarStock = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read'))
 
+// The treasurer's own read over the ledger, starting with foregone comp and discount value
+// (I-103); everything else module I builds on it gates the same way.
+export const viewFinanceReports = defineAbility((viewer: Viewer) => holds(viewer, 'finance.read'))
+
 // Planning the rota is sit-down work done days ahead, so it is a standing permission and the
 // officer bypass is not what opens it (0009, 0046, E-101 criterion 2).
 export const viewRota = defineAbility((viewer: Viewer) => holds(viewer, 'rota.read'))
@@ -127,6 +131,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   managePassTypes: 'ticketing.manage',
   viewBarCatalogue: 'bar.read',
   viewBarStock: 'bar.read',
+  viewFinanceReports: 'finance.read',
   verifyAccessProfiles: 'access.verify',
   viewRota: 'rota.read',
   manageRota: 'rota.write',

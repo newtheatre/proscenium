@@ -56,12 +56,12 @@ export function reportTakingsQuery(scope: TakingsScope, source: 'DESK' | 'TILL')
   `
 }
 
-// Foregone revenue, never a silent gap (criterion 2): a comp's line total and a discount's own
-// pence both come from the lines actually written, not from the entry's post-discount total.
+// Foregone revenue, never a silent gap (criterion 2): a comp line's own amount is always zero
+// (I-102 criterion 4), so what was given away is unit_price_pence, never amount_pence (I-103).
 export function reportForegoneQuery(scope: TakingsScope, source: 'DESK' | 'TILL'): SQL {
   return sql`
     SELECT
-      coalesce(sum(CASE WHEN le.tender = 'COMP' THEN ll.amount_pence ELSE 0 END), 0) AS compsPence,
+      coalesce(sum(CASE WHEN le.tender = 'COMP' THEN ll.unit_price_pence * ll.qty ELSE 0 END), 0) AS compsPence,
       coalesce(sum(ll.discount_pence), 0) AS discountsPence
     FROM ledger_entries le
     JOIN ledger_lines ll ON ll.entry_id = le.id
