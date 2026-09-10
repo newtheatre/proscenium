@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { NotificationTopic, SenderKey } from './senders'
 
 // The catalogue every outbound message is typed against (0013, H-101). A type that is not here
@@ -98,13 +99,13 @@ export const MESSAGE_TYPES = {
   // A booking is a thing somebody arranged, so it carries the rooms topic and its preference.
   'room.booking.confirmed': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-booked',
   },
 
   'room.request.received': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-requested',
   },
 
@@ -112,19 +113,19 @@ export const MESSAGE_TYPES = {
   // from one that has sat unanswered (C-113 criterion 4).
   'room.request.raised': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-request-raised',
   },
 
   'room.request.waiting': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-request-waiting',
   },
 
   'room.request.expired': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-request-expired',
   },
 
@@ -132,19 +133,19 @@ export const MESSAGE_TYPES = {
   // of five is one email rather than five (C-109 criterion 4).
   'room.request.approved': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-approved',
   },
 
   'room.request.rejected': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-rejected',
   },
 
   'room.booking.cancelled': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-cancelled',
   },
 
@@ -152,33 +153,33 @@ export const MESSAGE_TYPES = {
   // and 3). The old app had no clockwork at all, so nothing was ever reminded (RM-1).
   'room.booking.reminder': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-reminder',
   },
 
   // One message for a series, never one per occurrence (C-113 criterion 2).
   'room.series.confirmed': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-series-booked',
   },
 
   'room.series.requested': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-series-requested',
   },
 
   'room.series.cancelled': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-series-cancelled',
   },
 
   // Nobody asked for this one: the room was shut under them, so it leads with the reason.
   'room.blackout.cancelled': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-blackout-cancelled',
   },
 
@@ -186,7 +187,7 @@ export const MESSAGE_TYPES = {
   // what they have instead (C-115 criterion 3).
   'room.booking.bumped': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-bumped',
   },
 
@@ -194,31 +195,31 @@ export const MESSAGE_TYPES = {
   // nothing teaches people to ignore messages (C-116 criterion 5).
   'room.no-show.recorded': {
     topic: 'ROOMS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'room-no-show',
   },
 
   // A third party decides, so the member hears at every step (C-120).
-  'external.request.received': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-received' },
+  'external.request.received': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-received' },
 
-  'external.request.raised': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-raised' },
+  'external.request.raised': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-raised' },
 
-  'external.request.submitted': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-submitted' },
+  'external.request.submitted': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-submitted' },
 
-  'external.request.assigned': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-assigned' },
+  'external.request.assigned': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-assigned' },
 
-  'external.request.reassigning': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-reassigning' },
+  'external.request.reassigning': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-reassigning' },
 
-  'external.request.rejected': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-rejected' },
+  'external.request.rejected': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-rejected' },
 
-  'external.request.withdrawn': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-withdrawn' },
+  'external.request.withdrawn': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-withdrawn' },
 
-  'external.request.waiting': { topic: 'ROOMS', channels: ['EMAIL'], template: 'external-waiting' },
+  'external.request.waiting': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-waiting' },
 
   // A move changes what the member holds, so both directions say whether the slot went (C-123).
-  'room.request.unlisted': { topic: 'ROOMS', channels: ['EMAIL'], template: 'request-unlisted' },
+  'room.request.unlisted': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'request-unlisted' },
 
-  'external.request.relisted': { topic: 'ROOMS', channels: ['EMAIL'], template: 'request-relisted' },
+  'external.request.relisted': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'request-relisted' },
 
   // Module D: ticketing
 
@@ -325,7 +326,7 @@ export const MESSAGE_TYPES = {
   // topic rather than going out regardless of preference (E-109 criterion 4).
   'shift.reminder': {
     topic: 'SHIFTS',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'shift-reminder',
   },
   // Transactional: a serious incident is not a preference a safety officer may mute (E-116
@@ -349,7 +350,7 @@ export const MESSAGE_TYPES = {
   // Asking put it in the diary, which is worth saying: it is the only feedback a request gives.
   'training.request.scheduled': {
     topic: 'TRAINING',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'training-request-scheduled',
   },
 
@@ -357,7 +358,7 @@ export const MESSAGE_TYPES = {
   // still outstanding, and the schedule is the way out of that.
   'training.session.absent': {
     topic: 'TRAINING',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'training-session-absent',
   },
 
@@ -365,7 +366,7 @@ export const MESSAGE_TYPES = {
   // themselves: until the register is marked, the training did not happen (G-119).
   'training.register.unmarked': {
     topic: 'TRAINING',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'training-register-unmarked',
   },
 
@@ -388,19 +389,19 @@ export const MESSAGE_TYPES = {
   // Two warnings at different urgencies, neither suppressing the other (G-125 criterion 1).
   'training.expiry.window': {
     topic: 'TRAINING',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'training-expiry-window',
   },
 
   'training.expiry.final': {
     topic: 'TRAINING',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'training-expiry-final',
   },
 
   'training.expiry.digest': {
     topic: 'TRAINING',
-    channels: ['EMAIL'],
+    channels: ['EMAIL', 'INBOX'],
     template: 'training-expiry-digest',
   },
 
@@ -465,17 +466,76 @@ export interface Preference {
   push: boolean
 }
 
+// The five topics, in the order the preference screen shows them. Changing the list is a
+// migration, not a setting: the topic check is on the table (0025, H-102 criterion 1).
+export const NOTIFICATION_TOPICS = ['BOOKINGS', 'SHIFTS', 'TRAINING', 'ROOMS', 'ANNOUNCEMENTS'] as const satisfies readonly NotificationTopic[]
+
+// Every outcome a send-log row may hold. The status carries the outcome; `error` carries the
+// provider's own words where there are any (H-102 criterion 3, H-105 criterion 1).
+export const NOTIFICATION_STATUSES = [
+  'PENDING',
+  'SENT',
+  'FAILED',
+  'RETRYING',
+  'SUPPRESSED_PREFERENCE',
+  'SKIPPED_UNDELIVERABLE',
+] as const
+
+export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number]
+
+export const TOPIC_LABELS: Record<NotificationTopic, string> = {
+  BOOKINGS: 'Bookings',
+  SHIFTS: 'Shifts',
+  TRAINING: 'Training',
+  ROOMS: 'Room bookings',
+  ANNOUNCEMENTS: 'Committee announcements',
+}
+
+// What each topic actually covers, so a member switching one off knows what goes quiet.
+export const TOPIC_DESCRIPTIONS: Record<NotificationTopic, string> = {
+  BOOKINGS: 'Changes to shows you have tickets for, and reminders before a performance.',
+  SHIFTS: 'Rota reminders, and news about a shift you hold or asked for.',
+  TRAINING: 'Session places, register marks and training that is running out.',
+  ROOMS: 'Room requests and bookings, yours and any you approve.',
+  ANNOUNCEMENTS: 'Announcements from the committee to the membership.',
+}
+
+// Which topics a new account starts switched on for, per channel: configuration, so a workshop
+// can change it without a release (H-102 criterion 2).
+export interface PreferenceDefaults {
+  email: readonly NotificationTopic[]
+  push: readonly NotificationTopic[]
+}
+
+// A topic with no stored row falls to the configured default rather than to an assumed yes.
+export function defaultFor(topic: NotificationTopic, channel: 'EMAIL' | 'PUSH', defaults?: PreferenceDefaults): boolean {
+  if (!defaults) return channel === 'EMAIL'
+  return (channel === 'EMAIL' ? defaults.email : defaults.push).includes(topic)
+}
+
 // A transactional message ignores every preference; a topic message obeys the one for its
-// topic, and an absent preference means yes (0013, H-103).
-export function deliversOn(type: MessageType, channel: Channel, preferences: Preference[]): boolean {
+// topic, and a topic with no row falls to its configured default (0013, H-102, H-103).
+export function deliversOn(type: MessageType, channel: Channel, preferences: Preference[], defaults?: PreferenceDefaults): boolean {
   if (!type.channels.includes(channel)) return false
   if (isTransactional(type)) return true
+  // The inbox is the backstop for anything a preference can silence, so switching email off
+  // never makes a message unfindable (H-102 criterion 6).
   if (channel === 'INBOX') return true
 
   const preference = preferences.find(candidate => candidate.topic === type.topic)
-  if (!preference) return true
+  if (!preference) return defaultFor(type.topic!, channel, defaults)
   return channel === 'EMAIL' ? preference.email : preference.push
 }
+
+// One topic's row as the screen sends it back. A transactional type has no topic and so cannot
+// appear here at all, which is what keeps a preference from suppressing one (H-103 criterion 4).
+export const preferenceForm = z.object({
+  topic: z.enum(NOTIFICATION_TOPICS),
+  email: z.boolean(),
+  push: z.boolean(),
+})
+
+export type PreferenceInput = z.infer<typeof preferenceForm>
 
 // Setting a preference on a transactional type is a validation error, not a silent no-op
 // (H-103 criterion 4).

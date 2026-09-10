@@ -148,7 +148,7 @@ describe('the kind is a closed set held in code (0033)', () => {
 // The (source, tender, kind) triple for every money path is fixed in architecture.md, so the
 // table is read here: a row naming a value the code does not hold is drift, not documentation.
 describe('the money-path table agrees with the code (build order, Wave 0 b)', () => {
-  interface MoneyPath { path: string, module: string, sources: string[], tenders: string[], kinds: string[] }
+  interface MoneyPath { path: string, postsWhen: string, module: string, sources: string[], tenders: string[], kinds: string[] }
 
   const tokens = (cell: string): string[] => [...cell.matchAll(/`([A-Z_]+)`/g)].map(match => match[1]!)
 
@@ -159,10 +159,19 @@ describe('the money-path table agrees with the code (build order, Wave 0 b)', ()
       .filter(line => line.startsWith('| ') && !line.startsWith('| Money path') && !line.startsWith('| ---'))
       .map((line) => {
         const cells = line.split('|').slice(1, -1).map(cell => cell.trim())
-        const [path, , module, sources, tenders, kinds] = cells
-        return { path: path!, module: module!, sources: tokens(sources!), tenders: tokens(tenders!), kinds: tokens(kinds!) }
+        const [path, postsWhen, module, sources, tenders, kinds] = cells
+        return { path: path!, postsWhen: postsWhen!, module: module!, sources: tokens(sources!), tenders: tokens(tenders!), kinds: tokens(kinds!) }
       })
   }
+
+  // build-order.md wave 4: "I-102 closes when D-114, D-116, D-124, F-105 and F-108 have each
+  // added their row ... I-102's own pull request asserts the list is complete." Enforced here.
+  test('every story I-102 waits on has added its row (I-102)', async () => {
+    const citations = (await moneyPaths()).map(row => row.postsWhen).join(' ')
+    for (const story of ['D-114', 'D-116', 'D-124', 'F-105', 'F-108']) {
+      expect(`${story}: ${citations.includes(`(${story})`)}`).toBe(`${story}: true`)
+    }
+  })
 
   test('every path the build order names has a row', async () => {
     const named = (await moneyPaths()).map(row => row.path.toLowerCase())

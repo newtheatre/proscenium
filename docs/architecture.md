@@ -93,7 +93,8 @@ namespace, and asks the owner for one anywhere else.
 | Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/qr` (retrieval, resend and self-service edit and cancel while unpaid: D-108, D-110), `/passes` (a pass's own QR retrieval, D-124), `/account/passes`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/`, `app/pages/[...slug].vue` (the content catch-all, D-103) |
 | Show night | `/rota` and `/rota/manage/**` (templates, rota administration, the venue emergency card and the backstage board's own milestone types and presets at `/rota/manage/backstage`), the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**`, `/api/admin/rota/**`, `/api/admin/backstage/**`, `/api/board/**` and `server/utils/night-authority.ts`. The console screens sit under `/rota/manage`, never `/admin`: `/tonight` is the phone-first shell rather than a console prefix (0040, 0046). |
 | Bar | `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**` |
-| Platform | `/account/notifications`, `/comms/**`, `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`, `tests/helpers/race.ts` |
+| Platform | `/money/**`, `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`, `tests/helpers/race.ts` |
+| Communications | `/account/notifications`, `/comms/**`, `server/utils/notify.ts`, `server/utils/notification-preferences.ts`, `shared/utils/notifications.ts`, `shared/utils/senders.ts` |
 
 `/tonight` is the one prefix three streams write under, which is why the shell below is owned by
 one of them and settled before any of the screens are built. The hub page itself was written by
@@ -329,6 +330,21 @@ One centre (`server/utils/notify.ts`, decision 0013): per-topic preferences, tra
 always delivers, digest coalescing, full send log with retries, undeliverable and anonymised
 addresses dropped before the provider. Channels: email now, in-app inbox now, push when it
 actually delivers.
+
+### Preferences and the inbox (H-102, 0054)
+
+Five topics, two switchable channels, one row per person per topic, and a row only where the
+member has chosen. An absent row means the configured default
+(`NOTIFICATION_EMAIL_DEFAULT_TOPICS`, `NOTIFICATION_PUSH_DEFAULT_TOPICS`), which is why nothing is
+seeded at registration: a workshop changing a default still reaches everybody who never chose.
+The screen is `/account/notifications` and shows every cell with its default beside it.
+
+Order inside `notify()`, which is what the criteria turn on: resolve the account, render, write
+the inbox entry, then judge the email. A topic switched off is logged `SUPPRESSED_PREFERENCE` and
+never handed to the provider; a transactional type is not asked about at all. The inbox entry is
+written first and unconditionally (except for an anonymised account), so no preference, unproven
+address or provider failure can make a message unfindable. Every type carrying a topic declares
+the `INBOX` channel, and a unit test fails the build where one does not.
 
 ## The show night (0014, E-110)
 
@@ -571,6 +587,44 @@ all linked now, the last three from a plain button grid in the scrollable conten
 sticky action slot, which K-102 criterion 2 reserves for the one primary action (Till). Near-miss
 reporting reaches through a second tap on the incident log screen rather than a first tap from
 `/tonight` itself, an interpretation of E-117 criterion 1 recorded in the known issue.
+
+### Two shows, one venue, one day (E-127)
+
+Four of the six criteria: 2, 5, 6, and 1 for everything except the checklist. `shared/utils/tonight.ts`'s
+`activePerformanceId(performances, at)` is the one pure function underneath criterion 2: a
+performance is active from its own doors (or curtain, with none set) until the next one's doors
+begin, so it needs no duration estimate, and the edges resolve to "next one to come" before the
+first door and "still closing" after the last. `/tonight` lists every performance already
+(`GET /api/tonight/duty-manager`'s own `performances` array, in `performancesOnNight`'s running
+order); a venue running more than one gets a tab bar above the list, the active one filled and
+badged, and a tap scrolls to its section rather than filtering the others away, since a duty
+manager covering both houses still wants both in view.
+
+`incidents`, `age_checks` and `shifts` were already performance-keyed before this story; E-123's
+own report reads `performance_id` throughout. `tests/integration/night-keying.test.ts` checks this
+against the real schema rather than trusting the claim: every operational table this story can
+confirm carries `performance_id`, and a second describe block pins that `checklist_stamps` and
+`checklist_closes` still carry `venue_id` and `night` instead, deliberately not rebuilt here.
+Criterion 4 needs a decision (a migration reworking already-shipped E-114 tables) before that
+second block can be deleted rather than pinned.
+
+`GET /api/tonight/report` (E-123) already refuses ambiguity when asked with no `performanceId` and
+more than one performance is running, so the "every scan, admit and register entry lands against
+the performance selected" half of criterion 2 is answered wherever a screen resolves its own
+performance: `/tonight/incidents` and `/tonight/age-checks` already carry a picker when
+`performanceIds.length > 1` (E-115, E-118, predating this story). `POST /api/till/sale` accepts and
+correctly narrows on `performanceId` too, but `/tonight/till` never sends one yet, so a bar sale on
+a day with more than one performance currently lands unattributed to either report's bar summary,
+even though the shared till session itself is correct by design (criterion 5, `till_sessions` keyed
+to `venue_id` and `night` exactly as the criterion asks). Recorded in `docs/known-issues.md` for
+bar's own stream, since the fix is a picker on a page this stream does not own.
+
+Criterion 3 (a wrong-performance scan refuses loudly, naming the correct one) has no door screen
+to refuse into: D-126 is unbuilt, corrected onto this story's own dependency line, which omitted
+it. `tests/e2e/night-two-performances.test.ts` is criterion 6's own fixture: one venue, a matinee
+and an evening, the same person holding a shift on both (criterion 1's own clause), two age checks,
+one till session, a sale named to the matinee, and two independently-read reports proving neither
+crosses into the other.
 
 ### The Challenge 25 register (E-118)
 

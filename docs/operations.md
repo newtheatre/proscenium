@@ -86,14 +86,16 @@ The identity import is rehearsed weekly and applied once, at cutover. Everything
 runs offline against dumps, and nothing in `migration/` can write to a remote database
 (`migration/README.md`).
 
-A rehearsal, which is what `bun run migration:dry-run` does after `bun run migration:export`:
+A rehearsal, which is what `bun run migration:dry-run <target>` does after `bun run migration:export`,
+against a target that already carries the real application schema (`migration/README.md`):
 
 1. `inventory.ts` records per-table counts and domain checksums from the dumps.
 2. `transform-identity.ts` builds `out/unified.sqlite`, reusing `out/id-map.tsv` so the same person
    keeps the id they were given last week.
 3. `reconcile.ts` verifies the counts and the invariants, and **exits non-zero** on any failure.
-4. `load.ts` writes `out/load.sql` and, given a local path, applies it there and reports the row
-   count per table.
+4. `load.ts` writes `out/load.sql` and applies it to the target, reporting the row count per table.
+5. `transform-bookings.ts` and `transform-money.ts` run against the same target, now that the
+   users `room_bookings` and `ledger_entries` key to already exist there.
 
 The load upserts on identity and **never deletes**: a person or a grant that disappeared upstream
 stays until somebody decides what should happen to them.
@@ -469,6 +471,34 @@ Anyone holding a privileged role must set up an authenticator app before the rol
 Everything is mirrored in the committee password manager, which is the only place a value can be
 read back. The `NUXT_` prefix is load-bearing: Nuxt maps only `NUXT_*` onto `runtimeConfig`, so a
 worker secret without it is silently ignored.
+
+## Seeding a development database
+
+`bun run seed [database]` fills a local database, defaulting to `.data/db/sqlite.db`. It refuses
+any target that is not `:memory:`, under `.data/` or under `/tmp/`, refuses `NODE_ENV=production`,
+and has no flag to override either (K-120). It prints every credential it generated once: account
+passwords, backstage board join tokens and calendar feed tokens. None is stored anywhere it can be
+read back, and none is committed.
+
+It is re-runnable. Rows are matched on their natural key, so a database an earlier seed or an
+earlier version of the seed wrote is adopted rather than duplicated, and the only thing a second
+run changes is the password it prints.
+
+The builders live in `scripts/seed/`, one module per domain, and each returns a list of statements
+rather than writing anything itself. That is what lets the same builders back the test fixtures in
+`tests/helpers/`. Three things it deliberately does not seed:
+
+| Not seeded | Why |
+| --- | --- |
+| `totp_secrets`, `recovery_codes`, `passkeys`, `passkey_challenges`, `auth_tokens` | Credential material. A committed secret in a fixture is still a committed secret, and a passkey needs a real authenticator. Enrol a second factor through `/account` instead. |
+| `rate_limits`, `mfa_attempts` | Transient counters the runtime writes. Seeding them fakes throttling state a developer then has to wait out. |
+| `module_materials` | Every row would be a URL nobody has supplied. `data/catalogue.csv` carries none, and inventing them would put fiction on a training page. |
+
+`/dev` seeds the persona accounts and nothing else. The rest of the seed cannot run from there:
+its builders read as they write, and D1 inside a worker is asynchronous, so the synchronous
+natural-key lookup that makes a builder re-runnable is not available. Both doors read the same
+`shared/utils/personas.ts` registry and write the same `personas.json` map, so they agree
+whichever runs first.
 
 ## Not built yet
 

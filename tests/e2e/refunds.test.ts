@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, forgetSpentStep, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -64,11 +66,7 @@ const send = (method: string, path: string, body?: unknown, as = boxOffice.cooki
 function venue(): string {
   const database = new Database(app.databaseFile)
   try {
-    return testVenue({
-      batch: statements => database.transaction(() => {
-        for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
-      })(),
-    }, { suffix: crypto.randomUUID().slice(0, 8) }).id
+    return testVenue(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8) }).id
   }
   finally {
     database.close()
@@ -229,11 +227,12 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2)', () => {
     const database = new Database(app.databaseFile)
     let seeded: { performanceId: string, night: string }
     try {
-      seeded = tonightsPerformance({
-        batch: statements => database.transaction(() => {
-          for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
-        })(),
-      }, { suffix: crypto.randomUUID().slice(0, 8) })
+      // Booking closes at curtain (no override set here), so curtain must sit ahead of whatever
+      // time this suite happens to run, not the fixture's usual fixed 19:30.
+      const night = currentShowNight()
+      const hoursIntoNight = (Date.now() - showNightBounds(night).from.getTime()) / 3_600_000
+      const curtainHoursAfterNightStart = Math.min(23.9, hoursIntoNight + 0.1)
+      seeded = tonightsPerformance(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8), night, curtainHoursAfterNightStart })
     }
     finally {
       database.close()
@@ -270,11 +269,7 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2)', () => {
     const database = new Database(app.databaseFile)
     let elsewhere: { performanceId: string }
     try {
-      elsewhere = tonightsPerformance({
-        batch: statements => database.transaction(() => {
-          for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
-        })(),
-      }, { suffix: crypto.randomUUID().slice(0, 8) })
+      elsewhere = tonightsPerformance(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8) })
     }
     finally {
       database.close()

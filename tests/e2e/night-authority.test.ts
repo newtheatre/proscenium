@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -50,11 +51,7 @@ afterAll(async () => {
 function programme(suffix: string, status: 'ON_SALE' | 'CANCELLED' = 'ON_SALE'): { venueId: string, performanceId: string } {
   const database = new Database(app.databaseFile)
   try {
-    const made = tonightsPerformance({
-      batch: statements => database.transaction(() => {
-        for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
-      })(),
-    }, { suffix, status })
+    const made = tonightsPerformance(sqliteTarget(database), { suffix, status })
     return { venueId: made.venueId, performanceId: made.performanceId }
   }
   finally {

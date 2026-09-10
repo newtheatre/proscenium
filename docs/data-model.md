@@ -1873,11 +1873,26 @@ yet open resolves nothing, because there is nothing for a member to sign up to.
 `user_id` · `topic` CHECK `BOOKINGS|SHIFTS|TRAINING|ROOMS|ANNOUNCEMENTS` · `email` bool ·
 `push` bool. UNIQUE pair. Transactional types have no preference rows at all.
 
+**A row exists only where the member has chosen (H-102, 0054).** A new account has none, and an
+absent row means the configured default: `NOTIFICATION_EMAIL_DEFAULT_TOPICS` (all five topics) and
+`NOTIFICATION_PUSH_DEFAULT_TOPICS` (empty until push delivers). The column defaults are the
+fallback for a row written without them, not the rule: `deliversOn()` in
+`shared/utils/notifications.ts` is where the rule lives, and it takes the defaults as an argument.
+Rows are read and written through `server/utils/notification-preferences.ts`, and the member's own
+screen is `/account/notifications`. Changing the list of topics is a migration rather than a
+setting (0025).
+
 ### notification_log
 `id` PK · `user_id` NULL = set null on erasure · `type` · `channel` CHECK `EMAIL|INBOX|PUSH` ·
 `subject` · `record_id` · `session_id` · `claim` · `status` CHECK
-`PENDING|SENT|FAILED|RETRYING|SKIPPED_UNDELIVERABLE` · `sent_at` · `error` · `created_at`.
-Indexed on user, type, status, `record_id` and `created_at`.
+`PENDING|SENT|FAILED|RETRYING|SUPPRESSED_PREFERENCE|SKIPPED_UNDELIVERABLE` · `sent_at` · `error` ·
+`created_at`. Indexed on user, type, status, `record_id` and `created_at`.
+
+**The status set is `NOTIFICATION_STATUSES` in `shared/utils/notifications.ts`,** and a unit test
+holds the CHECK to it. `SUPPRESSED_PREFERENCE` is a topic the member switched off and is written
+with `error` null, because the status is the reason; `SKIPPED_UNDELIVERABLE` is an address the
+provider must never see and carries the reason in `error` (0054, H-102 criterion 3, H-107).
+`RETRYING` is in the check and unused until H-105.
 
 **A claimed send is one row, not two (0048).** `claimNotification()` writes `PENDING`; `notify()`
 updates that same row, matched on `claim`, to its outcome. No trigger sits on this table, so the
@@ -1890,11 +1905,10 @@ everything with nothing to claim, which is most messages, writes freely. `claimN
 `claimHeld()` in `server/utils/notify.ts` are the only things that touch it: the notification centre
 owns the ledger for the same reason it owns sending (0013).
 
-**A claimed message writes two rows, not one.** The claim is inserted first and `notify()` then
-records its own outcome, so counting how many messages of a type reached somebody double-counts
-unless the query says `claim IS NOT NULL` (or `IS NULL`, depending which it wants). Both rows are
-correct and both are wanted: one is the promise not to send again, the other is what happened when
-we tried. It is written down here because it has cost two people an hour.
+**A claimed message no longer writes two rows.** It did until 0048, and a query counting messages
+of a type had to say `claim IS NOT NULL` (or `IS NULL`) to avoid double-counting. It does not any
+more: one send is one row, whether claimed or not. The paragraph is kept because the old shape cost
+two people an hour and the queries written around it are still in the suites.
 
 The refs carry **no foreign key**. The ledger outlives what it refers to, and a message sent is a
 fact about the past that deleting a record must not rewrite. `user_id` is the exception and is
@@ -1903,6 +1917,14 @@ fact about the past that deleting a record must not rewrite. `user_id` is the ex
 ### inbox_items
 `id` PK · `user_id` cascade · `type` · `title` · `body` · `link` · `read_at` ·
 `created_at`. The in-app channel; never coalesced.
+
+**Written by `notify()` for every type that declares the `INBOX` channel, before the email is
+judged (H-102 criterion 6, 0054).** Every topic-carrying type declares it, so a message a
+preference silenced is still findable; a unit test fails the build when a new type with a topic
+does not. An anonymised account gets nothing at all (H-107). The entry is a row here and not a
+second row in `notification_log`: that would double every per-type count in the log. `title` is the
+rendered subject and `body` the rendered plain text, so both go on erasure. `read_at` is unused
+until something marks one read.
 
 ### config
 `key` PK · `value` JSON · `updated_by` · `updated_at`. Defaults live in code; a missing row means

@@ -67,6 +67,14 @@ onMounted(load)
       description="These tools sign in without a password. They are not in a production build: nuxt.config leaves the route out of the bundle rather than guarding it at runtime."
     />
 
+    <UAlert
+      color="neutral"
+      variant="subtle"
+      icon="i-lucide-database"
+      title="This seeds the accounts only"
+      description="Shows, performances, bookings, the rota, the bar and the ledger come from `bun run seed`, which prints the credentials it generates once. Both write the same personas, so either order works."
+    />
+
     <UCard>
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-2">

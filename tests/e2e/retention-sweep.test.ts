@@ -221,8 +221,8 @@ describe.skipIf(skip !== null)('exemptions and the two caps (criteria 2, 4)', ()
   test('an account owing on a tab is exempt', async () => {
     const id = await inactiveAccount(-10)
     write(
-      `INSERT INTO ledger_entries (id, london_day, source, tender, total_pence, tab_debtor_id, tab_settled_at)
-       VALUES (?, date('now'), 'TILL', 'TAB', 500, ?, NULL)`,
+      `INSERT INTO ledger_entries (id, london_day, source, tender, total_pence, tab_debtor_id)
+       VALUES (?, date('now'), 'TILL', 'TAB', 500, ?)`,
       crypto.randomUUID(), id,
     )
     await arm(true)
@@ -238,10 +238,24 @@ describe.skipIf(skip !== null)('exemptions and the two caps (criteria 2, 4)', ()
 
   test('a settled tab is no longer an exemption', async () => {
     const id = await inactiveAccount(-10)
+    // A charge settles by reference, never by rewriting its own row (F-109): a second entry
+    // carries a ledger_lines row whose settles_entry_id names the charge it covers.
+    const chargeId = crypto.randomUUID()
     write(
-      `INSERT INTO ledger_entries (id, london_day, source, tender, total_pence, tab_debtor_id, tab_settled_at)
-       VALUES (?, date('now'), 'TILL', 'TAB', 500, ?, unixepoch())`,
-      crypto.randomUUID(), id,
+      `INSERT INTO ledger_entries (id, london_day, source, tender, total_pence, tab_debtor_id)
+       VALUES (?, date('now'), 'TILL', 'TAB', 500, ?)`,
+      chargeId, id,
+    )
+    const settlementId = crypto.randomUUID()
+    write(
+      `INSERT INTO ledger_entries (id, london_day, source, tender, total_pence)
+       VALUES (?, date('now'), 'DESK', 'CARD', 500)`,
+      settlementId,
+    )
+    write(
+      `INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty, settles_entry_id)
+       VALUES (?, ?, 'TAB_SETTLEMENT', 500, 1, ?)`,
+      crypto.randomUUID(), settlementId, chargeId,
     )
     await arm(true)
 

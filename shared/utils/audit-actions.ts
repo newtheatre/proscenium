@@ -276,6 +276,8 @@ const CATALOGUE = {
 
   // Module H: communications
 
+  'notifications.preference.changed': { label: 'Notification preference changed', module: 'communications' },
+
   // Module I: finance
 
   // Module J: governance

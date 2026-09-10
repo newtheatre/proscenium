@@ -58,8 +58,8 @@ export async function personaAccounts(): Promise<Map<string, PersonaAccount>> {
   return found
 }
 
-// Seeds one account per persona, idempotently: running it twice changes nothing, because a
-// developer runs it whenever they are unsure rather than once.
+// The persona accounts only, idempotently. The rest of the seed is `bun run seed`, which cannot
+// run from here: its builders read as they write, and D1 in a worker is async (operations.md).
 export async function seedPersonas(): Promise<{ made: number, held: number }> {
   const map = await remembered()
   let made = 0
@@ -67,7 +67,11 @@ export async function seedPersonas(): Promise<{ made: number, held: number }> {
 
   for (const persona of PERSONAS) {
     const known = map[persona.email]
-    if ((known && await findById(known)) || await findByEmail(persona.email)) {
+    const existing = (known && await findById(known)) || await findByEmail(persona.email)
+    if (existing) {
+      // Recorded even when this run did not make it: `bun run seed` writes the same personas, and
+      // an erased one cannot be found by its address afterwards (0011).
+      map[persona.email] = existing.id
       held++
       continue
     }

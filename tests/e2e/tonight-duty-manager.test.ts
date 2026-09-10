@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -54,11 +55,7 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
 function performance(suffix: string): { performanceId: string, showId: string } {
   const database = new Database(app.databaseFile)
   try {
-    const made = tonightsPerformance({
-      batch: statements => database.transaction(() => {
-        for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
-      })(),
-    }, { suffix })
+    const made = tonightsPerformance(sqliteTarget(database), { suffix })
     return { performanceId: made.performanceId, showId: made.showId }
   }
   finally {

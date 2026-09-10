@@ -102,10 +102,11 @@ function sentTo(userId: string, type: string): number {
     'SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = ?', userId, type)?.n ?? 0
 }
 
+// A muted topic is its own outcome rather than an undeliverable address (H-102 criterion 3).
 function suppressedFor(userId: string, type: string): number {
   return read<{ n: number }>(
     `SELECT count(*) n FROM notification_log
-     WHERE user_id = ? AND type = ? AND status = 'SKIPPED_UNDELIVERABLE'`, userId, type)?.n ?? 0
+     WHERE user_id = ? AND type = ? AND status = 'SUPPRESSED_PREFERENCE'`, userId, type)?.n ?? 0
 }
 
 function clearReminders(): void {
