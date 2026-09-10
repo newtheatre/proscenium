@@ -1,4 +1,4 @@
-# 0062: How this repository rebuilds a table that `check:migrations` refuses
+# 0063: How this repository rebuilds a table that `check:migrations` refuses
 
 - Status: Accepted
 - Date: 2026-09-10

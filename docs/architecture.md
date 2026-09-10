@@ -718,7 +718,7 @@ own report reads `performance_id` throughout. `tests/integration/night-keying.te
 against the real schema rather than trusting the claim. Criterion 4, `checklist_stamps` and
 `checklist_closes` still carrying `venue_id` and `night`, was deliberately deferred rather than
 rebuilt here, and closed separately once E-128's own migration rebuilt both by hand
-(`docs/decisions/0062-hand-authored-table-rebuilds.md`).
+(`docs/decisions/0063-hand-authored-table-rebuilds.md`).
 
 `GET /api/tonight/report` (E-123) already refuses ambiguity when asked with no `performanceId` and
 more than one performance is running, so the "every scan, admit and register entry lands against

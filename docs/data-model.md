@@ -880,7 +880,7 @@ stamping) · `ticked_by` restrict NULL · `ticked_at` NULL · `exempted` bool ·
 `item_id`): one stamp per item per performance, made the first time that performance's checklist
 is touched, so an edit to `checklist_items` afterwards changes nothing already stamped (E-101's
 own pattern). Keyed to a performance (E-128; rebuilt by hand from the venue-and-night keying
-E-114 originally shipped, `docs/decisions/0062-hand-authored-table-rebuilds.md`), so a matinee
+E-114 originally shipped, `docs/decisions/0063-hand-authored-table-rebuilds.md`), so a matinee
 and an evening never share one. A system-verified item's `ticked_by`/`ticked_at` stay NULL
 forever; its done state is read live against this performance's own data, never stored (E-114
 criterion 3).
