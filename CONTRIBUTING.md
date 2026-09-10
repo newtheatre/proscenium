@@ -59,7 +59,10 @@ cautionary tale.
 - **Domain rules live in `shared/utils/`**, which Nuxt auto-imports into both the application
   and the server. A route or a server utility names them with no import at all.
 - Everything in `server/utils/` is auto-imported into server code the same way. Only types need
-  naming, because auto-import covers values and not types.
+  naming, because auto-import covers values and not types. **Except** a value a test reaches
+  transitively: `tests/` typechecks the file under Bun, which auto-imports nothing, so that
+  value needs a real import there. Discovered per file, by a red `typecheck:bun`; the pattern
+  and why it is not fixed at the boundary are decision 0055.
 - Outside the application, in `tests/` and `scripts/`, nothing is auto-imported: reach in by
   alias, `#shared/utils/...`, `#server/...`, `#tests/...`. Those paths are declared twice, by
   Nuxt for the application and in `tsconfig.bun.json` for the Bun projects, so one spelling
