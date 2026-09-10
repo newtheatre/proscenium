@@ -151,6 +151,32 @@ export const reservationReinstatements = sqliteTable('reservation_reinstatements
   check('reservation_reinstatements_previous_status_values', sql`${table.previousStatus} IN ('EXPIRED', 'CANCELLED')`),
 ])
 
+// One row per join, for one performance (D-113). `user_id` is always a real or guest account,
+// reused from `guestAccount()` exactly as D-104's own checkout does, so a notification always has
+// an address to reach. The active-only unique index is what refuses a duplicate join (criterion 1).
+export const waitingListEntries = sqliteTable('waiting_list', {
+  id: id(),
+  performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  partySize: integer('party_size').notNull(),
+  status: text('status').notNull().default('WAITING'),
+  // Both set together, when an offer goes out; both clear on a lapse back to nothing to offer from.
+  offeredAt: integer('offered_at'),
+  offerExpiresAt: integer('offer_expires_at'),
+  claimedReservationId: text('claimed_reservation_id').references(() => reservations.id, { onDelete: 'set null' }),
+  removedAt: integer('removed_at'),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+}, table => [
+  index('waiting_list_performance_status_created').on(table.performanceId, table.status, table.createdAt),
+  uniqueIndex('waiting_list_performance_user_active').on(table.performanceId, table.userId)
+    .where(sql`status IN ('WAITING', 'OFFERED')`),
+  check('waiting_list_status_values', sql`${table.status} IN ('WAITING', 'OFFERED', 'CLAIMED', 'LAPSED', 'REMOVED')`),
+  check('waiting_list_party_size', sql`${table.partySize} BETWEEN 1 AND 10`),
+  check('waiting_list_offer_pair', sql`(${table.offeredAt} IS NULL) = (${table.offerExpiresAt} IS NULL)`),
+  check('waiting_list_claimed_pairs_status', sql`(${table.status} = 'CLAIMED') = (${table.claimedReservationId} IS NOT NULL)`),
+])
+
 // One row per account. Everything special category lives inside `encrypted_payload` (0050);
 // `status` and `companions` stay plain, because the database enforces them (D-127 criterion 1).
 export const accessProfiles = sqliteTable('access_profiles', {

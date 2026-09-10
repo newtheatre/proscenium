@@ -78,6 +78,9 @@ export default defineNuxtConfig({
     // HMAC key material for the backstage board's join code (E-120). Never stored, never
     // logged, and read by nothing outside this app.
     backstageBoardSecret: '',
+    // Base64 HMAC key signing a waiting-list entry's claim and removal token (D-113). A worker
+    // secret: nothing outside this app ever verifies one.
+    waitingListTokenSecret: '',
     public: {
       // Every emailed link is built from this. NUXT_PUBLIC_BASE_URL overrides it, and development
       // points at the local port so a verification link in .data/mail is one that works.
@@ -114,7 +117,7 @@ export default defineNuxtConfig({
     // Mirrored one-for-one by the cron triggers below; the two lists must not drift, and every
     // name here has a handler under server/tasks (docs/architecture.md, Scheduled tasks).
     scheduledTasks: {
-      '*/10 * * * *': ['holds:release', 'health:watch', 'notifications:retry', 'notifications:digest'],
+      '*/10 * * * *': ['holds:release', 'health:watch', 'notifications:retry', 'notifications:digest', 'waiting-list:sweep'],
       '0 6 * * *': ['training:expiry-sweep'],
       '0 7 * * *': ['shifts:escalate'],
       '0 8 * * *': ['rooms:sweep'],
@@ -123,7 +126,7 @@ export default defineNuxtConfig({
       '0 11 * * *': ['passes:expire-requests'],
       '0 17 * * *': ['rooms:remind'],
       '12 0 * * *': ['nights:close'],
-      '0 4 * * *': ['daily:sweeps'],
+      '0 4 * * *': ['daily:sweeps', 'waiting-list:purge'],
       '0 5 * * 1': ['backup'],
       '0 4 1 * *': ['retention:sweep'],
     },

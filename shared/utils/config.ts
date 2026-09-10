@@ -51,6 +51,27 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Seats one public order may hold. The box office is uncapped.',
   },
+  // Open in the backlog (docs/backlog/D-ticketing.md): whether the window should shorten on the
+  // day of the performance is unresolved. Shipped as a proposed value rather than left unset, so
+  // the feature is live rather than dormant (0019); the window never outlives curtain regardless.
+  WAITING_LIST_OFFER_WINDOW_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 120,
+    workshop: 'money-and-box-office',
+    describes: 'How long a waiting-list offer stands before it lapses to the next entry, capped at the performance start.',
+  },
+  WAITING_LIST_OFFER_BATCH_CAP: {
+    schema: z.number().int().positive(),
+    default: 100,
+    workshop: 'money-and-box-office',
+    describes: 'The most waiting-list offers one sweep may issue or lapse in a single run.',
+  },
+  WAITING_LIST_PURGE_BATCH_CAP: {
+    schema: z.number().int().positive(),
+    default: 500,
+    workshop: 'money-and-box-office',
+    describes: 'The most waiting-list entries one purge run may delete after their performance ends.',
+  },
   REFUND_UNPAID_CANCELLATION_FREE: {
     schema: z.boolean(),
     default: true,
@@ -744,6 +765,9 @@ export const ENFORCED_KEYS = [
   'HOLD_RELEASE_MINUTES_BEFORE',
   'HOLD_REMINDER_MINUTES_BEFORE',
   'HOLD_RELEASE_BATCH_CAP',
+  'WAITING_LIST_OFFER_WINDOW_MINUTES',
+  'WAITING_LIST_OFFER_BATCH_CAP',
+  'WAITING_LIST_PURGE_BATCH_CAP',
   'RESERVATION_RESEND_ATTEMPTS',
   'RESERVATION_RESEND_WINDOW_MINUTES',
   'PASS_REQUEST_EXPIRE_BATCH_CAP',

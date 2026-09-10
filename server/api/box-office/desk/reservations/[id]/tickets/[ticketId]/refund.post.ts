@@ -43,5 +43,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'This ticket has already been refunded' })
   }
 
+  // Frees a seat (D-113 criterion 2): offer it on, the same as an expiry or a self-cancel.
+  const cap = await configValue(event, 'WAITING_LIST_OFFER_BATCH_CAP')
+  const run = await offerWaitingList(event, reservation.performanceId, new Date(), cap)
+  await notifyWaitingListOffers(event, run.offered)
+
   return { ok: true, entryId: result.entryId }
 })
