@@ -212,3 +212,35 @@ export function qrStatusDisplay(
       return { headline: status, detail: null }
   }
 }
+
+// D-126's own shape: a pass reference typed or scanned, and the performance chosen at the door.
+export const doorTicketScanForm = z.strictObject({
+  reference: z.string().trim().min(1),
+  performanceId: z.string().trim().min(1),
+})
+
+export type DoorTicketScanInput = z.output<typeof doorTicketScanForm>
+
+export interface DoorTicketOutcome {
+  headline: string
+  detail: string | null
+  admit: boolean
+}
+
+// D-108 criterion 5's fifth state, and E-127 criterion 3's refusal: only PENDING or COLLECTED
+// is ever asked whether it matches the door's own performance; every other state explains itself.
+export function doorTicketOutcome(
+  status: string,
+  cancelledBy: string | null,
+  performanceId: string,
+  selectedPerformanceId: string,
+  showTitle: string,
+  when: string,
+  totalDue: string | null,
+): DoorTicketOutcome {
+  if (performanceId !== selectedPerformanceId && (status === 'PENDING' || status === 'COLLECTED')) {
+    return { headline: 'Wrong performance', detail: `This ticket is for ${showTitle}, ${when}.`, admit: false }
+  }
+  if (status === 'COLLECTED') return { headline: 'Admit', detail: null, admit: true }
+  return { ...qrStatusDisplay(status, cancelledBy, totalDue), admit: false }
+}

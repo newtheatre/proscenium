@@ -3,6 +3,7 @@ import { readBookableTicketTypes } from '#server/utils/reservations'
 import {
   RESERVATION_REFERENCE_LENGTH,
   belowMinimumTicketsReason,
+  doorTicketOutcome,
   generateReservationReference,
   looksLikeReference,
   overCapReason,
@@ -162,6 +163,37 @@ describe('what the QR answers, loudly distinct per state (D-108 criterion 5)', (
     expect(exchanged.headline).toBe('Exchanged')
     expect(exchanged.headline).not.toBe(qrStatusDisplay('CANCELLED', 'CUSTOMER', null).headline)
     expect(exchanged.detail).toContain('A Different Show')
+  })
+})
+
+describe('the door\'s own fifth state, wrong performance (E-127 criterion 3, D-108 criterion 5)', () => {
+  test('a paid ticket for the performance selected admits', () => {
+    const outcome = doorTicketOutcome('COLLECTED', null, 'perf-matinee', 'perf-matinee', 'The Seagull', 'Friday, 2pm', null)
+    expect(outcome).toEqual({ headline: 'Admit', detail: null, admit: true })
+  })
+
+  test('a paid ticket for a different performance refuses loudly, naming the correct one', () => {
+    const outcome = doorTicketOutcome('COLLECTED', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null)
+    expect(outcome.admit).toBe(false)
+    expect(outcome.headline).toBe('Wrong performance')
+    expect(outcome.detail).toBe('This ticket is for The Seagull, Friday, 2pm.')
+  })
+
+  test('an unpaid ticket for the right performance still refuses, quoting the amount due', () => {
+    const outcome = doorTicketOutcome('PENDING', null, 'perf-matinee', 'perf-matinee', 'The Seagull', 'Friday, 2pm', '£9.00')
+    expect(outcome.admit).toBe(false)
+    expect(outcome.headline).toBe('Unpaid')
+  })
+
+  test('wrong performance takes priority over an unpaid ticket: the door only owes one answer', () => {
+    const outcome = doorTicketOutcome('PENDING', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', '£9.00')
+    expect(outcome.headline).toBe('Wrong performance')
+  })
+
+  test('a cancelled, lapsed or already-admitted ticket explains itself regardless of performance', () => {
+    expect(doorTicketOutcome('CANCELLED', 'CUSTOMER', 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Cancelled')
+    expect(doorTicketOutcome('EXPIRED', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Lapsed')
+    expect(doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Admitted')
   })
 })
 

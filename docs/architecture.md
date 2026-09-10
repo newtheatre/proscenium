@@ -708,7 +708,8 @@ query builders, each bound to one performance id and nothing that grows with a t
 `tonightPerformanceQuery` for the show and its warnings. "Sold" rides `heldSeatsSubquery` from
 `server/utils/capacity.ts`, never a second count of `tickets`, which
 `tests/unit/capacity-guard.test.ts` refuses outright (D-105 criterion 2); "admitted" is
-`reservations.status = 'DOOR'`, which reads honestly as nought until D-126 builds the door scan.
+`reservations.status = 'DOOR'`, set by a pass scan (D-126) or an ordinary ticket scan (E-127
+criterion 3) at `/tonight/door`, both below.
 
 `readTeamRow()` is the roster's pure half: `OPEN`, `DECLINED` and an unconfirmed `CLAIMED` all
 read as unfilled, because "who is actually coming" is the question the screen answers, never a
@@ -738,7 +739,9 @@ reporting reaches through a second tap on the incident log screen rather than a 
 
 ### Two shows, one venue, one day (E-127)
 
-Four of the six criteria: 2, 5, 6, and 1 for everything except the checklist. `shared/utils/tonight.ts`'s
+All six criteria: 2, 5, 6, and 1 for everything except the checklist here; criterion 4 (the
+checklist tables) closed separately by E-128, and criterion 3 (the wrong-performance door
+refusal) by the door-scan work below. `shared/utils/tonight.ts`'s
 `activePerformanceId(performances, at)` is the one pure function underneath criterion 2: a
 performance is active from its own doors (or curtain, with none set) until the next one's doors
 begin, so it needs no duration estimate, and the edges resolve to "next one to come" before the
@@ -766,9 +769,25 @@ even though the shared till session itself is correct by design (criterion 5, `t
 to `venue_id` and `night` exactly as the criterion asks). Recorded in `docs/known-issues.md` for
 bar's own stream, since the fix is a picker on a page this stream does not own.
 
-Criterion 3 (a wrong-performance scan refuses loudly, naming the correct one) has no door screen
-to refuse into: D-126 is unbuilt, corrected onto this story's own dependency line, which omitted
-it. `tests/e2e/night-two-performances.test.ts` is criterion 6's own fixture: one venue, a matinee
+Criterion 3 (a wrong-performance scan refuses loudly, naming the correct one) waited on D-126
+building `/tonight/door` at all, corrected onto this story's own dependency line, which omitted
+it; D-126 itself only ever scanned a pass. `POST /api/tonight/door/tickets/scan` is the ordinary
+ticket half: `reservationForDoorQuery()` reads a reservation by reference alone, not scoped to a
+performance, and `doorTicketOutcome()` (`shared/utils/reservations.ts`) asks whether it matches
+the door's own `performanceId` only when the reservation is still live (`PENDING` or
+`COLLECTED`); every other state, cancelled, lapsed, no-show or already admitted, explains itself
+regardless of which door asked. A mismatch answers `This ticket is for <show>, <when>.`, reusing
+the reservation's own joined columns rather than a second lookup. This is also D-108 criterion
+5's own fifth state, "wrong night", built at the door as that criterion always named it: four of
+its five states now read distinctly there, reusing `qrStatusDisplay()` for cancelled, unpaid and
+already-admitted; "exchanged" still reads as an ordinary cancellation until D-111 lands
+(`docs/known-issues.md`). `/tonight/door` tries the reference as a ticket first and falls back to
+a pass only on "no such booking", since the two share one reference alphabet and a scanner cannot
+tell them apart before asking. `tests/e2e/door-ticket-scan.test.ts` covers admission, the wrong-
+performance refusal (including against an unpaid ticket, where wrong performance still answers
+first), unpaid, cancelled, an unknown reference and the door role itself.
+
+`tests/e2e/night-two-performances.test.ts` is criterion 6's own fixture: one venue, a matinee
 and an evening, the same person holding a shift on both (criterion 1's own clause), two age checks,
 one till session, a sale named to the matinee, and two independently-read reports proving neither
 crosses into the other.
