@@ -62,6 +62,16 @@ accepted, following this procedure:
    E-125's rebuild of `night_reports` needs `night_report_addenda` and `night_report_deliveries`
    rebuilt with it and E-128's does not: nothing references `checklist_stamps` or
    `checklist_closes`.
+
+   Only the table whose own columns are changing can use the `__new_x`/rename pattern in place;
+   a dependent cannot, even one rebuilt first. Rebuilding `night_report_deliveries` via
+   `__new_`/rename ahead of `night_report_addenda` was tried and proved unsafe rather than
+   assumed so: the freshly rebuilt `deliveries` still carries the same live `restrict` foreign
+   key its predecessor had, and dropping `addenda` still fails with the same
+   `FOREIGN KEY constraint failed`. A table that must be temporarily absent to unblock its own
+   parent's drop cannot simultaneously use a pattern that keeps it present throughout, so a
+   dependent goes through the holding-table drop-and-recreate above, under its own final name,
+   never `__new_x`.
 4. **Correct ordering does not make `check:migrations` accept it.** `rebuildDependentProblems`
    reads the *final* schema's dependents and refuses any `restrict`, `no action`, `cascade` or
    `set null` dependent unconditionally; it has no notion of statement order within the file, so

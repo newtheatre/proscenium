@@ -28,7 +28,7 @@ const GRANDFATHERED = new Set<string>()
 const HAND_REVIEWED_REBUILDS = new Set<string>([
   // night_reports has two restrict dependents (night_report_addenda, night_report_deliveries),
   // rebuilt around it in the order verified against a real fixture in 0063, not reasoned about.
-  '0089_auto_close_within_24_hours',
+  '0090_auto_close_within_24_hours',
 ])
 
 function scan(dir: string, pattern: string): string[] {
