@@ -71,6 +71,31 @@ describe('attendance (criterion 1)', () => {
       expect(row).toMatchObject({ admitted: 2, noShows: 1, walkUps: 1 })
     })
   })
+
+  // D-126 criterion 3: pass admissions are `admitted`'s own subset, not a second seat count.
+  test('a pass admission is counted separately from an ordinary paid admission', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      person(database, 'holder')
+      reserve(database, 'r-paid', tonight.performanceId, 'DOOR', 'WEB')
+      reserve(database, 'r-pass', tonight.performanceId, 'DOOR', 'WEB')
+      database.batch([
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, 0, ?)',
+          't-pass', 'r-pass', tonight.performanceId, 'tt-standard', 'BASE'],
+        ['INSERT INTO pass_types (id, slug, name, valid_from, valid_until) VALUES (?, ?, ?, ?, ?)',
+          'pt-1', 'season', 'Season pass', 1_000, 2_000],
+        ['INSERT INTO pass_type_prices (id, pass_type_id, label, price) VALUES (?, ?, ?, 0)', 'price-1', 'pt-1', 'Standard'],
+        ['INSERT INTO passes (id, reference, pass_type_id, pass_type_price_id, user_id, price_paid, issued_by) VALUES (?, ?, ?, ?, ?, 0, ?)',
+          'pass-1', 'PASS01', 'pt-1', 'price-1', 'holder', 'holder'],
+        ['INSERT INTO pass_admissions (id, pass_id, performance_id, ticket_id) VALUES (?, ?, ?, ?)',
+          'admission-1', 'pass-1', tonight.performanceId, 't-pass'],
+      ])
+
+      const [row] = read<{ admitted: number, passAdmissions: number }>(
+        database, reportAttendanceQuery(tonight.performanceId))
+      expect(row).toMatchObject({ admitted: 2, passAdmissions: 1 })
+    })
+  })
 })
 
 describe('takings (criteria 1, 2)', () => {

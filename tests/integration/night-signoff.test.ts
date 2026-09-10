@@ -44,7 +44,7 @@ function house(database: TestDatabase, suffix: string): { venueId: string, perfo
 
 const REPORT: NightReport = {
   performanceId: 'placeholder',
-  attendance: { sold: 10, admitted: 8, noShows: 2, walkUps: 0 },
+  attendance: { sold: 10, admitted: 8, noShows: 2, walkUps: 0, passAdmissions: 0 },
   takings: {
     desk: { tenders: [], compsPence: 0, discountsPence: 0 },
     bar: { tenders: [], compsPence: 0, discountsPence: 0 },

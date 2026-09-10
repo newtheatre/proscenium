@@ -731,15 +731,16 @@ requests, regardless of channel.
 
 ### pass_admissions  APPEND-ONLY
 `id` PK · `pass_id` restrict · `performance_id` restrict · `ticket_id` UNIQUE restrict ·
-`admitted_at` · `admitted_by` NULL (self-serve).
+`admitted_at` · `admitted_by` NULL (self-serve) or the officer who scanned it (the door).
 **UNIQUE (`pass_id`, `performance_id`) is the once-per-performance rule.**
-D-124 creates this table; D-125 writes to it for the first time, redeeming a pass while reserving
-online (`admitted_by` NULL). D-126's door scan, which admits without a prior online redemption or
-checks in one that already exists, is not yet built. Append-only and trigger-enforced (0010), the
-same reasoning as the ledger: a register of admissions must be defensible after the fact, and
-"everything record-like keys to a performance" applies to one exactly (CLAUDE.md). The trigger is
-hand-appended after the generated `CREATE TABLE`, since drizzle-kit generates no triggers; it must
-be re-added if the migration is ever renumbered ahead of merging.
+D-124 creates this table; D-125 redeems a pass while reserving online (`admitted_by` NULL); D-126
+scans one at the door, redeeming on the spot if nothing exists yet (`admitted_by` the officer,
+`reservations.source = 'DOOR'`) or admitting the seat a prior online redemption already claimed.
+Append-only and trigger-enforced (0010), the same reasoning as the ledger: a register of
+admissions must be defensible after the fact, and "everything record-like keys to a performance"
+applies to one exactly (CLAUDE.md). The trigger is hand-appended after the generated
+`CREATE TABLE`, since drizzle-kit generates no triggers; it must be re-added if the migration is
+ever renumbered ahead of merging.
 
 `server/utils/pass-redemption.ts` is the one writer, shared with D-126 and D-130: capacity, the
 once-per-performance uniqueness and the pass's own terms (active, on sale, inside its validity
