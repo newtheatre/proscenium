@@ -331,6 +331,14 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // figure audits to who asked and who decided, and the request is financial evidence.
     why: 'Who asked for a ticket comp and who decided it is what a foregone-revenue figure audits to; the tombstone still answers for it.',
   },
+  {
+    name: 'reservation_reinstatements',
+    column: 'actor_id',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    why: 'Who reinstated a lapsed hold and why is what the booking\'s own history audits to; the tombstone still answers for it.',
+  },
 
   // Module E: show night
 

@@ -1,5 +1,15 @@
 import { describe, expect, test } from 'bun:test'
-import { amountDueFor, collectForm, deskSearchForm, refundTicketForm, strandedMoneyReason, uncollectableReason } from '#shared/utils/desk'
+import {
+  REINSTATE_REASON_LIMIT,
+  amountDueFor,
+  collectForm,
+  deskSearchForm,
+  refundTicketForm,
+  reinstateRefusal,
+  reinstateReservationForm,
+  strandedMoneyReason,
+  uncollectableReason,
+} from '#shared/utils/desk'
 
 // D-114 as pure rules. The database enforcement (the ticket-collection-once guard) is in
 // tests/integration/desk.test.ts; the full desk flow is tests/e2e/desk.test.ts.
@@ -73,5 +83,43 @@ describe('a booking still owing money is not cancelled (D-116 criterion 6)', () 
   test('anything still unrefunded quotes the amount', () => {
     const reason = strandedMoneyReason(900)
     expect(reason).toContain('£9.00')
+  })
+})
+
+describe('only an expired hold or the booker\'s own cancellation reinstates (D-118 criteria 1, 5)', () => {
+  test('EXPIRED has nothing to refuse', () => {
+    expect(reinstateRefusal('EXPIRED', null)).toBeNull()
+  })
+
+  test('a customer\'s own cancellation has nothing to refuse', () => {
+    expect(reinstateRefusal('CANCELLED', 'CUSTOMER')).toBeNull()
+  })
+
+  test('a staff cancellation refuses: it only ever follows a refund', () => {
+    const reason = reinstateRefusal('CANCELLED', 'STAFF')
+    expect(reason).toContain('refunded')
+  })
+
+  test('a still-pending, collected or no-show booking is not eligible either', () => {
+    const reasons = ['PENDING', 'COLLECTED', 'DOOR', 'NO_SHOW'].map(status => reinstateRefusal(status, null))
+    expect(reasons.every(reason => typeof reason === 'string' && reason.length > 0)).toBe(true)
+  })
+})
+
+describe('a reinstatement is a reason, nothing else (D-118 criterion 4)', () => {
+  test('a short reason is well-formed', () => {
+    expect(reinstateReservationForm.safeParse({ reason: 'Booker was held up on the tram, still coming' }).success).toBe(true)
+  })
+
+  test('an empty reason is refused before it reaches the route', () => {
+    expect(reinstateReservationForm.safeParse({ reason: '' }).success).toBe(false)
+  })
+
+  test('a reason past the limit is refused', () => {
+    expect(reinstateReservationForm.safeParse({ reason: 'x'.repeat(REINSTATE_REASON_LIMIT + 1) }).success).toBe(false)
+  })
+
+  test('a stray field is refused: nothing else belongs on this request', () => {
+    expect(reinstateReservationForm.safeParse({ reason: 'Fine', extra: 'no' }).success).toBe(false)
   })
 })

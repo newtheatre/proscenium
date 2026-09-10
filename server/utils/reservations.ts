@@ -406,3 +406,79 @@ export async function cancelReservation(reservationId: string, actorId: string |
     entry,
   )
 }
+
+export interface ReinstateReservationInput {
+  reservationId: string
+  performanceId: string
+  actorId: string
+  reason: string
+  ticketCount: number
+  capacity: number | null
+  freshHoldExpiresAt: number
+  // What the row held a moment before this write, carried onto the history row so D-106's own
+  // record of the lapse is not lost by this write overwriting it (criterion 2).
+  previousStatus: string
+  previousHoldExpiresAt: number | null
+}
+
+export interface ReinstateReservationResult {
+  applied: boolean
+}
+
+// The predicate and the write are one statement (0003): an expired hold or the booker's own
+// cancellation, and room for it, re-checked live rather than trusted from an earlier read.
+export function reinstateReservationStatement(
+  reservationId: string,
+  performanceId: string,
+  capacity: number | null,
+  ticketCount: number,
+  freshHoldExpiresAt: number,
+): SQL {
+  return sql`
+    UPDATE reservations
+    SET status = 'PENDING', cancelled_by = NULL, hold_expires_at = ${freshHoldExpiresAt}, updated_at = unixepoch()
+    WHERE id = ${reservationId}
+      AND (status = 'EXPIRED' OR (status = 'CANCELLED' AND cancelled_by = 'CUSTOMER'))
+      AND ${capacityAllows(performanceId, capacity, ticketCount)}
+    RETURNING id
+  `
+}
+
+// The claim, not the read, decides (0003): the capacity predicate rides the same UPDATE that
+// flips status, so a house that filled while the officer was deciding writes nothing at all.
+export async function reinstateReservation(input: ReinstateReservationInput): Promise<ReinstateReservationResult> {
+  const historyId = newId()
+
+  const update = reinstateReservationStatement(
+    input.reservationId,
+    input.performanceId,
+    input.capacity,
+    input.ticketCount,
+    input.freshHoldExpiresAt,
+  )
+
+  // Chained on the UPDATE's own `changes()`: a refused reinstatement leaves no history row and
+  // no audit trail for something that did not happen (0049's shape, extended one link further).
+  const historyInsert = sql`
+    INSERT INTO reservation_reinstatements (id, reservation_id, actor_id, reason, previous_status, previous_hold_expires_at)
+    SELECT ${historyId}, ${input.reservationId}, ${input.actorId}, ${input.reason}, ${input.previousStatus}, ${input.previousHoldExpiresAt}
+    WHERE changes() = 1
+    RETURNING id
+  `
+
+  // No `reason` in detail: that is free text and belongs on the history row, which the target
+  // id already points at (0011).
+  const entry = auditEntry({ actorId: input.actorId, action: 'reservation.reinstated', target: `reservation:${input.reservationId}` })
+
+  const [updateRows] = await db.batch([
+    db.all<{ id: string }>(update),
+    db.all<{ id: string }>(historyInsert),
+    db.run(sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, NULL
+      WHERE changes() = 1
+    `),
+  ])
+
+  return { applied: Array.isArray(updateRows) && updateRows.length > 0 }
+}
