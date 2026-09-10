@@ -570,7 +570,7 @@ index and a trigger on `ledger_lines` (`ledger_lines_ticket_collection_once`,
 `ledger_lines_ticket_collection_needs_collected_reservation`) enforce that a ticket is collected
 once, ever, and that a line can only exist for a reservation the same batch actually collected,
 so a lost race aborts the whole transaction rather than posting money for nothing (0001, I-102
-criterion 6); `check:migrations` refuses a rebuild of `ledger_lines` against a `restrict`
+criterion 6); `check migrations` refuses a rebuild of `ledger_lines` against a `restrict`
 dependent for exactly this reason, so the guard is index and trigger only. `COMP` needs a reason
 and is refused outright without `ticketing.manage` (committee decision): an ordinary desk officer
 cannot self-approve one, though whoever does hold the permission still approves their own; D-117's
@@ -735,7 +735,7 @@ unique where not null so a charge voids once · `void_reason` NULL, free text, o
 and off the audit trail (0011) · `created_at`.
 Exception to append-only: none. Even voids and refunds are new reversing rows, and
 `ledger_entries_no_self_reversal` refuses an entry that claims to reverse itself.
-`server/utils/ledger.ts` is the only writer; `check:ledger` fails the build on any other file
+`server/utils/ledger.ts` is the only writer; `check ledger` fails the build on any other file
 that inserts into either table. `postEntry` returns statements rather than writing them, so
 money and the thing it paid for commit in one batch (0001, I-102 criterion 6).
 
@@ -756,10 +756,22 @@ reasoning `product_variant_id` carries.
 Which source, tender and kind each money path posts under is the table in `architecture.md`
 under Money and the ledger. A path not in that table has not been agreed.
 
-### z_readings
-`london_day` PK · `reader_pence` (typed from the SumUp display) · `expected_pence` (computed
-at entry, snapshot) · `variance_pence` · `entered_by` · `note` · `created_at`. The daily
-reconciliation record (I-104); a variance is a fact to explain, not an error to suppress.
+### z_readings  APPEND-ONLY
+`id` PK · `night` (the show night, 04:00 to 04:00 London, the same label `till_sessions.night`
+carries: the reader is read once a night, not once a calendar day, so this is never
+`ledger_entries.london_day`) · `reader_pence` (typed from the SumUp display) · `expected_pence`
+(computed at entry, snapshot, never recomputed later) · `variance_pence`
+(`reader_pence - expected_pence`) · `entered_by` → users restrict · `note` NULL, mandatory
+whenever `variance_pence` is not zero · `supersedes_id` NULL, no foreign key (the same
+append-only reasoning as the ledger's own self-references), unique where not null so a reading
+resolves once · `written_off` (a real, nonzero variance accepted rather than restated as zero;
+always names what it resolves) · `created_at`. The daily reconciliation record (I-104); a
+variance is a fact to explain, not an error to suppress, and a correction or a write-off is a
+new row naming the one it resolves, never an edit (0010). Unique where `supersedes_id IS NULL`,
+one per `night`, so a racing second first-reading for a night collides rather than forking the
+chain. `server/utils/night-reconciliation.ts` builds the whole-night expected figure from
+F-118's own bar reconciliation (`server/utils/reconciliation.ts`) rather than a second account
+of the same figures, adding only the desk's own itemised breakdown.
 
 ### periods
 `id` PK · `kind` CHECK `TERM|SEASON` · `starts_on` · `ends_on` · `closed_at` NULL ·
@@ -1405,7 +1417,7 @@ after the term is gone is a form nobody withdraws, and it still sends one messag
 
 **A request moves between the two tables rather than being cancelled and re-asked** (C-123).
 Neither `status` set can gain a value: both carry a `CHECK` and both tables have cascading
-dependents, so `check:migrations` refuses the rebuild. So a move is a **supersede**, the habit the
+dependents, so `check migrations` refuses the rebuild. So a move is a **supersede**, the habit the
 rest of the estate already has: the old row goes to `CANCELLED` carrying `converted_to_request_id`
 or `converted_to_booking_id`, and the new row points back the other way. **A cancellation carrying
 one of those pointers must never display as "Cancelled"**: `saysBookingState` and
@@ -2056,7 +2068,7 @@ of actions: each carries a label and the module it belongs to, and `auditEntry` 
 is not in it, so a typo cannot create a category and the screen always has something to display.
 The modules are `identity`, `spaces`, `ticketing`, `show-night`, `bar`, `training`,
 `communications`, `finance` and `governance`, which is what the trail's module filter offers.
-`shared/utils/audit-coverage.ts` says which route answers for which entry, and `check:audit` fails
+`shared/utils/audit-coverage.ts` says which route answers for which entry, and `check audit` fails
 the build when a mutating route is missing from it, claims an action it does not write, or is
 exempt without a reason (J-101 criterion 5). A state change records `changes: { field: { from, to } }`,
 one shape whatever endpoint wrote it (J-101 criterion 4); a settings change whose value is

@@ -218,7 +218,7 @@ and exports are queries over the ledger; no module keeps its own money totals.
 `postEntry(input, at?)` validates the entry, computes its total from its lines and **returns the
 statements the caller batches**. It performs no write of its own, because money and the thing it
 paid for commit together or not at all (0001, I-102 criterion 6), and only the caller knows what
-the other half of the batch is. Nothing else writes to the ledger tables: `check:ledger` fails the
+the other half of the batch is. Nothing else writes to the ledger tables: `check ledger` fails the
 build on any file under `server/` other than `server/utils/ledger.ts` that does, and on any script
 that reaches the tables in raw SQL.
 
@@ -245,12 +245,14 @@ and `tender` are database CHECKs and cannot be widened; `kind` is the enum in
 `shared/utils/ledger.ts` (0033). `SYSTEM` is reserved for an entry no person took: no MVP path
 posts one.
 
-**Every row below groups by the financial day, never by the show night.** `london_day` is the
-plain London calendar day of `happened_at`, written by `londonDayOf` in `shared/utils/ledger.ts`,
-because the reader's Z total is a calendar-day figure (I-104). A 01:00 bar sale is the previous
-night's takings and the new day's Z, and both readings are correct. A report that wants the night
-resolves it from the performance or from `showNightOf` (E-110) and never from `london_day`; the
-ledger holds no night column and gains none.
+**Every row below carries the financial day for calendar grouping, never the show night.**
+`london_day` is the plain London calendar day of `happened_at`, written by `londonDayOf` in
+`shared/utils/ledger.ts`; a month or season total groups by it. Reconciliation to the reader's own
+Z is scoped to the show night instead, not the calendar day: the reader is read once per night,
+not once per calendar day, so a night that crosses midnight would otherwise split one physical
+reading across two days and read as a discrepancy every time it happens. F-118's till close and
+I-104's own daily reconciliation both resolve the night from `showNightBounds` (E-110, 0014) and
+never from `london_day`; the ledger holds no night column and gains none.
 
 | Money path | Posts when | Module | Source | Tender | Kind |
 | --- | --- | --- | --- | --- | --- |
@@ -312,7 +314,7 @@ without naming it).
 | Cron (UTC) | Task | Does |
 | --- | --- | --- |
 | `*/10 * * * *` | `holds:release` | Sends pre-expiry hold reminders (`HOLD_REMINDER_MINUTES_BEFORE`, 60 by default), then releases expired reservation holds (D-106, D-107). The one task that changes booking state, and only ever in the direction the customer was warned about. The waiting-list cascade is D-113's, not yet built. |
-| `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). The CI-side "after every deploy" half of criterion 3 is `.github/workflows/health-watch.yml` and a step at the end of `migrate.yml`, both outside the application. |
+| `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). The CI-side "after every deploy" half of criterion 3 is `.github/workflows/health-watch.yml` and `migrate.yml`'s own `health` job, both outside the application. |
 | `*/10 * * * *` | `notifications:retry` | Sends failed messages again, one claimed row at a time, when the doubling backoff since enqueue has passed (`NOTIFICATION_RETRY_BACKOFF_MINUTES`, 10 by default); marks an entry `FAILED_FINAL` once `NOTIFICATION_MAX_ATTEMPTS` is spent, so five attempts span about two and a half hours. Every guard runs again on each attempt, so an address change, a preference change or an erasure in between is honoured (H-105, 0056). Capped at 100 rows a run. |
 | `0 6 * * *` | `training:expiry-sweep` | Expiry warnings and digests (dry-run gated). |
 | `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or an unconfirmed duty manager, the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |

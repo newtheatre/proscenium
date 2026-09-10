@@ -30,14 +30,15 @@ Eleven steps, in `.github/workflows/ci.yml`. Run all of them before opening a pu
 4. `test`, the unit and integration suites, including the named regression cases: the register
    race, the double refund, the capacity race, DST recurrence arithmetic, academic-year carry-over,
    erasure completeness, and the expected-total mismatch.
-5. `check:comments`: two lines maximum, constraints not narration, no JSDoc block tags, no
+5. `check comments`: two lines maximum, constraints not narration, no JSDoc block tags, no
    narrated history.
-6. `check:migrations`: a generated migration that rebuilds an append-only table is refused, as is a
+6. `check migrations`: a generated migration that rebuilds an append-only table is refused, as is a
    hand-edited generated one, as is a journal that disagrees with the files on disk.
-7. `check:content-tokens`: a policy token on a content page that no configuration key answers.
-8. `check:ledger`: a ledger line kind that the code does not enforce.
-9. `check:notifications`: a notification type with no template, or a template nothing sends.
-10. `check:audit`: a privileged route with no audit write, or an action written but never
+7. `check content-tokens`: a policy token naming a key the schema does not have, or one that
+   holds personal data.
+8. `check ledger`: a ledger line kind that the code does not enforce.
+9. `check notifications`: a notification type with no template, or a template nothing sends.
+10. `check audit`: a privileged route with no audit write, or an action written but never
     registered.
 
 `test:e2e` is **not** a CI gate. It runs nightly and on demand (0029), and a full run takes minutes

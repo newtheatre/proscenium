@@ -38,9 +38,9 @@ another stream's namespace; ask the owning stream by name instead.
    with no pull request runs no CI, so pushing early costs nothing, and a commit that has not
    left your worktree is lost with it. Push each later fix as you make it.
 4. Run in order, each command in the foreground: `bun run build`, `bun run typecheck`,
-   `bun run typecheck:bun`, `bun run lint`, `bun run test`, `bun run check:comments`,
-   `bun run check:migrations`, `bun run check:content-tokens`, `bun run check:ledger`,
-   `bun run check:notifications`, `bun run check:audit`. Then the affected e2e suites with
+   `bun run typecheck:bun`, `bun run lint`, `bun run test`, `bun run check comments`,
+   `bun run check migrations`, `bun run check content-tokens`, `bun run check ledger`,
+   `bun run check notifications`, `bun run check audit`. Then the affected e2e suites with
    `bun run test:e2e`. Then `/code-review medium` on your diff; fix confirmed findings. If one
    call cannot cover a suite, split it by file and run each in sequence. Never end your turn
    waiting: a background command cannot wake you, so its result is lost and the lead restarts
@@ -77,9 +77,9 @@ question; record the interpretation in the PR that applies it.
 - Two runs on one port kill each other; a leaked dev server from another worktree is accepted
   by the test runner and every new route then 404s. Use your ports and nothing else.
 - `bun run build` while `bun run dev` runs breaks dev unless `NUXT_HUB_DIR` is set.
-- `check:migrations` refuses any rebuild of an existing table. New tables point at old tables;
+- `check migrations` refuses any rebuild of an existing table. New tables point at old tables;
   nothing is added to `rooms`, `users`, `ledger_*` or `training_*`.
-- `check:ledger` reads comments; do not write "insert" near a ledger table name.
+- `check ledger` reads comments; do not write "insert" near a ledger table name.
 - Every table naming a person needs a `shared/utils/personal-data.ts` row.
 - No em dashes anywhere, including SQL and JSON. No references to any AI tool in code,
   comments, commits, PRs or documentation.

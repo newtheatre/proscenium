@@ -104,7 +104,7 @@ describe('the ledger is append-only, and the database is what says so (I-101 cri
   })
 
   // 0033: the kind is held in code, so the database takes one it has never heard of. The write
-  // path is what refuses it, and check:ledger is what keeps the write path the only way in.
+  // path is what refuses it, and `check ledger` is what keeps the write path the only way in.
   test('a line kind is not the database\'s business', async () => {
     await withDatabase((database) => {
       seedActor(database)

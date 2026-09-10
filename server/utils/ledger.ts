@@ -8,7 +8,7 @@ import type { EntryInput, NettableEntry } from '#shared/utils/ledger'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { SQL } from 'drizzle-orm'
 
-// The only writer of the ledger: check:ledger refuses any other file that inserts into its
+// The only writer of the ledger: `check ledger` refuses any other file that inserts into its
 // tables, which makes "every money path posts" a build failure rather than a habit (0004).
 
 export interface PostedEntry {
