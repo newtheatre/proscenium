@@ -29,6 +29,9 @@ async function load(): Promise<void> {
   step.value = state.value.confirmed ? 'active' : 'none'
 }
 
+const reauthenticating = ref(false)
+const pending = ref<(() => Promise<void>) | null>(null)
+
 async function attempt(action: () => Promise<void>): Promise<void> {
   if (working.value) return
   working.value = true
@@ -37,13 +40,28 @@ async function attempt(action: () => Promise<void>): Promise<void> {
     await action()
   }
   catch (error) {
-    signInAgain.value = refusalData<{ signInAgain?: string }>(error)?.signInAgain ?? null
-    notice.value = refusalText(error)
+    if (needsReauthentication(error)) {
+      pending.value = action
+      reauthenticating.value = true
+    }
+    else {
+      notice.value = refusalText(error)
+    }
   }
   finally {
     working.value = false
   }
 }
+
+// The action that asked for reassertion is retried once, exactly as it was; the modal never
+// runs it itself (A-128 criterion 3).
+function retryAfterReauthentication(): void {
+  const action = pending.value
+  pending.value = null
+  if (action) void attempt(action)
+}
+
+useReauthenticateReturn()
 
 const begin = (): Promise<void> => attempt(async () => {
   const started = await $fetch<{ secret: string, uri: string }>('/api/account/mfa/enrol', { method: 'POST' })
@@ -85,9 +103,8 @@ const finish = (): Promise<void> => attempt(async () => {
   await load()
 })
 
-const signInAgain = ref<string | null>(null)
 const closing = ref(false)
-const confirmation = reactive({ email: '', password: '' })
+const confirmation = reactive({ email: '' })
 const { account, refresh: refreshAccount } = useAccount()
 
 // Erasure is final and the session goes with it, so the screen leaves rather than re-reading.
@@ -121,9 +138,6 @@ useSeoMeta({ title: 'Security' })
         color="error"
         variant="subtle"
         :description="notice"
-        :actions="signInAgain
-          ? [{ label: 'Sign in again', color: 'neutral', variant: 'subtle', to: `/sign-in?next=${encodeURIComponent(signInAgain)}` }]
-          : []"
       />
 
       <div
@@ -332,13 +346,6 @@ useSeoMeta({ title: 'Security' })
               required
             />
           </UFormField>
-          <UFormField label="Your password">
-            <UInput
-              v-model="confirmation.password"
-              data-test="close-password"
-              type="password"
-            />
-          </UFormField>
           <UButton
             type="submit"
             color="error"
@@ -350,5 +357,10 @@ useSeoMeta({ title: 'Security' })
         </form>
       </template>
     </UModal>
+
+    <ReauthenticateModal
+      v-model:open="reauthenticating"
+      @reauthenticated="retryAfterReauthentication"
+    />
   </UContainer>
 </template>

@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
     db.update(schema.users).set({ lastLoginAt: Math.floor(Date.now() / 1000), passwordLastUsedAt: Math.floor(Date.now() / 1000) }).where(eq(schema.users.id, account.id)),
     db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'session.started', target: `user:${account.id}` })),
   ])
-  await startSession(event, account)
+  await startSession(event, account, 'password')
 
   return { ok: true, mfaRequired: false as const, user: { id: account.id, name: account.name, email: account.email } }
 })

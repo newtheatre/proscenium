@@ -14,3 +14,9 @@ export function refusalData<T>(error: unknown): T | undefined {
 export function refusalStatus(error: unknown): number | undefined {
   return (error as { statusCode?: number }).statusCode
 }
+
+// A stale session on a sensitive action opens the re-authentication modal rather than sending the
+// person away to sign in again (A-128 criterion 3).
+export function needsReauthentication(error: unknown): boolean {
+  return refusalData<{ reauthenticate?: boolean }>(error)?.reauthenticate === true
+}

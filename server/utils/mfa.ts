@@ -1,31 +1,32 @@
 import { and, eq, isNotNull, lt } from 'drizzle-orm'
+import { isFresh } from '#shared/utils/freshness'
 import { generateRecoveryCodes, normaliseRecoveryCode } from '#shared/utils/recovery-codes'
+import { verifyCode } from '#shared/utils/totp'
 import type { AuditRow } from '#shared/utils/audit'
 import type { H3Event } from 'h3'
 
 // Enrolment, recovery and the challenge, kept together because minting codes is part of
 // confirming a factor and redeeming one is part of answering a challenge.
 
-export const FRESH_SESSION_SECONDS = 10 * 60
+// Enrolling, changing a security setting or reasserting for a sensitive action all need a
+// session proven within this window (A-109 criterion 4, A-110 criterion 3, A-128 criterion 5).
+export async function requireFreshSession(event: H3Event): Promise<void> {
+  const session = await getUserSession(event)
+  const windowMinutes = await configValue(event, 'REAUTH_WINDOW_MINUTES')
+  if (!isFresh(session?.signedInAt ?? 0, windowMinutes, Math.floor(Date.now() / 1000))) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Confirm it is still you before this goes ahead',
+      // The screen turns this into a re-authentication modal rather than leaving the person to
+      // find the way (A-128 criterion 3).
+      data: { reauthenticate: true },
+    })
+  }
+}
 
 async function hashCode(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normaliseRecoveryCode(value)))
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
-}
-
-// Enrolling or regenerating needs a session fresher than ten minutes, so a borrowed screen
-// cannot quietly add a factor (A-109 criterion 4, A-110 criterion 3).
-export async function requireFreshSession(event: H3Event): Promise<void> {
-  const session = await getUserSession(event)
-  const signedInAt = session?.signedInAt ?? 0
-  if (Math.floor(Date.now() / 1000) - signedInAt > FRESH_SESSION_SECONDS) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: 'Sign in again to change your security settings',
-      // The screen turns this into one button rather than leaving the person to find the way.
-      data: { signInAgain: getRequestURL(event).pathname },
-    })
-  }
 }
 
 // A factor only counts once it has been proven with a code; an unconfirmed enrolment is not a
@@ -86,8 +87,8 @@ export async function claimAttempt(id: string): Promise<{ userId: string } | nul
 
 export interface Redemption { redeemed: boolean, remaining: number }
 
-// Delete-as-claim, so one code redeems at most once and only ever answers a challenge, never a
-// first credential (A-110). Nothing but the challenge route calls this.
+// Delete-as-claim, so one code redeems at most once and only ever answers a challenge or a
+// reassertion, never a first credential (A-110).
 export async function redeemRecoveryCode(userId: string, code: string): Promise<Redemption> {
   const [claimed] = await db.delete(schema.recoveryCodes).where(and(
     eq(schema.recoveryCodes.userId, userId),
@@ -107,4 +108,34 @@ export async function sweepExpiredAttempts(before: Date): Promise<number> {
     .where(lt(schema.mfaAttempts.expiresAt, Math.floor(before.getTime() / 1000)))
     .returning({ id: schema.mfaAttempts.id })
   return gone.length
+}
+
+export interface SecondFactorAnswer {
+  accepted: boolean
+  factor: 'totp' | 'recovery-code' | null
+  // The step to persist as lastUsedStep either way, so a wrong guess cannot be replayed either.
+  totpStep: number | null
+  // How many recovery codes are left; only meaningful when factor is 'recovery-code'.
+  remaining: number
+}
+
+// An authenticator code first, then a recovery code, the order the sign-in challenge and a
+// reassertion both answer in. Persists only the recovery code's own claim (A-111, A-128 criterion 3).
+export async function answerSecondFactor(userId: string, code: string): Promise<SecondFactorAnswer> {
+  const [secret] = await db.select().from(schema.totpSecrets)
+    .where(and(eq(schema.totpSecrets.userId, userId), isNotNull(schema.totpSecrets.confirmedAt)))
+    .limit(1)
+
+  const totp = secret
+    ? await verifyCode(secret.secret, code, new Date(), secret.lastUsedStep)
+    : { accepted: false, step: null }
+
+  if (totp.accepted) return { accepted: true, factor: 'totp', totpStep: totp.step, remaining: 0 }
+
+  const recovery = await redeemRecoveryCode(userId, code)
+  if (recovery.redeemed) {
+    return { accepted: true, factor: 'recovery-code', totpStep: secret?.lastUsedStep ?? null, remaining: recovery.remaining }
+  }
+
+  return { accepted: false, factor: null, totpStep: secret?.lastUsedStep ?? null, remaining: 0 }
 }

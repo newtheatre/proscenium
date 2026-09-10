@@ -192,7 +192,7 @@ describe.skipIf(skip !== null)('GDPR erasure deletes the profile immediately, no
     expect((await send('PUT', '/api/account/access-profile', declaration(), gone.cookie)).status).toBe(200)
     expect(row('SELECT user_id FROM access_profiles WHERE user_id = ?', gone.id)).toBeDefined()
 
-    expect((await send('POST', '/api/account/close', { email: gone.email, password }, gone.cookie)).status).toBe(200)
+    expect((await send('POST', '/api/account/close', { email: gone.email }, gone.cookie)).status).toBe(200)
     expect(row('SELECT user_id FROM access_profiles WHERE user_id = ?', gone.id)).toBeUndefined()
   })
 })

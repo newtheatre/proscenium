@@ -94,19 +94,19 @@ const close = (person: Member, body: unknown): Promise<Response> =>
   send('POST', '/api/account/close', body, person.cookie)
 
 describe.skipIf(skip !== null)('closing your own account (A-125)', () => {
-  test('it needs the address typed and the password proved', async () => {
+  // Identity is re-asserted in the modal on the same screen; the route itself only asks the
+  // address match and a fresh session (A-128 criteria 1, 3 and 4).
+  test('it needs the address typed correctly', async () => {
     const person = await member('careful')
 
-    expect((await close(person, { email: 'someone.else@e2e.newtheatre.org.uk', password })).status).toBe(400)
-    expect((await close(person, { email: person.email })).status).toBe(401)
-    expect((await close(person, { email: person.email, password: `${password}-not` })).status).toBe(401)
+    expect((await close(person, { email: 'someone.else@e2e.newtheatre.org.uk' })).status).toBe(400)
 
     expect(read<{ anonymised: number | null }>('SELECT anonymised_at AS anonymised FROM users WHERE id = ?', person.id)!.anonymised).toBeNull()
   })
 
   test('closing anonymises the row rather than deleting it', async () => {
     const person = await member('closing')
-    expect((await close(person, { email: person.email, password })).status).toBe(200)
+    expect((await close(person, { email: person.email })).status).toBe(200)
 
     const row = read<{ email: string, name: string, password: string | null, anonymised: number | null }>(
       'SELECT email, name, password, anonymised_at AS anonymised FROM users WHERE id = ?', person.id)
@@ -117,7 +117,7 @@ describe.skipIf(skip !== null)('closing your own account (A-125)', () => {
 
   test('the session ends with the account, and cannot be used again', async () => {
     const person = await member('gone')
-    await close(person, { email: person.email, password })
+    await close(person, { email: person.email })
 
     const session = await (await fetch(`${app.baseURL}/api/auth/session`, { headers: { cookie: person.cookie } })).json() as { signedIn: boolean }
     expect(session.signedIn).toBe(false)
@@ -125,7 +125,7 @@ describe.skipIf(skip !== null)('closing your own account (A-125)', () => {
 
   test('a closed account cannot sign in, and is refused like any other failure', async () => {
     const person = await member('refused')
-    await close(person, { email: person.email, password })
+    await close(person, { email: person.email })
 
     const closed = await send('POST', '/api/auth/sign-in', { email: person.email, password })
     const stranger = await send('POST', '/api/auth/sign-in', { email: registrableAddress('nobody'), password })
@@ -136,7 +136,7 @@ describe.skipIf(skip !== null)('closing your own account (A-125)', () => {
   // Criterion 3: the tombstone is guarded by the database, so a later write path cannot undo it.
   test('the address is free again, and registering with it makes a new account', async () => {
     const person = await member('reused')
-    await close(person, { email: person.email, password })
+    await close(person, { email: person.email })
 
     expect((await send('POST', '/api/auth/register', { email: person.email, name: person.name, password })).status).toBe(200)
     const fresh = read<{ id: string }>('SELECT id FROM users WHERE email = ?', person.email)
@@ -146,7 +146,7 @@ describe.skipIf(skip !== null)('closing your own account (A-125)', () => {
 
   test('closing twice is not an error', async () => {
     const person = await member('twice')
-    expect((await close(person, { email: person.email, password })).status).toBe(200)
+    expect((await close(person, { email: person.email })).status).toBe(200)
 
     // The session is gone, so the second attempt is the admin path on an already-erased account.
     const again = await send('POST', `/api/admin/accounts/${person.id}/security`, { operation: 'erase' }, cookie)

@@ -44,9 +44,10 @@ export default defineEventHandler(async (event) => {
     detail: { count: RECOVERY_CODE_COUNT },
   }))
 
-  // The epoch moved, so this session is reissued rather than left stale by its own success.
+  // The epoch moved, so this session is reissued rather than left stale by its own success. The
+  // code just typed is what proved it, so the reissued session carries that factor.
   const refreshed = await findById(account.id)
-  if (refreshed) await startSession(event, refreshed)
+  if (refreshed) await startSession(event, refreshed, 'totp')
 
   return { ok: true, recoveryCodes: codes }
 })

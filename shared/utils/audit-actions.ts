@@ -57,6 +57,7 @@ const CATALOGUE = {
   'session.started.totp': { label: 'Signed in with an authenticator', module: 'identity', self: true },
   'session.started.recovery-code': { label: 'Signed in with a recovery code', module: 'identity', self: true },
   'session.revoked': { label: 'Sessions ended by an officer', module: 'identity' },
+  'session.reauthenticated': { label: 'Identity re-confirmed for a sensitive action', module: 'identity', self: true },
 
   'password.set': { label: 'First password set', module: 'identity', self: true },
   'password.reset': { label: 'Password reset', module: 'identity', self: true },

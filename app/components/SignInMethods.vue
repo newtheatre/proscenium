@@ -27,6 +27,17 @@ function when(at: number | null): string {
   return at === null ? 'not recorded' : formatLondon(new Date(at * 1000), { dateStyle: 'medium' })
 }
 
+// A stale session on any of these three opens the modal instead of a toast; the retry is the
+// same call again, in full, so its loading state and toast still apply (A-128 criterion 3).
+const reauthenticating = ref(false)
+const pending = ref<(() => Promise<void>) | null>(null)
+
+function retryAfterReauthentication(): void {
+  const action = pending.value
+  pending.value = null
+  if (action) void action()
+}
+
 const changing = ref(false)
 const wantedEmail = ref('')
 
@@ -42,7 +53,13 @@ async function changeEmail(): Promise<void> {
     await refreshAccount()
   }
   catch (error) {
-    toast.add({ title: refusalText(error), color: 'error' })
+    if (needsReauthentication(error)) {
+      pending.value = changeEmail
+      reauthenticating.value = true
+    }
+    else {
+      toast.add({ title: refusalText(error), color: 'error' })
+    }
   }
   finally {
     changing.value = false
@@ -62,7 +79,13 @@ async function addPasskey(): Promise<void> {
     await load()
   }
   catch (error) {
-    toast.add({ title: refusalText(error), color: 'error' })
+    if (needsReauthentication(error)) {
+      pending.value = addPasskey
+      reauthenticating.value = true
+    }
+    else {
+      toast.add({ title: refusalText(error), color: 'error' })
+    }
   }
   finally {
     enrolling.value = false
@@ -77,7 +100,13 @@ async function remove(method: SignInMethod): Promise<void> {
     await load()
   }
   catch (error) {
-    toast.add({ title: refusalText(error), color: 'error' })
+    if (needsReauthentication(error)) {
+      pending.value = () => remove(method)
+      reauthenticating.value = true
+    }
+    else {
+      toast.add({ title: refusalText(error), color: 'error' })
+    }
   }
   finally {
     working.value = ''
@@ -196,4 +225,9 @@ onMounted(load)
       </div>
     </template>
   </UPageCard>
+
+  <ReauthenticateModal
+    v-model:open="reauthenticating"
+    @reauthenticated="retryAfterReauthentication"
+  />
 </template>

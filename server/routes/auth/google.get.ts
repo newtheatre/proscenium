@@ -73,15 +73,32 @@ export default defineOAuthGoogleEventHandler({
     const account = await findById(userId)
     if (!account) return sendRedirect(event, '/sign-in?refused=account')
 
+    const after = onwards(getCookie(event, RETURN_COOKIE))
+    deleteCookie(event, RETURN_COOKIE)
+
+    // A reassertion, not a sign-in: it must land back on the same account already in session, or
+    // it proves nothing about who is asking (A-128 criteria 3 and 4).
+    if (getCookie(event, 'nnt-reauth') === '1') {
+      deleteCookie(event, 'nnt-reauth')
+      const current = await getUserSession(event)
+      if (outcome.action !== 'sign-in' || current?.user?.id !== account.id) {
+        return sendRedirect(event, '/sign-in?refused=account')
+      }
+      await db.batch([
+        db.update(schema.users).set({ googleLastUsedAt: now }).where(eq(schema.users.id, account.id)),
+        db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'session.reauthenticated', target: `user:${account.id}`, detail: { factor: 'google' } })),
+      ])
+      await reassertSession(event, account, 'google')
+      return sendRedirect(event, `${after}${after.includes('?') ? '&' : '?'}reauthenticated=1`)
+    }
+
     await db.batch([
       db.update(schema.users).set({ lastLoginAt: now, googleLastUsedAt: now }).where(eq(schema.users.id, account.id)),
       db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'session.started.google', target: `user:${account.id}` })),
     ])
-    await startSession(event, account)
+    await startSession(event, account, 'google')
 
     // Where they were when they were asked to sign in again, remembered across the round trip.
-    const after = onwards(getCookie(event, RETURN_COOKIE))
-    deleteCookie(event, RETURN_COOKIE)
     return sendRedirect(event, after)
   },
 

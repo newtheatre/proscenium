@@ -79,6 +79,19 @@ async function load(): Promise<void> {
   }
 }
 
+// A manual entry is a signed record, so a stale session re-asserts in the modal rather than
+// losing the form (A-128 criterion 3).
+const reauthenticating = ref(false)
+const pendingEntry = ref<FormSubmitEvent<ManualEntryForm> | null>(null)
+
+function retryAfterReauthentication(): void {
+  const pending = pendingEntry.value
+  pendingEntry.value = null
+  if (pending) void record(pending)
+}
+
+useReauthenticateReturn()
+
 async function record(event: FormSubmitEvent<ManualEntryForm>): Promise<void> {
   failure.value = null
   try {
@@ -99,6 +112,11 @@ async function record(event: FormSubmitEvent<ManualEntryForm>): Promise<void> {
     await load()
   }
   catch (error) {
+    if (needsReauthentication(error)) {
+      pendingEntry.value = event
+      reauthenticating.value = true
+      return
+    }
     const message = refusalText(error)
     if (/subject/i.test(message)) entryForm.value?.setErrors([{ name: 'target', message }])
     else if (/recorded for/i.test(message)) entryForm.value?.setErrors([{ name: 'onBehalfOf', message }])
@@ -426,5 +444,10 @@ onMounted(load)
         </UForm>
       </template>
     </UModal>
+
+    <ReauthenticateModal
+      v-model:open="reauthenticating"
+      @reauthenticated="retryAfterReauthentication"
+    />
   </div>
 </template>
