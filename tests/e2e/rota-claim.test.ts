@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { sqliteTarget } from '#tests/helpers/database'
 import { londonParts } from '#shared/utils/london'
 import { showNightOf } from '#shared/utils/show-night'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
@@ -100,11 +101,7 @@ function programme(caseSuffix: string): { performanceId: string } {
   const database = new Database(app.databaseFile)
   try {
     const night = showNightOf(new Date(Date.now() + 7 * 86_400_000))
-    const made = tonightsPerformance({
-      batch: statements => database.transaction(() => {
-        for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
-      })(),
-    }, { suffix: caseSuffix, night })
+    const made = tonightsPerformance(sqliteTarget(database), { suffix: caseSuffix, night })
     return { performanceId: made.performanceId }
   }
   finally {

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { showNightOf } from '#shared/utils/show-night'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -47,11 +48,7 @@ function performanceInDays(days: number, suffix: string): { venueId: string, per
   const database = new Database(app.databaseFile)
   try {
     const night = showNightOf(new Date(daysFromNow(days) * 1000))
-    const made = tonightsPerformance({
-      batch: statements => database.transaction(() => {
-        for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
-      })(),
-    }, { night, suffix })
+    const made = tonightsPerformance(sqliteTarget(database), { night, suffix })
     return { venueId: made.venueId, performanceId: made.performanceId }
   }
   finally {

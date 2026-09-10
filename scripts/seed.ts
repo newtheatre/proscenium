@@ -5,10 +5,9 @@
 import { Database } from 'bun:sqlite'
 import { Hash } from '@adonisjs/hash'
 import { Scrypt } from '@adonisjs/hash/drivers/scrypt'
-import { assertLocalTarget, assertNotProduction, generatePassword, registrableAddress } from '../tests/helpers/seed'
-import { londonDayOf } from '../shared/utils/ledger'
-import { currentShowNight, showNightBounds, showNightOf } from '../shared/utils/show-night'
-import { DEPARTMENTS, readCatalogue } from './lib/catalogue'
+import { assertLocalTarget, assertNotProduction, generatePassword } from '../tests/helpers/seed'
+import { seed } from './seed/index'
+import { sqliteTarget } from './seed/statements'
 
 const DEFAULT_TARGET = '.data/db/sqlite.db'
 const target = process.argv[2] ?? DEFAULT_TARGET
@@ -19,7 +18,7 @@ assertLocalTarget(target)
 
 // The same scrypt the application hashes with, so a seeded password actually signs in. The app
 // reaches it through nuxt-auth-utils, which a script cannot import.
-const hash = new Hash(new Scrypt({}))
+const hasher = new Hash(new Scrypt({}))
 
 const db = new Database(target)
 
@@ -28,621 +27,78 @@ if (!db.query(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'u
   process.exit(1)
 }
 
-const id = (): string => crypto.randomUUID().replaceAll('-', '')
-const now = Math.floor(Date.now() / 1000)
+db.run('PRAGMA foreign_keys = ON')
 
-// Named the way the society names them, so a screen looks like the real thing rather than like a
-// fixture. Hours are left empty on most: a room with none is open whenever (C-101).
+const result = await seed(sqliteTarget(db), {
+  hash: password => hasher.make(password),
+  password: generatePassword,
+  token: () => crypto.randomUUID(),
+})
 
-// Where a room is and who to ask are optional: ours are in one building and need no telling.
-interface SeedRoom {
-  name: string
-  capacity: number
-  description: string
-  sensitive: boolean
-  campus?: string
-  building?: string
-  contact?: string
-  hours?: { weekday: number, opens: string, closes: string }[]
-}
-
-const ROOMS: SeedRoom[] = [
-  { name: 'The Studio', capacity: 40, description: 'The rehearsal room upstairs.', sensitive: false },
-  { name: 'The Workshop', capacity: 25, description: 'Bench space, and the only room with a sink.', sensitive: false },
-  {
-    name: 'The Auditorium',
-    capacity: 120,
-    description: 'The house. Booked around the season, so every request is agreed by a person.',
-    sensitive: true,
-    hours: [1, 2, 3, 4, 5, 6, 0].map(weekday => ({ weekday, opens: '09:00', closes: '23:00' })),
-  },
-]
-
-function seedRooms(): { id: string, name: string }[] {
-  const seeded: { id: string, name: string }[] = []
-
-  for (const room of ROOMS) {
-    const held = db.query('SELECT id FROM rooms WHERE name = ?').get(room.name) as { id: string } | null
-    if (held) {
-      seeded.push({ id: held.id, name: room.name })
-      continue
-    }
-
-    const roomId = id()
-    db.query(`
-      INSERT INTO rooms (id, name, description, capacity, sensitive, campus, building, contact)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      roomId, room.name, room.description ?? null, room.capacity, room.sensitive ? 1 : 0,
-      room.campus ?? null, room.building ?? null, room.contact ?? null,
-    )
-
-    for (const hours of room.hours ?? []) {
-      db.query('INSERT INTO room_hours (id, room_id, weekday, opens, closes) VALUES (?, ?, ?, ?, ?)')
-        .run(id(), roomId, hours.weekday, hours.opens, hours.closes)
-    }
-    seeded.push({ id: roomId, name: room.name })
-  }
-
-  return seeded
-}
-
-// Obviously synthetic, and on the one domain registration accepts: the reserved .invalid domains
-// are refused at registration, so a person nobody can sign in as would be no use here.
-const PEOPLE = [
-  'Rowan Ellis (test)',
-  'Priya Nair (test)',
-  'Tomasz Zielinski (test)',
-  'Aoife Brennan (test)',
-  'Sam Okonkwo (test)',
-]
-
-interface Seeded { name: string, email: string, password: string, id: string }
-
-async function seedPeople(): Promise<Seeded[]> {
-  const seeded: Seeded[] = []
-
-  for (const name of PEOPLE) {
-    const email = registrableAddress(name.split(' ')[0]!.toLowerCase())
-    const password = generatePassword()
-    const userId = id()
-
-    db.query(`
-      INSERT INTO users (id, email, name, password, password_set_at, verified)
-      VALUES (?, ?, ?, ?, ?, 1)
-    `).run(userId, email, name, await hash.make(password), now)
-
-    // Booking a room needs a current membership (C-105 criterion 2), so a seeded member has one.
-    db.query(`
-      INSERT INTO memberships (id, user_id, starts_on, expires_on, source)
-      VALUES (?, ?, date('now', '-60 days'), date('now', '+300 days'), 'MANUAL')
-    `).run(id(), userId)
-
-    seeded.push({ name, email, password, id: userId })
-  }
-
-  return seeded
-}
-
-// A week that looks like a week: mostly confirmed, one waiting on a decision, one already over.
-function seedBookings(rooms: { id: string, name: string }[], people: Seeded[]): number {
-  const studio = rooms.find(room => room.name === 'The Studio')!
-  const workshop = rooms.find(room => room.name === 'The Workshop')!
-  const auditorium = rooms.find(room => room.name === 'The Auditorium')!
-
-  const day = 86_400
-  const at = (days: number, hour: number): number => {
-    const when = new Date()
-    when.setHours(hour, 0, 0, 0)
-    return Math.floor(when.getTime() / 1000) + days * day
-  }
-
-  const planned = [
-    { room: studio, who: 0, title: 'Read-through, The Seagull', from: at(1, 18), hours: 2, status: 'CONFIRMED' },
-    { room: studio, who: 1, title: 'Blocking, act one', from: at(2, 19), hours: 2, status: 'CONFIRMED' },
-    { room: studio, who: 0, title: 'Blocking, act two', from: at(3, 19), hours: 2, status: 'CONFIRMED' },
-    { room: workshop, who: 2, title: 'Set build', from: at(2, 14), hours: 4, status: 'CONFIRMED', purpose: 'GET_IN' },
-    { room: workshop, who: 3, title: 'Paint call', from: at(4, 10), hours: 3, status: 'CONFIRMED' },
-    // Two waiting on a decision, so the approval queue has something in it to look at (C-109).
-    {
-      room: auditorium,
-      who: 4,
-      title: 'Technical rehearsal',
-      from: at(5, 18),
-      hours: 4,
-      status: 'PENDING_APPROVAL',
-      reason: 'The auditorium is the only room the set fits in.',
-    },
-    {
-      room: workshop,
-      who: 1,
-      title: 'Emergency paint call',
-      from: at(1, 9),
-      hours: 3,
-      status: 'PENDING_APPROVAL',
-      reason: 'The flats have to be dry before the get-in on Saturday.',
-    },
-    { room: studio, who: 1, title: 'Last week\'s rehearsal', from: at(-4, 19), hours: 2, status: 'CONFIRMED' },
-  ]
-
-  for (const booking of planned) {
-    db.query(`
-      INSERT INTO room_bookings (id, room_id, user_id, title, starts_at, ends_at, tier, purpose, status, reason)
-      VALUES (?, ?, ?, ?, ?, ?, 'REHEARSAL', ?, ?, ?)
-    `).run(id(), booking.room.id, people[booking.who]!.id, booking.title,
-      booking.from, booking.from + booking.hours * 3600,
-      ('purpose' in booking ? booking.purpose : undefined) ?? 'REHEARSAL',
-      booking.status, ('reason' in booking ? booking.reason : null) ?? null)
-  }
-
-  return planned.length
-}
-
-// The rooms we do not manage, and the lesson that cost somebody an evening (C-119).
-function seedExternalSpaces(): number {
-  const spaces = [
-    { id: id(), name: 'Portland B12', building: 'Portland Building', campus: 'University Park', capacity: 20 },
-    { id: id(), name: 'Portland A9', building: 'Portland Building', campus: 'University Park', capacity: 60 },
-    { id: id(), name: 'Hallward Seminar 3', building: 'Hallward Library', campus: 'University Park', capacity: 15 },
-    { id: id(), name: 'Coates C15', building: 'Coates Building', campus: 'University Park', capacity: 45 },
-  ]
-
-  // Re-runnable, like the rooms above: seeding twice adds people, never a second catalogue.
-  for (const space of spaces) {
-    const held = db.query('SELECT id FROM external_spaces WHERE name = ?').get(space.name) as { id: string } | null
-    if (held) {
-      space.id = held.id
-      continue
-    }
-
-    db.query(`INSERT INTO external_spaces (id, name, building, campus, capacity, contact)
-              VALUES (?, ?, ?, ?, ?, 'SU reception, room bookings desk')`)
-      .run(space.id, space.name, space.building, space.campus, space.capacity)
-  }
-
-  const notes = [
-    { space: spaces[0]!.id, purpose: 'REHEARSAL', verdict: 'UNSUITABLE', reason: 'A fixed table fills the room; there is no floor to work on.' },
-    { space: spaces[0]!.id, purpose: 'MEETING', verdict: 'SUITABLE', reason: 'The table everybody complains about is the point here.' },
-    { space: spaces[2]!.id, purpose: 'REHEARSAL', verdict: 'CAUTION', reason: 'Next to a silent study area, so nothing loud.' },
-  ]
-
-  for (const note of notes) {
-    db.query(`INSERT INTO external_space_notes (id, space_id, purpose, verdict, reason)
-              VALUES (?, ?, ?, ?, ?)
-              ON CONFLICT (space_id, purpose) DO UPDATE SET verdict = excluded.verdict, reason = excluded.reason`)
-      .run(id(), note.space, note.purpose, note.verdict, note.reason)
-  }
-
-  return spaces.length
-}
-
-// Re-runnable like the rooms above: a row already there is reused rather than duplicated.
-function keyed(table: string, column: string, value: string, create: () => string): string {
-  const held = db.query(`SELECT id FROM ${table} WHERE ${column} = ?`).get(value) as { id: string } | null
-  return held ? held.id : create()
-}
-
-// The prices the box office actually sells at. Access and companion never appear in a public
-// payload (D-128), which is what the access kind marks them for.
-const TICKET_TYPES = [
-  { name: 'Standard', description: 'The full price.', price: 700, kind: 'SINGLE', accessKind: null },
-  { name: 'Concession', description: 'Students, over-65s, and anybody on benefits.', price: 500, kind: 'SINGLE', accessKind: null },
-  { name: 'Access', description: 'For a patron whose access needs bring a companion.', price: 700, kind: 'SINGLE', accessKind: 'ACCESS' },
-  { name: 'Companion', description: 'The companion seat, free.', price: 0, kind: 'SINGLE', accessKind: 'COMPANION' },
-]
-
-// A technical warning carries no level; a general one always does (D-102).
-const CONTENT_WARNINGS = [
-  { slug: 'strobe-lighting', title: 'Strobe lighting', kind: 'TECHNICAL', category: 'Lighting', sort: 0, level: null },
-  { slug: 'suicide', title: 'Suicide', kind: 'GENERAL', category: 'Themes', sort: 1, level: 'DEPICTED' },
-  { slug: 'firearms', title: 'Firearms', kind: 'GENERAL', category: 'Violence', sort: 2, level: 'DEPICTED' },
-]
-
-// A venue, a show and two performances, so every show-night and box-office screen has a night to
-// open. The venue points at the auditorium, which is the only effect that attachment has (0043).
-function seedProgramme(rooms: { id: string, name: string }[], people: Seeded[]): { performances: number, shifts: number } {
-  const auditorium = rooms.find(room => room.name === 'The Auditorium')
-
-  const venueId = keyed('venues', 'name', 'The Nottingham New Theatre', () => {
-    const id_ = id()
-    db.query(`INSERT INTO venues (id, name, address, capacity, is_external, description, room_id)
-              VALUES (?, ?, ?, 120, 0, ?, ?)`)
-      .run(id_, 'The Nottingham New Theatre', 'Nottingham University Students Union, University Park',
-        'The house. General admission, no seat map, because we have never had one.',
-        auditorium?.id ?? null)
-    return id_
-  })
-
-  // The card front of house reads in the dark (E-113). Append-only, so a re-run is a no-op only
-  // once a first row already exists, never a second version of the same seed.
-  const hasEmergencyCard = db.query(`SELECT id FROM venue_emergency_info WHERE venue_id = ? LIMIT 1`).get(venueId)
-  if (!hasEmergencyCard) {
-    db.query(`INSERT INTO venue_emergency_info (id, venue_id, assembly_point, exits, isolation_points, what3words, notes, updated_by)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(id(), venueId, 'The car park behind the Portland Building',
-        'Two: stage left to the alley, and the foyer to Portland Hill.',
-        'Lighting isolation is in the box; gas is in the workshop corridor.',
-        'towns.match.press', 'The nearest defibrillator is inside the Portland Building foyer.',
-        people[0]!.id)
-  }
-
-  const seasonId = keyed('seasons', 'name', '2026/27', () => {
-    const id_ = id()
-    db.query('INSERT INTO seasons (id, name, starts_on, ends_on, sort) VALUES (?, ?, ?, ?, 0)')
-      .run(id_, '2026/27', '2026-08-01', '2027-07-31')
-    return id_
-  })
-
-  const categoryId = keyed('show_categories', 'name', 'In-house', () => {
-    const id_ = id()
-    db.query('INSERT INTO show_categories (id, name, sort) VALUES (?, ?, 0)').run(id_, 'In-house')
-    return id_
-  })
-
-  for (const type of TICKET_TYPES) {
-    keyed('ticket_types', 'name', type.name, () => {
-      const id_ = id()
-      db.query('INSERT INTO ticket_types (id, name, description, price, kind, access_kind) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(id_, type.name, type.description, type.price, type.kind, type.accessKind)
-      return id_
-    })
-  }
-
-  const showId = keyed('shows', 'slug', 'the-seagull', () => {
-    const id_ = id()
-    db.query(`INSERT INTO shows (id, slug, title, subtitle, description, category_id, season_id,
-                                age_guidance, latecomer_policy, status)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'AT_INTERVAL', 'PUBLISHED')`)
-      .run(id_, 'the-seagull', 'The Seagull', 'Chekhov, in a new translation',
-        'Four acts, one lake, and nobody gets what they came for.', categoryId, seasonId,
-        'Recommended 14 and over')
-    return id_
-  })
-
-  for (const warning of CONTENT_WARNINGS) {
-    const warningId = keyed('content_warnings', 'slug', warning.slug, () => {
-      const id_ = id()
-      db.query('INSERT INTO content_warnings (id, slug, title, kind, category, sort) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(id_, warning.slug, warning.title, warning.kind, warning.category, warning.sort)
-      return id_
-    })
-    db.query(`INSERT INTO show_content_warnings (id, show_id, warning_id, level) VALUES (?, ?, ?, ?)
-              ON CONFLICT (show_id, warning_id) DO NOTHING`)
-      .run(id(), showId, warningId, warning.level)
-  }
-
-  // 19:30 London on each night, which is 15.5 hours after the night's 04:00 start whatever the
-  // clocks did in between (0014, E-110).
-  const curtain = (night: string): number =>
-    Math.floor(showNightBounds(night).from.getTime() / 1000) + Math.round(15.5 * 3600)
-  const nextWeek = showNightOf(new Date(Date.now() + 7 * 86_400 * 1000))
-
-  // Seeding after 19:30 would leave nothing sellable, so tonight's curtain moves forward, staying
-  // inside the night it belongs to.
-  const tonight = currentShowNight()
-  const lastMoment = Math.floor(showNightBounds(tonight).to.getTime() / 1000) - 1
-  const planned = [
-    Math.min(Math.max(curtain(tonight), now + 2 * 3600), lastMoment),
-    curtain(nextWeek),
-  ]
-
-  // Re-runnable, and tonight has to stay tonight: an existing performance moves rather than a
-  // second one appearing beside it.
-  const held = db.query('SELECT id FROM performances WHERE show_id = ? ORDER BY starts_at')
-    .all(showId) as { id: string }[]
-
-  for (const [index, startsAt] of planned.entries()) {
-    const existing = held[index]
-    if (existing) {
-      db.query('UPDATE performances SET starts_at = ?, doors_at = ? WHERE id = ?')
-        .run(startsAt, startsAt - 1800, existing.id)
-      continue
-    }
-    db.query(`INSERT INTO performances (id, show_id, venue_id, starts_at, doors_at, duration_minutes,
-                                        interval_count, interval_minutes, status)
-              VALUES (?, ?, ?, ?, ?, 150, 1, 15, 'ON_SALE')`)
-      .run(id(), showId, venueId, startsAt, startsAt - 1800)
-  }
-
-  // A house template, and the rota stamped onto both performances. Re-runnable: the template
-  // rows conflict on (venue, role) and the shifts on (performance, role, slot).
-  const slots: [string, number][] = [['DUTY_MANAGER', 1], ['DOOR', 2], ['BAR', 1]]
-  for (const [role, count] of slots) {
-    db.query(`INSERT INTO shift_templates (id, venue_id, role, "count", updated_by, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?)
-              ON CONFLICT (venue_id, role) DO NOTHING`)
-      .run(id(), venueId, role, count, people[0]?.id ?? null, now)
-  }
-
-  // Scoped to the venue this seeded, so a development database holding other venues is left
-  // alone. The shape is `stampStatement` in `server/utils/rota.ts`, which a worker cannot reach.
-  db.query(`
-    WITH RECURSIVE slot(i) AS (
-      SELECT 1 UNION ALL SELECT i + 1 FROM slot WHERE i < (SELECT coalesce(max("count"), 0) FROM shift_templates)
-    )
-    INSERT INTO shifts (id, performance_id, role, slot, status)
-    SELECT lower(hex(randomblob(16))), p.id, t.role, slot.i, 'OPEN'
-    FROM performances p
-    JOIN shift_templates t ON t.venue_id = p.venue_id
-    JOIN slot ON slot.i <= t."count"
-    WHERE p.status <> 'CANCELLED' AND p.venue_id = ?
-    ON CONFLICT DO NOTHING
-  `).run(venueId)
-
-  const shifts = (db.query(`
-    SELECT count(*) AS n FROM shifts s JOIN performances p ON p.id = s.performance_id WHERE p.venue_id = ?
-  `).get(venueId) as { n: number }).n
-  return { performances: planned.length, shifts }
-}
-
-// The subcommittee's draft catalogue, so a development database looks like the real thing rather
-// than like three modules somebody invented. The real one is migrated from the old database.
-async function seedCatalogue(): Promise<{ departments: number, modules: number, prerequisites: number }> {
-  for (const department of DEPARTMENTS) {
-    db.query(`INSERT INTO departments (code, name, sort) VALUES (?, ?, ?)
-              ON CONFLICT (code) DO UPDATE SET name = excluded.name, sort = excluded.sort`)
-      .run(department.code, department.name, department.sort)
-  }
-
-  const modules = await readCatalogue()
-  const known = new Set(DEPARTMENTS.map(department => department.code))
-
-  for (const module of modules) {
-    if (!known.has(module.department as typeof DEPARTMENTS[number]['code'])) {
-      throw new Error(`${module.id} names unknown department "${module.department}"`)
-    }
-
-    db.query(`INSERT INTO modules (
-                id, department, kind, name, description, notes, delivery_mode, expiry_mode,
-                expiry_months, safety_critical, signoff_required, grants_trainer, grants_supervisor,
-                status, sort
-              ) VALUES (?, ?, ?, ?, ?, ?, 'IN_PERSON', ?, ?, ?, ?, ?, ?, ?, ?)
-              ON CONFLICT (id) DO UPDATE SET
-                name = excluded.name, description = excluded.description, notes = excluded.notes,
-                expiry_mode = excluded.expiry_mode, expiry_months = excluded.expiry_months,
-                safety_critical = excluded.safety_critical, status = excluded.status,
-                sort = excluded.sort`)
-      .run(
-        module.id, module.department, module.kind, module.name, module.description, module.notes,
-        module.expiryMode, module.expiryMonths, Number(module.safetyCritical),
-        Number(module.signoffRequired), Number(module.grantsTrainer), Number(module.grantsSupervisor),
-        module.status, module.sort,
-      )
-
-    // One link per module in the draft, which is a row here rather than a column (G-107 c1).
-    if (module.materialsUrl) {
-      db.query(`INSERT INTO module_materials (id, module_id, label, url, sort)
-                VALUES (?, ?, 'Training materials', ?, 0)
-                ON CONFLICT DO NOTHING`)
-        .run(id(), module.id, module.materialsUrl)
-    }
-  }
-
-  let prerequisites = 0
-  for (const module of modules) {
-    for (const need of module.prerequisites) {
-      db.query(`INSERT INTO module_prerequisites (id, module_id, requires_id) VALUES (?, ?, ?)
-                ON CONFLICT (module_id, requires_id) DO NOTHING`)
-        .run(id(), module.id, need)
-      prerequisites++
-    }
-  }
-
-  return { departments: DEPARTMENTS.length, modules: modules.length, prerequisites }
-}
-
-// True when a row already answers that predicate, so a dated append-only table gets one row from
-// a rerun rather than a fresh one every time (variant_prices, category_prices, stock_movements).
-function exists(table: string, where: Record<string, string>): boolean {
-  const columns = Object.keys(where)
-  const clause = columns.map(column => `${column} = ?`).join(' AND ')
-  return Boolean(db.query(`SELECT 1 FROM ${table} WHERE ${clause} LIMIT 1`).get(...columns.map(column => where[column]!)))
-}
-
-interface SeedItem {
-  name: string
-  unit: 'ML' | 'ITEM'
-  containerMl: number | null
-  ageRestricted: boolean
-  allergenNotes: string | null
-  unitCostPence: number
-  caseSize: number
-}
-
-interface SeedVariant {
-  servingKind: string
-  label: string
-  // Omitted deliberately on one size, so it falls back to the category default (F-121).
-  pricePence?: number
-  recipe?: { item: string, qty: number }
-  choice?: { name: string, options: { item: string, qty: number }[] }
-}
-
-interface SeedProduct {
-  name: string
-  category: string
-  ageRestricted: boolean
-  allergenState: 'UNKNOWN' | 'NONE' | 'RECORDED'
-  allergenNote?: string
-  variants: SeedVariant[]
-}
-
-// The subcommittee's bar catalogue, at Matt's request and outside build-order rule 5's usual cut
-// (Wave 0 and show night wave 1 only); see the pull request that added this for why.
-function seedBar(people: Seeded[]): { categories: number, products: number, items: number } {
-  const on = londonDayOf(new Date())
-  const seller = people[0]?.id ?? null
-
-  const items: SeedItem[] = [
-    { name: 'Gin', unit: 'ML', containerMl: 700, ageRestricted: true, allergenNotes: null, unitCostPence: 1400, caseSize: 6 },
-    { name: 'Tonic water', unit: 'ML', containerMl: 1000, ageRestricted: false, allergenNotes: null, unitCostPence: 90, caseSize: 12 },
-    { name: 'Lemonade', unit: 'ML', containerMl: 1000, ageRestricted: false, allergenNotes: null, unitCostPence: 90, caseSize: 12 },
-    { name: 'House red', unit: 'ML', containerMl: 750, ageRestricted: true, allergenNotes: 'Contains sulphites.', unitCostPence: 650, caseSize: 6 },
-    { name: 'Lager', unit: 'ITEM', containerMl: null, ageRestricted: true, allergenNotes: 'Contains barley (gluten).', unitCostPence: 90, caseSize: 24 },
-  ]
-  const itemId = new Map<string, string>()
-  for (const item of items) {
-    const seeded = keyed('bar_items', 'name', item.name, () => {
-      const id_ = id()
-      db.query(`INSERT INTO bar_items (id, name, unit, container_ml, age_restricted, allergen_notes)
-                VALUES (?, ?, ?, ?, ?, ?)`)
-        .run(id_, item.name, item.unit, item.containerMl, item.ageRestricted ? 1 : 0, item.allergenNotes)
-      return id_
-    })
-    itemId.set(item.name, seeded)
-
-    // One delivery each, so on-hand is a real number and not a screen nobody has stocked.
-    if (!exists('stock_movements', { item_id: seeded, kind: 'DELIVERY' })) {
-      const qty = (item.unit === 'ML' ? item.containerMl! : 1) * item.caseSize
-      db.query(`INSERT INTO stock_movements (id, item_id, qty, kind, unit_cost_pence, actor_id)
-                VALUES (?, ?, ?, 'DELIVERY', ?, ?)`)
-        .run(id(), seeded, qty, item.unitCostPence, seller)
-    }
-  }
-
-  const categories = [
-    { name: 'Spirits', sort: 0 },
-    { name: 'Wine & beer', sort: 1 },
-  ]
-  const categoryId = new Map<string, string>()
-  for (const category of categories) {
-    categoryId.set(category.name, keyed('bar_categories', 'name', category.name, () => {
-      const id_ = id()
-      db.query('INSERT INTO bar_categories (id, name, sort) VALUES (?, ?, ?)').run(id_, category.name, category.sort)
-      return id_
-    }))
-  }
-
-  // Every spirit £2.50 as a single, £4.00 as a double: 0017's own example, and what the Gin
-  // single below falls back to rather than needing a price row of its own.
-  const spiritsId = categoryId.get('Spirits')!
-  for (const [servingKind, pricePence] of [['single', 250], ['double', 400]] as const) {
-    if (!exists('category_prices', { category_id: spiritsId, serving_kind: servingKind })) {
-      db.query(`INSERT INTO category_prices (id, category_id, serving_kind, price_pence, effective_from, created_by)
-                VALUES (?, ?, ?, ?, ?, ?)`)
-        .run(id(), spiritsId, servingKind, pricePence, on, seller)
-    }
-  }
-
-  const products: SeedProduct[] = [
-    {
-      name: 'Gin',
-      category: 'Spirits',
-      ageRestricted: true,
-      allergenState: 'UNKNOWN',
-      variants: [
-        { servingKind: 'single', label: 'Single', recipe: { item: 'Gin', qty: 25 } },
-        {
-          servingKind: 'double',
-          label: 'Double',
-          pricePence: 450,
-          recipe: { item: 'Gin', qty: 50 },
-          choice: { name: 'Mixers', options: [{ item: 'Tonic water', qty: 100 }, { item: 'Lemonade', qty: 100 }] },
-        },
-      ],
-    },
-    {
-      name: 'House red',
-      category: 'Wine & beer',
-      ageRestricted: true,
-      allergenState: 'RECORDED',
-      allergenNote: 'Contains sulphites.',
-      variants: [
-        { servingKind: '175ml', label: '175ml glass', pricePence: 550, recipe: { item: 'House red', qty: 175 } },
-      ],
-    },
-    {
-      name: 'Lager',
-      category: 'Wine & beer',
-      ageRestricted: true,
-      allergenState: 'RECORDED',
-      allergenNote: 'Contains barley (gluten).',
-      variants: [
-        { servingKind: 'can', label: 'Can', pricePence: 400, recipe: { item: 'Lager', qty: 1 } },
-      ],
-    },
-  ]
-
-  for (const product of products) {
-    const productId = keyed('bar_products', 'name', product.name, () => {
-      const id_ = id()
-      db.query(`INSERT INTO bar_products (id, category_id, name, status, age_restricted, allergen_state, allergen_note)
-                VALUES (?, ?, ?, 'ACTIVE', ?, ?, ?)`)
-        .run(id_, categoryId.get(product.category)!, product.name, product.ageRestricted ? 1 : 0,
-          product.allergenState, product.allergenNote ?? null)
-      return id_
-    })
-
-    for (const variant of product.variants) {
-      let variantId = (db.query('SELECT id FROM product_variants WHERE product_id = ? AND serving_kind = ?')
-        .get(productId, variant.servingKind) as { id: string } | null)?.id
-
-      if (!variantId) {
-        variantId = id()
-        db.query('INSERT INTO product_variants (id, product_id, serving_kind, label) VALUES (?, ?, ?, ?)')
-          .run(variantId, productId, variant.servingKind, variant.label)
-      }
-
-      if (variant.pricePence !== undefined && !exists('variant_prices', { variant_id: variantId })) {
-        db.query(`INSERT INTO variant_prices (id, variant_id, price_pence, effective_from, created_by)
-                  VALUES (?, ?, ?, ?, ?)`)
-          .run(id(), variantId, variant.pricePence, on, seller)
-      }
-
-      if (variant.recipe) {
-        db.query(`INSERT INTO variant_components (id, variant_id, item_id, qty)
-                  VALUES (?, ?, ?, ?)
-                  ON CONFLICT (variant_id, item_id) DO NOTHING`)
-          .run(id(), variantId, itemId.get(variant.recipe.item)!, variant.recipe.qty)
-      }
-
-      if (variant.choice) {
-        const choice = variant.choice
-        const groupId = keyed('choice_groups', 'name', choice.name, () => {
-          const id_ = id()
-          db.query('INSERT INTO choice_groups (id, name) VALUES (?, ?)').run(id_, choice.name)
-          return id_
-        })
-        for (const [sort, option] of choice.options.entries()) {
-          db.query(`INSERT INTO choice_group_items (id, choice_group_id, item_id, qty, sort)
-                    VALUES (?, ?, ?, ?, ?)
-                    ON CONFLICT (choice_group_id, item_id) DO NOTHING`)
-            .run(id(), groupId, itemId.get(option.item)!, option.qty, sort)
-        }
-        if (!exists('variant_components', { variant_id: variantId, choice_group_id: groupId })) {
-          db.query(`INSERT INTO variant_components (id, variant_id, choice_group_id, qty, included_in_price)
-                    VALUES (?, ?, ?, 1, 1)`)
-            .run(id(), variantId, groupId)
-        }
-      }
-    }
-  }
-
-  return { categories: categories.length, products: products.length, items: items.length }
-}
-
-const rooms = seedRooms()
-const spaces = seedExternalSpaces()
-const catalogue = await seedCatalogue()
-const people = await seedPeople()
-const bookings = seedBookings(rooms, people)
-const programme = seedProgramme(rooms, people)
-const bar = seedBar(people)
 db.close()
+
+const order = [
+  ['people', 'people'],
+  ['rooms', 'rooms'],
+  ['externalSpaces', 'SU rooms'],
+  ['roomBookings', 'room bookings'],
+  ['externalRequests', 'external requests'],
+  ['blackouts', 'blackouts'],
+  ['modules', 'training modules'],
+  ['trainingRecords', 'training records'],
+  ['trainingSessions', 'training sessions'],
+  ['venues', 'venues'],
+  ['seasons', 'seasons'],
+  ['shows', 'shows'],
+  ['performances', 'performances'],
+  ['reservations', 'reservations'],
+  ['tickets', 'tickets'],
+  ['discounts', 'discounts'],
+  ['shifts', 'shifts'],
+  ['incidents', 'incidents'],
+  ['ageChecks', 'age checks'],
+  ['checklistStamps', 'checklist stamps'],
+  ['barProducts', 'bar products'],
+  ['barVariants', 'bar variants'],
+  ['barItems', 'stocked items'],
+  ['stockMovements', 'stock movements'],
+  ['ledgerEntries', 'ledger entries'],
+  ['auditEntries', 'audit entries'],
+  ['inboxItems', 'inbox items'],
+  ['notifications', 'notifications'],
+] as const
+
+console.info(`\nSeeded ${target}\n`)
+for (const [key, label] of order) {
+  console.info(`  ${String(result.counts[key] ?? 0).padStart(4)}  ${label}`)
+}
+
+console.info('\n  Performances land in the past, tonight and the future, with one sold out, one')
+console.info('  cancelled, one a draft and one ticketed by somebody else. Reservations cover every')
+console.info('  status; training records and role grants each cover current, expiring and lapsed.\n')
 
 // Printed once, and nowhere else. Nothing here is committed and there is no way to read a
 // password back (K-120 criterion 1).
-console.info(`\nSeeded ${target}\n`)
-console.info(`  ${rooms.length} rooms, ${spaces} SU rooms, ${people.length} people, ${bookings} bookings`)
-console.info(`  ${catalogue.modules} training modules across ${catalogue.departments} departments, `
-  + `${catalogue.prerequisites} prerequisites`)
-console.info(`  1 venue and 1 show, with ${programme.performances} performances: one tonight, one next week`)
-console.info(`  1 venue shift template, stamped as ${programme.shifts} open shifts across them`)
-console.info(`  ${bar.categories} bar categories, ${bar.products} products and ${bar.items} stocked items, `
-  + 'one delivered each\n')
-console.info('  Every module is a DRAFT, as the subcommittee draft has them, so members see none of')
-console.info('  them until somebody publishes one.\n')
 console.info('  Sign in as any of these. The passwords are shown here and nowhere else:\n')
-for (const person of people) console.info(`    ${person.email}\n      ${person.password}`)
-console.info('\n  Give one of them the run of the place with:')
-console.info(`    bun run grant-admin ${people[0]!.email}\n`)
+for (const account of result.secrets.accounts) {
+  console.info(`    ${account.email}\n      ${account.password}`)
+}
+
+if (result.secrets.boardTokens.length) {
+  console.info('\n  Backstage board join tokens, also shown only here:\n')
+  for (const token of result.secrets.boardTokens) {
+    console.info(`    ${token.label}, ${token.night}\n      ${token.token}`)
+  }
+}
+
+if (result.secrets.feedTokens.length) {
+  console.info('\n  Calendar feed tokens, also shown only here:\n')
+  for (const token of result.secrets.feedTokens) {
+    console.info(`    ${token.person}\n      ${token.token}`)
+  }
+}
+
+console.info('\n  The development personas (dev-admin@, dev-foh@ and the rest) are seeded too, and')
+console.info('  `/dev` signs in as any of them without a password.\n')
+console.info('  Give one of them the run of the place with:')
+console.info(`    bun run grant-admin ${result.secrets.accounts[0]?.email ?? 'dev-admin@e2e.newtheatre.org.uk'}\n`)

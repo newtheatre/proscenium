@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -44,11 +45,7 @@ const named = (prefix: string): string => `${prefix} ${crypto.randomUUID().slice
 function programme(suffix: string) {
   const database = new Database(app.databaseFile)
   try {
-    return tonightsPerformance({
-      batch: statements => database.transaction(() => {
-        for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
-      })(),
-    }, { suffix })
+    return tonightsPerformance(sqliteTarget(database), { suffix })
   }
   finally {
     database.close()
