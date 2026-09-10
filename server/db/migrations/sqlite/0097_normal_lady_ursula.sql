@@ -1,0 +1,2 @@
+ALTER TABLE `reservations` ADD `exchanged_to_reservation_id` text REFERENCES reservations(id);--> statement-breakpoint
+CREATE INDEX `reservations_exchanged_to` ON `reservations` (`exchanged_to_reservation_id`);
