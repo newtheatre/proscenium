@@ -1,6 +1,26 @@
 import { sql } from 'drizzle-orm'
 import { closeTillSessionForm } from '#shared/utils/reconciliation'
 import { saysMoney } from '#shared/utils/bar'
+import type { H3Event } from 'h3'
+import type { AccountRow } from '#server/utils/accounts'
+
+// Tonight's session closes under the same authority that opened it; a night that has ended has
+// no shift left to fall back on, so only the standing officer role reaches back for it (F-102 criterion 5).
+async function closerFor(event: H3Event, session: { venueId: string, night: string }): Promise<AccountRow> {
+  if (session.night === currentShowNight()) {
+    return (await requireNightAuthority(event, 'BAR', { venueId: session.venueId })).account
+  }
+
+  const resolved = await authority(event)
+  if (!resolved.permissions.has('night.till')) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'A session from an earlier night needs the bar manager\'s role to close',
+    })
+  }
+  await requireSecondFactorIfPrivileged(event, resolved)
+  return resolved.account
+}
 
 // Close a till session, stamping who and when, and record the expected-versus-actual reader
 // figure alongside it: closing is the one write, so both are as append-only as it is (F-118 criterion 3).

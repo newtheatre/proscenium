@@ -3,12 +3,7 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
-import { authority, requireSecondFactorIfPrivileged } from './authorise'
-import { requireNightAuthority } from './night-authority'
-import { currentShowNight } from '#shared/utils/show-night'
 import type { SQL } from 'drizzle-orm'
-import type { H3Event } from 'h3'
-import type { AccountRow } from './accounts'
 import type { TillSession } from '#shared/utils/till'
 
 // Reading and guarding tonight's till session (F-102). Opening and closing one is the write
@@ -67,23 +62,4 @@ export function requireOpenSession(session: TillSession | null): TillSession {
     })
   }
   return session
-}
-
-// Tonight's session closes, or is previewed for closing, under the same authority that opened
-// it; a night that has ended has no shift left to fall back on, so only the standing officer role
-// reaches back for it (F-102 criterion 5). Shared by the close route and F-118's preview route.
-export async function closerFor(event: H3Event, session: { venueId: string, night: string }): Promise<AccountRow> {
-  if (session.night === currentShowNight()) {
-    return (await requireNightAuthority(event, 'BAR', { venueId: session.venueId })).account
-  }
-
-  const resolved = await authority(event)
-  if (!resolved.permissions.has('night.till')) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'A session from an earlier night needs the bar manager\'s role to close',
-    })
-  }
-  await requireSecondFactorIfPrivileged(event, resolved)
-  return resolved.account
 }
