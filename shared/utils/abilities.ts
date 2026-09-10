@@ -71,6 +71,9 @@ export const viewBarStock = defineAbility((viewer: Viewer) => holds(viewer, 'bar
 export const viewFinanceReports = defineAbility((viewer: Viewer) => holds(viewer, 'finance.read'))
 // Recording a daily Z reading and resolving a variance (I-104).
 export const recordZReadings = defineAbility((viewer: Viewer) => holds(viewer, 'finance.write'))
+// The season dashboard's aggregates: the treasurer's own full read, or the committee's narrower
+// summary-only one (I-105 criterion 5).
+export const viewSeasonSummary = defineAbility((viewer: Viewer) => holds(viewer, 'finance.read') || holds(viewer, 'finance.summary'))
 
 // Planning the rota is sit-down work done days ahead, so it is a standing permission and the
 // officer bypass is not what opens it (0009, 0046, E-101 criterion 2).
@@ -141,6 +144,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewBarStock: 'bar.read',
   viewFinanceReports: 'finance.read',
   recordZReadings: 'finance.write',
+  viewSeasonSummary: 'finance.summary',
   verifyAccessProfiles: 'access.verify',
   viewRota: 'rota.read',
   manageRota: 'rota.write',
