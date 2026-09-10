@@ -16,7 +16,7 @@ Stories: 14 total (9 MVP, 4 V2, 1 Later).
    (where a same-day change is urgent) need a shorter window or an exemption?
 3. ~~What is the retention period for the send log?~~ **Answered by H-105**:
    `NOTIFICATION_LOG_RETENTION_MONTHS`, shipped at 24 months to match rehearsal, pruned nightly by
-   `daily:sweeps`, owner the IT Manager, in `docs/workshops.md` for a workshop to amend (0058).
+   `daily:sweeps`, owner the IT Manager, in `docs/workshops.md` for a workshop to amend (0056).
 4. Do PECR soft opt-in rules let the theatre email past bookers about similar shows without the
    explicit marketing opt-in, and does the committee want to rely on that or require the opt-in
    regardless (the stricter reading is assumed below)?

@@ -7,7 +7,7 @@ import { resend } from './notify'
 import { logRetentionCutoff } from '#shared/utils/notifications'
 import type { H3Event } from 'h3'
 
-// A failed send is retried with backoff until it runs out of attempts (H-105, 0058). Nothing
+// A failed send is retried with backoff until it runs out of attempts (H-105, 0056). Nothing
 // here inserts: an attempt updates the row the first attempt wrote (0048).
 
 // A run is bounded so a backlog after an outage drains over several, as the hold release and the

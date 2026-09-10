@@ -247,7 +247,7 @@ describe('an attempt is appended to the entry it belongs to (criteria 2 and 3)',
 // registered type: an account-less one is not an untyped one (H-101 criterion 2).
 describe('an account-less send is retried like any other (E-124)', () => {
   // A configured recipient has no account to resolve an address from at the next attempt, so
-  // the address rides on the payload and is cleared with it (0058).
+  // the address rides on the payload and is cleared with it (0056).
   test('a row with no user_id is due like any other failure', async () => {
     await withDatabase((database) => {
       const id = `a-${Math.random().toString(36).slice(2, 10)}`
