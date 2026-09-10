@@ -1,3 +1,4 @@
+import { db, schema } from '@nuxthub/db'
 import { and, desc, eq } from 'drizzle-orm'
 
 export interface OwnClaim {

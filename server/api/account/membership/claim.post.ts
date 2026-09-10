@@ -1,4 +1,4 @@
-import { membershipClaimForm } from '#shared/utils/membership-claims'
+import { membershipClaimConstraintRefusal, membershipClaimForm } from '#shared/utils/membership-claims'
 
 // Say what you bought at the SU. It creates no membership: an officer records it (A-130).
 export default defineEventHandler(async (event) => {
@@ -18,13 +18,12 @@ export default defineEventHandler(async (event) => {
       term: input.term,
     })
   }
-  catch {
+  catch (error) {
     // Criterion 1 is the partial unique index, so the second claim is refused by the database
-    // rather than by a read that another request could have raced.
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'You already have a claim waiting to be recorded',
-    })
+    // rather than by a read that another request could have raced (0047).
+    const refusal = membershipClaimConstraintRefusal(error)
+    if (!refusal) throw error
+    throw createError(refusal)
   }
 
   return { ok: true, id }

@@ -3,8 +3,8 @@ import { endOfTerm } from '#shared/utils/membership'
 import { recordClaimStatements } from '#shared/utils/membership-claims'
 import type { MembershipTerm } from '#shared/utils/membership'
 
-// Record a claim: the number to the account, the membership by the A-117 path with the claim as
-// its evidence, and the claim closed, in one batch (A-130 criterion 2).
+// Record a claim: the number to the account, the membership row the A-117 route writes with the
+// claim as its evidence, and the claim closed, in one batch (A-130 criterion 2).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'No claim named' })

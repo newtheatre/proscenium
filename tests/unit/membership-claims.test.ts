@@ -51,6 +51,8 @@ describe('what a claim carries (A-130 criterion 1)', () => {
     expect(membershipClaimForm.safeParse({ ...good, startsOn: daysAfter(today, 1) }).success).toBe(false)
     expect(membershipClaimForm.safeParse({ ...good, startsOn: daysAfter(today, -30) }).success).toBe(true)
     expect(membershipClaimForm.safeParse({ ...good, startsOn: '14/09/2026' }).success).toBe(false)
+    // A day the calendar does not have would roll into March at the first sum.
+    expect(membershipClaimForm.safeParse({ ...good, startsOn: '2026-02-31' }).success).toBe(false)
   })
 
   test('the term is one or three, never anything the SU does not sell', () => {

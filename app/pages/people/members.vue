@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { recordMembership } from '#shared/utils/admin-forms'
+import { formatLondon } from '#shared/utils/london'
 import { MEMBERSHIP_TERMS, isInGrace, londonDay } from '#shared/utils/membership'
 import { claimDeclineForm } from '#shared/utils/membership-claims'
 import type { RecordMembership } from '#shared/utils/admin-forms'
@@ -45,6 +46,7 @@ interface Claim {
   term: number
   status: string
   createdAt: number
+  heldUntil: string | null
 }
 
 interface ClaimListing {
@@ -114,6 +116,7 @@ async function load(): Promise<void> {
         query: { search: search.value || undefined, page: page.value },
       })
       if (!search.value) waiting.value = claims.value.total
+      else void countWaiting()
     }
     else {
       listing.value = await $fetch<Listing>('/api/admin/memberships', {
@@ -179,7 +182,7 @@ async function recordClaim(claim: Claim): Promise<void> {
   try {
     await $fetch(`/api/admin/memberships/claims/${claim.id}/record`, { method: 'POST' })
     toast.add({ title: `${claim.name} recorded`, icon: 'i-lucide-badge-check', color: 'success' })
-    await load()
+    await Promise.all([load(), countWaiting()])
     await focusNextClaim()
   }
   catch (error) {
@@ -205,7 +208,7 @@ async function declineClaim(event: FormSubmitEvent<ClaimDeclineInput>): Promise<
     await $fetch(`/api/admin/memberships/claims/${claim.id}/decline`, { method: 'POST', body: event.data })
     toast.add({ title: `${claim.name} told why`, icon: 'i-lucide-message-square-warning', color: 'neutral' })
     declining.value = null
-    await load()
+    await Promise.all([load(), countWaiting()])
     await focusNextClaim()
   }
   catch (error) {
@@ -303,7 +306,7 @@ const columns: TableColumn<Member>[] = [
   },
 ]
 
-const sayWhen = (at: number): string => new Date(at * 1000).toLocaleDateString('en-GB', { timeZone: 'Europe/London', day: 'numeric', month: 'short' })
+const sayWhen = (at: number): string => formatLondon(new Date(at * 1000), { day: 'numeric', month: 'short' })
 
 const claimColumns: TableColumn<Claim>[] = [
   {
@@ -334,8 +337,13 @@ const claimColumns: TableColumn<Claim>[] = [
   {
     id: 'since',
     header: 'Waiting since',
-    cell: ({ row }) => sayWhen(row.original.createdAt),
-    meta: { class: { td: 'text-sm text-muted whitespace-nowrap' } },
+    cell: ({ row }) => h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
+      h('span', {}, sayWhen(row.original.createdAt)),
+      row.original.heldUntil && row.original.heldUntil >= londonDay(new Date())
+        ? h(UBadge, { 'color': 'info', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-held' }, () => `Holds one until ${row.original.heldUntil}`)
+        : null,
+    ]),
+    meta: { class: { td: 'text-sm text-muted' } },
   },
   {
     id: 'decide',
@@ -363,7 +371,7 @@ const claimColumns: TableColumn<Claim>[] = [
 
 onMounted(() => {
   void load()
-  if (!onQueue.value) void countWaiting()
+  void countWaiting()
 })
 </script>
 
@@ -511,6 +519,7 @@ onMounted(() => {
             type="submit"
             data-test="claim-decline-submit"
             color="neutral"
+            :loading="deciding !== null"
           >
             Decline and tell them
           </UButton>

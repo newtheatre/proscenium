@@ -43,6 +43,9 @@ export default defineEventHandler(async (event) => {
     term: schema.membershipClaims.term,
     status: schema.membershipClaims.status,
     createdAt: schema.membershipClaims.createdAt,
+    // The latest term already on the account: a claim for something "Record one" already wrote
+    // is declined as such rather than recorded twice.
+    heldUntil: sql<string | null>`(select max(expires_on) from memberships where user_id = ${schema.membershipClaims.userId})`,
   })
     .from(schema.membershipClaims)
     .innerJoin(schema.users, eq(schema.users.id, schema.membershipClaims.userId))

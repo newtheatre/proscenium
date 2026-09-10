@@ -169,6 +169,21 @@ describe('recording a claim (A-130 criteria 2 and 5)', () => {
     })
   })
 
+  // An erasure that lands between the officer's read and the batch: nothing may attach a
+  // membership to a tombstone, however open the claim still reads (0011).
+  test('a claim whose person was erased in the meantime records nothing', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      claim(database, { id: 'c-1' })
+      database.batch(erasureStatements('u1', 1_790_000_000).map(statement => boundStatement(database, statement)))
+
+      expect(attemptRecord(database, 0).status).toBe(409)
+      expect(rows(database, `SELECT id FROM memberships`)).toHaveLength(0)
+      expect(rows(database, `SELECT id FROM audit_log WHERE action LIKE 'membership.%'`)).toHaveLength(0)
+      expect(rows<{ status: string }>(database, `SELECT status FROM membership_claims WHERE id = 'c-1'`)[0]!.status).toBe('OPEN')
+    })
+  })
+
   // Criterion 5: the trail names the claim and never the number or the reason (0011).
   test('the trail carries the claim id and never the student number', async () => {
     await withDatabase((database) => {

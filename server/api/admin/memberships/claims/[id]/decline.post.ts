@@ -20,27 +20,22 @@ export default defineEventHandler(async (event) => {
   }
 
   const now = Math.floor(Date.now() / 1000)
-  const statements = declineClaimStatements({
-    claimId: id,
-    reason: input.reason,
+  // The reason is shown to the member and never reaches the trail (0011).
+  const entry = auditEntry({
     actorId: resolved.account.id,
-    now,
-    // The reason is shown to the member and never reaches the trail (0011).
-    entry: auditEntry({
-      actorId: resolved.account.id,
-      action: 'membership.claim.declined',
-      target: `claim:${id}`,
-      detail: { claim: id },
-    }),
-  }).map(statement => db.run(statement))
+    action: 'membership.claim.declined',
+    target: `claim:${id}`,
+    detail: { claim: id },
+  })
+  const statements = declineClaimStatements({ claimId: id, reason: input.reason, actorId: resolved.account.id, now, entry })
+    .map(statement => db.run(statement))
   await db.batch([statements[0]!, ...statements.slice(1)])
 
-  // Guarded writes, so a decision that lost a race wrote nothing: the row says who won (0006).
-  const [held] = await db.select({ decidedBy: schema.membershipClaims.decidedBy, decidedAt: schema.membershipClaims.decidedAt })
-    .from(schema.membershipClaims).where(eq(schema.membershipClaims.id, id)).limit(1)
-  if (held?.decidedBy !== resolved.account.id || held.decidedAt !== now) {
-    throw createError({ statusCode: 409, statusMessage: 'That claim has already been answered' })
-  }
+  // Guarded writes, so a decision that lost a race wrote nothing: this request's own entry is
+  // the proof of who won, and a double submit from one officer is a loser too (0006).
+  const [won] = await db.select({ id: schema.auditLog.id })
+    .from(schema.auditLog).where(eq(schema.auditLog.id, entry.id)).limit(1)
+  if (!won) throw createError({ statusCode: 409, statusMessage: 'That claim has already been answered' })
 
   await notify(event, {
     type: 'membership.claim.declined',

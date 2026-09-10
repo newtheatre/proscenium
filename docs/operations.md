@@ -252,8 +252,9 @@ Somebody holding `members.write` works the queue daily, from `/people/members?fi
 4. Focus moves to the next claim after each decision, so the keyboard alone works a page.
 
 Both decisions notify the member and are on the audit trail with the claim id and never the
-number or the reason (0011). A membership counts from the moment it is recorded; the SU-list check
-is what recording *is* here, so nothing further is owed under "Awaiting a check" for these.
+number or the reason (0011). A membership counts from the moment it is recorded, and a recorded
+claim lands under "Awaiting a check" like any other manual grant: confirming it against the SU's
+list is the separate, later act 0031 describes, and it never holds anything up.
 
 ### The staging duplicate
 

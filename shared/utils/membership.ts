@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { londonParts } from './london'
 
 // A membership is a term bought at the SU, not a committee year (0031). Everything about "is this
@@ -25,6 +26,13 @@ export function daysAfter(day: string, days: number): string {
   const [year, month, date] = day.split('-').map(Number) as [number, number, number]
   return londonDay(new Date(Date.UTC(year, month - 1, date + days)))
 }
+
+// The screen field for a civil date. The round trip refuses a day the calendar does not have
+// (2026-02-31 would roll into March), and guards the shape since every check runs after the regex.
+const DAY = /^\d{4}-\d{2}-\d{2}$/
+export const londonDayField = z.string()
+  .regex(DAY, 'Give the date as YYYY-MM-DD')
+  .refine(day => !DAY.test(day) || daysAfter(day, 0) === day, 'That is not a day on the calendar')
 
 export interface Term { startsOn: string, expiresOn: string }
 

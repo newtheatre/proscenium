@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { daysAfter, isCurrent, isInGrace, londonDay } from './membership'
+import { constraintRefusal } from './constraint-refusal'
+import { daysAfter, isCurrent, isInGrace, londonDayField, londonDay } from './membership'
 import type { AuditRow } from './audit'
 import type { Term } from './membership'
 import type { SQL } from 'drizzle-orm'
@@ -19,16 +20,23 @@ export function canTransition(from: ClaimStatus, to: ClaimStatus): boolean {
 
 export const CLAIM_REASON_LIMIT = 300
 
-const londonDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Give the date as YYYY-MM-DD')
-
 export const membershipClaimForm = z.object({
   studentId: z.string().trim().min(1, 'Your student number is how the SU knows you').max(32),
   // Never in the future: a purchase is something that has happened (criterion 1).
-  startsOn: londonDate.refine(day => day <= londonDay(new Date()), 'That purchase date has not happened yet'),
+  startsOn: londonDayField.refine(day => day <= londonDay(new Date()), 'That purchase date has not happened yet'),
   term: z.union([z.literal(1), z.literal(3)]),
 })
 
 export type MembershipClaimInput = z.output<typeof membershipClaimForm>
+
+// The one constraint a member can trip: the partial index that is criterion 1 (0047).
+const CLAIM_REFUSALS = [
+  { violated: 'membership_claims.user_id', says: 'You already have a claim waiting to be recorded' },
+]
+
+export function membershipClaimConstraintRefusal(error: unknown): { statusCode: 409, statusMessage: string } | null {
+  return constraintRefusal(CLAIM_REFUSALS, error)
+}
 
 export const claimDeclineForm = z.object({
   reason: z.string().trim().min(3).max(CLAIM_REASON_LIMIT),
@@ -62,8 +70,11 @@ function guardedEntry(entry: AuditRow, open: SQL): SQL {
   `
 }
 
+// Open, and on a person who still exists: an erasure landing between the route's read and the
+// batch must not attach a membership to a tombstone (0011).
 const stillOpen = (claimId: string): SQL =>
-  sql`(select 1 from membership_claims where id = ${claimId} and status = 'OPEN')`
+  sql`(select 1 from membership_claims c join users u on u.id = c.user_id
+    where c.id = ${claimId} and c.status = 'OPEN' and u.anonymised_at is null)`
 
 export interface ClaimRecording {
   claimId: string
@@ -98,7 +109,7 @@ export function recordClaimStatements(input: ClaimRecording): SQL[] {
     guardedEntry(input.entries.granted, open),
     guardedEntry(input.entries.recorded, open),
     sql`update membership_claims set status = 'RECORDED', decided_by = ${input.actorId}, decided_at = ${input.now}
-      where id = ${input.claimId} and status = 'OPEN'`,
+      where id = ${input.claimId} and exists ${open}`,
   )
   return statements
 }
@@ -118,6 +129,6 @@ export function declineClaimStatements(input: ClaimDecline): SQL[] {
     guardedEntry(input.entry, open),
     sql`update membership_claims
       set status = 'DECLINED', reason = ${input.reason}, decided_by = ${input.actorId}, decided_at = ${input.now}
-      where id = ${input.claimId} and status = 'OPEN'`,
+      where id = ${input.claimId} and exists ${open}`,
   ]
 }

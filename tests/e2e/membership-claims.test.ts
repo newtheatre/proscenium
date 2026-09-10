@@ -79,10 +79,12 @@ async function own(as: TestMember): Promise<Own> {
   return await response.json() as Own
 }
 
-async function queue(query = ''): Promise<{ items: { id: string, userId: string, studentId: string }[], total: number }> {
+interface Queued { id: string, userId: string, studentId: string, heldUntil: string | null }
+
+async function queue(query = ''): Promise<{ items: Queued[], total: number }> {
   const response = await send('GET', `/api/admin/memberships/claims${query}`, undefined, cookie)
   expect(response.status).toBe(200)
-  return await response.json() as { items: { id: string, userId: string, studentId: string }[], total: number }
+  return await response.json() as { items: Queued[], total: number }
 }
 
 const said = async (response: Response): Promise<string> =>
@@ -202,6 +204,15 @@ describe.skipIf(skip !== null)('the officer records or declines (A-130 criteria 
     expect(read<{ n: number }>(`SELECT count(*) n FROM audit_log WHERE action = 'membership.claim.recorded' AND target = ?`, `claim:${id}`)!.n).toBe(1)
   })
 
+  test('the queue says when the account already holds a term, so a hand-recorded one is not written twice', async () => {
+    const member = await registerMember(app, 'already-held', password)
+    const { id } = await (await claim(member)).json() as { id: string }
+    expect((await send('POST', '/api/admin/memberships', { userId: member.id, startsOn: today, years: 1 }, cookie)).status).toBe(200)
+
+    const listed = await queue(`?search=${encodeURIComponent(member.email)}`)
+    expect(listed.items.find(item => item.id === id)).toMatchObject({ heldUntil: endOfTerm(today, 1) })
+  })
+
   test('a number another account already holds is refused rather than moved', async () => {
     const holder = await registerMember(app, 'holder', password)
     const number = nextNumber()
@@ -234,9 +245,14 @@ describe.skipIf(skip !== null)('the officer records or declines (A-130 criteria 
     expect(read<{ n: number }>(
       `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'membership.claim.declined'`, member.id)!.n).toBe(1)
 
+    // Answered once: a second decline, or a record, is a loser however quickly it follows.
+    expect((await send('POST', `/api/admin/memberships/claims/${id}/decline`, { reason }, cookie)).status).toBe(409)
+    expect((await send('POST', `/api/admin/memberships/claims/${id}/record`, {}, cookie)).status).toBe(409)
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'membership.claim.declined'`, member.id)!.n).toBe(1)
+
     // A declined claim is put right by claiming again.
     expect((await claim(member)).status).toBe(200)
-    expect((await send('POST', `/api/admin/memberships/claims/${id}/record`, {}, cookie)).status).toBe(409)
   })
 
   test('an erased account cannot claim, and its open claim leaves the queue', async () => {
