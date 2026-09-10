@@ -1,31 +1,11 @@
 // Reservations in every status the lifecycle has, with the tickets they hold: what the desk, the
 // door, the capacity bar and a member's own bookings page each need before they show anything.
 
-import { RESERVATION_REFERENCE_LENGTH } from '../../shared/utils/reservations'
-import { insert, seedId } from './statements'
+import { insert, seedId, seedReference } from './statements'
 import { personIn } from './people'
 import type { People } from './people'
 import type { Programme } from './programme'
 import type { BoundStatement, SeedTarget } from './statements'
-
-// The reference alphabet excludes look-alikes, and a seeded reference has to satisfy the same
-// shape a desk search matches on (D-114 criterion 1).
-const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
-
-// Stable across runs, so a re-run adopts the reservation rather than minting a second reference
-// for the same seat. Any hash would do; this one is short enough to read back.
-export function seedReference(slug: string): string {
-  let hash = 2_166_136_261
-  for (const character of slug) {
-    hash = Math.imul(hash ^ character.charCodeAt(0), 16_777_619) >>> 0
-  }
-  let reference = ''
-  for (let index = 0; index < RESERVATION_REFERENCE_LENGTH; index++) {
-    reference += ALPHABET[hash % ALPHABET.length]
-    hash = Math.floor(hash / ALPHABET.length) + index * 7919
-  }
-  return reference
-}
 
 type Status = 'PENDING' | 'COLLECTED' | 'DOOR' | 'EXPIRED' | 'CANCELLED' | 'NO_SHOW'
 

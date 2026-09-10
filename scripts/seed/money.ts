@@ -233,7 +233,7 @@ export async function seedMoney(
 
   // Credit extended rather than money taken: the entry stamps the debtor and stays outstanding
   // until a settlement covers it (F-108).
-  post('tab-charge', {
+  const tabOne = post('tab-charge', {
     source: 'TILL',
     tender: 'TAB',
     actorId: barKeeper,
@@ -241,7 +241,7 @@ export async function seedMoney(
     lines: [{ kind: 'BAR_ITEM' as const, amountPence: wine.price * 4, qty: 4, unitPricePence: wine.price, productVariantId: wine.id }],
   }, new Date((now - 8 * DAY) * 1000))
 
-  post('tab-charge-two', {
+  const tabTwo = post('tab-charge-two', {
     source: 'TILL',
     tender: 'TAB',
     actorId: barKeeper,
@@ -249,16 +249,20 @@ export async function seedMoney(
     lines: [{ kind: 'BAR_ITEM' as const, amountPence: lager.price * 6, qty: 6, unitPricePence: lager.price, productVariantId: lager.id }],
   }, new Date((now - 7 * DAY) * 1000))
 
-  // Settled on the reader, bounded to the charges it covers, on its own calendar day (F-109).
+  // Settled on the reader, one line per charge it covers, on its own calendar day. A charge can
+  // be settled once, which a unique index on `settles_entry_id` enforces (F-109).
   post('tab-settlement', {
     source: 'TILL',
     tender: 'CARD',
     actorId: barKeeper,
-    lines: [{ kind: 'TAB_SETTLEMENT' as const, amountPence: wine.price * 4 + lager.price * 6, qty: 1 }],
+    lines: [
+      { kind: 'TAB_SETTLEMENT' as const, amountPence: wine.price * 4, qty: 1, settlesEntryId: tabOne },
+      { kind: 'TAB_SETTLEMENT' as const, amountPence: lager.price * 6, qty: 1, settlesEntryId: tabTwo },
+    ],
   }, new Date((now - 2 * DAY) * 1000))
 
-  // A void is a correction of an unsettled charge. `void_of_entry_id` stays unset because
-  // `postEntry` does not carry it yet, which architecture.md records as F-109's to add.
+  // A void is a correction of an unsettled charge, naming it and carrying its reason on the
+  // record rather than in the audit trail (F-109 criterion 4, 0011).
   const tabThree = post('tab-charge-voided', {
     source: 'TILL',
     tender: 'TAB',
@@ -272,6 +276,8 @@ export async function seedMoney(
     tender: 'TAB',
     actorId: barKeeper,
     reversesEntryId: tabThree,
+    voidOfEntryId: tabThree,
+    voidReason: 'Charged to the wrong tab: the round was the production\'s, not the holder\'s.',
     tabDebtorId: personIn(people, 'iris').id,
     lines: [{ kind: 'BAR_ITEM' as const, amountPence: -gin.price, qty: 1, unitPricePence: gin.price, productVariantId: gin.id }],
   }, new Date((now - 3 * DAY) * 1000))

@@ -2,7 +2,7 @@
 // performances land in the past, tonight and the future, and in every status a screen shows.
 
 import { currentShowNight, showNightBounds, showNightOf } from '../../shared/utils/show-night'
-import { ensure, holds, insert, seedId } from './statements'
+import { ensure, holds, insert, insertOnly, seedId, seedReference } from './statements'
 import { personIn } from './people'
 import type { People } from './people'
 import type { BoundStatement, SeedTarget } from './statements'
@@ -189,6 +189,8 @@ const SHOWS: SeedShow[] = [
 
 export interface Programme {
   venues: Map<string, string>
+  // Issued passes by slug, so the ledger can post a sale and an admission against a real one.
+  passes: Map<string, string>
   shows: Map<string, string>
   ticketTypes: Map<string, string>
   // Every performance this seed wrote, so a later module can attach to a named night.
@@ -389,9 +391,10 @@ export function seedProgramme(target: SeedTarget, people: People, now: number): 
 
   target.batch(statements)
 
-  seedPasses(target, shows, now)
+  const passes = seedPasses(target, people, shows, now)
 
   return {
+    passes,
     venues,
     shows,
     ticketTypes,
@@ -402,7 +405,7 @@ export function seedProgramme(target: SeedTarget, people: People, now: number): 
 }
 
 // A pass on sale, one closed and one still a draft, so the pass screens are never empty (D-124).
-function seedPasses(target: SeedTarget, shows: Map<string, string>, now: number): void {
+function seedPasses(target: SeedTarget, people: People, shows: Map<string, string>, now: number): Map<string, string> {
   const passes: { slug: string, name: string, status: string, from: number, until: number, max: number | null, prices: [string, number][], shows: string[] }[] = [
     {
       slug: 'season-2026-27',
@@ -463,4 +466,80 @@ function seedPasses(target: SeedTarget, shows: Map<string, string>, now: number)
     }
   }
   target.batch(statements)
+
+  return issuePasses(target, people, now)
+}
+
+// Passes actually held by somebody, in every status, plus the requests behind them and one
+// admission already taken. `pass_admissions` is append-only, so a re-run asks before it writes.
+function issuePasses(target: SeedTarget, people: People, now: number): Map<string, string> {
+  const desk = personIn(people, 'rowan').id
+  const issued = new Map<string, string>()
+  const statements: BoundStatement[] = []
+
+  const held: { slug: string, holder: string, status: string, label: string, price: number }[] = [
+    { slug: 'rowan', holder: 'rowan', status: 'ACTIVE', label: 'Standard', price: 3500 },
+    { slug: 'devon', holder: 'devon', status: 'ACTIVE', label: 'Concession', price: 2500 },
+    { slug: 'sam', holder: 'sam', status: 'CANCELLED', label: 'Standard', price: 3500 },
+    { slug: 'iris', holder: 'iris', status: 'EXPIRED', label: 'Standard', price: 3200 },
+  ]
+
+  for (const pass of held) {
+    const id = seedId('passheld', pass.slug)
+    issued.set(pass.slug, id)
+    statements.push(insert('passes', {
+      id,
+      reference: seedReference(`pass-${pass.slug}`),
+      pass_type_id: seedId('pass', pass.status === 'EXPIRED' ? 'season-2025-26' : 'season-2026-27'),
+      pass_type_price_id: seedId('passprice', pass.status === 'EXPIRED' ? 'season-2025-26' : 'season-2026-27', pass.label),
+      user_id: personIn(people, pass.holder).id,
+      price_paid: pass.price,
+      status: pass.status,
+      issued_by: desk,
+      notes: pass.status === 'CANCELLED' ? 'Cancelled and refunded: bought in error.' : null,
+      created_at: now - 20 * DAY,
+      updated_at: now - 20 * DAY,
+    }))
+  }
+
+  const requests: { slug: string, holder: string, status: string, note: string }[] = [
+    { slug: 'fulfilled', holder: 'rowan', status: 'FULFILLED', note: 'Paying at the desk on Thursday.' },
+    { slug: 'pending', holder: 'mira', status: 'PENDING', note: 'Can I pay in two halves?' },
+    { slug: 'declined', holder: 'lapsed', status: 'DECLINED', note: 'Would like a pass for the season.' },
+    { slug: 'expired', holder: 'kavya', status: 'EXPIRED', note: 'Asked before the sales window closed.' },
+  ]
+  for (const request of requests) {
+    const decided = request.status !== 'PENDING'
+    statements.push(insert('pass_requests', {
+      id: seedId('passrequest', request.slug),
+      pass_type_id: seedId('pass', 'season-2026-27'),
+      user_id: personIn(people, request.holder).id,
+      status: request.status,
+      note: request.note,
+      decided_by: decided ? desk : null,
+      pass_id: request.status === 'FULFILLED' ? issued.get('rowan')! : null,
+      created_at: now - 25 * DAY,
+      decided_at: decided ? now - 20 * DAY : null,
+    }))
+  }
+
+  target.batch(statements)
+  return issued
+}
+
+// The seat a pass covered on a night that is over, which is what the append-only admission
+// register holds. Separate because the ticket it names is written after the programme is.
+export function seedPassAdmissions(target: SeedTarget, people: People, programme: Programme, now: number): void {
+  const id = seedId('passadmission', 'past')
+  const ticketId = seedId('ticket', 'past-attended', 0)
+  if (holds(target, 'pass_admissions', { id }) || !holds(target, 'tickets', { id: ticketId })) return
+
+  target.batch([insertOnly('pass_admissions', {
+    id,
+    pass_id: programme.passes.get('rowan')!,
+    performance_id: programme.performances.get('the-seagull/past')!.id,
+    ticket_id: ticketId,
+    admitted_at: now - 6 * DAY,
+    admitted_by: personIn(people, 'rowan').id,
+  })])
 }

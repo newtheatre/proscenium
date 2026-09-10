@@ -6,7 +6,7 @@ import { seedBookings } from './bookings'
 import { seedGovernance } from './governance'
 import { seedMoney } from './money'
 import { seedPeople, seedPersonDetail } from './people'
-import { seedProgramme } from './programme'
+import { seedPassAdmissions, seedProgramme } from './programme'
 import { seedShowNight } from './show-night'
 import { seedSpaces } from './spaces'
 import { seedTraining } from './training'
@@ -48,6 +48,7 @@ export async function seed(target: SeedTarget, options: SeedOptions): Promise<Se
   const training = await seedTraining(target, people, now)
   const programme = seedProgramme(target, people, now)
   const bookings = seedBookings(target, people, programme, now)
+  seedPassAdmissions(target, people, programme, now)
   const showNight = await seedShowNight(target, people, programme, { now, token: options.token })
   const bar = seedBar(target, people, programme, now)
   const money = await seedMoney(target, people, programme, bookings, bar, now)

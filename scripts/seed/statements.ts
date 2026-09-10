@@ -46,6 +46,25 @@ export function seedId(...parts: (string | number)[]): string {
   return `seed-${parts.join('-')}`.toLowerCase().replaceAll(/[^a-z0-9-]+/g, '-').slice(0, 64)
 }
 
+// The reference alphabet excludes look-alikes, and a seeded reference has to satisfy the same
+// shape a desk search matches on (D-114 criterion 1, D-124).
+const REFERENCE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
+
+// Stable across runs, so a re-run adopts the row rather than minting a second reference for the
+// same seat or pass. Any hash would do; this one is short enough to read back.
+export function seedReference(slug: string, length = 6): string {
+  let hash = 2_166_136_261
+  for (const character of slug) {
+    hash = Math.imul(hash ^ character.charCodeAt(0), 16_777_619) >>> 0
+  }
+  let reference = ''
+  for (let index = 0; index < length; index++) {
+    reference += REFERENCE_ALPHABET[hash % REFERENCE_ALPHABET.length]
+    hash = Math.floor(hash / REFERENCE_ALPHABET.length) + index * 7919
+  }
+  return reference
+}
+
 export interface Row { [column: string]: unknown }
 
 function columnsOf(row: Row): { names: string[], values: unknown[] } {

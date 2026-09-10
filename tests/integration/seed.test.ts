@@ -65,6 +65,21 @@ describe('the seed fills the screens', () => {
     )
     expect(corrections.length).toBeGreaterThan(0)
     for (const correction of corrections) expect(correction.total).toBeLessThan(0)
+
+    // A void names the charge and carries its reason on the record (F-109 criterion 4), and a
+    // settlement names each charge it covers. Both silently vanish if the schema module is stale.
+    expect(counts('ledger_entries WHERE void_of_entry_id IS NOT NULL AND void_reason IS NOT NULL')).toBeGreaterThan(0)
+    expect(counts('ledger_lines WHERE settles_entry_id IS NOT NULL')).toBeGreaterThan(0)
+  })
+
+  test('passes are issued, requested and admitted', () => {
+    for (const status of ['ACTIVE', 'CANCELLED', 'EXPIRED']) {
+      expect(counts(`passes WHERE status = '${status}'`)).toBeGreaterThan(0)
+    }
+    for (const status of ['PENDING', 'FULFILLED', 'DECLINED', 'EXPIRED']) {
+      expect(counts(`pass_requests WHERE status = '${status}'`)).toBeGreaterThan(0)
+    }
+    expect(counts('pass_admissions')).toBeGreaterThan(0)
   })
 
   test('every reservation status exists', () => {
