@@ -14,6 +14,8 @@ import type { TestMember } from '#tests/helpers/accounts'
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
+// A cold route compiles on first request, and several of these cases open a handful each.
+const CASE_TIMEOUT_MS = 120_000
 
 let app: AppUnderTest
 let officer: TestMember
@@ -49,6 +51,7 @@ async function publishedShow(): Promise<string> {
 const slugOf = (title: string): string => title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
 
 interface Node { '@type': string | string[], [key: string]: unknown }
+interface Offer { price: string, priceCurrency: string, availability: string }
 
 // Every node in the page's one JSON-LD graph, whichever way it declares its type.
 function graph(page: string): Node[] {
@@ -83,13 +86,13 @@ describe.skipIf(skip !== null)('titles, descriptions and canonicals (K-125 crite
   test('a page title takes the house name after it, and the home page does not', async () => {
     expect(await html('/about')).toContain(`<title>About us | ${SITE_NAME}</title>`)
     expect(await html('/')).toContain('<title>The Nottingham New Theatre</title>')
-  })
+  }, CASE_TIMEOUT_MS)
 
   test('a public page carries a description and an absolute canonical', async () => {
     const page = await html('/about')
     expect(page).toMatch(/<meta name="description" content="[^"]+"/)
     expect(page).toMatch(/<link rel="canonical" href="https?:\/\/[^"]+\/about"/)
-  })
+  }, CASE_TIMEOUT_MS)
 })
 
 describe.skipIf(skip !== null)('what a crawler is told (K-125 criteria 2 and 6)', () => {
@@ -98,53 +101,58 @@ describe.skipIf(skip !== null)('what a crawler is told (K-125 criteria 2 and 6)'
     for (const pattern of ROBOTS_DISALLOW) expect(robots).toContain(`Disallow: ${pattern}`)
     expect(robots).toMatch(/Sitemap: .*\/sitemap\.xml/)
     expect(robots).not.toMatch(/^Disallow: \/$/m)
-  })
+  }, CASE_TIMEOUT_MS)
 
   test('/sitemap.xml lists the public pages, the show and the catalogue, and no closed route', async () => {
     const sitemap = await (await fetch(`${app.baseURL}/sitemap.xml`)).text()
+    // Anchored to the host, so /policies/rooms is not mistaken for /rooms.
+    const listed = (path: string, beneath = false): RegExp =>
+      new RegExp(`<loc>https?:\\/\\/[^/<]+${path.replace(/\//g, '\\/')}${beneath ? '(\\/[^<]*)?' : ''}<\\/loc>`)
     for (const path of ['/whats-on', '/about', '/history', '/get-involved', '/policies/booking', '/training/modules', `/shows/${slug}`]) {
-      expect(sitemap).toMatch(new RegExp(`<loc>[^<]*${path.replace(/\//g, '\\/')}<\\/loc>`))
+      expect(sitemap).toMatch(listed(path))
     }
     for (const path of ['/admin', '/account', '/sign-in', '/docs', '/tonight', '/rooms']) {
-      expect(sitemap).not.toMatch(new RegExp(`<loc>[^<]*${path.replace(/\//g, '\\/')}(\\/[^<]*)?<\\/loc>`))
+      expect(sitemap).not.toMatch(listed(path, true))
     }
-  })
+  }, CASE_TIMEOUT_MS)
 
   test('the auth and utility pages are noindex and the home page is not', async () => {
     for (const path of NOINDEX_PAGES) {
       expect(await html(path)).toMatch(/<meta name="robots" content="noindex/)
     }
     expect(await html('/')).toMatch(/<meta name="robots" content="index/)
-  })
+  }, CASE_TIMEOUT_MS)
 })
 
 describe.skipIf(skip !== null)('the Open Graph image (K-125 criterion 3)', () => {
   test('the home page and a show without a poster share the house image', async () => {
     expect(await html('/')).toMatch(/<meta property="og:image" content="[^"]*\/og-default\.png"/)
     expect(await html(`/shows/${slug}`)).toMatch(/<meta property="og:image" content="[^"]*\/og-default\.png"/)
-  })
+  }, CASE_TIMEOUT_MS)
 })
 
 describe.skipIf(skip !== null)('structured data (K-125 criterion 4)', () => {
   test('the home page names the organisation as a theatre', async () => {
     const theatre = graph(await html('/')).find(node => typed(node, 'PerformingArtsTheater'))
     expect(theatre?.name).toBe(SITE_NAME)
-  })
+  }, CASE_TIMEOUT_MS)
 
   test('a show page carries a TheaterEvent per performance with an offer per price', async () => {
     const events = graph(await html(`/shows/${slug}`)).filter(node => typed(node, 'TheaterEvent'))
     expect(events).toHaveLength(1)
-    const offers = events[0]!.offers as { price: string, priceCurrency: string, availability: string }[]
+    // One relation resolves to an object, several to an array; either way it is the offer per price.
+    const related = events[0]!.offers as Offer | Offer[]
+    const offers = Array.isArray(related) ? related : [related]
     expect(offers.length).toBeGreaterThan(0)
     expect(offers[0]).toMatchObject({ price: '9.00', priceCurrency: 'GBP' })
     expect(String(offers[0]!.availability)).toContain('InStock')
-  })
+  }, CASE_TIMEOUT_MS)
 
   test('an editorial page carries breadcrumbs from home', async () => {
     const crumbs = graph(await html('/about')).find(node => typed(node, 'BreadcrumbList'))
     const items = crumbs?.itemListElement as { name: string }[]
     expect(items.map(item => item.name)).toEqual(['Home', 'About us'])
-  })
+  }, CASE_TIMEOUT_MS)
 })
 
 describe.skipIf(skip !== null)('every old-site address answers 301 (K-125 criterion 5)', () => {
@@ -170,7 +178,7 @@ describe.skipIf(skip !== null)('every old-site address answers 301 (K-125 criter
       expect(response.status).toBe(301)
       expect(resolve(response.headers.get('location') ?? '')).toBe(resolve(to!))
     }
-  })
+  }, CASE_TIMEOUT_MS)
 
   test('the what\'s-on listing itself is untouched', async () => {
     const response = await fetch(`${app.baseURL}/whats-on`, { redirect: 'manual' })
