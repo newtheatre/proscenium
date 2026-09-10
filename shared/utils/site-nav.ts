@@ -229,6 +229,12 @@ export const PUBLIC_NAV: NavEntry[] = [
   // Module G: training
 
   { label: 'What we teach', icon: 'i-lucide-graduation-cap', to: '/training/modules', ability: anybody },
+
+  // Module J: governance
+
+  // Policy pages, whose numbers are the live settings rather than prose about them (0012, J-110).
+  { label: 'Tickets and refunds', icon: 'i-lucide-receipt', to: '/policies/booking', ability: anybody },
+  { label: 'Room booking policy', icon: 'i-lucide-calendar-check', to: '/policies/rooms', ability: anybody },
 ]
 
 // Longest prefix wins, so /rooms/manage/requests is matched by its own entry and not by /rooms.
