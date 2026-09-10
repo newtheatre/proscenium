@@ -847,10 +847,10 @@ against, which is how criterion 4's "bar can check outside a show" is read here:
 itself never has to name a performance, even on a night that has one.
 
 `/tonight/age-checks` is criterion 4's standalone half from the tonight screen: log a check,
-correct one, and read tonight's register, linked from `/tonight`. The criterion's other two
-halves stay open on issue #457: the till-inline reachability is F-106's, and the door half
-waits on a door screen existing at all, which no story has built yet and which is not this
-screen's work to start.
+correct one, and read tonight's register, linked from `/tonight`. The till-inline half is
+F-106's, folding an outcome into a sale. The door half waited on a door screen existing at all
+(issue #457); `/tonight/door` links to the register the same way `/tonight` already does, once
+D-126 and E-127 criterion 3 gave it something to link from and into.
 
 ### The incident log and near-miss reporting (E-115, E-117)
 
