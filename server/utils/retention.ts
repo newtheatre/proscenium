@@ -23,11 +23,12 @@ interface CandidateRow {
   createdAt: number
 }
 
-// A tab charge with nothing settling it yet: the schema already carries this (F-109's own route
-// does not exist, but tab_settled_at does), so this is not a guess ahead of that route.
+// A tab charge with nothing settling it yet, by reference: append-only `ledger_entries` (0016)
+// cannot mark itself settled, so `tab_settled_at`/`tab_settlement_entry_id` stay unwritten (F-109).
 const unsettledMoney = (): SQL => sql`exists (
-  select 1 from ledger_entries
-  where tab_debtor_id = ${schema.users.id} and tender = 'TAB' and tab_settled_at is null
+  select 1 from ledger_entries e
+  where e.tab_debtor_id = ${schema.users.id} and e.tender = 'TAB'
+    and not exists (select 1 from ledger_lines l where l.settles_entry_id = e.id)
 )`
 
 async function candidates(event: H3Event | undefined, now: number): Promise<CandidateRow[]> {
