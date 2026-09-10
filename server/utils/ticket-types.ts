@@ -93,7 +93,9 @@ const contains = (term: string): string => `%${term.replaceAll('\\', '\\\\').rep
 
 // Two bound parameters at most, whatever the filters and however many types there are (0003).
 function predicate(filters: TicketTypeFilters): SQL {
-  const terms: SQL[] = []
+  // The system row D-125's redemption ensures the first time any pass is redeemed is nobody's
+  // to administer: this screen sells and archives SINGLE rows, never a pass's own admission type.
+  const terms: SQL[] = [sql`kind = 'SINGLE'`]
   if (!filters.includeArchived) terms.push(sql`archived = 0`)
   // SQLite's LIKE is case-insensitive over ASCII already, and a COLLATE here would bind to the
   // escape character rather than to the comparison.

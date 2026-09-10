@@ -177,6 +177,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/passes/current.get.ts', exempt: 'reads the pass the cookie names; nothing is written' },
   { route: 'server/routes/passes/[token].get.ts', exempt: 'exchanges a token for a cookie; nothing is written' },
+  {
+    route: 'server/api/passes/[id]/redeem.post.ts',
+    actions: ['pass.redeemed'],
+    via: ['server/utils/pass-redemption.ts'],
+  },
   { route: 'server/api/admin/programme/shows.get.ts', exempt: 'reads the show picker, drafts included' },
   { route: 'server/api/admin/venues/index.get.ts', exempt: 'reads the venues a performance may be put in' },
   { route: 'server/api/admin/shows/index.get.ts', exempt: 'reads the programme, drafts included' },

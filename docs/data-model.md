@@ -694,12 +694,24 @@ requests, regardless of channel.
 `id` PK · `pass_id` restrict · `performance_id` restrict · `ticket_id` UNIQUE restrict ·
 `admitted_at` · `admitted_by` NULL (self-serve).
 **UNIQUE (`pass_id`, `performance_id`) is the once-per-performance rule.**
-D-124 creates this table only; nothing yet writes to it, since admitting on a pass is D-125's
-self-serve redemption and D-126's door, neither built. Append-only and trigger-enforced (0010),
-the same reasoning as the ledger: a register of admissions must be defensible after the fact, and
+D-124 creates this table; D-125 writes to it for the first time, redeeming a pass while reserving
+online (`admitted_by` NULL). D-126's door scan, which admits without a prior online redemption or
+checks in one that already exists, is not yet built. Append-only and trigger-enforced (0010), the
+same reasoning as the ledger: a register of admissions must be defensible after the fact, and
 "everything record-like keys to a performance" applies to one exactly (CLAUDE.md). The trigger is
 hand-appended after the generated `CREATE TABLE`, since drizzle-kit generates no triggers; it must
 be re-added if the migration is ever renumbered ahead of merging.
+
+`server/utils/pass-redemption.ts` is the one writer, shared with D-126 and D-130: capacity, the
+once-per-performance uniqueness and the pass's own terms (active, on sale, inside its validity
+window, covering the show) are all one predicate on the ticket insert's own `WHERE`
+(`passAdmissionTicketInsert`), never a read followed by a write (0003). A redemption creates an
+ordinary zero-value `PASS_ADMISSION`-kind ticket: `ticket_types` gains exactly one such row,
+lazily, the first time any pass is ever redeemed (`WHERE NOT EXISTS`, so no seed step owns it),
+and the admin ticket-type screen filters it out (`kind = 'SINGLE'`) since it is nobody's to
+administer. The reservation is `PENDING` with `hold_expires_at` NULL: nothing needs collecting, so
+D-106's release sweep, which only ever touches a non-null expiry, leaves it alone; a booker
+cancels it through the ordinary self-service path (D-110) like any other unpaid-looking hold.
 
 ### pass_requests
 `id` PK · request → decision workflow (`status` CHECK `PENDING|FULFILLED|DECLINED|EXPIRED`,
