@@ -60,3 +60,4 @@ afterwards, only superseded.
 | 0052 | A table rebuild refuses a copying column that does not resolve | the silent string-literal fallback drizzle-kit's own generated SQL can trigger, and why only the double-quoted form needs a static check |
 | 0053 | A typed-fetch call site takes an explicit response generic, never a route-map cast | the route-count recursion behind `TS2589`, why no central compiler or config fix exists, and the trade the explicit generic makes deliberately |
 | 0054 | A suppressed message is its own outcome, and still reaches the inbox | why a muted topic is not an undeliverable address, why every topic type declares the inbox, and where a preference default lives |
+| 0055 | A `server/utils/` file that `tests/` can reach names its own auto-imports explicitly | why merging the Bun and Nuxt type graphs risks reopening 0053, and why a lint rule is a bigger call than one file's fix |
