@@ -31,14 +31,20 @@ export function unclosedCandidatesQuery(now: number): SQL {
 
 export interface DuePerformance { performanceId: string, venueId: string, night: string }
 
+// Pure, so the boundary is proved without a database: 24 hours after the show night's own end,
+// timezone-aware through `showNightBounds`, never a wall-clock day (0014).
+export function autoCloseDeadline(startsAt: number): { night: string, deadline: number } {
+  const night = performanceNight(startsAt)
+  return { night, deadline: showNightBounds(night).to.getTime() + 24 * 60 * 60 * 1000 }
+}
+
 export async function performancesDueAutoClose(at: Date = new Date()): Promise<DuePerformance[]> {
   const now = Math.floor(at.getTime() / 1000)
   const candidates = await db.all<UnclosedCandidateRow>(unclosedCandidatesQuery(now))
 
   const due: DuePerformance[] = []
   for (const candidate of candidates) {
-    const night = performanceNight(candidate.startsAt)
-    const deadline = showNightBounds(night).to.getTime() + 24 * 60 * 60 * 1000
+    const { night, deadline } = autoCloseDeadline(candidate.startsAt)
     if (at.getTime() >= deadline) due.push({ performanceId: candidate.performanceId, venueId: candidate.venueId, night })
   }
   return due
