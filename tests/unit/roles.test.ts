@@ -150,7 +150,7 @@ describe('permissions come from live grants only', () => {
   // at the desk are operational and still derive from tonight (0009, D-119).
   test('the box office holds the programme configuration and nothing operational', () => {
     const held = permissionsFor([{ role: 'BOX_OFFICE', expiresAt: null }], now)
-    expect([...held].sort()).toEqual(['ticketing.read', 'ticketing.write'])
+    expect([...held].sort()).toEqual(['ticketing.export', 'ticketing.read', 'ticketing.write'])
   })
 
   // The whole point of the role: a named accessibility officer, never general box office

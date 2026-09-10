@@ -154,6 +154,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/ticket-types/[id]/index.put.ts', actions: ['ticket-type.updated', 'ticket-type.price.changed'] },
   { route: 'server/api/admin/ticket-types/[id]/archive.post.ts', actions: ['ticket-type.archived', 'ticket-type.restored'] },
   { route: 'server/api/admin/ticket-types/[id]/index.delete.ts', actions: ['ticket-type.deleted'] },
+  { route: 'server/api/admin/tickets/export.get.ts', actions: ['tickets.exported'] },
   { route: 'server/api/admin/pass-types/index.get.ts', exempt: 'reads the pass products' },
   { route: 'server/api/admin/pass-types/index.post.ts', actions: ['pass-type.created'] },
   { route: 'server/api/admin/pass-types/[id]/index.get.ts', exempt: 'reads one pass product and the shows it may cover' },
@@ -563,6 +564,15 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['notifications.preference.changed'],
     via: ['server/utils/notification-preferences.ts'],
   },
+  { route: 'server/api/admin/comms/announcements/preview.post.ts', exempt: 'resolves a count and renders a preview; nothing sends' },
+  {
+    route: 'server/api/admin/comms/announcements/index.post.ts',
+    actions: ['comms.announcement.sent'],
+    via: ['server/utils/announcements.ts'],
+  },
+  { route: 'server/api/admin/comms/send-log/index.get.ts', exempt: 'reads the send log; a filtered list is not a lookup on one person' },
+  { route: 'server/api/admin/comms/send-log/daily.get.ts', exempt: 'reads aggregate counts, naming nobody' },
+  { route: 'server/api/admin/comms/accounts/[id]/history.get.ts', actions: ['notifications.history.viewed'] },
 
   // Module I: finance
 

@@ -94,6 +94,12 @@ export const exportAgeChecks = defineAbility((viewer: Viewer) => holds(viewer, '
 export const viewBoardConfig = defineAbility((viewer: Viewer) => holds(viewer, 'board.read'))
 export const manageBoardConfig = defineAbility((viewer: Viewer) => holds(viewer, 'board.write'))
 
+// Composing a fan-out to a resolved audience, blind of one another (H-108).
+export const sendAnnouncements = defineAbility((viewer: Viewer) => holds(viewer, 'comms.announce'))
+
+// The send log, its daily counts and one person's history within it (H-106).
+export const viewCommsOperations = defineAbility((viewer: Viewer) => holds(viewer, 'comms.operations'))
+
 // Tonight is derived from a confirmed shift and expires at 04:00 with nothing to revoke (0014,
 // E-111), so it is read from the request rather than from anything the viewer holds.
 export const workTonight = defineAbility((viewer: Viewer) => viewer.onShiftTonight)
@@ -147,4 +153,6 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   workTheDoor: 'night.door',
   workTheTill: 'night.till',
   manageTonight: 'night.manage',
+  sendAnnouncements: 'comms.announce',
+  viewCommsOperations: 'comms.operations',
 }

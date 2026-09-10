@@ -997,6 +997,24 @@ to a performance (E-127 criterion 1). `performancesOnNightQuery()` is the statem
 `performancesOnNight()` runs, exported so an integration test executes the real SQL; it binds two
 parameters, or three when narrowed by venue, however many performances the night holds (0006).
 
+### Season ticket export (D-129)
+
+`GET /api/admin/tickets/export`, gated on `ticketing.export`, is the box office's own copy of
+season sales: one row per seat, filtered by show, performance, date range or season, and source.
+`ticketExportQuery()` (`server/utils/ticket-export.ts`) fetches one row over the 20,000-row cap
+(`TICKET_EXPORT_CAP`), so the route can tell "exactly full" from "more exists" without a separate
+count; over the cap it 400s naming the guidance to narrow the filter, rather than truncating
+silently (criterion 1). The column list is criterion 3 itself: `reference`, the performance
+(the show's title and start, resolved rather than stored), the ticket type's name, the price paid,
+the source, the reservation's status read through `saysReservationStatus()` and whether the ticket
+is refunded; no customer name, no note of either kind, no access-profile data is ever selected.
+CSV goes through `toCsv()`/`csvField()` (`server/utils/csv.ts`), the same formula-injection guard
+E-119's export already uses. A `season` filter resolves through `resolveSeasonBounds()`
+(`shared/utils/ticket-export.ts`) against the `SEASON_START`/`SEASON_END` configuration keys,
+1 August to 31 July by default (criterion 5); an explicit `from`/`to` range is the alternative, not
+both at once. Every export writes a `tickets.exported` audit entry naming the actor, the filter
+and the row count, before the file body is built (criterion 4).
+
 ## Show-night resilience (module K)
 
 Operational screens (door, till, registers, tonight view) are phone-first islands that cache

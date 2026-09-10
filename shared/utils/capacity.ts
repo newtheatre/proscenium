@@ -9,6 +9,20 @@ export const RESERVATION_STATUSES = ['PENDING', 'COLLECTED', 'DOOR', 'EXPIRED', 
 
 export type ReservationStatus = (typeof RESERVATION_STATUSES)[number]
 
+const STATUS_WORDING: Record<ReservationStatus, string> = {
+  PENDING: 'Held, not yet collected',
+  COLLECTED: 'Collected',
+  DOOR: 'Admitted at the door',
+  EXPIRED: 'Hold expired, uncollected',
+  CANCELLED: 'Cancelled',
+  NO_SHOW: 'No-show',
+}
+
+// For a report a person reads (D-129), not a console filter.
+export function saysReservationStatus(status: ReservationStatus): string {
+  return STATUS_WORDING[status]
+}
+
 // Held: somebody is coming, or has paid and is coming. A ticket under one of these occupies a seat.
 export const HOLDING_STATUSES = ['PENDING', 'COLLECTED', 'DOOR'] as const
 
