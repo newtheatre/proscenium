@@ -4,20 +4,22 @@ import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { join } from 'node:path'
+import { MAX_BOUND_PARAMETERS, sqliteTarget } from '../../scripts/seed/statements'
+import type { BoundStatement, SeedTarget } from '../../scripts/seed/statements'
 
 const MIGRATIONS_DIR = 'server/db/migrations/sqlite'
 
-// D1 caps a statement at 100 bound parameters and the repository chunks at 90 (0003). SQLite
-// accepts far more, so without this a test passes and production fails.
-export const MAX_BOUND_PARAMETERS = 90
-
-// A statement and its bound parameters, the shape D1's prepare/bind takes.
-export type BoundStatement = [statement: string, ...parameters: unknown[]]
+// The currency and the sinks live with the seed builders, so a fixture and a development database
+// are written by the same code (K-120). Re-exported here because tests reach for them by habit.
+export { MAX_BOUND_PARAMETERS, sqliteTarget }
+export type { BoundStatement, SeedTarget }
 
 export interface TestDatabase {
   db: BunSQLiteDatabase<Record<string, never>>
   raw: Database
   batch: (statements: BoundStatement[]) => void
+  // A natural-key lookup, which is what makes a seed builder re-runnable against this database.
+  get: <T>(statement: string, ...parameters: unknown[]) => T | undefined
   close: () => void
 }
 
@@ -60,24 +62,15 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   raw.exec('PRAGMA foreign_keys = ON;')
   await applyMigrations(raw)
   const db = drizzle(raw)
+  // D1 has no interactive transaction: atomicity is batch only (0001, 0003). The sink mirrors
+  // its all-or-nothing semantics so a test exercises the shape production runs.
+  const target = sqliteTarget(raw)
 
   return {
     db,
     raw,
-    // D1 has no interactive transaction: atomicity is batch only (0001, 0003). This mirrors
-    // its all-or-nothing semantics so a test exercises the shape production runs.
-    batch(statements) {
-      for (const [, ...parameters] of statements) {
-        if (parameters.length > MAX_BOUND_PARAMETERS) {
-          throw new Error(`statement binds ${parameters.length} parameters, over the ${MAX_BOUND_PARAMETERS} chunk limit: D1 refuses this in production (0003)`)
-        }
-      }
-      raw.transaction(() => {
-        for (const [statement, ...parameters] of statements) {
-          raw.prepare(statement).run(...parameters as never[])
-        }
-      })()
-    },
+    batch: target.batch,
+    get: target.get,
     close() {
       raw.close()
     },

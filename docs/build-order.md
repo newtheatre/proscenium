@@ -85,6 +85,7 @@ pull request, titled in the repository's habit: a sentence, then the ids in pare
 | show night | 27 | `unified/show-night/` | 3012 | 3301 |
 | bar | 21 | `unified/bar/` | 3013 | 3401 |
 | platform | 32 | `unified/platform/` | 3014 | 3501 |
+| seed | | `unified/seed/` | 3017 | 4101 |
 | the reviewer | | | 3001 | 3701 |
 
 Ports matter: the end-to-end runner refuses a held port, and worse, accepts a leaked dev server
@@ -221,8 +222,12 @@ Provider first, consumer second. "If late" is what the consumer builds against m
 4. **Append to shared registries inside your module's banner section:** ledger kinds, message
    types, audit catalogue and coverage, configuration keys, the personal-data registry, site
    navigation, personas.
-5. **Seed changes only in Wave 0 and show night wave 1.** Later fixtures go through
-   `tests/helpers`.
+5. **The seed stream owns `scripts/seed/`.** A stream needing a fixture writes one in
+   `tests/helpers`, which speaks the same `BoundStatement` currency and the same sinks, so
+   nothing has to be built twice. Where a story genuinely needs the development database to
+   carry something (a new status a screen renders, a new table), say so and the seed stream
+   adds it, rather than a stream editing the seed inside a feature branch and every other
+   stream conflicting on it.
 6. **Run the full CI list before opening a pull request** (`CONTRIBUTING.md` names the eleven
    steps), then the affected end-to-end suites on your own base port.
 7. **A pull request that wakes a stub task** (`holds:release`, `shifts:remind`, `nights:close`,

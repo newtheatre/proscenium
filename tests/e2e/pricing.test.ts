@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -42,11 +43,7 @@ const send = (method: string, path: string, body?: unknown, as = officer.cookie)
 function venue(capacity: number | null): string {
   const database = new Database(app.databaseFile)
   try {
-    return testVenue({
-      batch: statements => database.transaction(() => {
-        for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
-      })(),
-    }, { suffix: crypto.randomUUID().slice(0, 8), capacity }).id
+    return testVenue(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8), capacity }).id
   }
   finally {
     database.close()

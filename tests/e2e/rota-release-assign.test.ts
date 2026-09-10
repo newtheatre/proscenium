@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { sqliteTarget } from '#tests/helpers/database'
 import { showNightOf } from '#shared/utils/show-night'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -85,11 +86,7 @@ function performance(daysOut: number, caseSuffix: string, role = 'DOOR'): { perf
   const database = new Database(app.databaseFile)
   try {
     const night = showNightOf(new Date(Date.now() + daysOut * 86_400_000))
-    const made = tonightsPerformance({
-      batch: statements => database.transaction(() => {
-        for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
-      })(),
-    }, { suffix: caseSuffix, night })
+    const made = tonightsPerformance(sqliteTarget(database), { suffix: caseSuffix, night })
     const shiftId = `${made.performanceId}-${role}-1`
     database.query('INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)')
       .run(shiftId, made.performanceId, role, 'OPEN')
@@ -141,11 +138,7 @@ describe.skipIf(skip !== null)('releasing a shift (E-107 criterion 1)', () => {
     const database = new Database(app.databaseFile)
     let shiftId: string
     try {
-      const made = tonightsPerformance({
-        batch: statements => database.transaction(() => {
-          for (const [statement, ...parameters] of statements) database.prepare(statement).run(...parameters as never[])
-        })(),
-      }, { suffix: 'release-tonight' })
+      const made = tonightsPerformance(sqliteTarget(database), { suffix: 'release-tonight' })
       shiftId = `${made.performanceId}-DOOR-1`
       database.query('INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)')
         .run(shiftId, made.performanceId, 'DOOR', 'OPEN')
