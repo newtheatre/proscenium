@@ -48,7 +48,7 @@ export async function reportForPerformance(performanceId: string): Promise<Night
   return { ...row, report: JSON.parse(row.report) as NightReport }
 }
 
-export interface SignOffInput {
+export interface NightSignOffInput {
   id: string
   performanceId: string
   venueId: string
@@ -61,7 +61,7 @@ export interface SignOffInput {
 
 // Predicated on no existing row for this performance, `closeStatement`'s own shape (E-114): a
 // second sign-off for the same one returns nothing rather than racing the unique index (0006).
-export function signOffStatement(input: SignOffInput): SQL {
+export function signOffStatement(input: NightSignOffInput): SQL {
   return sql`
     INSERT INTO night_reports (id, performance_id, venue_id, night, closing_note, report, signed_by, signed_via)
     SELECT ${input.id}, ${input.performanceId}, ${input.venueId}, ${input.night}, ${input.closingNote},
