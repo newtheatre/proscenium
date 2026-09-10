@@ -510,7 +510,9 @@ credential) · `performance_id` → performances restrict · `user_id` → users
 `status` CHECK `PENDING|COLLECTED|DOOR|EXPIRED|CANCELLED|NO_SHOW` · `source` CHECK
 `WEB|DESK|DOOR` (the door writes DOOR, fixing the old blur) · `hold_expires_at` (set while
 PENDING; the release sweep moves PENDING to EXPIRED and records it for no-show statistics) ·
-`cancelled_by` CHECK `CUSTOMER|STAFF` NULL · `customer_notes` scrub · `staff_notes` scrub ·
+`cancelled_by` CHECK `CUSTOMER|STAFF` NULL · `exchanged_to_reservation_id` NULL → reservations
+restrict, set only alongside a CUSTOMER cancellation, no CHECK pairing the two to avoid a table
+rebuild (D-111, 0052) · `customer_notes` scrub · `staff_notes` scrub ·
 `qr_token_hash` unused, superseded by a stateless signed token that needs no storage (D-108,
 below) · `window_bypassed` bool, true only for a desk reservation made after the customer window
 had already closed (D-112 criterion 3; nothing yet writes DESK, so this stays false until a
@@ -551,8 +553,8 @@ nothing sits in `qr_token_hash` to leak. `GET /qr/[token]` verifies the signatur
 a short-lived (60 minute) httpOnly cookie and redirects to `/qr`, so the token stops appearing in
 the address bar or a referrer header after the first open. `GET /api/qr/current` reads that cookie
 and answers the booking's live state (unpaid with the amount due, paid, admitted, cancelled naming
-who, or lapsed), never anything saved earlier; "exchanged" and "wrong night" have no state to
-report until D-111 and D-126 exist (`docs/known-issues.md`). `POST /api/reservations/resend`
+who, exchanged naming where, or lapsed), never anything saved earlier; "wrong night" has no state
+to report until D-126 exists (`docs/known-issues.md`). `POST /api/reservations/resend`
 re-sends the same confirmation, rate limited (`RESERVATION_RESEND_ATTEMPTS`,
 `RESERVATION_RESEND_WINDOW_MINUTES`, both by IP and by reference) and enumeration-safe: it answers
 identically whether or not the reference and address match, and only actually sends while the
@@ -651,6 +653,33 @@ checks, sets `hold_expires_at` to `NULL` and is refused once the performance has
 `/qr` page offers only a refund note, since D-116 owns the actual refund). Both routes read the
 reservation back afterwards rather than trusting their own statements, since the guard is
 identical everywhere and either the whole request landed or none of it did.
+
+**Exchange to another performance of the same show, while unpaid (D-111).** `GET
+/api/qr/exchange-options` lists the show's other on-sale performances, the same honest
+availability `publicShowBySlug()` gives the public listing. `POST /api/qr/exchange` (body:
+`{ performanceId }`) refuses a different show outright (criterion 5, `differentShowReason()`) and
+a booking carrying an access or companion ticket type, since D-128's entitlement is checked once,
+against the performance it was granted for, and re-running it against a different one is a box
+office conversation rather than this form's job (`docs/known-issues.md`). The write,
+`exchangeReservation()` in `server/utils/exchange.ts`, is criterion 1 honestly within what D1
+actually offers: `writeReservation()` secures the new hold first, capacity-checked at that exact
+moment, prices re-snapshotted against the target's effective prices (criterion 2) and the hold
+expiry reset to the target's own curtain (criterion 3, D-106); only once that has fully landed
+does a second, separate write claim the old reservation, `UPDATE ... SET status = 'CANCELLED',
+cancelled_by = 'CUSTOMER', exchanged_to_reservation_id = <new id> WHERE id = ? AND status =
+'PENDING' RETURNING id`, the same conditional-write shape D-106's release and D-113's claim use
+(0003). A booker who loses the destination between choosing it and submitting never loses the
+seats they already held, because the old row is untouched unless the new one is secured; the rare
+case where claiming the old row itself loses a race (a desk collection landing in between) leaves
+a real, unreachable new hold, which is cancelled immediately rather than left live. The audit
+trail (`reservation.exchanged`) and the pointer together are criterion 4's "recorded on the
+reservation history": both rows survive in full, superseding rather than editing, the same
+principle 0010 states for the ledger. `GET /api/qr/current` follows the pointer to name the show
+and night the old QR now reads Exchanged for; presenting the old QR itself still verifies (the
+signature is over the id alone) but no longer names a live booking, and the `/qr` page's cookie
+moves to the new reservation's token so the booker is looking at the booking that is now real.
+Releasing the vacated seat to the waiting list is D-113's `offerWaitingList()`, not yet wired in
+because D-113 had not merged when this was written (`docs/known-issues.md`).
 
 ### tickets
 `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances

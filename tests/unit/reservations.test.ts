@@ -3,6 +3,7 @@ import { readBookableTicketTypes } from '#server/utils/reservations'
 import {
   RESERVATION_REFERENCE_LENGTH,
   belowMinimumTicketsReason,
+  differentShowReason,
   doorTicketOutcome,
   generateReservationReference,
   looksLikeReference,
@@ -13,6 +14,7 @@ import {
   reservationExchangeForm,
   reservationForm,
   reservationResendForm,
+  sameNightReason,
   ticketEditDelta,
   totalTickets,
 } from '#shared/utils/reservations'
@@ -302,5 +304,27 @@ describe('D-111: exchange asks for a target performance and nothing else', () =>
 
   test('an empty id is refused', () => {
     expect(reservationExchangeForm.safeParse({ performanceId: '' }).success).toBe(false)
+  })
+})
+
+describe('D-111 criterion 5: only another performance of the same show is an exchange', () => {
+  test('the same show is allowed', () => {
+    expect(differentShowReason('show-1', 'show-1')).toBeNull()
+  })
+
+  test('a different show is refused, naming cancel and rebook as the way', () => {
+    const reason = differentShowReason('show-1', 'show-2')
+    expect(reason).not.toBeNull()
+    expect(reason).toContain('same show')
+  })
+})
+
+describe('an exchange into the performance already held is not a real exchange', () => {
+  test('a different performance is allowed', () => {
+    expect(sameNightReason('perf-1', 'perf-2')).toBeNull()
+  })
+
+  test('the same performance is refused', () => {
+    expect(sameNightReason('perf-1', 'perf-1')).not.toBeNull()
   })
 })

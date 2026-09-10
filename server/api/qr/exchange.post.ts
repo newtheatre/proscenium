@@ -92,11 +92,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Frees the seats this booking held (D-113 criterion 2): offered on exactly as a plain
-  // self-cancel does, since that is what the source side of an exchange also is.
-  const cap = await configValue(event, 'WAITING_LIST_OFFER_BATCH_CAP')
-  const offered = await offerWaitingList(event, reservation.performanceId, new Date(), cap)
-  await notifyWaitingListOffers(event, offered.offered)
+  // Frees the seats this booking held, the same as a plain self-cancel does: the source side of
+  // an exchange must offer them to the waiting list (D-113 criterion 2, #812, not yet merged).
 
   return {
     reference: result.reservation.reference,

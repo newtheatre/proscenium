@@ -149,7 +149,7 @@ const exchangeLoading = ref(false)
 const exchangeSubmitting = ref(false)
 const exchangeFailure = ref<string | null>(null)
 const exchangeOptions = ref<ExchangeOption[]>([])
-const exchangeChoice = ref<string | null>(null)
+const exchangeChoice = ref<string | undefined>(undefined)
 
 async function startExchange(): Promise<void> {
   exchangeFailure.value = null
@@ -157,7 +157,7 @@ async function startExchange(): Promise<void> {
   try {
     const options = await $fetch<{ performances: ExchangeOption[] }>('/api/qr/exchange-options')
     exchangeOptions.value = options.performances
-    exchangeChoice.value = null
+    exchangeChoice.value = undefined
     exchanging.value = true
   }
   catch (error) {

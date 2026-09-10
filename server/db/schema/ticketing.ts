@@ -69,8 +69,8 @@ export const reservations = sqliteTable('reservations', {
   // Set while PENDING; the release sweep moves PENDING to EXPIRED and clears it (D-106).
   holdExpiresAt: integer('hold_expires_at'),
   cancelledBy: text('cancelled_by'),
-  // Cancelled-with-a-pointer, not a fourth status (D-111): `status`'s CHECK is restrict-FK'd and
-  // cannot be extended (0010). Set only alongside a CUSTOMER cancellation.
+  // Cancelled-with-a-pointer, not a fourth status (D-111): no CHECK pairs this with the status
+  // change either, to avoid a rebuild (0010, 0052); `server/utils/exchange.ts` is the only writer.
   exchangedToReservationId: text('exchanged_to_reservation_id').references((): AnySQLiteColumn => reservations.id, { onDelete: 'restrict' }),
   customerNotes: text('customer_notes'),
   staffNotes: text('staff_notes'),
@@ -91,7 +91,6 @@ export const reservations = sqliteTable('reservations', {
   check('reservations_status_values', sql`${table.status} IN ('PENDING', 'COLLECTED', 'DOOR', 'EXPIRED', 'CANCELLED', 'NO_SHOW')`),
   check('reservations_source_values', sql`${table.source} IN ('WEB', 'DESK', 'DOOR')`),
   check('reservations_cancelled_by_values', sql`${table.cancelledBy} IS NULL OR ${table.cancelledBy} IN ('CUSTOMER', 'STAFF')`),
-  check('reservations_exchanged_to_shape', sql`${table.exchangedToReservationId} IS NULL OR (${table.status} = 'CANCELLED' AND ${table.cancelledBy} = 'CUSTOMER')`),
 ])
 
 // One row per seat. Capacity is counted from these, never stored: `server/utils/capacity.ts` is

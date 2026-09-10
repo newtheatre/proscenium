@@ -4,6 +4,7 @@ import { auditedWrite } from './audit'
 import { writeReservation } from './reservations'
 import { auditEntry } from '#shared/utils/audit'
 import type { ReservationLineToWrite, WriteReservationResult } from './reservations'
+import type { SQL } from 'drizzle-orm'
 
 // D-111: moving an unpaid reservation to another performance of the same show. Kept apart from
 // server/utils/reservations.ts, which `tests/` imports directly under Bun (0055).
@@ -22,11 +23,19 @@ export interface ExchangeReservationResult {
   reservation?: WriteReservationResult
 }
 
-// Criterion 1's atomicity, honestly within what D1 actually offers (one `db.batch` per write,
-// 0003): the new reservation is secured first, through D-104's own write path, capacity-checked
-// at this exact moment; the old one is claimed only once that has fully succeeded, so a booker
-// who loses the destination never loses the seats they already held. The same two-phase shape
-// D-113's claim uses for the identical reason (mark the winner, then do the slower work).
+// The move from PENDING to cancelled-with-a-pointer, 0049's shape: whichever of two concurrent
+// exchanges (or an exchange racing a desk collection or a release) runs this first wins it.
+export function claimForExchangeStatement(reservationId: string, newReservationId: string): SQL {
+  return sql`
+    UPDATE reservations
+    SET status = 'CANCELLED', cancelled_by = 'CUSTOMER', exchanged_to_reservation_id = ${newReservationId}, hold_expires_at = NULL, updated_at = unixepoch()
+    WHERE id = ${reservationId} AND status = 'PENDING'
+    RETURNING id
+  `
+}
+
+// Criterion 1, honestly within what D1 offers (one `db.batch` per write, 0003): the new hold is
+// secured first, capacity-checked at that moment; the old one is claimed only once that lands.
 export async function exchangeReservation(input: ExchangeReservationInput): Promise<ExchangeReservationResult> {
   const written = await writeReservation({
     performanceId: input.targetPerformanceId,
@@ -52,12 +61,7 @@ export async function exchangeReservation(input: ExchangeReservationInput): Prom
   })
 
   const claimed = await auditedWrite(
-    db.all<{ id: string }>(sql`
-      UPDATE reservations
-      SET status = 'CANCELLED', cancelled_by = 'CUSTOMER', exchanged_to_reservation_id = ${written.id}, hold_expires_at = NULL, updated_at = unixepoch()
-      WHERE id = ${input.reservationId} AND status = 'PENDING'
-      RETURNING id
-    `),
+    db.all<{ id: string }>(claimForExchangeStatement(input.reservationId, written.id)),
     entry,
   )
 
