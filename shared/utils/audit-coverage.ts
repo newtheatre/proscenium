@@ -154,6 +154,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/ticket-types/[id]/index.put.ts', actions: ['ticket-type.updated', 'ticket-type.price.changed'] },
   { route: 'server/api/admin/ticket-types/[id]/archive.post.ts', actions: ['ticket-type.archived', 'ticket-type.restored'] },
   { route: 'server/api/admin/ticket-types/[id]/index.delete.ts', actions: ['ticket-type.deleted'] },
+  { route: 'server/api/admin/tickets/export.get.ts', actions: ['tickets.exported'] },
   { route: 'server/api/admin/pass-types/index.get.ts', exempt: 'reads the pass products' },
   { route: 'server/api/admin/pass-types/index.post.ts', actions: ['pass-type.created'] },
   { route: 'server/api/admin/pass-types/[id]/index.get.ts', exempt: 'reads one pass product and the shows it may cover' },

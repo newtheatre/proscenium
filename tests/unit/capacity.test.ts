@@ -6,6 +6,7 @@ import {
   capacityRefusal,
   holdsSeat,
   loweringRefusal,
+  saysReservationStatus,
   seatsHeldBy,
 } from '#shared/utils/capacity'
 import type { ReservationStatus } from '#shared/utils/capacity'
@@ -104,5 +105,14 @@ describe('capacity cannot be lowered under what is already held (D-105 criterion
   test('closing a house that has sold reads the same way, in the singular', () => {
     expect(loweringRefusal(0, 1))
       .toBe('1 ticket is already held on this performance, so its capacity cannot be 0')
+  })
+})
+
+// D-129's "collected" column reads the status, so every one of them needs a label.
+describe('every reservation status has a wording for a report (D-129)', () => {
+  test.each([...RESERVATION_STATUSES])('%s says something, and never the bare status', (status) => {
+    const said = saysReservationStatus(status)
+    expect(said.length).toBeGreaterThan(0)
+    expect(said).not.toBe(status)
   })
 })
