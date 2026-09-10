@@ -1,4 +1,4 @@
-# 0062: A period close is a row appended, never a flag on the ledger
+# 0064: A period close is a row appended, never a flag on the ledger
 
 - Status: Accepted
 - Date: 2026-09-10
