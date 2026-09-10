@@ -254,11 +254,25 @@ export const tillSessions = sqliteTable('till_sessions', {
   openedAt: integer('opened_at').notNull().default(now),
   closedBy: text('closed_by').references(() => users.id, { onDelete: 'restrict' }),
   closedAt: integer('closed_at'),
+  // Written once, with the close itself (F-118 criterion 3): the night's own expected figure,
+  // never a later edit, so these four are as append-only as a one-time write can be.
+  expectedTotalPence: integer('expected_total_pence'),
+  actualZPence: integer('actual_z_pence'),
+  variancePence: integer('variance_pence'),
+  varianceNote: text('variance_note'),
 }, table => [
   uniqueIndex('till_sessions_one_open_per_venue_night').on(table.venueId, table.night).where(sql`closed_at IS NULL`),
   index('till_sessions_unclosed').on(table.night).where(sql`closed_at IS NULL`),
   check('till_sessions_close_is_whole', sql`(${table.closedAt} IS NULL) = (${table.closedBy} IS NULL)`),
   check('till_sessions_closes_after_it_opens', sql`${table.closedAt} IS NULL OR ${table.closedAt} >= ${table.openedAt}`),
+  // The reconciliation figures are exactly as present as the close itself (F-118 criterion 3).
+  check('till_sessions_reconciliation_is_whole', sql`
+    (${table.closedAt} IS NULL) = (${table.expectedTotalPence} IS NULL)
+    AND (${table.closedAt} IS NULL) = (${table.actualZPence} IS NULL)
+    AND (${table.closedAt} IS NULL) = (${table.variancePence} IS NULL)
+  `),
+  // A note is mandatory exactly when the reader disagreed with the ledger, optional when it agreed.
+  check('till_sessions_variance_needs_a_note', sql`${table.variancePence} IS NULL OR ${table.variancePence} = 0 OR ${table.varianceNote} IS NOT NULL`),
 ])
 
 // At most one open stocktake estate-wide: the unique value the partial index covers is always

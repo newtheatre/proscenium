@@ -8,6 +8,7 @@ import { currentShowNight } from '#shared/utils/show-night'
 import type { IdType, InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
 import type { Discount } from '#shared/utils/discounts'
 import type { PricedBasket, PricedLine, SaleCatalogue, SaleChoice, SaleProduct, SaleReceipt, SaleVariant } from '#shared/utils/sale'
+import type { NightReconciliation } from '#shared/utils/reconciliation'
 import type { TillSession } from '#shared/utils/till'
 
 definePageMeta({ layout: 'tonight' })
@@ -67,23 +68,61 @@ async function open(): Promise<void> {
   }
 }
 
-async function close(): Promise<void> {
+// The expected figure before anyone commits to closing (F-102 criterion 4, F-118 criterion 3).
+const closeModalOpen = ref(false)
+const reconciliation = ref<NightReconciliation | null>(null)
+const reconciliationLoading = ref(false)
+const reconciliationFailure = ref<string | null>(null)
+const actualZPounds = ref<number | undefined>(undefined)
+const varianceNote = ref('')
+const closingBusy = ref(false)
+const closeFailure = ref<string | null>(null)
+
+const actualZPence = computed(() => Math.round((actualZPounds.value ?? 0) * 100))
+const variancePreviewPence = computed(() => (reconciliation.value ? actualZPence.value - reconciliation.value.bar.expectedPence : 0))
+
+async function openCloseModal(): Promise<void> {
   if (!session.value) return
-  busy.value = true
-  failure.value = null
+  closeModalOpen.value = true
+  reconciliation.value = null
+  reconciliationFailure.value = null
+  actualZPounds.value = undefined
+  varianceNote.value = ''
+  closeFailure.value = null
+  reconciliationLoading.value = true
+  try {
+    reconciliation.value = await request<NightReconciliation>(`/api/till/${session.value.id}/reconciliation`)
+  }
+  catch (refused) {
+    reconciliationFailure.value = refusalText(refused)
+  }
+  finally {
+    reconciliationLoading.value = false
+  }
+}
+
+async function confirmClose(): Promise<void> {
+  if (!session.value) return
+  closingBusy.value = true
+  closeFailure.value = null
   try {
     const closed = await request<{ session: TillSession }>('/api/till/close', {
       method: 'POST',
-      body: { id: session.value.id },
+      body: {
+        id: session.value.id,
+        actualZPence: actualZPence.value,
+        varianceNote: varianceNote.value.trim() || undefined,
+      },
     })
     session.value = closed.session
     syncedAt.value = new Date()
+    closeModalOpen.value = false
   }
   catch (refused) {
-    failure.value = refusalText(refused)
+    closeFailure.value = refusalText(refused)
   }
   finally {
-    busy.value = false
+    closingBusy.value = false
   }
 }
 
@@ -671,8 +710,8 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           label="Close till"
           icon="i-lucide-lock"
           color="error"
-          :loading="busy"
-          @press="close"
+          data-test="open-close-till"
+          @press="openCloseModal"
         />
         <NightAction
           v-else
@@ -810,6 +849,116 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             @click="refuseAgeCheck"
           >
             Confirm refusal
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="closeModalOpen"
+      title="Close till"
+      description="What the ledger expects, and what the reader actually shows."
+      @update:open="closeModalOpen = $event"
+    >
+      <template #body>
+        <div
+          v-if="reconciliationLoading"
+          data-test="reconciliation-loading"
+          class="py-6 text-center text-sm text-muted"
+        >
+          Working it out&hellip;
+        </div>
+        <UAlert
+          v-else-if="reconciliationFailure"
+          data-test="reconciliation-failure"
+          color="error"
+          variant="subtle"
+          :description="reconciliationFailure"
+        />
+        <div
+          v-else-if="reconciliation"
+          class="space-y-4"
+        >
+          <dl
+            data-test="reconciliation-breakdown"
+            class="space-y-1 text-sm"
+          >
+            <div class="flex justify-between">
+              <dt>Card sales</dt>
+              <dd>{{ saysMoney(reconciliation.bar.cardSalesPence) }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt>Tab settlements</dt>
+              <dd>{{ saysMoney(reconciliation.bar.tabSettlementsPence) }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt>Comps ({{ reconciliation.bar.compsCount }})</dt>
+              <dd>{{ saysMoney(reconciliation.bar.compsForegonePence) }} foregone</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt>Discounts given</dt>
+              <dd>{{ saysMoney(reconciliation.bar.discountsPence) }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt>Refunds</dt>
+              <dd>{{ saysMoney(reconciliation.bar.refundsPence) }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt>Tab charges (credit extended)</dt>
+              <dd>{{ saysMoney(reconciliation.bar.tabChargesPence) }}</dd>
+            </div>
+            <div class="flex justify-between font-medium">
+              <dt>Expected on the reader, this bar</dt>
+              <dd data-test="expected-pence">
+                {{ saysMoney(reconciliation.bar.expectedPence) }}
+              </dd>
+            </div>
+            <div class="flex justify-between text-muted">
+              <dt>Desk takings, alongside</dt>
+              <dd>{{ saysMoney(reconciliation.deskTakingsPence) }}</dd>
+            </div>
+          </dl>
+
+          <UInputNumber
+            v-model="actualZPounds"
+            :min="0"
+            :step="0.5"
+            :format-options="{ style: 'currency', currency: 'GBP' }"
+            data-test="actual-z-input"
+          />
+
+          <UAlert
+            v-if="variancePreviewPence !== 0"
+            data-test="variance-preview"
+            color="warning"
+            variant="subtle"
+            :description="`${saysMoney(Math.abs(variancePreviewPence))} ${variancePreviewPence > 0 ? 'over' : 'under'} what the ledger expects. A note is needed before this can be recorded.`"
+          />
+
+          <UTextarea
+            v-if="variancePreviewPence !== 0"
+            v-model="varianceNote"
+            placeholder="Why does the reader disagree with the ledger?"
+            data-test="variance-note"
+          />
+
+          <UAlert
+            v-if="closeFailure"
+            data-test="close-failure"
+            color="error"
+            variant="subtle"
+            :description="closeFailure"
+          />
+
+          <UButton
+            block
+            color="error"
+            class="min-h-12"
+            :loading="closingBusy"
+            data-test="confirm-close-till"
+            @click="confirmClose"
+          >
+            Confirm close
           </UButton>
         </div>
       </template>

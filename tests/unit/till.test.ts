@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { isOpen, requireOpenSession } from '#server/utils/till'
-import { closeTillSessionForm, tillScopeForm } from '#shared/utils/till'
+import { closeTillSessionForm } from '#shared/utils/reconciliation'
+import { tillScopeForm } from '#shared/utils/till'
 import type { TillSession } from '#shared/utils/till'
 
 // F-102's write-path rules over a session object, with no database beneath them: the schema's
@@ -14,6 +15,10 @@ const aSession = (over: Partial<TillSession> = {}): TillSession => ({
   openedAt: 1000,
   closedBy: null,
   closedAt: null,
+  expectedTotalPence: null,
+  actualZPence: null,
+  variancePence: null,
+  varianceNote: null,
   ...over,
 })
 
@@ -57,12 +62,21 @@ describe('the till scope names a venue or a performance, and never a night (F-10
   })
 })
 
-describe('closing names which session', () => {
+describe('closing names which session and what the reader read (F-118 criterion 3)', () => {
   test('an empty id is refused', () => {
-    expect(closeTillSessionForm.safeParse({ id: '' }).success).toBe(false)
+    expect(closeTillSessionForm.safeParse({ id: '', actualZPence: 0 }).success).toBe(false)
   })
 
-  test('an id is enough', () => {
-    expect(closeTillSessionForm.safeParse({ id: 'till-1' })).toMatchObject({ success: true, data: { id: 'till-1' } })
+  test('an id and the reader\'s own reading are enough; a note is not required by the shape alone', () => {
+    expect(closeTillSessionForm.safeParse({ id: 'till-1', actualZPence: 2500 }))
+      .toMatchObject({ success: true, data: { id: 'till-1', actualZPence: 2500 } })
+  })
+
+  test('the reader\'s reading is required: whether it varies from expected is the route\'s own question', () => {
+    expect(closeTillSessionForm.safeParse({ id: 'till-1' }).success).toBe(false)
+  })
+
+  test('a negative reading is refused: the reader never shows less than nothing', () => {
+    expect(closeTillSessionForm.safeParse({ id: 'till-1', actualZPence: -1 }).success).toBe(false)
   })
 })

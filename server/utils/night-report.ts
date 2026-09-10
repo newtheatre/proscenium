@@ -1,7 +1,9 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { heldSeatsSubquery } from './capacity'
+import { cardSalesQuery } from './reconciliation'
 import { OFFICER_BYPASS_ACTION, officerBypassTarget } from '#shared/utils/night-authority'
+import { showNightBounds } from '#shared/utils/show-night'
 import type { SQL } from 'drizzle-orm'
 
 // The night report compiler (E-123). Every figure derives from the ledger and the registers at
@@ -28,28 +30,41 @@ export async function reportAttendance(performanceId: string): Promise<ReportAtt
 
 export interface TenderTotal { tender: string, totalPence: number }
 
+// A performance's own lines for the desk, and the whole show night's for the bar: a bar line
+// never carries a performance_id (F-105 posts a basket for the night, not one house), so the
+// same join that works for the desk always reads zero for the till (F-118).
+type TakingsScope = { performanceId: string } | { night: string }
+
+function scopeWindow(scope: TakingsScope): SQL {
+  if ('performanceId' in scope) return sql`ll.performance_id = ${scope.performanceId}`
+  const { from, to } = showNightBounds(scope.night)
+  const fromAt = Math.floor(from.getTime() / 1000)
+  const toAt = Math.floor(to.getTime() / 1000)
+  return sql`le.happened_at >= ${fromAt} AND le.happened_at < ${toAt}`
+}
+
 // One row per tender actually used; a tender nobody took tonight is simply absent; the caller
 // fills zeroes for display rather than this carrying every possible value (criterion 1).
-export function reportTakingsQuery(performanceId: string, source: 'DESK' | 'TILL'): SQL {
+export function reportTakingsQuery(scope: TakingsScope, source: 'DESK' | 'TILL'): SQL {
   return sql`
     SELECT le.tender AS tender, sum(ll.amount_pence) AS totalPence
     FROM ledger_entries le
     JOIN ledger_lines ll ON ll.entry_id = le.id
-    WHERE le.source = ${source} AND ll.performance_id = ${performanceId}
+    WHERE le.source = ${source} AND ${scopeWindow(scope)}
     GROUP BY le.tender
   `
 }
 
 // Foregone revenue, never a silent gap (criterion 2): a comp's line total and a discount's own
 // pence both come from the lines actually written, not from the entry's post-discount total.
-export function reportForegoneQuery(performanceId: string, source: 'DESK' | 'TILL'): SQL {
+export function reportForegoneQuery(scope: TakingsScope, source: 'DESK' | 'TILL'): SQL {
   return sql`
     SELECT
       coalesce(sum(CASE WHEN le.tender = 'COMP' THEN ll.amount_pence ELSE 0 END), 0) AS compsPence,
       coalesce(sum(ll.discount_pence), 0) AS discountsPence
     FROM ledger_entries le
     JOIN ledger_lines ll ON ll.entry_id = le.id
-    WHERE le.source = ${source} AND ll.performance_id = ${performanceId}
+    WHERE le.source = ${source} AND ${scopeWindow(scope)}
   `
 }
 
@@ -58,16 +73,16 @@ export interface ReportTakings {
   bar: { tenders: TenderTotal[], compsPence: number, discountsPence: number }
 }
 
-async function takingsFor(performanceId: string, source: 'DESK' | 'TILL'): Promise<ReportTakings['desk']> {
+async function takingsFor(scope: TakingsScope, source: 'DESK' | 'TILL'): Promise<ReportTakings['desk']> {
   const [tenders, [foregone]] = await Promise.all([
-    db.all<TenderTotal>(reportTakingsQuery(performanceId, source)),
-    db.all<{ compsPence: number, discountsPence: number }>(reportForegoneQuery(performanceId, source)),
+    db.all<TenderTotal>(reportTakingsQuery(scope, source)),
+    db.all<{ compsPence: number, discountsPence: number }>(reportForegoneQuery(scope, source)),
   ])
   return { tenders, compsPence: foregone?.compsPence ?? 0, discountsPence: foregone?.discountsPence ?? 0 }
 }
 
-export async function reportTakings(performanceId: string): Promise<ReportTakings> {
-  const [desk, bar] = await Promise.all([takingsFor(performanceId, 'DESK'), takingsFor(performanceId, 'TILL')])
+export async function reportTakings(performanceId: string, night: string): Promise<ReportTakings> {
+  const [desk, bar] = await Promise.all([takingsFor({ performanceId }, 'DESK'), takingsFor({ night }, 'TILL')])
   return { desk, bar }
 }
 
@@ -185,20 +200,27 @@ export async function reportStaffing(performanceId: string, venueId: string, nig
 
 export interface ReportBarSummary { revenuePence: number, itemsSold: number }
 
-// Bar takings already appear under `takings.bar`; this is the summary criterion 1 separately
-// names, items sold rather than pence, from the same lines with no ledger-entry join needed.
-export function reportBarSummaryQuery(performanceId: string): SQL {
+// Items sold, the one figure `barReconciliation` does not carry (criterion 1 names it
+// separately); revenue is F-118's own card-sales figure, so this report and till-close agree.
+export function reportBarItemsSoldQuery(night: string): SQL {
+  const { from, to } = showNightBounds(night)
+  const fromAt = Math.floor(from.getTime() / 1000)
+  const toAt = Math.floor(to.getTime() / 1000)
   return sql`
-    SELECT coalesce(sum(ll.amount_pence), 0) AS revenuePence, coalesce(sum(ll.qty), 0) AS itemsSold
-    FROM ledger_lines ll
-    JOIN ledger_entries le ON le.id = ll.entry_id
-    WHERE le.source = 'TILL' AND ll.performance_id = ${performanceId}
+    SELECT coalesce(sum(l.qty), 0) AS itemsSold
+    FROM ledger_lines l JOIN ledger_entries e ON e.id = l.entry_id
+    WHERE e.source = 'TILL' AND l.kind = 'BAR_ITEM' AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
   `
 }
 
-export async function reportBarSummary(performanceId: string): Promise<ReportBarSummary> {
-  const [row] = await db.all<ReportBarSummary>(reportBarSummaryQuery(performanceId))
-  return row ?? { revenuePence: 0, itemsSold: 0 }
+// Never a retyped figure (F-118 criterion 4): revenue is `cardSalesQuery`, the exact query
+// till-close reconciles card sales against, not a second one hand-written over the same lines.
+export async function reportBarSummary(night: string): Promise<ReportBarSummary> {
+  const [[cardSales], [items]] = await Promise.all([
+    db.all<{ cardSalesPence: number }>(cardSalesQuery(night)),
+    db.all<{ itemsSold: number }>(reportBarItemsSoldQuery(night)),
+  ])
+  return { revenuePence: cardSales?.cardSalesPence ?? 0, itemsSold: items?.itemsSold ?? 0 }
 }
 
 export interface ReportAccess { verified: number }
@@ -237,12 +259,12 @@ export interface NightReport {
 export async function compileNightReport(performanceId: string, venueId: string, night: string): Promise<NightReport> {
   const [attendance, takings, incidents, ageChecks, milestones, staffing, bar, access] = await Promise.all([
     reportAttendance(performanceId),
-    reportTakings(performanceId),
+    reportTakings(performanceId, night),
     reportIncidents(performanceId),
     reportAgeChecks(performanceId),
     reportMilestones(venueId, night),
     reportStaffing(performanceId, venueId, night),
-    reportBarSummary(performanceId),
+    reportBarSummary(night),
     reportAccess(performanceId),
   ])
   return { performanceId, attendance, takings, incidents, ageChecks, milestones, staffing, bar, access }
