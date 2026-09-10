@@ -153,7 +153,7 @@ describe('a Fellowship covers every show without being told about one (0023, D-1
   })
 })
 
-describe('an erased Fellow is refused, not silently admitted or silently failed (D-130, 0061)', () => {
+describe('an erased Fellow is refused, not silently admitted or silently failed (D-130, 0062)', () => {
   test('the contended write finds nothing to spend once the holder is a tombstone', async () => {
     const database = await createTestDatabase()
     try {
@@ -177,7 +177,7 @@ describe('an erased Fellow is refused, not silently admitted or silently failed 
         )))
       expect(written).toHaveLength(0)
 
-      // The pass itself was never written back over; it still reads exactly as issued (0061).
+      // The pass itself was never written back over; it still reads exactly as issued (0062).
       const [pass] = rows<{ status: string }>(database, 'SELECT status FROM passes WHERE id = ?', 'pass-fellow')
       expect(pass!.status).toBe('ACTIVE')
     }

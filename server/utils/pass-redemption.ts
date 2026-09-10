@@ -30,7 +30,7 @@ function coversShowClause(showId: string): SQL {
 }
 
 // Shared by both lookups below; `anonymised` is D-130's own guard, checked ahead of everything
-// else that decides a redemption (0061).
+// else that decides a redemption (0062).
 function stateColumns(showId: string): SQL {
   return sql`
     p.id AS id, p.user_id AS userId, p.status AS status, t.name AS passTypeName, t.status AS passTypeStatus,
@@ -152,7 +152,7 @@ export async function admissionForPerformance(passId: string, performanceId: str
 }
 
 // Criteria 2 and 3 as one predicate, re-asked here rather than trusted from an earlier read
-// (0003, 0061). Capacity is `passAdmissionTicketInsert`'s own.
+// (0003, 0062). Capacity is `passAdmissionTicketInsert`'s own.
 export function passAdmissionAllows(passId: string, performanceId: string, showId: string, now: number): SQL {
   return sql`
     NOT EXISTS (SELECT 1 FROM pass_admissions WHERE pass_id = ${passId} AND performance_id = ${performanceId})

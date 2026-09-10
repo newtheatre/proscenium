@@ -78,7 +78,7 @@ export interface PassRedemptionState {
   validUntil: number
   coversShow: boolean
   // Erased (D-130): checked ahead of everything else, since none of the other facts matter once
-  // nobody can any longer be reached through this account (0061).
+  // nobody can any longer be reached through this account (0062).
   anonymised?: boolean
 }
 

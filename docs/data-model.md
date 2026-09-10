@@ -144,7 +144,7 @@ A revoked fellowship stops future admissions and rewrites nothing (0023): awardi
 `server/utils/fellowship-pass.ts`'s pass insert in the same batch as the fellowship
 (A-127 criterion 3); revoking cancels that pass in the same batch as the revocation
 (`cancelFellowshipPassStatement`), and an anonymised holder never admits on it either way
-(0061). Every admission already taken stands, append-only and untouched (0010).
+(0062). Every admission already taken stands, append-only and untouched (0010).
 
 ### role_grants
 `id` PK · `user_id` → users cascade · `role` (namespace-free officer role, validated against

@@ -281,7 +281,7 @@ describe.skipIf(skip !== null)('the lifetime entitlement rides the pass model (0
     expect(stillAdmitted!.total).toBe(1)
   })
 
-  test('an erased Fellow is refused at the door, not silently admitted (0061)', async () => {
+  test('an erased Fellow is refused at the door, not silently admitted (0062)', async () => {
     const doorOfficer = await registerMember(app, 'door-for-fellows', password)
     await send('POST', '/api/admin/roles', { userId: doorOfficer.id, role: 'FOH_MANAGER' }, cookie)
 
@@ -299,7 +299,7 @@ describe.skipIf(skip !== null)('the lifetime entitlement rides the pass model (0
     const admissions = read<{ total: number }>('SELECT count(*) AS total FROM pass_admissions WHERE pass_id = ?', passId)
     expect(admissions!.total).toBe(0)
 
-    // The pass itself was never written back over (0061): it still reads exactly as issued.
+    // The pass itself was never written back over (0062): it still reads exactly as issued.
     const pass = read<{ status: string }>('SELECT status FROM passes WHERE id = ?', passId)
     expect(pass!.status).toBe('ACTIVE')
   }, CASE_TIMEOUT_MS)
