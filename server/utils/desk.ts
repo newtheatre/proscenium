@@ -1,6 +1,8 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { doorWordingFor } from './access-profiles'
 import { looksLikeReference } from '#shared/utils/reservations'
+import type { TicketTypeAccessKind } from '#shared/utils/ticket-types'
 import type { SQL } from 'drizzle-orm'
 
 // The desk screen (D-114): finding today's performance and a booking against it. Kept free of
@@ -87,6 +89,7 @@ export interface DeskTicketLine {
   ticketId: string
   ticketTypeName: string
   pricePaid: number
+  accessKind: TicketTypeAccessKind | null
 }
 
 export interface DeskReservationDetail {
@@ -99,6 +102,9 @@ export interface DeskReservationDetail {
   bookerName: string
   bookerEmail: string
   tickets: DeskTicketLine[]
+  // The booking and nothing more: null unless it holds an access or companion ticket, whatever
+  // else the booker's own profile carries (D-127 criterion 3, D-128 criterion 4).
+  doorWording: string | null
 }
 
 // Everything the collection screen shows in one read: who is being served, what they hold, and
@@ -107,7 +113,7 @@ export function deskReservationQuery(id: string): SQL {
   return sql`
     SELECT r.id AS id, r.reference AS reference, r.status AS status, p.id AS performanceId,
            s.title AS showTitle, p.starts_at AS startsAt,
-           u.name AS bookerName, u.email AS bookerEmail
+           r.user_id AS bookerUserId, u.name AS bookerName, u.email AS bookerEmail
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
     JOIN shows s ON s.id = p.show_id
@@ -118,7 +124,7 @@ export function deskReservationQuery(id: string): SQL {
 
 export function deskTicketsQuery(reservationId: string): SQL {
   return sql`
-    SELECT t.id AS ticketId, tt.name AS ticketTypeName, t.price_paid AS pricePaid
+    SELECT t.id AS ticketId, tt.name AS ticketTypeName, t.price_paid AS pricePaid, tt.access_kind AS accessKind
     FROM tickets t
     JOIN ticket_types tt ON tt.id = t.ticket_type_id
     WHERE t.reservation_id = ${reservationId} AND t.refunded_at IS NULL
@@ -127,8 +133,10 @@ export function deskTicketsQuery(reservationId: string): SQL {
 }
 
 export async function deskReservation(id: string): Promise<DeskReservationDetail | undefined> {
-  const [row] = await db.all<Omit<DeskReservationDetail, 'tickets'>>(deskReservationQuery(id))
+  const [row] = await db.all<Omit<DeskReservationDetail, 'tickets' | 'doorWording'> & { bookerUserId: string }>(deskReservationQuery(id))
   if (!row) return undefined
   const tickets = await db.all<DeskTicketLine>(deskTicketsQuery(id))
-  return { ...row, tickets }
+  const { bookerUserId, ...detail } = row
+  const holdsAccessTicket = tickets.some(ticket => ticket.accessKind !== null)
+  return { ...detail, tickets, doorWording: holdsAccessTicket ? await doorWordingFor(bookerUserId) : null }
 }

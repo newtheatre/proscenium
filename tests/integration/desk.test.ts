@@ -107,8 +107,8 @@ describe('deskReservationQuery and deskTicketsQuery read the collection screen i
       // D-116 needs this to scope tonight's duty-manager check to the right performance.
       expect(detail?.performanceId).toBe(seeded.performanceId)
 
-      const tickets = read<{ ticketId: string, ticketTypeName: string, pricePaid: number }>(database, deskTicketsQuery('r-1'))
-      expect(tickets).toEqual([{ ticketId: 't-1', ticketTypeName: 'Standard', pricePaid: 900 }])
+      const tickets = read<{ ticketId: string, ticketTypeName: string, pricePaid: number, accessKind: string | null }>(database, deskTicketsQuery('r-1'))
+      expect(tickets).toEqual([{ ticketId: 't-1', ticketTypeName: 'Standard', pricePaid: 900, accessKind: null }])
     })
   })
 })

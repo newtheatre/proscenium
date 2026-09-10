@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const result = await collect({ ...input, reservationId: id }, resolved.account.id, reservation.tickets)
+  const result = await collect({ ...input, reservationId: id }, resolved.account.id, reservation.tickets, reservation.performanceId)
 
   return { ok: true, ...result }
 })

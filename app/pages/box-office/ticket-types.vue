@@ -90,6 +90,12 @@ const pounds = computed({
   },
 })
 
+// A companion ticket is always free (D-128 criterion 3); the field is forced rather than left to
+// fail validation on submit.
+watch(() => state.accessKind, (accessKind) => {
+  if (accessKind === 'COMPANION') state.price = 0
+})
+
 const kindOptions = TICKET_TYPE_KINDS.map(kind => ({ label: saysTicketTypeKind(kind), value: kind }))
 const accessOptions = [
   { label: 'Neither', value: null },
@@ -400,12 +406,13 @@ const columns: TableColumn<TicketType>[] = [
             label="Base price"
             name="price"
             required
-            description="In pounds. A show or a performance can override it later."
+            :description="state.accessKind === 'COMPANION' ? 'A companion ticket is always free.' : 'In pounds. A show or a performance can override it later.'"
           >
             <UInputNumber
               v-model="pounds"
               :min="0"
               :step="0.5"
+              :disabled="state.accessKind === 'COMPANION'"
               :format-options="{ style: 'currency', currency: 'GBP' }"
               class="w-full"
               data-test="ticket-type-price"

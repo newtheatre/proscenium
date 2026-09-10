@@ -5,13 +5,13 @@ import { auditedWrite } from './audit'
 import { capacityAllows, heldSeatsQuery, reservationIsPending, ticketAdditionQueries, ticketInsertQueries, ticketRemovalQueries } from './capacity'
 import { auditEntry } from '#shared/utils/audit'
 import { normaliseEmail } from '#shared/utils/auth'
-import { capacityRefusal } from '#shared/utils/capacity'
+import { HOLDING_STATUSES, capacityRefusal } from '#shared/utils/capacity'
 import { generateReservationReference } from '#shared/utils/reservations'
 import { resolvePrice } from '#shared/utils/ticket-types'
 import type { TicketToWrite } from './capacity'
 import type { CapacityRefusal } from '#shared/utils/capacity'
 import type { ReservationSource, TicketTypeCount } from '#shared/utils/reservations'
-import type { PriceSource, TicketTypeRestriction } from '#shared/utils/ticket-types'
+import type { PriceSource, TicketTypeAccessKind, TicketTypeRestriction } from '#shared/utils/ticket-types'
 import type { SQL } from 'drizzle-orm'
 
 // Resolving what a performance may sell and writing what it sold (D-104). The predicate that
@@ -28,6 +28,7 @@ export interface BookableTicketTypeRow {
   performancePrice: number | null
   performanceActive: number | null
   restrictedTo: TicketTypeRestriction | null
+  accessKind: TicketTypeAccessKind | null
 }
 
 export interface BookableTicketType {
@@ -37,6 +38,7 @@ export interface BookableTicketType {
   price: number
   source: PriceSource
   restrictedTo: TicketTypeRestriction | null
+  accessKind: TicketTypeAccessKind | null
 }
 
 const readFlag = (value: number | null): boolean | null => (value === null ? null : value === 1)
@@ -56,27 +58,57 @@ export function readBookableTicketTypes(rows: BookableTicketTypeRow[], isMember:
     if (!resolved.active) return []
     return [{
       id: row.id, name: row.name, description: row.description, price: resolved.price,
-      source: resolved.source, restrictedTo: row.restrictedTo,
+      source: resolved.source, restrictedTo: row.restrictedTo, accessKind: row.accessKind,
     }]
   })
 }
 
-export function bookableTicketTypesQuery(performanceId: string, showId: string): SQL {
+// Nobody but an entitled booker is ever sent an access or companion row: `includeAccessTypes`
+// gates it here, not by filtering the response afterward (D-128 criterion 1).
+export function bookableTicketTypesQuery(performanceId: string, showId: string, includeAccessTypes: boolean): SQL {
+  const accessFilter = includeAccessTypes ? sql`` : sql` AND t.access_kind IS NULL`
   return sql`
     SELECT t.id AS id, t.name AS name, t.description AS description, t.price AS basePrice,
-           t.active_by_default AS activeByDefault, t.restricted_to AS restrictedTo,
+           t.active_by_default AS activeByDefault, t.restricted_to AS restrictedTo, t.access_kind AS accessKind,
            so.price AS showPrice, so.active AS showActive,
            po.price AS performancePrice, po.active AS performanceActive
     FROM ticket_types t
     LEFT JOIN show_ticket_overrides so ON so.show_id = ${showId} AND so.ticket_type_id = t.id
     LEFT JOIN performance_ticket_overrides po ON po.performance_id = ${performanceId} AND po.ticket_type_id = t.id
-    WHERE t.archived = 0 AND t.access_kind IS NULL AND t.kind = 'SINGLE'
+    WHERE t.archived = 0 AND t.kind = 'SINGLE'${accessFilter}
     ORDER BY t.price, t.name COLLATE NOCASE
   `
 }
 
-export async function bookableTicketTypes(performanceId: string, showId: string, isMember: boolean): Promise<BookableTicketType[]> {
-  return readBookableTicketTypes(await db.all<BookableTicketTypeRow>(bookableTicketTypesQuery(performanceId, showId)), isMember)
+export async function bookableTicketTypes(performanceId: string, showId: string, isMember: boolean, includeAccessTypes = false): Promise<BookableTicketType[]> {
+  return readBookableTicketTypes(await db.all<BookableTicketTypeRow>(bookableTicketTypesQuery(performanceId, showId, includeAccessTypes)), isMember)
+}
+
+export interface HeldAccessCounts {
+  access: number
+  companion: number
+}
+
+// What this booker already holds for this performance, any source, unrefunded: the "have" side
+// of the entitlement check, counted fresh rather than trusted from an earlier read (D-128 criterion 2).
+export function heldAccessCountsQuery(userId: string, performanceId: string): SQL {
+  return sql`
+    SELECT tt.access_kind AS accessKind, count(*) AS n
+    FROM tickets t
+    JOIN reservations r ON r.id = t.reservation_id
+    JOIN ticket_types tt ON tt.id = t.ticket_type_id
+    WHERE r.user_id = ${userId} AND t.performance_id = ${performanceId} AND t.refunded_at IS NULL
+      AND r.status IN (${sql.raw(HOLDING_STATUSES.map(status => `'${status}'`).join(', '))})
+      AND tt.access_kind IS NOT NULL
+    GROUP BY tt.access_kind
+  `
+}
+
+export async function heldAccessCounts(userId: string, performanceId: string): Promise<HeldAccessCounts> {
+  const rows = await db.all<{ accessKind: TicketTypeAccessKind, n: number }>(heldAccessCountsQuery(userId, performanceId))
+  const access = rows.find(row => row.accessKind === 'ACCESS')?.n ?? 0
+  const companion = rows.find(row => row.accessKind === 'COMPANION')?.n ?? 0
+  return { access: Number(access), companion: Number(companion) }
 }
 
 export interface ReservationLineToWrite {

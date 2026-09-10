@@ -1,11 +1,20 @@
+import { db, schema } from '@nuxthub/db'
 import { and, eq, like, lte, or, sql } from 'drizzle-orm'
-import type { H3Event } from 'h3'
+import { createError } from 'h3'
+// Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
+// Bun, where nothing is auto-imported (CONTRIBUTING).
+import { decryptAccessProfilePayload, encryptAccessProfilePayload } from './access-profile-crypto'
+import { auditedWrite } from './audit'
+import { configValue } from './configuration'
+import { auditEntry } from '#shared/utils/audit'
 import {
   ACCESS_FLAGS,
   WITHDRAWAL_TOMBSTONE_DAYS,
   asAccessProfileStatus,
+  doorWording,
   effectiveStatus,
 } from '#shared/utils/access-profiles'
+import type { H3Event } from 'h3'
 import type {
   AccessFlag,
   AccessProfilePayload,
@@ -56,6 +65,33 @@ export async function ownAccessProfile(userId: string, now = Date.now()): Promis
   const row = await rowFor(userId)
   if (!row) return null
   return shapeOwn(row, await payloadOf(row, userId), Math.floor(now / 1000))
+}
+
+export interface AccessEntitlementProfile {
+  status: AccessProfileStatus
+  consentFohAt: number | null
+  expiresAt: number | null
+  companions: number
+}
+
+// The columns entitlement needs and nothing else: no payload to decrypt, so this is safe on the
+// public booking route's own hot path (D-128 criterion 1).
+export async function accessEntitlementProfile(userId: string): Promise<AccessEntitlementProfile | null> {
+  const row = await rowFor(userId)
+  if (!row) return null
+  return { status: asAccessProfileStatus(row.status), consentFohAt: row.consentFohAt, expiresAt: row.expiresAt, companions: row.companions }
+}
+
+// What the desk's own scan screen shows for a booking that holds an access or companion ticket:
+// the agreed wording, decrypted for exactly this, or nothing at all (D-127 criterion 3).
+export async function doorWordingFor(userId: string, now = Date.now()): Promise<string | null> {
+  const row = await rowFor(userId)
+  if (!row) return null
+  const payload = await payloadOf(row, userId)
+  return doorWording(
+    { status: asAccessProfileStatus(row.status), consentFohAt: row.consentFohAt, expiresAt: row.expiresAt, fohNote: payload.fohNote },
+    Math.floor(now / 1000),
+  )
 }
 
 // Months from now, in whole calendar months: the expiry is an instant, but nobody thinks about

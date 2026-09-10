@@ -101,6 +101,7 @@ describe('a bookable price resolves the same chain the public listing does', () 
     performancePrice: null,
     performanceActive: null,
     restrictedTo: null,
+    accessKind: null,
     ...overrides,
   })
 

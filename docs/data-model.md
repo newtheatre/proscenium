@@ -434,6 +434,26 @@ is checked at collection instead. Entitlement is read from a session-scoped call
 into the cacheable public listing (`/api/whats-on`, `/api/shows/[slug]`), so those stay
 viewer-independent.
 
+**Access and companion tickets (D-128).** An `access_kind` row is offered to a booker only once
+their `access_profiles` row reads verified, consented and unexpired: `isEntitledToAccessTickets()`
+in `shared/utils/access-profiles.ts` is the exact same three gates `doorWording()` already asks,
+because booking eligibility and the door's own visibility are one question asked twice, never
+two. `bookableTicketTypesQuery()` takes an `includeAccessTypes` flag rather than filtering a
+result afterward, so an ineligible caller's response never contains the row at all. Entitlement
+is one access ticket (the holder's own seat) plus up to the verified `companions` figure, counted
+by `heldAccessCountsQuery()` against every ticket this booker already holds for the performance,
+any reservation source, unrefunded: a desk-made booking counts exactly as a web one does, because
+nothing yet writes a desk-sourced reservation to test that boundary against (see `reservations`,
+above). `POST /api/reservations` re-runs the same count immediately before writing and refuses
+naming the number, never the profile's contents (`accessEntitlementRefusal()`). A companion type
+is forced to price nought at creation (`newTicketTypeForm`'s own refinement) and again on any
+edit that would move an existing one off it, since the edit form carries no `access_kind` of its
+own to refine against; a companion ticket's `tickets.price_paid` therefore snapshots zero and the
+`TICKET_COLLECTION` ledger line D-114 posts at collection is zero-value by construction, with no
+special case in `server/utils/desk-collection.ts` at all. At the desk, `deskReservation()` adds
+`doorWording`, null unless the booking holds an access or companion ticket: the same wording
+D-127's own screen shows, resolved fresh from the booker's profile, never stored on the booking.
+
 ### show_ticket_overrides / performance_ticket_overrides
 `id` PK · parent (`show_id` → shows cascade, or `performance_id` → performances cascade) ·
 `ticket_type_id` → ticket_types restrict · UNIQUE (parent, ticket_type) · `price` NULL =

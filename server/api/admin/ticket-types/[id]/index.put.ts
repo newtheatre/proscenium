@@ -12,6 +12,9 @@ export default defineEventHandler(async (event) => {
   if (!held) throw createError({ statusCode: 404, statusMessage: 'No such ticket type' })
 
   const input = await readValidatedBodyOrThrow(event, ticketTypeForm)
+  if (held.accessKind === 'COMPANION' && input.price !== 0) {
+    throw createError({ statusCode: 400, statusMessage: 'A companion ticket is always free' })
+  }
   const description = input.description ?? null
   const priceChanged = input.price !== held.price
   // The description is prose, so the trail records that it moved and never what it says (0011).
