@@ -30,6 +30,10 @@ export default defineEventHandler(async (event) => {
     : ticketTypes.filter(type =>
         (type.accessKind !== 'ACCESS' || remaining.access > 0) && (type.accessKind !== 'COMPANION' || remaining.companion > 0))
 
+  // Offered automatically (D-125 criterion 1), same gate an ordinary ticket type sits behind:
+  // nothing is offered against a performance that is not on sale in the first place.
+  const redeemablePass = !refusal && account ? await redeemablePassFor(account.id, id, performance.showId, now) : null
+
   return {
     performanceId: id,
     showId: performance.showId,
@@ -37,5 +41,6 @@ export default defineEventHandler(async (event) => {
     cap: await configValue(event, 'PUBLIC_ORDER_SEAT_CAP'),
     ticketTypes: visible,
     accessEntitlement: remaining,
+    redeemablePass,
   }
 })

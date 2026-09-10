@@ -18,6 +18,12 @@ interface AccessEntitlement {
   companion: number
 }
 
+interface RedeemablePass {
+  id: string
+  reference: string
+  passTypeName: string
+}
+
 interface BookingInfo {
   performanceId: string
   showId: string
@@ -25,6 +31,7 @@ interface BookingInfo {
   cap: number
   ticketTypes: BookableTicketType[]
   accessEntitlement: AccessEntitlement | null
+  redeemablePass: RedeemablePass | null
 }
 
 interface Confirmation {
@@ -109,6 +116,31 @@ async function book(): Promise<void> {
   }
 }
 
+// D-125: redeeming a pass is a separate, zero-value action from choosing paid ticket lines above,
+// never a quantity in `lines` (a pass admits, it is not a ticket type on sale, criterion 1).
+const redeeming = ref(false)
+const redeemNotice = ref<string | null>(null)
+const redemption = ref<Confirmation | null>(null)
+
+async function redeemPass(): Promise<void> {
+  if (!data.value?.redeemablePass) return
+  redeemNotice.value = null
+  redeeming.value = true
+  try {
+    const result = await $fetch<Confirmation>(`/api/passes/${data.value.redeemablePass.id}/redeem`, {
+      method: 'POST',
+      body: { performanceId: performanceId.value },
+    })
+    redemption.value = result
+  }
+  catch (error) {
+    redeemNotice.value = refusalText(error)
+  }
+  finally {
+    redeeming.value = false
+  }
+}
+
 useSeoMeta({ title: 'Book tickets' })
 </script>
 
@@ -137,6 +169,34 @@ useSeoMeta({ title: 'Book tickets' })
         <UButton
           :to="`/qr/${confirmation.qrToken}`"
           data-test="view-booking"
+        >
+          View your booking
+        </UButton>
+        <UButton
+          to="/whats-on"
+          variant="link"
+        >
+          Back to what's on
+        </UButton>
+      </div>
+    </div>
+
+    <div
+      v-else-if="redemption"
+      class="mt-8 space-y-3"
+      data-test="pass-redeemed"
+    >
+      <UAlert
+        color="success"
+        variant="subtle"
+        icon="i-lucide-ticket"
+        title="Pass redeemed"
+        :description="`Reference ${redemption.reference}. Your pass admits you to this performance; nothing further is due.`"
+      />
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          :to="`/qr/${redemption.qrToken}`"
+          data-test="view-redemption"
         >
           View your booking
         </UButton>
@@ -200,6 +260,37 @@ useSeoMeta({ title: 'Book tickets' })
         :description="`Your access entitlement: ${data!.accessEntitlement.access} access ticket and up to ${data!.accessEntitlement.companion} companion ticket(s) still available for this performance.`"
         data-test="access-entitlement"
       />
+
+      <UCard
+        v-if="data!.redeemablePass"
+        data-test="redeemable-pass"
+      >
+        <template #header>
+          <h2 class="font-semibold">
+            Your pass
+          </h2>
+        </template>
+        <div class="flex items-center justify-between gap-4">
+          <p class="text-sm text-muted">
+            {{ data!.redeemablePass.passTypeName }} ({{ data!.redeemablePass.reference }}) covers this performance.
+          </p>
+          <UButton
+            :loading="redeeming"
+            data-test="redeem-pass"
+            @click="redeemPass"
+          >
+            Use my pass
+          </UButton>
+        </div>
+        <UAlert
+          v-if="redeemNotice"
+          class="mt-3"
+          color="error"
+          variant="subtle"
+          :description="redeemNotice"
+          data-test="redeem-notice"
+        />
+      </UCard>
 
       <UCard>
         <template #header>

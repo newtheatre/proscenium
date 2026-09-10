@@ -162,6 +162,8 @@ const CATALOGUE = {
   'pass.request.created': { label: 'Pass requested', module: 'ticketing', self: true },
   'pass.request.fulfilled': { label: 'Pass request fulfilled at issue', module: 'ticketing' },
   'pass.request.expired': { label: 'Pass request lapsed unfulfilled', module: 'ticketing' },
+  // Not `self`: D-126 and D-130 both write this for an officer acting on somebody else's pass.
+  'pass.redeemed': { label: 'Pass redeemed for a performance', module: 'ticketing' },
 
   // Module E: show night
 
