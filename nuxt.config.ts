@@ -67,18 +67,6 @@ export default defineNuxtConfig({
     defaultLocale: 'en-GB',
   },
 
-  robots: {
-    disallow: ROBOTS_DISALLOW,
-  },
-
-  // Only the server source lists URLs: the page scan would offer every console and member
-  // route, and the content scan the signed-in documentation (K-125).
-  sitemap: {
-    excludeAppSources: true,
-    sources: ['/api/__sitemap__/urls'],
-    credits: false,
-  },
-
   content: {
     database: {
       type: 'd1',
@@ -241,4 +229,16 @@ export default defineNuxtConfig({
   // @nuxtjs/seo pulls in og-image, whose renderer needs a WASM dependency the worker bundle
   // cannot externalise. Nothing uses OG images yet; enabling it is a deliberate Phase 2 act.
   ogImage: { enabled: false },
+
+  robots: {
+    disallow: ROBOTS_DISALLOW,
+  },
+
+  // Only the server source lists URLs: the page scan would offer every console and member
+  // route, and the content scan the signed-in documentation (K-125).
+  sitemap: {
+    excludeAppSources: true,
+    sources: ['/api/__sitemap__/urls'],
+    credits: false,
+  },
 })

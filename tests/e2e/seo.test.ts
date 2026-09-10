@@ -9,9 +9,8 @@ import { NOINDEX_PAGES, ROBOTS_DISALLOW, SITE_NAME } from '#shared/utils/seo'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// K-125 against the live routes: what a crawler is told, what a shared link carries, what a
-// search result reads, and where an old address lands. The lists themselves are pinned in
-// tests/unit/seo.test.ts against the navigation declaration.
+// K-125 against the live routes: what a crawler is told, what a shared link carries, and where
+// an old address lands. The lists themselves are pinned in tests/unit/seo.test.ts.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
