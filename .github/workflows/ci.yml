@@ -40,29 +40,7 @@ jobs:
       - name: Tests
         run: bun run test
 
-      - name: Comments
-        run: bun run check:comments
-
-      # A generated rebuild of an append-only table, or one that drops a cascade or a
-      # trigger the snapshot cannot re-emit (invariant 0010).
-      - name: Migrations
-        run: bun run check:migrations
-
-      # A policy page quoting a configuration key that does not exist would publish a rule
-      # the write path does not enforce (0012).
-      - name: Content tokens
-        run: bun run check:content-tokens
-
-      # A money path that writes the ledger itself is a path that can forget to (0004).
-      - name: Ledger
-        run: bun run check:ledger
-
-      # Anything but the notification centre reaching the mail binding skips every rule the
-      # centre enforces (0013).
-      - name: Notifications
-        run: bun run check:notifications
-
-      # A privileged mutation that records nothing is a gap nobody sees until it matters
-      # (J-101 criterion 5).
-      - name: Audit coverage
-        run: bun run check:audit
+      # The six invariant checkers. One step rather than six, because the runner runs all of
+      # them and names each failure as a GitHub annotation (`scripts/check.ts`).
+      - name: Checks
+        run: bun run check

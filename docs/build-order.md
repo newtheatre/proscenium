@@ -38,7 +38,7 @@ What shapes the order:
   catalogue and coverage in `shared/utils/audit-*.ts`, and `config.ts`, `personal-data.ts`,
   `site-nav.ts` and `personas.ts` beside them.
 - Merges to the integration branch are squash merges; the migration journal is one file; and
-  `check:migrations` refuses any rebuild of an existing table, so nothing may add a NOT NULL,
+  `check migrations` refuses any rebuild of an existing table, so nothing may add a NOT NULL,
   CHECK or foreign-key column to `rooms`, `users`, `ledger_*` or `training_*`. New tables point
   at old ones, never the reverse.
 
@@ -150,7 +150,7 @@ screens sit under `/bar`, not `/admin`: `/admin` means System and nothing else, 
 | Wave | Pull-request groups | Notes |
 | --- | --- | --- |
 | 1 | K-103 · K-105 harness + J-106 · K-108 + J-107 · K-112 · K-111 + A-126 | K-103 builds `useNightCache(key, loader)` against the placeholder and a seeded performance; show night and bar adopt it. K-105 here is only `tests/helpers/race.ts` and splitting `races.test.ts` and `money.test.ts` into per-invariant files, before D-105 and F-105 both try to fill the same file. J-106: verify the existing endpoint against its criteria and close. K-108 wakes `backup`; K-111 wakes `retention:sweep`. |
-| 2 | H-102 + H-104 · H-105 + H-106 · J-109 + J-110 · K-113 | H-105's retries are what `nights:close` and D-107 lean on. J-110 makes `check:content-tokens` real: keep it small and early. |
+| 2 | H-102 + H-104 · H-105 + H-106 · J-109 + J-110 · K-113 | H-105's retries are what `nights:close` and D-107 lean on. J-110 makes `check content-tokens` real: keep it small and early. |
 | 3 | A-119 · H-108 · K-114 + I-109 · J-105 | K-114 and I-109 import from `tickets` and `reservations`, not the old estate's near-empty `transactions` table (verified against production, 6 September 2026). K-116 no longer needs a wave: it resolved without a pull request, on the same verification finding no stock-movement history to transform (`docs/backlog/K-platform.md`). I-109 stays platform's: it shares K-114's import pipeline rather than the finance stream's own reporting surface. |
 | 4 | A-123 · K-104 | K-104 needs a real door write and a real till write to reconcile against. |
 
@@ -244,9 +244,9 @@ Provider first, consumer second. "If late" is what the consumer builds against m
 7. **A pull request that wakes a stub task** (`holds:release`, `shifts:remind`, `nights:close`,
    `backup`, `retention:sweep`) updates the task table in `architecture.md` and the row in
    `known-issues.md`.
-8. **Checker traps.** `check:ledger` reads comments, so do not write "insert" beside a ledger
-   table name. `check:notifications` rejects the bare identifier `EMAIL` in `server/**` outside
-   `notify.ts`. `check:comments` rejects an em dash in `.sql`, `.md` and `.json` too. Every new
+8. **Checker traps.** `check ledger` reads comments, so do not write "insert" beside a ledger
+   table name. `check notifications` rejects the bare identifier `EMAIL` in `server/**` outside
+   `notify.ts`. `check comments` rejects an em dash in `.sql`, `.md` and `.json` too. Every new
    table naming a person needs a `personal-data.ts` row and an erasure fixture.
 9. **The pull request description** names the story ids, quotes which criteria the tests pin,
    records any interpretation, and links the seam contract if it introduced one.
