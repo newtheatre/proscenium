@@ -1,0 +1,37 @@
+# Lives here, not only on unified/main, because GitHub only reads a schedule: trigger from a
+# workflow file on the repository's default branch. Until cutover the unified system is built on
+# unified/main, so this checks that deploy rather than main's own. Self-contained: it names no
+# repository code, so it needs no checkout and no ref pin to remove at cutover. At cutover,
+# unified/main's own copy of this file becomes the one that matters and this one is retired.
+name: Health watch
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: health-watch
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # No hardcoded fallback: a wrong default is the exact failure this variable exists to fix.
+      - name: Fail fast if HEALTH_URL is missing
+        run: |
+          if [ -z "${{ vars.HEALTH_URL }}" ]; then
+            echo "::error::HEALTH_URL must be set as a repository variable."
+            exit 1
+          fi
+
+      - name: Check the live health endpoint
+        run: |
+          if status=$(curl -fsS -o /tmp/health.json -w '%{http_code}' "${{ vars.HEALTH_URL }}") && [ "$status" = "200" ]; then
+            echo "Health endpoint reports ok."
+            exit 0
+          fi
+          echo "::error::${{ vars.HEALTH_URL }} did not report ok. Response:"
+          cat /tmp/health.json 2>/dev/null || echo "(no response body)"
+          exit 1
