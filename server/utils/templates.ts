@@ -500,6 +500,31 @@ The new code is not in this message: get it from tonight's duty manager.
 The Nottingham New Theatre`,
   }),
 
+  // No personal greeting: this reaches a committee-configured address as often as an account,
+  // and `sendRaw()` renders it once for every recipient (E-124 criterion 3).
+  'night-report-signed': (context: TemplateContext): Rendered => ({
+    subject: `Night report signed off: ${context.venueName}, ${context.night}`,
+    html: layout(`<p>Tonight's report at ${context.venueName} was signed off by ${context.signedByName}
+${context.officerBypass ? '(an officer, standing in for the duty manager)' : ''}.</p>
+<p>Closing note: ${context.closingNote}</p>`),
+    text: `Tonight's report at ${context.venueName} was signed off by ${context.signedByName}${context.officerBypass ? ' (an officer, standing in for the duty manager)' : ''}.
+
+Closing note: ${context.closingNote}
+
+The Nottingham New Theatre`,
+  }),
+
+  'night-report-addendum': (context: TemplateContext): Rendered => ({
+    subject: `Correction to the ${context.night} report: ${context.venueName}`,
+    html: layout(`<p>A correction was added to the signed-off report at ${context.venueName}, ${context.night}, by ${context.addedByName}.</p>
+<p>${context.note}</p>`),
+    text: `A correction was added to the signed-off report at ${context.venueName}, ${context.night}, by ${context.addedByName}.
+
+${context.note}
+
+The Nottingham New Theatre`,
+  }),
+
   // Good news, so it leads with it. The way out is in the same breath as the place, because a
   // place nobody uses is one somebody else was waiting for.
   'training-session-promoted': (context: TemplateContext): Rendered => {

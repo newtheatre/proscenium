@@ -348,7 +348,7 @@ Counts: 27 MVP stories (E-101 to E-127), 4 V2 stories (E-201 to E-204), 1 Later 
 - Role: Shift authority
 - Phase: MVP
 - Story: As tonight's duty manager, I want to sign off the night and have the report distribute itself so that the evening's record carries my name and reaches the people who need it.
-- Depends on: E-114, E-123; Prompt Book H-1
+- Depends on: E-114, E-123, H-105 (criterion 4's automatic retry until delivered and its operations-dashboard surfacing are H-105 and H-106's own build, not this story's; omitted from this line originally, corrected once building the story found it)
 - Acceptance criteria:
   1. Sign-off requires the E-114 checklist gate; the duty manager adds a closing note and signs, and the report freezes into an append-only row uniquely keyed to the performance, so a second report for the same night is impossible.
   2. Sign-off is available only under live shift authority (E-111); an officer closing instead of the duty manager is recorded and flagged as such.

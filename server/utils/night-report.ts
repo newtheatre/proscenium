@@ -1,9 +1,11 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { checklistFor } from './checklist'
 import { heldSeatsSubquery } from './capacity'
 import { cardSalesQuery } from './reconciliation'
 import { OFFICER_BYPASS_ACTION, officerBypassTarget } from '#shared/utils/night-authority'
 import { showNightBounds } from '#shared/utils/show-night'
+import type { ChecklistEntry } from './checklist'
 import type { SQL } from 'drizzle-orm'
 
 // The night report compiler (E-123). Every figure derives from the ledger and the registers at
@@ -251,12 +253,13 @@ export interface NightReport {
   staffing: ReportStaffingRow[]
   bar: ReportBarSummary
   access: ReportAccess
+  checklist: ChecklistEntry[]
 }
 
 // The whole report, one call, every section its own query run together (criterion 4: a draft
 // before close and a frozen read after E-124 exists run this identically).
 export async function compileNightReport(performanceId: string, venueId: string, night: string): Promise<NightReport> {
-  const [attendance, takings, incidents, ageChecks, milestones, staffing, bar, access] = await Promise.all([
+  const [attendance, takings, incidents, ageChecks, milestones, staffing, bar, access, checklist] = await Promise.all([
     reportAttendance(performanceId),
     reportTakings(performanceId, night),
     reportIncidents(performanceId),
@@ -265,6 +268,9 @@ export async function compileNightReport(performanceId: string, venueId: string,
     reportStaffing(performanceId, venueId, night),
     reportBarSummary(night),
     reportAccess(performanceId),
+    // Venue-and-night scoped like the checklist itself (E-114); an exception's reason now
+    // prints here, closing the gap E-114 criterion 5 left open.
+    checklistFor(venueId, night),
   ])
-  return { performanceId, attendance, takings, incidents, ageChecks, milestones, staffing, bar, access }
+  return { performanceId, attendance, takings, incidents, ageChecks, milestones, staffing, bar, access, checklist }
 }
