@@ -1,5 +1,12 @@
+import { db, schema } from '@nuxthub/db'
 import { and, eq, like, lte, or, sql } from 'drizzle-orm'
-import type { H3Event } from 'h3'
+import { createError } from 'h3'
+// Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
+// Bun, where nothing is auto-imported (CONTRIBUTING).
+import { decryptAccessProfilePayload, encryptAccessProfilePayload } from './access-profile-crypto'
+import { auditedWrite } from './audit'
+import { configValue } from './configuration'
+import { auditEntry } from '#shared/utils/audit'
 import {
   ACCESS_FLAGS,
   WITHDRAWAL_TOMBSTONE_DAYS,
@@ -7,6 +14,7 @@ import {
   doorWording,
   effectiveStatus,
 } from '#shared/utils/access-profiles'
+import type { H3Event } from 'h3'
 import type {
   AccessFlag,
   AccessProfilePayload,
