@@ -79,6 +79,9 @@ const CATALOGUE = {
 
   'membership.granted': { label: 'Membership recorded', module: 'identity' },
   'membership.confirmed': { label: 'Membership confirmed', module: 'identity' },
+  // Both name the claim and never the number or the reason (A-130 criterion 5, 0011).
+  'membership.claim.recorded': { label: 'Membership claim recorded', module: 'identity' },
+  'membership.claim.declined': { label: 'Membership claim declined', module: 'identity' },
   'account.method.added': { label: 'Sign-in method added', module: 'identity', self: true },
   'account.method.removed': { label: 'Sign-in method removed', module: 'identity', self: true },
   'account.email.changed': { label: 'Email address changed', module: 'identity', self: true },

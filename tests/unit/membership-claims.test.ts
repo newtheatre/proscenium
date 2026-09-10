@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { daysAfter, londonDay } from '#shared/utils/membership'
 import {
   CLAIM_STATUSES,
-  DECLINE_REASON_LIMIT,
+  CLAIM_REASON_LIMIT,
   canTransition,
   claimDeclineForm,
   membershipClaimForm,
@@ -34,7 +34,7 @@ describe('the claim state machine (A-130 criterion 1)', () => {
 
 describe('what a claim carries (A-130 criterion 1)', () => {
   const today = londonDay(new Date())
-  const good = { studentId: '20123456', startsOn: today, term: 1 }
+  const good = { studentId: '20123456', startsOn: today, term: 1 as const }
 
   test('a student number, a purchase day and a term of one or three years', () => {
     expect(membershipClaimForm.parse(good)).toEqual(good)
@@ -66,7 +66,7 @@ describe('declining needs a reason the member reads (A-130 criterion 3)', () => 
     expect(claimDeclineForm.safeParse({ reason: 'no' }).success).toBe(false)
     expect(claimDeclineForm.parse({ reason: '  Not on the SU list under that number  ' }).reason)
       .toBe('Not on the SU list under that number')
-    expect(claimDeclineForm.safeParse({ reason: 'x'.repeat(DECLINE_REASON_LIMIT + 1) }).success).toBe(false)
+    expect(claimDeclineForm.safeParse({ reason: 'x'.repeat(CLAIM_REASON_LIMIT + 1) }).success).toBe(false)
   })
 })
 
