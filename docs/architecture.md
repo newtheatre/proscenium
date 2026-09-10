@@ -272,6 +272,31 @@ caller resolves a term's dates from `GET /api/admin/finance/terms` before asking
 Closing a term reads its range from that same list and posts it through the ordinary close, which
 has no notion of "term" at all: a lock is a range and an optional label, whatever named it.
 
+### SU accounting exports (I-108)
+
+A period export (`GET /api/admin/finance/export?fromDay=...&toDay=...`) is one CSV row per
+ledger line in the range, categorised against `su_nominal_mappings`. Decision 0025 refuses a
+config key that holds a record, so the mapping from a `(kind, source)` pair to an SU nominal code
+is its own table, seeded from the posting table below and only ever `UPDATE`d, the same shape
+`incident_severity_config` already uses: nothing here creates or removes a pair, only changes
+what one maps to, and every change is audited with the from and to values (`finance.nominal-mapping.changed`).
+
+Nothing in the export is a computed total. Each row carries a ledger line's own signed
+`amount_pence`, exactly as `ledger_lines` stores it; a refund line is already negative at the
+source (`server/utils/refunds.ts`), so summing a category's rows reaches the same net figure
+I-106 reports for the same lines without this route deriving it a second way. A line whose pair
+has no mapping still exports, on its own row with an explicit `UNMAPPED` code (criterion 3),
+never dropped. The row count is capped (`SU_EXPORT_ROW_CAP`) and the nominal code column runs
+through `toCsv`'s formula-injection guard (D-129) like every other user-typed export cell.
+
+**An open period exports anyway, permitted but marked, never refused.** A treasurer may need a
+figure before closing (a return is due, a close is still being prepared), and refusing until
+close would make I-108 depend on a close that has its own separate warnings and workflow
+(I-107). `isRangeClosed()` checks the requested range against `period_locks` the same way a day
+is checked, and the response carries the answer as `x-period-status: closed|open` rather than a
+CSV column, so the file itself stays exactly the shape the SU's own import expects. A range only
+partly closed reads as open: nothing here assumes a term is closed in one row.
+
 ### The money paths
 
 The triple every path posts under. A module adding a money path adds a row here in the same pull

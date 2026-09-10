@@ -845,6 +845,30 @@ instead of `db.batch()`, and it is what turns that raise into a 409. A correctio
 today's date, in the open period, exactly as any other entry does; only `NEW.london_day` is
 judged, never what a correction names in `reverses_entry_id`.
 
+### su_nominal_mappings
+`id` PK · `kind`, `source` (a `ledger_lines.kind` / `ledger_entries.source` pair) · `nominal_code`
+NULL (unmapped) · `updated_by` → users set null · `updated_at`. Unique on `(kind, source)`.
+
+**One row per pair a ledger line can actually post under, seeded by migration and only ever
+`UPDATE`d (I-108), the same shape `incident_severity_config` already uses for committee
+configuration that is not a scalar setting.** Decision 0025 refuses a config key that holds a
+keyed record, so a mapping from every `(kind, source)` to an SU nominal code cannot live in
+`config`; this table is the alternative. Nothing here ever creates or removes a pair: the seed
+migration enumerates the posting table in `architecture.md`, and a change is an audited `UPDATE`
+(`finance.nominal-mapping.changed`, `server/utils/su-export.ts`'s `setNominalMapping`).
+`GET /api/admin/finance/nominal-mappings` lists it, `POST` changes one pair.
+
+**`GET /api/admin/finance/export?fromDay=...&toDay=...`** is one CSV row per ledger line in the
+range, `le.london_day BETWEEN fromDay AND toDay`, joined against this table: a line whose pair
+has no mapping still exports, with an explicit `UNMAPPED` nominal code rather than a dropped or
+blank row (criterion 3). Every figure is the line's own signed `amount_pence`, read straight off
+the row: nothing here computes a total that could disagree with I-106's gross, refunded and net
+figures for the same range, because nothing here computes a total at all. Rows are capped at
+`SU_EXPORT_ROW_CAP` (`shared/utils/su-export.ts`), refused before the CSV is built rather than
+truncated silently. The export is audited (`finance.exported`) with who, when and the range.
+An open range exports anyway, permitted rather than refused: the `x-period-status` response
+header says `closed` or `open`, read from `period_locks` the same way a single day is (I-107).
+
 ## Show night (module E)
 
 ### shift_templates
