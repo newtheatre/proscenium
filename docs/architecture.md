@@ -369,6 +369,30 @@ written first and unconditionally (except for an anonymised account), so no pref
 address or provider failure can make a message unfindable. Every type carrying a topic declares
 the `INBOX` channel, and a unit test fails the build where one does not.
 
+## Operator documentation (J-109)
+
+One page per module under `content/docs/`, a second Nuxt Content collection (`content.config.ts`)
+alongside the public one D-103 built, excluded from its glob so operator documentation is never
+reachable through the public catch-all. `/docs` lists every page; `/docs/[...slug]` renders one,
+gated on nothing but a session (`signed-in` middleware), so an operational-only shift with no
+standing permission can still read the page for the screen in front of them (criterion 1). Both
+routes sit in `SHELL_NAV` alongside Tonight and Manage.
+
+**The in-app editor criterion 2 asks for does not exist,** the same interim state 0051 left the
+public pages in: a page is edited by editing the file and merging, and `updatedOn`/`updatedBy`
+frontmatter is set by whoever makes that edit rather than stamped by a system that does not exist
+yet (criterion 3's display half). What criterion 3 asks of an in-app edit, being audited, has
+nothing to audit until that editor is built; `docs/known-issues.md` names this rather than the
+route pretending to satisfy it.
+
+**Reporting drift is real.** Every page carries a "Report this page as out of date" action,
+`POST /api/docs/report-drift` (`server/api/docs/report-drift.post.ts`): a `docs.drift-reported`
+audit entry naming the page, and a transactional notification to every live `ADMIN`
+(`liveAdmins()`, the same audience `health:watch` already reaches) through the same `notify()`
+every other message goes through. There is no open-items list yet, the way safety's incidents or
+health's own alerting have one; today "visible to the IT Manager" means an immediate notification
+and a permanent line in the trail, not a triaged, closeable queue (criterion 4, `known-issues.md`).
+
 ## The show night (0014, E-110)
 
 The operational day runs 04:00 to 04:00 Europe/London, and `shared/utils/show-night.ts` is its
