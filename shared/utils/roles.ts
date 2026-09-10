@@ -114,6 +114,9 @@ export const PERMISSIONS = [
   // Reopening a closed period. Deliberately not TREASURER's: I-107 criterion 4 asks for an
   // administrator, so ADMIN's automatic grant of every permission is what answers it.
   'finance.reopen',
+  // Taking a copy of a period shaped for the SU's own accounting: general finance reading is
+  // not enough, echoing D-129's own distinct `ticketing.export` (I-108).
+  'finance.export',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
@@ -151,7 +154,7 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   SAFETY_OFFICER: ['safety.read', 'safety.write'],
   // Reads the ledger and everything built on it. Nothing in the old estate grants this role, so
   // the import cannot reach it (I-103).
-  TREASURER: ['finance.read', 'finance.write'],
+  TREASURER: ['finance.read', 'finance.write', 'finance.export'],
   // Season aggregates only, never the entry-level drill-down (I-105 criterion 5).
   COMMITTEE: ['finance.summary'],
 }
