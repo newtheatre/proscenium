@@ -652,6 +652,13 @@
       "when": 1789029167304,
       "tag": "0092_mature_living_tribunal",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "6",
+      "when": 1789030612767,
+      "tag": "0093_auto_close_within_24_hours",
+      "breakpoints": true
     }
   ]
 }
