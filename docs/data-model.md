@@ -2033,8 +2033,8 @@ fact about the past that deleting a record must not rewrite. `user_id` is the ex
 
 ### notification_digest_entries
 `id` PK · `user_id` cascade · `topic` CHECK `BOOKINGS|SHIFTS|TRAINING|ROOMS|ANNOUNCEMENTS` ·
-`type` · `subject` · `body` · `digest_log_id` NULL, references `notification_log.id` cascade ·
-`created_at`. Indexed on `(topic, user_id, digest_log_id)`.
+`type` · `subject` · `body` · `digest_log_id` NULL, no foreign key · `created_at`. Indexed on
+`(topic, user_id, digest_log_id)`.
 
 **A row is written when `notify()` holds a message for its topic's digest instead of sending
 (H-104 criterion 1).** Unclaimed and topic-bearing is what qualifies; a claimed call (0048) or one
@@ -2049,11 +2049,12 @@ before flushing is one scalar config key per topic (`NOTIFICATION_DIGEST_WINDOW_
 still-unclaimed row for that topic and person, not the latest: a fresh entry arriving after a claim
 starts its own window rather than joining the digest that already sent (H-104 criteria 2, 6).
 
-**`digest_log_id` cascades from `notification_log`.** An entry survives exactly as long as the
-send it was claimed into; there is no separate retention clock for this table; pruning the log row
-(H-105 criterion 5) takes its constituent entries with it. This is what "was I told about X"
-answers from (criterion 5): the entry names the change, and its log row (or absence of one, while
-still held) names the outcome.
+**`digest_log_id` carries no foreign key.** `notification_log` is rebuilt on every status it
+gains, and a cascading dependent on a table `check:migrations` already rebuilds is exactly what
+that check refuses (0052, 0061). An entry survives its send only until `daily:sweeps` notices its
+log row is gone (`NOT EXISTS`, scoped by subquery and capped, never an id list, 0003, 0006), which
+is what "was I told about X" answers from (criterion 5): the entry names the change, and its log
+row, while it lasts, names the outcome.
 
 ### inbox_items
 `id` PK · `user_id` cascade · `type` · `title` · `body` · `link` · `read_at` ·

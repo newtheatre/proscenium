@@ -184,15 +184,42 @@ describe('an entry outlives its own send only as long as the log row does (crite
     })
   })
 
-  test('pruning the log row takes its constituent entries with it, and nothing else', async () => {
+  test('a claimed entry whose log row still exists is not touched by the prune', async () => {
+    await withDatabase((database) => {
+      seedUser(database)
+      const entryId = hold(database, { createdAt: NOW - 61 * 60 })
+      loggedRow(database, 'digest-1')
+      claim(database, 'ROOMS', 'u1', 'digest-1')
+      expect(pruneOrphans(database)).toEqual([])
+      expect(rows(database, `SELECT id FROM notification_digest_entries WHERE id = ?`, entryId)).toEqual([{ id: entryId }])
+    })
+  })
+
+  // Exactly pruneOrphanedDigestEntries(): no foreign key does this automatically (0061, the
+  // rebuild-dependent check check:migrations refuses), so the prune notices the gone row itself.
+  function pruneOrphans(database: TestDatabase): string[] {
+    return (database.raw.prepare(
+      `DELETE FROM notification_digest_entries
+       WHERE id IN (
+         SELECT id FROM notification_digest_entries
+         WHERE digest_log_id IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM notification_log WHERE notification_log.id = notification_digest_entries.digest_log_id)
+       )
+       RETURNING id`,
+    ).all() as { id: string }[]).map(row => row.id)
+  }
+
+  test('pruning the log row leaves its constituent entries for this to notice and take', async () => {
     await withDatabase((database) => {
       seedUser(database)
       const claimed = hold(database, { id: 'claimed', createdAt: NOW - 61 * 60 })
-      const untouched = hold(database, { id: 'pending', createdAt: NOW })
       loggedRow(database, 'digest-1')
       claim(database, 'ROOMS', 'u1', 'digest-1')
+      // Held after the claim, so it is genuinely still pending rather than swept up with it.
+      const untouched = hold(database, { id: 'pending', createdAt: NOW })
 
       database.raw.prepare(`DELETE FROM notification_log WHERE id = 'digest-1'`).run()
+      expect(pruneOrphans(database)).toEqual([claimed])
 
       expect(rows(database, `SELECT id FROM notification_digest_entries WHERE id = ?`, claimed)).toEqual([])
       expect(rows(database, `SELECT id FROM notification_digest_entries WHERE id = ?`, untouched)).toEqual([{ id: untouched }])

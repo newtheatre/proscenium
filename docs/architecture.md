@@ -325,7 +325,7 @@ without naming it).
 | `0 11 * * *` | `passes:expire-requests` | Lapses a pending pass request once its product's own sales window has closed unfulfilled, capped per run like `holds:release` (`PASS_REQUEST_EXPIRE_BATCH_CAP`, D-124 criterion 3). |
 | `0 17 * * *` | `rooms:remind` | Tomorrow's room bookings, one message per member however many they hold, with the calendar file attached (C-113). Idempotent: a second run the same London day sends nothing, read from `notification_log` rather than a column. |
 | `12 0 * * *` | `nights:close` | Auto-closes unsigned night reports inside 24 hours, retries unsent report emails. |
-| `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, the send-log prune at `NOTIFICATION_LOG_RETENTION_MONTHS` (H-105 criterion 5, and retries are `notifications:retry`'s rather than this task's), unverified account expiry (0026), and the role-lapse work: one warning per holder covering every grant of theirs inside `ROLE_LAPSE_NOTICE_DAYS`, claimed per grant and expiry so moving a date re-arms it; a monthly digest to administrators on the first, carrying what is lapsing, what lapsed inside the prune window and every permanent grant; and the tidying of grants lapsed longer ago than `ROLE_GRANT_PRUNE_DAYS`. Both the warning and the tidy write the trail with no actor, which is what attributes them to system (A-119, 0009). |
+| `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, the send-log prune at `NOTIFICATION_LOG_RETENTION_MONTHS` (H-105 criterion 5, and retries are `notifications:retry`'s rather than this task's), the digest entries a pruned send left behind (H-104, 0061), unverified account expiry (0026), and the role-lapse work: one warning per holder covering every grant of theirs inside `ROLE_LAPSE_NOTICE_DAYS`, claimed per grant and expiry so moving a date re-arms it; a monthly digest to administrators on the first, carrying what is lapsing, what lapsed inside the prune window and every permanent grant; and the tidying of grants lapsed longer ago than `ROLE_GRANT_PRUNE_DAYS`. Both the warning and the tidy write the trail with no actor, which is what attributes them to system (A-119, 0009). |
 | `0 5 * * 1` | `backup` | A row-count and ledger-total manifest to R2 (the `BLOB` binding), independent of D1. A failure audits `backup.export-failed` rather than only logging. Point-in-time restore is D1 Time Travel, already automatic; the restore drill and its cadence are administered at `/admin/backups` (K-108, J-107). |
 | `0 4 1 * *` | `retention:sweep` | Two independent warnings (window and final) for an account approaching its inactivity threshold, a sign-in re-arming the claim by carrying `lastLoginAt` in its key; exempts a current member, a live role holder and an unsettled tab debtor; warns neither an unverified address nor an unclaimed guest, which are anonymised on their own clock without ever being written to; anonymises what is past its threshold, reusing `eraseAccount()`. Warnings and anonymisations carry a cap each (`RETENTION_WARNING_CAP`, `RETENTION_SWEEP_CAP`), and a run that hits one reports the figure in the digest rather than deferring the surplus. The digest always sends, dry-run or armed, since it is what the IT Manager reviews before arming (0011, A-126, K-111). |
 
@@ -390,10 +390,12 @@ digest can never hold itself for the next one and never duplicates the inbox. Th
 scalar keys, `NOTIFICATION_DIGEST_WINDOW_<TOPIC>_MINUTES`, shipped at 60 minutes each, and it
 opens at the earliest still-unclaimed entry, not the latest.
 
-An entry survives exactly as long as the `notification_log` row it was claimed into: pruning that
-row cascades its entries with it, so nothing prunes the digest ledger on its own clock, and
-"was I told about X" is answerable from the entry until the send itself ages out (H-105
-criterion 5).
+An entry survives exactly as long as the `notification_log` row it was claimed into, so "was I
+told about X" is answerable from the entry until the send itself ages out (H-105 criterion 5).
+There is no foreign key from `digest_log_id` to that row: `notification_log` is rebuilt on every
+status it gains, and a cascading dependent on a table `check:migrations` already rebuilds is
+exactly what that check refuses. `daily:sweeps` prunes an entry whose log row is gone instead,
+by `NOT EXISTS`, capped and scoped like every other sweep (0061).
 
 ## Operator documentation (J-109)
 

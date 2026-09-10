@@ -77,3 +77,19 @@ export async function sendDueDigests(event: H3Event | undefined, now = new Date(
   }
   return sent
 }
+
+// No foreign key ties `digest_log_id` to `notification_log` (0061), so a claimed entry outlives
+// its send until this notices; scoped by subquery and capped, never an id list (0003, 0006).
+export async function pruneOrphanedDigestEntries(): Promise<number> {
+  const pruned = await db.all<{ id: string }>(sql`
+    DELETE FROM notification_digest_entries
+    WHERE id IN (
+      SELECT id FROM notification_digest_entries
+      WHERE digest_log_id IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM notification_log WHERE notification_log.id = notification_digest_entries.digest_log_id)
+      LIMIT ${BATCH_CAP}
+    )
+    RETURNING id
+  `)
+  return pruned.length
+}

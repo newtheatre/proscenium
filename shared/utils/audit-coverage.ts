@@ -609,5 +609,6 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/dev/remind-shifts.post.ts', exempt: 'sends a reminder; the send is recorded in notification_log' },
   { route: 'server/api/dev/escalate-rota.post.ts', exempt: 'sends a digest; the send is recorded in notification_log' },
   { route: 'server/api/dev/retry-notifications.post.ts', exempt: 'runs the retry sweep; every attempt is recorded in notification_log' },
+  { route: 'server/api/dev/send-digests.post.ts', exempt: 'runs the digest sweep; every send is recorded in notification_log' },
   { route: 'server/api/dev/sign-in-as.post.ts', exempt: 'a development sign-in with no password, in no build' },
 ]

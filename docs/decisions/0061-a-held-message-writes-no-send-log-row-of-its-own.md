@@ -64,12 +64,15 @@ and deliverability guards do run again at the digest's send, because H-101 crite
 current address at send time regardless of when the underlying change happened; H-107's protections
 are unconditional and are not this decision's to relax.
 
-**An entry's retention rides on its digest's send.** `digest_log_id` references `notification_log`
-with `ON DELETE CASCADE`, so pruning the log row at `NOTIFICATION_LOG_RETENTION_MONTHS` (H-105
-criterion 5) takes its constituent entries with it, and nothing prunes
-`notification_digest_entries` on a clock of its own. An entry still held (`digest_log_id` null) has
-no parent to cascade from and is untouched by that prune, which is what "was I told about X" needs
-to keep answering while a change is still waiting for its window to close.
+**An entry's retention rides on its digest's send, but not through a foreign key.** A first attempt
+gave `digest_log_id` a cascading reference to `notification_log`, and `check:migrations` refused
+it: that table is rebuilt on every status it gains (three times already), and a cascading dependent
+on a table already rebuilt is exactly what 0052's check exists to catch, because the rebuild does
+not know to save and restore what a drop would take from a dependent nothing named to it explicitly.
+`daily:sweeps` prunes an entry whose `digest_log_id` names a row that is gone instead, by
+`NOT EXISTS`, scoped by subquery and capped like every other sweep (0003, 0006). An entry still
+held (`digest_log_id` null) has nothing to be missing yet and is untouched by that prune, which is
+what "was I told about X" needs to keep answering while a change waits for its window to close.
 
 ## Consequences
 
