@@ -108,6 +108,9 @@ export const PERMISSIONS = [
   'comms.operations',
   // Recording a daily Z reading and resolving a variance: the treasurer's own write (I-104).
   'finance.write',
+  // The season dashboard's aggregate figures, without the entry-level drill-down `finance.read`
+  // carries (I-105 criterion 5): the committee sees how the season is doing, not who rang it in.
+  'finance.summary',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
@@ -146,7 +149,8 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   // Reads the ledger and everything built on it. Nothing in the old estate grants this role, so
   // the import cannot reach it (I-103).
   TREASURER: ['finance.read', 'finance.write'],
-  COMMITTEE: [],
+  // Season aggregates only, never the entry-level drill-down (I-105 criterion 5).
+  COMMITTEE: ['finance.summary'],
 }
 
 // Any role holding a permission no other role does; losing the last holder locks everyone out.
