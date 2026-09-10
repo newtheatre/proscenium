@@ -10,7 +10,7 @@ import { londonDay } from '#shared/utils/membership'
 import { messageType } from '#shared/utils/notifications'
 import { currentShowNight } from '#shared/utils/show-night'
 import type { AudienceDefinition, ComposeAnnouncementInput } from '#shared/utils/announcements'
-import type { NotificationStatus } from '#shared/utils/notifications'
+import type { Outcome } from './notify'
 import type { Rendered } from '#server/utils/templates'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
@@ -120,7 +120,9 @@ export async function previewAnnouncement(event: H3Event, input: ComposeAnnounce
 
 export interface AnnouncementOutcome {
   recipientId: string
-  status: NotificationStatus
+  // Widened for `admin.announcement`, which carries the announcements topic and can join the
+  // next digest for it exactly like any other unclaimed, topic-bearing send (H-104).
+  status: Outcome
 }
 
 // One `notify()` call per recipient (criterion 2): every provider send carries one address, so no
