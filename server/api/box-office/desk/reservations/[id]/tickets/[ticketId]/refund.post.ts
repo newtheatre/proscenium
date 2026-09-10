@@ -32,7 +32,13 @@ export default defineEventHandler(async (event) => {
   // confirmed duty manager for this performance, scoped so a shift elsewhere does not reach it.
   const approverId = await requireRefundApproval(event, resolved, { performanceId: reservation.performanceId })
 
-  const result = await refundTicket({ reservationId: id, ticketId, pricePaid: ticket.pricePaid, actorId: approverId })
+  const result = await refundTicket({
+    reservationId: id,
+    ticketId,
+    pricePaid: ticket.pricePaid,
+    actorId: approverId,
+    performanceId: reservation.performanceId,
+  })
   if (!result.applied) {
     throw createError({ statusCode: 409, statusMessage: 'This ticket has already been refunded' })
   }
