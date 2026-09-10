@@ -267,18 +267,24 @@ export interface ReservationCurrentState {
   showTitle: string
   startsAt: number
   totalPence: number
+  exchangedToShowTitle: string | null
+  exchangedToStartsAt: number | null
 }
 
 // What the QR answers when it is presented: live, from this row, never from anything saved
-// earlier (D-108 criterion 1). "Exchanged" awaits D-111; "wrong night" is the door's own query.
+// earlier (D-108 criterion 1). "Wrong night" is the door's own query; exchanged is this row's pointer.
 export function reservationCurrentStateQuery(id: string): SQL {
   return sql`
     SELECT r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
            s.title AS showTitle, p.starts_at AS startsAt,
-           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence
+           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence,
+           xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
     JOIN shows s ON s.id = p.show_id
+    LEFT JOIN reservations x ON x.id = r.exchanged_to_reservation_id
+    LEFT JOIN performances xp ON xp.id = x.performance_id
+    LEFT JOIN shows xs ON xs.id = xp.show_id
     WHERE r.id = ${id}
   `
 }
@@ -297,6 +303,8 @@ export interface DoorReservationRow {
   showTitle: string
   startsAt: number
   totalPence: number
+  exchangedToShowTitle: string | null
+  exchangedToStartsAt: number | null
 }
 
 // By reference alone, not scoped to the performance selected at the door (E-127 criterion 3): a
@@ -305,10 +313,14 @@ export function reservationForDoorQuery(reference: string): SQL {
   return sql`
     SELECT r.id AS id, r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
            r.performance_id AS performanceId, s.title AS showTitle, p.starts_at AS startsAt,
-           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence
+           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence,
+           xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
     JOIN shows s ON s.id = p.show_id
+    LEFT JOIN reservations x ON x.id = r.exchanged_to_reservation_id
+    LEFT JOIN performances xp ON xp.id = x.performance_id
+    LEFT JOIN shows xs ON xs.id = xp.show_id
     WHERE r.reference = ${reference.toUpperCase()}
   `
 }
@@ -324,6 +336,7 @@ export interface SelfServiceReservation {
   userId: string | null
   performanceId: string
   showId: string
+  showSlug: string
   startsAt: number
 }
 
@@ -332,9 +345,10 @@ export interface SelfServiceReservation {
 export function selfServiceReservationQuery(id: string): SQL {
   return sql`
     SELECT r.id AS id, r.status AS status, r.user_id AS userId, r.performance_id AS performanceId,
-           p.show_id AS showId, p.starts_at AS startsAt
+           p.show_id AS showId, s.slug AS showSlug, p.starts_at AS startsAt
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
+    JOIN shows s ON s.id = p.show_id
     WHERE r.id = ${id}
   `
 }
@@ -356,6 +370,26 @@ export function currentTicketLinesQuery(reservationId: string): SQL {
 
 export async function currentTicketLines(reservationId: string): Promise<TicketTypeCount[]> {
   return db.all<TicketTypeCount>(currentTicketLinesQuery(reservationId))
+}
+
+export interface ExchangeableTicketLine extends TicketTypeCount {
+  accessKind: TicketTypeAccessKind | null
+}
+
+// What an exchange carries forward: the same grouping D-110's edit reads, with the access kind
+// so an access or companion line can be refused up front rather than as a type-not-found (D-111).
+export function exchangeableTicketLinesQuery(reservationId: string): SQL {
+  return sql`
+    SELECT t.ticket_type_id AS ticketTypeId, count(*) AS quantity, tt.access_kind AS accessKind
+    FROM tickets t
+    JOIN ticket_types tt ON tt.id = t.ticket_type_id
+    WHERE t.reservation_id = ${reservationId} AND t.refunded_at IS NULL
+    GROUP BY t.ticket_type_id, tt.access_kind
+  `
+}
+
+export async function exchangeableTicketLines(reservationId: string): Promise<ExchangeableTicketLine[]> {
+  return db.all<ExchangeableTicketLine>(exchangeableTicketLinesQuery(reservationId))
 }
 
 export interface NamedTicketLine extends TicketTypeCount {

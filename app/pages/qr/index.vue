@@ -20,12 +20,21 @@ interface Booking {
   totalDue: string | null
   qrSvg: string
   lines: NamedLine[]
+  exchangedTo: { showTitle: string, when: string } | null
 }
 
 interface BookableType {
   id: string
   name: string
   price: number
+}
+
+interface ExchangeOption {
+  id: string
+  startsAt: number
+  venueName: string
+  availability: string
+  says: string
 }
 
 const route = useRoute()
@@ -60,7 +69,9 @@ async function resend(payload: FormSubmitEvent<z.output<typeof reservationResend
   outcome.value = 'sent'
 }
 
-const display = computed(() => booking.value ? qrStatusDisplay(booking.value.status, booking.value.cancelledBy, booking.value.totalDue) : null)
+const display = computed(() => booking.value
+  ? qrStatusDisplay(booking.value.status, booking.value.cancelledBy, booking.value.totalDue, booking.value.exchangedTo)
+  : null)
 const resendHeadline = computed(() => (route.query.refused ? 'That link isn\'t valid' : 'Open your booking from your email'))
 
 // D-110: editing and cancelling while unpaid, both against the same cookie the QR page already
@@ -129,6 +140,48 @@ async function cancelBooking(): Promise<void> {
   }
   finally {
     cancelling.value = false
+  }
+}
+
+// D-111: moving the booking to another performance of the same show, while unpaid.
+const exchanging = ref(false)
+const exchangeLoading = ref(false)
+const exchangeSubmitting = ref(false)
+const exchangeFailure = ref<string | null>(null)
+const exchangeOptions = ref<ExchangeOption[]>([])
+const exchangeChoice = ref<string | undefined>(undefined)
+
+async function startExchange(): Promise<void> {
+  exchangeFailure.value = null
+  exchangeLoading.value = true
+  try {
+    const options = await $fetch<{ performances: ExchangeOption[] }>('/api/qr/exchange-options')
+    exchangeOptions.value = options.performances
+    exchangeChoice.value = undefined
+    exchanging.value = true
+  }
+  catch (error) {
+    exchangeFailure.value = refusalText(error)
+  }
+  finally {
+    exchangeLoading.value = false
+  }
+}
+
+async function submitExchange(): Promise<void> {
+  if (!exchangeChoice.value) return
+  exchangeSubmitting.value = true
+  exchangeFailure.value = null
+  try {
+    await $fetch('/api/qr/exchange', { method: 'POST', body: { performanceId: exchangeChoice.value } })
+    exchanging.value = false
+    await loadBooking()
+  }
+  catch (error) {
+    exchangeFailure.value = refusalText(error)
+  }
+  finally {
+    exchangeSubmitting.value = false
   }
 }
 
@@ -214,7 +267,7 @@ useSeoMeta({ title: 'Your booking' })
         />
 
         <div
-          v-if="booking.status === 'PENDING' && !editing"
+          v-if="booking.status === 'PENDING' && !editing && !exchanging"
           class="flex flex-wrap gap-2 pt-2"
         >
           <UButton
@@ -225,6 +278,15 @@ useSeoMeta({ title: 'Your booking' })
             @click="startEdit"
           >
             Change tickets
+          </UButton>
+          <UButton
+            data-test="booking-exchange-start"
+            color="neutral"
+            variant="subtle"
+            :loading="exchangeLoading"
+            @click="startExchange"
+          >
+            Exchange for another night
           </UButton>
           <UButton
             data-test="booking-cancel-start"
@@ -242,6 +304,55 @@ useSeoMeta({ title: 'Your booking' })
           variant="subtle"
           :description="editFailure"
         />
+
+        <UAlert
+          v-if="exchangeFailure"
+          color="error"
+          variant="subtle"
+          :description="exchangeFailure"
+        />
+
+        <div
+          v-if="exchanging"
+          class="space-y-3 border-t border-default pt-4"
+          data-test="booking-exchange-form"
+        >
+          <p class="text-sm text-muted">
+            Same tickets, another night of this show. Prices reflect that performance and may differ.
+          </p>
+          <URadioGroup
+            v-model="exchangeChoice"
+            :items="exchangeOptions.map(option => ({
+              label: `${option.venueName}: ${option.says}`,
+              value: option.id,
+              disabled: option.availability === 'SOLD_OUT' || option.availability === 'BOOKING_CLOSED',
+            }))"
+            data-test="booking-exchange-options"
+          />
+          <p
+            v-if="exchangeOptions.length === 0"
+            class="text-sm text-muted"
+          >
+            No other performance of this show is on sale right now.
+          </p>
+          <div class="flex gap-2">
+            <UButton
+              data-test="booking-exchange-submit"
+              :loading="exchangeSubmitting"
+              :disabled="!exchangeChoice"
+              @click="submitExchange"
+            >
+              Exchange booking
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              @click="exchanging = false"
+            >
+              Cancel
+            </UButton>
+          </div>
+        </div>
 
         <div
           v-if="editing"

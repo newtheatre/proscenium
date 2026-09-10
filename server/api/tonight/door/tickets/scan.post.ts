@@ -19,6 +19,9 @@ export default defineEventHandler(async (event) => {
     reservation.showTitle,
     formatLondon(new Date(reservation.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
     reservation.status === 'PENDING' ? saysPrice(reservation.totalPence) : null,
+    reservation.exchangedToShowTitle && reservation.exchangedToStartsAt
+      ? { showTitle: reservation.exchangedToShowTitle, when: formatLondon(new Date(reservation.exchangedToStartsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }) }
+      : null,
   )
 
   if (!outcome.admit) throw createError({ statusCode: 409, statusMessage: outcome.detail ?? outcome.headline })

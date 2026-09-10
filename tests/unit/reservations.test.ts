@@ -3,6 +3,7 @@ import { readBookableTicketTypes } from '#server/utils/reservations'
 import {
   RESERVATION_REFERENCE_LENGTH,
   belowMinimumTicketsReason,
+  differentShowReason,
   doorTicketOutcome,
   generateReservationReference,
   looksLikeReference,
@@ -13,6 +14,7 @@ import {
   reservationExchangeForm,
   reservationForm,
   reservationResendForm,
+  sameNightReason,
   ticketEditDelta,
   totalTickets,
 } from '#shared/utils/reservations'
@@ -195,6 +197,16 @@ describe('the door\'s own fifth state, wrong performance (E-127 criterion 3, D-1
     expect(doorTicketOutcome('EXPIRED', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Lapsed')
     expect(doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Admitted')
   })
+
+  test('an exchanged ticket points at where it went, not a plain cancellation (D-111)', () => {
+    const outcome = doorTicketOutcome(
+      'CANCELLED', 'CUSTOMER', 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null,
+      { showTitle: 'The Cherry Orchard', when: 'Saturday, 7:30pm' },
+    )
+    expect(outcome.headline).toBe('Exchanged')
+    expect(outcome.detail).toContain('The Cherry Orchard')
+    expect(outcome.admit).toBe(false)
+  })
 })
 
 describe('a resend is asked for by reference and email, not a token (criterion 2)', () => {
@@ -302,5 +314,27 @@ describe('D-111: exchange asks for a target performance and nothing else', () =>
 
   test('an empty id is refused', () => {
     expect(reservationExchangeForm.safeParse({ performanceId: '' }).success).toBe(false)
+  })
+})
+
+describe('D-111 criterion 5: only another performance of the same show is an exchange', () => {
+  test('the same show is allowed', () => {
+    expect(differentShowReason('show-1', 'show-1')).toBeNull()
+  })
+
+  test('a different show is refused, naming cancel and rebook as the way', () => {
+    const reason = differentShowReason('show-1', 'show-2')
+    expect(reason).not.toBeNull()
+    expect(reason).toContain('same show')
+  })
+})
+
+describe('an exchange into the performance already held is not a real exchange', () => {
+  test('a different performance is allowed', () => {
+    expect(sameNightReason('perf-1', 'perf-2')).toBeNull()
+  })
+
+  test('the same performance is refused', () => {
+    expect(sameNightReason('perf-1', 'perf-1')).not.toBeNull()
   })
 })
