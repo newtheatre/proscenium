@@ -437,6 +437,12 @@ export const CONFIG_KEYS = {
     workshop: 'people-and-communications',
     describes: 'How long a proven password step waits for its second factor before the person starts again.',
   },
+  REAUTH_WINDOW_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 10,
+    workshop: 'people-and-communications',
+    describes: 'How long a proven credential stays fresh enough to change a security setting or re-assert for a sensitive action before it is asked for again (A-128).',
+  },
   PRIVILEGED_ROLES: {
     schema: z.array(z.string()),
     default: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER'],
@@ -712,6 +718,7 @@ export const ENFORCED_KEYS = [
   'ADMIN_TOKEN_HOURS',
   'MAGIC_LINK_MINUTES',
   'MFA_ATTEMPT_MINUTES',
+  'REAUTH_WINDOW_MINUTES',
   'PASSWORD_MAX_LENGTH',
   'PASSWORD_MIN_LENGTH',
   'PASSWORD_REQUIRE_MIXED_CASE',

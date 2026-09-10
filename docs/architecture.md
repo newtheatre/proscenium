@@ -191,6 +191,14 @@ becomes interactive.
   person before it would sign, so the credential step and the second step happened at once
   (A-105). `nuxt-auth-utils` verifies both ceremonies with `requireUserVerification: false`, so
   that rule is enforced in `shared/utils/passkeys.ts` and checked in both handlers.
+- The session records which factor proved it (`shared/utils/session-factor.ts`), session-scoped
+  rather than read off the account: a passkey session counts as second-factor-satisfied for that
+  session only, and registering a passkey does not retroactively satisfy a password session
+  signed in elsewhere (A-128, 0066). A sensitive or destructive action re-asserts identity in
+  `ReauthenticateModal.vue` at the moment it is taken rather than forcing a full sign-out and
+  sign-in; `shared/utils/reauthentication.ts`'s `reauthOptions` decides what the modal may accept,
+  at least as strong as the factor that opened the session, resolved fresh against the account's
+  current methods every time.
 
 ```mermaid
 flowchart TD

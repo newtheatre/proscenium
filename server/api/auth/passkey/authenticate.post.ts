@@ -41,7 +41,7 @@ export default defineWebAuthnAuthenticateEventHandler({
     ])
 
     // No challenge follows: user verification on the authenticator is the second step, so a
-    // passkey is a complete sign-in (criterion 2).
-    await startSession(event, account)
+    // passkey is a complete sign-in, session-scoped (A-105 criterion 2; A-128 criteria 1 and 2).
+    await startSession(event, account, 'passkey')
   },
 })

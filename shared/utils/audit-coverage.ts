@@ -83,6 +83,9 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/account/profile.put.ts', actions: ['account.profile.updated'], via: ['server/utils/profile.ts'] },
   { route: 'server/api/account/profile.get.ts', exempt: 'reads your own profile' },
   { route: 'server/api/account/methods/index.get.ts', exempt: 'reads what the account signs in with' },
+  { route: 'server/api/account/reauthenticate/index.get.ts', exempt: 'reads what the modal may offer, writing nothing' },
+  { route: 'server/api/account/reauthenticate/password.post.ts', actions: ['session.reauthenticated'] },
+  { route: 'server/api/account/reauthenticate/passkey.post.ts', actions: ['session.reauthenticated'] },
   { route: 'server/api/auth/passkey/register.post.ts', actions: ['account.method.added'] },
   { route: 'server/api/auth/passkey/authenticate.post.ts', actions: ['session.started.passkey'] },
   { route: 'server/api/account/room-feed.get.ts', exempt: 'says whether your own feed exists' },
@@ -93,7 +96,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
     route: 'server/api/auth/verify/resend.post.ts',
     exempt: 'issues a token and asks for a message; the send is recorded in notification_log',
   },
-  { route: 'server/routes/auth/google.get.ts', actions: ['account.created.google', 'session.started.google'] },
+  { route: 'server/routes/auth/google.get.ts', actions: ['account.created.google', 'session.started.google', 'session.reauthenticated'] },
 
   // Module C: spaces
 

@@ -10,7 +10,7 @@ password; there is one unified app, so the old cross-app session contract does n
 passkeys enrolled against the old relying-party id cannot cross to the new one (SP-4 found one
 affected account, so no re-enrolment flow is built).
 
-**Counts: 28 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
+**Counts: 29 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
 
 Open questions for the committee:
 
@@ -24,8 +24,9 @@ Open questions for the committee:
 - Do the retention periods carried from the old estate (two years for full accounts, three for
   guests) remain right for a system that also holds booking history, and who reviews the first
   armed run of the sweep?
-- The old estate used 30-day sessions with a 10-minute freshness rule for sensitive actions. Should
-  the unified app, which serves money and safety surfaces from the same session, keep those numbers?
+- Answered by A-128, 10 September 2026: the ten-minute freshness rule carries forward as
+  `REAUTH_WINDOW_MINUTES`, now configurable and shared with A-109/A-110's own gate rather than
+  fixed. Session length itself is unchanged and remains open.
 
 ## A-101: Register with email and password
 
@@ -432,6 +433,45 @@ Open questions for the committee:
   time, and the committee is asked to confirm. Shipped that way on 30 August 2026 and recorded in
   known issues, so the question has somewhere to be answered rather than being lost in a story.
 - Source: Committee direction, 26 August 2026; decision 0023.
+
+## A-128: A passkey counts as a second factor, and sensitive actions re-assert it
+
+- Role: Member and officer identity
+- Phase: MVP
+- Story: As a member who signs in with a passkey, I want that to count as two factors so that I am
+  not asked for a code I do not have, and as the theatre I want a destructive action to be
+  re-confirmed at the moment it is taken.
+- Depends on: A-104, 0008
+- Context: A passkey is genuinely two factors in one gesture (something you have, unlocked by
+  something you are or know), so it should count. Matt's direction on 10 September 2026 is that it
+  counts per session, not per account, and that sensitive actions get a re-authentication modal
+  rather than being gated by account state. His words: "there will be some situations where the
+  password will need to be confirmed instead. Maybe confirmation modals can replace the sign-out
+  then sign-in in more situations?"
+- Acceptance criteria:
+  1. A session authenticated by a passkey is recorded as having satisfied a second factor, for
+     that session only. The session records which factor satisfied it and when.
+  2. Registering a passkey does not mark the account second-factor-satisfied. A password sign-in
+     on an account that happens to own a passkey still demands its own second factor, because a
+     passkey sitting unused on another device proves nothing about the person signing in now.
+  3. A sensitive or destructive action asks for re-authentication in a modal at the moment it is
+     taken, rather than refusing based on how the session began. The modal accepts a factor at
+     least as strong as the one that opened the session: a passkey session re-asserts the passkey;
+     a password session confirms the password, and its second factor where the account has one.
+  4. A Workspace account has no password to confirm (0008 forbids one existing, including via
+     import), so its re-authentication is a passkey assertion or a fresh Google assertion. A modal
+     that offers a password field to a Workspace account is a defect, not a fallback.
+  5. Re-authentication is fresh, with a short configurable window recorded in `docs/workshops.md`
+     as a proposed value. A confirmation from an hour ago does not authorise an action now.
+  6. Every place that currently forces a sign-out and sign-in to raise assurance is reviewed, and
+     each is either replaced by the modal or documented as needing the full re-entry, with the
+     reason.
+  7. Re-authentication is audited where its peers are (0049), with no personal free text in the
+     detail (0011).
+  8. Tests cover: a passkey session satisfying the factor; a password session on a passkey-owning
+     account not inheriting it; a stale confirmation refused; and a Workspace account offered no
+     password field.
+- Source: Matt, 10 September 2026.
 
 ## A-130: Claim a membership bought at the SU
 

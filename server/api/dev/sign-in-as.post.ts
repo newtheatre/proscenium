@@ -14,6 +14,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // The same session every other path writes, so what is being tested is the real thing (0007).
-  await startSession(event, account)
+  // 'password' is a stand-in: this bypass proves nothing about a factor.
+  await startSession(event, account, 'password')
   return { ok: true, name: account.name }
 })

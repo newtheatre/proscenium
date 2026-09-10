@@ -39,6 +39,6 @@ export default defineEventHandler(async (event) => {
     })),
   ])
 
-  await startSession(event, { ...account, verified: true })
+  await startSession(event, { ...account, verified: true }, 'magic-link')
   return { ok: true, mfaRequired: false as const, user: { id: account.id, name: account.name, email: account.email } }
 })

@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { verifyCode } from '#shared/utils/totp'
 
 const body = z.object({
   attemptId: z.string().min(10).max(64),
@@ -22,18 +21,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: 'Those details do not match an account' })
   }
 
-  const [factor] = await db.select().from(schema.totpSecrets)
-    .where(eq(schema.totpSecrets.userId, account.id)).limit(1)
+  const answer = await answerSecondFactor(account.id, input.code)
 
-  const totp = factor?.confirmedAt
-    ? await verifyCode(factor.secret, input.code, new Date(), factor.lastUsedStep)
-    : { accepted: false, step: null }
-
-  const recovery = totp.accepted
-    ? { redeemed: false, remaining: 0 }
-    : await redeemRecoveryCode(account.id, input.code)
-
-  if (!totp.accepted && !recovery.redeemed) {
+  if (!answer.accepted) {
     // A typo costs the code, not the password step: a fresh attempt is issued (criterion 2).
     const attemptId = await openAttempt(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'), auditEntry({
       actorId: account.id,
@@ -53,22 +43,22 @@ export default defineEventHandler(async (event) => {
       .where(eq(schema.users.id, account.id)),
     // A spent step is recorded so the same code cannot answer a second challenge.
     db.update(schema.totpSecrets)
-      .set({ lastUsedStep: totp.accepted ? totp.step : (factor?.lastUsedStep ?? null) })
+      .set({ lastUsedStep: answer.totpStep })
       .where(eq(schema.totpSecrets.userId, account.id)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: account.id,
-      action: totp.accepted ? 'session.started.totp' : 'session.started.recovery-code',
+      action: answer.factor === 'totp' ? 'session.started.totp' : 'session.started.recovery-code',
       target: `user:${account.id}`,
       // How many are left is the useful part of a recovery redemption (A-110 criterion 2).
-      detail: totp.accepted ? undefined : { remaining: recovery.remaining },
+      detail: answer.factor === 'totp' ? undefined : { remaining: answer.remaining },
     })),
   ])
 
-  await startSession(event, account)
+  await startSession(event, account, answer.factor === 'totp' ? 'totp' : 'recovery-code')
 
   return {
     ok: true,
     user: { id: account.id, name: account.name, email: account.email },
-    recoveryCodesRemaining: recovery.redeemed ? recovery.remaining : undefined,
+    recoveryCodesRemaining: answer.factor === 'recovery-code' ? answer.remaining : undefined,
   }
 })

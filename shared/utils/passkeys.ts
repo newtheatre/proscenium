@@ -30,6 +30,17 @@ export function authenticationOptions(): AuthenticationShape {
   return { userVerification: 'required', allowCredentials: [] }
 }
 
+export interface ReauthenticationShape {
+  userVerification: AuthenticatorSelectionCriteria['userVerification']
+  allowCredentials: { id: string }[]
+}
+
+// Named this time: reassertion already knows who is asking, so it is scoped to their own
+// credentials rather than left usernameless (A-128 criterion 3).
+export function reauthenticationOptions(credentialIds: string[]): ReauthenticationShape {
+  return { userVerification: 'required', allowCredentials: credentialIds.map(id => ({ id })) }
+}
+
 export function refusalForVerification(userVerified: boolean): string | null {
   return userVerified
     ? null
