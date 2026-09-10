@@ -560,6 +560,9 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['comms.announcement.sent'],
     via: ['server/utils/announcements.ts'],
   },
+  { route: 'server/api/admin/comms/send-log/index.get.ts', exempt: 'reads the send log; a filtered list is not a lookup on one person' },
+  { route: 'server/api/admin/comms/send-log/daily.get.ts', exempt: 'reads aggregate counts, naming nobody' },
+  { route: 'server/api/admin/comms/accounts/[id]/history.get.ts', actions: ['notifications.history.viewed'] },
 
   // Module I: finance
 

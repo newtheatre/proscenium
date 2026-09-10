@@ -103,6 +103,9 @@ export const PERMISSIONS = [
   // Composing a fan-out to a resolved audience (H-108). Open question 1 asks which roles beyond
   // ADMIN and whether a whole-membership send needs a second officer; unanswered, so narrow.
   'comms.announce',
+  // The send log and one person's history within it, the latter audited on its own (H-106
+  // criterion 5). Who beyond ADMIN holds this awaits the same open question.
+  'comms.operations',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

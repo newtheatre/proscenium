@@ -284,6 +284,9 @@ const CATALOGUE = {
   // Sender, audience definition and count; never the subject or body, which are prose (H-108
   // criterion 4, 0011). Per-recipient outcomes are `notification_log`'s own rows, not this.
   'comms.announcement.sent': { label: 'Announcement sent', module: 'communications' },
+  // A support lookup on somebody else's send history, recorded every time regardless of outcome
+  // (H-106 criterion 5).
+  'notifications.history.viewed': { label: 'Send history viewed', module: 'communications' },
 
   // Module I: finance
 
