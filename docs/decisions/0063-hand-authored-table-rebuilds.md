@@ -54,18 +54,41 @@ accepted, following this procedure:
    rows or a reference silently the moment the drop runs; one referenced with `restrict` or the
    SQLite default `no action` aborts the whole migration outright the first time a referencing
    row exists, which an empty development database never has and production eventually will.
-   `check:migrations` refuses this case unconditionally rather than trying to judge it safe:
-   a table with a `restrict` or `no action` dependent is rebuilt only alongside every dependent
-   that references it, in an order where nothing referencing `x` still exists in its old shape
-   when `x` itself is dropped. This is why E-125's rebuild of `night_reports` needs
-   `night_report_addenda` and `night_report_deliveries` rebuilt with it and E-128's does not:
-   nothing references `checklist_stamps` or `checklist_closes`.
-4. **Any hand-authored trigger on the table is dropped by `DROP TABLE x`** and is not in the
+   A table `x` with a `restrict` or `no action` dependent is rebuilt only alongside every
+   dependent that references it, in an order where nothing referencing `x` still exists in its
+   old shape when `x` itself is dropped: each dependent's own rows are copied into a holding
+   table, the dependent is dropped, `x` is rebuilt, and each dependent is recreated pointing at
+   the new `x` with its rows and its own triggers restored from the holding table. This is why
+   E-125's rebuild of `night_reports` needs `night_report_addenda` and `night_report_deliveries`
+   rebuilt with it and E-128's does not: nothing references `checklist_stamps` or
+   `checklist_closes`.
+4. **Correct ordering does not make `check:migrations` accept it.** `rebuildDependentProblems`
+   reads the *final* schema's dependents and refuses any `restrict`, `no action`, `cascade` or
+   `set null` dependent unconditionally; it has no notion of statement order within the file, so
+   a dependent correctly dropped, rebuilt and restored around `x` is refused exactly as an
+   unsafe one would be. Proved rather than assumed: a minimal two-table fixture (`parent`,
+   `child` referencing it with `restrict`), rebuilt in the provably correct order above, was run
+   through the real function and still produced "the rebuild's own DROP TABLE runs with foreign
+   keys still enforced, so the whole migration aborts the moment a referencing row exists." This
+   is a limitation of a static check, not a defect in a migration it refuses.
+
+   Two answers were rejected. Widening `GRANDFATHERED` waives the copying-column and
+   trigger-drop checks too, neither of which is over-approximating here, and turns a set
+   documented as a historical exemption into a general bypass with no ceremony attached. Teaching
+   the checker to parse statement order was rejected outright: a regex-based detector reasoning
+   about sequence is exactly where a subtle bug would hide, and the existing, simpler guard has
+   already caught real incidents (#757, #758, #760, #767, #772). The sanctioned answer is
+   `HAND_REVIEWED_REBUILDS` in `scripts/check-migrations.ts`, a second, narrower set that waives
+   `rebuildDependentProblems` alone. Every entry's comment names this record and states that the
+   ordering was verified against a real fixture, not merely reasoned about.
+5. **Any hand-authored trigger on the table is dropped by `DROP TABLE x`** and is not in the
    Drizzle snapshot, so nothing regenerates it. It is re-created in the same migration, after the
    rename, or the table stops being append-only the moment the migration runs, silently, since
    0010's own trigger-drop check is the only thing that would notice and it is a table `x`
    genuinely append-only, unlike `checklist_stamps` and `checklist_closes`, will actually need.
-5. **A hand-authored migration needs no paired `meta/x_snapshot.json` for `check:migrations` to
+   A dependent rebuilt under point 3 needs its own triggers re-created the same way, after it is
+   recreated, not only `x`'s.
+6. **A hand-authored migration needs no paired `meta/x_snapshot.json` for `check:migrations` to
    accept it**: a snapshot missing from the journal is a recognised shape, not a gap. It still
    needs a real one for Drizzle's own future diffing to stay correct, generated with
    `drizzle-kit generate --custom`, which reserves the journal entry and an empty `.sql` file
@@ -73,18 +96,22 @@ accepted, following this procedure:
    true post-migration shape before the hand-authored SQL is written into the reserved file.
    Skipping this step leaves the next real `drizzle-kit generate` diffing against a stale shape
    and proposing to redo, badly, what this migration already did by hand.
-6. **Existing rows are carried forward, not dropped.** Where the new key is unambiguous from the
+7. **Existing rows are carried forward, not dropped.** Where the new key is unambiguous from the
    data alone, the copying `INSERT` resolves it directly. Where it is not, the migration's own
    comment states which row the resolution chose and why, because that comment is the only record
    a successor has of the judgement made; nothing else remembers it.
 
 ## Consequences
 
-- `check:migrations`' refusal is unconditional and stays that way: this record does not add a
-  grandfather entry or a bypass flag. A hand-authored rebuild still passes every check that
-  applies to a generated one, because the checks are about correctness (an unresolved copying
-  column, a dropped trigger, a broken dependent), not about authorship.
-- Steps 1 to 5 apply to any table's rebuild, append-only or not. Step 6's judgement is specific to
+- `check:migrations`' refusal is unconditional for the copying-column and trigger-drop checks,
+  and stays that way: this record does not touch either. The one check it deliberately narrows,
+  `rebuildDependentProblems`, is waived only for a migration named in `HAND_REVIEWED_REBUILDS`,
+  never for `GRANDFATHERED`'s historical set, and only with a comment citing this record and the
+  fixture that verified the ordering. A hand-authored rebuild still passes every check that
+  applies to a generated one and is about correctness rather than authorship; the one exception
+  is named, narrow and reviewed, not silent.
+- Steps 1 to 6 apply to any table's rebuild, append-only or not. Step 7's judgement is specific to
   the data actually being moved and belongs in the migration that makes it, not repeated here.
 - E-128's migration and E-125's, once written, are this record's first two worked examples; both
-  cite it rather than re-deriving the procedure.
+  cite it rather than re-deriving the procedure. E-125's is also the first to use
+  `HAND_REVIEWED_REBUILDS`.
