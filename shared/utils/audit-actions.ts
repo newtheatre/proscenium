@@ -290,6 +290,8 @@ const CATALOGUE = {
 
   // Module I: finance
 
+  'finance.z-reading.recorded': { label: 'Daily Z reading recorded', module: 'finance' },
+
   // Module J: governance
 
   'membership.exported': { label: 'Membership register exported', module: 'governance' },
