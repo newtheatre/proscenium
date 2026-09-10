@@ -206,6 +206,24 @@ can be sequenced against the other pipeline's completion; both fail the GitHub A
 rather than passing silently. The `health:watch` task below is the third leg, for sustained
 unhealthiness reaching the IT Manager rather than a CI log.
 
+## Changing a published rule
+
+Every number on a policy page is read from the settings surface as the page loads (0012, J-110), so
+changing a rule is a settings change at `/admin/settings` and nothing else: no content edit, no
+release, no deploy. The page shows the new value on its next load.
+
+Three things worth knowing before doing it:
+
+- **A rule the system does not enforce says so on the page.** A setting nothing in the server reads
+  is marked "not enforced yet" beside its value, so publishing a rule the code does not apply is
+  visible to the reader rather than a quiet lie.
+- **A setting that holds personal data can never be quoted.** CI refuses a token naming one, and
+  the endpoint that answers the page refuses the key, so neither a preview nor a deploy publishes
+  committee addresses.
+- **The prose is a content edit and a deploy.** The sentences around the numbers live in
+  `content/policies/*.md` in the repository, so changing the wording is a pull request, while
+  changing the number is not. That split is deliberate (0012).
+
 ## Scheduled tasks
 
 Registered in `nuxt.config.ts` and mirrored in the wrangler cron triggers; the two lists must

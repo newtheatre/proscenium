@@ -107,7 +107,7 @@ describe.skipIf(skip !== null)('a rule nothing enforces says so (criterion 5)', 
 })
 
 describe.skipIf(skip !== null)('what a page may ask for (criterion 4)', () => {
-  // Keyed on the page, so this endpoint cannot be used to read a setting no page publishes.
+  // Keyed on the page, so no caller can read a setting that page does not already publish.
   test('it answers only for the keys the page itself names', async () => {
     const { values } = await valuesFor('/policies/rooms')
     expect(Object.keys(values)).toContain('ROOM_MAX_BOOKING_HOURS')

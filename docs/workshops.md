@@ -99,6 +99,11 @@ Not a setting: prose, not a number, and there is no default to propose (D-103). 
 marked `placeholder: true` until its copy lands, and clearing the flag is then a content edit,
 not a release.
 
+The two policy pages are a different case, and are not in this table: `content/policies/rooms.md`
+and `content/policies/booking.md` quote the live settings for every number they state (0012,
+J-110), so they cannot go stale as a number changes. What the committee owes them is a reading of
+the prose around the numbers, not a value.
+
 | Page | What is needed |
 | --- | --- |
 | `content/technical-specification.md` | Venue capacities, stage and wing dimensions, rigging, power and access, checked against the building rather than the old estate's copy, which may no longer be accurate. |
