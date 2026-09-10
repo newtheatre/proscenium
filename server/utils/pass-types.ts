@@ -145,10 +145,12 @@ const contains = (term: string): string => `%${term.replaceAll('\\', '\\\\').rep
 
 // Two bound parameters at most, whatever the filters and however many pass types there are (0003).
 function predicate(filters: PassTypeFilters): SQL {
-  const terms: SQL[] = []
+  // The reserved slug D-130's committee-awarded entitlement uses is nobody's to browse to and
+  // put on sale from this screen: excluded from the listing, not protected against a direct id.
+  const terms: SQL[] = [sql`t.slug != 'fellowship'`]
   if (filters.status) terms.push(sql`t.status = ${filters.status}`)
   if (filters.search) terms.push(sql`t.name LIKE ${contains(filters.search)} ESCAPE '\\'`)
-  return terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``
+  return sql` WHERE ${sql.join(terms, sql` AND `)}`
 }
 
 export function passTypesQuery(filters: PassTypeFilters, limit: number, offset: number, references = issuedReferences()): SQL {

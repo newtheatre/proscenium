@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
+import { sqliteTarget } from '#tests/helpers/database'
+import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillDate, openSignedOutView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -189,6 +191,117 @@ describe.skipIf(skip !== null)('the roll in a browser (A-127)', () => {
     finally {
       view.close()
     }
+  }, CASE_TIMEOUT_MS)
+})
+
+const named = (prefix: string): string => `${prefix} ${crypto.randomUUID().slice(0, 8)}`
+const slugged = (title: string): string => title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+const nextWeek = (): number => Math.floor(Date.now() / 1000) + 7 * 86_400
+
+function venue(): string {
+  const database = new Database(app.databaseFile)
+  try {
+    return testVenue(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8) }).id
+  }
+  finally {
+    database.close()
+  }
+}
+
+// The door needs a performance running tonight, `requireNightAuthority`'s own scope; a booking
+// test needs neither, so `coveredPerformance()` below stays a week out and never bothers it.
+function performanceTonight(): string {
+  const database = new Database(app.databaseFile)
+  try {
+    return tonightsPerformance(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8) }).performanceId
+  }
+  finally {
+    database.close()
+  }
+}
+
+// A show pass_type_shows never names: the whole point of D-130's coverage bypass is that this
+// still works (0023).
+async function coveredPerformance(): Promise<string> {
+  const title = named('The Alchemist')
+  const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) }, cookie)
+  const { id: showId } = await show.json() as { id: string }
+  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId: venue(), startsAt: nextWeek() }, cookie)
+  const { id: performanceId } = await performance.json() as { id: string }
+  expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true }, cookie)).status).toBe(200)
+  return performanceId
+}
+
+describe.skipIf(skip !== null)('the lifetime entitlement rides the pass model (0023, D-130)', () => {
+  test('awarding issues an active, zero-price pass in the same batch', async () => {
+    const alumna = await registerMember(app, 'entitled', password, { signIn: false })
+    const { passId } = await (await record(alumna.id)).json() as { passId: string }
+    expect(passId).toBeTruthy()
+
+    const pass = read<{ status: string, pricePaid: number, slug: string }>(
+      `SELECT p.status AS status, p.price_paid AS pricePaid, t.slug AS slug
+       FROM passes p JOIN pass_types t ON t.id = p.pass_type_id WHERE p.id = ?`, passId)
+    expect(pass).toEqual({ status: 'ACTIVE', pricePaid: 0, slug: 'fellowship' })
+  })
+
+  test('a Fellow books a show nobody told the pass type about, at zero price (criteria 1, 2)', async () => {
+    const alumna = await registerMember(app, 'booking-fellow', password)
+    await record(alumna.id)
+    const performanceId = await coveredPerformance()
+
+    const before = await send('GET', `/api/performances/${performanceId}/booking`, null, alumna.cookie)
+    const { redeemablePass } = await before.json() as { redeemablePass: { id: string, passTypeName: string } | null }
+    expect(redeemablePass).not.toBeNull()
+    // Criterion 6: the public booking page never names the entitlement.
+    expect(redeemablePass!.passTypeName).toBe('Pass')
+
+    const redeemed = await send('POST', `/api/passes/${redeemablePass!.id}/redeem`, { performanceId }, alumna.cookie)
+    expect(redeemed.status).toBe(200)
+    expect((await redeemed.json() as { totalPence: number }).totalPence).toBe(0)
+  })
+
+  test('revoking cancels the pass: no new booking, admissions already taken stand (criterion 4)', async () => {
+    const alumna = await registerMember(app, 'revoked-entitlement', password)
+    const { id: fellowshipId, passId } = await (await record(alumna.id)).json() as { id: string, passId: string }
+    const first = await coveredPerformance()
+    expect((await send('POST', `/api/passes/${passId}/redeem`, { performanceId: first }, alumna.cookie)).status).toBe(200)
+
+    expect((await send('POST', `/api/admin/fellowships/${fellowshipId}/revoke`, { reason: 'A safeguarding matter.' }, cookie)).status).toBe(200)
+
+    const pass = read<{ status: string }>('SELECT status FROM passes WHERE id = ?', passId)
+    expect(pass!.status).toBe('CANCELLED')
+
+    const second = await coveredPerformance()
+    const refused = await send('POST', `/api/passes/${passId}/redeem`, { performanceId: second }, alumna.cookie)
+    expect(refused.status).toBe(409)
+
+    // The admission already taken stands, rewritten by nothing this revocation did.
+    const stillAdmitted = read<{ total: number }>(
+      'SELECT count(*) AS total FROM pass_admissions WHERE pass_id = ? AND performance_id = ?', passId, first)
+    expect(stillAdmitted!.total).toBe(1)
+  })
+
+  test('an erased Fellow is refused at the door, not silently admitted (0061)', async () => {
+    const doorOfficer = await registerMember(app, 'door-for-fellows', password)
+    await send('POST', '/api/admin/roles', { userId: doorOfficer.id, role: 'FOH_MANAGER' }, cookie)
+
+    const alumna = await registerMember(app, 'erased-entitled', password)
+    const { passId } = await (await record(alumna.id)).json() as { passId: string }
+    const reference = read<{ reference: string }>('SELECT reference FROM passes WHERE id = ?', passId)!.reference
+    const performanceId = performanceTonight()
+
+    expect((await send('POST', `/api/admin/accounts/${alumna.id}/security`, { operation: 'erase' }, cookie)).status).toBe(200)
+
+    const scanned = await send('POST', '/api/tonight/door/passes/scan', { reference, performanceId }, doorOfficer.cookie)
+    expect(scanned.status).toBe(409)
+    expect(await scanned.text()).toContain('closed')
+
+    const admissions = read<{ total: number }>('SELECT count(*) AS total FROM pass_admissions WHERE pass_id = ?', passId)
+    expect(admissions!.total).toBe(0)
+
+    // The pass itself was never written back over (0061): it still reads exactly as issued.
+    const pass = read<{ status: string }>('SELECT status FROM passes WHERE id = ?', passId)
+    expect(pass!.status).toBe('ACTIVE')
   }, CASE_TIMEOUT_MS)
 })
 

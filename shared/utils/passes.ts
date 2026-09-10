@@ -77,11 +77,15 @@ export interface PassRedemptionState {
   validFrom: number
   validUntil: number
   coversShow: boolean
+  // Erased (D-130): checked ahead of everything else, since none of the other facts matter once
+  // nobody can any longer be reached through this account (0061).
+  anonymised?: boolean
 }
 
 // Criterion 1: covered, inside the validity window, and a live product. Once-per-performance and
 // capacity are contended, so the database predicate decides those, never a read taken here (0003).
 export function passRedemptionRefusal(pass: PassRedemptionState, now: number): string | null {
+  if (pass.anonymised) return 'This account has been closed and can no longer be admitted.'
   if (pass.status !== 'ACTIVE') return 'This pass is not active.'
   if (pass.passTypeStatus === 'CLOSED') return 'This pass has been archived and no longer admits.'
   if (now < pass.validFrom) return 'This pass is not valid yet.'

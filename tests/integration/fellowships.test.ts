@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test'
+import { passAdmissionTicketInsert } from '#server/utils/capacity'
+import { passAdmissionAllows, redeemablePassQuery } from '#server/utils/pass-redemption'
 import { erasureStatements } from '#shared/utils/erasure'
 import { PERSONAL_TABLES } from '#shared/utils/personal-data'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 
 // A fellowship is the theatre's record about a person rather than the person's own, which is why
@@ -92,5 +95,111 @@ describe('an erasure leaves the award standing (0011, A-127 criterion 6)', () =>
     expect(entry).toBeDefined()
     expect(entry!.erasure).toBe('scrub')
     expect(entry!.scrub).toEqual(['revocation_reason'])
+  })
+})
+
+// The lifetime entitlement itself (0023, D-130): a Fellowship pass, issued the way
+// server/utils/fellowship-pass.ts issues one, covering a show it was never explicitly told about.
+function fellowshipPass(database: TestDatabase, id: string, userId: string): void {
+  database.batch([
+    ['INSERT INTO pass_types (id, slug, name, status, valid_from, valid_until) VALUES (?, ?, ?, ?, ?, ?)',
+      'pt-fellowship', 'fellowship', 'Fellowship', 'DRAFT', 0, 4102444800],
+    ['INSERT INTO pass_type_prices (id, pass_type_id, label, price) VALUES (?, ?, ?, 0)', 'pt-fellowship-price', 'pt-fellowship', 'Fellowship'],
+    ['INSERT INTO passes (id, reference, pass_type_id, pass_type_price_id, user_id, price_paid, status, issued_by) VALUES (?, ?, ?, ?, ?, 0, ?, ?)',
+      id, id.toUpperCase().slice(0, 6), 'pt-fellowship', 'pt-fellowship-price', userId, 'ACTIVE', userId],
+  ])
+}
+
+describe('a Fellowship covers every show without being told about one (0023, D-130 criteria 1, 2)', () => {
+  test('the booking page offers it for a show pass_type_shows never named', async () => {
+    const database = await createTestDatabase()
+    try {
+      const tonight = tonightsPerformance(database)
+      addPerson(database, 'u-fellow', 'fellow@example.invalid')
+      fellowshipPass(database, 'pass-fellow', 'u-fellow')
+
+      const [offered] = rows<{ id: string }>(database,
+        ...boundStatement(database, redeemablePassQuery('u-fellow', tonight.performanceId, tonight.showId, 500)))
+      expect(offered?.id).toBe('pass-fellow')
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  test('it redeems into an ordinary capacity-checked ticket, same as any other pass', async () => {
+    const database = await createTestDatabase()
+    try {
+      const tonight = tonightsPerformance(database, { venueCapacity: 100 })
+      ticketTypeFixture(database)
+      addPerson(database, 'u-fellow', 'fellow@example.invalid')
+      fellowshipPass(database, 'pass-fellow', 'u-fellow')
+      database.batch([
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-fellow', 'RFELLO', tonight.performanceId, 'u-fellow', 'PENDING', 'WEB'],
+      ])
+
+      const written = rows<{ id: string }>(database,
+        ...boundStatement(database, passAdmissionTicketInsert(
+          { id: 't-fellow', reservationId: 'r-fellow', performanceId: tonight.performanceId, ticketTypeId: 'tt-standard', pricePaid: 0, priceSource: 'BASE' },
+          passAdmissionAllows('pass-fellow', tonight.performanceId, tonight.showId, 500),
+          100,
+        )))
+      expect(written).toHaveLength(1)
+    }
+    finally {
+      database.close()
+    }
+  })
+})
+
+describe('an erased Fellow is refused, not silently admitted or silently failed (D-130, 0061)', () => {
+  test('the contended write finds nothing to spend once the holder is a tombstone', async () => {
+    const database = await createTestDatabase()
+    try {
+      const tonight = tonightsPerformance(database, { venueCapacity: 100 })
+      ticketTypeFixture(database)
+      addPerson(database, 'u-fellow', 'fellow@example.invalid')
+      fellowshipPass(database, 'pass-fellow', 'u-fellow')
+      database.batch([
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-fellow', 'RFELLO', tonight.performanceId, 'u-fellow', 'PENDING', 'WEB'],
+      ])
+
+      // One batch, all or nothing, the way production erases (K-109 criterion 1).
+      database.batch(erasureStatements('u-fellow', 1_780_000_002).map(statement => boundStatement(database, statement)))
+
+      const written = rows<{ id: string }>(database,
+        ...boundStatement(database, passAdmissionTicketInsert(
+          { id: 't-fellow', reservationId: 'r-fellow', performanceId: tonight.performanceId, ticketTypeId: 'tt-standard', pricePaid: 0, priceSource: 'BASE' },
+          passAdmissionAllows('pass-fellow', tonight.performanceId, tonight.showId, 500),
+          100,
+        )))
+      expect(written).toHaveLength(0)
+
+      // The pass itself was never written back over; it still reads exactly as issued (0061).
+      const [pass] = rows<{ status: string }>(database, 'SELECT status FROM passes WHERE id = ?', 'pass-fellow')
+      expect(pass!.status).toBe('ACTIVE')
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  test('no longer offered on the booking page either, once the holder is a tombstone', async () => {
+    const database = await createTestDatabase()
+    try {
+      const tonight = tonightsPerformance(database)
+      addPerson(database, 'u-fellow', 'fellow@example.invalid')
+      fellowshipPass(database, 'pass-fellow', 'u-fellow')
+      database.batch(erasureStatements('u-fellow', 1_780_000_003).map(statement => boundStatement(database, statement)))
+
+      const offered = rows<{ id: string }>(database,
+        ...boundStatement(database, redeemablePassQuery('u-fellow', tonight.performanceId, tonight.showId, 500)))
+      expect(offered).toHaveLength(0)
+    }
+    finally {
+      database.close()
+    }
   })
 })

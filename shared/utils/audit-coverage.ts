@@ -632,7 +632,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['shared/utils/audit-actions.ts'],
   },
   { route: 'server/api/admin/fellowships/[id]/revoke.post.ts', actions: ['fellowship.revoked'] },
-  { route: 'server/api/admin/fellowships/index.post.ts', actions: ['fellowship.awarded'] },
+  {
+    route: 'server/api/admin/fellowships/index.post.ts',
+    actions: ['fellowship.awarded', 'pass.issued'],
+    via: ['server/utils/fellowship-pass.ts'],
+  },
   { route: 'server/api/admin/config/[key].put.ts', actions: ['config.changed'], via: ['server/utils/config-write.ts'] },
   { route: 'server/api/admin/config/[key]/blast-radius.get.ts', exempt: 'reads a live count; nothing is written' },
   { route: 'server/api/admin/config/[key]/revert.post.ts', actions: ['config.changed'], via: ['server/utils/config-write.ts'] },
