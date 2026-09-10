@@ -84,10 +84,11 @@ criterion 4: a change takes effect for the next send, and a retry is a next send
 ## Consequences
 
 - The migration widens `notification_log`'s status check to add `FAILED_FINAL` and adds `attempts`
-  and `retry_payload` in the same rebuild. It is the second rebuild of this table in two pull
-  requests, deliberately: shipping `FAILED_FINAL` in H-102's rebuild would have been a status
-  nothing wrote and no test exercised. No trigger sits on the table and no foreign key points at
-  it, which is what makes a rebuild of it ordinary (0010, 0052, 0058).
+  and `retry_payload` in the same rebuild. Migration 0058 already rebuilt this table once for
+  `PENDING` and H-102's rebuilt it again for `SUPPRESSED_PREFERENCE`, deliberately: shipping
+  `FAILED_FINAL` there would have been a status nothing wrote and no test exercised. No trigger
+  sits on the table and no foreign key points at it, which is what makes a rebuild of it ordinary
+  (0010, 0052).
 - `notifications:retry` joins the existing ten-minute cron rather than taking a cadence of its own,
   so the backoff's first step is ten minutes and five attempts span about two and a half hours.
 - The prune runs inside `daily:sweeps` and is capped, so the first run after a long gap drains over

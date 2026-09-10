@@ -1940,7 +1940,7 @@ provider must never see and carries the reason in `error` (0054, H-102 criterion
 `SENT`, `FAILED_FINAL`, `SUPPRESSED_PREFERENCE` and `SKIPPED_UNDELIVERABLE` are terminal;
 `TERMINAL_STATUSES` says so in one place, and no sweep may pick a terminal row up again.
 
-**Retries are attempts on the same row, never new rows (H-105, 0056).** `attempts` counts provider
+**Retries are attempts on the same row, never new rows (H-105, 0058).** `attempts` counts provider
 attempts, the first included, so a refusal that never reached a provider spends none. The next
 attempt is due at `created_at + backoff * (2^attempts - 1)`, computed in the sweep's predicate
 rather than stored, so nothing can disagree with the count beside it. `notifications:retry` claims
@@ -1951,7 +1951,7 @@ cannot send the same message. When `attempts` reaches `NOTIFICATION_MAX_ATTEMPTS
 **`retry_payload` is the rendered message and is held only while a retry is owed.** It is
 `{ subject, html, text }` as JSON, written when a send fails with attempts left, and cleared by
 every terminal outcome, so a row at rest carries no message body. It is scrubbed on erasure and
-appears in no customer or operator response (0056; H-106 criterion 3). A message carrying an
+appears in no customer or operator response (0058; H-106 criterion 3). A message carrying an
 attachment is never retried, because the attachment is not here to send again: it goes straight to
 `FAILED_FINAL` with the reason on the row.
 

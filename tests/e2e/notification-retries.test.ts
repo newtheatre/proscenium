@@ -93,7 +93,7 @@ describe.skipIf(skip !== null)('a failed send is sent again (criterion 2)', () =
     expect(rowFor(id)).toMatchObject({ status: 'SENT', attempts: 2, retry_payload: null })
     expect(rowsFor(id)).toBe(1)
 
-    // What arrived is what was rendered the first time, not a re-render (0056).
+    // What arrived is what was rendered the first time, not a re-render (0058).
     expect((await letters(app)).some(body => body.includes(subject))).toBe(true)
   }, CASE_TIMEOUT_MS)
 

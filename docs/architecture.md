@@ -312,7 +312,7 @@ without naming it).
 | --- | --- | --- |
 | `*/10 * * * *` | `holds:release` | Sends pre-expiry hold reminders (`HOLD_REMINDER_MINUTES_BEFORE`, 60 by default), then releases expired reservation holds (D-106, D-107). The one task that changes booking state, and only ever in the direction the customer was warned about. The waiting-list cascade is D-113's, not yet built. |
 | `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). The CI-side "after every deploy" half of criterion 3 is `.github/workflows/health-watch.yml` and a step at the end of `migrate.yml`, both outside the application. |
-| `*/10 * * * *` | `notifications:retry` | Sends failed messages again, one claimed row at a time, when the doubling backoff since enqueue has passed (`NOTIFICATION_RETRY_BACKOFF_MINUTES`, 10 by default); marks an entry `FAILED_FINAL` once `NOTIFICATION_MAX_ATTEMPTS` is spent, so five attempts span about two and a half hours. Every guard runs again on each attempt, so an address change, a preference change or an erasure in between is honoured (H-105, 0056). Capped at 100 rows a run. |
+| `*/10 * * * *` | `notifications:retry` | Sends failed messages again, one claimed row at a time, when the doubling backoff since enqueue has passed (`NOTIFICATION_RETRY_BACKOFF_MINUTES`, 10 by default); marks an entry `FAILED_FINAL` once `NOTIFICATION_MAX_ATTEMPTS` is spent, so five attempts span about two and a half hours. Every guard runs again on each attempt, so an address change, a preference change or an erasure in between is honoured (H-105, 0058). Capped at 100 rows a run. |
 | `0 6 * * *` | `training:expiry-sweep` | Expiry warnings and digests (dry-run gated). |
 | `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or an unconfirmed duty manager, the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |
@@ -340,7 +340,7 @@ member has chosen. An absent row means the configured default
 seeded at registration: a workshop changing a default still reaches everybody who never chose.
 The screen is `/account/notifications` and shows every cell with its default beside it.
 
-### Retries (H-105, 0056)
+### Retries (H-105, 0058)
 
 A failed send keeps the rendered message on its own row in `retry_payload` and is sent again by
 `notifications:retry` when the doubling backoff has passed, up to `NOTIFICATION_MAX_ATTEMPTS`
