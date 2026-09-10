@@ -636,6 +636,15 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // Append-only does not forbid one, as audit_log shows (0004, 0010, 0011).
     why: 'Money the theatre took. Sales statistics survive an erasure; the person in them does not.',
   },
+  {
+    name: 'z_readings',
+    column: 'entered_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Holds no free text naming anyone: who typed in the reader's figure, and why it differed.
+    why: 'Who recorded a day\'s reconciliation is the accountable record (I-104); the tombstone still answers for it.',
+  },
 
   // Module J: governance
 

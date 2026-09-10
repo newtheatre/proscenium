@@ -106,6 +106,8 @@ export const PERMISSIONS = [
   // The send log and one person's history within it, the latter audited on its own (H-106
   // criterion 5). Who beyond ADMIN holds this awaits the same open question.
   'comms.operations',
+  // Recording a daily Z reading and resolving a variance: the treasurer's own write (I-104).
+  'finance.write',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
@@ -143,7 +145,7 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   SAFETY_OFFICER: ['safety.read', 'safety.write'],
   // Reads the ledger and everything built on it. Nothing in the old estate grants this role, so
   // the import cannot reach it (I-103).
-  TREASURER: ['finance.read'],
+  TREASURER: ['finance.read', 'finance.write'],
   COMMITTEE: [],
 }
 

@@ -582,6 +582,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
 
   // Module I: finance
 
+  { route: 'server/api/admin/finance/reconciliation/index.post.ts', actions: ['finance.z-reading.recorded'] },
+
   // Module J: governance
 
   { route: 'server/api/admin/audit/export.get.ts', actions: ['audit.exported'] },

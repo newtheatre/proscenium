@@ -168,6 +168,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     prefix: '/money',
     items: [
       { label: 'Comps and discounts', icon: 'i-lucide-gift', to: '/money/reports', ability: viewFinanceReports },
+      { label: 'Daily reconciliation', icon: 'i-lucide-scale', to: '/money/reconciliation', ability: viewFinanceReports },
     ],
   },
 
