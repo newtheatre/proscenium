@@ -1,6 +1,7 @@
 import { statSync } from 'node:fs'
 import { Database } from 'bun:sqlite'
 import { hubDirFor } from './hub-dir'
+import { createServerLog, readServerLog } from './server-log'
 import type { Subprocess } from 'bun'
 
 // Bun.WebView's default backend is WKWebView, which is macOS only. Everything else drives
@@ -71,6 +72,8 @@ export interface AppUnderTest {
   // Where a development send is written instead of being sent. Beside the database, because the
   // server reads the same `NUXT_HUB_DIR` for both (`server/utils/mailbox.ts`).
   mailDir: string
+  // Everything the dev server wrote, stdout and stderr both: never discarded (docs/known-issues.md).
+  logTail: () => Promise<string>
   stop: () => Promise<void>
 }
 
@@ -185,6 +188,8 @@ export async function startApp(): Promise<AppUnderTest> {
       baseURL: BASE_URL,
       databaseFile: `${hubDirFor(port)}/db/sqlite.db`,
       mailDir: `${hubDirFor(port)}/mail`,
+      // Read-only: whoever booted this server owns writing it, via this same convention.
+      logTail: readServerLog(hubDirFor(port)).tail,
       stop: async () => {
         removeClaimedProfiles()
         await Promise.resolve()
@@ -198,22 +203,31 @@ export async function startApp(): Promise<AppUnderTest> {
   await Bun.$`rm -rf ${hubDir}`.quiet().nothrow()
 
   // Nuxt directly, not through `bun run dev`: that spawns a child, and killing the parent orphans
-  // it still holding the port. Output is discarded, because a pipe nobody reads blocks the writer.
+  // it still holding the port. Redirected straight to a file, not ignored: docs/known-issues.md
+  // records an afternoon lost to a server that explained its own 500 into a discarded pipe.
+  const log = await createServerLog(hubDir)
   const server: Subprocess = Bun.spawn(['./node_modules/.bin/nuxt', 'dev', '--port', port], {
     env: { ...process.env, NUXT_PORT: port, NUXT_HUB_DIR: hubDir, E2E_BASE_URL: BASE_URL },
-    stdout: 'ignore',
-    stderr: 'ignore',
+    stdout: log.stdout,
+    stderr: log.stderr,
   })
   const began = Date.now()
-  await waitForServer(BASE_URL, controller.signal)
+  try {
+    await waitForServer(BASE_URL, controller.signal)
+  }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`${message}\n${await log.tail()}`, { cause: error })
+  }
   // The one boot a run pays for, said out loud: fifteen seconds of silence at the start otherwise
   // looks like a hung suite.
-  Bun.write(Bun.stderr, `[e2e] dev server on ${port} ready in ${((Date.now() - began) / 1000).toFixed(1)}s\n`)
+  Bun.write(Bun.stderr, `[e2e] dev server on ${port} ready in ${((Date.now() - began) / 1000).toFixed(1)}s, log in ${hubDir}\n`)
 
   const app: AppUnderTest = {
     baseURL: BASE_URL,
     databaseFile: `${hubDir}/db/sqlite.db`,
     mailDir: `${hubDir}/mail`,
+    logTail: log.tail,
     // The server outlives the suite; what a suite owns is its data and its browser profiles.
     stop: async () => {
       removeClaimedProfiles()

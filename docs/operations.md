@@ -609,12 +609,16 @@ Anyone holding a privileged role must set up an authenticator app before the rol
 | --- | --- | --- |
 | `NUXT_SESSION_PASSWORD` | Cloudflare account Secrets Store, bound in | Shared across the estate. Rotating it signs everyone out; it is the emergency lever, not routine. Setting it as a worker secret **breaks** sealing, because a leftover secret of that name takes priority over the store binding. |
 | `NUXT_OAUTH_GOOGLE_CLIENT_ID` / `_SECRET` | worker secrets | Workspace-only sign-in. |
+| `NUXT_ACCESS_PROFILE_ENCRYPTION_KEY` | worker secret | Seals `access_profiles.encrypted_payload` (D-127, 0050). Generated once; rotating it makes every stored profile unreadable. |
+| `NUXT_QR_TOKEN_SECRET` | worker secret | Signs a reservation's QR token (D-108). Rotating it invalidates every QR already sent. |
 | `NUXT_BACKSTAGE_BOARD_SECRET` | worker secret | HMAC key material for the backstage board's join code (E-120). Never read outside this app; rotating it invalidates every code and every joined device in one step. |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | repository secrets | Read by the migrate workflow. Needs D1 edit. |
 
 Everything is mirrored in the committee password manager, which is the only place a value can be
 read back. The `NUXT_` prefix is load-bearing: Nuxt maps only `NUXT_*` onto `runtimeConfig`, so a
-worker secret without it is silently ignored.
+worker secret without it is silently ignored. `0.required-env.ts` names, on the first request an
+isolate serves, any of the three above (and anything shaped like them) that resolved empty; it
+never blocks the request and never logs a value, only which keys are missing.
 
 ## Seeding a development database
 

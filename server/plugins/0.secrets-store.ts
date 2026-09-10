@@ -91,8 +91,8 @@ export default defineNitroPlugin((nitroApp) => {
       }
 
       console.error('[secrets-store] could not read SESSION_PASSWORD', error)
-      // Rethrow to skip the remaining request hooks: the next one reads a session, which
-      // memoises the empty password for good (0007).
+      // This does not abort the request: Nitro's onRequest catches a `request` hook's
+      // rejection for logging only. iron-webcrypto's own length guard is the real backstop.
       throw error
     }
   })

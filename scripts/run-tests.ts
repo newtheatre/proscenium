@@ -4,6 +4,7 @@
 
 import { join } from 'node:path'
 import { hubDirFor } from '../tests/helpers/hub-dir'
+import { createServerLog } from '../tests/helpers/server-log'
 import type { Subprocess } from 'bun'
 
 // One by default, and that is not timidity: concurrent `nuxt dev` servers share this project's
@@ -69,18 +70,6 @@ const WARM = [
   '/admin/fellows', '/admin/members', '/dev', '/foh',
 ]
 
-// Keeps the last few lines so a server that never becomes healthy can say why.
-async function drain(from: ReadableStream<Uint8Array>, tail: string[]): Promise<void> {
-  const decoder = new TextDecoder()
-  const reader = from.getReader()
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) return
-    tail.push(decoder.decode(value, { stream: true }))
-    if (tail.length > 40) tail.shift()
-  }
-}
-
 async function warm(port: number): Promise<void> {
   await Promise.all(WARM.map(path =>
     fetch(`http://localhost:${port}${path}`, { signal: AbortSignal.timeout(120_000) }).catch(() => undefined)))
@@ -118,17 +107,17 @@ async function serve(port: number): Promise<Subprocess> {
 
   const hubDir = hubDirFor(port)
   await Bun.$`rm -rf ${hubDir}`.quiet().nothrow()
+
+  // Redirected straight to a file, not piped: a pipe nobody reads fills at 64KB and blocks the
+  // writer, and a dev server frozen mid-log answers every request with a 500. Kept, not
+  // discarded once healthy: a request that 500s mid-run explains itself in the same file, which
+  // piping used to lose the moment `nuxt dev` finished its own boot (docs/known-issues.md).
+  const log = await createServerLog(hubDir)
   const server = Bun.spawn(['./node_modules/.bin/nuxt', 'dev', '--port', String(port)], {
     env: { ...process.env, NUXT_PORT: String(port), NUXT_HUB_DIR: hubDir, E2E_BASE_URL: `http://localhost:${port}` },
-    stdout: 'pipe',
-    stderr: 'pipe',
+    stdout: log.stdout,
+    stderr: log.stderr,
   })
-
-  // Drained, not merely piped: a pipe nobody reads fills at 64KB and blocks the writer, and a dev
-  // server frozen mid-log answers every request with a 500.
-  const tail: string[] = []
-  void drain(server.stdout as ReadableStream<Uint8Array>, tail)
-  void drain(server.stderr as ReadableStream<Uint8Array>, tail)
 
   // Health rather than any response: the dev server answers long before the hub module has
   // applied the migrations, and a suite that starts then talks to an empty schema.
@@ -139,6 +128,7 @@ async function serve(port: number): Promise<Subprocess> {
       const health = await (await fetch(`http://localhost:${port}/api/health`, { signal: AbortSignal.timeout(2000) })).json() as { ok?: boolean }
       if (health.ok === true) {
         await warm(port)
+        console.log(`  server on ${port}: log in ${hubDir}`)
         return server
       }
       last = JSON.stringify(health)
@@ -147,7 +137,7 @@ async function serve(port: number): Promise<Subprocess> {
     await Bun.sleep(250)
   }
   server.kill('SIGKILL')
-  throw new Error(`the dev server on ${port} never became healthy: ${last}\n${tail.join('')}`)
+  throw new Error(`the dev server on ${port} never became healthy: ${last}\n${await log.tail()}`)
 }
 
 async function e2e(files: string[]): Promise<boolean> {
