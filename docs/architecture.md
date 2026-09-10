@@ -111,6 +111,36 @@ J-110's policy pages share: J-110 adds files under `content/`, not a second rout
 A page carrying `placeholder: true` in its frontmatter renders a banner saying so (D-103); it is
 how copy the committee has not yet supplied reaches the site honestly rather than not at all.
 
+### Policy tokens (J-110, 0012)
+
+A policy page writes `{{ROOM_MAX_BOOKING_HOURS}}` in its prose and the page renders the live value
+of that setting, so the published rule and the rule the write path enforces are one document. The
+number is never in the markdown, so changing a setting changes the page with no content edit.
+
+The markdown parser reads `{{KEY}}` as MDC interpolation and leaves a `binding` node in the parsed
+page, which renders as **blank** if nothing resolves it: that is the failure J-110 criterion 4
+forbids, and it is why the resolver handles the binding node rather than trusting the raw text.
+
+| Piece | Where | Does |
+| --- | --- | --- |
+| The token rules | `shared/utils/policy-tokens.ts` | Finds tokens in a parsed page, formats a value for what its key measures (hours, minutes, days, weeks, months, years, pence, per cent, yes or no, a list read as a sentence), and decides what a page may quote at all. Pure, so the CI check, the endpoint and the page cannot disagree. |
+| The build check | `scripts/check-content-tokens.ts` | Refuses a token naming a key the schema does not have, and refuses one naming a key that holds personal data, before it can reach a page a visitor reads. |
+| The values | `GET /api/policies/values?path=...` | Answers with the live value of every setting **that page** names, keyed on the page rather than on a list of keys from the caller, so it cannot become a way to read the settings surface. Never cached. |
+| The rendering | `app/pages/[...slug].vue` | Substitutes each token before `ContentRenderer` sees the page. |
+
+Three things a token can be, and all three are visible on the page rather than silent:
+
+- **Resolved**: the live value, formatted for its unit.
+- **Stated but unenforced**: the value, marked "not enforced yet". A key is enforced when the
+  server actually reads it, which `ENFORCED_KEYS` records and a test greps the server to verify,
+  so the mark cannot drift from the truth (criterion 5).
+- **Unresolvable**: a visible error naming the key, never a blank and never stale text. The build
+  check makes this unreachable from the repository, so it is the last line of defence for a key
+  unset after the page was written or a stale content database (criterion 4).
+
+A setting that holds personal data (`isSensitive`) can never appear on a policy page: CI refuses
+the token and the endpoint refuses the key, so neither a preview nor a deploy can publish it.
+
 ## The identity screens
 
 `/sign-in` and `/register` are the two entry points, and each carries its own steps rather than
