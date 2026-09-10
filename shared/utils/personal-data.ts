@@ -321,6 +321,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'keep',
     why: 'Which officer decided a request. The decision survives; it does not describe the officer.',
   },
+  {
+    name: 'ticket_comp_requests',
+    column: 'requested_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // The same reasoning bar's own comp_requests already carries (F-110): a foregone-revenue
+    // figure audits to who asked and who decided, and the request is financial evidence.
+    why: 'Who asked for a ticket comp and who decided it is what a foregone-revenue figure audits to; the tombstone still answers for it.',
+  },
 
   // Module E: show night
 

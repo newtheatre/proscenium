@@ -7,17 +7,26 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const input = await readValidatedBodyOrThrow(event, collectForm)
 
-  // Desk access is not comp authority: an ordinary volunteer collects, but only a manager
-  // self-approves one, until D-117's own request-and-approval flow replaces this gate.
-  if (input.tender === 'COMP' && !resolved.permissions.has('ticketing.manage')) {
-    throw createError({ statusCode: 403, statusMessage: 'A manager must approve a comp' })
-  }
-
   const reservation = await deskReservation(id)
   if (!reservation) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
 
   const refusal = uncollectableReason(reservation.status)
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
+
+  const expiryMinutes = await configValue(event, 'COMP_REQUEST_EXPIRY_MINUTES')
+  let compRequest = null
+  if (input.tender === 'COMP') {
+    // Desk access is not comp authority (D-117 criterion 1): only an approved request, decided
+    // by tonight's duty manager or a ticketing manager, ever moves a comp to collection.
+    const request = await ticketCompRequestById(input.compRequestId!, expiryMinutes)
+    if (!request || request.reservationId !== id) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
+    if (request.status !== 'APPROVED') {
+      throw createError({ statusCode: 409, statusMessage: request.status === 'PENDING' ? 'That request has not been approved yet' : 'That request was declined' })
+    }
+    if (request.expired) throw createError({ statusCode: 409, statusMessage: 'That request has lapsed; ask again' })
+    if (request.entryId) throw createError({ statusCode: 409, statusMessage: 'That comp has already been given' })
+    compRequest = request
+  }
 
   const ticketTotalPence = reservation.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0)
   const dueNow = amountDueFor(input.tender, ticketTotalPence)
@@ -28,7 +37,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const result = await collect({ ...input, reservationId: id }, resolved.account.id, reservation.tickets, reservation.performanceId)
+  const result = await collect({ ...input, reservationId: id }, resolved.account.id, reservation.tickets, reservation.performanceId, compRequest, expiryMinutes)
 
   return { ok: true, ...result }
 })

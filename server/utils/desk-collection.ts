@@ -2,10 +2,12 @@ import { db, schema } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { postEntry } from './ledger'
+import { claimTicketCompRequestForCollection, releaseTicketCompRequestClaim } from './ticket-comps'
 import { auditEntry } from '#shared/utils/audit'
 import { amountDueFor } from '#shared/utils/desk'
 import type { DeskTicketLine } from './desk'
 import type { CollectInput } from '#shared/utils/desk'
+import type { TicketCompRequest } from '#shared/utils/ticket-comps'
 import type { BatchItem } from 'drizzle-orm/batch'
 
 // The collection write, kept apart from server/utils/desk.ts's read-only queries so `tests/`
@@ -18,16 +20,33 @@ export interface CollectResult {
 
 // The payment boundary (criterion 2): the reservation's conditional UPDATE and its ledger entry
 // are one batch, guarded by a trigger that refuses a line whose reservation is not COLLECTED (0001).
-export async function collect(input: CollectInput, actorId: string, tickets: DeskTicketLine[], performanceId: string): Promise<CollectResult> {
+export async function collect(
+  input: CollectInput,
+  actorId: string,
+  tickets: DeskTicketLine[],
+  performanceId: string,
+  compRequest: TicketCompRequest | null,
+  expiryMinutes: number,
+): Promise<CollectResult> {
   const ticketTotalPence = tickets.reduce((total, ticket) => total + ticket.pricePaid, 0)
   const totalPence = amountDueFor(input.tender, ticketTotalPence)
+  const entryId = newId()
+
+  if (input.tender === 'COMP') {
+    // The claim, not the permission, is comp authority now (D-117 criterion 2).
+    const claimed = await claimTicketCompRequestForCollection(compRequest!.id, entryId, expiryMinutes)
+    if (!claimed) {
+      throw createError({ statusCode: 409, statusMessage: 'That comp is no longer available to give: it may have just been spent or have lapsed' })
+    }
+  }
 
   const posted = postEntry({
+    id: entryId,
     source: 'DESK',
     tender: input.tender,
     actorId,
-    compReason: input.tender === 'COMP' ? input.compReason : undefined,
-    compApprovedBy: input.tender === 'COMP' ? actorId : undefined,
+    compReason: input.tender === 'COMP' ? compRequest!.reason : undefined,
+    compApprovedBy: input.tender === 'COMP' ? compRequest!.decidedBy! : undefined,
     // Without this a matinee collection is invisible to its own night report (E-127 criterion 6,
     // the same gap #791 fixed for a bar sale).
     lines: tickets.map(ticket => ({
@@ -61,6 +80,9 @@ export async function collect(input: CollectInput, actorId: string, tickets: Des
     await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
   }
   catch (error) {
+    // Frees the request rather than losing it to a claim that never became a collection: the
+    // desk can still spend the same approval again, right up to its own expiry.
+    if (input.tender === 'COMP') await releaseTicketCompRequestClaim(compRequest!.id, entryId)
     if (error instanceof Error && error.message.includes('ledger_lines_ticket_collection_needs_collected_reservation')) {
       throw createError({
         statusCode: 409,
@@ -70,5 +92,5 @@ export async function collect(input: CollectInput, actorId: string, tickets: Des
     throw error
   }
 
-  return { entryId: posted.id, totalPence }
+  return { entryId, totalPence }
 }

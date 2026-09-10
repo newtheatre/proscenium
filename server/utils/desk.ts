@@ -1,8 +1,11 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { doorWordingFor } from './access-profiles'
+import { configValue } from './configuration'
+import { pendingTicketCompRequestForReservation } from './ticket-comps'
 import { looksLikeReference } from '#shared/utils/reservations'
 import type { TicketTypeAccessKind } from '#shared/utils/ticket-types'
+import type { TicketCompRequest } from '#shared/utils/ticket-comps'
 import type { SQL } from 'drizzle-orm'
 
 // The desk screen (D-114): finding today's performance and a booking against it. Kept free of
@@ -105,6 +108,9 @@ export interface DeskReservationDetail {
   // The booking and nothing more: null unless it holds an access or companion ticket, whatever
   // else the booker's own profile carries (D-127 criterion 3, D-128 criterion 4).
   doorWording: string | null
+  // The one still-open comp request against this booking, if any (D-117): what the screen
+  // offers to request, or reads back to collect against once approved.
+  compRequest: TicketCompRequest | null
 }
 
 // Everything the collection screen shows in one read: who is being served, what they hold, and
@@ -133,10 +139,17 @@ export function deskTicketsQuery(reservationId: string): SQL {
 }
 
 export async function deskReservation(id: string): Promise<DeskReservationDetail | undefined> {
-  const [row] = await db.all<Omit<DeskReservationDetail, 'tickets' | 'doorWording'> & { bookerUserId: string }>(deskReservationQuery(id))
+  const [row] = await db.all<Omit<DeskReservationDetail, 'tickets' | 'doorWording' | 'compRequest'> & { bookerUserId: string }>(deskReservationQuery(id))
   if (!row) return undefined
   const tickets = await db.all<DeskTicketLine>(deskTicketsQuery(id))
   const { bookerUserId, ...detail } = row
   const holdsAccessTicket = tickets.some(ticket => ticket.accessKind !== null)
-  return { ...detail, tickets, doorWording: holdsAccessTicket ? await doorWordingFor(bookerUserId) : null }
+  const expiryMinutes = await configValue(undefined, 'COMP_REQUEST_EXPIRY_MINUTES')
+  const compRequest = await pendingTicketCompRequestForReservation(id, expiryMinutes)
+  return {
+    ...detail,
+    tickets,
+    doorWording: holdsAccessTicket ? await doorWordingFor(bookerUserId) : null,
+    compRequest: compRequest ?? null,
+  }
 }
