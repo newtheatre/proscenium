@@ -942,10 +942,11 @@ lapsed rows" job that task already runs nightly.
 
 ### The night report compiles itself (E-123)
 
-`GET /api/tonight/report` and `server/utils/night-report.ts`. No table, deliberately: criterion 2
-asks that every figure derive from the ledger and the registers at read time, never a stored
-total, so a draft read before close and, once E-124 exists, a frozen read after it run the
-identical queries. `compileNightReport(performanceId, venueId, night)` runs eight independent
+`GET /api/tonight/report` and `server/utils/night-report.ts`. No table for the draft itself,
+deliberately: criterion 2 asks that every figure derive from the ledger and the registers at
+read time, never a stored total, so a draft read before close and a frozen read after it
+(E-124) run the identical queries; only the freeze stores the result, and only once.
+`compileNightReport(performanceId, venueId, night)` runs eight independent
 queries together, each its own exported statement builder so an integration test executes the
 real SQL:
 
@@ -963,6 +964,49 @@ real SQL:
 `GET /api/tonight/report` takes an optional `performanceId`; a venue running more than one
 performance today must name which one, the same shape `POST /api/tonight/authority` already
 refuses ambiguity with (E-127 criterion 1).
+
+### Sign-off, freeze and distribution (E-124)
+
+`POST /api/tonight/report/sign-off`, `POST /api/admin/night-reports/addenda` and
+`server/utils/night-signoff.ts`, over three tables, each append-only and trigger-enforced like
+`incidents` (0010): `night_reports` (one row per performance, `UNIQUE` on `performance_id`),
+`night_report_addenda` (a correction, never an edit) and `night_report_deliveries` (one row per
+distribution attempt).
+
+Sign-off is `requireNightAuthority(event, 'DUTY_MANAGER', ...)`, the same shift-or-officer guard
+`GET /api/tonight/report` itself uses, so `signedVia` is exactly `resolved.via`: `SHIFT` or
+`OFFICER`, flagging an officer standing in for the duty manager without a separate column
+(criterion 2). It refuses with 409 until `checklist_closes` carries a row for tonight's venue and
+night (criterion 1, E-114's own gate; venue-and-night scoped rather than performance-scoped, the
+E-127 criterion 4 gap this inherits rather than fixes). The insert is `signOffStatement`'s own
+predicate, `WHERE NOT EXISTS`, so two concurrent sign-offs for the same performance produce
+exactly one row and the loser reads 409, the same race-safety a checklist or till close already
+carries.
+
+Distribution is `distributeReport()`: the configured standing list
+(`NIGHT_REPORT_RECIPIENTS`, unset until a workshop confirms it) plus the closer's own address,
+deduplicated, one `sendRaw()` per recipient and one `night_report_deliveries` row per attempt,
+`SENT` or `FAILED` (criterion 4). `sendRaw()` is `notify.ts`'s one sanctioned raw-address path:
+the standing list is committee configuration, not necessarily an account, so this bypasses
+`notify()`'s per-user preference and topic machinery entirely. Automatic retry until delivered
+and the operations-dashboard surfacing criterion 4 also asks for are H-105 and H-106's own scope,
+not this route's: H-105 has since shipped `notifyAddress()` for exactly this shape of send, but
+this file predates it and is not yet wired to it (`docs/known-issues.md`), so a failed send here
+stops after the one attempt, recorded as `FAILED` rather than retried.
+
+An addendum (`POST /api/admin/night-reports/addenda`) is not shift-scoped: a correction can be found
+days after the night ends, when nobody holds a live shift on it any more, so the guard is the
+standing permission `night.manage` rather than `requireNightAuthority` (criterion 5). It lives
+under `/api/admin`, not `/api/tonight`, because that guard is the property `tests/unit/night-authority.test.ts`
+enforces of every route in the latter namespace (E-111 criterion 5): a route that cannot use
+`requireNightAuthority` does not belong there. It distributes the same way, `addendumId` on its
+own `night_report_deliveries` rows distinguishing it from the original send.
+
+`GET /api/tonight/report` reads `night_reports` first: once a performance is signed off, the
+frozen `report` column is what returns, verbatim, with `signedOff` and `addenda` alongside it,
+rather than the live queries recomputing over data that has moved on since the freeze (criterion
+5, "a frozen report is immutable"). Before sign-off, the response is the live draft above with
+`signedOff: null` and `addenda: []`, so a caller reads one shape either way.
 
 ## The programme (build-order contract d, 0043)
 
