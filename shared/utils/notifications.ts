@@ -77,6 +77,22 @@ export const MESSAGE_TYPES = {
     template: 'membership-expiring',
   },
 
+  // A handover is planned rather than discovered, so this is transactional: no topic may
+  // suppress the notice that somebody's standing authority is about to end (A-119 criterion 1).
+  'role.expiring': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'role-expiring',
+  },
+
+  // The administrator's monthly view of what is lapsing, what just lapsed and which grants never
+  // expire, so the exceptions stay visible (A-119 criteria 2, 3).
+  'role.expiry.digest': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'role-expiry-digest',
+  },
+
   // Module C: spaces
 
   // A booking is a thing somebody arranged, so it carries the rooms topic and its preference.

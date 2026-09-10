@@ -120,9 +120,11 @@ A revoked fellowship stops future admissions and rewrites nothing (0023).
 ### role_grants
 `id` PK · `user_id` → users cascade · `role` (namespace-free officer role, validated against
 the permission map in code) · `expires_at` NULL = permanent (default: next 31 July, London) ·
-`granted_by` · `granted_at` · `note` scrub · `expiry_warned_at`.
+`granted_by` · `granted_at` · `note` scrub · `expiry_warned_at` (stamped by the nightly lapse
+warning, A-119).
 UNIQUE (`user_id`, `role`). Enforced at read time; the last-administrator guard is a write
-check, not a constraint.
+check, not a constraint. The stamp is for a reader: what stops a second warning is the claim in
+`notification_log`, which carries the expiry the warning was computed against (0048).
 
 ### totp_secrets
 `user_id` PK → users cascade · `secret` · `confirmed_at` NULL until proven ·

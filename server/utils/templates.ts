@@ -1172,6 +1172,95 @@ Nothing is lost if you let it lapse: your account, your bookings and your histor
 The Nottingham New Theatre`,
     }
   },
+
+  // Says plainly that a lapsing grant is not a lapsing shift: authority on the night derives from
+  // tonight's confirmed shift, never from a standing grant (0009, A-119 criterion 1).
+  'role-expiring': (context: TemplateContext): Rendered => {
+    const roles = context.roles as { role: string, lapsesOn: string }[]
+    const one = roles.length === 1
+    const first = roles[0]!
+    const lines = roles.map(row => `${row.role}, ${row.lapsesOn}`)
+
+    return {
+      subject: one
+        ? `Your ${first.role} role lapses on ${first.lapsesOn}`
+        : `${roles.length} of your roles lapse soon`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${one ? 'A role you hold lapses soon.' : 'Roles you hold lapse soon.'} Committee roles run to the
+end of the theatre's year, so this is the ordinary handover rather than anything having gone wrong.</p>
+<ul>${lines.map(line => `<li>${line}</li>`).join('')}</ul>
+<p>If you are carrying on, ask an administrator to renew ${one ? 'it' : 'them'}. If you are handing
+over, this is the notice to plan it.</p>
+<p>This is about your standing role and nothing else. A shift you are confirmed for still opens the
+screens it always did, and your account, bookings and training records are untouched. Your roles are
+listed on <a href="${String(context.accountUrl)}">your account</a>.</p>`),
+      text: `Hello ${context.name},
+
+${one ? 'A role you hold lapses soon.' : 'Roles you hold lapse soon.'} Committee roles run to the end
+of the theatre's year, so this is the ordinary handover rather than anything having gone wrong.
+
+${lines.map(line => `- ${line}`).join('\n')}
+
+If you are carrying on, ask an administrator to renew ${one ? 'it' : 'them'}. If you are handing
+over, this is the notice to plan it.
+
+This is about your standing role and nothing else. A shift you are confirmed for still opens the
+screens it always did, and your account, bookings and training records are untouched.
+
+Your roles:
+${String(context.accountUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
+  // Sent whether or not it has anything in it, the same reasoning the training digest uses: a
+  // month with no digest means the clockwork stopped (A-119 criteria 2, 3).
+  'role-expiry-digest': (context: TemplateContext): Rendered => {
+    const expiring = context.expiring as { name: string, role: string, lapsesOn: string }[]
+    const lapsed = context.lapsed as { name: string, role: string, lapsesOn: string }[]
+    const permanent = context.permanent as { name: string, role: string }[]
+    const nothing = expiring.length === 0 && lapsed.length === 0 && permanent.length === 0
+
+    const dated = (rows: typeof expiring): string =>
+      rows.map(row => `<li>${row.name}: ${row.role}, ${row.lapsesOn}</li>`).join('')
+    const datedPlain = (rows: typeof expiring): string =>
+      rows.map(row => `- ${row.name}: ${row.role}, ${row.lapsesOn}`).join('\n')
+    const standing = (rows: typeof permanent): string =>
+      rows.map(row => `<li>${row.name}: ${row.role}</li>`).join('')
+    const standingPlain = (rows: typeof permanent): string =>
+      rows.map(row => `- ${row.name}: ${row.role}`).join('\n')
+
+    return {
+      subject: `Role expiry digest, ${String(context.period)}`,
+      html: layout(`<p>Hello ${context.name},</p>
+${nothing
+  ? `<p>Nothing is lapsing, nothing has just lapsed, and no grant is permanent. This email still
+arrives every month, so that its absence means the clockwork stopped rather than that there was
+nothing to say.</p>`
+  : `${lapsed.length > 0 ? `<p>Lapsed recently:</p><ul>${dated(lapsed)}</ul>` : ''}
+${expiring.length > 0 ? `<p>Lapsing soon:</p><ul>${dated(expiring)}</ul>` : ''}
+${permanent.length > 0 ? `<p>Permanent grants, which never lapse and so are worth a look:</p><ul>${standing(permanent)}</ul>` : ''}`}
+<p>A lapsed grant grants nothing from the instant it expires, so nothing here is waiting on you to
+enforce it. <a href="${String(context.rolesUrl)}">The account directory</a> has the detail.</p>`),
+      text: `Hello ${context.name},
+
+${nothing
+  ? `Nothing is lapsing, nothing has just lapsed, and no grant is permanent. This email still arrives
+every month, so that its absence means the clockwork stopped rather than that there was nothing to
+say.`
+  : `${lapsed.length > 0 ? `Lapsed recently:\n${datedPlain(lapsed)}\n` : ''}${expiring.length > 0 ? `\nLapsing soon:\n${datedPlain(expiring)}\n` : ''}${permanent.length > 0 ? `\nPermanent grants, which never lapse and so are worth a look:\n${standingPlain(permanent)}` : ''}`}
+
+A lapsed grant grants nothing from the instant it expires, so nothing here is waiting on you to
+enforce it.
+
+The account directory:
+${String(context.rolesUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'reservation-hold-expiring': (context: TemplateContext): Rendered => {
     const show = String(context.show)
     const when = String(context.when)

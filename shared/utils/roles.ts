@@ -161,3 +161,23 @@ export function permissionsFor(grants: Grant[], now: Date): Set<Permission> {
 export function defaultRoleExpiry(now: Date): number {
   return Math.floor(nextCommitteeYearEnd(now).getTime() / 1000)
 }
+
+const ROLE_WORDING: Record<Role, string> = {
+  ADMIN: 'IT Manager',
+  MANAGER: 'Manager',
+  THEATRE_MANAGER: 'Theatre Manager',
+  TRAINING_MANAGER: 'Training Manager',
+  BOX_OFFICE: 'Box office',
+  FOH_MANAGER: 'Front of house manager',
+  FRONT_OF_HOUSE: 'Front of house',
+  BAR_MANAGER: 'Bar manager',
+  ACCESSIBILITY_OFFICER: 'Accessibility officer',
+  SAFETY_OFFICER: 'Safety officer',
+  COMMITTEE: 'Committee',
+}
+
+// For a message a holder reads rather than a console filter. The vocabulary is provisional until
+// the workshop signs the mapping, so an unregistered role reads as itself (0027's habit).
+export function saysRole(role: string): string {
+  return ROLE_WORDING[role as Role] ?? role
+}
