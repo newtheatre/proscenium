@@ -19,6 +19,9 @@ export default defineEventHandler(async (event) => {
   if (held) throw createError({ statusCode: 409, statusMessage: 'That person already holds a fellowship' })
 
   const id = newId()
+  // Batch invariant: a Fellow can never exist without the entitlement (A-127 criterion 3, 0023).
+  const pass = await fellowshipPassStatements(input.userId, resolved.account.id)
+
   await db.batch([
     db.insert(schema.fellowships).values({
       id,
@@ -35,7 +38,8 @@ export default defineEventHandler(async (event) => {
       target: `user:${input.userId}`,
       detail: { fellowship: id },
     })),
+    ...pass.statements,
   ])
 
-  return { ok: true, id }
+  return { ok: true, id, passId: pass.passId }
 })

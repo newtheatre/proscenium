@@ -12,6 +12,9 @@ export default defineEventHandler(async (event) => {
   if (!held) throw createError({ statusCode: 404, statusMessage: 'No such fellowship' })
   if (held.revokedAt !== null) throw createError({ statusCode: 409, statusMessage: 'That fellowship is already revoked' })
 
+  const [fellow] = await db.select({ userId: schema.fellowships.userId })
+    .from(schema.fellowships).where(eq(schema.fellowships.id, id)).limit(1)
+
   await db.batch([
     // The award, the date and the citation stand: what a revocation adds is a second fact, not a
     // correction to the first.
@@ -26,6 +29,9 @@ export default defineEventHandler(async (event) => {
       target: `fellowship:${id}`,
       detail: { fellowship: id },
     })),
+    // Stops future admissions; every one already taken stands, since it is a fact this write
+    // never touches (D-130 criterion 4).
+    cancelFellowshipPassStatement(fellow!.userId),
   ])
 
   return { ok: true }

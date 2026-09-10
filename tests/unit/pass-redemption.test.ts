@@ -68,3 +68,17 @@ describe('the door scans a reference, not a QR token (D-126)', () => {
     expect(doorPassScanForm.safeParse({ reference: '', performanceId: 'performance-1' }).success).toBe(false)
   })
 })
+
+describe('an erased holder never admits, whatever else is true (D-130)', () => {
+  test('anonymised refuses ahead of every other fact, active and in-window included', () => {
+    expect(passRedemptionRefusal({ ...eligible, anonymised: true }, 1_500)).toContain('closed')
+  })
+
+  test('not anonymised falls through to the ordinary rules', () => {
+    expect(passRedemptionRefusal({ ...eligible, anonymised: false }, 1_500)).toBeNull()
+  })
+
+  test('absent reads the same as false, for a caller that never populated it', () => {
+    expect(passRedemptionRefusal(eligible, 1_500)).toBeNull()
+  })
+})

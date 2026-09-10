@@ -31,7 +31,7 @@ const NIGHT_END = showNightBounds(NIGHT).to
 
 const REPORT: NightReport = {
   performanceId: 'placeholder',
-  attendance: { sold: 0, admitted: 0, noShows: 0, walkUps: 0, passAdmissions: 0 },
+  attendance: { sold: 0, admitted: 0, noShows: 0, walkUps: 0, passAdmissions: 0, fellowshipAdmissions: 0 },
   takings: {
     desk: { tenders: [], compsPence: 0, discountsPence: 0 },
     bar: { tenders: [], compsPence: 0, discountsPence: 0 },
