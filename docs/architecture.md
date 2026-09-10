@@ -218,7 +218,7 @@ and exports are queries over the ledger; no module keeps its own money totals.
 `postEntry(input, at?)` validates the entry, computes its total from its lines and **returns the
 statements the caller batches**. It performs no write of its own, because money and the thing it
 paid for commit together or not at all (0001, I-102 criterion 6), and only the caller knows what
-the other half of the batch is. Nothing else writes to the ledger tables: `check:ledger` fails the
+the other half of the batch is. Nothing else writes to the ledger tables: `check ledger` fails the
 build on any file under `server/` other than `server/utils/ledger.ts` that does, and on any script
 that reaches the tables in raw SQL.
 

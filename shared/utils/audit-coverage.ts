@@ -1,6 +1,6 @@
 import type { AuditActionName } from './audit-actions'
 
-// Which route is answerable for which entry. `check:audit` reads this, so a privileged mutation
+// Which route is answerable for which entry. `check audit` reads this, so a privileged mutation
 // arriving without an audit write is a failed build rather than a missed review (J-101 criterion 5).
 
 export interface Covered {

@@ -67,7 +67,7 @@ export function seedGovernance(target: SeedTarget, people: People, now: number):
 }
 
 // Through `auditEntry` even from a script, so the action catalogue governs every writer and not
-// only the ones inside a request (0027). `check:audit` refuses any other shape.
+// only the ones inside a request (0027). `check audit` refuses any other shape.
 function seedAudit(target: SeedTarget, people: People, now: number): number {
   const officer = personIn(people, 'rowan').id
   const trainer = personIn(people, 'aoife').id
