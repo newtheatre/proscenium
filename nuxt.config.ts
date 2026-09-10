@@ -1,4 +1,10 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import { OLD_SITE_REDIRECTS } from './shared/utils/redirects'
+import { PRODUCTION_SITE_URL, ROBOTS_DISALLOW, SITE_NAME } from './shared/utils/seo'
+
+// The canonical address. A duplicate host (the pre-cutover one) sets NUXT_PUBLIC_SITE_URL to its
+// own, and server/plugins/site-indexable.ts keeps crawlers off it (K-125).
+const SITE_URL = process.env.NUXT_PUBLIC_SITE_URL ?? PRODUCTION_SITE_URL
 
 export default defineNuxtConfig({
 
@@ -55,6 +61,24 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/theme.css'],
 
+  site: {
+    url: SITE_URL,
+    name: SITE_NAME,
+    defaultLocale: 'en-GB',
+  },
+
+  robots: {
+    disallow: ROBOTS_DISALLOW,
+  },
+
+  // Only the server source lists URLs: the page scan would offer every console and member
+  // route, and the content scan the signed-in documentation (K-125).
+  sitemap: {
+    excludeAppSources: true,
+    sources: ['/api/__sitemap__/urls'],
+    credits: false,
+  },
+
   content: {
     database: {
       type: 'd1',
@@ -86,6 +110,10 @@ export default defineNuxtConfig({
       // points at the local port so a verification link in .data/mail is one that works.
       baseURL: process.env.NUXT_PUBLIC_BASE_URL
         ?? (process.env.NODE_ENV === 'development' ? `http://localhost:${process.env.NUXT_PORT ?? 3000}` : 'https://newtheatre.org.uk'),
+      // Declared here so a worker's NUXT_PUBLIC_SITE_URL reaches site config at request time.
+      site: {
+        url: SITE_URL,
+      },
     },
   },
 
@@ -158,18 +186,9 @@ export default defineNuxtConfig({
     },
 
     routeRules: {
-      // The door scanner reads a ticket QR, so it is the one route allowed the camera.
-      // Same-origin only; every other header matches the baseline below.
-      '/foh/scan': {
-        headers: {
-          'Referrer-Policy': 'strict-origin-when-cross-origin',
-          'X-Content-Type-Options': 'nosniff',
-          'X-Frame-Options': 'DENY',
-          'Strict-Transport-Security': 'max-age=15552000',
-          'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(), payment=()',
-          'Content-Security-Policy': 'frame-ancestors \'none\'; object-src \'none\'; base-uri \'self\'',
-        },
-      },
+      // Every old-site address answers 301 to where it lives now (K-125, docs/operations.md).
+      ...Object.fromEntries(Object.entries(OLD_SITE_REDIRECTS)
+        .map(([from, to]) => [from, { redirect: { to, statusCode: 301 } }])),
 
       // Baseline security headers on every response.
       '/**': {

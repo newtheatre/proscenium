@@ -267,6 +267,62 @@ copy of the real thing. Any health check or alert aimed at staging is its own wo
 variable, never `HEALTH_URL`, so a staging outage is never mistaken for a production one and never
 pages the IT Manager as though it were.
 
+### Old addresses, the subdomains and search (K-125)
+
+Three things belong to the same cutover day as the DNS flip above.
+
+**The pre-cutover host must not be indexed.** Set `NUXT_PUBLIC_SITE_URL` as a worker variable on
+the pre-cutover deployment to that host's own address (`https://proscenium.newtheatre.org.uk`).
+The application marks itself indexable only when the resolved site URL is `https://newtheatre.org.uk`
+(`server/plugins/site-indexable.ts`), so with the variable set the host answers `Disallow: /` and
+`noindex` everywhere, and its canonical links still point at the production address. At cutover,
+remove the variable: with nothing set, the default is the production address and the site indexes.
+Confirm afterwards by reading `/robots.txt` on the bare domain: it must list the closed prefixes,
+not `Disallow: /`.
+
+**Every public address of the old site answers 301.** The map is `OLD_SITE_REDIRECTS` in
+`shared/utils/redirects.ts`, read into `nuxt.config.ts` as route rules; `tests/e2e/seo.test.ts`
+hits every row. As it stands:
+
+| Old address | Lands on |
+| --- | --- |
+| `/whats-on/<slug>`, `/whats-on/<slug>/book` | `/shows/<slug>` (a server route: a `/whats-on/**` rule would take `/whats-on` itself) |
+| `/whats-on/<slug>/booking/<id>` | `/qr`, ticket retrieval |
+| `/technical` | `/technical-specification` |
+| `/festival` | `/whats-on` |
+| `/alumni` | `https://alumni.newtheatre.org.uk/` |
+| `/alumni/register`, `/alumni/registration` and anything under `/alumni/` | `https://alumni.newtheatre.org.uk/register` |
+| `/mailing-list` | the Mailchimp sign-up form |
+| `/get-involved/creatives` | `/get-involved` |
+| `/get-involved/stagecraft` | `/training/modules` |
+| `/account`, `/account/tab` | `/account/profile` |
+| `/account/reservations` | `/qr` |
+| `/account/shifts` | `/rota` |
+| `/backstage` | `/board` |
+| `/bar/tab`, `/foh/bar/till` | `/tonight/till` |
+| `/foh`, `/foh/tonight`, `/foh/contacts` | `/tonight` |
+| `/foh/scan`, `/foh/practice-tickets` | `/tonight/door` |
+| `/foh/age-checks` | `/tonight/age-checks` |
+| `/foh/emergency` | `/tonight/emergency` |
+| `/foh/backstage` | `/tonight/board` |
+
+`/`, `/whats-on`, `/about`, `/get-involved` and the account pages that kept their names need no
+row. `/admin/*` is answered inside the application by `app/pages/admin/[...legacy].vue`.
+
+**The `rooms.` and `training.` subdomains forward into the one site.** Both are Cloudflare
+Redirect Rules on the `newtheatre.org.uk` zone (Rules, Redirect Rules), created on cutover day once
+the old workers behind them are retired:
+
+| Rule | When | Then |
+| --- | --- | --- |
+| rooms to the unified site | hostname equals `rooms.newtheatre.org.uk` | 301 to `https://newtheatre.org.uk/rooms`, query string not preserved |
+| training to the unified site | hostname equals `training.newtheatre.org.uk` | 301 to `https://newtheatre.org.uk/training/modules`, query string not preserved |
+
+A redirect rule only fires on a request that reaches Cloudflare, so each hostname keeps a proxied
+DNS record (the placeholder `AAAA 100::` is the usual choice once the old worker route is
+removed). `auth.newtheatre.org.uk` is not forwarded: sessions are this application's own now, and
+a link to the old sign-in has nothing equivalent to land on.
+
 ### The rollback runbook (K-119)
 
 The old estate goes read-only on 1 November and can be re-armed within a day for the rest of the

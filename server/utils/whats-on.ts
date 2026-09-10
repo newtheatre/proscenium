@@ -32,6 +32,7 @@ export function listedShowsQuery(at: number, limit: number, offset: number): SQL
     SELECT s.id AS id, s.slug AS slug, s.title AS title, s.subtitle AS subtitle,
            s.description AS description, s.long_description AS longDescription,
            s.age_guidance AS ageGuidance, s.latecomer_policy AS latecomerPolicy,
+           s.poster_key AS posterKey,
            s.status AS status, s.warnings_confirmed_none AS warningsConfirmedNone,
            c.name AS categoryName,
            (SELECT min(p.starts_at) FROM performances p
@@ -175,8 +176,9 @@ export interface PublicListing {
   cacheSeconds: number
 }
 
-interface ShowRow extends PublicShow {
+interface ShowRow extends Omit<PublicShow, 'posterUrl'> {
   id: string
+  posterKey: string | null
   status: 'DRAFT' | 'PUBLISHED'
   warningsConfirmedNone: number
   categoryName: string | null
@@ -299,6 +301,7 @@ export async function publicShowBySlug(
       SELECT s.id AS id, s.slug AS slug, s.title AS title, s.subtitle AS subtitle,
              s.description AS description, s.long_description AS longDescription,
              s.age_guidance AS ageGuidance, s.latecomer_policy AS latecomerPolicy,
+             s.poster_key AS posterKey,
              s.status AS status, s.warnings_confirmed_none AS warningsConfirmedNone,
              c.name AS categoryName
       FROM shows s

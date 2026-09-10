@@ -28,6 +28,16 @@ useSeoMeta({
   title: page.value.title,
   description: page.value.description,
 })
+
+// Home, then this page: two steps is the whole depth of the editorial site (K-125 criterion 4).
+useSchemaOrg([
+  defineBreadcrumb({
+    itemListElement: [
+      { name: 'Home', item: '/' },
+      { name: page.value.title, item: route.path },
+    ],
+  }),
+])
 </script>
 
 <template>

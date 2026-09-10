@@ -112,6 +112,37 @@ J-110's policy pages share: J-110 adds files under `content/`, not a second rout
 A page carrying `placeholder: true` in its frontmatter renders a banner saying so (D-103); it is
 how copy the committee has not yet supplied reaches the site honestly rather than not at all.
 
+### Search engines and old links (K-125)
+
+`@nuxtjs/seo` runs on the lists in `shared/utils/seo.ts`, which `tests/unit/seo.test.ts` holds
+against the navigation declaration so a screen cannot be indexed, or hidden, by accident:
+
+- **Site.** `site.url` defaults to the production address and `NUXT_PUBLIC_SITE_URL` overrides it
+  at request time (declared under `runtimeConfig.public.site` so a worker variable reaches it).
+  `server/plugins/site-indexable.ts` marks the site indexable only when the resolved URL is the
+  production one, which is what keeps a duplicate host out of search; a dev server always indexes
+  so its output can be read as production's.
+- **Titles.** `app/plugins/seo.ts` sets one template, `titleFor()`: the page title, a bar, the
+  house name, except where the title already is the house name.
+- **Crawling.** `ROBOTS_DISALLOW` feeds `/robots.txt`, and the robots module derives each page's
+  `<meta name="robots">` and `X-Robots-Tag` from the same list, so the auth and utility pages are
+  `noindex` without a per-page declaration.
+- **The sitemap.** Only `server/api/__sitemap__/urls.get.ts` supplies URLs (`excludeAppSources`):
+  the home page, `PUBLIC_NAV`, every public content page, every show the what's-on listing would
+  show, and every published module. The disallow list is its final filter.
+- **Sharing.** `app.vue` names `public/og-default.png` for every page; a show page names its
+  poster instead when `posterUrl` is set, which `posterUrl()` derives from a blob key under
+  `posters/` served by `server/routes/posters/`. The image renderer stays off
+  (`docs/known-issues.md`).
+- **Structured data.** The home page defines the organisation as a `PerformingArtsTheater`, a
+  show page one `TheaterEvent` per performance with an `Offer` per price, and the content
+  catch-all a two-step `BreadcrumbList`.
+- **Old addresses.** `shared/utils/redirects.ts` maps every public URL of the old site, and
+  `nuxt.config.ts` turns the map into 301 route rules. The one family a rule cannot express,
+  `/whats-on/<slug>` and the booking pages under it, is answered by `server/routes/whats-on/`,
+  because a `/whats-on/**` rule would redirect `/whats-on` itself. The cutover runbook in
+  `docs/operations.md` quotes the map and the subdomain rule.
+
 ### Policy tokens (J-110, 0012)
 
 A policy page writes `{{ROOM_MAX_BOOKING_HOURS}}` in its prose and the page renders the live value
