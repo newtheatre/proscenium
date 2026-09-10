@@ -1,0 +1,2 @@
+DROP INDEX `ledger_lines_ticket_collection_once`;--> statement-breakpoint
+CREATE UNIQUE INDEX `ledger_lines_ticket_collection_once` ON `ledger_lines` (`ticket_id`) WHERE kind IN ('TICKET_COLLECTION', 'WALK_UP');

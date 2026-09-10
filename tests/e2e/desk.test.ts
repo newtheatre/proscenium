@@ -338,8 +338,8 @@ describe.skipIf(skip !== null)('a walk-up sale is one flow, source DOOR from cre
        JOIN reservations r ON r.id = t.reservation_id WHERE r.reference = ?`, body.reference,
     )
     expect(lines).toEqual([
-      { kind: 'TICKET_COLLECTION', amountPence: 900, performanceId },
-      { kind: 'TICKET_COLLECTION', amountPence: 900, performanceId },
+      { kind: 'WALK_UP', amountPence: 900, performanceId },
+      { kind: 'WALK_UP', amountPence: 900, performanceId },
     ])
   }, CASE_TIMEOUT_MS)
 

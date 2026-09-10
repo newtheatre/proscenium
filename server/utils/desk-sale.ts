@@ -3,13 +3,11 @@ import { sql } from 'drizzle-orm'
 import { postEntry, runLedgerBatch } from './ledger'
 import { writeReservation } from './reservations'
 import { auditEntry } from '#shared/utils/audit'
-import type { WrittenTicket } from './reservations'
-import type { ReservationLineToWrite } from './reservations'
+import type { ReservationLineToWrite, WrittenTicket } from './reservations'
 import type { BatchItem } from 'drizzle-orm/batch'
 
-// D-115: a walk-up sale is D-104's own write path (`writeReservation`) immediately followed by
-// its own payment boundary, one request, two batches (0001, 0003). Kept apart from
-// server/utils/desk.ts's read-only queries, the same split desk-collection.ts already keeps.
+// D-115: a walk-up sale is D-104's own write path (`writeReservation`), then its own payment
+// boundary, one request and two batches (0001, 0003), the same split desk-collection.ts keeps.
 
 export interface WalkUpSaleInput {
   performanceId: string
@@ -45,7 +43,9 @@ export async function sellWalkUp(input: WalkUpSaleInput): Promise<WalkUpSaleOutc
   const written = await writeReservation({
     performanceId: input.performanceId,
     userId: input.userId,
-    source: 'DESK',
+    // The reservation's own channel is DOOR (criterion 1); the ledger entry's source stays DESK
+    // below, the SumUp reader the money actually moved through (D-114's own source).
+    source: 'DOOR',
     windowBypassed: input.windowBypassed,
     lines: input.lines,
     capacity: input.capacity,

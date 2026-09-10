@@ -21,11 +21,9 @@ export default defineEventHandler(async (event) => {
   const windowBypassed = saleRefusal(performance, new Date(), 'CUSTOMER')?.reason === 'WINDOW_CLOSED'
 
   const resolvedTypes = new Map((await bookableTicketTypes(input.performanceId, performance.showId, false, false)).map(type => [type.id, type]))
-  const ticketTypeNames = new Map<string, string>()
   const lines = input.lines.map((line) => {
     const type = resolvedTypes.get(line.ticketTypeId)
     if (!type) throw createError({ statusCode: 400, statusMessage: 'No such ticket type for this performance' })
-    ticketTypeNames.set(type.id, type.name)
     return { ticketTypeId: type.id, quantity: line.quantity, pricePaid: type.price, priceSource: type.source }
   })
 
@@ -50,7 +48,7 @@ export default defineEventHandler(async (event) => {
     holdExpiresAt: holdExpiresAt(performance.startsAt, releaseMinutes),
     expectedTotalPence: input.expectedTotalPence,
     actorId: resolved.account.id,
-  }, ticketTypeNames)
+  })
 
   if (!outcome.applied) {
     throw createError({ statusCode: 409, statusMessage: 'This performance no longer has room for that order' })
