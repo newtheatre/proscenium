@@ -316,6 +316,7 @@ without naming it).
 | `*/10 * * * *` | `holds:release` | Sends pre-expiry hold reminders (`HOLD_REMINDER_MINUTES_BEFORE`, 60 by default), then releases expired reservation holds (D-106, D-107). The one task that changes booking state, and only ever in the direction the customer was warned about. The waiting-list cascade is D-113's, not yet built. |
 | `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). The CI-side "after every deploy" half of criterion 3 is `.github/workflows/health-watch.yml` and `migrate.yml`'s own `health` job, both outside the application. |
 | `*/10 * * * *` | `notifications:retry` | Sends failed messages again, one claimed row at a time, when the doubling backoff since enqueue has passed (`NOTIFICATION_RETRY_BACKOFF_MINUTES`, 10 by default); marks an entry `FAILED_FINAL` once `NOTIFICATION_MAX_ATTEMPTS` is spent, so five attempts span about two and a half hours. Every guard runs again on each attempt, so an address change, a preference change or an erasure in between is honoured (H-105, 0056). Capped at 100 rows a run. |
+| `*/10 * * * *` | `notifications:digest` | Claims and sends every topic-and-person digest whose window has passed (`NOTIFICATION_DIGEST_WINDOW_<TOPIC>_MINUTES`, 60 minutes each by default), one email per pair, capped at 100 pairs a topic a run (H-104). |
 | `0 6 * * *` | `training:expiry-sweep` | Expiry warnings and digests (dry-run gated). |
 | `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or an unconfirmed duty manager, the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |
@@ -370,6 +371,29 @@ never handed to the provider; a transactional type is not asked about at all. Th
 written first and unconditionally (except for an anonymised account), so no preference, unproven
 address or provider failure can make a message unfindable. Every type carrying a topic declares
 the `INBOX` channel, and a unit test fails the build where one does not.
+
+### Digests (H-104)
+
+An unclaimed, topic-bearing message that would otherwise be emailed now joins the next digest for
+its topic instead: `notify()` writes a `notification_digest_entries` row and returns
+`HELD_FOR_DIGEST` rather than sending, and writes no `notification_log` row for that call at all.
+The inbox entry above already went out, so nothing about criterion 4 depends on this branch. A
+claimed call (already its own batch, 0048) and a message carrying an attachment (nothing to
+reattach later, the same reasoning 0056 gives for a retry) bypass the hold and send as before.
+
+`notifications:digest` claims every topic-and-person pair whose window has passed with one
+conditional `UPDATE ... WHERE digest_log_id IS NULL`, the same claim-before-send shape the retry
+sweep uses (0003, 0048), then sends the coalesced list through `notify()` again under a digest
+type carrying the pre-claimed id. The digest types (`digest.bookings`, `digest.shifts`,
+`digest.training`, `digest.rooms`, `digest.announcements`) are transactional and email-only, so a
+digest can never hold itself for the next one and never duplicates the inbox. The window is five
+scalar keys, `NOTIFICATION_DIGEST_WINDOW_<TOPIC>_MINUTES`, shipped at 60 minutes each, and it
+opens at the earliest still-unclaimed entry, not the latest.
+
+An entry survives exactly as long as the `notification_log` row it was claimed into: pruning that
+row cascades its entries with it, so nothing prunes the digest ledger on its own clock, and
+"was I told about X" is answerable from the entry until the send itself ages out (H-105
+criterion 5).
 
 ## Operator documentation (J-109)
 

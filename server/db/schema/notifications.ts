@@ -52,6 +52,24 @@ export const notificationLog = sqliteTable('notification_log', {
   check('notification_log_channel', sql`${table.channel} IN ('EMAIL', 'INBOX', 'PUSH')`),
 ])
 
+export const notificationDigestEntries = sqliteTable('notification_digest_entries', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  topic: text('topic').notNull(),
+  type: text('type').notNull(),
+  subject: text('subject').notNull(),
+  body: text('body').notNull(),
+  // Null is the claim: the sweep's conditional UPDATE sets this to the notification_log row it
+  // sent as, the same predicate-on-the-statement shape the retry sweep's claim uses (0003, H-105).
+  digestLogId: text('digest_log_id').references(() => notificationLog.id, { onDelete: 'cascade' }),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  // The sweep's due query groups by topic and user over the unclaimed rows; the log id is last
+  // so the same index also answers "what did this digest send" (H-104 criterion 5).
+  index('notification_digest_entries_due').on(table.topic, table.userId, table.digestLogId),
+  check('notification_digest_entries_topic', sql`${table.topic} IN ('BOOKINGS', 'SHIFTS', 'TRAINING', 'ROOMS', 'ANNOUNCEMENTS')`),
+])
+
 export const inboxItems = sqliteTable('inbox_items', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

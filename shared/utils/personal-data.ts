@@ -623,6 +623,18 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'delete',
     why: 'Messages written to the person, and prose about them.',
   },
+  {
+    name: 'notification_digest_entries',
+    column: 'user_id',
+    section: 'messages',
+    columns: ['topic', 'type', 'subject', 'body', 'created_at'],
+    erasure: 'scrub',
+    // Held only until its digest sends or prunes with it (H-104); the count survives, the
+    // rendered text of what changed does not.
+    scrub: ['subject', 'body'],
+    scrubTo: { subject: 'Erased entry', body: '' },
+    why: 'A change held for the next digest email; the rendered subject and body name it.',
+  },
 
   // Module I: finance
 

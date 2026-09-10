@@ -2031,9 +2031,34 @@ The refs carry **no foreign key**. The ledger outlives what it refers to, and a 
 fact about the past that deleting a record must not rewrite. `user_id` is the exception and is
 `set null`, so an erased person's messages stay counted without naming them.
 
+### notification_digest_entries
+`id` PK · `user_id` cascade · `topic` CHECK `BOOKINGS|SHIFTS|TRAINING|ROOMS|ANNOUNCEMENTS` ·
+`type` · `subject` · `body` · `digest_log_id` NULL, references `notification_log.id` cascade ·
+`created_at`. Indexed on `(topic, user_id, digest_log_id)`.
+
+**A row is written when `notify()` holds a message for its topic's digest instead of sending
+(H-104 criterion 1).** Unclaimed and topic-bearing is what qualifies; a claimed call (0048) or one
+carrying an attachment sends immediately as before. No `notification_log` row exists for a held
+send; the entry is the only record of it until the digest that covers it is sent.
+
+**`digest_log_id` null is the claim.** `notifications:digest` moves every unclaimed row for one
+topic and person to the same id in one conditional `UPDATE ... WHERE digest_log_id IS NULL`, so
+two overlapping runs cannot split or duplicate one digest (0003, 0048). The window a topic waits
+before flushing is one scalar config key per topic (`NOTIFICATION_DIGEST_WINDOW_<TOPIC>_MINUTES`,
+0025: a setting is a rule, not a keyed record), and opens at the earliest
+still-unclaimed row for that topic and person, not the latest: a fresh entry arriving after a claim
+starts its own window rather than joining the digest that already sent (H-104 criteria 2, 6).
+
+**`digest_log_id` cascades from `notification_log`.** An entry survives exactly as long as the
+send it was claimed into; there is no separate retention clock for this table; pruning the log row
+(H-105 criterion 5) takes its constituent entries with it. This is what "was I told about X"
+answers from (criterion 5): the entry names the change, and its log row (or absence of one, while
+still held) names the outcome.
+
 ### inbox_items
 `id` PK · `user_id` cascade · `type` · `title` · `body` · `link` · `read_at` ·
-`created_at`. The in-app channel; never coalesced.
+`created_at`. The in-app channel; never coalesced, even where the email covering the same change
+is (H-104 criterion 4).
 
 **Written by `notify()` for every type that declares the `INBOX` channel, before the email is
 judged (H-102 criterion 6, 0054).** Every topic-carrying type declares it, so a message a
@@ -2041,7 +2066,8 @@ preference silenced is still findable; a unit test fails the build when a new ty
 does not. An anonymised account gets nothing at all (H-107). The entry is a row here and not a
 second row in `notification_log`: that would double every per-type count in the log. `title` is the
 rendered subject and `body` the rendered plain text, so both go on erasure. `read_at` is unused
-until something marks one read.
+until something marks one read; H-104's criteria named individual entries and coalescing, not a
+read state, so it left this column exactly as it found it (`docs/known-issues.md`, H-204).
 
 ### config
 `key` PK · `value` JSON · `updated_by` · `updated_at`. Defaults live in code; a missing row means
