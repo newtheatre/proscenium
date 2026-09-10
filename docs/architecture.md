@@ -380,6 +380,10 @@ its topic instead: `notify()` writes a `notification_digest_entries` row and ret
 The inbox entry above already went out, so nothing about criterion 4 depends on this branch. A
 claimed call (already its own batch, 0048) and a message carrying an attachment (nothing to
 reattach later, the same reasoning 0056 gives for a retry) bypass the hold and send as before.
+`joinsDigest()` in `shared/utils/notifications.ts` is where those three conditions live, so a new
+call site never has to re-derive them: transactional (`topic: null`) never coalesces at all,
+because that is what marks a deadline a digest interval would consume, such as a hold expiring or
+an offer waiting to be claimed before it lapses to the next entry (D-113).
 
 `notifications:digest` claims every topic-and-person pair whose window has passed with one
 conditional `UPDATE ... WHERE digest_log_id IS NULL`, the same claim-before-send shape the retry

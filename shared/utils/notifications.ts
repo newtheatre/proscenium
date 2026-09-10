@@ -491,6 +491,12 @@ export function isTransactional(type: MessageType): boolean {
   return type.topic === null
 }
 
+// `topic: null` means a deadline a digest interval would eat (a hold, an offer), so transactional
+// never coalesces; a claim or an attachment bypass it for their own reasons (H-104, 0061).
+export function joinsDigest(type: MessageType, hasClaim: boolean, hasAttachment: boolean): boolean {
+  return !hasClaim && !isTransactional(type) && !hasAttachment
+}
+
 export interface Preference {
   topic: NotificationTopic
   email: boolean

@@ -9,7 +9,7 @@ import { MAILBOX, writeToMailbox } from './mailbox'
 import { preferenceDefaults, storedPreferences } from './notification-preferences'
 import { render } from './templates'
 import { undeliverableReason } from '#shared/utils/deliverability'
-import { deliversOn, isMessageType, isTransactional, messageType, outOfAttempts } from '#shared/utils/notifications'
+import { deliversOn, isMessageType, isTransactional, joinsDigest, messageType, outOfAttempts } from '#shared/utils/notifications'
 import { formatSender, senderForTopic, SENDERS } from '#shared/utils/senders'
 import type { Channel, MessageType, NotificationStatus } from '#shared/utils/notifications'
 import type { NotificationTopic } from '#shared/utils/senders'
@@ -439,9 +439,7 @@ export async function notify(event: H3Event | undefined, notification: Notificat
     return 'SUPPRESSED_PREFERENCE'
   }
 
-  // Unclaimed and topic-bearing joins the next digest instead of sending now; a claim or an
-  // attachment bypasses the hold and sends as today, for the reasons 0061 gives (H-104).
-  if (!notification.claim && !isTransactional(type) && !notification.attachments?.length) {
+  if (joinsDigest(type, Boolean(notification.claim), Boolean(notification.attachments?.length))) {
     await holdForDigest({
       userId: account.id,
       topic: type.topic!,

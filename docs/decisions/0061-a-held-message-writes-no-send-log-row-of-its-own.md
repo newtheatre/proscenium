@@ -28,6 +28,15 @@ this decision nothing further. `notification_digest_entries` carries the rendere
 a subject switched off for email but not the inbox still needs the inbox's own write, and holding
 reuses the same rendered text rather than re-rendering later).
 
+**The test for whether a type may ever coalesce is not how important it reads, it is whether it
+carries a deadline a digest interval would eat.** `topic: null` already marks that shape for other
+reasons (H-103): a hold expiring, an offer waiting to be claimed before it lapses to the next
+entry, a booking confirmation the guest is holding open in another tab. Delaying any of those into
+a digest spends the window the feature depends on, so transactional never coalesces, whatever else
+is true of the send; this is `joinsDigest()`'s first condition, not a special case bolted on. D-113
+confirmed the shape from the other side: its waiting-list offer is transactional for exactly this
+reason, checked against this decision rather than decided independently of it.
+
 **Two kinds of message bypass the hold and send as they do today.** A claimed call already batches
 itself before it reaches `notify()` (0048's own words: "several rows... before a single
 digest-style message covers all of them"), so holding it again would be a second, uncoordinated

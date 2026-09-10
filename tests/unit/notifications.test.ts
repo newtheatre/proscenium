@@ -13,6 +13,7 @@ import {
   deliversOn,
   isTerminal,
   isTransactional,
+  joinsDigest,
   logRetentionCutoff,
   messageType,
   outOfAttempts,
@@ -284,6 +285,31 @@ describe('digest coalescing (H-104)', () => {
       expect(isTransactional(type)).toBe(true)
       expect([...type.channels]).toEqual(['EMAIL'])
     }
+  })
+
+  // The general test, not the specific answer: transactional never coalesces, whatever a future
+  // type is about, because topic: null is what marks a deadline a digest window would eat.
+  test('a transactional type never joins a digest, unclaimed and attachment-free or not', () => {
+    expect(joinsDigest(transactional, false, false)).toBe(false)
+    expect(joinsDigest(transactional, true, false)).toBe(false)
+    expect(joinsDigest(transactional, false, true)).toBe(false)
+  })
+
+  // A hold expiring and an offer lapsing are exactly this shape: one person, one seat, a
+  // countdown a digest interval would consume, which is why both ship transactional.
+  test('a hold-expiring reminder and a reservation confirmation are both exempt', () => {
+    expect(isTransactional(messageType('reservation.hold-expiring'))).toBe(true)
+    expect(isTransactional(messageType('reservation.confirmed'))).toBe(true)
+    expect(joinsDigest(messageType('reservation.hold-expiring'), false, false)).toBe(false)
+  })
+
+  test('an unclaimed, attachment-free, topic-bearing type does join', () => {
+    expect(joinsDigest(onTopic, false, false)).toBe(true)
+  })
+
+  test('a claim or an attachment bypasses the hold even on a topic-bearing type', () => {
+    expect(joinsDigest(onTopic, true, false)).toBe(false)
+    expect(joinsDigest(onTopic, false, true)).toBe(false)
   })
 
   test('the digest window ships as sixty minutes for every topic', () => {
