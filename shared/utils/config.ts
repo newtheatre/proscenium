@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { NOTIFICATION_TOPICS } from './notifications'
 import { MODULE_ID } from './training'
+import type { NotificationTopic } from './senders'
 
 // Every operational rule with a number in it is a validated key enforced at the write path
 // (0012). Defaults live here; a missing `config` row means the default.
@@ -154,6 +155,14 @@ export const CONFIG_KEYS = {
     default: '07-31',
     workshop: 'money-and-box-office',
     describes: 'Month and day the season closes, London. Roles expire at the last London instant of it.',
+  },
+  // The keys a save must preview and a typed echo before it takes (J-105 criteria 1, 2, 5).
+  // Itself configuration, so naming a key here is an administrator's audited act, not a deploy.
+  WIDE_BLAST_RADIUS_KEYS: {
+    schema: z.array(z.string()),
+    default: ['REFUND_PAID_REQUIRES_MANAGER', 'RETENTION_ARMED'],
+    workshop: 'people-and-communications',
+    describes: 'Settings that need a blast-radius preview and a typed confirmation before saving.',
   },
 
   // Module C: spaces
@@ -513,6 +522,38 @@ export const CONFIG_KEYS = {
     workshop: 'people-and-communications',
     describes: 'Topics a new account starts subscribed to on push. Empty until push actually delivers, so consent is collected rather than assumed (H-101 criterion 6, H-204).',
   },
+  // One key per topic rather than a record: a setting is a rule, and a keyed record is a table in
+  // a blob (0025). Five scalars, not a shape a workshop screen cannot render a single field for.
+  NOTIFICATION_DIGEST_WINDOW_BOOKINGS_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 60,
+    workshop: 'people-and-communications',
+    describes: 'Minutes bookings-topic email holds for coalescing before it sends, opening at the first message held (H-104 criterion 2).',
+  },
+  NOTIFICATION_DIGEST_WINDOW_SHIFTS_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 60,
+    workshop: 'people-and-communications',
+    describes: 'Minutes shifts-topic email holds for coalescing before it sends, opening at the first message held (H-104 criterion 2).',
+  },
+  NOTIFICATION_DIGEST_WINDOW_TRAINING_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 60,
+    workshop: 'people-and-communications',
+    describes: 'Minutes training-topic email holds for coalescing before it sends, opening at the first message held (H-104 criterion 2).',
+  },
+  NOTIFICATION_DIGEST_WINDOW_ROOMS_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 60,
+    workshop: 'people-and-communications',
+    describes: 'Minutes rooms-topic email holds for coalescing before it sends, opening at the first message held (H-104 criterion 2).',
+  },
+  NOTIFICATION_DIGEST_WINDOW_ANNOUNCEMENTS_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 60,
+    workshop: 'people-and-communications',
+    describes: 'Minutes announcements-topic email holds for coalescing before it sends, opening at the first message held (H-104 criterion 2).',
+  },
 
   // Module K: platform
 
@@ -624,6 +665,16 @@ export const CONFIG_KEYS = {
 
 export type ConfigKey = keyof typeof CONFIG_KEYS
 
+// Which scalar key holds a topic's digest window, so a caller reaches the right one by topic
+// rather than five separate literals of its own (H-104 criterion 2).
+export const DIGEST_WINDOW_KEY = {
+  BOOKINGS: 'NOTIFICATION_DIGEST_WINDOW_BOOKINGS_MINUTES',
+  SHIFTS: 'NOTIFICATION_DIGEST_WINDOW_SHIFTS_MINUTES',
+  TRAINING: 'NOTIFICATION_DIGEST_WINDOW_TRAINING_MINUTES',
+  ROOMS: 'NOTIFICATION_DIGEST_WINDOW_ROOMS_MINUTES',
+  ANNOUNCEMENTS: 'NOTIFICATION_DIGEST_WINDOW_ANNOUNCEMENTS_MINUTES',
+} as const satisfies Record<NotificationTopic, ConfigKey>
+
 export const CONFIG_KEY_NAMES = Object.keys(CONFIG_KEYS) as ConfigKey[]
 
 export function isConfigKey(name: string): name is ConfigKey {
@@ -679,10 +730,16 @@ export const ENFORCED_KEYS = [
   'NOTIFICATION_MAX_ATTEMPTS',
   'NOTIFICATION_PUSH_DEFAULT_TOPICS',
   'NOTIFICATION_RETRY_BACKOFF_MINUTES',
+  'NOTIFICATION_DIGEST_WINDOW_BOOKINGS_MINUTES',
+  'NOTIFICATION_DIGEST_WINDOW_SHIFTS_MINUTES',
+  'NOTIFICATION_DIGEST_WINDOW_TRAINING_MINUTES',
+  'NOTIFICATION_DIGEST_WINDOW_ROOMS_MINUTES',
+  'NOTIFICATION_DIGEST_WINDOW_ANNOUNCEMENTS_MINUTES',
   'PRIVILEGED_ROLES',
   'PUBLIC_ORDER_SEAT_CAP',
   'SEASON_START',
   'SEASON_END',
+  'WIDE_BLAST_RADIUS_KEYS',
   'REFUND_PAID_REQUIRES_MANAGER',
   'HOLD_RELEASE_MINUTES_BEFORE',
   'HOLD_REMINDER_MINUTES_BEFORE',

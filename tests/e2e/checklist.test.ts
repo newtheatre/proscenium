@@ -2,14 +2,14 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
-import { tonightsPerformance } from '#tests/helpers/programme'
+import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// E-114 through the real routes. The pure statement and query builders are pinned against the
-// real migrations in `tests/integration/checklist.test.ts`; this is the guard and the wiring.
+// E-114 through the real routes, keyed to a performance since E-128. The pure statement and
+// query builders are pinned against the real migrations in `tests/integration/checklist.test.ts`.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -184,5 +184,72 @@ describe.skipIf(skip !== null)('reviewing an incident (E-114 criterion 3)', () =
 
   test('reviewing a missing incident 404s', async () => {
     expect((await send('POST', '/api/tonight/incidents/no-such-entry/review', undefined, foh.cookie)).status).toBe(404)
+  })
+})
+
+function write(statement: string, ...parameters: unknown[]): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(statement).run(...parameters as never[])
+  }
+  finally {
+    database.close()
+  }
+}
+
+function shift(performanceId: string, role: string, userId: string): void {
+  write('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+    `${performanceId}-${role}`, performanceId, role, userId, 'CONFIRMED')
+}
+
+describe.skipIf(skip !== null)('two performances, one venue, one day (E-128)', () => {
+  test('a matinee and an evening keep their own checklist, and closing one does not touch the other', async () => {
+    const dm = await registerMember(app, 'checklist-matinee-dm', generatePassword())
+    const { venueId, matineeId, eveningId } = (() => {
+      const database = new Database(app.databaseFile)
+      try {
+        const target = sqliteTarget(database)
+        const venue = testVenue(target, { suffix: 'checklist-matinee-house' })
+        const matinee = tonightsPerformance(target, { suffix: 'checklist-matinee', venueId: venue.id, curtainHoursAfterNightStart: 10 })
+        const evening = tonightsPerformance(target, { suffix: 'checklist-evening', venueId: venue.id, curtainHoursAfterNightStart: 15.5 })
+        return { venueId: venue.id, matineeId: matinee.performanceId, eveningId: evening.performanceId }
+      }
+      finally {
+        database.close()
+      }
+    })()
+    shift(matineeId, 'DUTY_MANAGER', dm.id)
+    shift(eveningId, 'DUTY_MANAGER', dm.id)
+
+    const created = await send('POST', '/api/admin/checklist/items', { venueId, phase: 'PRE', label: 'Fire exits checked', sort: 1, required: true })
+    expect(created.status).toBe(200)
+
+    const ambiguous = await send('GET', '/api/tonight/checklist', undefined, dm.cookie)
+    expect(ambiguous.status).toBe(400)
+
+    const matineeRead = await send('GET', `/api/tonight/checklist?performanceId=${matineeId}`, undefined, dm.cookie)
+    const { items: matineeItems } = await matineeRead.json() as { items: { id: string }[] }
+    const matineeStamp = matineeItems[0]!
+
+    const eveningRead = await send('GET', `/api/tonight/checklist?performanceId=${eveningId}`, undefined, dm.cookie)
+    const { items: eveningItems } = await eveningRead.json() as { items: { id: string, done: boolean }[] }
+    expect(eveningItems[0]!.id).not.toBe(matineeStamp.id)
+    expect(eveningItems[0]!.done).toBe(false)
+
+    const ticked = await send('POST', `/api/tonight/checklist/${matineeStamp.id}/tick`, { performanceId: matineeId }, dm.cookie)
+    expect(ticked.status).toBe(200)
+
+    const closedMatinee = await send('POST', '/api/tonight/checklist/close', { performanceId: matineeId }, dm.cookie)
+    expect(closedMatinee.status).toBe(200)
+
+    const eveningStillOpen = await send('GET', `/api/tonight/checklist?performanceId=${eveningId}`, undefined, dm.cookie)
+    const { close: eveningClose, items: eveningAfter } = await eveningStillOpen.json() as { close: unknown, items: { done: boolean }[] }
+    expect(eveningClose).toBeNull()
+    expect(eveningAfter[0]!.done).toBe(false)
+
+    const eveningExempted = await send('POST', `/api/tonight/checklist/${eveningItems[0]!.id}/exempt`, { performanceId: eveningId, reason: 'Evening closes on its own record' }, dm.cookie)
+    expect(eveningExempted.status).toBe(200)
+    const closedEvening = await send('POST', '/api/tonight/checklist/close', { performanceId: eveningId }, dm.cookie)
+    expect(closedEvening.status).toBe(200)
   })
 })

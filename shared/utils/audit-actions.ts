@@ -167,6 +167,9 @@ const CATALOGUE = {
   // Not `self`: D-126 and D-130 both write this for an officer acting on somebody else's pass.
   'pass.redeemed': { label: 'Pass redeemed for a performance', module: 'ticketing' },
   'tickets.exported': { label: 'Ticket export downloaded', module: 'ticketing' },
+  'ticketing.comp-request.created': { label: 'A ticket comp requested at the desk', module: 'ticketing' },
+  'ticketing.comp-request.approved': { label: 'A ticket comp request approved', module: 'ticketing' },
+  'ticketing.comp-request.declined': { label: 'A ticket comp request declined', module: 'ticketing' },
 
   // Module E: show night
 

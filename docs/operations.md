@@ -86,11 +86,21 @@ with `health` red is the ordering race above, which resolves itself once Workers
 up. One job carrying both readings is how 21 real failures of this exact race went unattributed
 before the split.
 
-`health`'s target is `${{ vars.HEALTH_URL }}`, a variable on the `production` GitHub environment,
-never a literal in the workflow file. There is no fallback: the job fails fast naming the missing
-variable rather than silently checking the wrong system. **This is also cutover's whole mechanism
-for this job**: pointing `HEALTH_URL` at the unified deploy, and back again if cutover needs to
-reverse, is a value change in the environment's settings, not a pull request.
+`health`'s target is `${{ vars.HEALTH_URL }}`, a **repository** variable, never a literal in the
+workflow file and never environment-scoped: `health-watch.yml`'s own job below declares no
+`environment:`, and an environment-scoped variable would need one added purely to read it, which
+risks a scheduled run stalling on an approval gate this repository does not currently have but
+could one day add. There is no fallback: both jobs fail fast naming the missing variable rather
+than silently checking the wrong system. **This is also cutover's whole mechanism for both**:
+pointing `HEALTH_URL` at the unified deploy, and back again if cutover needs to reverse, is one
+repository variable's value changing, not a pull request.
+
+**`health-watch.yml`'s own schedule has never actually run.** GitHub only reads a `schedule:`
+trigger from a workflow file on the repository's default branch, still `main` until cutover; a
+file that exists only on `unified/main` never registers. A `platform/register-scheduled-workflows`
+copy on `main` (checking `unified/main`'s deploy, since that is where the real code is) is what
+makes the schedule real before cutover rather than for the first time on the day it matters most,
+ADR-0021's lesson again. `e2e.yml`'s nightly run had the identical gap and the identical fix.
 
 ### Applying a destructive migration by hand (K-107 criterion 3)
 
@@ -156,6 +166,105 @@ Travel bookmark is taken first and why the load is safe to run again after a par
 
 Keep `out/id-map.tsv` until cutover is complete. After that it is the key to an estate that no
 longer exists, and it goes with the archive rather than staying on anybody's laptop.
+
+### The cutover runbook: branches, DNS and workflows
+
+The data load above is one step inside this. Cutover itself is a branch rename, not a merge and
+not a force-push: `unified/main` becomes `main`, and today's `main` is renamed to an archive name
+chosen at the time (`<archive-name>` below; nothing is decided yet). In order:
+
+1. **Choose the archive name for today's `main`.** Not yet decided. Whatever it is, it should say
+   plainly what the branch is: the old estate's history, frozen.
+
+2. **Empty the board of anything targeting `main` before the rename.** A GitHub branch rename
+   closes every open pull request that targets the renamed branch by name; nothing that still
+   matters may be sitting open against it when the rename happens. #825 targets `main` and is
+   held until cutover for exactly this reason: closing when `main` is renamed is correct for it,
+   because its whole job is registering schedules that only work once `unified/main` is the
+   default branch, which the rename itself achieves. Anything else open against `main` is
+   reviewed, merged or explicitly abandoned first; anything left open is lost work, not deferred
+   work.
+
+3. **Change `HEALTH_URL`, the repository variable, to the production host** (Settings > Secrets
+   and variables > Actions > Variables, repository tab). `migrate.yml`'s own `health` job and
+   `health-watch.yml` both read it (`## Applying migrations`, "What it cannot do"); until this
+   changes, both are checking the pre-cutover host, and once cutover starts, checking that host
+   is checking nothing.
+
+4. **The DNS flip, and its ordering against the rename.** `wrangler.jsonc`'s one route today is
+   `proscenium.newtheatre.org.uk` (`custom_domain: true`), the pre-cutover testing host; the
+   application's own code already assumes production is the bare `newtheatre.org.uk`
+   (`nuxt.config.ts`'s `baseURL`). Changing the route pattern to the production hostname is a code
+   change, merged and deployed; the rename does not do this by itself. Order: **rename first, then
+   merge the route change to the newly-renamed `main`, then confirm a real deploy has gone out**
+   (Workers Builds deploying `main` needs no reconfiguration in this repository, the same reason
+   the database id below needs none: it is *the branch that currently deploys*, and the rename is
+   what makes `unified/main`'s content that branch). What is **not** confirmed and must be checked
+   at the time, not assumed: whether Cloudflare's own Workers Builds project, in the Cloudflare
+   dashboard rather than this repository, tracks the branch to deploy by a fixed name that the
+   GitHub rename may or may not carry across automatically. If a push to the renamed `main` does
+   not trigger a fresh build, that setting is where to look, not this repository's own workflow
+   files.
+
+5. **Retire `main`'s duplicate workflows.** After the rename, the archive branch carries its own
+   frozen copies of `ci.yml` and `migrate.yml`, exactly as they stood at the last commit on old
+   `main`. The archived `migrate.yml` still targets the `proscenium` database id
+   (`01a75263-…`), now the archive's own database and nothing this system should ever write to
+   again. Nothing should push to the archive branch again, by policy, but `on: push` triggers do
+   not know that: a stray commit there would still fire both workflows, and `migrate.yml` would
+   still try to apply a migration to a database nobody reads any more. Delete both files (or
+   strip their triggers to nothing) on the archive branch in a direct commit immediately after the
+   rename, so a scheduled or triggered run against the archive is impossible rather than merely
+   unlikely.
+
+6. **Remove the `ref: unified/main` pin from `e2e.yml`'s checkout.** #825's copy on `main` checks
+   out `unified/main` explicitly, because the workflow file itself lived on `main` and needed the
+   unified system's own code to test; the pin is named for removal at cutover in the file's own
+   header comment. Once the rename makes `unified/main` the thing checked out by default (there is
+   no longer a separate `unified/main` to pin to), the explicit `ref:` is not just redundant, it
+   points at a branch name that no longer exists.
+
+7. **`unified/main`'s own `migrate.yml` needs no edit.** Its trigger already reads
+   `branches: [main, unified/main]`, and its database id is already `02c35a27-…`, `unified`'s own
+   id: the database that stays live at cutover, taking over from `proscenium`'s archived one. Both
+   facts were true before cutover and stay true after it; the file was written for the rename in
+   advance; say so plainly, because the obvious assumption, that the hardcoded id needs changing
+   because it belonged to whichever database was live *before*, is the wrong way round.
+
+### The staging duplicate
+
+After cutover, a duplicate of `unified` with mock data becomes a testing and staging environment,
+most naturally at `proscenium.newtheatre.org.uk`, the hostname cutover's own DNS step just freed.
+"Duplicate" means the schema and the deployed code, from a fresh D1 database created for the
+purpose; it does not mean the data, and this is the part to get right rather than assume.
+
+**A staging database seeded from a copy of `unified` is a personal-data copy**, the day `unified`
+holds real bookings, real members and real emails, whatever the intention behind making it. This
+repository already treats a real personal-data copy as something to handle carefully rather than
+casually: `migration/dumps/` and `migration/out/` are gitignored, live on one machine, and are
+deleted after each rehearsal (`migration/README.md`). A staging database that persisted a copy of
+production data on a shared, always-on environment would be a bigger, less controlled version of
+exactly what those two directories exist to contain. Staging's data must be **genuinely mock**:
+the same fabricated data `bun run seed` already produces for local development (K-120), which
+refuses outright to run against anything but a local target and generates its credentials at
+runtime rather than reusing anybody real.
+
+**What is not yet built:** `bun run seed` writes to a local SQLite file only
+(`assertLocalTarget()`, `scripts/seed.ts`); nothing today loads what it produces into a remote D1
+database the way `migration/load.ts` loads a real import into `unified`. Getting mock data into a
+real staging database needs either a small loader built for exactly this, the same shape as
+cutover's own `load.sql` step above (dump the locally-seeded file's rows, then
+`wrangler d1 execute --remote --file=`), or accepting a schema-only staging database, seeded by
+hand, until one exists. This is named here as work still to do, not claimed as a working path.
+
+**Workflows and variables.** Staging needs its own Cloudflare Workers Builds project or
+environment, outside this repository's own configuration, reading a distinct database id and
+serving the freed `proscenium.newtheatre.org.uk` route: this is the same shape `unified/main`
+itself already is today, a second environment deployed from a branch at its own hostname with its
+own database, just re-pointed at mock data instead of what was, until cutover, the pre-production
+copy of the real thing. Any health check or alert aimed at staging is its own workflow and its own
+variable, never `HEALTH_URL`, so a staging outage is never mistaken for a production one and never
+pages the IT Manager as though it were.
 
 ### The rollback runbook (K-119)
 

@@ -111,9 +111,12 @@ describe('permissions come from live grants only', () => {
   })
 
   test('an operational role carries no standing permission at all (0009)', () => {
-    for (const role of ['FRONT_OF_HOUSE', 'COMMITTEE'] as const) {
-      expect(`${role}: ${permissionsFor([{ role, expiresAt: null }], now).size}`).toBe(`${role}: 0`)
-    }
+    expect(permissionsFor([{ role: 'FRONT_OF_HOUSE', expiresAt: null }], now).size).toBe(0)
+  })
+
+  // The season dashboard's aggregates, and nothing else standing (I-105 criterion 5).
+  test('the committee holds the season summary and no entry-level drill-down', () => {
+    expect([...permissionsFor([{ role: 'COMMITTEE', expiresAt: null }], now)]).toEqual(['finance.summary'])
   })
 
   // The one named exception, and it stays one: an officer role opens tonight's screens and every

@@ -107,6 +107,34 @@ export const tickets = sqliteTable('tickets', {
   check('tickets_price_source_values', sql`${table.priceSource} IN ('PERFORMANCE', 'SHOW', 'BASE', 'IMPORT')`),
 ])
 
+// A request to collect a reservation's tickets free instead of paying, decided once by tonight's
+// duty manager or a ticketing manager, never the requester (D-117 criterion 1).
+export const ticketCompRequests = sqliteTable('ticket_comp_requests', {
+  id: id(),
+  reservationId: text('reservation_id').notNull().references(() => reservations.id, { onDelete: 'restrict' }),
+  performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'restrict' }),
+  requestedBy: text('requested_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  reason: text('reason').notNull(),
+  status: text('status').notNull().default('PENDING'),
+  decidedBy: text('decided_by').references(() => users.id, { onDelete: 'restrict' }),
+  decidedAt: integer('decided_at'),
+  declineReason: text('decline_reason'),
+  // Set once an approval is spent at collection (criterion 2's atomic claim). No foreign key:
+  // the claim is written before the ledger entry it names exists.
+  entryId: text('entry_id'),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  index('ticket_comp_requests_reservation').on(table.reservationId),
+  index('ticket_comp_requests_performance').on(table.performanceId),
+  check('ticket_comp_requests_status_values', sql`${table.status} IN ('PENDING', 'APPROVED', 'DECLINED')`),
+  check('ticket_comp_requests_decided_shape', sql`
+    (${table.status} = 'PENDING' AND ${table.decidedBy} IS NULL AND ${table.decidedAt} IS NULL)
+    OR (${table.status} <> 'PENDING' AND ${table.decidedBy} IS NOT NULL AND ${table.decidedAt} IS NOT NULL)
+  `),
+  check('ticket_comp_requests_decline_reason_shape', sql`(${table.status} = 'DECLINED') = (${table.declineReason} IS NOT NULL)`),
+  check('ticket_comp_requests_entry_needs_approval', sql`${table.entryId} IS NULL OR ${table.status} = 'APPROVED'`),
+])
+
 // One row per account. Everything special category lives inside `encrypted_payload` (0050);
 // `status` and `companions` stay plain, because the database enforces them (D-127 criterion 1).
 export const accessProfiles = sqliteTable('access_profiles', {

@@ -24,10 +24,11 @@ export const collectForm = z.object({
   // the screen into the reader, so it must never silently drift from what is actually charged.
   expectedTotalPence: z.number().int().min(0),
   tender: z.enum(DESK_TENDERS),
-  compReason: z.string().trim().min(1).max(200).optional(),
+  // Names an approved request (D-117); the reason lives there, never typed here.
+  compRequestId: z.string().trim().min(1).optional(),
 }).refine(
-  input => input.tender !== 'COMP' || input.compReason !== undefined,
-  { path: ['compReason'], message: 'A comp needs a reason' },
+  input => input.tender !== 'COMP' || input.compRequestId !== undefined,
+  { path: ['compRequestId'], message: 'A comp needs an approved request' },
 )
 
 export type CollectInput = z.output<typeof collectForm> & { reservationId: string }

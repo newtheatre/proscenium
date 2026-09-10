@@ -12,8 +12,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'More than one performance is running tonight: name the performance' })
   }
 
-  const closed = await closeFor(resolved.venueId, resolved.night)
-  if (!closed) throw createError({ statusCode: 409, statusMessage: 'Tonight\'s checklist has not been closed yet' })
+  const closed = await closeFor(target)
+  if (!closed) throw createError({ statusCode: 409, statusMessage: 'This performance\'s checklist has not been closed yet' })
 
   const report = await compileNightReport(target, resolved.venueId, resolved.night)
   const id = newId()

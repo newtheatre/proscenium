@@ -571,10 +571,30 @@ index and a trigger on `ledger_lines` (`ledger_lines_ticket_collection_once`,
 once, ever, and that a line can only exist for a reservation the same batch actually collected,
 so a lost race aborts the whole transaction rather than posting money for nothing (0001, I-102
 criterion 6); `check migrations` refuses a rebuild of `ledger_lines` against a `restrict`
-dependent for exactly this reason, so the guard is index and trigger only. `COMP` needs a reason
-and is refused outright without `ticketing.manage` (committee decision): an ordinary desk officer
-cannot self-approve one, though whoever does hold the permission still approves their own; D-117's
-own request-and-approval workflow, which replaces this gate rather than removing it, is not built.
+dependent for exactly this reason, so the guard is index and trigger only. `COMP` names an
+approved `ticket_comp_requests` row rather than a typed reason (D-117, below); the request itself
+carries the reason and the approver's identity, which `collect()` reads onto `comp_reason` and
+`comp_approved_by` rather than trusting whoever happens to be collecting.
+
+**Comps, requested and approved before anything is collected (D-117).** `ticket_comp_requests`
+mirrors `comp_requests` below exactly, for a reservation already held at the desk rather than a
+basket: `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances
+restrict · `requested_by` → users restrict · `reason` · `status` CHECK
+`PENDING|APPROVED|DECLINED` · `decided_by` NULL → users restrict, `decided_at` NULL, set together
+or not at all · `decline_reason` NULL, set exactly when declined · `entry_id`, no foreign key, set
+once the approval is spent at collection (criterion 2's atomic claim, the same reasoning
+`comp_requests.entry_id` below is not one). `POST /api/box-office/desk/comp-requests` is open to
+any `ticketing.write` desk user, since nothing moves until it is approved; deciding one
+(`POST .../[id]/approve`, `.../[id]/decline`) needs tonight's confirmed duty manager for that
+performance or `ticketing.manage` (`isDutyManagerOrTicketingManager()`, the same shape
+`isDutyOrBarManager()` already takes for F-110), never the requester, and a pending request
+lapses after `COMP_REQUEST_EXPIRY_MINUTES` (10 by default, reused from F-110's own key), derived
+at read time from `created_at` rather than swept. `collect()` claims the request's `entry_id` with
+the ledger entry's own pre-generated id before posting, so two collections racing one approval
+settle to one (criterion 2); the claim releases if the batch then fails for any other reason. A
+comped ticket is an ordinary ticket collected at nought, so it counts against capacity exactly
+like a paid one (criterion 4, `heldSeatsSubquery`), and I-103's own `foregoneQuery` (`tender =
+'COMP'`) already reports it, split from paid revenue, with no code of its own to add.
 
 **Refunds and cancelling a paid booking (D-116).** `POST
 /api/box-office/desk/reservations/[id]/tickets/[ticketId]/refund` hands money back one ticket at
@@ -874,21 +894,23 @@ hand-ticked) · `active` bool (soft-retired, never deleted: a stamp keeps refere
 mutable like `shift_templates` rather than append-only: ticking a box is a state, not a record.
 
 ### checklist_stamps
-`id` PK · `venue_id` → venues restrict · `night` · `item_id` → checklist_items restrict ·
+`id` PK · `performance_id` → performances restrict · `item_id` → checklist_items restrict ·
 `phase`, `label`, `sort`, `required`, `system_check` (snapshotted from the item at the moment of
 stamping) · `ticked_by` restrict NULL · `ticked_at` NULL · `exempted` bool · `exempt_reason` NULL
-· `exempted_by` restrict NULL · `exempted_at` NULL · `stamped_at`. UNIQUE (`venue_id`, `night`,
-`item_id`): one stamp per item per venue per night, made the first time that night's checklist is
-touched, so an edit to `checklist_items` afterwards changes nothing already stamped (E-101's own
-pattern). Keyed to a venue and a night rather than a performance, like `till_sessions`. A
-system-verified item's `ticked_by`/`ticked_at` stay NULL forever; its done state is read live
-against the data the check names, never stored (E-114 criterion 3).
+· `exempted_by` restrict NULL · `exempted_at` NULL · `stamped_at`. UNIQUE (`performance_id`,
+`item_id`): one stamp per item per performance, made the first time that performance's checklist
+is touched, so an edit to `checklist_items` afterwards changes nothing already stamped (E-101's
+own pattern). Keyed to a performance (E-128; rebuilt by hand from the venue-and-night keying
+E-114 originally shipped, `docs/decisions/0063-hand-authored-table-rebuilds.md`), so a matinee
+and an evening never share one. A system-verified item's `ticked_by`/`ticked_at` stay NULL
+forever; its done state is read live against this performance's own data, never stored (E-114
+criterion 3).
 
 ### checklist_closes
-`id` PK · `venue_id` → venues restrict · `night` · `closed_by` restrict · `closed_at`. UNIQUE
-(`venue_id`, `night`) makes closing idempotent, the same guarantee `night_reports`' PK gives its
-own close. The close-night action itself (E-114 criterion 4); blocked while a required item
-across either phase is neither ticked nor exempted.
+`id` PK · `performance_id` → performances restrict, UNIQUE · `closed_by` restrict · `closed_at`.
+The UNIQUE on `performance_id` makes closing idempotent, the same guarantee `night_reports`' own
+PK gives its close. The close-night action itself (E-114 criterion 4; performance-keyed since
+E-128); blocked while a required item across either phase is neither ticked nor exempted.
 
 ### night_reports  APPEND-ONLY
 `id` PK · `performance_id` → performances restrict, UNIQUE · `venue_id` → venues restrict ·
@@ -2032,9 +2054,35 @@ The refs carry **no foreign key**. The ledger outlives what it refers to, and a 
 fact about the past that deleting a record must not rewrite. `user_id` is the exception and is
 `set null`, so an erased person's messages stay counted without naming them.
 
+### notification_digest_entries
+`id` PK · `user_id` cascade · `topic` CHECK `BOOKINGS|SHIFTS|TRAINING|ROOMS|ANNOUNCEMENTS` ·
+`type` · `subject` · `body` · `digest_log_id` NULL, no foreign key · `created_at`. Indexed on
+`(topic, user_id, digest_log_id)`.
+
+**A row is written when `notify()` holds a message for its topic's digest instead of sending
+(H-104 criterion 1).** Unclaimed and topic-bearing is what qualifies; a claimed call (0048) or one
+carrying an attachment sends immediately as before. No `notification_log` row exists for a held
+send; the entry is the only record of it until the digest that covers it is sent.
+
+**`digest_log_id` null is the claim.** `notifications:digest` moves every unclaimed row for one
+topic and person to the same id in one conditional `UPDATE ... WHERE digest_log_id IS NULL`, so
+two overlapping runs cannot split or duplicate one digest (0003, 0048). The window a topic waits
+before flushing is one scalar config key per topic (`NOTIFICATION_DIGEST_WINDOW_<TOPIC>_MINUTES`,
+0025: a setting is a rule, not a keyed record), and opens at the earliest
+still-unclaimed row for that topic and person, not the latest: a fresh entry arriving after a claim
+starts its own window rather than joining the digest that already sent (H-104 criteria 2, 6).
+
+**`digest_log_id` carries no foreign key.** `notification_log` is rebuilt on every status it
+gains, and a cascading dependent on a table `check:migrations` already rebuilds is exactly what
+that check refuses (0052, 0061). An entry survives its send only until `daily:sweeps` notices its
+log row is gone (`NOT EXISTS`, scoped by subquery and capped, never an id list, 0003, 0006), which
+is what "was I told about X" answers from (criterion 5): the entry names the change, and its log
+row, while it lasts, names the outcome.
+
 ### inbox_items
 `id` PK · `user_id` cascade · `type` · `title` · `body` · `link` · `read_at` ·
-`created_at`. The in-app channel; never coalesced.
+`created_at`. The in-app channel; never coalesced, even where the email covering the same change
+is (H-104 criterion 4).
 
 **Written by `notify()` for every type that declares the `INBOX` channel, before the email is
 judged (H-102 criterion 6, 0054).** Every topic-carrying type declares it, so a message a
@@ -2042,7 +2090,8 @@ preference silenced is still findable; a unit test fails the build when a new ty
 does not. An anonymised account gets nothing at all (H-107). The entry is a row here and not a
 second row in `notification_log`: that would double every per-type count in the log. `title` is the
 rendered subject and `body` the rendered plain text, so both go on erasure. `read_at` is unused
-until something marks one read.
+until something marks one read; H-104's criteria named individual entries and coalescing, not a
+read state, so it left this column exactly as it found it (`docs/known-issues.md`, H-204).
 
 ### config
 `key` PK · `value` JSON · `updated_by` · `updated_at`. Defaults live in code; a missing row means

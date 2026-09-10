@@ -31,8 +31,8 @@ beforeAll(async () => {
   boxOffice = await registerMember(app, 'boxoffice', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, officer.cookie)
 
-  // Both roles, plus MFA: MANAGER is privileged (0037/A-112), so requirePermission also needs
-  // a confirmed second factor before ticketing.manage, the comp gate, is honoured (D-114).
+  // Both roles, plus MFA: MANAGER is privileged (0037/A-112). ticketing.manage is now what
+  // decides a comp request rather than what collects one (D-117).
   const managerPassword = generatePassword()
   manager = await registerMember(app, 'manager', managerPassword)
   await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'BOX_OFFICE' }, officer.cookie)
@@ -225,15 +225,21 @@ describe.skipIf(skip !== null)('collection is the payment boundary (criteria 2, 
     expect(await again.text()).toContain('already been collected')
   }, CASE_TIMEOUT_MS)
 
-  test('a comp posts a zero-value entry, keeping the real price on the line (criterion 4)', async () => {
+  // D-117 replaced the standing ticketing.manage gate with a request-and-approval workflow;
+  // the full request, approve, decline and race coverage lives in tests/e2e/ticket-comps.test.ts.
+  test('an approved comp posts a zero-value entry, keeping the real price on the line (criterion 4)', async () => {
     const { performanceId, ticketTypeId } = await bookableShow(900)
     const { id } = await bookedReservation(performanceId, ticketTypeId)
+
+    const asked = await send('POST', '/api/box-office/desk/comp-requests', { reservationId: id, reason: 'Reviewer' })
+    const { id: requestId } = await asked.json() as { id: string }
+    expect((await send('POST', `/api/box-office/desk/comp-requests/${requestId}/approve`, {}, manager.cookie)).status).toBe(200)
 
     const collected = await send('POST', `/api/box-office/desk/reservations/${id}/collect`, {
       expectedTotalPence: 0,
       tender: 'COMP',
-      compReason: 'Reviewer',
-    }, manager.cookie)
+      compRequestId: requestId,
+    })
     expect(collected.status).toBe(200)
 
     const line = query<{ amountPence: number, unitPricePence: number }>(
@@ -243,28 +249,31 @@ describe.skipIf(skip !== null)('collection is the payment boundary (criteria 2, 
     expect(line).toEqual({ amountPence: 0, unitPricePence: 900 })
   }, CASE_TIMEOUT_MS)
 
-  test('a comp with no reason is refused before anything is written', async () => {
+  test('a comp with no request named is refused before anything is written', async () => {
     const { performanceId, ticketTypeId } = await bookableShow(900)
     const { id } = await bookedReservation(performanceId, ticketTypeId)
 
     const refused = await send('POST', `/api/box-office/desk/reservations/${id}/collect`, {
       expectedTotalPence: 0,
       tender: 'COMP',
-    }, manager.cookie)
+    })
     expect(refused.status).toBe(400)
   }, CASE_TIMEOUT_MS)
 
-  test('a comp is refused without ticketing.manage, even with a well-formed body (committee decision)', async () => {
+  test('a comp is refused without an approved request, even with a well-formed body (D-117)', async () => {
     const { performanceId, ticketTypeId } = await bookableShow(900)
     const { id } = await bookedReservation(performanceId, ticketTypeId)
+
+    const asked = await send('POST', '/api/box-office/desk/comp-requests', { reservationId: id, reason: 'Reviewer' })
+    const { id: requestId } = await asked.json() as { id: string }
 
     const refused = await send('POST', `/api/box-office/desk/reservations/${id}/collect`, {
       expectedTotalPence: 0,
       tender: 'COMP',
-      compReason: 'Reviewer',
+      compRequestId: requestId,
     })
-    expect(refused.status).toBe(403)
-    expect(await refused.text()).toContain('manager')
+    expect(refused.status).toBe(409)
+    expect(await refused.text()).toContain('not been approved')
 
     const row = query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', id)
     expect(row?.status).toBe('PENDING')

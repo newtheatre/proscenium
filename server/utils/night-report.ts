@@ -272,9 +272,9 @@ export async function compileNightReport(performanceId: string, venueId: string,
     reportStaffing(performanceId, venueId, night),
     reportBarSummary(night),
     reportAccess(performanceId),
-    // Venue-and-night scoped like the checklist itself (E-114); an exception's reason now
+    // Performance-scoped like every other section here (E-128); an exception's reason now
     // prints here, closing the gap E-114 criterion 5 left open.
-    checklistFor(venueId, night),
+    checklistFor(performanceId),
   ])
   return { performanceId, attendance, takings, incidents, ageChecks, milestones, staffing, bar, access, checklist }
 }
