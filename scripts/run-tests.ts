@@ -108,10 +108,8 @@ async function serve(port: number): Promise<Subprocess> {
   const hubDir = hubDirFor(port)
   await Bun.$`rm -rf ${hubDir}`.quiet().nothrow()
 
-  // Redirected straight to a file, not piped: a pipe nobody reads fills at 64KB and blocks the
-  // writer, and a dev server frozen mid-log answers every request with a 500. Kept, not
-  // discarded once healthy: a request that 500s mid-run explains itself in the same file, which
-  // piping used to lose the moment `nuxt dev` finished its own boot (docs/known-issues.md).
+  // Redirected to a file, not piped: an unread pipe fills at 64KB and blocks the writer
+  // (docs/known-issues.md).
   const log = await createServerLog(hubDir)
   const server = Bun.spawn(['./node_modules/.bin/nuxt', 'dev', '--port', String(port)], {
     env: { ...process.env, NUXT_PORT: String(port), NUXT_HUB_DIR: hubDir, E2E_BASE_URL: `http://localhost:${port}` },

@@ -202,10 +202,12 @@ export async function startApp(): Promise<AppUnderTest> {
 
   await Bun.$`rm -rf ${hubDir}`.quiet().nothrow()
 
-  // Nuxt directly, not through `bun run dev`: that spawns a child, and killing the parent orphans
-  // it still holding the port. Redirected straight to a file, not ignored: docs/known-issues.md
-  // records an afternoon lost to a server that explained its own 500 into a discarded pipe.
+  // Redirected to a file, not piped: an unread pipe fills at 64KB and blocks the writer
+  // (docs/known-issues.md).
   const log = await createServerLog(hubDir)
+
+  // Nuxt directly, not through `bun run dev`: that spawns a child, and killing the parent
+  // orphans it still holding the port.
   const server: Subprocess = Bun.spawn(['./node_modules/.bin/nuxt', 'dev', '--port', port], {
     env: { ...process.env, NUXT_PORT: port, NUXT_HUB_DIR: hubDir, E2E_BASE_URL: BASE_URL },
     stdout: log.stdout,

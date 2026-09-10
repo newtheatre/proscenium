@@ -1,6 +1,5 @@
-// Piped-and-read does not survive `nuxt dev`'s own lifecycle: once Nitro finishes booting,
-// further output stops arriving on the stream this file used to read, silently and without
-// error. Direct file redirection does not depend on anything reading it, and does survive.
+// Redirected to a file, not piped-and-read: piping did not survive nuxt dev's own lifecycle
+// (docs/known-issues.md).
 
 function logPaths(hubDir: string): { stdout: string, stderr: string } {
   return { stdout: `${hubDir}/server.out.log`, stderr: `${hubDir}/server.err.log` }
