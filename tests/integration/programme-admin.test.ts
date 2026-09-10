@@ -13,7 +13,6 @@ import { boundStatement, createTestDatabase, rows } from '#tests/helpers/databas
 import { tonightsPerformance } from '#tests/helpers/programme'
 import type { PerformanceReference } from '#server/utils/programme'
 import type { FilterField } from '#shared/utils/list-filters'
-import type { FilterField } from '#shared/utils/list-filters'
 import type { TestDatabase } from '#tests/helpers/database'
 
 // D-121 and D-112 on the real migrations. "Has sold tickets" is what criterion 5 turns on, and it

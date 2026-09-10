@@ -8,7 +8,6 @@ import { accountsClause } from '#server/utils/directory'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { AccountsContext } from '#server/utils/directory'
 import type { FilterField } from '#shared/utils/list-filters'
-import type { FilterField } from '#shared/utils/list-filters'
 import type { TestDatabase } from '#tests/helpers/database'
 
 // The account directory through its declaration (K-129 criteria 1 and 5). A role is not a

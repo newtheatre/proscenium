@@ -167,9 +167,8 @@ function baseSchema(spec: ListSpec) {
 
 export type ListQuery = z.output<ReturnType<typeof baseSchema>>
 
-// The endpoint's Zod query, on top of the shared page query. Each field is one key holding one
-// condition, read back with conditionsOf. Strict: a key the list does not declare is refused,
-// so an obsolete link is told so rather than shown a plausible unfiltered listing.
+// The endpoint's Zod query on top of the page query: one key per field, read back with
+// conditionsOf. Strict, so an obsolete link is refused rather than shown an unfiltered listing.
 export function filterQuerySchema(spec: ListSpec): ReturnType<typeof baseSchema> {
   const fields: Record<string, z.ZodType> = {}
   for (const field of spec.fields) {
