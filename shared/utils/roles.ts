@@ -100,6 +100,9 @@ export const PERMISSIONS = [
   // The treasurer's own read over the ledger: comps, discounts and the reports built on them.
   // No distinct permission existed before I-103; every report routed through `bar.read` instead.
   'finance.read',
+  // Composing a fan-out to a resolved audience (H-108). Open question 1 asks which roles beyond
+  // ADMIN and whether a whole-membership send needs a second officer; unanswered, so narrow.
+  'comms.announce',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

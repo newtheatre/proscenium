@@ -281,6 +281,9 @@ const CATALOGUE = {
   // Module H: communications
 
   'notifications.preference.changed': { label: 'Notification preference changed', module: 'communications' },
+  // Sender, audience definition and count; never the subject or body, which are prose (H-108
+  // criterion 4, 0011). Per-recipient outcomes are `notification_log`'s own rows, not this.
+  'comms.announcement.sent': { label: 'Announcement sent', module: 'communications' },
 
   // Module I: finance
 
