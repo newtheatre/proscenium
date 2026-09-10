@@ -169,6 +169,19 @@ export function pastCurtainReason(startsAt: number, now: number): string | null 
   return 'This performance has already started, so it can no longer be cancelled online. Contact the box office directly.'
 }
 
+// D-111 criterion 5: a different show is cancel and rebook, never an exchange.
+export function differentShowReason(currentShowId: string, targetShowId: string): string | null {
+  if (currentShowId === targetShowId) return null
+  return 'Only another performance of the same show can be exchanged into. Cancel this booking and make a new one for a different show.'
+}
+
+// The same performance is not a real exchange; refusing it early is a clearer answer than a
+// capacity check that would always pass against seats this booking already holds.
+export function sameNightReason(currentPerformanceId: string, targetPerformanceId: string): string | null {
+  if (currentPerformanceId !== targetPerformanceId) return null
+  return 'This booking is already for that performance.'
+}
+
 export interface QrExchangedTo {
   showTitle: string
   when: string

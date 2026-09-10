@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { check, index, integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { performances, shows } from './programme'
 import { users } from './identity'
+import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 
 const id = () => text('id').primaryKey()
 const now = sql`(unixepoch())`
@@ -68,6 +69,9 @@ export const reservations = sqliteTable('reservations', {
   // Set while PENDING; the release sweep moves PENDING to EXPIRED and clears it (D-106).
   holdExpiresAt: integer('hold_expires_at'),
   cancelledBy: text('cancelled_by'),
+  // Cancelled-with-a-pointer, not a fourth status (D-111): `status`'s CHECK is restrict-FK'd and
+  // cannot be extended (0010). Set only alongside a CUSTOMER cancellation.
+  exchangedToReservationId: text('exchanged_to_reservation_id').references((): AnySQLiteColumn => reservations.id, { onDelete: 'restrict' }),
   customerNotes: text('customer_notes'),
   staffNotes: text('staff_notes'),
   // Unused: the QR is a stateless HMAC over this row's id (`server/utils/qr-tokens.ts`), so a
@@ -83,9 +87,11 @@ export const reservations = sqliteTable('reservations', {
   index('reservations_performance_status').on(table.performanceId, table.status),
   index('reservations_user_created').on(table.userId, table.createdAt),
   index('reservations_hold_expires_at').on(table.holdExpiresAt),
+  index('reservations_exchanged_to').on(table.exchangedToReservationId),
   check('reservations_status_values', sql`${table.status} IN ('PENDING', 'COLLECTED', 'DOOR', 'EXPIRED', 'CANCELLED', 'NO_SHOW')`),
   check('reservations_source_values', sql`${table.source} IN ('WEB', 'DESK', 'DOOR')`),
   check('reservations_cancelled_by_values', sql`${table.cancelledBy} IS NULL OR ${table.cancelledBy} IN ('CUSTOMER', 'STAFF')`),
+  check('reservations_exchanged_to_shape', sql`${table.exchangedToReservationId} IS NULL OR (${table.status} = 'CANCELLED' AND ${table.cancelledBy} = 'CUSTOMER')`),
 ])
 
 // One row per seat. Capacity is counted from these, never stored: `server/utils/capacity.ts` is

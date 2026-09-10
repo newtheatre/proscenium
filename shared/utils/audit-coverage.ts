@@ -240,6 +240,12 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['reservation.cancelled'],
     via: ['server/utils/reservations.ts'],
   },
+  { route: 'server/api/qr/exchange-options.get.ts', exempt: 'reads what the exchange form needs; nothing is written' },
+  {
+    route: 'server/api/qr/exchange.post.ts',
+    actions: ['reservation.exchanged'],
+    via: ['server/utils/exchange.ts'],
+  },
   { route: 'server/api/box-office/desk/performances.get.ts', exempt: 'reads tonight\'s programme; nothing is written' },
   { route: 'server/api/box-office/desk/search.get.ts', exempt: 'reads bookings against a performance; nothing is written' },
   { route: 'server/api/box-office/desk/scan.post.ts', exempt: 'resolves a scanned code to a booking; nothing is written' },
