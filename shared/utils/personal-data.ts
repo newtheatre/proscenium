@@ -668,6 +668,15 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Who recorded a day\'s reconciliation is the accountable record (I-104); the tombstone still answers for it.',
   },
   {
+    name: 'periods',
+    column: 'created_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // The label names a term, not a person: "Autumn term 2026", never a reason or a note.
+    why: 'Who defined a term is the accountable record (I-107); the tombstone still answers for it.',
+  },
+  {
     name: 'period_locks',
     column: 'actor_id',
     section: null,

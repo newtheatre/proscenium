@@ -602,6 +602,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/admin/finance/periods/index.post.ts', actions: ['finance.period.closed'], via: ['server/utils/period-locks.ts'] },
   { route: 'server/api/admin/finance/periods/[id]/reopen.post.ts', actions: ['finance.period.reopened'], via: ['server/utils/period-locks.ts'] },
+  { route: 'server/api/admin/finance/terms/index.get.ts', exempt: 'reads defined terms, writing nothing' },
+  { route: 'server/api/admin/finance/terms/index.post.ts', actions: ['finance.period.defined'], via: ['server/utils/period-locks.ts'] },
 
   // Module J: governance
 

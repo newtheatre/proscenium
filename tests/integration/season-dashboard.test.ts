@@ -80,6 +80,20 @@ describe('period boundaries, Europe/London (criterion 1)', () => {
     expect(bounds.fromDay).toBe('2026-09-14')
     expect(bounds.toDay).toBe('2026-09-20')
   })
+
+  // I-107's own defined term: the range travels with the request rather than being resolved a
+  // second time here, so a term's own dates are exactly what the caller already looked up.
+  test('a term is exactly the range named, inclusive at both ends', () => {
+    const bounds = periodBounds({ kind: 'TERM', fromDay: '2026-09-21', toDay: '2026-12-11' })
+    expect(bounds.fromDay).toBe('2026-09-21')
+    expect(bounds.toDay).toBe('2026-12-11')
+    // December is GMT, no DST offset to account for.
+    const lastMinute = Math.floor(new Date('2026-12-11T23:59:00Z').getTime() / 1000)
+    const firstMinuteAfter = Math.floor(new Date('2026-12-12T00:00:00Z').getTime() / 1000)
+    expect(lastMinute).toBeGreaterThanOrEqual(bounds.fromAt)
+    expect(lastMinute).toBeLessThan(bounds.toAt)
+    expect(firstMinuteAfter).toBeGreaterThanOrEqual(bounds.toAt)
+  })
 })
 
 describe('revenue by source (criterion 2)', () => {

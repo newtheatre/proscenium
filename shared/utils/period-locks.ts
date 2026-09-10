@@ -14,6 +14,26 @@ export const CLOSED_PERIOD_TRIGGER = 'ledger_entries_refuses_a_closed_period'
 
 const londonDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A day is YYYY-MM-DD')
 
+// A named term, the range I-105's own TERM selector reads. A season needs none: its range is
+// computed, never stored (architecture.md).
+export const defineTermForm = z.object({
+  label: z.string().trim().min(1).max(120),
+  fromDay: londonDay,
+  toDay: londonDay,
+}).refine(input => input.toDay >= input.fromDay, { path: ['toDay'], message: 'A term cannot end before it starts' })
+
+export type DefineTermInput = z.output<typeof defineTermForm>
+
+export interface Period {
+  id: string
+  label: string
+  fromDay: string
+  toDay: string
+  createdBy: string
+  createdByName: string
+  createdAt: number
+}
+
 export const closePeriodForm = z.object({
   fromDay: londonDay,
   toDay: londonDay,
@@ -53,6 +73,7 @@ export function hasBlockingConditions(blocking: BlockingConditions): boolean {
 
 const PERIOD_LOCK_CONSTRAINT_REFUSALS: ConstraintRefusal[] = [
   { violated: 'period_locks_range_order', says: 'A period cannot end before it starts' },
+  { violated: 'periods_range_order', says: 'A term cannot end before it starts' },
 ]
 
 export function periodLockConstraintRefusal(error: unknown): { statusCode: 409, statusMessage: string } | null {

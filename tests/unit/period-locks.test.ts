@@ -1,10 +1,25 @@
 import { describe, expect, test } from 'bun:test'
 import {
   closePeriodForm,
+  defineTermForm,
   hasBlockingConditions,
   periodLockConstraintRefusal,
   reopenPeriodForm,
 } from '#shared/utils/period-locks'
+
+describe('defining a term (I-105\'s own TERM seam)', () => {
+  test('a labelled range is accepted', () => {
+    expect(defineTermForm.safeParse({ label: 'Autumn term', fromDay: '2026-09-21', toDay: '2026-12-11' }).success).toBe(true)
+  })
+
+  test('a term needs a label, unlike a close', () => {
+    expect(defineTermForm.safeParse({ fromDay: '2026-09-21', toDay: '2026-12-11' }).success).toBe(false)
+  })
+
+  test('a range ending before it starts is refused', () => {
+    expect(defineTermForm.safeParse({ label: 'Autumn term', fromDay: '2026-12-11', toDay: '2026-09-21' }).success).toBe(false)
+  })
+})
 
 describe('closing a period (I-107 criterion 1)', () => {
   test('a well-formed range is accepted', () => {

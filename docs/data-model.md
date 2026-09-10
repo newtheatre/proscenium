@@ -793,6 +793,19 @@ chain. `server/utils/night-reconciliation.ts` builds the whole-night expected fi
 F-118's own bar reconciliation (`server/utils/reconciliation.ts`) rather than a second account
 of the same figures, adding only the desk's own itemised breakdown.
 
+### periods
+`id` PK · `label` · `from_day`, `to_day` (`london_day` format, both inclusive; CHECK
+`to_day >= from_day`) · `created_by` → users restrict · `created_at`. Indexed on
+`(from_day, to_day)`.
+
+**A named term, and only a term: a season needs no row here.** A season's range is computed
+from `committeeYearEnd` (`shared/utils/london.ts`), never stored, the boundary E-126 also reuses
+rather than resolving its own (I-107). A term has no fixed formula, so it is named once, ahead
+of closing it: `POST /api/admin/finance/terms` defines the range, `GET` lists every one, and the
+season dashboard's `TERM` period kind (I-105) reads its bounds from here. Closing a period does
+not reference this table: a lock names a range directly, whether or not that range was ever
+defined as a term.
+
 ### period_locks
 `id` PK · `from_day`, `to_day` (`london_day` format, both inclusive; CHECK `to_day >= from_day`) ·
 `label` NULL · `action` CHECK `CLOSED|REOPENED` · `actor_id` → users restrict · `created_at`.

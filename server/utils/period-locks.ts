@@ -6,12 +6,55 @@ import { newId } from './accounts'
 import { auditedWrite } from './audit'
 import { nightsMissingAReading, nightsWithOpenVariance } from './night-reconciliation'
 import { auditEntry } from '#shared/utils/audit'
-import type { ClosePeriodInput, PeriodLock, PeriodLockAction } from '#shared/utils/period-locks'
+import type { ClosePeriodInput, DefineTermInput, Period, PeriodLock, PeriodLockAction } from '#shared/utils/period-locks'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { SQL } from 'drizzle-orm'
 
 // I-107. `ledger_entries_refuses_a_closed_period` is the actual enforcement; everything here is
 // the record of what was closed and by whom, and the warning shown before closing it.
+
+interface PeriodRow {
+  id: string
+  label: string
+  fromDay: string
+  toDay: string
+  createdBy: string
+  createdByName: string
+  createdAt: number
+}
+
+// A term's own definition, read by the season dashboard's TERM selector (I-105) as well as by
+// closing one: the range a client submits for `kind: 'TERM'` is exactly what this lists.
+export function periodsQuery(): SQL {
+  return sql`
+    SELECT p.id AS id, p.label AS label, p.from_day AS fromDay, p.to_day AS toDay,
+           p.created_by AS createdBy, u.name AS createdByName, p.created_at AS createdAt
+    FROM periods p
+    JOIN users u ON u.id = p.created_by
+    ORDER BY p.from_day DESC
+  `
+}
+
+export async function periodsList(): Promise<Period[]> {
+  return db.all<PeriodRow>(periodsQuery())
+}
+
+// Criterion: a term is named once and never redefined; correcting a mistaken range is a fresh
+// term, the same append-only reasoning the rest of this module already keeps.
+export async function defineTerm(input: DefineTermInput, actorId: string): Promise<{ id: string, applied: boolean }> {
+  const id = newId()
+  const statement = db.run(sql`
+    INSERT INTO periods (id, label, from_day, to_day, created_by) VALUES (${id}, ${input.label}, ${input.fromDay}, ${input.toDay}, ${actorId})
+  `)
+  const entry = auditEntry({
+    actorId,
+    action: 'finance.period.defined',
+    target: `period:${id}`,
+    detail: { label: input.label, fromDay: input.fromDay, toDay: input.toDay },
+  })
+  const applied = await auditedWrite(statement, entry)
+  return { id, applied }
+}
 
 interface PeriodLockRow {
   id: string

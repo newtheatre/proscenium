@@ -126,3 +126,36 @@ describe('the range and the action are refused by the database, not trusted to t
     })
   })
 })
+
+describe('a defined term is where the range a close names can come from', () => {
+  // Exactly defineTerm()'s insert.
+  function definePeriod(database: TestDatabase, id: string, label: string, fromDay: string, toDay: string): void {
+    database.raw.prepare(
+      `INSERT INTO periods (id, label, from_day, to_day, created_by) VALUES (?, ?, ?, ?, ?)`,
+    ).run(id, label, fromDay, toDay, ACTOR)
+  }
+
+  test('a well-formed term is written', async () => {
+    await withDatabase((database) => {
+      seedActor(database)
+      definePeriod(database, 'term-1', 'Autumn term', '2026-09-21', '2026-12-11')
+      expect(rows(database, `SELECT label FROM periods WHERE id = 'term-1'`)).toEqual([{ label: 'Autumn term' }])
+    })
+  })
+
+  test('a term ending before it starts is refused', async () => {
+    await withDatabase((database) => {
+      seedActor(database)
+      expect(() => definePeriod(database, 'term-bad', 'Autumn term', '2026-12-11', '2026-09-21')).toThrow()
+    })
+  })
+
+  test('closing the range a term named locks it exactly like any other close', async () => {
+    await withDatabase((database) => {
+      seedActor(database)
+      definePeriod(database, 'term-1', 'Autumn term', '2026-09-21', '2026-12-11')
+      lock(database, 'lock-1', '2026-09-21', '2026-12-11', 'CLOSED')
+      expect(() => postEntry(database, 'e-1', '2026-10-01')).toThrow()
+    })
+  })
+})

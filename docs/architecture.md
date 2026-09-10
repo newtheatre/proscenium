@@ -264,6 +264,14 @@ range with no Z reading at all, and nights whose reading still carries an open v
 read from I-104's own outstanding-night queries rather than reimplemented. A warning is not a
 refusal; the treasurer closes past it if that is the right call.
 
+A term, unlike a season, has no fixed formula, so `periods` (`POST /api/admin/finance/terms`)
+names one ahead of closing it: a label and a range, defined once. `shared/utils/season-dashboard.ts`'s
+`periodBounds()` gains a `TERM` kind that takes the range directly, the same as `DAY` and `WEEK`
+already do, so the file stays a pure function reading nothing from the database itself; the
+caller resolves a term's dates from `GET /api/admin/finance/terms` before asking for its bounds.
+Closing a term reads its range from that same list and posts it through the ordinary close, which
+has no notion of "term" at all: a lock is a range and an optional label, whatever named it.
+
 ### The money paths
 
 The triple every path posts under. A module adding a money path adds a row here in the same pull

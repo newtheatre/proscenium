@@ -39,6 +39,21 @@ export const zReadings = sqliteTable('z_readings', {
   check('z_readings_write_off_resolves_a_variance', sql`${table.writtenOff} = 0 OR (${table.variancePence} <> 0 AND ${table.supersedesId} IS NOT NULL)`),
 ])
 
+// A named term (I-107, I-105's own dashboard selector). A season needs no row: its range is
+// computed from `committeeYearEnd` and stored nowhere (architecture.md, E-126).
+
+export const periods = sqliteTable('periods', {
+  id: id(),
+  label: text('label').notNull(),
+  fromDay: text('from_day').notNull(),
+  toDay: text('to_day').notNull(),
+  createdBy: text('created_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  index('periods_range').on(table.fromDay, table.toDay),
+  check('periods_range_order', sql`${table.toDay} >= ${table.fromDay}`),
+])
+
 // A period close (I-107): a fact appended, never a flag flipped on the entries it covers.
 // `ledger_entries_refuses_a_closed_period` is what actually stops a write; this is the record.
 

@@ -70,9 +70,18 @@ figures. The treasurer sees the warning and closes past it if that is the right 
 here makes it a hard gate, because the criterion asks for a warning, not a second permission
 check.
 
+**A term is named separately from being closed, in a second table, `periods`.** I-105's own
+dashboard already carries a `TERM` period kind waiting on this story, and a term genuinely has no
+computable range the way a season does (`committeeYearEnd`): naming one is its own fact, ahead of
+whether it is ever closed at all. `period_locks` does not reference `periods`: a close names a
+range directly, so closing something that was never defined as a term (an arbitrary date pair)
+costs nothing extra, and `periodBounds()` in `shared/utils/season-dashboard.ts` takes `TERM`'s
+range as given, the same way it already takes `DAY` and `WEEK`'s, rather than resolving a
+`periodId` itself and turning a pure function into one that reads the database.
+
 ## Consequences
 
-- The migration adds one table and one trigger; no existing table is rebuilt, so none of 0052's
+- The migration adds two tables and one trigger; no existing table is rebuilt, so none of 0052's
   or 0010's traps apply to this pull request.
 - `blockingConditionsFor()` compares a night label against a `london_day` range by plain string
   comparison. The two are usually the same string; a night spanning midnight can differ from its
