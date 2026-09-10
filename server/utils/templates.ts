@@ -492,6 +492,19 @@ Open the safety officer's list to read and close it.
 The Nottingham New Theatre`,
   }),
 
+  // No note field yet: the page and who reported it is enough to go and look (J-109 criterion 4).
+  'docs-drift-reported': (context: TemplateContext): Rendered => ({
+    subject: `Documentation flagged: ${context.path}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>${context.reportedByName} flagged the documentation page <code>${context.path}</code> as out
+of date.</p>`),
+    text: `Hello ${context.name},
+
+${context.reportedByName} flagged the documentation page ${context.path} as out of date.
+
+The Nottingham New Theatre`,
+  }),
+
   // Never the new code: it travels by voice only, so nothing here can leak it by being read
   // over someone's shoulder or forwarded (E-122 criterion 2).
   'board-reset': (context: TemplateContext): Rendered => ({

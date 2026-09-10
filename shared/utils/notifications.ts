@@ -342,6 +342,13 @@ export const MESSAGE_TYPES = {
     channels: ['EMAIL'],
     template: 'board-reset',
   },
+  // Drift is a defect, not a chore, so it is transactional like an incident's follow-up rather
+  // than a preference the IT Manager could mute (J-109 criterion 4).
+  'docs.drift-reported': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'docs-drift-reported',
+  },
 
   // Module F: bar
 
