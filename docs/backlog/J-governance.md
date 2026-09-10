@@ -7,7 +7,7 @@ with a tested restore drill, and operator documentation that lives in the app. T
 audit history is not imported in any shape (0030), which is what withdrew J-108. Handover mode itself is V2, shipping before July 2027 so the
 2027/28 committee is the first to be handed the system by the system.
 
-Stories: 13 (9 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
+Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
 
 ## Open questions
 
@@ -166,6 +166,30 @@ Stories: 13 (9 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
   4. At runtime, an unresolvable token renders as a visible error, never as blank or stale text.
   5. A rule the committee has stated but the system does not yet enforce is marked unenforced on the page, from a flag on the configuration key, so honesty about enforcement is part of the rendering.
 - Source: Decision 0012 (mechanism, amended 26 August); audit RM-1 and RM-7 (the unenforced policy document this exists to prevent).
+
+## J-111: The public pages carry the committee's wording
+
+- Role: Committee
+- Phase: MVP
+- Story: As the committee, I want the policy and editorial pages to carry the wording we agreed
+  so that the public site says what we say, with every number still read from the live
+  configuration.
+- Depends on: J-110, K-126
+- Acceptance criteria:
+  1. The supplied wording lands in `content/policies/*.md` and the editorial pages as Markdown;
+     `placeholder: true` is cleared only on sections the wording covers (0051).
+  2. No figure appears in the prose. Every number is a `{{KEY}}` token resolving to a
+     `CONFIG_KEYS` entry; a figure with no key gets one, with the wording's value as its proposed
+     default and a row in `docs/workshops.md`, and until the server reads it the page marks it
+     unenforced (J-110 criterion 5).
+  3. Where the wording's figure disagrees with an existing proposed default, the pull request
+     names the disagreement as a workshop question rather than choosing; the configuration's
+     value ships.
+  4. The public pages use the restored photography, scrimmed, inside the expressive budget
+     (`docs/design-language.md`), and every page carries a title and a description.
+  5. `bun run check` passes: no unknown or sensitive token anywhere under `content/`.
+- Source: Pre-cutover review, 10 September 2026; the known-issues row on unsigned-off policy
+  prose; 0012, 0051.
 
 ## J-201: The handover run and the atomic access flip
 

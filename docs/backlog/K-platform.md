@@ -3,11 +3,13 @@
 Cross-cutting requirements every other module assumes, plus the migration itself expressed as
 stories with acceptance criteria. Nothing here is optional polish: these are the conditions under
 which show night can trust one database, and the conditions under which four databases become one
-without losing a row that matters. Phasing follows the roadmap: the platform stories land in
+without losing a row that matters. The pre-cutover passes (K-125 to K-128) live here too: they are
+cross-cutting, each is a story with criteria rather than polish done by feel, and they land before
+the cutover rather than after it. Phasing follows the roadmap: the platform stories land in
 Phase 1, the migration stories rehearse weekly through Phase 2 and complete at the 31 October
 cutover.
 
-Stories: 24. Phases: 19 MVP, 0 V2, 0 Later, 5 resolved.
+Stories: 28. Phases: 23 MVP, 0 V2, 0 Later, 5 resolved.
 
 ## Open questions
 
@@ -536,3 +538,95 @@ Stories: 24. Phases: 19 MVP, 0 V2, 0 Later, 5 resolved.
 - Source: Review of the admin surface, 30 August 2026; estate convention that a consumer app's
   dev login is guarded by `import.meta.dev` (workspace CLAUDE.md), applied here to the app that
   writes the session.
+
+## K-125: Search engines and old links find the new site
+
+- Role: Visitor
+- Phase: MVP
+- Story: As somebody searching for a show, or following a link on a poster printed last year, I
+  want to land on the right page so that the cutover loses no audience.
+- Depends on: K-126, D-101
+- Acceptance criteria:
+  1. `site.url` and `site.name` are configured and overridable by `NUXT_PUBLIC_SITE_URL`; every
+     page title uses one template; every public page has a description; canonical URLs resolve
+     absolute.
+  2. `/sitemap.xml` lists every public content page, every published show and every public
+     module from a server source, and no console, member, show-night or auth route;
+     `/robots.txt` disallows those prefixes. A unit test holds both lists against
+     `shared/utils/site-nav.ts`.
+  3. Public pages carry a static Open Graph image: a show's poster when one exists, the default
+     otherwise. The renderer stays disabled and the reason stays in known issues.
+  4. Structured data: the organisation on the home page, a `TheaterEvent` with offers per
+     performance on a show page, breadcrumbs on content pages, each checked by a test.
+  5. Every public URL of the old site (the `main` branch) answers a 301 to its unified
+     equivalent through `routeRules`, and an integration test hits each. The map, and the DNS
+     rule forwarding the `rooms.` and `training.` subdomains, live in the cutover runbook in
+     `docs/operations.md`.
+  6. Auth and utility pages (`/sign-in`, `/register`, `/reset`, `/verify`, `/magic`, `/qr`,
+     `/board`) are marked `noindex`.
+- Source: Pre-cutover review, 10 September 2026. `@nuxtjs/seo` was installed on its defaults
+  with no site URL and no `public/` directory.
+
+## K-126: The photography and static assets come across
+
+- Role: Visitor
+- Phase: MVP
+- Story: As a visitor, I want the site to carry the theatre's own photographs, logo and favicon
+  so that it looks like the theatre and not like a template.
+- Depends on: none
+- Acceptance criteria:
+  1. `public/` is restored from `main`: the favicon (PNG, ICO and an Apple touch icon), the
+     anniversary logos, the SU icon and the `_robots.txt` merge source.
+  2. The banners are re-encoded (WebP or AVIF, at most 1920 wide, under 300 KB each) rather
+     than copied; the originals never enter this branch's history.
+  3. A 1200 by 630 default Open Graph image exists under `public/`.
+  4. The home, what's-on, about and get-involved pages use their banners through `NuxtImg`
+     behind `nnt-scrim` (`docs/design-language.md`, photography rule 1).
+  5. No image is referenced that does not exist: a unit test resolves every `/images/` path
+     under `app/` and `content/` against `public/`.
+- Source: Pre-cutover review, 10 September 2026. `unified/main` had no `public/` directory and
+  referenced no image.
+
+## K-127: My NNT, a members home
+
+- Role: Member
+- Phase: MVP
+- Story: As a member, I want one screen that shows what is mine right now, with my account
+  settings kept apart from it, so that I open the site and see my next shift, booking and session
+  rather than a menu.
+- Depends on: A-129
+- Acceptance criteria:
+  1. `/my` in the `member` layout is a grid of tiles of differing sizes: next shift, next room
+     booking, training progress and next session, passes, membership state, recent
+     notifications, the next show on sale. Each tile reads an existing endpoint; a summary
+     endpoint is added only if the page would otherwise make more than five requests.
+  2. `MEMBER_NAV` becomes `MY_NAV` (the members area) and `ACCOUNT_NAV` (profile, sign-in and
+     security, notifications). The sub-nav renders the first, the account menu the second, the
+     footer both, and `tests/unit/site-nav.test.ts` covers both (0040).
+  3. The three account pages share one settings layout: a side list on wide screens, stacked on
+     narrow. `security.vue`'s fields sit inside a `UForm`.
+  4. `/account` redirects to `/my`. Member surfaces stay calm: nothing from the expressive kit.
+  5. `scripts/shots.ts` captures the member screens too, and before-and-after captures are
+     attached to the pull request.
+- Source: Pre-cutover review, 10 September 2026; 0040 named the member's own pages as needing
+  shaping and left it to do.
+
+## K-128: One voice across every screen
+
+- Role: Member
+- Phase: MVP
+- Story: As anybody using the system, I want every button, message and refusal to speak the same
+  way so that a screen I have not seen before reads like one I have.
+- Depends on: K-127, D-132, G-129, J-111
+- Acceptance criteria:
+  1. `docs/copy-style.md` states the tone, the register of each shell (`default`, `member`,
+     `console`, `tonight`), a glossary, the shape of a refusal, an error and an empty state,
+     button verbs, and the date and time format. It is reviewed and merged before any sweep.
+  2. Every string under `app/`, the shared refusal strings under `shared/utils/`, every
+     `createError` message that reaches a screen, and every email and notification template are
+     swept against it, one surface per pull request, each with a before-and-after table.
+  3. Editorial pages under `content/` are untouched: the committee owns those words (0051 and
+     the known-issues row).
+  4. A unit test fails on an em dash or a banned spelling anywhere under `app/`, `shared/` and
+     `content/`.
+- Source: Pre-cutover review, 10 September 2026; the workspace writing rules.

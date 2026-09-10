@@ -7,7 +7,7 @@ half of this module reserves and the desk takes payment (Get-In constraint 1). G
 the core model; capacity is a count enforced by the database, and seat maps are deliberately Later
 (Get-In constraint 4).
 
-Stories: 39 total. 31 MVP (D-101 to D-131), 5 V2 (D-201 to D-206, with D-205 resolved as
+Stories: 40 total. 32 MVP (D-101 to D-132), 5 V2 (D-201 to D-206, with D-205 resolved as
 won't-build), 2 Later epics (D-301, D-302).
 
 Open questions:
@@ -683,6 +683,28 @@ Open questions:
      venue row and links to that card rather than building it.
 - Source: Committee direction, 4 September 2026. The programme schema shipped these tables as
   Wave 0 contract (d) with no screen over them, and the build order recorded the gap.
+
+## D-132: Show management screens shaped for a season
+
+- Role: Box Office officer
+- Phase: MVP
+- Story: As the box office manager running a season, I want a show's state at a glance and its
+  sections editable one at a time so that managing twelve shows does not mean scrolling one very
+  long page.
+- Depends on: D-121, D-131
+- Acceptance criteria:
+  1. `/box-office/shows/[id]` is split into tabbed sections (details, performances, ticket
+     types, content warnings, sales), each a component under `app/components/box-office/show/`,
+     with no behaviour change: the existing integration tests pass untouched.
+  2. A status strip heads the page: on sale or not, next performance, sold count, unpaid queue,
+     each stated in words as well as colour (K-101).
+  3. The shows list filters by season and shows status badges with words; it stays a `UTable`
+     paged from the server (0032).
+  4. The screens stay calm: the `UDashboard*` family and nothing from the expressive kit
+     (`docs/design-language.md`).
+  5. Before-and-after captures from `bun run shots` are attached to the pull request.
+- Source: Pre-cutover review, 10 September 2026. The detail page is the largest in the app at
+  over a thousand lines.
 
 ## D-201: Named allocations reserve capacity without tickets
 
