@@ -13,6 +13,7 @@ export const ROLES = [
   'BAR_MANAGER',
   'ACCESSIBILITY_OFFICER',
   'SAFETY_OFFICER',
+  'TREASURER',
   'COMMITTEE',
 ] as const
 
@@ -93,6 +94,9 @@ export const PERMISSIONS = [
   'night.door',
   'night.till',
   'night.manage',
+  // The treasurer's own read over the ledger: comps, discounts and the reports built on them.
+  // No distinct permission existed before I-103; every report routed through `bar.read` instead.
+  'finance.read',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
@@ -128,6 +132,9 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   // Configures which severities route to them, and reads and closes the open-items list.
   // Nothing in the old estate grants this role, so the import cannot reach it (E-116).
   SAFETY_OFFICER: ['safety.read', 'safety.write'],
+  // Reads the ledger and everything built on it. Nothing in the old estate grants this role, so
+  // the import cannot reach it (I-103).
+  TREASURER: ['finance.read'],
   COMMITTEE: [],
 }
 
@@ -174,6 +181,7 @@ const ROLE_WORDING: Record<Role, string> = {
   BAR_MANAGER: 'Bar manager',
   ACCESSIBILITY_OFFICER: 'Accessibility officer',
   SAFETY_OFFICER: 'Safety officer',
+  TREASURER: 'Treasurer',
   COMMITTEE: 'Committee',
 }
 

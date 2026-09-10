@@ -44,9 +44,9 @@ describe('the role vocabulary', () => {
     for (const target of targets) {
       expect(`${target}: ${isRole(target)}`).toBe(`${target}: true`)
     }
-    // Every role should be reachable by import, save three the old estate never had: no card
-    // reader (0044), no access profiles (D-127) and no safety officer (E-116).
-    expect([...ROLES].filter(role => !targets.has(role))).toEqual(['BAR_MANAGER', 'ACCESSIBILITY_OFFICER', 'SAFETY_OFFICER'])
+    // Every role should be reachable by import, save four the old estate never had: no card
+    // reader (0044), no access profiles (D-127), no safety officer (E-116), no treasurer (I-103).
+    expect([...ROLES].filter(role => !targets.has(role))).toEqual(['BAR_MANAGER', 'ACCESSIBILITY_OFFICER', 'SAFETY_OFFICER', 'TREASURER'])
   })
 
   // Questions 7 and 8, answered 2 September. Pinned because a role widening is a governance

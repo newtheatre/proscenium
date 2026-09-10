@@ -15,6 +15,7 @@ import {
   viewChecklist,
   viewEmergencyCard,
   viewFellows,
+  viewFinanceReports,
   viewMembers,
   viewPassTypes,
   viewProgramme,
@@ -158,7 +159,15 @@ export const CONSOLE_NAV: NavGroup[] = [
   },
 
   // Module I: finance
-  { key: 'money', label: 'Money', icon: 'i-lucide-banknote', prefix: '/money', items: [] },
+  {
+    key: 'money',
+    label: 'Money',
+    icon: 'i-lucide-banknote',
+    prefix: '/money',
+    items: [
+      { label: 'Comps and discounts', icon: 'i-lucide-gift', to: '/money/reports', ability: viewFinanceReports },
+    ],
+  },
 
   // Module H: communications
   { key: 'comms', label: 'Communications', icon: 'i-lucide-send', prefix: '/comms', items: [] },

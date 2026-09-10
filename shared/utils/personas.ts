@@ -37,4 +37,8 @@ export const PERSONAS: Persona[] = [
   // Module G: training
 
   { email: 'dev-training@e2e.newtheatre.org.uk', name: 'Tri Training (dev)', role: 'TRAINING_MANAGER', shape: 'full', describes: 'Reads accounts, the register and the rooms: the one role whose sidebar is partial.' },
+
+  // Module I: finance
+
+  { email: 'dev-treasurer@e2e.newtheatre.org.uk', name: 'Theo Treasurer (dev)', role: 'TREASURER', shape: 'full', describes: 'Reads the ledger: foregone comp and discount value, and every finance report built after it.' },
 ]
