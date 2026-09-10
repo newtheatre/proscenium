@@ -22,7 +22,7 @@ export function sqliteTarget(database: Database): SeedTarget {
   return {
     // One transaction per call, mirroring D1's all-or-nothing batch (0001, 0003).
     batch(statements) {
-      for (const [statement, ...parameters] of statements) {
+      for (const [, ...parameters] of statements) {
         if (parameters.length > MAX_BOUND_PARAMETERS) {
           throw new Error(`statement binds ${parameters.length} parameters, over the ${MAX_BOUND_PARAMETERS} chunk limit: D1 refuses this in production (0003)`)
         }
@@ -35,9 +35,8 @@ export function sqliteTarget(database: Database): SeedTarget {
         }
       })()
     },
-    get<T>(statement, ...parameters) {
-      return (database.prepare(statement).get(...parameters as never[]) as T | null) ?? undefined
-    },
+    get: <T>(statement: string, ...parameters: unknown[]): T | undefined =>
+      (database.prepare(statement).get(...parameters as never[]) as T | null) ?? undefined,
   }
 }
 

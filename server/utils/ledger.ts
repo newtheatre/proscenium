@@ -3,7 +3,7 @@ import { asc, eq, inArray, sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { newId } from './accounts'
-import { entryForm, londonDayOf, totalOf } from '#shared/utils/ledger'
+import { entryForm, londonDayOf, netPence, totalOf } from '#shared/utils/ledger'
 import type { EntryInput, NettableEntry } from '#shared/utils/ledger'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { SQL } from 'drizzle-orm'

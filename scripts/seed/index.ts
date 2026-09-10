@@ -24,6 +24,9 @@ export interface SeedOptions {
 
 export interface SeedResult {
   people: SeededPerson[]
+  // Persona email to account id, which `/dev` reads to find an account whose address erasure has
+  // since rewritten (0011). Written by whichever door ran, so either order works.
+  personaMap: Record<string, string>
   counts: Record<string, number>
   // Credentials the caller prints once and never stores.
   secrets: {
@@ -52,6 +55,9 @@ export async function seed(target: SeedTarget, options: SeedOptions): Promise<Se
 
   return {
     people: people.order,
+    personaMap: Object.fromEntries(
+      people.order.filter(person => person.persona).map(person => [person.email, person.id]),
+    ),
     counts: {
       people: people.order.length,
       rooms: spaces.counts.rooms,

@@ -72,19 +72,33 @@ suite is slow (0029). CI gates on the first; the second runs nightly and on dema
 bun run seed
 ```
 
-Rooms, members with memberships, and a week of bookings, into `.data/db/sqlite.db`. It prints the
-credentials it generated **once**, and there is no way to read a password back afterwards. It
-refuses to run against production or any database that is not local, exiting non-zero and saying
-why; there is no flag to override that, because the only reason to add one is the mistake it exists
-to prevent (K-120).
+One command fills 81 of the schema's 86 tables in `.data/db/sqlite.db`: two venues and eight
+shows, with performances in the past, tonight and the future, one sold out, one cancelled, one a
+draft and one ticketed by somebody else; reservations in every status; a rota, a checklist part way
+through, incidents and age checks; the bar catalogue with stock that has moved; and one ledger
+entry per money path in `docs/architecture.md`. Members, roles and training records each cover
+current, expiring and lapsed, because a screen that only ever sees the happy state is a screen
+nobody has tested.
 
-Run it again and it adds people without duplicating rooms.
+It prints the credentials it generated **once**, and there is no way to read a password or a token
+back afterwards. It refuses to run against production or any database that is not local, exiting
+non-zero and saying why; there is no flag to override that, because the only reason to add one is
+the mistake it exists to prevent (K-120).
+
+Run it again and nothing duplicates: rows are matched on their natural key, and the only thing a
+re-run changes is the password it prints, which is the one value it cannot recover.
+
+The builders live in `scripts/seed/`, one module per domain. Each returns the same
+`BoundStatement` list the test fixtures in `tests/helpers/` use, so a fixture and a development
+database are written by the same code rather than by two that drift.
 
 ### Developer tools
 
 Running locally, `/dev` seeds a persona per role plus a plain member, a guest and a tombstone,
 signs in as any of them without a password, and shows the local mailbox alongside the permissions
-the current session resolves to. It is an authentication bypass, so it does not exist in a build:
+the current session resolves to. `bun run seed` seeds the same personas from the same registry, so
+the two agree whichever runs first; the accounts are all `/dev` writes, because the seed builders
+read as they write and D1 inside a worker is asynchronous. It is an authentication bypass, so it does not exist in a build:
 `nuxt.config` leaves the page and its routes out of the bundle, and `tests/unit/dev-tools.test.ts`
 greps a built `.output` to prove it (K-124).
 

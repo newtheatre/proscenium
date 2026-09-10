@@ -38,7 +38,7 @@ for (const file of serverFiles()) {
 // This file included would match its own pattern, which is a checker reporting itself.
 const SELF = 'check-ledger.ts'
 
-for (const file of [...new Bun.Glob('*.ts').scanSync({ cwd: 'scripts', onlyFiles: true })].sort()) {
+for (const file of [...new Bun.Glob('**/*.ts').scanSync({ cwd: 'scripts', onlyFiles: true })].sort()) {
   if (file === SELF) continue
   const source = await Bun.file(join('scripts', file)).text()
   if (/INSERT\s+INTO\s+ledger_(entries|lines)/i.test(source)) {

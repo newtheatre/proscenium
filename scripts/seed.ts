@@ -37,6 +37,11 @@ const result = await seed(sqliteTarget(db), {
 
 db.close()
 
+// Beside the database it describes, and the same file `/dev` reads: a persona seeded from here is
+// one the developer tools can still find after erasure rewrote its address (0011).
+const devDir = process.env.NUXT_HUB_DIR ?? '.data'
+await Bun.write(`${devDir}/personas.json`, JSON.stringify(result.personaMap, null, 2))
+
 const order = [
   ['people', 'people'],
   ['rooms', 'rooms'],
