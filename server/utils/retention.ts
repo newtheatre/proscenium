@@ -1,4 +1,3 @@
-import { and, eq, isNull, sql } from 'drizzle-orm'
 import {
   daysUntilRetentionThreshold,
   isRetentionGuest,
@@ -7,47 +6,16 @@ import {
   retentionWarningClaimFor,
 } from '#shared/utils/retention'
 import { londonDay } from '#shared/utils/membership'
+import { candidates } from './retention-candidates'
+import type { CandidateRow } from './retention-candidates'
 import type { RetentionWarningKind } from '#shared/utils/retention'
-import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
 // Inactivity warnings and anonymisation, dry-run by default (A-126, built as K-111). Reuses
 // K-109's erasure engine for the write and 0011's exemptions, computed fresh every run.
 
-interface CandidateRow {
-  id: string
-  verified: boolean
-  password: string | null
-  googleSub: string | null
-  lastLoginAt: number | null
-  createdAt: number
-}
-
-// A tab charge with nothing settling it yet, by reference: append-only `ledger_entries` (0016)
-// cannot mark itself settled, so `tab_settled_at`/`tab_settlement_entry_id` stay unwritten (F-109).
-const unsettledMoney = (): SQL => sql`exists (
-  select 1 from ledger_entries e
-  where e.tab_debtor_id = ${schema.users.id} and e.tender = 'TAB'
-    and not exists (select 1 from ledger_lines l where l.settles_entry_id = e.id)
-)`
-
-async function candidates(event: H3Event | undefined, now: number): Promise<CandidateRow[]> {
-  return db.select({
-    id: schema.users.id,
-    verified: schema.users.verified,
-    password: schema.users.password,
-    googleSub: schema.users.googleSub,
-    lastLoginAt: schema.users.lastLoginAt,
-    createdAt: schema.users.createdAt,
-  })
-    .from(schema.users)
-    .where(and(
-      isNull(schema.users.anonymisedAt),
-      sql`not ${currentMembership(await configValue(event, 'MEMBERSHIP_GRACE_DAYS'))}`,
-      sql`not ${holdsLiveRole(now)}`,
-      sql`not ${unsettledMoney()}`,
-    ))
-}
+// The candidate query and the digest check live in retention-candidates.ts, so a caller wanting
+// only those never pulls `useRuntimeConfig` below into the Bun graph behind them (0057).
 
 async function warn(
   event: H3Event | undefined,
@@ -128,16 +96,6 @@ export interface RetentionRun {
   warningsCappedAt: number | null
   anonymisationsCappedAt: number | null
   digests: number
-}
-
-// What the arming route checks before RETENTION_ARMED may turn on (J-105 criterion 4): reviewing
-// a digest is nobody's to verify in code, but one having existed to review is.
-export async function hasSentRetentionDigest(): Promise<boolean> {
-  const [row] = await db.select({ id: schema.notificationLog.id })
-    .from(schema.notificationLog)
-    .where(and(eq(schema.notificationLog.type, 'retention.digest'), eq(schema.notificationLog.status, 'SENT')))
-    .limit(1)
-  return row !== undefined
 }
 
 export async function sweepRetention(event: H3Event | undefined, at: Date = new Date()): Promise<RetentionRun> {

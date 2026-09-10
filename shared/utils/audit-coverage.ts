@@ -239,6 +239,23 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['reservation.collected'],
     via: ['server/utils/desk-collection.ts'],
   },
+  { route: 'server/api/box-office/desk/comp-requests/index.get.ts', exempt: 'reads tonight\'s pending comp requests, writing nothing' },
+  {
+    route: 'server/api/box-office/desk/comp-requests/index.post.ts',
+    actions: ['ticketing.comp-request.created'],
+    via: ['server/utils/ticket-comps.ts'],
+  },
+  { route: 'server/api/box-office/desk/comp-requests/[id]/index.get.ts', exempt: 'reads one comp request\'s outcome; nothing is written' },
+  {
+    route: 'server/api/box-office/desk/comp-requests/[id]/approve.post.ts',
+    actions: ['ticketing.comp-request.approved'],
+    via: ['server/utils/ticket-comps.ts'],
+  },
+  {
+    route: 'server/api/box-office/desk/comp-requests/[id]/decline.post.ts',
+    actions: ['ticketing.comp-request.declined'],
+    via: ['server/utils/ticket-comps.ts'],
+  },
   {
     route: 'server/api/box-office/desk/reservations/[id]/tickets/[ticketId]/refund.post.ts',
     actions: ['ticket.refunded'],
@@ -589,7 +606,9 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/admin/fellowships/[id]/revoke.post.ts', actions: ['fellowship.revoked'] },
   { route: 'server/api/admin/fellowships/index.post.ts', actions: ['fellowship.awarded'] },
-  { route: 'server/api/admin/config/[key].put.ts', actions: ['config.changed'] },
+  { route: 'server/api/admin/config/[key].put.ts', actions: ['config.changed'], via: ['server/utils/config-write.ts'] },
+  { route: 'server/api/admin/config/[key]/blast-radius.get.ts', exempt: 'reads a live count; nothing is written' },
+  { route: 'server/api/admin/config/[key]/revert.post.ts', actions: ['config.changed'], via: ['server/utils/config-write.ts'] },
   { route: 'server/api/docs/report-drift.post.ts', actions: ['docs.drift-reported'] },
 
   // Module K: platform
@@ -609,5 +628,6 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/dev/remind-shifts.post.ts', exempt: 'sends a reminder; the send is recorded in notification_log' },
   { route: 'server/api/dev/escalate-rota.post.ts', exempt: 'sends a digest; the send is recorded in notification_log' },
   { route: 'server/api/dev/retry-notifications.post.ts', exempt: 'runs the retry sweep; every attempt is recorded in notification_log' },
+  { route: 'server/api/dev/send-digests.post.ts', exempt: 'runs the digest sweep; every send is recorded in notification_log' },
   { route: 'server/api/dev/sign-in-as.post.ts', exempt: 'a development sign-in with no password, in no build' },
 ]

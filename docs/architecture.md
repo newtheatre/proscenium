@@ -257,7 +257,7 @@ never from `london_day`; the ledger holds no night column and gains none.
 | Money path | Posts when | Module | Source | Tender | Kind |
 | --- | --- | --- | --- | --- | --- |
 | Desk collection | The reader is paid at collection, never at reservation (D-114) | ticketing | `DESK` | `CARD` | `TICKET_COLLECTION` |
-| Comp admission | A comp is issued at collection (D-114), gated behind `ticketing.manage` rather than plain desk access; D-117's own request-and-approval workflow, still owed, replaces that gate rather than removing it | ticketing | `DESK` | `COMP` | `TICKET_COLLECTION` |
+| Comp admission | A comp is issued at collection (D-114); gated behind an approved `ticket_comp_requests` row, claimed atomically at collection, rather than the `ticketing.manage` permission it once was (D-117) | ticketing | `DESK` | `COMP` | `TICKET_COLLECTION` |
 | Walk-up sale | Reservation and payment in one desk flow (D-115) | ticketing | `DESK` | `CARD`, `COMP` | `WALK_UP` |
 | Refund | The money is handed back, one entry per ticket (D-116) | ticketing | `DESK` | `CARD` | `REFUND` |
 | Pass sale | A pass is issued and paid for at the desk (D-124) | ticketing | `DESK` | `CARD` | `PASS_SALE` |
@@ -316,6 +316,7 @@ without naming it).
 | `*/10 * * * *` | `holds:release` | Sends pre-expiry hold reminders (`HOLD_REMINDER_MINUTES_BEFORE`, 60 by default), then releases expired reservation holds (D-106, D-107). The one task that changes booking state, and only ever in the direction the customer was warned about. The waiting-list cascade is D-113's, not yet built. |
 | `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). The CI-side "after every deploy" half of criterion 3 is `.github/workflows/health-watch.yml` and `migrate.yml`'s own `health` job, both outside the application. |
 | `*/10 * * * *` | `notifications:retry` | Sends failed messages again, one claimed row at a time, when the doubling backoff since enqueue has passed (`NOTIFICATION_RETRY_BACKOFF_MINUTES`, 10 by default); marks an entry `FAILED_FINAL` once `NOTIFICATION_MAX_ATTEMPTS` is spent, so five attempts span about two and a half hours. Every guard runs again on each attempt, so an address change, a preference change or an erasure in between is honoured (H-105, 0056). Capped at 100 rows a run. |
+| `*/10 * * * *` | `notifications:digest` | Claims and sends every topic-and-person digest whose window has passed (`NOTIFICATION_DIGEST_WINDOW_<TOPIC>_MINUTES`, 60 minutes each by default), one email per pair, capped at 100 pairs a topic a run (H-104). |
 | `0 6 * * *` | `training:expiry-sweep` | Expiry warnings and digests (dry-run gated). |
 | `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or an unconfirmed duty manager, the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |
@@ -324,7 +325,7 @@ without naming it).
 | `0 11 * * *` | `passes:expire-requests` | Lapses a pending pass request once its product's own sales window has closed unfulfilled, capped per run like `holds:release` (`PASS_REQUEST_EXPIRE_BATCH_CAP`, D-124 criterion 3). |
 | `0 17 * * *` | `rooms:remind` | Tomorrow's room bookings, one message per member however many they hold, with the calendar file attached (C-113). Idempotent: a second run the same London day sends nothing, read from `notification_log` rather than a column. |
 | `12 0 * * *` | `nights:close` | Auto-closes unsigned night reports inside 24 hours, retries unsent report emails. |
-| `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, the send-log prune at `NOTIFICATION_LOG_RETENTION_MONTHS` (H-105 criterion 5, and retries are `notifications:retry`'s rather than this task's), unverified account expiry (0026), and the role-lapse work: one warning per holder covering every grant of theirs inside `ROLE_LAPSE_NOTICE_DAYS`, claimed per grant and expiry so moving a date re-arms it; a monthly digest to administrators on the first, carrying what is lapsing, what lapsed inside the prune window and every permanent grant; and the tidying of grants lapsed longer ago than `ROLE_GRANT_PRUNE_DAYS`. Both the warning and the tidy write the trail with no actor, which is what attributes them to system (A-119, 0009). |
+| `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, the send-log prune at `NOTIFICATION_LOG_RETENTION_MONTHS` (H-105 criterion 5, and retries are `notifications:retry`'s rather than this task's), the digest entries a pruned send left behind (H-104, 0061), unverified account expiry (0026), and the role-lapse work: one warning per holder covering every grant of theirs inside `ROLE_LAPSE_NOTICE_DAYS`, claimed per grant and expiry so moving a date re-arms it; a monthly digest to administrators on the first, carrying what is lapsing, what lapsed inside the prune window and every permanent grant; and the tidying of grants lapsed longer ago than `ROLE_GRANT_PRUNE_DAYS`. Both the warning and the tidy write the trail with no actor, which is what attributes them to system (A-119, 0009). |
 | `0 5 * * 1` | `backup` | A row-count and ledger-total manifest to R2 (the `BLOB` binding), independent of D1. A failure audits `backup.export-failed` rather than only logging. Point-in-time restore is D1 Time Travel, already automatic; the restore drill and its cadence are administered at `/admin/backups` (K-108, J-107). |
 | `0 4 1 * *` | `retention:sweep` | Two independent warnings (window and final) for an account approaching its inactivity threshold, a sign-in re-arming the claim by carrying `lastLoginAt` in its key; exempts a current member, a live role holder and an unsettled tab debtor; warns neither an unverified address nor an unclaimed guest, which are anonymised on their own clock without ever being written to; anonymises what is past its threshold, reusing `eraseAccount()`. Warnings and anonymisations carry a cap each (`RETENTION_WARNING_CAP`, `RETENTION_SWEEP_CAP`), and a run that hits one reports the figure in the digest rather than deferring the surplus. The digest always sends, dry-run or armed, since it is what the IT Manager reviews before arming (0011, A-126, K-111). |
 
@@ -371,6 +372,35 @@ written first and unconditionally (except for an anonymised account), so no pref
 address or provider failure can make a message unfindable. Every type carrying a topic declares
 the `INBOX` channel, and a unit test fails the build where one does not.
 
+### Digests (H-104)
+
+An unclaimed, topic-bearing message that would otherwise be emailed now joins the next digest for
+its topic instead: `notify()` writes a `notification_digest_entries` row and returns
+`HELD_FOR_DIGEST` rather than sending, and writes no `notification_log` row for that call at all.
+The inbox entry above already went out, so nothing about criterion 4 depends on this branch. A
+claimed call (already its own batch, 0048) and a message carrying an attachment (nothing to
+reattach later, the same reasoning 0056 gives for a retry) bypass the hold and send as before.
+`joinsDigest()` in `shared/utils/notifications.ts` is where those three conditions live, so a new
+call site never has to re-derive them: transactional (`topic: null`) never coalesces at all,
+because that is what marks a deadline a digest interval would consume, such as a hold expiring or
+an offer waiting to be claimed before it lapses to the next entry (D-113).
+
+`notifications:digest` claims every topic-and-person pair whose window has passed with one
+conditional `UPDATE ... WHERE digest_log_id IS NULL`, the same claim-before-send shape the retry
+sweep uses (0003, 0048), then sends the coalesced list through `notify()` again under a digest
+type carrying the pre-claimed id. The digest types (`digest.bookings`, `digest.shifts`,
+`digest.training`, `digest.rooms`, `digest.announcements`) are transactional and email-only, so a
+digest can never hold itself for the next one and never duplicates the inbox. The window is five
+scalar keys, `NOTIFICATION_DIGEST_WINDOW_<TOPIC>_MINUTES`, shipped at 60 minutes each, and it
+opens at the earliest still-unclaimed entry, not the latest.
+
+An entry survives exactly as long as the `notification_log` row it was claimed into, so "was I
+told about X" is answerable from the entry until the send itself ages out (H-105 criterion 5).
+There is no foreign key from `digest_log_id` to that row: `notification_log` is rebuilt on every
+status it gains, and a cascading dependent on a table `check:migrations` already rebuilds is
+exactly what that check refuses. `daily:sweeps` prunes an entry whose log row is gone instead,
+by `NOT EXISTS`, capped and scoped like every other sweep (0061).
+
 ## Operator documentation (J-109)
 
 One page per module under `content/docs/`, a second Nuxt Content collection (`content.config.ts`)
@@ -394,6 +424,40 @@ audit entry naming the page, and a transactional notification to every live `ADM
 every other message goes through. There is no open-items list yet, the way safety's incidents or
 health's own alerting have one; today "visible to the IT Manager" means an immediate notification
 and a permanent line in the trail, not a triaged, closeable queue (criterion 4, `known-issues.md`).
+
+## Settings, and a wide-blast-radius save (J-104, J-105)
+
+`CONFIG_KEYS` (`shared/utils/config.ts`) declares every operational number: a Zod schema, a
+default where the workshop register proposed one, and the workshop it belongs to.
+`configValue(event, key)` reads a `config` row if one exists, the default otherwise, and 503s a
+key with neither (J-104). `PUT /api/admin/config/[key]` and the read side, `GET
+/api/admin/config`, are the whole surface; `/admin/settings.vue` renders every key from the second
+and writes through the first.
+
+**A key named in `WIDE_BLAST_RADIUS_KEYS`**, itself a `config` row and so itself audited (criterion
+5), needs a live preview and a typed echo before it saves (criteria 1, 2). `blastRadiusPreview()`
+(`server/utils/blast-radius.ts`) is one function per key: `REFUND_PAID_REQUIRES_MANAGER` counts
+box office officers who would gain or lose self-approval, `RETENTION_ARMED` counts accounts
+already due anonymisation, read with no side effect at all
+(`dueForAnonymisation()`, `server/utils/retention-candidates.ts`). `GET
+/api/admin/config/[key]/blast-radius` answers with the count and its category; `PUT` requires a
+`confirmation` field matching the key's own name or the previewed count
+(`confirmationMatches()`, `shared/utils/blast-radius.ts`, pure and shared with the client), 400ing
+otherwise. `RETENTION_ARMED` additionally refuses arming until a dry-run digest has actually sent
+(`hasSentRetentionDigest()`), criterion 4, built before this pull request.
+
+**Any setting reverts in one action** (criterion 3), `POST /api/admin/config/[key]/revert`: no
+second history table, `priorConfigValue()` reads the value a key stood at immediately before its
+own last `config.changed` audit entry, ordered by `created_at` then `rowid` to break a same-second
+tie, the way `bar.ts`'s own effective-price lookups already do. A sensitive key's audit detail is
+a hash pair (0024), which cannot be reverted to, and priorConfigValue says so (409) rather than
+guessing. A save and a revert are one write path, `writeConfigValue()`
+(`server/utils/config-write.ts`): both run the digest gate and the pair rules, so a revert cannot
+bypass what a save must satisfy.
+
+`retention-candidates.ts` exists apart from `retention.ts` so a reader of only the candidate query
+never pulls `retention.ts`'s own `useRuntimeConfig` usage into the Bun compile graph behind it
+(0057): `tests/` reaches the first file and never the second.
 
 ## The show night (0014, E-110)
 
@@ -651,11 +715,10 @@ manager covering both houses still wants both in view.
 
 `incidents`, `age_checks` and `shifts` were already performance-keyed before this story; E-123's
 own report reads `performance_id` throughout. `tests/integration/night-keying.test.ts` checks this
-against the real schema rather than trusting the claim: every operational table this story can
-confirm carries `performance_id`, and a second describe block pins that `checklist_stamps` and
-`checklist_closes` still carry `venue_id` and `night` instead, deliberately not rebuilt here.
-Criterion 4 needs a decision (a migration reworking already-shipped E-114 tables) before that
-second block can be deleted rather than pinned.
+against the real schema rather than trusting the claim. Criterion 4, `checklist_stamps` and
+`checklist_closes` still carrying `venue_id` and `night`, was deliberately deferred rather than
+rebuilt here, and closed separately once E-128's own migration rebuilt both by hand
+(`docs/decisions/0063-hand-authored-table-rebuilds.md`).
 
 `GET /api/tonight/report` (E-123) already refuses ambiguity when asked with no `performanceId` and
 more than one performance is running, so the "every scan, admit and register entry lands against
@@ -795,16 +858,18 @@ range, the format and the row count, before the file body is built (criterion 3)
 `checklist_items` is the committee's own configuration, one row per venue and phase, mutable
 like `shift_templates` rather than append-only: ticking a box is a state a duty manager moves
 through once, not a record a correction supersedes. `checklist_stamps` is the E-101 pattern
-applied a second time: `ensureStamped()` snapshots every active item onto a venue's night the
-first time `GET /api/tonight/checklist` reads it, so an edit to `checklist_items` afterwards
-changes nothing already stamped (criterion 1). Ticking (`POST .../tick`) and exempting
-(`POST .../exempt`) are both predicated `UPDATE`s decided from `RETURNING` via `auditedWrite()`
-(0049); a system-verified stamp's `system_check IS NULL` predicate is what refuses a hand-tick
-outright, matched by its own CHECK at the schema layer too.
+applied a second time: `ensureStamped()` snapshots every active item onto a performance the
+first time `GET /api/tonight/checklist` reads it, resolving the venue's active items through
+the performance it is given (criterion 1, keyed to a performance since E-128, never a venue and
+a night). An edit to `checklist_items` afterwards changes nothing already stamped. Ticking
+(`POST .../tick`) and exempting (`POST .../exempt`) are both predicated `UPDATE`s decided from
+`RETURNING` via `auditedWrite()` (0049); a system-verified stamp's `system_check IS NULL`
+predicate is what refuses a hand-tick outright, matched by its own CHECK at the schema layer too.
 
 A system-verified item's done state is never stored: `noShowHoldsReleased()` and
-`incidentsReviewed()` (`server/utils/checklist.ts`) run live against `reservations` and
-`incidents`/`audit_log` on every read. Reviewing an incident (`POST
+`incidentsReviewed()` (`server/utils/checklist.ts`) run live against this performance's own
+`reservations` and `incidents`/`audit_log` on every read, so a matinee's checklist never waits
+on the evening's data (E-128). Reviewing an incident (`POST
 /api/tonight/incidents/[id]/review`) writes an `incident.reviewed` audit entry rather than a
 column on `incidents`, which cannot be touched post-insert; acknowledgement, not E-116's later
 severity-routed resolution, which is a separate workflow this does not build.
@@ -814,7 +879,9 @@ neither ticked nor exempted refuses with a 409 naming it by label (criterion 4),
 close reads back the first's `checklist_closes` row rather than refusing (idempotent, matching
 `night_reports`' own PK guarantee). `/tonight` shows a warning banner for incomplete required
 pre-show items from house open, `doors_at` where a performance sets one, curtain otherwise
-(criterion 6).
+(criterion 6). None of the four routes carries a performance picker yet (`docs/known-issues.md`),
+so a matinee day falls back to the same single-performance resolution `GET /api/tonight/report`
+uses and refuses ambiguity outright once a second performance is running.
 
 `/rota/manage/checklists` is the committee's own screen; `/tonight/checklist` is the duty
 manager's. Both, and the pure statement and query builders they call, are guarded the same way
@@ -823,10 +890,10 @@ their siblings are: `checklist.read`/`checklist.write` (a new, paired standing p
 'DUTY_MANAGER')` for the tonight screen, since criterion 1 names the checklist as the duty
 manager's own, unlike the incident log's wider `BAR`/`DOOR`/`DUTY_MANAGER` reach.
 
-Two gaps recorded in `docs/known-issues.md`: criterion 5's exception reason has nowhere to be
-read except the database, since neither `night_reports` (E-123) nor an FOH digest (E-124) is
-built yet; and `noShowHoldsReleased()` can never clear itself in production until D-126 builds a
-door to move a reservation off `PENDING`/`COLLECTED`.
+Two gaps recorded in `docs/known-issues.md`: criterion 5's exception reason now prints in the
+report `compileNightReport()` builds (E-123) and the frozen row E-124 signs, but still has no
+FOH digest of its own; and `noShowHoldsReleased()` can never clear itself in production until
+D-126 builds a door to move a reservation off `PENDING`/`COLLECTED`.
 
 **Also closes a standing gap from E-106/E-107**: `POST /api/rota/shifts/[id]/dismiss` lets a
 member clear a declined claim off their own `/rota` list. It returns the shift to `OPEN`, naming
@@ -978,10 +1045,9 @@ distribution attempt).
 Sign-off is `requireNightAuthority(event, 'DUTY_MANAGER', ...)`, the same shift-or-officer guard
 `GET /api/tonight/report` itself uses, so `signedVia` is exactly `resolved.via`: `SHIFT` or
 `OFFICER`, flagging an officer standing in for the duty manager without a separate column
-(criterion 2). It refuses with 409 until `checklist_closes` carries a row for tonight's venue and
-night (criterion 1, E-114's own gate; venue-and-night scoped rather than performance-scoped, the
-E-127 criterion 4 gap this inherits rather than fixes). The insert is `signOffStatement`'s own
-predicate, `WHERE NOT EXISTS`, so two concurrent sign-offs for the same performance produce
+(criterion 2). It refuses with 409 until `checklist_closes` carries a row for this performance
+(criterion 1, E-114's own gate, performance-scoped since E-128). The insert is `signOffStatement`'s
+own predicate, `WHERE NOT EXISTS`, so two concurrent sign-offs for the same performance produce
 exactly one row and the loser reads 409, the same race-safety a checklist or till close already
 carries.
 

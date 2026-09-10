@@ -85,7 +85,7 @@ pull request, titled in the repository's habit: a sentence, then the ids in pare
 | show night | 27 | `unified/show-night/` | 3012 | 3301 |
 | bar | 21 | `unified/bar/` | 3013 | 3401 |
 | platform | 32 | `unified/platform/` | 3014 | 3501 |
-| finance | 6 | `unified/finance/` | 3015 | 3601 |
+| finance | 4 | `unified/finance/` | 3015 | 3601 |
 | seed | | `unified/seed/` | 3017 | 4101 |
 | the reviewer | | | 3001 | 3701 |
 
@@ -166,15 +166,19 @@ nothing else in platform is on the critical path.
 
 ### Finance (module I, except I-109)
 
+I-107 and I-108 moved to a second finance stream once the comms block finished, so this stream's
+own remaining work is I-105 and I-106; period close and the SU accounting exports are the second
+stream's, coordinated through the same reviewer rather than directly between the two.
+
 | Wave | Pull-request groups | Notes |
 | --- | --- | --- |
 | 1 | I-103 | Smallest: reads the ledger directly, no new table. Found and fixed in the same pull request: `reportForegoneQuery` (E-123) summed a comp line's `amount_pence`, which a real comp always posts as zero; the retail figure sits on `unit_price_pence` (I-103 criterion 1). |
-| 2 | I-104 | Depends on I-103. Reconciles by `london_day`, the plain London calendar day, never the show night: `architecture.md`'s money-path table already fixed this, because the reader's own Z is a calendar-day figure. Reads F-118's till-session close record when present and reconciles from the ledger alone otherwise. |
-| 3 | I-105 | Needs I-104's reconciliation for the open-variance total. |
+| 2 | I-104 | Depends on I-103. Reconciles by the show night, sharing F-118's own `nightReconciliation()` (`server/utils/reconciliation.ts`) rather than a second account of the same figures. `architecture.md`'s money-path table previously said reconciliation groups by the calendar day; that claim did not survive contact with F-118 and was corrected in this pull request. |
+| 3 | I-105 | Needs I-104's reconciliation for the open-variance total; reuses I-103's own `foregoneQuery` for the comps and discounts figure rather than a third account of it. `TERM` is not yet a selectable period: it needs the second stream's `periods` table (I-107). |
 | 4 | I-106 | Needs I-102 (platform, closed) only; independent of I-103 to I-105, slotted here to match the order this stream was asked to work in. Imported history (`IMPORT` rows) carries no `performance_id` and cannot attribute to a show; reported as its own total, never folded into "no show" as if the money were missing. |
-| 5 | I-107 · I-108 | I-107 first, alone: I-108's export is period-scoped and reads more cleanly once a period can close. |
 
-Routes and files owned: `/money/**`, `/api/admin/finance/**`, `server/utils/finance-reports.ts`.
+Routes and files owned: `/money/**`, `/api/admin/finance/**`, `server/utils/finance-reports.ts`,
+`server/utils/night-reconciliation.ts`, `server/utils/season-dashboard.ts`.
 The finance screens sit under `/money`, the prefix its sidebar group was declared with (0040).
 
 ## The critical path

@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { undeliverableReason } from '#shared/utils/deliverability'
 import {
+  DIGEST_TOPIC_NOUN,
+  DIGEST_TYPE_FOR_TOPIC,
   MESSAGE_TYPES,
   NOTIFICATION_STATUSES,
   NOTIFICATION_TOPICS,
@@ -11,6 +13,7 @@ import {
   deliversOn,
   isTerminal,
   isTransactional,
+  joinsDigest,
   logRetentionCutoff,
   messageType,
   outOfAttempts,
@@ -18,7 +21,7 @@ import {
   preferenceIsSettable,
   retryDueAt,
 } from '#shared/utils/notifications'
-import { CONFIG_KEYS } from '#shared/utils/config'
+import { CONFIG_KEYS, DIGEST_WINDOW_KEY } from '#shared/utils/config'
 import type { MessageType, Preference, PreferenceDefaults } from '#shared/utils/notifications'
 
 const transactional: MessageType = { topic: null, channels: ['EMAIL'], template: 't' }
@@ -262,5 +265,63 @@ describe('the send log retries with backoff (H-105)', () => {
 
   test('the retention period ships as a configured number of months', () => {
     expect(CONFIG_KEYS.NOTIFICATION_LOG_RETENTION_MONTHS.default).toBe(24)
+  })
+})
+
+describe('digest coalescing (H-104)', () => {
+  // Criterion 1: every topic that can hold a message has somewhere for the sweep to send it.
+  test('every topic has a registered digest type and a noun for its subject line', () => {
+    for (const topic of NOTIFICATION_TOPICS) {
+      expect(`${topic}: ${Boolean(DIGEST_TYPE_FOR_TOPIC[topic])}`).toBe(`${topic}: true`)
+      expect(`${topic}: ${Boolean(DIGEST_TOPIC_NOUN[topic])}`).toBe(`${topic}: true`)
+    }
+  })
+
+  // A digest that could itself be held would never send: it has to be transactional and
+  // email-only, since the inbox entries it covers already went out individually.
+  test('every digest type is transactional and carries no topic of its own', () => {
+    for (const topic of NOTIFICATION_TOPICS) {
+      const type = messageType(DIGEST_TYPE_FOR_TOPIC[topic])
+      expect(isTransactional(type)).toBe(true)
+      expect([...type.channels]).toEqual(['EMAIL'])
+    }
+  })
+
+  // The general test, not the specific answer: transactional never coalesces, whatever a future
+  // type is about, because topic: null is what marks a deadline a digest window would eat.
+  test('a transactional type never joins a digest, unclaimed and attachment-free or not', () => {
+    expect(joinsDigest(transactional, false, false)).toBe(false)
+    expect(joinsDigest(transactional, true, false)).toBe(false)
+    expect(joinsDigest(transactional, false, true)).toBe(false)
+  })
+
+  // A hold expiring and an offer lapsing are exactly this shape: one person, one seat, a
+  // countdown a digest interval would consume, which is why both ship transactional.
+  test('a hold-expiring reminder and a reservation confirmation are both exempt', () => {
+    expect(isTransactional(messageType('reservation.hold-expiring'))).toBe(true)
+    expect(isTransactional(messageType('reservation.confirmed'))).toBe(true)
+    expect(joinsDigest(messageType('reservation.hold-expiring'), false, false)).toBe(false)
+  })
+
+  test('an unclaimed, attachment-free, topic-bearing type does join', () => {
+    expect(joinsDigest(onTopic, false, false)).toBe(true)
+  })
+
+  test('a claim or an attachment bypasses the hold even on a topic-bearing type', () => {
+    expect(joinsDigest(onTopic, true, false)).toBe(false)
+    expect(joinsDigest(onTopic, false, true)).toBe(false)
+  })
+
+  test('the digest window ships as sixty minutes for every topic', () => {
+    for (const topic of NOTIFICATION_TOPICS) {
+      expect(CONFIG_KEYS[DIGEST_WINDOW_KEY[topic]].default).toBe(60)
+    }
+  })
+
+  test('the digest table check and the topic registry say the same thing', async () => {
+    const schema = await Bun.file('server/db/schema/notifications.ts').text()
+    const check = /notification_digest_entries_topic.*?IN \(([^)]*)\)/s.exec(schema)?.[1] ?? ''
+    const listed = [...check.matchAll(/'([A-Z_]+)'/g)].map(match => match[1])
+    expect(listed.sort()).toEqual([...NOTIFICATION_TOPICS].sort())
   })
 })

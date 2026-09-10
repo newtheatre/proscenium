@@ -321,6 +321,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'keep',
     why: 'Which officer decided a request. The decision survives; it does not describe the officer.',
   },
+  {
+    name: 'ticket_comp_requests',
+    column: 'requested_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // The same reasoning bar's own comp_requests already carries (F-110): a foregone-revenue
+    // figure audits to who asked and who decided, and the request is financial evidence.
+    why: 'Who asked for a ticket comp and who decided it is what a foregone-revenue figure audits to; the tombstone still answers for it.',
+  },
 
   // Module E: show night
 
@@ -622,6 +632,18 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     columns: ['type', 'title', 'body', 'created_at', 'read_at'],
     erasure: 'delete',
     why: 'Messages written to the person, and prose about them.',
+  },
+  {
+    name: 'notification_digest_entries',
+    column: 'user_id',
+    section: 'messages',
+    columns: ['topic', 'type', 'subject', 'body', 'created_at'],
+    erasure: 'scrub',
+    // Held only until its digest sends or prunes with it (H-104); the count survives, the
+    // rendered text of what changed does not.
+    scrub: ['subject', 'body'],
+    scrubTo: { subject: 'Erased entry', body: '' },
+    why: 'A change held for the next digest email; the rendered subject and body name it.',
   },
 
   // Module I: finance

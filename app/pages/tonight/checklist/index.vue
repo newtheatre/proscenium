@@ -36,12 +36,16 @@ const items = ref<Entry[]>([])
 // Read from the server on every load, never only from `closeNight()`'s own response: otherwise
 // a reload forgets the night is closed and re-enables the close action (E-114 follow-up).
 const close = ref<CloseInfo | null>(null)
+// Carried on every write below: the server resolves tonight's one performance without it, but
+// naming it is what the resolved GET already answered with (no picker yet, docs/known-issues.md).
+const performanceId = ref<string | null>(null)
 
 async function load(): Promise<void> {
   busy.value = true
   failure.value = null
   try {
-    const listed = await request<{ items: Entry[], close: CloseInfo | null }>('/api/tonight/checklist')
+    const listed = await request<{ performanceId: string, items: Entry[], close: CloseInfo | null }>('/api/tonight/checklist')
+    performanceId.value = listed.performanceId
     items.value = listed.items
     close.value = listed.close
     syncedAt.value = new Date()
@@ -65,7 +69,7 @@ const saving = ref(false)
 async function tick(entry: Entry): Promise<void> {
   saving.value = true
   try {
-    await $fetch(`/api/tonight/checklist/${entry.id}/tick`, { method: 'POST' })
+    await $fetch(`/api/tonight/checklist/${entry.id}/tick`, { method: 'POST', body: { performanceId: performanceId.value ?? undefined } })
     await load()
   }
   catch (refused) {
@@ -91,7 +95,7 @@ async function submitExempt(): Promise<void> {
   saving.value = true
   exemptFailure.value = null
   try {
-    await $fetch(`/api/tonight/checklist/${exempting.value.id}/exempt`, { method: 'POST', body: { reason: exemptReason.value } })
+    await $fetch(`/api/tonight/checklist/${exempting.value.id}/exempt`, { method: 'POST', body: { performanceId: performanceId.value ?? undefined, reason: exemptReason.value } })
     exempting.value = null
     await load()
   }
@@ -111,7 +115,7 @@ async function closeNight(): Promise<void> {
   saving.value = true
   closeFailure.value = null
   try {
-    await $fetch('/api/tonight/checklist/close', { method: 'POST' })
+    await $fetch('/api/tonight/checklist/close', { method: 'POST', body: { performanceId: performanceId.value ?? undefined } })
     toast.add({ title: 'Night closed', icon: 'i-lucide-check', color: 'success' })
   }
   catch (refused) {

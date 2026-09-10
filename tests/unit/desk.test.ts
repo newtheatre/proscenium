@@ -35,12 +35,12 @@ describe('a comp needs a reason; a card needs nothing else', () => {
     expect(collectForm.safeParse({ expectedTotalPence: 900, tender: 'CARD' }).success).toBe(true)
   })
 
-  test('COMP with no reason is refused before it reaches the route', () => {
+  test('COMP with no request named is refused before it reaches the route', () => {
     expect(collectForm.safeParse({ expectedTotalPence: 0, tender: 'COMP' }).success).toBe(false)
   })
 
-  test('COMP with a reason is well-formed', () => {
-    expect(collectForm.safeParse({ expectedTotalPence: 0, tender: 'COMP', compReason: 'Reviewer' }).success).toBe(true)
+  test('COMP naming an approved request is well-formed', () => {
+    expect(collectForm.safeParse({ expectedTotalPence: 0, tender: 'COMP', compRequestId: 'comp-1' }).success).toBe(true)
   })
 
   test('a tender outside CARD or COMP is refused: the theatre takes no cash', () => {

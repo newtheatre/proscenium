@@ -12,8 +12,11 @@ Stories: 14 total (9 MVP, 4 V2, 1 Later).
 
 1. Which roles may use admin fan-out, and to which audiences? Does a whole-membership announcement
    need a second officer's approval, or is the audit trail enough?
-2. Is one hour the right default digest window for every topic, or do shifts and room bookings
-   (where a same-day change is urgent) need a shorter window or an exemption?
+2. ~~Is one hour the right default digest window for every topic, or do shifts and room bookings
+   (where a same-day change is urgent) need a shorter window or an exemption?~~ **Answered by
+   H-104**: one scalar key per topic (`NOTIFICATION_DIGEST_WINDOW_<TOPIC>_MINUTES`), shipped at 60
+   minutes for all five in `docs/workshops.md` for a workshop to shorten shifts or rooms without a
+   release.
 3. ~~What is the retention period for the send log?~~ **Answered by H-105**:
    `NOTIFICATION_LOG_RETENTION_MONTHS`, shipped at 24 months to match rehearsal, pruned nightly by
    `daily:sweeps`, owner the IT Manager, in `docs/workshops.md` for a workshop to amend (0056).
