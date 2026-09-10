@@ -10,6 +10,7 @@ export default defineTask({
     const now = new Date()
     const reminders = await sendHoldReminders(undefined, now, cap)
     const released = await releaseExpiredHolds(now, cap)
-    return { result: { reminders, released } }
+    await notifyWaitingListOffers(undefined, released.offered)
+    return { result: { reminders, released: { eligible: released.eligible, released: released.released, offered: released.offered.length } } }
   },
 })

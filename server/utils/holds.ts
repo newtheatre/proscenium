@@ -3,9 +3,11 @@ import { sql } from 'drizzle-orm'
 import { auditedWrite } from './audit'
 import { configValue } from './configuration'
 import { claimNotification, notify } from './notify'
+import { offerWaitingList } from './waiting-list'
 import { auditEntry } from '#shared/utils/audit'
 import { formatLondon } from '#shared/utils/london'
 import { holdReminderClaim } from '#shared/utils/reservations'
+import type { OfferedWaitingListEntry } from './waiting-list'
 import type { H3Event } from 'h3'
 import type { SQL } from 'drizzle-orm'
 
@@ -24,13 +26,14 @@ export function releaseHoldStatement(reservationId: string): SQL {
 
 export interface ExpiredHoldRow {
   id: string
+  performanceId: string
 }
 
 // Oldest first, so a backlog drains in the order it built up rather than by whichever row the
 // query happens to touch last (0006: bound by `cap`, never by how many rows actually match).
 export function expiredHoldsQuery(at: number, cap: number): SQL {
   return sql`
-    SELECT id FROM reservations
+    SELECT id, performance_id AS performanceId FROM reservations
     WHERE status = 'PENDING' AND hold_expires_at IS NOT NULL AND hold_expires_at <= ${at}
     ORDER BY hold_expires_at
     LIMIT ${cap}
@@ -66,6 +69,9 @@ export function reminderCandidatesQuery(at: number, reminderMinutes: number, cap
 export interface ReleaseRun {
   eligible: number
   released: number
+  // What releasing just freed and offered on to the waiting list (D-106 criterion 2, D-113):
+  // the caller notifies, since that needs a live Nitro runtime this file stays free of.
+  offered: OfferedWaitingListEntry[]
 }
 
 // `auditedWrite` is 0049's shape: a hold already moved by something else writes no trail for
@@ -73,15 +79,21 @@ export interface ReleaseRun {
 export async function releaseExpiredHolds(at: Date, cap: number): Promise<ReleaseRun> {
   const now = Math.floor(at.getTime() / 1000)
   const candidates = await db.all<ExpiredHoldRow>(expiredHoldsQuery(now, cap))
+  const offerCap = await configValue(undefined, 'WAITING_LIST_OFFER_BATCH_CAP')
 
   let released = 0
+  const offered: OfferedWaitingListEntry[] = []
   for (const candidate of candidates) {
     const entry = auditEntry({ actorId: null, action: 'reservation.expired', target: `reservation:${candidate.id}` })
     const applied = await auditedWrite(db.all<{ id: string }>(releaseHoldStatement(candidate.id)), entry)
-    if (applied) released += 1
+    if (applied) {
+      released += 1
+      const run = await offerWaitingList(undefined, candidate.performanceId, at, offerCap)
+      offered.push(...run.offered)
+    }
   }
 
-  return { eligible: candidates.length, released }
+  return { eligible: candidates.length, released, offered }
 }
 
 export interface HoldReminderRun {

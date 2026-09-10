@@ -186,14 +186,15 @@ function from(performance: Listed): string | null {
               >
                 Book
               </UButton>
-              <!-- D-113 builds the waiting list; until then a sold-out house says where to ask. -->
-              <span
+              <UButton
                 v-else-if="performance.availability === 'SOLD_OUT'"
-                class="text-sm text-muted"
+                :to="`/waiting-list/${performance.id}`"
+                variant="subtle"
+                size="sm"
                 :data-test="`waiting-${performance.id}`"
               >
-                Ask the box office about returns
-              </span>
+                Join the waiting list
+              </UButton>
             </div>
           </li>
         </ul>

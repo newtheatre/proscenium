@@ -1,6 +1,11 @@
+import { db, schema } from '@nuxthub/db'
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { newId } from './accounts'
+import { configValue } from './configuration'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
-import { isCurrent } from '#shared/utils/membership'
+// Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
+// Bun, where nothing is auto-imported (CONTRIBUTING), since D-113 reaches `hasCurrentMembership`.
+import { isCurrent, londonDay } from '#shared/utils/membership'
 import type { BookingStatus, Conflict } from '#shared/utils/bookings'
 import type { H3Event } from 'h3'
 

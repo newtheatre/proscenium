@@ -92,6 +92,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // A raised capacity frees room the same way a cancellation does (D-113 criterion 2); a lowered
+  // or unchanged one simply offers nothing, since `offerWaitingList` reads what is actually free.
+  const offerCap = await configValue(event, 'WAITING_LIST_OFFER_BATCH_CAP')
+  const run = await offerWaitingList(event, id, new Date(), offerCap)
+  await notifyWaitingListOffers(event, run.offered)
+
   // Only once the move is real: restamping a rota for an edit that was refused would cancel held
   // shifts against a venue the performance never went to.
   if (moved) {

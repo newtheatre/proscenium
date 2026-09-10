@@ -20,5 +20,10 @@ export default defineEventHandler(async (event) => {
     await sendReservationCancellation(event, { userId: reservation.userId, reservationId })
   }
 
+  // Frees a seat the same way expiry does (D-113 criterion 2), so the waiting list is offered here too.
+  const cap = await configValue(event, 'WAITING_LIST_OFFER_BATCH_CAP')
+  const run = await offerWaitingList(event, reservation.performanceId, new Date(), cap)
+  await notifyWaitingListOffers(event, run.offered)
+
   return { status: 'CANCELLED' as const }
 })

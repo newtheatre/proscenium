@@ -286,6 +286,26 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['reservation.reinstated'],
     via: ['server/utils/reservations.ts'],
   },
+  {
+    route: 'server/api/performances/[id]/waiting-list.post.ts',
+    actions: ['waiting-list.joined'],
+    via: ['server/utils/waiting-list.ts'],
+  },
+  {
+    route: 'server/api/waiting-list/[token]/claim.post.ts',
+    actions: ['waiting-list.claimed'],
+    via: ['server/utils/waiting-list.ts', 'server/utils/reservations.ts'],
+  },
+  {
+    route: 'server/api/waiting-list/[token]/remove.post.ts',
+    actions: ['waiting-list.removed'],
+    via: ['server/utils/waiting-list.ts'],
+  },
+  {
+    route: 'server/api/box-office/desk/performances/[id]/waiting-list/offer.post.ts',
+    actions: ['waiting-list.offered'],
+    via: ['server/utils/waiting-list.ts'],
+  },
 
   // Module E: show night
 

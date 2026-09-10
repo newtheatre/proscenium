@@ -1435,6 +1435,53 @@ Open your pass: ${url}
 The Nottingham New Theatre`,
     }
   },
+  'waiting-list-joined': (context: TemplateContext): Rendered => {
+    const show = String(context.show)
+    const when = String(context.when)
+    const partySize = Number(context.partySize)
+    const removeUrl = String(context.removeUrl)
+    const seats = partySize === 1 ? '1 seat' : `${partySize} seats`
+    return {
+      subject: `You're on the waiting list for ${show}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>You are on the waiting list for ${show}, ${when}, for ${seats}. We will email you the moment
+seats free up, in the order people joined.</p>
+<p>Changed your mind? <a href="${removeUrl}">Leave the waiting list</a>.</p>`),
+      text: `Hello ${context.name},
+
+You are on the waiting list for ${show}, ${when}, for ${seats}. We will email you the moment
+seats free up, in the order people joined.
+
+Leave the waiting list: ${removeUrl}
+
+The Nottingham New Theatre`,
+    }
+  },
+  'waiting-list-offered': (context: TemplateContext): Rendered => {
+    const show = String(context.show)
+    const when = String(context.when)
+    const expires = String(context.expires)
+    const claimUrl = String(context.claimUrl)
+    const removeUrl = String(context.removeUrl)
+    return {
+      subject: `Seats are free for ${show}: claim by ${expires}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>A seat has freed up for ${show}, ${when}. It is held for you until <strong>${expires}</strong>;
+after that it passes to the next person on the list.</p>
+<p><a href="${claimUrl}">Claim my seats</a></p>
+<p>Not coming after all? <a href="${removeUrl}">Leave the waiting list</a>.</p>`),
+      text: `Hello ${context.name},
+
+A seat has freed up for ${show}, ${when}. It is held for you until ${expires}; after that it
+passes to the next person on the list.
+
+Claim your seats: ${claimUrl}
+
+Leave the waiting list: ${removeUrl}
+
+The Nottingham New Theatre`,
+    }
+  },
   'health-alert': (context: TemplateContext): Rendered => {
     const since = String(context.since)
     return {

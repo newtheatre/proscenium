@@ -262,6 +262,26 @@ export const MESSAGE_TYPES = {
     sender: 'BOX_OFFICE',
   },
 
+  // Transactional and reaches an unverified account: a guest joined with an address nobody has
+  // proven, the same reach a reservation confirmation gets (D-113 criterion 1).
+  'waiting-list.joined': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'waiting-list-joined',
+    reachesUnverified: true,
+    sender: 'BOX_OFFICE',
+  },
+
+  // Transactional: a preference cannot silence the one message that tells somebody a seat is
+  // theirs to claim before it lapses to the next entry (D-113 criterion 2).
+  'waiting-list.offered': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'waiting-list-offered',
+    reachesUnverified: true,
+    sender: 'BOX_OFFICE',
+  },
+
   // Module E: show night
 
   // Transactional, so no rota preference can silence it: somebody who turned shift email off
