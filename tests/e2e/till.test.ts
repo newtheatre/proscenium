@@ -72,13 +72,19 @@ interface TillSessionBody {
   openedAt: number
   closedBy: string | null
   closedAt: number | null
+  expectedTotalPence: number | null
+  actualZPence: number | null
+  variancePence: number | null
+  varianceNote: string | null
 }
 
 const openTill = (venueId: string, as?: string): Promise<Response> =>
   request(app, 'POST', '/api/till', { venueId }, as)
 
-const closeTill = (id: string, as?: string): Promise<Response> =>
-  request(app, 'POST', '/api/till/close', { id }, as)
+// Nothing sold in this file's own fixtures, so the reader agrees with the ledger at nought and no
+// note is needed; the figure itself and a disagreeing reading are F-118's own e2e suite.
+const closeTill = (id: string, as?: string, actualZPence = 0, varianceNote?: string): Promise<Response> =>
+  request(app, 'POST', '/api/till/close', { id, actualZPence, varianceNote }, as)
 
 const tillStatus = (venueId: string, as?: string): Promise<Response> =>
   request(app, 'GET', `/api/till?venueId=${venueId}`, undefined, as)
@@ -241,7 +247,9 @@ describe.skipIf(skip !== null)('closing a session (F-102 criterion 4)', () => {
     const response = await closeTill(opened.session.id, bar.cookie)
     expect(response.status).toBe(200)
     const closed = await response.json() as { session: TillSessionBody }
-    expect(closed.session).toMatchObject({ id: opened.session.id, closedBy: bar.id })
+    expect(closed.session).toMatchObject({
+      id: opened.session.id, closedBy: bar.id, expectedTotalPence: 0, actualZPence: 0, variancePence: 0, varianceNote: null,
+    })
     expect(closed.session.closedAt).not.toBeNull()
 
     expect(auditCount('bar.till.closed', `till:${closing.venueId}:${night}`)).toBe(1)

@@ -11,6 +11,11 @@ export interface TillSession {
   openedAt: number
   closedBy: string | null
   closedAt: number | null
+  // Written once, with the close itself; null until then (F-118 criterion 3).
+  expectedTotalPence: number | null
+  actualZPence: number | null
+  variancePence: number | null
+  varianceNote: string | null
 }
 
 // Where to open one. Never a night: the till only ever acts on tonight's (F-101 criterion 1), and
@@ -22,6 +27,5 @@ export const tillScopeForm = z.object({
 
 export type TillScopeInput = z.output<typeof tillScopeForm>
 
-export const closeTillSessionForm = z.object({
-  id: z.string().trim().min(1, 'Which session to close'),
-})
+// Closing a session takes the reader's own reading and needs a live expected figure to compare
+// it against, so its form lives with that computation in `shared/utils/reconciliation.ts` (F-118).

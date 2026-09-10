@@ -254,6 +254,12 @@ export const tillSessions = sqliteTable('till_sessions', {
   openedAt: integer('opened_at').notNull().default(now),
   closedBy: text('closed_by').references(() => users.id, { onDelete: 'restrict' }),
   closedAt: integer('closed_at'),
+  // Written once with the close (F-118 criterion 3); `close.post.ts` is the only writer. No CHECK
+  // enforces that: one on a brand-new column forces a rebuild the copying INSERT cannot resolve (0052).
+  expectedTotalPence: integer('expected_total_pence'),
+  actualZPence: integer('actual_z_pence'),
+  variancePence: integer('variance_pence'),
+  varianceNote: text('variance_note'),
 }, table => [
   uniqueIndex('till_sessions_one_open_per_venue_night').on(table.venueId, table.night).where(sql`closed_at IS NULL`),
   index('till_sessions_unclosed').on(table.night).where(sql`closed_at IS NULL`),

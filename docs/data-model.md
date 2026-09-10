@@ -1029,15 +1029,22 @@ change never restates a past sale (criterion 4).
 ### till_sessions
 `id` PK · `venue_id` → venues restrict · `night` civil date, the show night it belongs to ·
 `opened_by` → users restrict · `opened_at` · `closed_by` NULL → users restrict · `closed_at` NULL,
-set with `closed_by` together or not at all, never before `opened_at` (F-102). Partial UNIQUE
-(`venue_id`, `night`) WHERE `closed_at IS NULL`: at most one *open* session per venue per night,
-so a session once closed stays closed and a fresh one opening later that night is a row of its
-own rather than a reuse. Keys to the night rather than a performance, so one session covers a
-matinee and an evening at the same venue (E-127), the same choice 0044 makes for an officer
-bypass. The expected reconciliation figure at close is F-118's, which needs sales that do not
-exist yet; a session left open past its night is F-102's own query (`staleUnclosedSessionsQuery`).
-E-114's checklist criterion 3 names only two system-verified checks; a stale till session is not
-a third one it added, so this query still has no screen reading it (`docs/known-issues.md`).
+set with `closed_by` together or not at all, never before `opened_at` (F-102). `expected_total_pence`,
+`actual_z_pence`, `variance_pence` NULL → set together with the close itself, never separately;
+`variance_note` NULL unless the two disagree, in which case it is required (F-118 criterion 3).
+`close.post.ts` is the only writer and enforces both rules; no CHECK does, since one referencing
+these columns would force a rebuild whose generated copying INSERT cannot resolve a column the old
+table never had (0052).
+Partial UNIQUE (`venue_id`, `night`) WHERE `closed_at IS NULL`: at most one *open* session per
+venue per night, so a session once closed stays closed and a fresh one opening later that night is
+a row of its own rather than a reuse. Keys to the night rather than a performance, so one session
+covers a matinee and an evening at the same venue (E-127), the same choice 0044 makes for an
+officer bypass. The expected figure itself is night-wide, not this session's venue alone: ledger
+money carries no venue reference (`server/utils/reconciliation.ts`), so two venues running the
+same night would each be shown the combined total, an open gap tracked in `docs/known-issues.md`.
+A session left open past its night is F-102's own query (`staleUnclosedSessionsQuery`). E-114's
+checklist criterion 3 names only two system-verified checks; a stale till session is not a third
+one it added, so this query still has no screen reading it (`docs/known-issues.md`).
 
 ### comp_requests
 `id` PK · `venue_id` → venues restrict · `night` · `requested_by` → users restrict · `reason` ·

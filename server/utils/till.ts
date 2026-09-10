@@ -11,7 +11,8 @@ import type { TillSession } from '#shared/utils/till'
 
 const SESSION_COLUMNS = sql`
   id AS id, venue_id AS venueId, night AS night, opened_by AS openedBy, opened_at AS openedAt,
-  closed_by AS closedBy, closed_at AS closedAt
+  closed_by AS closedBy, closed_at AS closedAt, expected_total_pence AS expectedTotalPence,
+  actual_z_pence AS actualZPence, variance_pence AS variancePence, variance_note AS varianceNote
 `
 
 // The open session only: closing one and opening another later that night is a second row, so
