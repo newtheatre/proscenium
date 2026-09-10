@@ -36,7 +36,7 @@ export const notificationLog = sqliteTable('notification_log', {
   // `created_at` rather than stored, so the two can never disagree (H-105).
   attempts: integer('attempts').notNull().default(0),
   // The rendered message, held only while a failed send is still owed a retry and cleared the
-  // moment it reaches a terminal status. Never in a customer or operator response (H-105, 0055).
+  // moment it reaches a terminal status. Never in a customer or operator response (H-105, 0056).
   retryPayload: text('retry_payload'),
   createdAt: integer('created_at').notNull().default(now),
 }, table => [

@@ -111,7 +111,7 @@ interface Recorded {
   // attempt, so it does not spend one (H-105 criterion 2).
   attempted?: boolean
   // The rendered message, held only while a retry is still owed and cleared once one is not
-  // (0055). Anything terminal passes nothing and so clears it.
+  // (0056). Anything terminal passes nothing and so clears it.
   payload?: string | null
 }
 
@@ -204,7 +204,7 @@ async function resolveById(id: string, status: Status, error: string | null, pay
 interface Rendered { subject: string, html: string, text: string }
 
 // A send with no account carries its recipient here, because there is no account to resolve one
-// from at the next attempt. Cleared with the rest of the payload the moment it settles (0055).
+// from at the next attempt. Cleared with the rest of the payload the moment it settles (0056).
 interface StoredMessage extends Rendered { to?: string }
 
 function storedMessage(payload: string | null): StoredMessage | null {
@@ -244,7 +244,7 @@ export async function resend(event: H3Event | undefined, id: string, maxAttempts
   }
 
   // A configured recipient has no account, no preference and no address to re-resolve, so it is
-  // judged on the address it carries and nothing else (E-124, 0055).
+  // judged on the address it carries and nothing else (E-124, 0056).
   if (!row.userId) return await resendToAddress(event, id, type, message, row.attempts, maxAttempts)
 
   const account = await findById(row.userId)
@@ -447,7 +447,7 @@ export async function notify(event: H3Event | undefined, notification: Notificat
       return 'FAILED_FINAL'
     }
 
-    // The rendered message rides on the row so the sweep can send exactly this again (0055).
+    // The rendered message rides on the row so the sweep can send exactly this again (0056).
     await record({
       ...logged,
       status: 'FAILED',
