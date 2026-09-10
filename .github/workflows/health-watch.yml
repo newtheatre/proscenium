@@ -19,12 +19,22 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      # No hardcoded fallback: a wrong default is the exact failure this variable exists to fix.
+      # A repository variable, not environment-scoped: this job declares no environment, and one
+      # would only risk a scheduled run stalling on an approval gate for no benefit.
+      - name: Fail fast if HEALTH_URL is missing
+        run: |
+          if [ -z "${{ vars.HEALTH_URL }}" ]; then
+            echo "::error::HEALTH_URL must be set as a repository variable."
+            exit 1
+          fi
+
       - name: Check the live health endpoint
         run: |
-          if status=$(curl -fsS -o /tmp/health.json -w '%{http_code}' https://newtheatre.org.uk/api/health) && [ "$status" = "200" ]; then
+          if status=$(curl -fsS -o /tmp/health.json -w '%{http_code}' "${{ vars.HEALTH_URL }}") && [ "$status" = "200" ]; then
             echo "Health endpoint reports ok."
             exit 0
           fi
-          echo "::error::/api/health did not report ok. Response:"
+          echo "::error::${{ vars.HEALTH_URL }} did not report ok. Response:"
           cat /tmp/health.json 2>/dev/null || echo "(no response body)"
           exit 1
