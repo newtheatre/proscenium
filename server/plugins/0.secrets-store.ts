@@ -9,9 +9,13 @@ interface SecretsStoreSecret {
 let sessionPassword: Promise<string> | undefined
 let warnedAboutWorkerSecret = false
 let warnedAboutMissingBinding = false
+let warnedAboutUnreadableLocally = false
 
 // Enough to ride out a Secrets Store blip, few enough to fail fast.
 const READ_ATTEMPTS = 3
+
+// iron-webcrypto refuses to seal below this: an empty or short read is never a real password.
+const MIN_PASSWORD_LENGTH = 32
 
 async function readSecret(secret: SecretsStoreSecret): Promise<string> {
   let lastError: unknown
@@ -62,11 +66,30 @@ export default defineNitroPlugin((nitroApp) => {
 
     try {
       sessionPassword ??= readSecret(secret)
-      useRuntimeConfig(event).session.password = await sessionPassword
+      const password = await sessionPassword
+
+      // A resolved-but-empty or too-short read is not a blip: the catch below must treat it
+      // exactly like a thrown one, never sealing a session with it.
+      if (password.length < MIN_PASSWORD_LENGTH) {
+        throw new Error(`SESSION_PASSWORD resolved to ${password.length} characters, refusing to seal with it`)
+      }
+
+      useRuntimeConfig(event).session.password = password
     }
     catch (error) {
       // Do not pin a failed read for the life of the isolate.
       sessionPassword = undefined
+
+      if (import.meta.dev) {
+        // The store has no local emulation, so a binding that exists but cannot be read, or
+        // reads empty, is routine here; the .env value already stands, same as no binding at all.
+        if (!warnedAboutUnreadableLocally) {
+          warnedAboutUnreadableLocally = true
+          console.warn('[secrets-store] SESSION_PASSWORD binding unusable locally, falling back to .env', error)
+        }
+        return
+      }
+
       console.error('[secrets-store] could not read SESSION_PASSWORD', error)
       // Rethrow to skip the remaining request hooks: the next one reads a session, which
       // memoises the empty password for good (0007).
