@@ -4,15 +4,14 @@
 export const ALUMNI_SITE = 'https://alumni.newtheatre.org.uk'
 export const MAILING_LIST_URL = 'https://newtheatre.us3.list-manage.com/subscribe?u=ce5311ce46fe45638f90f4022&id=97e4899eb8'
 
-// A key ending /** covers everything beneath it and the bare path too, so a bare path that lands
-// somewhere else takes its own row: the exact rule wins over the wildcard for that one path.
+// A key ending /** covers everything beneath it and the bare path too. Only a bare path that lands
+// somewhere else takes its own row, and then the exact rule wins over the wildcard for it.
 export const OLD_SITE_REDIRECTS: Record<string, string> = {
   // Editorial pages
   '/technical': '/technical-specification',
   '/festival': '/whats-on',
   '/alumni': `${ALUMNI_SITE}/`,
   '/alumni/**': `${ALUMNI_SITE}/register`,
-  '/mailing-list': MAILING_LIST_URL,
   '/mailing-list/**': MAILING_LIST_URL,
   '/get-involved/creatives': '/get-involved',
   '/get-involved/stagecraft': '/training/modules',

@@ -1,24 +1,28 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
+import { matchPathToRule } from '@nuxtjs/robots/util'
 import { OLD_SITE_REDIRECTS, oldShowRedirect } from '#shared/utils/redirects'
 import {
   DEFAULT_OG_IMAGE,
-  NOINDEX_PAGES,
   PRODUCTION_SITE_URL,
   ROBOTS_DISALLOW,
-  SITE_NAME,
-  isCrawlable,
+  isPosterKey,
   posterUrl,
-  robotsMatches,
   siteIndexable,
-  titleFor,
 } from '#shared/utils/seo'
 import { CONSOLE_HOME, CONSOLE_NAV, MEMBER_NAV, PUBLIC_NAV, SHELL_NAV } from '#shared/utils/site-nav'
 
-// K-125: the crawl and sitemap lists are held against the navigation declaration (0040), so a
-// screen added to the site cannot be indexed, or hidden, by accident.
+// K-125: the crawl list is held against the navigation declaration (0040) with the robots
+// module's own matcher, so a screen cannot be indexed, or hidden, by accident.
 
 const PAGES = 'app/pages'
+
+// Criterion 6's list. Read only here and by the end-to-end suite; the rule that makes them
+// noindex is the disallow list itself.
+const NOINDEX_PAGES = ['/sign-in', '/register', '/reset', '/verify', '/magic', '/qr', '/board']
+
+const RULES = ROBOTS_DISALLOW.map(pattern => ({ pattern, allow: false }))
+const isCrawlable = (path: string): boolean => matchPathToRule(path, RULES) === null
 
 function pageFiles(): string[] {
   return [...new Bun.Glob('**/*.vue').scanSync({ cwd: PAGES, onlyFiles: true })].sort()
@@ -35,21 +39,6 @@ function contentRoutes(): Set<string> {
     .filter(entry => !entry.startsWith('docs/'))
     .map(entry => `/${entry.replace(/\.md$/, '')}`))
 }
-
-describe('robots patterns (K-125 criterion 2)', () => {
-  test('a bare pattern is a prefix', () => {
-    expect(robotsMatches('/admin', '/admin')).toBe(true)
-    expect(robotsMatches('/admin', '/admin/audit')).toBe(true)
-    expect(robotsMatches('/admin', '/administer')).toBe(true)
-    expect(robotsMatches('/admin', '/about')).toBe(false)
-  })
-
-  test('a dollar ends the path exactly and a star spans anything', () => {
-    expect(robotsMatches('/training$', '/training')).toBe(true)
-    expect(robotsMatches('/training$', '/training/modules')).toBe(false)
-    expect(robotsMatches('/rooms/*/book', '/rooms/abc/book')).toBe(true)
-  })
-})
 
 describe('the crawl list and the navigation agree (K-125 criterion 2)', () => {
   test('every public destination is crawlable', () => {
@@ -69,6 +58,16 @@ describe('the crawl list and the navigation agree (K-125 criterion 2)', () => {
 
   test('the auth and utility pages are not (criterion 6)', () => {
     expect(NOINDEX_PAGES.filter(path => isCrawlable(path))).toEqual([])
+  })
+
+  // A guarded page is one a visitor cannot open, whether or not any navigation names it.
+  test('no page declaring middleware is crawlable', async () => {
+    const leaked: string[] = []
+    for (const file of pageFiles()) {
+      const source = await Bun.file(join(PAGES, file)).text()
+      if (/definePageMeta\(\{[\s\S]*?\bmiddleware\b/.test(source) && isCrawlable(routeOf(file))) leaked.push(file)
+    }
+    expect(leaked).toEqual([])
   })
 
   test('the public catalogue survives the training disallow', () => {
@@ -115,7 +114,7 @@ describe('every crawlable page carries a description (K-125 criterion 1)', () =>
   })
 })
 
-describe('indexability follows the site URL (K-125 criterion 1)', () => {
+describe('indexability follows the origin a request reached (K-125 criterion 1)', () => {
   test('only the production address indexes', () => {
     expect(siteIndexable(PRODUCTION_SITE_URL)).toBe(true)
     expect(siteIndexable(`${PRODUCTION_SITE_URL}/`)).toBe(true)
@@ -127,35 +126,59 @@ describe('indexability follows the site URL (K-125 criterion 1)', () => {
   test('a development server indexes whatever its address', () => {
     expect(siteIndexable('http://localhost:3001', true)).toBe(true)
   })
-})
 
-describe('the title template (K-125 criterion 1)', () => {
-  test('a page title takes the house name after it', () => {
-    expect(titleFor('What\'s on')).toBe(`What's on | ${SITE_NAME}`)
-  })
+  // The plugin is wired by hand here: a dev server always indexes, so no end-to-end run ever
+  // reaches the branch that keeps a duplicate host out of search.
+  test('the server plugin pushes the decision below every configured source', async () => {
+    let registered: ((ctx: { event: unknown, siteConfig: unknown }) => void) | undefined
+    const pushed: Record<string, unknown>[] = []
+    Object.assign(globalThis, { defineNitroPlugin: (setup: unknown) => setup })
+    // Loaded by a built path so the tests project does not type the file against Nitro's globals.
+    const plugin = await import(['..', '..', 'server', 'plugins', 'site-indexable'].join('/')) as {
+      default: (app: unknown) => void
+      INDEXABLE_PRIORITY: number
+    }
+    plugin.default({ hooks: { hook: (_name: string, fn: typeof registered) => void (registered = fn) } })
+    expect(registered).toBeDefined()
 
-  test('a title that is already the house name stands alone', () => {
-    expect(titleFor('The Nottingham New Theatre')).toBe('The Nottingham New Theatre')
-    expect(titleFor(SITE_NAME)).toBe(SITE_NAME)
-  })
-
-  test('no title at all is the house name', () => {
-    expect(titleFor(undefined)).toBe(SITE_NAME)
-    expect(titleFor('  ')).toBe(SITE_NAME)
+    const run = (origin: string): Record<string, unknown> => {
+      pushed.length = 0
+      registered!({ event: { context: { siteConfigNitroOrigin: origin } }, siteConfig: { push: (entry: Record<string, unknown>) => pushed.push(entry) } })
+      return pushed[0]!
+    }
+    expect(run('https://proscenium.newtheatre.org.uk')).toMatchObject({ indexable: false, _priority: plugin.INDEXABLE_PRIORITY })
+    expect(run(PRODUCTION_SITE_URL)).toMatchObject({ indexable: true })
+    expect(plugin.INDEXABLE_PRIORITY).toBeLessThan(0)
   })
 })
 
 describe('the Open Graph image (K-125 criterion 3)', () => {
   test('a poster key under posters/ becomes the address it is served at', () => {
     expect(posterUrl('posters/the-seagull.jpg')).toBe('/posters/the-seagull.jpg')
-    expect(posterUrl('/posters/the-seagull.jpg')).toBe('/posters/the-seagull.jpg')
+    expect(posterUrl('/posters/2026/the-seagull.jpg')).toBe('/posters/2026/the-seagull.jpg')
   })
 
-  test('no key, an empty key, or a key outside posters/ falls back to the default', () => {
+  test('no key, a bare prefix, a key outside posters/ or one climbing out falls back to the default', () => {
     expect(posterUrl(null)).toBeNull()
     expect(posterUrl('posters/')).toBeNull()
     expect(posterUrl('uploads/anything.jpg')).toBeNull()
+    expect(isPosterKey('posters/../secrets.txt')).toBe(false)
+    expect(isPosterKey('posters/a/..')).toBe(false)
     expect(DEFAULT_OG_IMAGE).toBe('/og-default.png')
+  })
+
+  // The files ship with K-126; this branch carries copies so a merge in the wrong order fails
+  // here rather than as a 404 on every shared link.
+  test('every picture the app names exists under public/', async () => {
+    const missing: string[] = []
+    for (const path of [...new Bun.Glob('**/*.{vue,ts}').scanSync({ cwd: 'app', onlyFiles: true })].map(file => join('app', file))) {
+      const source = await Bun.file(path).text()
+      for (const match of source.matchAll(/\/(?:images\/[\w-]+(?:\/[\w-]+)*\.[a-z0-9]+|og-default\.png)\b/g)) {
+        if (!await Bun.file(join('public', match[0])).exists()) missing.push(`${match[0]} (${path})`)
+      }
+    }
+    expect(await Bun.file(join('public', DEFAULT_OG_IMAGE)).exists()).toBe(true)
+    expect(missing).toEqual([])
   })
 })
 
@@ -175,8 +198,12 @@ describe('the old-site redirect map (K-125 criterion 5)', () => {
     expect(Object.values(OLD_SITE_REDIRECTS).filter(to => !to.startsWith('/') && !to.startsWith('https://'))).toEqual([])
   })
 
-  test('no address redirects to itself', () => {
-    expect(Object.entries(OLD_SITE_REDIRECTS).filter(([from, to]) => from === to)).toEqual([])
+  test('a bare path beside a wildcard row exists only where it lands somewhere else', () => {
+    const redundant = Object.keys(OLD_SITE_REDIRECTS)
+      .filter(from => from.endsWith('/**'))
+      .map(from => from.slice(0, -3))
+      .filter(bare => bare in OLD_SITE_REDIRECTS && OLD_SITE_REDIRECTS[bare] === OLD_SITE_REDIRECTS[`${bare}/**`])
+    expect(redundant).toEqual([])
   })
 
   test('the old show family lands on the show, and a receipt on ticket retrieval', () => {

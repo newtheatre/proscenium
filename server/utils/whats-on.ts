@@ -25,8 +25,14 @@ import type { SQL } from 'drizzle-orm'
 const listable = (at: number): SQL =>
   sql`p.status <> 'DRAFT' AND p.starts_at >= ${at}`
 
-// Published, and with something still to sell. A show whose last performance has passed drops off
-// the listing on its own, with nothing to sweep.
+// Listed, on an alias `s`: published, with a performance still to come, so a finished run drops off
+// on its own. The listing, its count and the sitemap all read this one predicate (K-125).
+export const listedShowPredicate = (at: number): SQL => sql`
+  s.status = 'PUBLISHED'
+  AND EXISTS (SELECT 1 FROM performances p
+               WHERE p.show_id = s.id AND p.status = 'ON_SALE' AND p.starts_at >= ${at})
+`
+
 export function listedShowsQuery(at: number, limit: number, offset: number): SQL {
   return sql`
     SELECT s.id AS id, s.slug AS slug, s.title AS title, s.subtitle AS subtitle,
@@ -39,21 +45,14 @@ export function listedShowsQuery(at: number, limit: number, offset: number): SQL
              WHERE p.show_id = s.id AND p.status = 'ON_SALE' AND p.starts_at >= ${at}) AS opensAt
     FROM shows s
     LEFT JOIN show_categories c ON c.id = s.category_id
-    WHERE s.status = 'PUBLISHED'
-      AND EXISTS (SELECT 1 FROM performances p
-                   WHERE p.show_id = s.id AND p.status = 'ON_SALE' AND p.starts_at >= ${at})
+    WHERE ${listedShowPredicate(at)}
     ORDER BY opensAt, s.title COLLATE NOCASE
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
 export function countListedShowsQuery(at: number): SQL {
-  return sql`
-    SELECT count(*) AS total FROM shows s
-    WHERE s.status = 'PUBLISHED'
-      AND EXISTS (SELECT 1 FROM performances p
-                   WHERE p.show_id = s.id AND p.status = 'ON_SALE' AND p.starts_at >= ${at})
-  `
+  return sql`SELECT count(*) AS total FROM shows s WHERE ${listedShowPredicate(at)}`
 }
 
 // The page's shows again as a subquery rather than an id list read back from the first result

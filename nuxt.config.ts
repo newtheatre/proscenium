@@ -1,10 +1,10 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import { OLD_SITE_REDIRECTS } from './shared/utils/redirects'
-import { PRODUCTION_SITE_URL, ROBOTS_DISALLOW, SITE_NAME } from './shared/utils/seo'
+import { PRODUCTION_SITE_URL, ROBOTS_DISALLOW, SITE_ADDRESS, SITE_NAME } from './shared/utils/seo'
 
-// The canonical address. A duplicate host (the pre-cutover one) sets NUXT_PUBLIC_SITE_URL to its
-// own, and server/plugins/site-indexable.ts keeps crawlers off it (K-125).
-const SITE_URL = process.env.NUXT_PUBLIC_SITE_URL ?? PRODUCTION_SITE_URL
+// One literal for the canonical address and for emailed links. Nuxt maps NUXT_PUBLIC_SITE_URL
+// and NUXT_PUBLIC_BASE_URL onto the two keys at request time, so nothing is read here (K-125).
+const SITE_URL = PRODUCTION_SITE_URL
 
 export default defineNuxtConfig({
 
@@ -96,8 +96,7 @@ export default defineNuxtConfig({
     public: {
       // Every emailed link is built from this. NUXT_PUBLIC_BASE_URL overrides it, and development
       // points at the local port so a verification link in .data/mail is one that works.
-      baseURL: process.env.NUXT_PUBLIC_BASE_URL
-        ?? (process.env.NODE_ENV === 'development' ? `http://localhost:${process.env.NUXT_PORT ?? 3000}` : 'https://newtheatre.org.uk'),
+      baseURL: process.env.NODE_ENV === 'development' ? `http://localhost:${process.env.NUXT_PORT ?? 3000}` : SITE_URL,
       // Declared here so a worker's NUXT_PUBLIC_SITE_URL reaches site config at request time.
       site: {
         url: SITE_URL,
@@ -226,12 +225,23 @@ export default defineNuxtConfig({
 
   image: { provider: 'none' },
 
-  // @nuxtjs/seo pulls in og-image, whose renderer needs a WASM dependency the worker bundle
-  // cannot externalise. Nothing uses OG images yet; enabling it is a deliberate Phase 2 act.
+  // Off: og-image's renderer needs a WASM dependency the worker bundle cannot externalise, so
+  // every page names a static file instead (K-125, docs/known-issues.md).
   ogImage: { enabled: false },
 
   robots: {
     disallow: ROBOTS_DISALLOW,
+  },
+
+  // The organisation node every page carries and a show's events point at as organiser (K-125).
+  schemaOrg: {
+    identity: {
+      '@type': ['Organization', 'PerformingArtsTheater'],
+      'name': SITE_NAME,
+      'url': SITE_URL,
+      'logo': '/images/logos/anniversary-grey.png',
+      'address': SITE_ADDRESS,
+    },
   },
 
   // Only the server source lists URLs: the page scan would offer every console and member

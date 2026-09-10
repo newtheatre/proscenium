@@ -271,14 +271,14 @@ pages the IT Manager as though it were.
 
 Three things belong to the same cutover day as the DNS flip above.
 
-**The pre-cutover host must not be indexed.** Set `NUXT_PUBLIC_SITE_URL` as a worker variable on
-the pre-cutover deployment to that host's own address (`https://proscenium.newtheatre.org.uk`).
-The application marks itself indexable only when the resolved site URL is `https://newtheatre.org.uk`
-(`server/plugins/site-indexable.ts`), so with the variable set the host answers `Disallow: /` and
-`noindex` everywhere, and its canonical links still point at the production address. At cutover,
-remove the variable: with nothing set, the default is the production address and the site indexes.
-Confirm afterwards by reading `/robots.txt` on the bare domain: it must list the closed prefixes,
-not `Disallow: /`.
+**The pre-cutover host is not indexed, and nothing has to be set for that.** The application
+marks itself indexable only when the request reached `https://newtheatre.org.uk`
+(`server/plugins/site-indexable.ts`), so any other host serving the same build answers
+`Disallow: /` and `noindex` everywhere. Setting `NUXT_PUBLIC_SITE_INDEXABLE` still overrides it,
+either way. Canonical links and sitemap addresses follow the site URL, which defaults to the
+production address; a host that wants them to name itself sets `NUXT_PUBLIC_SITE_URL` as a worker
+variable, as `NUXT_PUBLIC_BASE_URL` already does for emailed links. Confirm on cutover day by
+reading `/robots.txt` on the bare domain: it must list the closed prefixes, not `Disallow: /`.
 
 **Every public address of the old site answers 301.** The map is `OLD_SITE_REDIRECTS` in
 `shared/utils/redirects.ts`, read into `nuxt.config.ts` as route rules; `tests/e2e/seo.test.ts`

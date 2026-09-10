@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { PRODUCTION_SITE_URL, SITE_NAME } from '#shared/utils/seo'
-
 const { account } = useAccount()
 
 useSeoMeta({
@@ -8,16 +6,8 @@ useSeoMeta({
   description: 'The country\'s only entirely student-run theatre, at the University of Nottingham: what is on, how to book a ticket, and how to get involved.',
 })
 
-// The organisation, once, on the home page (K-125 criterion 4).
-useSchemaOrg([
-  defineOrganization({
-    '@type': ['Organization', 'PerformingArtsTheater'],
-    'name': SITE_NAME,
-    'url': PRODUCTION_SITE_URL,
-    'logo': '/images/logos/anniversary-grey.png',
-    'address': { addressLocality: 'Nottingham', addressCountry: 'GB' },
-  }),
-])
+// The one page whose title is already the house's name, so the site template would read it twice.
+useHead({ titleTemplate: '%s' })
 </script>
 
 <template>

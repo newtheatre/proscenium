@@ -5,7 +5,7 @@ import { adminSession } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import { OLD_SITE_REDIRECTS } from '#shared/utils/redirects'
-import { NOINDEX_PAGES, ROBOTS_DISALLOW, SITE_NAME } from '#shared/utils/seo'
+import { ROBOTS_DISALLOW, SITE_NAME } from '#shared/utils/seo'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -13,6 +13,8 @@ import type { TestMember } from '#tests/helpers/accounts'
 // an old address lands. The lists themselves are pinned in tests/unit/seo.test.ts.
 
 const skip = skipReason()
+// Criterion 6's list; the rule that makes them noindex is the disallow list itself.
+const NOINDEX_PAGES = ['/sign-in', '/register', '/reset', '/verify', '/magic', '/qr', '/board']
 const BOOT_TIMEOUT_MS = 180_000
 // A cold route compiles on first request, and several of these cases open a handful each.
 const CASE_TIMEOUT_MS = 120_000
@@ -108,10 +110,11 @@ describe.skipIf(skip !== null)('what a crawler is told (K-125 criteria 2 and 6)'
     // Anchored to the host, so /policies/rooms is not mistaken for /rooms.
     const listed = (path: string, beneath = false): RegExp =>
       new RegExp(`<loc>https?:\\/\\/[^/<]+${path.replace(/\//g, '\\/')}${beneath ? '(\\/[^<]*)?' : ''}<\\/loc>`)
-    for (const path of ['/whats-on', '/about', '/history', '/get-involved', '/policies/booking', '/training/modules', `/shows/${slug}`]) {
+    for (const path of ['/', '/whats-on', '/policies/booking', '/policies/rooms', '/training/modules', `/shows/${slug}`]) {
       expect(sitemap).toMatch(listed(path))
     }
-    for (const path of ['/admin', '/account', '/sign-in', '/docs', '/tonight', '/rooms']) {
+    // A placeholder page is not offered, and nothing behind an account is.
+    for (const path of ['/about', '/history', '/admin', '/account', '/sign-in', '/docs', '/tonight', '/rooms']) {
       expect(sitemap).not.toMatch(listed(path, true))
     }
   }, CASE_TIMEOUT_MS)
@@ -179,6 +182,12 @@ describe.skipIf(skip !== null)('every old-site address answers 301 (K-125 criter
       expect(resolve(response.headers.get('location') ?? '')).toBe(resolve(to!))
     }
   }, CASE_TIMEOUT_MS)
+
+  test('a wildcard row answers its bare path too', async () => {
+    const response = await fetch(`${app.baseURL}/mailing-list`, { redirect: 'manual' })
+    expect(response.status).toBe(301)
+    expect(resolve(response.headers.get('location') ?? '')).toBe(resolve(OLD_SITE_REDIRECTS['/mailing-list/**']!))
+  })
 
   test('the what\'s-on listing itself is untouched', async () => {
     const response = await fetch(`${app.baseURL}/whats-on`, { redirect: 'manual' })

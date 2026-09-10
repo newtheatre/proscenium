@@ -559,9 +559,10 @@ Stories: 29. Phases: 24 MVP, 0 V2, 0 Later, 5 resolved.
   4. Structured data: the organisation on the home page, a `TheaterEvent` with offers per
      performance on a show page, breadcrumbs on content pages, each checked by a test.
   5. Every public URL of the old site (the `main` branch) answers a 301 to its unified
-     equivalent through `routeRules`, and an integration test hits each. The map, and the DNS
-     rule forwarding the `rooms.` and `training.` subdomains, live in the cutover runbook in
-     `docs/operations.md`.
+     equivalent through `routeRules`, or through a server route where a rule cannot express
+     the mapping, and an end-to-end test hits each against the live server. The map, and the
+     DNS rule forwarding the `rooms.` and `training.` subdomains, live in the cutover runbook
+     in `docs/operations.md`.
   6. Auth and utility pages (`/sign-in`, `/register`, `/reset`, `/verify`, `/magic`, `/qr`,
      `/board`) are marked `noindex`.
 - Source: Pre-cutover review, 10 September 2026. `@nuxtjs/seo` was installed on its defaults

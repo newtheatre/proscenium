@@ -117,26 +117,30 @@ how copy the committee has not yet supplied reaches the site honestly rather tha
 `@nuxtjs/seo` runs on the lists in `shared/utils/seo.ts`, which `tests/unit/seo.test.ts` holds
 against the navigation declaration so a screen cannot be indexed, or hidden, by accident:
 
-- **Site.** `site.url` defaults to the production address and `NUXT_PUBLIC_SITE_URL` overrides it
-  at request time (declared under `runtimeConfig.public.site` so a worker variable reaches it).
-  `server/plugins/site-indexable.ts` marks the site indexable only when the resolved URL is the
-  production one, which is what keeps a duplicate host out of search; a dev server always indexes
-  so its output can be read as production's.
-- **Titles.** `app/plugins/seo.ts` sets one template, `titleFor()`: the page title, a bar, the
-  house name, except where the title already is the house name.
+- **Site.** One literal, `PRODUCTION_SITE_URL`, is the default for `site.url` (canonicals, the
+  sitemap) and `runtimeConfig.public.baseURL` (emailed links); `NUXT_PUBLIC_SITE_URL` and
+  `NUXT_PUBLIC_BASE_URL` override each at request time through Nuxt's own env mapping.
+  `server/plugins/site-indexable.ts` marks the site indexable only when the request reached the
+  production origin, pushed below every configured source so `NUXT_PUBLIC_SITE_INDEXABLE` still
+  wins; a dev server always indexes so its output can be read as production's.
+- **Titles.** The template is `nuxt-seo-utils`' own, built from `site.name`; the home page alone
+  sets `titleTemplate: '%s'`, its title already being the house's name.
 - **Crawling.** `ROBOTS_DISALLOW` feeds `/robots.txt`, and the robots module derives each page's
   `<meta name="robots">` and `X-Robots-Tag` from the same list, so the auth and utility pages are
   `noindex` without a per-page declaration.
 - **The sitemap.** Only `server/api/__sitemap__/urls.get.ts` supplies URLs (`excludeAppSources`):
-  the home page, `PUBLIC_NAV`, every public content page, every show the what's-on listing would
-  show, and every published module. The disallow list is its final filter.
+  the home page, `PUBLIC_NAV`, every content page not marked `placeholder`, every show the
+  what's-on listing would show (`listedShowPredicate`, shared with the listing) and every active
+  module. The sitemap module then drops whatever the robots rules disallow, so the source applies
+  no filter of its own.
 - **Sharing.** `app.vue` names `public/og-default.png` for every page; a show page names its
-  poster instead when `posterUrl` is set, which `posterUrl()` derives from a blob key under
-  `posters/` served by `server/routes/posters/`. The image renderer stays off
-  (`docs/known-issues.md`).
-- **Structured data.** The home page defines the organisation as a `PerformingArtsTheater`, a
-  show page one `TheaterEvent` per performance with an `Offer` per price, and the content
-  catch-all a two-step `BreadcrumbList`.
+  poster instead when `posterUrl` is set, which `posterUrl()` derives from a blob key that
+  `isPosterKey()` accepts, served by `server/routes/posters/` under the same rule. The image
+  renderer stays off (`docs/known-issues.md`).
+- **Structured data.** `schemaOrg.identity` in `nuxt.config.ts` is the organisation, typed
+  `PerformingArtsTheater`, on every page; a show page adds one `TheaterEvent` per performance
+  with an `Offer` per price pointing at the show page and the identity as organiser; the content
+  catch-all adds a two-step `BreadcrumbList`.
 - **Old addresses.** `shared/utils/redirects.ts` maps every public URL of the old site, and
   `nuxt.config.ts` turns the map into 301 route rules. The one family a rule cannot express,
   `/whats-on/<slug>` and the booking pages under it, is answered by `server/routes/whats-on/`,

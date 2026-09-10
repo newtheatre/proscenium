@@ -1,7 +1,9 @@
 <script setup lang="ts">
-// The house image for any shared link; a page with a picture of its own overrides it (K-126).
+import { DEFAULT_OG_IMAGE } from '#shared/utils/seo'
+
+// The house image for any shared link; a page with a picture of its own overrides it (K-125).
 useSeoMeta({
-  ogImage: '/og-default.png',
+  ogImage: DEFAULT_OG_IMAGE,
   twitterCard: 'summary_large_image',
 })
 </script>
