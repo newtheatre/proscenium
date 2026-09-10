@@ -270,7 +270,7 @@ export interface ReservationCurrentState {
 }
 
 // What the QR answers when it is presented: live, from this row, never from anything saved
-// earlier (D-108 criterion 1). "Exchanged" and "wrong night" await D-111 and D-126.
+// earlier (D-108 criterion 1). "Exchanged" awaits D-111; "wrong night" is the door's own query.
 export function reservationCurrentStateQuery(id: string): SQL {
   return sql`
     SELECT r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
@@ -285,6 +285,36 @@ export function reservationCurrentStateQuery(id: string): SQL {
 
 export async function reservationCurrentState(id: string): Promise<ReservationCurrentState | undefined> {
   const [row] = await db.all<ReservationCurrentState>(reservationCurrentStateQuery(id))
+  return row
+}
+
+export interface DoorReservationRow {
+  id: string
+  reference: string
+  status: string
+  cancelledBy: string | null
+  performanceId: string
+  showTitle: string
+  startsAt: number
+  totalPence: number
+}
+
+// By reference alone, not scoped to the performance selected at the door (E-127 criterion 3): a
+// mismatch is a fact this reports, never a row the query already filtered out.
+export function reservationForDoorQuery(reference: string): SQL {
+  return sql`
+    SELECT r.id AS id, r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
+           r.performance_id AS performanceId, s.title AS showTitle, p.starts_at AS startsAt,
+           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence
+    FROM reservations r
+    JOIN performances p ON p.id = r.performance_id
+    JOIN shows s ON s.id = p.show_id
+    WHERE r.reference = ${reference.toUpperCase()}
+  `
+}
+
+export async function reservationForDoor(reference: string): Promise<DoorReservationRow | undefined> {
+  const [row] = await db.all<DoorReservationRow>(reservationForDoorQuery(reference))
   return row
 }
 

@@ -5,6 +5,7 @@ import {
   heldAccessCountsQuery,
   namedTicketLinesQuery,
   reservationCurrentStateQuery,
+  reservationForDoorQuery,
   reservationForResendQuery,
   selfServiceReservationQuery,
 } from '#server/utils/reservations'
@@ -159,6 +160,50 @@ describe('a resend reads the booker, the template fields and a summed total in o
   test('an unknown reference reads nothing, the shape a refused enumeration attempt gets', async () => {
     await withDatabase((database) => {
       expect(read(database, reservationForResendQuery('ZZZZZZ'))).toEqual([])
+    })
+  })
+})
+
+describe('the door reads a reservation by reference alone, not scoped to a performance (E-127 criterion 3)', () => {
+  test('carries the performance it actually belongs to, for a door that chose a different one', async () => {
+    await withDatabase((database) => {
+      const matinee = tonightsPerformance(database, { suffix: 'matinee' })
+      const evening = tonightsPerformance(database, { suffix: 'evening', venueId: matinee.venueId })
+      user(database, 'u-1', 'booker@example.invalid')
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-1', 'ABCDEF', matinee.performanceId, 'u-1', 'COLLECTED', 'WEB'],
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+          't-1', 'r-1', matinee.performanceId, 'tt-standard', 900, 'BASE'],
+      ])
+
+      const [found] = read<{ id: string, status: string, performanceId: string, showTitle: string }>(
+        database, reservationForDoorQuery('ABCDEF'),
+      )
+      expect(found?.id).toBe('r-1')
+      expect(found?.status).toBe('COLLECTED')
+      expect(found?.performanceId).toBe(matinee.performanceId)
+      expect(found?.performanceId).not.toBe(evening.performanceId)
+    })
+  })
+
+  test('matches regardless of the case typed at the door', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'booker@example.invalid')
+      database.batch([
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-1', 'ABCDEF', seeded.performanceId, 'u-1', 'PENDING', 'WEB'],
+      ])
+
+      expect(read(database, reservationForDoorQuery('abcdef'))).toHaveLength(1)
+    })
+  })
+
+  test('an unknown reference reads nothing', async () => {
+    await withDatabase((database) => {
+      expect(read(database, reservationForDoorQuery('ZZZZZZ'))).toEqual([])
     })
   })
 })

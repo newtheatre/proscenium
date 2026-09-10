@@ -187,6 +187,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['pass.redeemed', 'reservation.admitted'],
     via: ['server/utils/pass-redemption.ts', 'server/utils/door.ts'],
   },
+  {
+    route: 'server/api/tonight/door/tickets/scan.post.ts',
+    actions: ['reservation.admitted'],
+    via: ['server/utils/door.ts'],
+  },
   { route: 'server/api/admin/programme/shows.get.ts', exempt: 'reads the show picker, drafts included' },
   { route: 'server/api/admin/venues/index.get.ts', exempt: 'reads the venues a performance may be put in' },
   { route: 'server/api/admin/shows/index.get.ts', exempt: 'reads the programme, drafts included' },
