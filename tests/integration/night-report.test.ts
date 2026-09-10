@@ -99,6 +99,21 @@ describe('takings (criteria 1, 2)', () => {
     })
   })
 
+  // I-103 criterion 1: a comp is reportable per show whichever module gave it away, not only a
+  // desk one. Bar's own comp (F-110) is the same shape as ticketing's (D-114), read here as TILL.
+  test('a bar comp and a bar discount are foregone revenue too, the same as a desk one', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      entry(database, 'e-bar-comp', 'TILL', 'COMP')
+      line(database, 'l-bar-comp', 'e-bar-comp', tonight.performanceId, 450)
+      entry(database, 'e-bar-discount', 'TILL', 'CARD')
+      line(database, 'l-bar-discount', 'e-bar-discount', tonight.performanceId, 380, 20)
+
+      const [row] = read<{ compsPence: number, discountsPence: number }>(database, reportForegoneQuery(tonight.performanceId, 'TILL'))
+      expect(row).toMatchObject({ compsPence: 450, discountsPence: 20 })
+    })
+  })
+
   test('a reversal nets against what it reverses, since both are summed rather than one excluded', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
