@@ -48,6 +48,7 @@ const CATALOGUE = {
   'account.erased': { label: 'Account closed by its owner', module: 'identity', self: true },
   'account.erased.admin': { label: 'Account erased by an officer', module: 'identity' },
   'account.erased.system': { label: 'Account erased automatically', module: 'identity' },
+  'account.merged': { label: 'Merged into another account', module: 'identity' },
 
   'session.started': { label: 'Signed in with a password', module: 'identity', self: true },
   'session.started.google': { label: 'Signed in with Google', module: 'identity', self: true },

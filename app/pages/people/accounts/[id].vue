@@ -14,10 +14,68 @@ interface View {
   history: { action: string, target: string | null, createdAt: number, byThem: boolean }[]
 }
 
+interface MergeCounts { bookings: number, records: number, shifts: number, memberships: number, grants: number }
+interface MergePreview { winner: { id: string, name: string, email: string }, loser: { id: string, name: string, email: string }, counts: MergeCounts }
+interface DirectoryItem { id: string, name: string, email: string }
+
 const route = useRoute()
 const view = ref<View | null>(null)
 const failure = ref<string | null>(null)
 const working = ref('')
+
+// The account this page shows is always the losing side: merging it away is one of its own
+// security-adjacent actions, the same way disabling or erasing it is (A-123).
+const mergeSearch = ref('')
+const mergeFailure = ref<string | null>(null)
+const mergePreview = ref<MergePreview | null>(null)
+const mergeConfirmEmail = ref('')
+const mergeWorking = ref(false)
+
+async function previewMerge(): Promise<void> {
+  mergeFailure.value = null
+  mergePreview.value = null
+  mergeWorking.value = true
+  try {
+    const found = await $fetch<{ items: DirectoryItem[] }>('/api/admin/accounts', { query: { search: mergeSearch.value, pageSize: 5 } })
+    const winner = found.items.find(item => item.email.toLowerCase() === mergeSearch.value.trim().toLowerCase())
+    if (!winner) {
+      mergeFailure.value = 'No account matches that email exactly.'
+      return
+    }
+    mergePreview.value = await $fetch<MergePreview>(`/api/admin/accounts/${route.params.id}/merge-preview`, {
+      method: 'POST',
+      body: { winnerId: winner.id },
+    })
+  }
+  catch (error) {
+    mergeFailure.value = refusalText(error)
+  }
+  finally {
+    mergeWorking.value = false
+  }
+}
+
+async function confirmMerge(): Promise<void> {
+  if (!mergePreview.value) return
+  mergeFailure.value = null
+  mergeWorking.value = true
+  try {
+    await $fetch(`/api/admin/accounts/${route.params.id}/merge`, {
+      method: 'POST',
+      body: { winnerId: mergePreview.value.winner.id, confirmEmail: mergeConfirmEmail.value },
+    })
+    mergePreview.value = null
+    mergeSearch.value = ''
+    mergeConfirmEmail.value = ''
+    await load()
+  }
+  catch (error) {
+    mergeFailure.value = refusalText(error)
+  }
+  finally {
+    mergeWorking.value = false
+  }
+}
 
 async function load(): Promise<void> {
   failure.value = null
@@ -239,6 +297,88 @@ onMounted(load)
           >
             Reset the authenticator
           </UButton>
+        </div>
+      </UPageCard>
+
+      <UPageCard
+        v-if="!view.account.anonymisedAt"
+        data-test="merge"
+        title="Merge into another account"
+        description="A dry run first: nothing changes until the losing account's email is typed back as confirmation."
+      >
+        <UAlert
+          v-if="mergeFailure"
+          data-test="merge-failure"
+          color="error"
+          variant="subtle"
+          :description="mergeFailure"
+          class="mb-3"
+        />
+
+        <div
+          v-if="!mergePreview"
+          class="flex flex-wrap items-end gap-2"
+        >
+          <UFormField label="Winning account's email">
+            <UInput
+              v-model="mergeSearch"
+              data-test="merge-search"
+              type="email"
+              placeholder="winner@example.com"
+            />
+          </UFormField>
+          <UButton
+            data-test="merge-preview"
+            variant="subtle"
+            :loading="mergeWorking"
+            :disabled="!mergeSearch.trim()"
+            @click="previewMerge"
+          >
+            Preview the merge
+          </UButton>
+        </div>
+
+        <div
+          v-else
+          data-test="merge-preview-result"
+          class="space-y-3"
+        >
+          <p class="text-sm">
+            <span class="font-medium">{{ view.account.email }}</span> moves into
+            <span class="font-medium">{{ mergePreview.winner.email }}</span> and becomes a tombstone.
+            Nothing here is undone once confirmed.
+          </p>
+          <ul class="list-inside list-disc text-sm">
+            <li>{{ plural(mergePreview.counts.bookings, 'booking') }}</li>
+            <li>{{ plural(mergePreview.counts.records, 'training record') }}</li>
+            <li>{{ plural(mergePreview.counts.shifts, 'shift') }}</li>
+            <li>{{ plural(mergePreview.counts.memberships, 'membership') }}</li>
+            <li>{{ plural(mergePreview.counts.grants, 'role grant') }}</li>
+          </ul>
+          <UFormField :label="`Type ${view.account.email} to confirm`">
+            <UInput
+              v-model="mergeConfirmEmail"
+              data-test="merge-confirm-email"
+            />
+          </UFormField>
+          <div class="flex gap-2">
+            <UButton
+              data-test="merge-confirm"
+              color="error"
+              variant="subtle"
+              :loading="mergeWorking"
+              :disabled="mergeConfirmEmail.trim().toLowerCase() !== view.account.email.toLowerCase()"
+              @click="confirmMerge"
+            >
+              Merge the accounts
+            </UButton>
+            <UButton
+              variant="ghost"
+              @click="mergePreview = null; mergeConfirmEmail = ''"
+            >
+              Cancel
+            </UButton>
+          </div>
         </div>
       </UPageCard>
 

@@ -51,9 +51,11 @@ function entry(database: TestDatabase, id: string, source: string, tender: strin
     id, '2026-09-10', source, tender]])
 }
 
-function line(database: TestDatabase, id: string, entryId: string, performanceId: string, amountPence: number, discountPence = 0): void {
-  database.batch([['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, discount_pence, performance_id) VALUES (?, ?, ?, ?, ?, ?)',
-    id, entryId, 'TICKET', amountPence, discountPence, performanceId]])
+// `unitPricePence` defaults to `amountPence` for an ordinary sale line; a comp line passes them
+// apart, since a real comp always posts amount_pence 0 with the retail price on unit_price_pence.
+function line(database: TestDatabase, id: string, entryId: string, performanceId: string, amountPence: number, discountPence = 0, unitPricePence = amountPence): void {
+  database.batch([['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, discount_pence, unit_price_pence, performance_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    id, entryId, 'TICKET', amountPence, discountPence, unitPricePence, performanceId]])
 }
 
 describe('attendance (criterion 1)', () => {
@@ -108,7 +110,9 @@ describe('takings (criteria 1, 2)', () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       entry(database, 'e-comp', 'DESK', 'COMP')
-      line(database, 'l-comp', 'e-comp', tonight.performanceId, 900)
+      // amount_pence 0, the real shape a comp line posts (D-114): the retail price sits on
+      // unit_price_pence, so a query summing amount_pence for a comp would silently read zero.
+      line(database, 'l-comp', 'e-comp', tonight.performanceId, 0, 0, 900)
       entry(database, 'e-discount', 'DESK', 'CARD')
       line(database, 'l-discount', 'e-discount', tonight.performanceId, 800, 100)
 
@@ -123,7 +127,7 @@ describe('takings (criteria 1, 2)', () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       entry(database, 'e-bar-comp', 'TILL', 'COMP')
-      line(database, 'l-bar-comp', 'e-bar-comp', tonight.performanceId, 450)
+      line(database, 'l-bar-comp', 'e-bar-comp', tonight.performanceId, 0, 0, 450)
       entry(database, 'e-bar-discount', 'TILL', 'CARD')
       line(database, 'l-bar-discount', 'e-bar-discount', tonight.performanceId, 380, 20)
 

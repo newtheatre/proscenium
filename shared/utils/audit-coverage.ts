@@ -34,6 +34,15 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/account/mfa/index.delete.ts', actions: ['mfa.removed'] },
   { route: 'server/api/account/mfa/recovery-codes.post.ts', actions: ['mfa.recovery-codes.minted'] },
   {
+    route: 'server/api/admin/accounts/[id]/merge-preview.post.ts',
+    exempt: 'a dry run: nothing changes until the confirmed merge route runs',
+  },
+  {
+    route: 'server/api/admin/accounts/[id]/merge.post.ts',
+    actions: ['account.merged'],
+    via: ['server/utils/account-merge.ts'],
+  },
+  {
     route: 'server/api/admin/accounts/[id]/security.post.ts',
     actions: ['account.disabled', 'account.enabled', 'session.revoked', 'mfa.reset', 'account.erased.admin'],
     via: ['server/utils/erasure.ts'],
