@@ -56,6 +56,9 @@ export const PERMISSIONS = [
   // Narrowing what a pass product already covers once it has live passes against it: general
   // box office is not enough, echoing D-117's comp approval (D-123 criterion 4).
   'ticketing.manage',
+  // Taking a copy of season sales for reporting: general box office duty, distinct from the
+  // programme's own configuration (D-129).
+  'ticketing.export',
   // Approving a refund: general box office is not enough (D-116 criterion 2). Tonight's
   // confirmed duty manager reaches the same approval without holding it (0009).
   'money.refund',
@@ -97,6 +100,12 @@ export const PERMISSIONS = [
   // The treasurer's own read over the ledger: comps, discounts and the reports built on them.
   // No distinct permission existed before I-103; every report routed through `bar.read` instead.
   'finance.read',
+  // Composing a fan-out to a resolved audience (H-108). Open question 1 asks which roles beyond
+  // ADMIN and whether a whole-membership send needs a second officer; unanswered, so narrow.
+  'comms.announce',
+  // The send log and one person's history within it, the latter audited on its own (H-106
+  // criterion 5). Who beyond ADMIN holds this awaits the same open question.
+  'comms.operations',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
@@ -118,7 +127,7 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   TRAINING_MANAGER: ['accounts.read', 'members.read', 'rooms.read', 'training.leads', 'training.read', 'training.revoke', 'training.write'],
   // Owns the programme's configuration. Nothing operational is here: the door and the desk
   // derive from tonight's performance and shift (0009).
-  BOX_OFFICE: ['ticketing.read', 'ticketing.write'],
+  BOX_OFFICE: ['ticketing.read', 'ticketing.write', 'ticketing.export'],
   // Administers the rota in advance, and opens the door and duty manager screens without a shift
   // tonight. The till is the bar manager's (0044, 0046, E-101 criterion 2).
   FOH_MANAGER: ['night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write'],

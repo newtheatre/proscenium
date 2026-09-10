@@ -522,9 +522,37 @@ natural-key lookup that makes a builder re-runnable is not available. Both doors
 `shared/utils/personas.ts` registry and write the same `personas.json` map, so they agree
 whichever runs first.
 
+## Sending an announcement (H-108)
+
+`/comms/announce`, behind `comms.announce`, composes to an audience resolved fresh from live
+data at send time: all current members, holders of a named role, tonight's rota, or a training
+session's sign-ups (the last taken by id, typed in, since no session picker exists yet). Preview
+before sending: it renders the message and counts the audience without sending anything. Sending
+is one `notify()` call per recipient, so nobody on the list ever sees another's address, and
+writes one audit entry naming the sender, the audience and the count, never the subject or body.
+
+Flagging a safety notice sends it as a different, transactional message type: it ignores the
+announcements preference entirely, the same as a ticket or a refund would.
+
+## Checking whether a message sent (H-106)
+
+`/comms/operations`, behind the `comms.operations` permission, answers "did the reminder go out"
+without a database query. It filters `notification_log` by type, topic, channel, outcome and date
+range, paged in SQL, and shows daily counts by type and outcome so a provider outage over a
+weekend shows as a dip rather than nothing. A suppressed-by-preference send reads as its own
+outcome there, never as a failure: chasing it is chasing something that correctly did not go.
+
+Opening one person's history from a row (`/comms/operations/accounts/[id]`) answers a support
+query with types, dates and outcomes only, never a message body; every such view writes a
+`notifications.history.viewed` audit entry regardless of what it finds.
+
 ## Not built yet
 
 Named here so nobody looks for it: the operator documentation published in-app (J-109), which is
 where the restore drill procedure belongs once it exists (J-107 criterion 5). The retention sweep
 is built and documented above; what it still waits on is a warning cadence and, in December, an
 arming (A-126, K-111).
+
+H-106's own criterion 2, the manual re-send action, still waits: `retry_payload` is cleared by
+the time a row reaches `FAILED_FINAL`, so resending has to rebuild the message from source, per
+sender, a registry nothing has built yet. `docs/known-issues.md` carries the detail.

@@ -4,6 +4,7 @@ import {
   exportAgeChecks,
   reachConsole,
   runTrainingSessions,
+  sendAnnouncements,
   signedIn,
   verifyAccessProfiles,
   viewAccounts,
@@ -13,6 +14,7 @@ import {
   viewBarStock,
   viewBoardConfig,
   viewChecklist,
+  viewCommsOperations,
   viewEmergencyCard,
   viewFellows,
   viewFinanceReports,
@@ -170,7 +172,16 @@ export const CONSOLE_NAV: NavGroup[] = [
   },
 
   // Module H: communications
-  { key: 'comms', label: 'Communications', icon: 'i-lucide-send', prefix: '/comms', items: [] },
+  {
+    key: 'comms',
+    label: 'Communications',
+    icon: 'i-lucide-send',
+    prefix: '/comms',
+    items: [
+      { label: 'Announce', icon: 'i-lucide-megaphone', to: '/comms/announce', ability: sendAnnouncements },
+      { label: 'Send log', icon: 'i-lucide-list', to: '/comms/operations', ability: viewCommsOperations },
+    ],
+  },
 
   // Module J: governance
   {

@@ -407,6 +407,22 @@ export const MESSAGE_TYPES = {
 
   // Module H: communications
 
+  // An officer's fan-out to a resolved audience (H-108). Carries the committee-announcements
+  // topic, so a member who muted announcements is not reached by this one.
+  'admin.announcement': {
+    topic: 'ANNOUNCEMENTS',
+    channels: ['EMAIL', 'INBOX'],
+    template: 'admin-announcement',
+  },
+
+  // The same composer, flagged transactional at the type level rather than at the call site
+  // (H-103 criterion 1, H-108 criterion 3): a safety notice reaches its audience regardless.
+  'admin.safety-notice': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'admin-announcement',
+  },
+
   // Module I: finance
 
   // Module J: governance
