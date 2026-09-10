@@ -1,0 +1,35 @@
+# Lives here, not only on unified/main, because GitHub only reads a schedule: trigger from a
+# workflow file on the repository's default branch. The checkout below is pinned to unified/main,
+# where the unified system's code and its own copy of this file actually live until cutover.
+# Remove the explicit ref at cutover, when unified/main becomes main and checking out the default
+# branch is checking out the same code again.
+#
+# Not on every pull request there either: these drive a real browser against a dev server, take
+# minutes rather than seconds, and are the suite a person runs deliberately (0029).
+name: End-to-end
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: unified/main
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: End-to-end suites
+        run: bun run test:e2e
