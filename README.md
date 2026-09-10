@@ -49,12 +49,12 @@ Before opening a pull request, run what CI gates on:
 bun run lint
 bun run typecheck
 bun run typecheck:bun
-bun run check:comments
-bun run check:migrations
-bun run check:content-tokens
-bun run check:ledger
-bun run check:notifications
-bun run check:audit
+bun run check comments
+bun run check migrations
+bun run check content-tokens
+bun run check ledger
+bun run check notifications
+bun run check audit
 bun run test
 bun run test:e2e
 bun run build

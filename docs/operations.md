@@ -80,6 +80,18 @@ Applying and deploying cannot be sequenced from CI: the migration job and Worker
 from the same push and race. The health check below is what makes losing that race visible rather
 than silent. **Anything destructive is applied by hand, before merging.**
 
+The health check is its own job, `health`, gated on `migrate` succeeding first. Reading the two
+apart matters: `migrate` red is a schema problem, restore from its own bookmark; `migrate` green
+with `health` red is the ordering race above, which resolves itself once Workers Builds catches
+up. One job carrying both readings is how 21 real failures of this exact race went unattributed
+before the split.
+
+`health`'s target is `${{ vars.HEALTH_URL }}`, a variable on the `production` GitHub environment,
+never a literal in the workflow file. There is no fallback: the job fails fast naming the missing
+variable rather than silently checking the wrong system. **This is also cutover's whole mechanism
+for this job**: pointing `HEALTH_URL` at the unified deploy, and back again if cutover needs to
+reverse, is a value change in the environment's settings, not a pull request.
+
 ### Applying a destructive migration by hand (K-107 criterion 3)
 
 `check-migrations` refuses a generated rebuild outright (0010, 0052). Splitting the change so no
@@ -223,12 +235,13 @@ batch). No second screen, and no import step precedes it.
 
 A 503 naming migrations means the deploy won the race. Run the migrate workflow by hand.
 
-**Nothing watches it from outside on its own** (J-106 criterion 3): `.github/workflows/migrate.yml`
-polls it once, with retries, right after applying migrations, and `.github/workflows/health-watch.yml`
-polls it on a schedule so a Workers Builds deploy that touches no migration is still caught. Neither
-can be sequenced against the other pipeline's completion; both fail the GitHub Actions run loudly
-rather than passing silently. The `health:watch` task below is the third leg, for sustained
-unhealthiness reaching the IT Manager rather than a CI log.
+**Nothing watches it from outside on its own** (J-106 criterion 3): `migrate.yml`'s own `health`
+job polls it once, with retries, right after `migrate` applies and verifies the schema, and
+`.github/workflows/health-watch.yml` polls it on a schedule so a Workers Builds deploy that
+touches no migration is still caught. Neither can be sequenced against the other pipeline's
+completion; both fail the GitHub Actions run loudly rather than passing silently. The
+`health:watch` task below is the third leg, for sustained unhealthiness reaching the IT Manager
+rather than a CI log.
 
 ## Changing a published rule
 

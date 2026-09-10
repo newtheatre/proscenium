@@ -75,7 +75,7 @@ describe('every shared registry carries a banner per module', () => {
   }
 
   // A banner directly above another comment reads as one block, and a block over two lines fails
-  // check:comments. The blank line between them is what keeps the banner its own block.
+  // `check comments`. The blank line between them is what keeps the banner its own block.
   test('a banner is followed by code or a blank line, never by another comment', async () => {
     for (const file of REGISTRIES) {
       const lines = (await Bun.file(file).text()).split('\n')

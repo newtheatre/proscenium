@@ -570,7 +570,7 @@ index and a trigger on `ledger_lines` (`ledger_lines_ticket_collection_once`,
 `ledger_lines_ticket_collection_needs_collected_reservation`) enforce that a ticket is collected
 once, ever, and that a line can only exist for a reservation the same batch actually collected,
 so a lost race aborts the whole transaction rather than posting money for nothing (0001, I-102
-criterion 6); `check:migrations` refuses a rebuild of `ledger_lines` against a `restrict`
+criterion 6); `check migrations` refuses a rebuild of `ledger_lines` against a `restrict`
 dependent for exactly this reason, so the guard is index and trigger only. `COMP` needs a reason
 and is refused outright without `ticketing.manage` (committee decision): an ordinary desk officer
 cannot self-approve one, though whoever does hold the permission still approves their own; D-117's
@@ -736,7 +736,7 @@ unique where not null so a charge voids once · `void_reason` NULL, free text, o
 and off the audit trail (0011) · `created_at`.
 Exception to append-only: none. Even voids and refunds are new reversing rows, and
 `ledger_entries_no_self_reversal` refuses an entry that claims to reverse itself.
-`server/utils/ledger.ts` is the only writer; `check:ledger` fails the build on any other file
+`server/utils/ledger.ts` is the only writer; `check ledger` fails the build on any other file
 that inserts into either table. `postEntry` returns statements rather than writing them, so
 money and the thing it paid for commit in one batch (0001, I-102 criterion 6).
 
@@ -1418,7 +1418,7 @@ after the term is gone is a form nobody withdraws, and it still sends one messag
 
 **A request moves between the two tables rather than being cancelled and re-asked** (C-123).
 Neither `status` set can gain a value: both carry a `CHECK` and both tables have cascading
-dependents, so `check:migrations` refuses the rebuild. So a move is a **supersede**, the habit the
+dependents, so `check migrations` refuses the rebuild. So a move is a **supersede**, the habit the
 rest of the estate already has: the old row goes to `CANCELLED` carrying `converted_to_request_id`
 or `converted_to_booking_id`, and the new row points back the other way. **A cancellation carrying
 one of those pointers must never display as "Cancelled"**: `saysBookingState` and
@@ -2069,7 +2069,7 @@ of actions: each carries a label and the module it belongs to, and `auditEntry` 
 is not in it, so a typo cannot create a category and the screen always has something to display.
 The modules are `identity`, `spaces`, `ticketing`, `show-night`, `bar`, `training`,
 `communications`, `finance` and `governance`, which is what the trail's module filter offers.
-`shared/utils/audit-coverage.ts` says which route answers for which entry, and `check:audit` fails
+`shared/utils/audit-coverage.ts` says which route answers for which entry, and `check audit` fails
 the build when a mutating route is missing from it, claims an action it does not write, or is
 exempt without a reason (J-101 criterion 5). A state change records `changes: { field: { from, to } }`,
 one shape whatever endpoint wrote it (J-101 criterion 4); a settings change whose value is

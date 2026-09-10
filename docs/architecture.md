@@ -218,7 +218,7 @@ and exports are queries over the ledger; no module keeps its own money totals.
 `postEntry(input, at?)` validates the entry, computes its total from its lines and **returns the
 statements the caller batches**. It performs no write of its own, because money and the thing it
 paid for commit together or not at all (0001, I-102 criterion 6), and only the caller knows what
-the other half of the batch is. Nothing else writes to the ledger tables: `check:ledger` fails the
+the other half of the batch is. Nothing else writes to the ledger tables: `check ledger` fails the
 build on any file under `server/` other than `server/utils/ledger.ts` that does, and on any script
 that reaches the tables in raw SQL.
 
@@ -314,7 +314,7 @@ without naming it).
 | Cron (UTC) | Task | Does |
 | --- | --- | --- |
 | `*/10 * * * *` | `holds:release` | Sends pre-expiry hold reminders (`HOLD_REMINDER_MINUTES_BEFORE`, 60 by default), then releases expired reservation holds (D-106, D-107). The one task that changes booking state, and only ever in the direction the customer was warned about. The waiting-list cascade is D-113's, not yet built. |
-| `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). The CI-side "after every deploy" half of criterion 3 is `.github/workflows/health-watch.yml` and a step at the end of `migrate.yml`, both outside the application. |
+| `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). The CI-side "after every deploy" half of criterion 3 is `.github/workflows/health-watch.yml` and `migrate.yml`'s own `health` job, both outside the application. |
 | `*/10 * * * *` | `notifications:retry` | Sends failed messages again, one claimed row at a time, when the doubling backoff since enqueue has passed (`NOTIFICATION_RETRY_BACKOFF_MINUTES`, 10 by default); marks an entry `FAILED_FINAL` once `NOTIFICATION_MAX_ATTEMPTS` is spent, so five attempts span about two and a half hours. Every guard runs again on each attempt, so an address change, a preference change or an erasure in between is honoured (H-105, 0056). Capped at 100 rows a run. |
 | `0 6 * * *` | `training:expiry-sweep` | Expiry warnings and digests (dry-run gated). |
 | `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or an unconfirmed duty manager, the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |

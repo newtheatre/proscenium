@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { join } from 'node:path'
 
 // Proves the copy against a scratch database seeded with the real old shape (0010), since
-// `check:migrations` cannot see a silently omitted or mis-copied column.
+// `check migrations` cannot see a silently omitted or mis-copied column.
 
 const MIGRATIONS_DIR = 'server/db/migrations/sqlite'
 const REBUILD_TAG = '0073_the_venue_emergency_card_is_versioned_and_append_only'
