@@ -130,6 +130,45 @@ CHECK `expires_on > starts_on`. Current membership = today inside the term or in
 `MEMBERSHIP_GRACE_DAYS` after it, read at query time (0031). A renewal is another row: history is
 never rewritten.
 
+### membership_claims
+`id` PK · `user_id` → users cascade · `student_id` (as the member typed it; NOT NULL, blanked
+rather than nulled by erasure) · `starts_on` (London date, never in the future) · `term` CHECK
+`1|3` · `status` CHECK `OPEN|RECORDED|DECLINED|WITHDRAWN` · `reason` scrub (what the officer
+wrote back; the member is shown it) · `decided_by` → users set null · `decided_at` · `created_at`.
+Indexed on (`status`, `created_at`) for the queue and on `user_id`.
+
+**Partial UNIQUE (`user_id`) WHERE `status` = 'OPEN'.** One open claim per person is the
+database's rule, not the form's (A-130 criterion 1), and being partial is what lets a withdrawn or
+declined claim be followed by another: the settled row leaves the index. `POST
+/api/account/membership/claim` lets the index refuse the second one and answers 409, so two
+claims racing produce one row (0006).
+
+**A claim creates no membership.** It is a member saying what they bought at the Students' Union;
+SUMS remains the system of record and nothing here sells anything (0005, 0031, A-202). The
+member-facing routes are `GET /api/account/membership` (the longest-running term, its state as
+`membershipState()` computes it from `MEMBERSHIP_GRACE_DAYS`, and the newest claim with its
+reason), `POST /api/account/membership/claim` (Zod: `studentId`, `startsOn` not after today,
+`term` 1 or 3) and `DELETE /api/account/membership/claim` (withdraws the open claim by predicate;
+idempotent). The screen is `/account/membership`, a `MEMBER_NAV` entry.
+
+**Recording is the officer's act** (`members.write`). `GET /api/admin/memberships/claims` is the
+queue behind the register's "Awaiting record" filter at `/people/members`: oldest first, paged in
+SQL, searchable by name, address or claimed number, and never showing an erased person's claim.
+`POST /api/admin/memberships/claims/[id]/record` runs `recordClaimStatements()`
+(`shared/utils/membership-claims.ts`) as one batch, every write guarded on the claim still being
+`OPEN`: the number to `users.student_id` (refused with 409 if another account holds it, exactly as
+`recordStudentId` refuses), the `memberships` row by the A-117 path with `source = 'MANUAL'` and
+`evidence = 'claim <id>'`, the three trail entries (`account.student-id.recorded`,
+`membership.granted`, `membership.claim.recorded`), and last the claim itself. The loser of a race
+writes nothing and reads 409; the membership row is the proof of who won.
+`POST /api/admin/memberships/claims/[id]/decline` needs a `reason` (3 to 300 characters), writes it
+on the claim and `membership.claim.declined` on the trail. Neither entry's detail ever carries the
+student number or the reason (0011). Both decisions notify the member (`membership.claim.recorded`,
+`membership.claim.declined`: transactional, email and inbox).
+
+Erasure blanks `student_id` and clears `reason`; the row, its term and its outcome survive as a
+statistic. A claim on an anonymised account is refused at every write, and the queue omits it.
+
 ### fellowships
 `id` PK · `user_id` → users restrict · `awarded_on` (date, London) · `awarded_by` (the
 committee or meeting that resolved it, not an individual) · `citation` (the public wording of

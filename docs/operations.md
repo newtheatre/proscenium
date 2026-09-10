@@ -232,6 +232,29 @@ chosen at the time (`<archive-name>` below; nothing is decided yet). In order:
    advance; say so plainly, because the obvious assumption, that the hardcoded id needs changing
    because it belonged to whichever database was live *before*, is the wrong way round.
 
+### The first week: clear the claims queue
+
+The identity import carries no memberships (`docs/known-issues.md`), so on the first day every
+member reads as lapsed until an officer records them. Members put that right themselves at
+`/account/membership` (A-130): a claim carries the student number, the purchase date and the term,
+and creates nothing until an officer records it. Expect hundreds in the first week.
+
+Somebody holding `members.write` works the queue daily, from `/people/members?filter=awaiting-record`:
+
+1. Open the queue. It is oldest first and paged; the filter's label carries the count, and the
+   count is what to watch until it stays near zero.
+2. Check each claim against the SU's membership list by student number, not by name: names do
+   not always match the SU's record, and a claim whose number differs from the one already on the
+   account is flagged in the queue.
+3. **Record** writes the number to the account, the membership with the claim as its evidence and
+   closes the claim, in one click and one batch. **Decline** asks for a reason the member reads;
+   write what to put right, because a declined member claims again rather than emailing.
+4. Focus moves to the next claim after each decision, so the keyboard alone works a page.
+
+Both decisions notify the member and are on the audit trail with the claim id and never the
+number or the reason (0011). A membership counts from the moment it is recorded; the SU-list check
+is what recording *is* here, so nothing further is owed under "Awaiting a check" for these.
+
 ### The staging duplicate
 
 After cutover, a duplicate of `unified` with mock data becomes a testing and staging environment,
