@@ -8,6 +8,10 @@ withDefaults(defineProps<{
   // The pictures are backdrops, so the default is the empty alt a decorative image should carry.
   alt?: string
 }>(), { description: undefined, alt: '' })
+
+// Every key carries a breakpoint: a bare value files under a 1px screen and the srcset collapses
+// to a two-pixel image (tests/unit/static-assets.test.ts).
+const SIZES = 'xs:100vw sm:100vw md:100vw lg:100vw xl:100vw 2xl:100vw'
 </script>
 
 <template>
@@ -18,9 +22,11 @@ withDefaults(defineProps<{
     <NuxtImg
       :src="src"
       :alt="alt"
-      sizes="100vw"
+      :sizes="SIZES"
+      format="auto"
       loading="eager"
       fetchpriority="high"
+      preload
       class="absolute inset-0 -z-20 size-full object-cover"
     />
     <div
@@ -32,7 +38,10 @@ withDefaults(defineProps<{
       :description="description"
       :ui="{ title: 'nnt-headline text-highlighted', description: 'text-default' }"
     >
-      <template #links>
+      <template
+        v-if="$slots.links"
+        #links
+      >
         <slot name="links" />
       </template>
     </UPageHero>

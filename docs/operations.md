@@ -232,6 +232,11 @@ chosen at the time (`<archive-name>` below; nothing is decided yet). In order:
    advance; say so plainly, because the obvious assumption, that the hardcoded id needs changing
    because it belonged to whichever database was live *before*, is the wrong way round.
 
+8. **Confirm the photographs transform on the host that serves them.** Open the home page on the
+   deployed host and check the hero image's `src` starts `/cdn-cgi/image/` and loads. The image
+   provider builds a relative URL, so this is the same check on the pre-cutover host and on the
+   bare domain (K-126).
+
 ### The staging duplicate
 
 After cutover, a duplicate of `unified` with mock data becomes a testing and staging environment,

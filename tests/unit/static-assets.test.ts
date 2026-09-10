@@ -1,13 +1,19 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
+import { imageMeta } from 'image-meta'
+import { createImage } from '@nuxt/image/runtime'
+import cloudflare from '@nuxt/image/runtime/providers/cloudflare'
 
 // K-126: the photographs and static assets are real files, encoded within budget, and nothing
 // under app/ or content/ points at a picture that is not there.
 
 const PUBLIC = 'public'
+const HERO = 'app/components/PhotoHero.vue'
 const BANNER_MAX_WIDTH = 1920
 const BANNER_MAX_BYTES = 300 * 1024
 const OG_SIZE = { width: 1200, height: 630 }
+// Below this a srcset candidate is a thumbnail, not a hero: the smallest screen @nuxt/image knows.
+const SMALLEST_HERO_WIDTH = 320
 
 // The four pages the story names, and the file each one draws its banner from.
 const BANNERED = [
@@ -23,41 +29,19 @@ function files(directory: string, pattern: string): string[] {
     .sort()
 }
 
+// A path with an extension, so prose ending "/images/banners." is not read as a reference.
+const REFERENCE = /\/(?:images\/[\w-]+(?:\/[\w-]+)*\.[a-z0-9]+|og-default\.png|favicon\.(?:png|ico)|apple-touch-icon\.png)\b/g
+
 async function references(): Promise<Map<string, string[]>> {
   const found = new Map<string, string[]>()
   const sources = [...files('app', '**/*.{vue,ts}'), ...files('content', '**/*.md'), 'nuxt.config.ts']
   for (const path of sources) {
     const source = await Bun.file(path).text()
-    for (const match of source.matchAll(/\/(?:images\/[\w./-]+|og-default\.png|favicon\.(?:png|ico)|apple-touch-icon\.png)/g)) {
+    for (const match of source.matchAll(REFERENCE)) {
       found.set(match[0], [...found.get(match[0]) ?? [], path])
     }
   }
   return found
-}
-
-interface Dimensions { width: number, height: number }
-
-// Enough of PNG and WebP to read a size, so the test needs no image library of its own.
-function dimensions(bytes: Uint8Array): Dimensions {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  const ascii = (at: number, length: number): string => String.fromCharCode(...bytes.subarray(at, at + length))
-
-  if (ascii(1, 3) === 'PNG') {
-    return { width: view.getUint32(16), height: view.getUint32(20) }
-  }
-  if (ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP') {
-    const chunk = ascii(12, 4)
-    if (chunk === 'VP8 ') return { width: view.getUint16(26, true) & 0x3FFF, height: view.getUint16(28, true) & 0x3FFF }
-    if (chunk === 'VP8L') {
-      const b0 = bytes[21]!, b1 = bytes[22]!, b2 = bytes[23]!, b3 = bytes[24]!
-      return { width: 1 + (((b1 & 0x3F) << 8) | b0), height: 1 + (((b3 & 0x0F) << 10) | (b2 << 2) | ((b1 & 0xC0) >> 6)) }
-    }
-    if (chunk === 'VP8X') {
-      const u24 = (at: number): number => bytes[at]! | (bytes[at + 1]! << 8) | (bytes[at + 2]! << 16)
-      return { width: 1 + u24(24), height: 1 + u24(27) }
-    }
-  }
-  throw new Error(`not a PNG or WebP: ${ascii(0, 4)}`)
 }
 
 const read = async (path: string): Promise<Uint8Array> => new Uint8Array(await Bun.file(path).arrayBuffer())
@@ -89,10 +73,11 @@ describe('the banners are re-encoded, not copied (K-126 criterion 2)', () => {
 
   for (const banner of banners) {
     test(`${banner} is WebP or AVIF, at most ${BANNER_MAX_WIDTH} wide and under ${BANNER_MAX_BYTES / 1024} KB`, async () => {
-      expect(banner).toMatch(/\.(webp|avif)$/)
       const bytes = await read(banner)
+      const meta = imageMeta(bytes)
+      expect(['webp', 'avif']).toContain(meta.type ?? '')
       expect(bytes.byteLength).toBeLessThan(BANNER_MAX_BYTES)
-      expect(dimensions(bytes).width).toBeLessThanOrEqual(BANNER_MAX_WIDTH)
+      expect(meta.width).toBeLessThanOrEqual(BANNER_MAX_WIDTH)
     })
   }
 })
@@ -111,40 +96,55 @@ describe('the favicon, logos and merge source come across (K-126 criterion 1)', 
     expect(await Bun.file('app/assets/icons/su.svg').exists()).toBe(true)
   })
 
-  test('the head declares all three icons', async () => {
-    const config = await Bun.file('nuxt.config.ts').text()
-    for (const href of ['/favicon.png', '/favicon.ico', '/apple-touch-icon.png']) expect(config).toContain(href)
+  test('the ICO carries the sizes a browser tab asks for', async () => {
+    const meta = imageMeta(await read(join(PUBLIC, 'favicon.ico')))
+    expect(meta.type).toBe('ico')
+    expect((meta.images ?? []).map(image => image.width)).toEqual(expect.arrayContaining([16, 32, 48]))
   })
 
-  test('the ICO carries a PNG for the sizes a browser tab asks for', async () => {
-    const bytes = await read(join(PUBLIC, 'favicon.ico'))
-    const view = new DataView(bytes.buffer)
-    expect(view.getUint16(2, true)).toBe(1)
-    const sizes = Array.from({ length: view.getUint16(4, true) }, (_, index) => bytes[6 + index * 16])
-    expect(sizes).toEqual(expect.arrayContaining([16, 32, 48]))
+  test('the touch icon is the 180 pixel square Safari asks for', async () => {
+    expect(imageMeta(await read(join(PUBLIC, 'apple-touch-icon.png')))).toMatchObject({ type: 'png', width: 180, height: 180 })
   })
 })
 
 describe('a default Open Graph image exists (K-126 criterion 3)', () => {
   test('public/og-default.png is 1200 by 630', async () => {
-    expect(dimensions(await read(join(PUBLIC, 'og-default.png')))).toEqual(OG_SIZE)
+    expect(imageMeta(await read(join(PUBLIC, 'og-default.png')))).toMatchObject({ type: 'png', ...OG_SIZE })
+  })
+
+  test('the app declares it as the image for a shared link', async () => {
+    expect(await Bun.file('app/app.vue').text()).toContain('ogImage: \'/og-default.png\'')
   })
 })
 
 describe('the four pages draw their banners through NuxtImg behind a scrim (K-126 criterion 4)', () => {
-  const HERO = 'app/components/PhotoHero.vue'
-
   // A markdown page reaches its banner through the catch-all, which is where the hero must be.
   const renderers: Record<string, string> = {
     'content/about.md': 'app/pages/[...slug].vue',
     'content/get-involved.md': 'app/pages/[...slug].vue',
   }
 
-  test('the shared hero puts the scrim between NuxtImg and the words', async () => {
+  const attribute = (tag: string, name: string): string => {
+    const match = tag.match(new RegExp(`\\s${name}="([^"]*)"`))
+    return match?.[1] ?? ''
+  }
+
+  test('the hero stacks the picture, then the scrim, then the words, in one stacking context', async () => {
     const source = await Bun.file(HERO).text()
-    expect(source).toContain('<NuxtImg')
-    expect(source.indexOf('nnt-scrim')).toBeGreaterThan(source.indexOf('<NuxtImg'))
-    expect(source.indexOf('<UPageHero')).toBeGreaterThan(source.indexOf('nnt-scrim'))
+    const image = source.match(/<NuxtImg[\s\S]*?\/>/)?.[0] ?? ''
+    const scrim = source.match(/<div[^>]*nnt-scrim[^>]*\/>/)?.[0] ?? ''
+    const root = source.match(/<div[^>]*data-test="photo-hero"[^>]*>/)?.[0] ?? ''
+    expect(attribute(image, 'class').split(/\s+/)).toContain('-z-20')
+    expect(attribute(scrim, 'class').split(/\s+/)).toContain('-z-10')
+    expect(attribute(root, 'class').split(/\s+/)).toEqual(expect.arrayContaining(['isolate', 'relative', 'dark']))
+  })
+
+  test('nothing under app/ scrims a photograph except the hero', async () => {
+    const elsewhere: string[] = []
+    for (const path of files('app', '**/*.{vue,ts}')) {
+      if (path !== HERO && (await Bun.file(path).text()).includes('nnt-scrim')) elsewhere.push(path)
+    }
+    expect(elsewhere).toEqual([])
   })
 
   for (const { page, banner } of BANNERED) {
@@ -153,4 +153,34 @@ describe('the four pages draw their banners through NuxtImg behind a scrim (K-12
       expect(await Bun.file(renderers[page] ?? page).text()).toContain('<PhotoHero')
     })
   }
+})
+
+describe('the hero srcset is built for real screens under the production provider', () => {
+  // @nuxt/image files a breakpoint-less `sizes` under a 1px screen, and every candidate is then
+  // one or two pixels wide. The value is read from the component so the test pins what ships.
+  test('no candidate width is below the smallest screen', async () => {
+    const source = await Bun.file(HERO).text()
+    const sizes = source.match(/const SIZES = '([^']+)'/)?.[1] ?? ''
+    expect(sizes).not.toBe('')
+
+    const img = createImage({
+      provider: 'cloudflare',
+      providers: { cloudflare: { setup: cloudflare, defaults: { baseURL: '/' } } },
+      nuxt: { baseURL: '/' },
+      runtimeConfig: { public: {} },
+      presets: {},
+      screens: { 'xs': 320, 'sm': 640, 'md': 768, 'lg': 1024, 'xl': 1280, '2xl': 1536 },
+      densities: [1, 2],
+      domains: [],
+      alias: {},
+      format: [],
+    })
+    const built = img.getSizes('/images/nnt-front.webp', { sizes, modifiers: { format: 'auto' } })
+    // Matched by descriptor rather than split on commas: the Cloudflare URL carries commas itself.
+    const widths = [...built.srcset.matchAll(/ (\d+)w(?:,|$)/g)].map(match => Number(match[1]))
+
+    expect(widths.length).toBeGreaterThan(1)
+    expect(Math.min(...widths)).toBeGreaterThanOrEqual(SMALLEST_HERO_WIDTH)
+    expect(built.src).toContain('/cdn-cgi/image/')
+  })
 })
