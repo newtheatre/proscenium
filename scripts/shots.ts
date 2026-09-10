@@ -155,7 +155,7 @@ await click(view, 'form button[type="submit"]')
 await waitFor(view, `document.querySelectorAll('[data-test="mfa-challenge"] input').length >= 6`)
 forgetStep()
 await fillPin(view, '[data-test="mfa-challenge"] input', await codeForStep(secret, stepFor(new Date())))
-await waitFor(view, `document.querySelector('[data-test="sign-out"]')`)
+await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
 interface Shot {
   name: string
