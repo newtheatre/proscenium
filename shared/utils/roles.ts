@@ -24,6 +24,7 @@ export const PERMISSIONS = [
   'accounts.read',
   'accounts.create',
   'accounts.disable',
+  'accounts.merge',
   'roles.grant',
   'roles.revoke',
   'audit.read',

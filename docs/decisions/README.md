@@ -64,3 +64,4 @@ afterwards, only superseded.
 | 0056 | A retry carries the message it will send again, and gives up visibly | why the rendered message rides on the row rather than its context, why the due time is computed rather than stored, and why an attachment is never retried |
 | 0057 | A `server/utils/` file resolves a Nitro-runtime-only value outside the Bun graph, and never imports it, static or dynamic | why a dynamic import only defers the same unresolvable dependency, and the two patterns the estate already uses instead |
 | 0058 | A ledger line whose kind always belongs to one performance refuses a missing performanceId | four independent writers silently dropping the same column, and why `BAR_ITEM` and `TAB_SETTLEMENT` are not in the enforced list |
+| 0060 | A merge refuses outright if either account is already a tombstone | why this differs from a migration writer's per-statement guard (0059), and why it is a refusal rather than `eraseAccount()`'s idempotent no-op |

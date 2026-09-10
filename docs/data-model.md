@@ -86,6 +86,31 @@ one where the old estate never recorded it: the screen says so rather than inven
 Indexed on `disabled`, `verified`, `anonymised_at`, `last_login_at` and `name`, which are what
 the admin directory filters and sorts on (A-121); without them every filter is a scan.
 
+**Merging duplicate accounts (A-123).** An administrator merges a losing account into a
+winning one, in one batch: `room_bookings`, `room_series` and `reservations` reassign by a
+plain `user_id` predicate; `shifts` and `memberships` do the same; `role_grants` reconciles
+rather than duplicating, since `(user_id, role)` is unique, so the more generous expiry of the
+two survives under the winner and the loser's row retires; `training_records` cannot be
+reassigned at all (its own append-only trigger refuses an `UPDATE` touching `user_id`), so each
+of the loser's records is copied forward as a fresh row under the winner and the original is
+revoked, if it was not already, with the reason `Superseded: account merged`, never deleted.
+The loser's credentials (`totp_secrets`, `recovery_codes`, `passkeys`, `auth_tokens`,
+`passkey_challenges`, `mfa_attempts`, `room_feed_tokens`) are deleted outright, never combined
+onto the winner (criterion 5, 0008): the winner's own row is never a target of any merge
+statement. The loser is then anonymised exactly as erasure anonymises a row, except the email
+takes the prefix `merged-` rather than `deleted-` (`deliverability.ts` treats both as
+undeliverable) and the name becomes `Merged account` rather than `Deleted user`, so the two
+paths to a tombstone are told apart at a glance. Refused outright, before anything moves, if
+either account is already anonymised (0011: nothing is written onto, or moved out of, a
+tombstone), if the two ids are the same, or if the loser holds the last usable Administrator
+grant (A-120, the same guard erasure and disabling use); a per-statement guard, the shape a
+migration writer uses against the same hazard at import scale, is not needed once two named
+accounts have been checked up front (0059, 0060). Personal tables outside this list (`emergency_contacts`,
+`notification_log`, `fellowships`, `access_profiles`, department leaderships and training
+attendance among them) are not moved: they stay attached to the tombstone, exactly as an
+officer-reference column does, and are named as a known gap rather than silently dropped
+(`docs/known-issues.md`).
+
 ### emergency_contacts
 `user_id` PK → users cascade · `name` (scrub) · `phone` (scrub) · `relation` (scrub) ·
 `updated_at`. Readable only by tonight's duty manager and safety officers while the person
@@ -125,6 +150,7 @@ warning, A-119).
 UNIQUE (`user_id`, `role`). Enforced at read time; the last-administrator guard is a write
 check, not a constraint. The stamp is for a reader: what stops a second warning is the claim in
 `notification_log`, which carries the expiry the warning was computed against (0048).
+A merge reconciles rather than reassigning: see "Merging duplicate accounts" above (A-123).
 
 ### totp_secrets
 `user_id` PK → users cascade · `secret` · `confirmed_at` NULL until proven ·
@@ -1797,6 +1823,7 @@ record is current is derived the same way: a renewal is a newer award for the sa
 module, and supersession is computed, not a column.
 Partial UNIQUE (`session_id`, `user_id`, `module_id`) WHERE session NOT NULL AND revoked
 NULL.
+A merge cannot reassign `user_id` at all: see "Merging duplicate accounts" under `users` (A-123).
 
 `session_id` carries **no foreign key, now or ever**. The sessions table is G-112's, and adding a
 key to this one later would be a table rebuild, which the append-only triggers make a refusal
