@@ -23,7 +23,7 @@ export const CHECKS: Check[] = [
   {
     name: 'content-tokens',
     script: 'scripts/check-content-tokens.ts',
-    describes: 'A policy page quoting a configuration key that does not exist would publish a rule the write path does not enforce (0012).',
+    describes: 'A policy page quoting a key the schema does not have, or one that holds personal data (0012, 0011).',
   },
   {
     name: 'ledger',
