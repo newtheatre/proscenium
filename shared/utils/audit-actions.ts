@@ -160,6 +160,7 @@ const CATALOGUE = {
   'ticket.refunded': { label: 'Ticket refunded at the desk', module: 'ticketing' },
   'reservation.cancelled.staff': { label: 'Booking cancelled at the desk', module: 'ticketing' },
   'reservation.admitted': { label: 'Admitted at the door', module: 'ticketing' },
+  'reservation.reinstated': { label: 'Lapsed or cancelled booking reinstated at the desk', module: 'ticketing' },
   'pass.issued': { label: 'Pass issued at the desk', module: 'ticketing' },
   'pass.request.created': { label: 'Pass requested', module: 'ticketing', self: true },
   'pass.request.fulfilled': { label: 'Pass request fulfilled at issue', module: 'ticketing' },
@@ -297,6 +298,9 @@ const CATALOGUE = {
   // Module I: finance
 
   'finance.z-reading.recorded': { label: 'Daily Z reading recorded', module: 'finance' },
+  'finance.period.defined': { label: 'Term defined', module: 'finance' },
+  'finance.period.closed': { label: 'Period closed', module: 'finance' },
+  'finance.period.reopened': { label: 'Period reopened', module: 'finance' },
 
   // Module J: governance
 

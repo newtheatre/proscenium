@@ -258,7 +258,12 @@ Stories: 24. Phases: 19 MVP, 0 V2, 0 Later, 5 resolved.
      any shape. Its actions belong to features this system does not have and its details carry the
      free text the live trail refuses, so importing it would put a standing obligation on every
      later erasure (0030).
-  3. Anonymised tombstones import as tombstones and remain guarded against rewrite.
+  3. Anonymised tombstones import as tombstones and remain guarded against rewrite. Amended 10
+     September 2026: the guard covers every table the import owns, not only `users`. The old
+     estate does not learn that a person was erased here, so a stale export still carries their
+     live TOTP secret and recovery codes; the loader refuses to write any row, insert or update,
+     for a person already anonymised in the target, so a credential erasure deleted is never
+     reinstated by the next weekly run (0011).
   4. The import is re-runnable weekly against a fresh export: keyed upsert by canonical id, zero
      duplicates, and a reconciliation report of row counts per table after every run. Amended 30
      August 2026: the key is `out/id-map.tsv`, read back before anything is minted, so the same

@@ -12,8 +12,10 @@ import {
   ticketRemovalQueries,
 } from '#server/utils/capacity'
 import { performanceSoldColumn, performanceSoldQuery, showSoldColumn } from '#server/utils/programme'
+import { reinstateReservationStatement } from '#server/utils/reservations'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
+import { expectOneWinner, race } from '#tests/helpers/race'
 import type { TicketToWrite } from '#server/utils/capacity'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
@@ -56,17 +58,6 @@ function reserve(database: TestDatabase, id: string, performanceId: string, stat
     id, id.toUpperCase().slice(0, 6), performanceId, status, 'WEB',
   ]])
   return id
-}
-
-// What D-118 will write: the check rides the statement that puts the seats back, so a reservation
-// cannot be reinstated over somebody who took the seat meanwhile.
-function reinstate(reservationId: string, performanceId: string, capacity: number): SQL {
-  return sql`
-    UPDATE reservations SET status = 'PENDING'
-    WHERE id = ${reservationId}
-      AND status IN ('EXPIRED', 'CANCELLED')
-      AND ${capacityAllows(performanceId, capacity, 1)}
-  `
 }
 
 function heldSeats(database: TestDatabase, performanceId: string): number {
@@ -235,13 +226,15 @@ describe('a status change back into the house is checked too (D-105 criterion 3,
       const reservation = reserve(database, 'r-1', seeded.performanceId, 'EXPIRED')
       run(database, ticketInsertQueries([ticket('t-1', seeded.performanceId, reservation)], null))
 
-      run(database, [reinstate(reservation, seeded.performanceId, 2)])
+      run(database, [reinstateReservationStatement(reservation, seeded.performanceId, 2, 1, 1_800_000_000)])
 
       expect(heldSeats(database, seeded.performanceId)).toBe(1)
+      const status = rows<{ status: string }>(database, 'SELECT status FROM reservations WHERE id = ?', reservation)
+      expect(status[0]?.status).toBe('PENDING')
     })
   })
 
-  test('reinstating over a resold seat writes nothing', async () => {
+  test('reinstating over a resold seat writes nothing (criterion 1, criterion 3)', async () => {
     await withDatabase((database) => {
       const seeded = tonightsPerformance(database, { capacityOverride: 1 })
       const lapsed = reserve(database, 'r-1', seeded.performanceId, 'EXPIRED')
@@ -251,10 +244,66 @@ describe('a status change back into the house is checked too (D-105 criterion 3,
       run(database, ticketInsertQueries([ticket('t-2', seeded.performanceId, resold)], 1))
       expect(heldSeats(database, seeded.performanceId)).toBe(1)
 
-      run(database, [reinstate(lapsed, seeded.performanceId, 1)])
+      run(database, [reinstateReservationStatement(lapsed, seeded.performanceId, 1, 1, 1_800_000_000)])
 
       const status = rows<{ status: string }>(database, 'SELECT status FROM reservations WHERE id = ?', lapsed)
       expect(status[0]?.status).toBe('EXPIRED')
+      expect(heldSeats(database, seeded.performanceId)).toBe(1)
+    })
+  })
+
+  test('a customer\'s own cancellation reinstates', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database, { capacityOverride: 1 })
+      const cancelled = reserve(database, 'r-1', seeded.performanceId, 'CANCELLED')
+      database.batch([['UPDATE reservations SET cancelled_by = ? WHERE id = ?', 'CUSTOMER', cancelled]])
+      run(database, ticketInsertQueries([ticket('t-1', seeded.performanceId, cancelled)], null))
+
+      run(database, [reinstateReservationStatement(cancelled, seeded.performanceId, 1, 1, 1_800_000_000)])
+
+      const status = rows<{ status: string }>(database, 'SELECT status FROM reservations WHERE id = ?', cancelled)
+      expect(status[0]?.status).toBe('PENDING')
+    })
+  })
+
+  // D-116 criterion 5: a staff cancellation only ever follows a refund, so it is never a hold
+  // this path brings back, whatever the house's capacity.
+  test('a staff cancellation never reinstates, even with room to spare', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database, { capacityOverride: 10 })
+      const cancelled = reserve(database, 'r-1', seeded.performanceId, 'CANCELLED')
+      database.batch([['UPDATE reservations SET cancelled_by = ? WHERE id = ?', 'STAFF', cancelled]])
+      run(database, ticketInsertQueries([ticket('t-1', seeded.performanceId, cancelled)], null))
+
+      run(database, [reinstateReservationStatement(cancelled, seeded.performanceId, 10, 1, 1_800_000_000)])
+
+      const status = rows<{ status: string }>(database, 'SELECT status FROM reservations WHERE id = ?', cancelled)
+      expect(status[0]?.status).toBe('CANCELLED')
+    })
+  })
+
+  // The named race (0003): reinstating the lapsed hold and a fresh order both chase the one
+  // seat it freed, fired together so an in-process SQLite still proves exactly one winner.
+  test('reinstating races a fresh order for the same freed seat: exactly one wins', async () => {
+    await withDatabase(async (database) => {
+      const seeded = tonightsPerformance(database, { capacityOverride: 1 })
+      const lapsed = reserve(database, 'r-1', seeded.performanceId, 'EXPIRED')
+      run(database, ticketInsertQueries([ticket('t-1', seeded.performanceId, lapsed)], null))
+
+      const fresh = reserve(database, 'r-2', seeded.performanceId, 'PENDING')
+
+      const answers = await race(2, async (index) => {
+        if (index === 0) {
+          run(database, [reinstateReservationStatement(lapsed, seeded.performanceId, 1, 1, 1_800_000_000)])
+          const status = rows<{ status: string }>(database, 'SELECT status FROM reservations WHERE id = ?', lapsed)
+          return { status: status[0]?.status === 'PENDING' ? 200 : 409 }
+        }
+        run(database, ticketInsertQueries([ticket('t-2', seeded.performanceId, fresh)], 1))
+        const held = rows<{ n: number }>(database, 'SELECT count(*) n FROM tickets WHERE reservation_id = ?', fresh)[0]?.n ?? 0
+        return { status: held === 1 ? 200 : 409 }
+      })
+
+      expectOneWinner(answers)
       expect(heldSeats(database, seeded.performanceId)).toBe(1)
     })
   })

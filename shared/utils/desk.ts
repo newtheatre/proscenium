@@ -44,9 +44,9 @@ export function uncollectableReason(status: string): string | null {
     case 'DOOR':
       return 'This booking was already admitted at the door.'
     case 'CANCELLED':
-      return 'This booking was cancelled and cannot be collected.'
+      return 'This booking was cancelled and cannot be collected. Reinstate it below if it still can be.'
     case 'EXPIRED':
-      return 'This hold has lapsed. Contact the booker to make a fresh reservation.'
+      return 'This hold has lapsed. Reinstate it below if the seats are still free.'
     case 'NO_SHOW':
       return 'This booking was recorded as a no-show and cannot be collected.'
     default:
@@ -72,4 +72,23 @@ export type RefundTicketInput = z.output<typeof refundTicketForm>
 export function strandedMoneyReason(strandedPence: number): string | null {
   if (strandedPence <= 0) return null
   return `${saysPrice(strandedPence)} is still unrefunded on this booking. Refund every ticket first, then cancel.`
+}
+
+export const REINSTATE_REASON_LIMIT = 200
+
+export const reinstateReservationForm = z.strictObject({
+  reason: z.string().trim().min(1, 'A reason is required').max(REINSTATE_REASON_LIMIT),
+})
+
+export type ReinstateReservationInput = z.output<typeof reinstateReservationForm>
+
+// Criteria 1 and 5 as one predicate: an expired hold or the booker's own cancellation, never a
+// staff cancellation, which only ever follows a refund (D-116) and so is never a hold to bring back.
+export function reinstateRefusal(status: string, cancelledBy: string | null): string | null {
+  if (status === 'EXPIRED') return null
+  if (status === 'CANCELLED' && cancelledBy === 'CUSTOMER') return null
+  if (status === 'CANCELLED') {
+    return 'This booking was refunded and cancelled at the desk: reinstating it would bring back a sale that was already handed back. Take a new booking instead.'
+  }
+  return `This booking is ${status.toLowerCase()} and cannot be reinstated.`
 }

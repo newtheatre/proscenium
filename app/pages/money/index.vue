@@ -10,7 +10,10 @@ const request = useRequestFetch()
 
 const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
 const currentYear = new Date().getFullYear()
-const kind = ref<(typeof PERIOD_KINDS)[number]>('SEASON')
+// TERM has a range, not a formula, so it needs its own picker over I-107's defined terms;
+// this screen offers only the kinds a year and a day already answer, until that picker exists.
+const SELECTABLE_PERIOD_KINDS = PERIOD_KINDS.filter(one => one !== 'TERM')
+const kind = ref<(typeof SELECTABLE_PERIOD_KINDS)[number]>('SEASON')
 const day = ref(today)
 const year = ref(currentYear)
 const month = ref(new Date().getMonth() + 1)
@@ -29,7 +32,11 @@ const query = computed(() => {
     base.year = String(period.value.year)
     base.month = String(period.value.month)
   }
-  else base.year = String(period.value.year)
+  else if (period.value.kind === 'SEASON') base.year = String(period.value.year)
+  else {
+    base.fromDay = period.value.fromDay
+    base.toDay = period.value.toDay
+  }
   return base
 })
 
@@ -57,7 +64,7 @@ function entriesUrl(source?: string): string {
         <USelect
           v-model="kind"
           data-test="period-kind"
-          :items="[...PERIOD_KINDS]"
+          :items="[...SELECTABLE_PERIOD_KINDS]"
         />
         <DateField
           v-if="kind === 'DAY' || kind === 'WEEK'"

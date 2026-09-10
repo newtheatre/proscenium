@@ -135,6 +135,22 @@ export const ticketCompRequests = sqliteTable('ticket_comp_requests', {
   check('ticket_comp_requests_entry_needs_approval', sql`${table.entryId} IS NULL OR ${table.status} = 'APPROVED'`),
 ])
 
+// The desk bringing back a lapsed or self-cancelled hold, never a refunded one (D-118 criterion
+// 5, enforced by which statuses the write path accepts). Append-only: a correction is a new row.
+export const reservationReinstatements = sqliteTable('reservation_reinstatements', {
+  id: id(),
+  reservationId: text('reservation_id').notNull().references(() => reservations.id, { onDelete: 'restrict' }),
+  actorId: text('actor_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  reason: text('reason').notNull(),
+  // What D-106 already recorded, carried forward so reinstating never loses it (criterion 2).
+  previousStatus: text('previous_status').notNull(),
+  previousHoldExpiresAt: integer('previous_hold_expires_at'),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  index('reservation_reinstatements_reservation').on(table.reservationId),
+  check('reservation_reinstatements_previous_status_values', sql`${table.previousStatus} IN ('EXPIRED', 'CANCELLED')`),
+])
+
 // One row per account. Everything special category lives inside `encrypted_payload` (0050);
 // `status` and `companions` stay plain, because the database enforces them (D-127 criterion 1).
 export const accessProfiles = sqliteTable('access_profiles', {

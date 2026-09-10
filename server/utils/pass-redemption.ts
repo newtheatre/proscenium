@@ -2,7 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { newId } from './accounts'
 import { passAdmissionTicketInsert } from './capacity'
-import { postEntry } from './ledger'
+import { postEntry, runLedgerBatch } from './ledger'
 import { auditEntry } from '#shared/utils/audit'
 import { generateReservationReference } from '#shared/utils/reservations'
 import type { SQL } from 'drizzle-orm'
@@ -209,7 +209,7 @@ export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): 
     detail: { performanceId: input.performanceId, ticketId },
   })
 
-  const results = await db.batch([
+  const results = await runLedgerBatch([
     db.run(reservationInsert),
     db.all<{ id: string }>(ticketInsert),
     db.all<{ id: string }>(admissionInsert),

@@ -331,6 +331,14 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // figure audits to who asked and who decided, and the request is financial evidence.
     why: 'Who asked for a ticket comp and who decided it is what a foregone-revenue figure audits to; the tombstone still answers for it.',
   },
+  {
+    name: 'reservation_reinstatements',
+    column: 'actor_id',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    why: 'Who reinstated a lapsed hold and why is what the booking\'s own history audits to; the tombstone still answers for it.',
+  },
 
   // Module E: show night
 
@@ -666,6 +674,24 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'keep',
     // Holds no free text naming anyone: who typed in the reader's figure, and why it differed.
     why: 'Who recorded a day\'s reconciliation is the accountable record (I-104); the tombstone still answers for it.',
+  },
+  {
+    name: 'periods',
+    column: 'created_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // The label names a term, not a person: "Autumn term 2026", never a reason or a note.
+    why: 'Who defined a term is the accountable record (I-107); the tombstone still answers for it.',
+  },
+  {
+    name: 'period_locks',
+    column: 'actor_id',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // No free text: from_day, to_day and action are the whole of a close or reopen's own record.
+    why: 'Who closed or reopened a period is the accountable record (I-107); the tombstone still answers for it.',
   },
 
   // Module J: governance

@@ -2,7 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { newId } from './accounts'
 import { auditedWrite } from './audit'
-import { postEntry } from './ledger'
+import { postEntry, runLedgerBatch } from './ledger'
 import { passCapAllows } from './pass-types'
 import { auditEntry } from '#shared/utils/audit'
 import { generatePassReference } from '#shared/utils/passes'
@@ -82,7 +82,7 @@ export async function issuePass(input: IssuePassWriteInput, at = new Date()): Pr
       ]
     : []
 
-  const [claimed] = await db.batch([
+  const [claimed] = await runLedgerBatch([
     db.all<{ id: string }>(passInsert),
     ...posted.statements,
     db.run(sql`
