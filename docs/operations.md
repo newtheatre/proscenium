@@ -86,11 +86,21 @@ with `health` red is the ordering race above, which resolves itself once Workers
 up. One job carrying both readings is how 21 real failures of this exact race went unattributed
 before the split.
 
-`health`'s target is `${{ vars.HEALTH_URL }}`, a variable on the `production` GitHub environment,
-never a literal in the workflow file. There is no fallback: the job fails fast naming the missing
-variable rather than silently checking the wrong system. **This is also cutover's whole mechanism
-for this job**: pointing `HEALTH_URL` at the unified deploy, and back again if cutover needs to
-reverse, is a value change in the environment's settings, not a pull request.
+`health`'s target is `${{ vars.HEALTH_URL }}`, a **repository** variable, never a literal in the
+workflow file and never environment-scoped: `health-watch.yml`'s own job below declares no
+`environment:`, and an environment-scoped variable would need one added purely to read it, which
+risks a scheduled run stalling on an approval gate this repository does not currently have but
+could one day add. There is no fallback: both jobs fail fast naming the missing variable rather
+than silently checking the wrong system. **This is also cutover's whole mechanism for both**:
+pointing `HEALTH_URL` at the unified deploy, and back again if cutover needs to reverse, is one
+repository variable's value changing, not a pull request.
+
+**`health-watch.yml`'s own schedule has never actually run.** GitHub only reads a `schedule:`
+trigger from a workflow file on the repository's default branch, still `main` until cutover; a
+file that exists only on `unified/main` never registers. A `platform/register-scheduled-workflows`
+copy on `main` (checking `unified/main`'s deploy, since that is where the real code is) is what
+makes the schedule real before cutover rather than for the first time on the day it matters most,
+ADR-0021's lesson again. `e2e.yml`'s nightly run had the identical gap and the identical fix.
 
 ### Applying a destructive migration by hand (K-107 criterion 3)
 

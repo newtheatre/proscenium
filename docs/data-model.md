@@ -893,21 +893,23 @@ hand-ticked) · `active` bool (soft-retired, never deleted: a stamp keeps refere
 mutable like `shift_templates` rather than append-only: ticking a box is a state, not a record.
 
 ### checklist_stamps
-`id` PK · `venue_id` → venues restrict · `night` · `item_id` → checklist_items restrict ·
+`id` PK · `performance_id` → performances restrict · `item_id` → checklist_items restrict ·
 `phase`, `label`, `sort`, `required`, `system_check` (snapshotted from the item at the moment of
 stamping) · `ticked_by` restrict NULL · `ticked_at` NULL · `exempted` bool · `exempt_reason` NULL
-· `exempted_by` restrict NULL · `exempted_at` NULL · `stamped_at`. UNIQUE (`venue_id`, `night`,
-`item_id`): one stamp per item per venue per night, made the first time that night's checklist is
-touched, so an edit to `checklist_items` afterwards changes nothing already stamped (E-101's own
-pattern). Keyed to a venue and a night rather than a performance, like `till_sessions`. A
-system-verified item's `ticked_by`/`ticked_at` stay NULL forever; its done state is read live
-against the data the check names, never stored (E-114 criterion 3).
+· `exempted_by` restrict NULL · `exempted_at` NULL · `stamped_at`. UNIQUE (`performance_id`,
+`item_id`): one stamp per item per performance, made the first time that performance's checklist
+is touched, so an edit to `checklist_items` afterwards changes nothing already stamped (E-101's
+own pattern). Keyed to a performance (E-128; rebuilt by hand from the venue-and-night keying
+E-114 originally shipped, `docs/decisions/0063-hand-authored-table-rebuilds.md`), so a matinee
+and an evening never share one. A system-verified item's `ticked_by`/`ticked_at` stay NULL
+forever; its done state is read live against this performance's own data, never stored (E-114
+criterion 3).
 
 ### checklist_closes
-`id` PK · `venue_id` → venues restrict · `night` · `closed_by` restrict · `closed_at`. UNIQUE
-(`venue_id`, `night`) makes closing idempotent, the same guarantee `night_reports`' PK gives its
-own close. The close-night action itself (E-114 criterion 4); blocked while a required item
-across either phase is neither ticked nor exempted.
+`id` PK · `performance_id` → performances restrict, UNIQUE · `closed_by` restrict · `closed_at`.
+The UNIQUE on `performance_id` makes closing idempotent, the same guarantee `night_reports`' own
+PK gives its close. The close-night action itself (E-114 criterion 4; performance-keyed since
+E-128); blocked while a required item across either phase is neither ticked nor exempted.
 
 ### night_reports  APPEND-ONLY
 `id` PK · `performance_id` → performances restrict, UNIQUE · `venue_id` → venues restrict ·

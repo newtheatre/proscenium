@@ -37,9 +37,17 @@ export const checklistItemForm = z.object({
 
 export type ChecklistItemInput = z.output<typeof checklistItemForm>
 
+// Optional: the common case is tonight's one performance, resolved the same way
+// `POST /api/tonight/report/sign-off` resolves it, and named only to disambiguate a matinee day.
+export const checklistScopeForm = z.object({
+  performanceId: z.string().min(1).optional(),
+})
+
+export type ChecklistScopeInput = z.output<typeof checklistScopeForm>
+
 const REASON_LIMIT = 500
 
-export const exemptForm = z.object({
+export const exemptForm = checklistScopeForm.extend({
   reason: z.string().trim().min(1, 'Say why, because an exception needs a reason on the record').max(REASON_LIMIT),
 })
 

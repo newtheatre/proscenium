@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
 import { coversThrough, lastCovered, londonDate } from '#shared/utils/working-days'
+import { confirmationOptions } from '#shared/utils/blast-radius'
+import type { BlastRadiusPreview } from '#shared/utils/blast-radius'
 
 definePageMeta({ layout: 'console', title: 'Settings', middleware: 'console' })
 
@@ -33,6 +35,7 @@ interface Setting {
   set: boolean
   enforced: boolean
   sensitive: boolean
+  wideBlastRadius: boolean
   updatedAt: number | null
   updatedBy: { id: string, name: string } | null
 }
@@ -122,13 +125,13 @@ async function load(): Promise<void> {
   }
 }
 
-async function save(setting: Setting, value: unknown): Promise<void> {
+async function save(setting: Setting, value: unknown, confirmation?: string): Promise<void> {
   saving.value = setting.key
   failure.value = null
   notices[setting.key] = ''
 
   try {
-    await $fetch(`/api/admin/config/${setting.key}`, { method: 'PUT', body: { value } })
+    await $fetch(`/api/admin/config/${setting.key}`, { method: 'PUT', body: { value, confirmation } })
     await load()
     notices[setting.key] = 'Saved'
   }
@@ -140,6 +143,68 @@ async function save(setting: Setting, value: unknown): Promise<void> {
   }
 }
 
+// A flagged save previews its blast radius before anything is asked to confirm (J-105 criteria
+// 1, 5): the modal opens on a loading preview rather than waiting to show the typed-echo field.
+const confirming = ref<Setting | null>(null)
+const pendingValue = ref<unknown>(null)
+const confirmationText = ref('')
+const preview = ref<BlastRadiusPreview | null>(null)
+const previewLoading = ref(false)
+
+const confirmOptions = computed(() => confirming.value ? confirmationOptions(confirming.value.key, preview.value) : [])
+const confirmationValid = computed(() => confirmOptions.value.includes(confirmationText.value.trim()))
+
+async function attemptSave(setting: Setting, value: unknown): Promise<void> {
+  if (!setting.wideBlastRadius) {
+    await save(setting, value)
+    return
+  }
+
+  confirming.value = setting
+  pendingValue.value = value
+  confirmationText.value = ''
+  preview.value = null
+  previewLoading.value = true
+  try {
+    preview.value = await $fetch<BlastRadiusPreview>(`/api/admin/config/${setting.key}/blast-radius`)
+  }
+  catch {
+    preview.value = null
+  }
+  finally {
+    previewLoading.value = false
+  }
+}
+
+async function confirmSave(): Promise<void> {
+  if (!confirming.value || !confirmationValid.value) return
+  const setting = confirming.value
+  await save(setting, pendingValue.value, confirmationText.value.trim())
+  confirming.value = null
+}
+
+const reverting = ref('')
+
+// One action, no second confirmation: undoing carries none of a new change's own uncertainty
+// about what is about to happen (J-105 criterion 3).
+async function revert(setting: Setting): Promise<void> {
+  reverting.value = setting.key
+  failure.value = null
+  notices[setting.key] = ''
+
+  try {
+    await $fetch(`/api/admin/config/${setting.key}/revert`, { method: 'POST' })
+    await load()
+    notices[setting.key] = 'Reverted'
+  }
+  catch (error) {
+    failure.value = `${setting.key}: ${refusalText(error)}`
+  }
+  finally {
+    reverting.value = ''
+  }
+}
+
 // Pounds on the screen, pence in the database, converted here and nowhere else (0004).
 const pounds = (pence: number | undefined): number => (pence ?? 0) / 100
 const pence = (amount: number | undefined): number => Math.round((amount ?? 0) * 100)
@@ -148,14 +213,14 @@ const pence = (amount: number | undefined): number => Math.round((amount ?? 0) *
 // number and true into a boolean, and the schema would refuse a value the officer typed correctly.
 function saveText(setting: Setting): Promise<void> {
   const raw = drafts[setting.key] ?? ''
-  if (kind(setting) === 'number') return save(setting, Number(raw))
-  if (typeof standing(setting) === 'string') return save(setting, raw)
+  if (kind(setting) === 'number') return attemptSave(setting, Number(raw))
+  if (typeof standing(setting) === 'string') return attemptSave(setting, raw)
 
   try {
-    return save(setting, JSON.parse(raw))
+    return attemptSave(setting, JSON.parse(raw))
   }
   catch {
-    return save(setting, raw)
+    return attemptSave(setting, raw)
   }
 }
 
@@ -225,6 +290,15 @@ onMounted(load)
               </div>
               <div class="flex gap-1">
                 <UBadge
+                  v-if="setting.wideBlastRadius"
+                  color="warning"
+                  variant="subtle"
+                  size="sm"
+                  :data-test="`blast-radius-${setting.key}`"
+                >
+                  Wide blast radius
+                </UBadge>
+                <UBadge
                   v-if="!setting.enforced"
                   color="neutral"
                   variant="subtle"
@@ -249,7 +323,7 @@ onMounted(load)
                 :model-value="standing(setting) === true"
                 :loading="saving === setting.key"
                 :data-test="`toggle-${setting.key}`"
-                @update:model-value="save(setting, $event)"
+                @update:model-value="attemptSave(setting, $event)"
               />
 
               <template v-else-if="kind(setting) === 'money'">
@@ -267,7 +341,7 @@ onMounted(load)
                   variant="outline"
                   :loading="saving === setting.key"
                   :data-test="`save-${setting.key}`"
-                  @click="save(setting, numbers[setting.key])"
+                  @click="attemptSave(setting, numbers[setting.key])"
                 >
                   Save
                 </UButton>
@@ -285,7 +359,7 @@ onMounted(load)
                   variant="outline"
                   :loading="saving === setting.key"
                   :data-test="`save-${setting.key}`"
-                  @click="save(setting, numbers[setting.key])"
+                  @click="attemptSave(setting, numbers[setting.key])"
                 >
                   Save
                 </UButton>
@@ -302,7 +376,7 @@ onMounted(load)
                   variant="outline"
                   :loading="saving === setting.key"
                   :data-test="`save-${setting.key}`"
-                  @click="save(setting, lists[setting.key] ?? [])"
+                  @click="attemptSave(setting, lists[setting.key] ?? [])"
                 >
                   Save
                 </UButton>
@@ -325,6 +399,18 @@ onMounted(load)
                 </UButton>
               </template>
 
+              <UButton
+                v-if="setting.set"
+                color="neutral"
+                variant="ghost"
+                icon="i-lucide-undo-2"
+                :loading="reverting === setting.key"
+                :data-test="`revert-${setting.key}`"
+                @click="revert(setting)"
+              >
+                Revert
+              </UButton>
+
               <span
                 v-if="notices[setting.key]"
                 class="text-sm text-muted"
@@ -343,5 +429,67 @@ onMounted(load)
         </div>
       </template>
     </UTabs>
+
+    <UModal
+      :open="confirming !== null"
+      :title="confirming ? `Confirm: ${confirming.key}` : ''"
+      description="This setting is flagged wide blast radius. Read the count before you type either option below (J-105)."
+      @update:open="confirming = null"
+    >
+      <template #body>
+        <div
+          v-if="confirming"
+          class="space-y-4"
+        >
+          <p
+            v-if="previewLoading"
+            class="text-sm text-muted"
+          >
+            Working out who this affects…
+          </p>
+          <UAlert
+            v-else-if="preview"
+            color="warning"
+            variant="subtle"
+            :data-test="`blast-radius-preview-${confirming.key}`"
+            :description="`${preview.count} ${preview.category}.`"
+          />
+          <UAlert
+            v-else
+            color="error"
+            variant="subtle"
+            description="No live preview for this setting. Type the setting's own name to confirm."
+          />
+
+          <UFormField :label="`Type ${confirmOptions.map(option => `“${option}”`).join(' or ')} to confirm`">
+            <UInput
+              v-model="confirmationText"
+              data-test="blast-radius-confirmation"
+              class="w-full font-mono"
+              @keyup.enter="confirmationValid && confirmSave()"
+            />
+          </UFormField>
+        </div>
+      </template>
+
+      <template #footer>
+        <UButton
+          color="neutral"
+          variant="outline"
+          @click="confirming = null"
+        >
+          Cancel
+        </UButton>
+        <UButton
+          color="warning"
+          :disabled="!confirmationValid"
+          :loading="Boolean(confirming) && saving === confirming!.key"
+          data-test="blast-radius-confirm"
+          @click="confirmSave"
+        >
+          Save anyway
+        </UButton>
+      </template>
+    </UModal>
   </div>
 </template>
