@@ -1,5 +1,9 @@
-import { londonDay } from '#shared/utils/membership'
+import { db, schema } from '@nuxthub/db'
 import { and, count, eq, gt, inArray, isNotNull, isNull, like, ne, or, sql } from 'drizzle-orm'
+// Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
+// Bun, where nothing is auto-imported (CONTRIBUTING, 0055).
+import { configValue } from './configuration'
+import { londonDay } from '#shared/utils/membership'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
