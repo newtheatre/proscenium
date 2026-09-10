@@ -692,6 +692,7 @@ export const ENFORCED_KEYS = [
   'UNVERIFIED_EXPIRY_CAP',
   'VERIFY_RESEND_ATTEMPTS',
   'VERIFY_RESEND_WINDOW_MINUTES',
+  'NIGHT_REPORT_RECIPIENTS',
 ] as const satisfies readonly ConfigKey[]
 
 export function isEnforced(key: ConfigKey): boolean {

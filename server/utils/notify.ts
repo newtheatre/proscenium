@@ -227,3 +227,28 @@ export async function notify(event: H3Event | undefined, notification: Notificat
     return 'FAILED'
   }
 }
+
+export interface RawMessage {
+  to: string
+  subject: string
+  html: string
+  text: string
+}
+
+// For a recipient with no account behind it, such as a committee-configured address (E-124):
+// `notification_log`'s shape assumes a user on every row, so the caller logs its own outcome.
+export async function sendRaw(event: H3Event | undefined, message: RawMessage): Promise<{ ok: true } | { ok: false, error: string }> {
+  try {
+    await transportFor(event).send({
+      to: message.to,
+      from: formatSender(SENDERS.ACCOUNTS),
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    })
+    return { ok: true }
+  }
+  catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}

@@ -64,6 +64,12 @@ export const PERFORMANCE_REFERENCES: PerformanceReference[] = [
     why: 'a safety record: who reported what, and nobody has bought a seat (E-115)',
   },
   {
+    table: 'night_reports',
+    column: 'performance_id',
+    sold: false,
+    why: 'the frozen close-night record: who signed off, and nobody has bought a seat (E-124)',
+  },
+  {
     table: 'pass_admissions',
     column: 'performance_id',
     sold: false,
