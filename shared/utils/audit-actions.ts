@@ -305,6 +305,7 @@ const CATALOGUE = {
 
   'backup.drill-recorded': { label: 'Restore drill recorded', module: 'governance' },
   'backup.export-failed': { label: 'Weekly export failed', module: 'governance' },
+  'docs.drift-reported': { label: 'Operator documentation flagged as out of date', module: 'governance' },
 
   // Recorded after the fact, for a decision taken outside the system. The vocabulary grows with
   // the modules: there is no general-purpose manual action, because that is a note (J-103).

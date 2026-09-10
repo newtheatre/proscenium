@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-// The live draft, recomputed on every view (E-123 criterion 4). A venue running more than one
-// performance today must name which one (E-127 criterion 1).
+// The live draft (E-123 criterion 4) until sign-off freezes it, after which the frozen snapshot
+// and its addenda return instead (E-124 criterion 5). A venue running more than one today must name which one.
 const query = z.object({ performanceId: z.string().min(1).optional() })
 
 export default defineEventHandler(async (event) => {
@@ -14,5 +14,19 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'More than one performance is running tonight: name the performance' })
   }
 
-  return await compileNightReport(target, resolved.venueId, resolved.night)
+  const signed = await reportForPerformance(target)
+  if (signed) {
+    return {
+      ...signed.report,
+      signedOff: {
+        closingNote: signed.closingNote,
+        signedByName: signed.signedByName,
+        signedVia: signed.signedVia,
+        signedAt: signed.signedAt,
+      },
+      addenda: await addendaForReport(signed.id),
+    }
+  }
+
+  return { ...(await compileNightReport(target, resolved.venueId, resolved.night)), signedOff: null, addenda: [] }
 })

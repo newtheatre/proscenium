@@ -237,6 +237,9 @@ export const MEMBER_NAV: NavEntry[] = [
 export const SHELL_NAV: NavEntry[] = [
   { label: 'Tonight', icon: 'i-lucide-moon-star', to: '/tonight', ability: workTonight },
   { label: 'Manage', icon: 'i-lucide-layout-dashboard', to: '/admin', ability: reachConsole },
+  // Reachable whether or not a viewer holds a standing permission, since an operational-only
+  // shift is exactly who most needs the page for the screen in front of them (J-109 criterion 1).
+  { label: 'Documentation', icon: 'i-lucide-book-open', to: '/docs', ability: signedIn },
 ]
 
 // The public half of the footer: pages a visitor reads before they are anybody here. The policy
