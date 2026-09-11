@@ -9,14 +9,12 @@ const links = MY_NAV.map(entry => ({ label: entry.label, icon: entry.icon, to: e
 <template>
   <div class="flex min-h-screen flex-col">
     <div class="dark">
-      <UHeader :ui="{ root: 'bg-default' }">
+      <UHeader
+        title="The Nottingham New Theatre"
+        :ui="{ root: 'bg-default' }"
+      >
         <template #title>
-          <NuxtLink
-            to="/"
-            class="nnt-headline text-lg"
-          >
-            The Nottingham New Theatre
-          </NuxtLink>
+          <SiteWordmark />
         </template>
         <template #right>
           <AuthStatus />
@@ -25,6 +23,7 @@ const links = MY_NAV.map(entry => ({ label: entry.label, icon: entry.icon, to: e
           <UNavigationMenu
             :items="links"
             orientation="vertical"
+            aria-label="Primary"
             highlight
           />
         </template>
@@ -38,6 +37,7 @@ const links = MY_NAV.map(entry => ({ label: entry.label, icon: entry.icon, to: e
         <UNavigationMenu
           :items="links"
           highlight
+          aria-label="My theatre"
           class="border-b border-default w-max min-w-full"
         />
       </UContainer>

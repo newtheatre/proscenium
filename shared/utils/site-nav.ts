@@ -279,6 +279,12 @@ export const PUBLIC_NAV: NavEntry[] = [
   { label: 'Room booking policy', icon: 'i-lucide-calendar-check', to: '/policies/rooms', ability: anybody },
 ]
 
+// The few destinations a visitor arrives looking for, in the mockup's order; the rest of
+// PUBLIC_NAV stays in the footer. Derived, so a header link cannot disagree with the footer (0040).
+const HEADER_ORDER = ['/whats-on', '/get-involved', '/about']
+
+export const HEADER_NAV: NavEntry[] = HEADER_ORDER.flatMap(to => PUBLIC_NAV.filter(entry => entry.to === to))
+
 // Longest prefix wins, so /rooms/manage/requests is matched by its own entry and not by /rooms.
 export function entryFor(path: string): NavEntry | null {
   const every = [CONSOLE_HOME, ...CONSOLE_NAV.flatMap(group => group.items)]
