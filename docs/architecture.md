@@ -453,6 +453,19 @@ stock movements and stocktakes each declare their fields and read them through `
 column of its own; `movements-list.ts`'s `recordedOrder` sort field is `rowid`, the table's own
 insertion order, which is what a same-second tie now breaks on rather than the random `id`.
 
+The rooms module is migrated: the bookable estate (`rooms-list.ts`), its closures
+(`blackouts-list.ts`) and the SU catalogue (`external-spaces-list.ts`) all hide a retired row
+unless the officer explicitly asks for one, the accounts directory's `anonymised` default applied
+a second time; none of the three declares a genuine list because nothing in the estate is paged
+today, so each returns its whole filtered set rather than a windowed page. The utilisation report
+(`utilisation-list.ts`) and the room request queue (`rooms-queue-list.ts`) declare fields for the
+URL and the query schema without ever calling `whereFrom`: the report is aggregated in memory
+(C-117) and the queue is judged and ordered by hand (C-109), so a declared field there is answered
+by reading `conditionsOf` directly rather than by a predicate. The queue keeps its own bespoke
+envelope (`items`, `total`, `more`, `counts`) and its server-side cap, because a triage queue is
+tens of rows and not a paged list; its free-text search stayed client-side, now reading through
+`useListQuery` so it lives in the URL.
+
 ## Scheduled tasks
 
 All Nitro scheduled tasks mirrored in wrangler cron triggers. The system notices, humans

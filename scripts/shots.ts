@@ -196,20 +196,26 @@ const SHOTS: Shot[] = [
   { name: '09a-calendar-week', path: '/rooms', marker: '[data-test="calendar-span"]' },
   { name: '09b-calendar-day', path: '/rooms', marker: '[data-test="calendar-span"]', after: `document.querySelector('[data-test="calendar-day"]').click()` },
   { name: '09c-home', path: '/', marker: 'main' },
-  { name: '10a-rooms', path: '/admin/rooms', marker: '[data-test="rooms-table"]' },
-  { name: '10b-rooms-modal', path: '/admin/rooms', marker: '[data-test="rooms-table"]', after: `(async () => {
+  { name: '10a-rooms', path: '/rooms/manage', marker: '[data-test="rooms-table"]' },
+  { name: '10b-rooms-modal', path: '/rooms/manage', marker: '[data-test="rooms-table"]', after: `(async () => {
     document.querySelector('[data-test="add-room"]').click()
     await new Promise(resolve => setTimeout(resolve, 500))
     for (const section of ['hours-section', 'policy-section']) {
       document.querySelector('[data-test="' + section + '"] button')?.click()
     }
   })()` },
-  { name: '10c-rooms-filters', path: '/admin/rooms', marker: '[data-test="rooms-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
-  { name: '10d-requests', path: '/admin/requests', marker: '[data-test="requests-table"]' },
+  { name: '10c-rooms-filters', path: '/rooms/manage', marker: '[data-test="rooms-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '10d-requests', path: '/rooms/manage/requests', marker: '[data-test="requests-table"]' },
   { name: '10d1-shows', path: '/box-office/shows', marker: '[data-test="shows-table"]' },
   { name: '10d2-shows-filters', path: '/box-office/shows?status=is:DRAFT', marker: '[data-test="toolbar-active"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
-  { name: '10e-other-rooms', path: '/admin/other-rooms', marker: '[data-test="spaces-table"]' },
-  { name: '10f-requests-unlisted', path: '/admin/requests?kind=unlisted', marker: '[data-test="requests-table"]' },
+  { name: '10e-other-rooms', path: '/rooms/manage/other', marker: '[data-test="spaces-table"]' },
+  { name: '10e1-other-rooms-filters', path: '/rooms/manage/other', marker: '[data-test="spaces-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '10f-requests-unlisted', path: '/rooms/manage/requests?kind=unlisted', marker: '[data-test="requests-table"]' },
+  { name: '10f1-requests-filters', path: '/rooms/manage/requests', marker: '[data-test="requests-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '10f2-closures', path: '/rooms/manage/closures', marker: '[data-test="blackouts-table"]' },
+  { name: '10f3-closures-filters', path: '/rooms/manage/closures', marker: '[data-test="blackouts-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '10f4-utilisation', path: '/rooms/manage/utilisation', marker: '[data-test="utilisation-table"]' },
+  { name: '10f5-utilisation-filters', path: '/rooms/manage/utilisation', marker: '[data-test="utilisation-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '10g-bar-categories', path: '/bar/categories', marker: '[data-test="bar-categories-table"]' },
   { name: '10h-bar-products', path: '/bar/products', marker: '[data-test="bar-products-table"]' },
   { name: '10i-bar-products-filters', path: '/bar/products', marker: '[data-test="bar-products-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
