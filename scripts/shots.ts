@@ -124,7 +124,7 @@ sql(`INSERT INTO shift_templates (id, venue_id, role, "count") VALUES (?, ?, ?, 
 const shotsNow = Math.floor(Date.now() / 1000)
 sql(`INSERT INTO performances (id, show_id, venue_id, starts_at, doors_at, duration_minutes, status)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  'shots-performance', 'shots-show', 'shots-venue', shotsNow + 4 * 3600, shotsNow + 3.5 * 3600, 120, 'ON_SALE')
+'shots-performance', 'shots-show', 'shots-venue', shotsNow + 4 * 3600, shotsNow + 3.5 * 3600, 120, 'ON_SALE')
 sql(`INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)`,
   'shots-shift-open', 'shots-performance', 'DOOR', 1, 'OPEN')
 sql(`INSERT INTO shifts (id, performance_id, role, slot, status, user_id, claimed_at) VALUES (?, ?, ?, ?, ?, ?, unixepoch())`,
