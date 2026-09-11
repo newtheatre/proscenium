@@ -1,22 +1,16 @@
-import { z } from 'zod'
-import { MAX_BAR_NAME } from '#shared/utils/bar'
+import { barProductsList } from '#shared/utils/bar-products-list'
+import { filterQuerySchema } from '#shared/utils/list-filters'
 
-const query = pageQuery.extend({
-  // A retired product is still what a historical line was sold as, so the console shows it by
-  // default and the till is what leaves it out (F-111 criterion 3).
-  includeRetired: yesOrNo.default(true),
-  categoryId: z.string().trim().min(1).optional(),
-  search: z.string().trim().max(MAX_BAR_NAME).optional(),
-})
+const query = filterQuerySchema(barProductsList)
 
-// Every product, in the order the till lays them out, with whether each has ever been sold.
+// Every product, filtered and ordered by its declaration (K-129), with whether each has ever sold.
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'bar.read')
-  const { page, pageSize, includeRetired, categoryId, search } = await getValidatedQueryOrThrow(event, query)
-  const filters = { includeRetired, categoryId: categoryId || undefined, search: search || undefined }
+  const input = await getValidatedQueryOrThrow(event, query)
+  const clause = productsClause(input)
 
-  const total = await countProducts(filters)
-  const items = await listProducts(filters, pageSize, offsetFor(page, pageSize))
+  const total = await countProducts(clause)
+  const items = await listProducts(clause, input.pageSize, offsetFor(input.page, input.pageSize))
 
-  return envelope(items, total, page, pageSize)
+  return envelope(items, total, input.page, input.pageSize)
 })

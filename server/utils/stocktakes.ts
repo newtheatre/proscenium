@@ -1,7 +1,11 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { stocktakesList } from '#shared/utils/stocktakes-list'
+import { aliasColumns, whereFrom } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
+import type { ListQuery } from '#shared/utils/list-filters'
+import type { ListClause } from './list-filters'
 
 // Reading a stocktake and its lines (F-115). Opening, counting and applying are each the write
 // path's own SQL in their routes; what a reader needs is here so nothing restates the shape.
@@ -28,6 +32,36 @@ export async function stocktakeById(id: string): Promise<Stocktake | undefined> 
 export async function openStocktake(): Promise<Stocktake | undefined> {
   const [row] = await db.all<Stocktake>(openStocktakeQuery())
   return row
+}
+
+// The declaration's predicates and order, through the `t` alias the raw SQL below uses (K-129).
+export function stocktakesClause(query: ListQuery): ListClause {
+  return whereFrom(stocktakesList, query, { column: aliasColumns('t'), search: [sql`t.status`] })
+}
+
+const STOCKTAKE_LIST_COLUMNS = sql`
+  t.id AS id, t.status AS status, t.opened_by AS openedBy, t.opened_at AS openedAt,
+  t.applied_by AS appliedBy, t.applied_at AS appliedAt
+`
+
+export function stocktakesQuery(clause: ListClause, limit: number, offset: number): SQL {
+  return sql`
+    SELECT ${STOCKTAKE_LIST_COLUMNS}
+    FROM stocktakes t${clause.where ? sql` WHERE ${clause.where}` : sql``}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
+    LIMIT ${limit} OFFSET ${offset}
+  `
+}
+
+export async function listStocktakes(clause: ListClause, limit: number, offset: number): Promise<Stocktake[]> {
+  return db.all<Stocktake>(stocktakesQuery(clause, limit, offset))
+}
+
+export async function countStocktakes(clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(sql`
+    SELECT count(*) AS total FROM stocktakes t${clause.where ? sql` WHERE ${clause.where}` : sql``}
+  `)
+  return Number(row?.total ?? 0)
 }
 
 // The delivered cost a variance is valued at, or null if the item has never been delivered

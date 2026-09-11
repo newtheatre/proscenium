@@ -9,7 +9,7 @@ import {
   saysQuantity,
   stockItemForm,
 } from '#shared/utils/bar'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { barItemsList } from '#shared/utils/bar-items-list'
 import type { MovementReason, StockItem, StockMovementKind, StockUnit } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -20,9 +20,6 @@ const UButton = resolveComponent('UButton')
 
 const request = useRequestFetch()
 const toast = useToast()
-const search = ref('')
-const includeRetired = ref(true)
-const page = ref(1)
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
@@ -30,18 +27,14 @@ interface Listing { items: StockItem[], total: number, pageSize: number, pages: 
 
 const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
+// Search, filters, sort and page live in the URL (K-129).
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(barItemsList)
+
 const { data, status, error, refresh } = await useAsyncData(
   'bar-items',
-  () => request<Listing>('/api/admin/bar/items', {
-    query: { includeRetired: includeRetired.value, search: search.value.trim() || undefined, page: page.value },
-  }),
-  { watch: [page], default: empty },
+  () => request<Listing>('/api/admin/bar/items', { query: query.value }),
+  { watch: [query], default: empty },
 )
-
-watch([search, includeRetired], () => {
-  if (page.value === 1) void refresh()
-  else page.value = 1
-})
 
 const editing = ref<StockItem | null>(null)
 const open = ref(false)
@@ -226,21 +219,6 @@ async function remove(): Promise<void> {
 
 const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The stocked items could not be read.') : null))
 
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (!includeRetired.value) {
-    active.push({ key: 'retired', label: 'Hiding retired', icon: 'i-lucide-archive', clear: () => {
-      includeRetired.value = true
-    } })
-  }
-  return active
-})
-
 const columns: TableColumn<StockItem>[] = [
   {
     id: 'name',
@@ -350,18 +328,18 @@ const columns: TableColumn<StockItem>[] = [
     <AdminToolbar
       v-model:search="search"
       placeholder="A stocked item"
-      :active="activeFilters"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''; includeRetired = true"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Show">
-          <USwitch
-            v-model="includeRetired"
-            label="Including retired items"
-            data-test="items-retired"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="barItemsList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -383,7 +361,7 @@ const columns: TableColumn<StockItem>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ search ? 'No stocked item matches that.' : 'No stocked items yet. Add what the bar counts, then record a delivery.' }}
+          {{ filtered ? 'No stocked item matches that.' : 'No stocked items yet. Add what the bar counts, then record a delivery.' }}
         </p>
       </template>
     </UTable>

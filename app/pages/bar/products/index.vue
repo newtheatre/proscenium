@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { ALLERGEN_STATES, productForm, says } from '#shared/utils/bar'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { barProductsList } from '#shared/utils/bar-products-list'
+import type { FilterOption } from '#shared/utils/list-filters'
 import type { AllergenState, BarCategory, BarProduct, ProductStatus } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -12,10 +13,6 @@ const UButton = resolveComponent('UButton')
 
 const request = useRequestFetch()
 const toast = useToast()
-const search = ref('')
-const includeRetired = ref(true)
-const categoryId = ref<string | undefined>(undefined)
-const page = ref(1)
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
@@ -23,19 +20,6 @@ interface Listing<T> { items: T[], total: number, pageSize: number, pages: numbe
 
 const noProducts = (): Listing<BarProduct> => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 const noCategories = (): Listing<BarCategory> => ({ items: [], total: 0, pageSize: 0, pages: 1 })
-
-const { data, status, error, refresh } = await useAsyncData(
-  'bar-products',
-  () => request<Listing<BarProduct>>('/api/admin/bar/products', {
-    query: {
-      includeRetired: includeRetired.value,
-      categoryId: categoryId.value,
-      search: search.value.trim() || undefined,
-      page: page.value,
-    },
-  }),
-  { watch: [page], default: noProducts },
-)
 
 // The form needs the categories, not the page the categories screen shows. The page cap is the
 // ceiling, which no bar's category list comes near.
@@ -45,10 +29,17 @@ const { data: categories } = await useAsyncData(
   { default: noCategories },
 )
 
-watch([search, includeRetired, categoryId], () => {
-  if (page.value === 1) void refresh()
-  else page.value = 1
-})
+const categoryOptions = computed(() => categories.value.items.map(item => ({ label: item.name, value: item.id })))
+const filterOptions = computed<Record<string, FilterOption[]>>(() => ({ categoryId: categoryOptions.value }))
+
+// Search, filters, sort and page live in the URL (K-129).
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(barProductsList, { options: filterOptions })
+
+const { data, status, error, refresh } = await useAsyncData(
+  'bar-products',
+  () => request<Listing<BarProduct>>('/api/admin/bar/products', { query: query.value }),
+  { watch: [query], default: noProducts },
+)
 
 const editing = ref<BarProduct | null>(null)
 const open = ref(false)
@@ -83,7 +74,6 @@ watch(() => state.allergenState, (chosen) => {
   if (chosen === 'UNKNOWN') state.allergenNote = undefined
 })
 
-const categoryOptions = computed(() => categories.value.items.map(item => ({ label: item.name, value: item.id })))
 const allergenOptions = ALLERGEN_STATES.map(value => ({ label: says(value), value }))
 
 async function reload(): Promise<void> {
@@ -172,27 +162,6 @@ async function remove(): Promise<void> {
 }
 
 const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The products could not be read.') : null))
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (categoryId.value) {
-    const named = categories.value.items.find(item => item.id === categoryId.value)?.name ?? 'a category'
-    active.push({ key: 'category', label: `In ${named}`, icon: 'i-lucide-layout-grid', clear: () => {
-      categoryId.value = undefined
-    } })
-  }
-  if (!includeRetired.value) {
-    active.push({ key: 'retired', label: 'Hiding retired', icon: 'i-lucide-archive', clear: () => {
-      includeRetired.value = true
-    } })
-  }
-  return active
-})
 
 const columns: TableColumn<BarProduct>[] = [
   {
@@ -312,27 +281,19 @@ const columns: TableColumn<BarProduct>[] = [
     <AdminToolbar
       v-model:search="search"
       placeholder="A product"
-      :active="activeFilters"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''; includeRetired = true; categoryId = undefined"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Category">
-          <USelect
-            v-model="categoryId"
-            :items="categoryOptions"
-            placeholder="Every category"
-            class="w-48"
-            data-test="products-category"
-          />
-        </UFormField>
-        <UFormField label="Show">
-          <USwitch
-            v-model="includeRetired"
-            label="Including retired products"
-            data-test="products-retired"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="barProductsList"
+          :conditions="conditions"
+          :sort="sort"
+          :options="filterOptions"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -355,7 +316,7 @@ const columns: TableColumn<BarProduct>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ search ? 'No product matches that.' : 'No products yet. Add a category first, then what the bar sells.' }}
+          {{ filtered ? 'No product matches that.' : 'No products yet. Add a category first, then what the bar sells.' }}
         </p>
       </template>
     </UTable>
