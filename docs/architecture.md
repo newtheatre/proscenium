@@ -1506,6 +1506,18 @@ the cache.
 No screen adopts this yet: F-103 (till) and D-126 (door) build the writes that will call it. This
 is the mechanism K-103 set the precedent for landing ahead of the screens that need it.
 
+### The member's own summary (K-127)
+
+`GET /api/my/summary` is the one request `/my` makes. `shared/utils/my-summary.ts` declares
+`MySummary`, a column allow-list for the eight tiles; `server/utils/my-summary.ts` exports the
+pure `assembleMySummary()`, which shapes it from already-fetched facts and derives
+`onShiftTonight`, the membership state word and a room booking's `cancellable` flag, and nothing
+in it reaches a database, which is what makes the allow-list provable in a unit test. The
+endpoint itself does the fetching, one bounded read per tile (`myShiftsQuery`, `longestTerm`,
+`ownClaim`, a new `nextRoomBooking`, `listModules`/`modulesHeldBy`/`whatsNextFor`,
+`sessionsForMember`, a new `activePasses`/`openPassRequest`, `recentInbox`, `publicListing`), run
+with `Promise.all` rather than in sequence.
+
 ## Environments
 
 | | Database | Email | Payments |
