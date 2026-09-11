@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { MAX_ACCESS_TICKETS_PER_PERFORMANCE, isEntitledToAccessTickets } from '#shared/utils/access-profiles'
 import { remainingSeats, saleRefusal } from '#shared/utils/programme'
+import { resolveHoldReleaseMinutes } from '#shared/utils/reservations'
 
 // Deliberately public: what the booking form needs before it asks for a name and an email
 // (D-104). This route, never the cacheable public listing, is where entitlement is read (D-109 criterion 2).
@@ -59,6 +60,9 @@ export default defineEventHandler(async (event) => {
       waitingListUrl: soldOut ? `/waiting-list/${id}` : undefined,
     },
     cap: await configValue(event, 'PUBLIC_ORDER_SEAT_CAP'),
+    // The page quotes the figure it is actually held to, per-show override included, rather than
+    // saying "shortly before curtain" (0012, D-106).
+    holdReleaseMinutes: resolveHoldReleaseMinutes(performance.holdReleaseMinutesBefore, await configValue(event, 'HOLD_RELEASE_MINUTES_BEFORE')),
     ticketTypes: visible,
     accessEntitlement: remaining,
     redeemablePass,

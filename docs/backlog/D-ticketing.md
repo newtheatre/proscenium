@@ -102,7 +102,8 @@ Open questions:
 - Depends on: D-101, D-105, D-112
 - Acceptance criteria:
   1. Guest checkout requires only a name and an email address; a reservation from a signed-in
-     account attaches to that account.
+     account attaches to that account. Both are validated on the field they concern, in house copy:
+     neither a Zod default nor the server's own "Invalid request: guest.email" reaches a reader.
   2. At most 10 tickets per order, enforced both per line and as the order total; an order over
      the cap is refused with the box office contact for larger parties.
   3. A reservation writes the reservation row and its price-snapshotted tickets in one atomic
@@ -113,7 +114,11 @@ Open questions:
      address) and every refusal is enumeration-safe.
   6. A guest who later registers with the same verified email address sees their guest
      reservations in their account (module A claim flow).
-- Source: Prompt Book D-2; audit PR-2
+  7. The screen is one page in three numbered steps, breadcrumbed from the show: pick a performance
+     from the run, choose tickets, give your details, with the order as a ticket stub beside them
+     carrying the view's one marquee. The stub quotes the hold-release figure from configuration
+     rather than saying "shortly before curtain".
+- Source: Prompt Book D-2; audit PR-2; booking.png
 
 ## D-105: Capacity enforced by the database
 
