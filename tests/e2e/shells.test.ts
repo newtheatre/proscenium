@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
-import { openView, skipReason, startApp } from '#tests/helpers/webview'
+import { click, openView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
@@ -101,6 +101,30 @@ describe.skipIf(skip !== null)('the three shells (docs/design-language.md)', () 
       }
     }
   }, 150_000)
+
+  // UHeader wraps the title slot in its own anchor, so a link inside it nests one anchor in
+  // another and the page hydrates with a mismatch on every load (#895).
+  test('the header title is one anchor deep', async () => {
+    expect(await inspect<number>('/', `document.querySelectorAll('header a a').length`)).toBe(0)
+  })
+
+  // The toggle is a phone visitor's only navigation control, so the panel behind it has to carry
+  // the links rather than open empty (#894).
+  test('the mobile header panel carries the public links', async () => {
+    const link = `[...document.querySelectorAll('[data-test=header-nav-mobile] a')].find(node => node.innerText.includes("What's on"))`
+    const view = await openView({ width: 390, height: 780 })
+    try {
+      await visit(view, `${app.baseURL}/`)
+      await click(view, 'header button')
+      await waitFor(view, link)
+      await view.evaluate(`${link}.click()`)
+      await waitFor(view, `location.pathname === '/whats-on'`)
+      expect(await view.evaluate<string>('location.pathname')).toBe('/whats-on')
+    }
+    finally {
+      view.close()
+    }
+  })
 
   // No poster kit in the console. On /dev because it wears the console layout and holds no
   // middleware, so a signed-out view renders the shell rather than the sign-in screen (0040).
