@@ -76,7 +76,7 @@ const { data: nightly, refresh: refreshNightly, error: nightlyError } = await us
 )
 
 // The failure is shown rather than left to a silent "no results", since a fetch a shift opens on
-// can refuse for reasons the empty state cannot say (#899).
+// can refuse for reasons the empty state cannot say.
 const nightlyFailure = computed(() => (nightlyError.value ? refusalText(nightlyError.value, 'Tonight could not be read.') : null))
 
 watch(nightly, (value) => {
@@ -110,7 +110,7 @@ async function search(): Promise<void> {
 }
 
 // Immediate, since the nightly watcher above may already have set performanceId synchronously
-// before this one registers, and a shift that opens the desk fresh still wants tonight's list (#940).
+// ahead of this one registering, and a shift that opens the desk fresh still wants tonight's list.
 watch(performanceId, () => {
   results.value = []
   q.value = ''
@@ -468,7 +468,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
           <template v-if="selected.status === 'PENDING'">
             <UFormField label="Tender">
               <!-- A URadioGroup, not USelect: choosing a value inside a select nested in this modal
-                   left its own backdrop swallowing clicks after close (#939, Nuxt UI issue). -->
+                   left its own backdrop swallowing clicks after close (a Nuxt UI defect). -->
               <URadioGroup
                 v-model="tender"
                 orientation="horizontal"

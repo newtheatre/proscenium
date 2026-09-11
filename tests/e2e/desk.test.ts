@@ -432,8 +432,8 @@ describe.skipIf(skip !== null)('opening the desk by a full page load (#899, #940
   }, CASE_TIMEOUT_MS)
 })
 
-// #939: choosing COMP used to leave the reservation modal's own backdrop as an overlay that
-// swallowed every further click. A URadioGroup replaced the nested select.
+// Choosing COMP left the reservation modal's own backdrop as an overlay that swallowed every
+// further click; a URadioGroup replaces the nested select that caused it.
 describe.skipIf(skip !== null)('raising a comp from the desk with real pointer events (#939)', () => {
   test('choosing COMP still lets the reason be typed and the request sent', async () => {
     const { performanceId, ticketTypeId } = await bookableShow(900)

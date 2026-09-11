@@ -45,9 +45,8 @@ const props = withDefaults(defineProps<{
 // been cleared.
 const chosen = ref<Item | null>(null)
 
-// A caller that already knows who was chosen, such as fulfilling a request by name, shows them
-// without a round trip through search (#940 criterion 3). Exposed before the await below: after
-// one, defineExpose no longer attaches to this component's instance.
+// A caller that already knows who was chosen shows them without a round trip through search.
+// Exposed above the await below: defineExpose after one no longer attaches to the instance.
 function preset(person: { id: string, name: string, email: string }): void {
   chosen.value = { label: person.name, value: person.id, email: person.email, hint: null, erased: false }
   model.value = person.id

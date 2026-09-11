@@ -35,7 +35,7 @@ const { data: passTypes, refresh: refreshPassTypes, error: passTypesError } = aw
   { default: (): SellablePassType[] => [] },
 )
 
-// Shown rather than a bare "Nothing is on sale", which a refused fetch also rendered (#899).
+// Shown rather than a bare "Nothing is on sale", which a refused fetch also rendered.
 const passTypesFailure = computed(() => (passTypesError.value ? refusalText(passTypesError.value, 'The sellable passes could not be read.') : null))
 
 const passTypeId = ref<string | undefined>(undefined)
@@ -62,7 +62,7 @@ watch(passTypeId, loadRequests, { immediate: true })
 
 const priceId = ref<string | undefined>(undefined)
 // Immediate: selectedPassType is already set by the time this registers, since the watcher
-// above runs synchronously first, and a price left blank silently zeroes what Issue charges (#940).
+// above runs synchronously first, and a price left blank silently zeroes what Issue charges.
 watch(selectedPassType, (type) => {
   priceId.value = type?.prices[0]?.id
 }, { immediate: true })
@@ -73,7 +73,7 @@ const personPicker = useTemplateRef('personPicker')
 const requestId = ref<string | undefined>(undefined)
 
 // A person is chosen, never typed (0032): the picker's own preset shows the requester's name
-// without a search, since fulfilling a request already knows exactly who they are (#940, #924).
+// without a search, since fulfilling a request already knows exactly who they are.
 function fulfilRequest(request: PendingRequest): void {
   requestId.value = request.id
   buyerId.value = request.userId
