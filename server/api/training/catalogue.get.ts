@@ -20,8 +20,11 @@ export default defineEventHandler(async (event) => {
   const departments = await listDepartments(false)
   const named = new Map(departments.map(department => [department.code, department.name]))
 
+  const today = londonToday()
   const prerequisites = await prerequisitesOf(items.map(module => module.id))
-  const held = account ? await modulesHeldBy(account.id, londonToday()) : null
+  const held = account ? await modulesHeldBy(account.id, today) : null
+  const nextSessions = await nextOpenSessions(today)
+  const requested = account ? await openRequestsOf(account.id) : null
 
   return {
     items: items.map(module => ({
@@ -43,6 +46,8 @@ export default defineEventHandler(async (event) => {
       // A Drive folder is not a public page, so a signed-out visitor is not given the link.
       materials: account ? module.materials : [],
       held: held ? held.has(module.id) : null,
+      nextSession: nextSessions.get(module.id) ?? null,
+      requested: requested ? requested.has(module.id) : null,
     })),
     departments: departments
       .filter(department => items.some(module => module.department === department.code))

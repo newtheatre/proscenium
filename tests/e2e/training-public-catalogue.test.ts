@@ -128,6 +128,45 @@ describe.skipIf(skip !== null)('the catalogue answers without an account (G-128)
     }
   }, CASE_TIMEOUT_MS)
 
+  test('the catalogue names each module\'s earliest open session, from one grouped query (G-129)', async () => {
+    const soon = await addModule({ name: 'Working the desk' })
+    const untaught = await addModule({ name: 'Rigging a lantern' })
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+    const later = new Date(Date.now() + 172_800_000).toISOString().slice(0, 10)
+
+    // Two sessions teach the same module; the catalogue names the earlier one.
+    await send('POST', '/api/admin/training/sessions', {
+      heldOn: later, startsAt: '18:00', endsAt: '20:00', place: 'Green room', capacity: 10, moduleIds: [soon],
+    })
+    const answered = await send('POST', '/api/admin/training/sessions', {
+      heldOn: tomorrow, startsAt: '18:00', endsAt: '20:00', place: 'Studio', capacity: 10, moduleIds: [soon],
+    })
+    expect(answered.status).toBe(200)
+
+    const { items } = await (await send('GET', '/api/training/catalogue', undefined, '')).json() as {
+      items: { id: string, nextSession: { heldOn: string, place: string } | null }[]
+    }
+    expect(items.find(item => item.id === soon)?.nextSession).toMatchObject({ heldOn: tomorrow, place: 'Studio' })
+    expect(items.find(item => item.id === untaught)?.nextSession).toBeNull()
+  }, CASE_TIMEOUT_MS)
+
+  test('a signed-in member sees their own open request against the module, and nobody else\'s', async () => {
+    const asked = await addModule({ name: 'Rigging a lantern' })
+    const untouched = await addModule({ name: 'Working the desk' })
+    await send('POST', '/api/training/requests', { moduleId: asked })
+
+    const { items } = await (await send('GET', '/api/training/catalogue')).json() as {
+      items: { id: string, requested: boolean | null }[]
+    }
+    expect(items.find(item => item.id === asked)?.requested).toBe(true)
+    expect(items.find(item => item.id === untouched)?.requested).toBe(false)
+
+    const anonymous = await (await send('GET', '/api/training/catalogue', undefined, '')).json() as {
+      items: { id: string, requested: boolean | null }[]
+    }
+    expect(anonymous.items.find(item => item.id === asked)?.requested).toBeNull()
+  }, CASE_TIMEOUT_MS)
+
   test('the old catalogue address still arrives somewhere', async () => {
     const view = await openSignedOutView(app.baseURL)
     try {
