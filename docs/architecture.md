@@ -1364,7 +1364,13 @@ follow. Each is retired rather than deleted once anything points at it: `VENUE_R
 emergency card, a shift template, a checklist, a closed night, the backstage board, a comp or a
 till session); a season or a category is in use through `shows.season_id` or `shows.category_id`
 alone. `GET /api/admin/shows/[id]` carries the category and season pickers the show screen uses,
-and publishing refuses a show whose category or season was retired after it was drafted.
+and publishing refuses a show whose category or season was retired after it was drafted. Its
+performances also answer as a console list of their own at `GET /api/admin/shows/[id]/performances`,
+declared in `shared/utils/performances-list.ts` and filtered by status, venue, curtain day and
+whether the performance is ticketed elsewhere (D-132). The show id is the endpoint's own
+predicate, so a filtered list is still one show's list. The same payload carries `unpaidTickets`,
+counted from seats on open holds, and the show row carries its house, its next curtain and that
+same unpaid figure for the status strip.
 
 Access profiles are declared at `/account/access` and verified at `/box-office/access-profiles`
 (D-127), the one screen `access.verify` gates rather than any of the box office's ordinary

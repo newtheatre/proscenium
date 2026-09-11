@@ -40,6 +40,33 @@ export function heldSeatsColumn(alias: string): SQL {
   return heldSeatsSubquery(sql`${sql.raw(alias)}.id`)
 }
 
+// Seats held but not yet paid for: a PENDING reservation is somebody coming who still owes the
+// desk, which is the queue D-132 criterion 2 names.
+export function unpaidSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    WHERE t.performance_id = ${performanceId}
+      AND t.refunded_at IS NULL
+      AND r.status = 'PENDING'
+  )`
+}
+
+// Correlated to a row already in hand, so a listing reads many performances without binding a
+// parameter per performance (0006).
+export function unpaidSeatsColumn(alias: string): SQL {
+  return unpaidSeatsSubquery(sql`${sql.raw(alias)}.id`)
+}
+
+// The same count for a whole show, scoped through its performances by subquery rather than by an
+// id list read back from a result set (0006).
+export function showUnpaidSeatsColumn(alias: string): SQL {
+  return sql`(
+    SELECT coalesce(sum(${unpaidSeatsSubquery(sql`sup.id`)}), 0)
+    FROM performances sup WHERE sup.show_id = ${sql.raw(alias)}.id
+  )`
+}
+
 // True while the house can still take `seats` more, counting everybody but `except`. A caller
 // appends this to its own WHERE, so the check and the write are one statement (D-105 criterion 2).
 export function capacityAllows(performanceId: string, capacity: number | null, seats: number, except?: string): SQL {
