@@ -162,6 +162,8 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
         </div>
       </div>
 
+      <BoxOfficeShowStatusStrip :show="show" />
+
       <UTabs
         v-model="active"
         :content="false"
@@ -182,7 +184,6 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
       <BoxOfficeShowPerformances
         v-else-if="active === 'performances'"
         :show="show"
-        :performances="performances"
         :venues="venues"
         @changed="refresh()"
       />

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { h } from 'vue'
+import { h, resolveComponent } from 'vue'
 import { formatLondon } from '#shared/utils/london'
+import { soldShare } from '#shared/utils/show-strip'
 import type { TableColumn } from '@nuxt/ui'
 import type { VNode } from 'vue'
 import type { AdminPerformance } from '#shared/utils/programme'
@@ -10,6 +11,8 @@ import type { AdminPerformance } from '#shared/utils/programme'
 
 const props = defineProps<{ performances: AdminPerformance[] }>()
 
+const UProgress = resolveComponent('UProgress')
+
 const capacityOf = (one: AdminPerformance): number | null =>
   (one.externalBookingUrl ? null : one.capacityOverride ?? one.venueCapacity)
 
@@ -17,6 +20,7 @@ const rows = computed(() => props.performances)
 
 const figure = (value: string): VNode => h('span', { class: 'font-mono text-sm' }, value)
 
+const unpaidTotal = computed(() => rows.value.reduce((sum, one) => sum + (one.externalBookingUrl ? 0 : one.unpaidTickets), 0))
 const soldTotal = computed(() => rows.value.reduce((sum, one) => sum + (one.externalBookingUrl ? 0 : one.soldTickets), 0))
 const capacityTotal = computed(() => rows.value.reduce((sum, one) => sum + (capacityOf(one) ?? 0), 0))
 
@@ -46,9 +50,23 @@ const columns = computed<TableColumn<AdminPerformance>[]>(() => [
     header: 'Sold',
     meta: { class: { th: 'text-right', td: 'text-right whitespace-nowrap' } },
     footer: () => figure(`${soldTotal.value}`),
+    cell: ({ row }) => {
+      if (row.original.externalBookingUrl) return h('span', { class: 'text-sm text-muted' }, 'n/a')
+      const share = soldShare(row.original.soldTickets, capacityOf(row.original) ?? 0)
+      return h('div', { class: 'flex flex-col items-end gap-1' }, [
+        figure(`${row.original.soldTickets}`),
+        share === null ? null : h(UProgress, { modelValue: share, size: '2xs', class: 'w-20' }),
+      ])
+    },
+  },
+  {
+    id: 'unpaid',
+    header: 'Unpaid',
+    meta: { class: { th: 'text-right', td: 'text-right whitespace-nowrap' } },
+    footer: () => figure(`${unpaidTotal.value}`),
     cell: ({ row }) => (row.original.externalBookingUrl
       ? h('span', { class: 'text-sm text-muted' }, 'n/a')
-      : figure(`${row.original.soldTickets}`)),
+      : figure(`${row.original.unpaidTickets}`)),
   },
   {
     id: 'remaining',
@@ -71,7 +89,7 @@ const columns = computed<TableColumn<AdminPerformance>[]>(() => [
         How the run is selling
       </h3>
       <p class="text-sm text-muted">
-        Counted from the seats held right now, so a released hold is back in the house here too.
+        Counted from the seats held right now, so a released hold is back in the house here too. Unpaid is what the desk still has to take money for.
       </p>
     </template>
 

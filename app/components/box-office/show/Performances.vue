@@ -2,23 +2,22 @@
 import { h, resolveComponent } from 'vue'
 import { formatLondon, fromLondonWallClock } from '#shared/utils/london'
 import {
-  PERFORMANCE_STATUSES,
   bookingWindowSource,
   performanceScreenForm,
   resolveBookingClosesHours,
   saysBookingWindow,
   saysPerformanceStatus,
 } from '#shared/utils/programme'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { performancesList } from '#shared/utils/performances-list'
 import type { TableColumn } from '@nuxt/ui'
-import type { AdminPerformance, AdminShow, PerformanceStatus, ShowVenue } from '#shared/utils/programme'
+import type { FilterOption } from '#shared/utils/list-filters'
+import type { AdminPerformance, AdminShow, ShowVenue } from '#shared/utils/programme'
 
 // Every performance of one show, with the four actions that belong to a performance: edit, price,
 // put on or off sale, cancel or delete (D-121, D-122).
 
 const props = defineProps<{
   show: AdminShow
-  performances: AdminPerformance[]
   venues: ShowVenue[]
 }>()
 
@@ -27,18 +26,39 @@ const emit = defineEmits<{ changed: [] }>()
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
 
+const request = useRequestFetch()
 const toast = useToast()
 const saving = ref(false)
 const failure = ref<string | null>(null)
 
-const search = ref('')
-const performanceStatus = ref<PerformanceStatus | 'ALL'>('ALL')
+interface Listing { items: AdminPerformance[], total: number, pageSize: number, pages: number }
+const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
-const rows = computed(() => props.performances.filter((one) => {
-  const matchesStatus = performanceStatus.value === 'ALL' || one.status === performanceStatus.value
-  const term = search.value.trim().toLowerCase()
-  return matchesStatus && (!term || one.venueName.toLowerCase().includes(term))
+// The venue names the chips and the picker read; the declaration names the column, not the rows.
+const venueLabels = computed<Record<string, FilterOption[]>>(() => ({
+  venueId: props.venues.map(one => ({ value: one.id, label: one.name })),
 }))
+
+// Search, filters, sort and page live in the URL (K-129). The tab is the page's own key, so it
+// stays in the URL and never reaches the endpoint's strict schema.
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear }
+  = useListQuery(performancesList, { options: venueLabels, ignore: ['tab'] })
+
+const { data, status: loading, error: listingError, refresh } = await useAsyncData(
+  () => `box-office-show-performances-${props.show.id}`,
+  () => request<Listing>(`/api/admin/shows/${props.show.id}/performances`, { query: query.value }),
+  { watch: [query], default: empty },
+)
+
+const rows = computed(() => data.value.items)
+
+const listingFailure = computed(() => (listingError.value ? refusalText(listingError.value, 'The performances could not be read.') : null))
+
+// The page above holds the status strip, which counts the same rows this list changes.
+async function changed(): Promise<void> {
+  await refresh()
+  emit('changed')
+}
 
 const performanceOpen = ref(false)
 const editingPerformance = ref<AdminPerformance | null>(null)
@@ -137,7 +157,7 @@ async function savePerformance(): Promise<void> {
       color: 'success',
     })
     performanceOpen.value = false
-    emit('changed')
+    await changed()
   }
   catch (refused) {
     failure.value = refusalText(refused)
@@ -152,7 +172,7 @@ async function setOnSale(one: AdminPerformance, onSale: boolean): Promise<void> 
   try {
     await $fetch(`/api/admin/performances/${one.id}/sale`, { method: 'POST', body: { onSale } })
     toast.add({ title: onSale ? 'Performance on sale' : 'Performance off sale', icon: 'i-lucide-check', color: 'success' })
-    emit('changed')
+    await changed()
   }
   catch (refused) {
     failure.value = refusalText(refused)
@@ -179,7 +199,7 @@ async function cancelPerformance(): Promise<void> {
       color: answer.ticketsOwedARefund ? 'warning' : 'success',
     })
     cancelling.value = null
-    emit('changed')
+    await changed()
   }
   catch (refused) {
     failure.value = refusalText(refused)
@@ -198,7 +218,7 @@ async function deletePerformance(): Promise<void> {
     await $fetch(`/api/admin/performances/${one.id}`, { method: 'DELETE' })
     toast.add({ title: 'Performance deleted', icon: 'i-lucide-check', color: 'success' })
     removing.value = null
-    emit('changed')
+    await changed()
   }
   catch (refused) {
     failure.value = refusalText(refused)
@@ -214,26 +234,6 @@ const venueOptions = computed(() => props.venues
   .filter(one => !one.archived || one.id === editingPerformance.value?.venueId)
   .map(one => ({ label: one.name, value: one.id })))
 const bookableVenues = computed(() => props.venues.filter(one => !one.archived))
-
-const statusOptions = [
-  { label: 'Every performance', value: 'ALL' },
-  ...PERFORMANCE_STATUSES.map(one => ({ label: saysPerformanceStatus(one), value: one })),
-]
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `At ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (performanceStatus.value !== 'ALL') {
-    active.push({ key: 'status', label: saysPerformanceStatus(performanceStatus.value), icon: 'i-lucide-ticket', clear: () => {
-      performanceStatus.value = 'ALL'
-    } })
-  }
-  return active
-})
 
 function windowOf(one: AdminPerformance): string {
   const inherited = { bookingClosesHoursBefore: props.show.bookingClosesHoursBefore }
@@ -352,6 +352,14 @@ const columns: TableColumn<AdminPerformance>[] = [
 <template>
   <div class="space-y-6">
     <UAlert
+      v-if="listingFailure"
+      data-test="listing-failure"
+      color="error"
+      variant="subtle"
+      :description="listingFailure"
+    />
+
+    <UAlert
       v-if="failure"
       data-test="failure"
       color="error"
@@ -361,19 +369,20 @@ const columns: TableColumn<AdminPerformance>[] = [
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A venue"
-      :active="activeFilters"
-      @clear="search = ''; performanceStatus = 'ALL'"
+      :placeholder="performancesList.search?.placeholder"
+      :active="active"
+      :loading="loading === 'pending'"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Show">
-          <USelect
-            v-model="performanceStatus"
-            :items="statusOptions"
-            class="w-full"
-            data-test="performances-status"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="performancesList"
+          :conditions="conditions"
+          :sort="sort"
+          :options="venueLabels"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -391,14 +400,30 @@ const columns: TableColumn<AdminPerformance>[] = [
     <UTable
       :data="rows"
       :columns="columns"
+      :loading="loading === 'pending'"
       data-test="performances-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ search || performanceStatus !== 'ALL' ? 'No performance matches that.' : 'No performances yet. Add one, and it waits off sale until you say otherwise.' }}
+          {{ filtered ? 'No performance matches that.' : 'No performances yet. Add one, and it waits off sale until you say otherwise.' }}
         </p>
       </template>
     </UTable>
+
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p
+        data-test="performances-total"
+        class="text-sm text-muted"
+      >
+        {{ plural(data.total, 'performance', 'performances') }}
+      </p>
+      <UPagination
+        v-if="data.pages > 1"
+        v-model:page="page"
+        :total="data.total"
+        :items-per-page="data.pageSize"
+      />
+    </div>
 
     <UModal
       v-model:open="performanceOpen"
