@@ -25,9 +25,8 @@ import type { SQL } from 'drizzle-orm'
 const listable = (at: number): SQL =>
   sql`p.status <> 'DRAFT' AND p.starts_at >= ${at}`
 
-// Listed, on an alias `s`: published, with a performance still to come, so a finished run drops off
-// on its own. The listing, its count and the sitemap all read this one predicate (K-125).
-// A venue narrows what counts as still to come, so the filter and the count cannot disagree.
+// Listed, on alias `s`: published, with a performance still to come, optionally in one venue.
+// The listing, its count and the sitemap read this one predicate, so they cannot disagree (K-125).
 export const listedShowPredicate = (at: number, venue?: string | null): SQL => sql`
   s.status = 'PUBLISHED'
   AND EXISTS (SELECT 1 FROM performances p
