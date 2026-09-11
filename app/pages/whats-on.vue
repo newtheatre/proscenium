@@ -11,23 +11,26 @@ useSeoMeta({
 interface Listing { items: ListedShow[], total: number, page: number, pageSize: number, pages: number }
 
 const page = ref(1)
-const venue = ref('')
+
+// A tab value is never empty, or the tab strip has nothing to select; "all" is the absent filter.
+const venue = ref('all')
+const wanted = computed(() => (venue.value === 'all' ? undefined : venue.value))
 
 const { data, status } = await useFetch<Listing>('/api/whats-on', {
-  query: { page, venue },
+  query: { page, venue: wanted },
   default: (): Listing => ({ items: [], total: 0, page: 1, pageSize: 25, pages: 1 }),
 })
 
-// The venues with something on, read from the unfiltered first load and then kept: filtering by
-// one of them must not narrow the list of the others down to itself.
+// The venues with something on, read from the unfiltered load and then kept: filtering by one of
+// them must not narrow the list of the others down to itself.
 const venues = ref<string[]>([])
 watchEffect(() => {
-  if (venue.value) return
+  if (wanted.value) return
   venues.value = [...new Set(data.value.items.flatMap(listed => listed.performances.map(one => one.venueName)))].sort()
 })
 
 const tabs = computed(() => [
-  { label: 'All', value: '' },
+  { label: 'All', value: 'all' },
   ...venues.value.map(name => ({ label: name, value: name })),
 ])
 
