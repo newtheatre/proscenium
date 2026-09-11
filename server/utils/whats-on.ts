@@ -17,8 +17,6 @@ import type { ShowContentWarning } from '#shared/utils/content-warnings'
 import type { ListedPerformance, ListedShow, PublicPrice, PublicShow } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 
-export type { ListedPerformance, ListedShow, PublicPrice } from '#shared/utils/programme'
-
 // The public programme (D-101, D-102). Every payload here goes through the allow-listed
 // projections in `shared/utils/programme.ts`; no column reaches a visitor without being named.
 
