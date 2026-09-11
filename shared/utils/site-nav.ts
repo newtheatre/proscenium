@@ -207,9 +207,8 @@ export const CONSOLE_NAV: NavGroup[] = [
   },
 ]
 
-// The member's own screens: what is mine right now (K-127 criterion 2). The footer and the
-// account menu show these to everybody and send a signed-out visitor through /sign-in?next=, so
-// somebody who followed a link still arrives where they meant to.
+// The member's own screens: what is mine right now (K-127 criterion 2). A signed-out visitor
+// who followed a link is sent through /sign-in?next= to arrive where they meant to.
 export const MY_NAV: NavEntry[] = [
   // Module K: platform
 
