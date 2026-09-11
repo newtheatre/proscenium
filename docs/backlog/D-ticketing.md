@@ -7,7 +7,7 @@ half of this module reserves and the desk takes payment (Get-In constraint 1). G
 the core model; capacity is a count enforced by the database, and seat maps are deliberately Later
 (Get-In constraint 4).
 
-Stories: 40 total. 32 MVP (D-101 to D-132), 5 V2 (D-201 to D-206, with D-205 resolved as
+Stories: 42 total. 32 MVP (D-101 to D-132), 7 V2 (D-201 to D-208, with D-205 resolved as
 won't-build), 2 Later epics (D-301, D-302).
 
 Open questions:
@@ -62,7 +62,8 @@ Open questions:
      renders the two differently, and an unassessed published show is flagged on the committee
      dashboard.
   3. The show page carries age guidance, running time, interval information and latecomer policy
-     alongside the warnings.
+     alongside the warnings. The hero states the four a visitor decides on (dates, running time,
+     tickets, guidance); interval and latecomers are practical detail and sit with the prose.
   4. Warnings and age guidance set on the show flow through to the e-ticket (D-108) and the
      show-night screens (module E) from the same rows, never re-entered.
 - Source: Prompt Book D-1; audit PR-7 (vocabulary and confirmed-none carried from proscenium)
@@ -803,6 +804,42 @@ Open questions:
   4. All exports respect the row cap, the formula-injection guard and the column allow-list
      rules from D-129.
 - Source: Prompt Book D-7, I-3; audit PR-7
+
+## D-207: A performance carries its own access flags
+
+- Role: Visitor
+- Phase: V2
+- Story: As a theatregoer who needs a captioned or a relaxed performance, I want to see which night
+  is which before I choose so that the access I need is a night I pick, not a favour I ask for.
+- Depends on: D-101, D-102
+- Acceptance criteria:
+  1. A performance carries structured access flags (captioned, relaxed, audio described, BSL
+     interpreted) set on the performance, never inferred from a note or a title.
+  2. The show page's performance list, the booking screen's performance cards and the show-night
+     glance all read the same flags, each rendering colour alongside words.
+  3. The show page's access alert names the flagged nights in prose rather than repeating the list.
+  4. A flag is part of the public listing payload and is therefore column allow-listed and
+     edge-cacheable on the same terms as availability (D-101 criterion 3).
+- Source: show-page.png and booking.png, which both show per-night access tags; the schema carries
+  none today, and accessibility in this system is per-person (D-127) rather than per-performance.
+
+## D-208: A newly published show is flagged as new
+
+- Role: Visitor
+- Phase: V2
+- Story: As a visitor returning to the site, I want to see at a glance which shows have gone on
+  sale since I last looked so that a new announcement is visible without me comparing lists.
+- Depends on: D-121
+- Acceptance criteria:
+  1. `shows` gains a publication timestamp set by the publish action and left alone by every later
+     edit, so that "new" does not move when somebody fixes a typo.
+  2. The show page and the what's-on listing show a NEW sticker for a configurable window after
+     publication, defaulting to a fortnight, spending the view's one sticker.
+  3. The window is a configuration key, enforced where it is read and quoted nowhere as a literal.
+  4. Unpublishing and republishing a show is a decision the committee makes deliberately, so it
+     resets the timestamp; the audit trail already records both (`show.published`).
+- Source: show-page.png and mobile-show.png, which both carry a NEW sticker; `shows` has no
+  publication timestamp today, only `created_at` and `updated_at`.
 
 ## D-301: Reserved-seating maps (epic)
 
