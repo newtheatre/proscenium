@@ -17,10 +17,6 @@ import { CONSOLE_HOME, CONSOLE_NAV, MEMBER_NAV, PUBLIC_NAV, SHELL_NAV } from '#s
 
 const PAGES = 'app/pages'
 
-// Criterion 6's list. Read only here and by the end-to-end suite; the rule that makes them
-// noindex is the disallow list itself.
-const NOINDEX_PAGES = ['/sign-in', '/register', '/reset', '/verify', '/magic', '/qr', '/board']
-
 const RULES = ROBOTS_DISALLOW.map(pattern => ({ pattern, allow: false }))
 const isCrawlable = (path: string): boolean => matchPathToRule(path, RULES) === null
 
@@ -57,7 +53,8 @@ describe('the crawl list and the navigation agree (K-125 criterion 2)', () => {
   })
 
   test('the auth and utility pages are not (criterion 6)', () => {
-    expect(NOINDEX_PAGES.filter(path => isCrawlable(path))).toEqual([])
+    const pages = ['/sign-in', '/register', '/reset', '/verify', '/magic', '/qr', '/board']
+    expect(pages.filter(path => isCrawlable(path))).toEqual([])
   })
 
   // A guarded page is one a visitor cannot open, whether or not any navigation names it.

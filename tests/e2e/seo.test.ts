@@ -13,8 +13,6 @@ import type { TestMember } from '#tests/helpers/accounts'
 // an old address lands. The lists themselves are pinned in tests/unit/seo.test.ts.
 
 const skip = skipReason()
-// Criterion 6's list; the rule that makes them noindex is the disallow list itself.
-const NOINDEX_PAGES = ['/sign-in', '/register', '/reset', '/verify', '/magic', '/qr', '/board']
 const BOOT_TIMEOUT_MS = 180_000
 // A cold route compiles on first request, and several of these cases open a handful each.
 const CASE_TIMEOUT_MS = 120_000
@@ -120,7 +118,8 @@ describe.skipIf(skip !== null)('what a crawler is told (K-125 criteria 2 and 6)'
   }, CASE_TIMEOUT_MS)
 
   test('the auth and utility pages are noindex and the home page is not', async () => {
-    for (const path of NOINDEX_PAGES) {
+    // Criterion 6's list; the rule that makes them noindex is the disallow list itself.
+    for (const path of ['/sign-in', '/register', '/reset', '/verify', '/magic', '/qr', '/board']) {
       expect(await html(path)).toMatch(/<meta name="robots" content="noindex/)
     }
     expect(await html('/')).toMatch(/<meta name="robots" content="index/)
