@@ -476,6 +476,26 @@ envelope (`items`, `total`, `more`, `counts`) and its server-side cap, because a
 tens of rows and not a paged list; its free-text search stayed client-side, now reading through
 `useListQuery` so it lives in the URL.
 
+The small-module pass migrates the audit trail (`audit-list.ts`), the backup drill log
+(`backup-drills-list.ts`), the send log (`send-log-list.ts`), the membership register
+(`memberships-list.ts`), the membership claims queue (`membership-claims-list.ts`) and the roll of
+Fellows (`fellowships-list.ts`). `comms/announce.vue` has no table to migrate; the send history
+under `comms/operations/accounts/[id].vue` is a bounded per-account detail view, one exact-match
+field and no sort, reached only by drilling in from the send log, and stays out of scope for the
+same reason a bar product's own variant list did. The audit trail gains a genuine `person`-kind
+field, `actor`, the mechanism's first: `ConsoleFilters` already wired `PersonPicker` up for it, and
+nothing before this needed to prove the wiring against real rows. The register's `filter` field
+carries a fifth option, `awaiting-record`, that the endpoint refuses to answer: selecting it swaps
+the whole screen to a different table through a different request instead of narrowing this one,
+so the declaration serves the URL and the toolbar without being the queue's own predicate. Both the
+register and the roll of Fellows hide a state by default the way the accounts directory hides
+anonymised rows: `current` when nothing is asked, with the toolbar showing no chip for it and the
+control itself reading as unset, matching the established pattern rather than a bespoke default
+selection. Free text that was previously an exact match (the audit trail's `target`, the send
+log's `type`) now searches as everywhere else does, a substring match on `search` rather than a
+dedicated query key; each still finds the same row for the full-string links already in use, since
+a value matches its own substring.
+
 ## Scheduled tasks
 
 All Nitro scheduled tasks mirrored in wrangler cron triggers. The system notices, humans
