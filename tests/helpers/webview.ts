@@ -483,7 +483,7 @@ const CHOOSE = (label: string): string => `(() => {
       .find(item => item.innerText.trim().startsWith(wanted))
   if (!option) return false
   const init = { bubbles: true, cancelable: true, button: 0 }
-  for (const type of ['pointermove', 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+  for (const type of ['pointermove', 'pointerdown', 'pointerup', 'click']) {
     option.dispatchEvent(type.startsWith('pointer')
       ? new PointerEvent(type, { ...init, pointerType: 'mouse', isPrimary: true })
       : new MouseEvent(type, init))
