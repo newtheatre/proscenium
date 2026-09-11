@@ -6,7 +6,7 @@
 // included, lives in the footer via PUBLIC_NAV (D-103).
 const { account } = useAccount()
 const links = computed(() => (account.value.signedIn
-  ? [{ label: 'What\'s on', to: '/whats-on' }, { label: 'Rooms', to: '/rooms' }, { label: 'My bookings', to: '/rooms/mine' }]
+  ? [{ label: 'What\'s on', to: '/whats-on' }, { label: 'My NNT', to: '/my' }]
   : [{ label: 'What\'s on', to: '/whats-on' }]))
 </script>
 

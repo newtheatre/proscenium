@@ -103,7 +103,7 @@ from Nuxt UI's structural components:
 | Surface | Layout | Built from |
 | --- | --- | --- |
 | Public site | `default` | `UHeader`, `UMain`, `UFooter`, `UFooterColumns`, `UNavigationMenu`, the `UPage*` family |
-| A member's own screens | `member` | The site header, a `UNavigationMenu` sub-nav, the shared footer. No sidebar |
+| A member's own screens | `member` | The site header, a `UNavigationMenu` sub-nav of `MY_NAV`, the shared footer. No sidebar. Account settings pages (`/account/profile`, `/account/security`, `/account/notifications`) additionally wrap in `AccountSettings.vue`, a `UPage` with a `UPageAside` of `ACCOUNT_NAV` |
 | Console: managing rooms, training, the bar, the box office, people, money | `console` | `UDashboardGroup`, `UDashboardSidebar`, `UDashboardPanel`, `UDashboardNavbar`, `UDashboardSearch`, `UTable` |
 | Show night | `tonight` | A plain dark subtree, because a phone held in a foyer is not a dashboard |
 
@@ -127,10 +127,10 @@ Four rules follow:
    and render from cache when the network drops (`architecture.md`, module K). Anything that only
    looks right on a desk monitor is wrong for the surface it is on.
 4. **Navigation is declared once and filtered by ability.** Every destination in the console
-   sidebar, the member sub-nav, the account menu and the footer comes from
-   `shared/utils/site-nav.ts`, and the console middleware guards a route from the same entry the
-   sidebar renders. A screen added to a layout and not to the declaration fails
-   `tests/unit/site-nav.test.ts` (0040).
+   sidebar, the member sub-nav (`MY_NAV`), account settings (`ACCOUNT_NAV`), the account menu and
+   the footer comes from `shared/utils/site-nav.ts`, and the console middleware guards a route
+   from the same entry the sidebar renders. A screen added to a layout and not to the declaration
+   fails `tests/unit/site-nav.test.ts` (0040).
 
 ## Photography and show artwork
 

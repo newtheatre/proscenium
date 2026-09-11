@@ -102,3 +102,20 @@ describe.skipIf(skip !== null)('an old link still arrives (0040)', () => {
     expect((await shell(officer.cookie, '/admin/people')).html).toContain('Accounts')
   })
 })
+
+describe.skipIf(skip !== null)('the members area and account settings split (K-127 criterion 2)', () => {
+  test('/my carries every MY_NAV destination for an ordinary member', async () => {
+    const answer = await fetch(`${app.baseURL}/my`, { headers: { cookie: member.cookie } })
+    expect(answer.status).toBe(200)
+    const html = await answer.text()
+    for (const href of ['/my', '/rota', '/rooms', '/rooms/mine', '/training', '/training/sessions', '/account/passes', '/account/access', '/account/membership']) {
+      expect(html).toContain(`href="${href}"`)
+    }
+  })
+
+  test('/account redirects a signed-in member to /my', async () => {
+    const answer = await fetch(`${app.baseURL}/account`, { headers: { cookie: member.cookie }, redirect: 'manual' })
+    expect([200, 302, 303]).toContain(answer.status)
+    if (answer.status !== 200) expect(answer.headers.get('location')).toContain('/my')
+  })
+})
