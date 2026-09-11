@@ -1,17 +1,14 @@
 <script setup lang="ts">
+import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import type { CatalogueModule } from '~/components/training/CatalogueTable.vue'
 
 definePageMeta({ layout: 'console', title: 'Training catalogue', middleware: 'console' })
 
 interface Department { code: string, name: string }
+interface Listing { items: CatalogueModule[], total: number, pageSize: number, pages: number }
 
 const request = useRequestFetch()
-
-const { data, status, refresh } = await useAsyncData(
-  'training-modules',
-  () => request<{ items: CatalogueModule[], total: number }>('/api/admin/training/modules'),
-  { default: (): { items: CatalogueModule[], total: number } => ({ items: [], total: 0 }) },
-)
+const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
 const { data: departments } = await useAsyncData(
   'training-modules-departments',
@@ -19,6 +16,15 @@ const { data: departments } = await useAsyncData(
   { default: () => ({ items: [] as Department[] }) },
 )
 
+// The prerequisite editor needs every module as a candidate, not only the table's current page:
+// a separate, unfiltered read rather than widening the table's own paged one (K-129).
+const { data: everyModule, refresh: refreshCandidates } = await useAsyncData(
+  'training-modules-candidates',
+  () => request<Listing>('/api/admin/training/modules', { query: { pageSize: MAX_PAGE_SIZE } }),
+  { default: empty },
+)
+
+const table = ref<{ refresh: () => Promise<void> } | null>(null)
 const open = ref(false)
 const editing = ref<CatalogueModule | null>(null)
 
@@ -33,7 +39,7 @@ function edit(module: CatalogueModule): void {
 }
 
 async function saved(): Promise<void> {
-  await refresh()
+  await Promise.all([table.value?.refresh(), refreshCandidates()])
 }
 </script>
 
@@ -48,9 +54,8 @@ async function saved(): Promise<void> {
     />
 
     <TrainingCatalogueTable
-      :modules="data.items"
+      ref="table"
       :departments="departments.items"
-      :loading="status === 'pending'"
       @add="add"
       @edit="edit"
     />
@@ -59,7 +64,7 @@ async function saved(): Promise<void> {
       v-model:open="open"
       :module="editing"
       :departments="departments.items"
-      :candidates="data.items"
+      :candidates="everyModule.items"
       @saved="saved"
     />
   </div>

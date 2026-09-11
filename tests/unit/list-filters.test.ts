@@ -32,6 +32,7 @@ import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import { sendLogList } from '#shared/utils/send-log-list'
 import { showsList } from '#shared/utils/shows-list'
 import { stocktakesList } from '#shared/utils/stocktakes-list'
+import { trainingModulesList } from '#shared/utils/training-modules-list'
 import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import { utilisationList } from '#shared/utils/utilisation-list'
 import type { FilterField, ListSpec } from '#shared/utils/list-filters'
@@ -74,7 +75,7 @@ const parse = (query: Record<string, string>) => filterQuerySchema(spec).safePar
 // The rooms module's declarations (K-129).
 const roomsLists = [roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList]
 // Every migrated declaration; the cross-declaration checks below walk this list.
-const MIGRATED = [accountsList, showsList, ...roomsLists, ...rotaLists, ...barLists, ...smallLists]
+const MIGRATED = [accountsList, showsList, ...roomsLists, ...rotaLists, ...barLists, ...smallLists, trainingModulesList]
 
 describe('the schema is derived from the declaration (criterion 1)', () => {
   test('an empty query is the first page, the default sort and no conditions', () => {

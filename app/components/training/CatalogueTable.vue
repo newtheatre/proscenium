@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { describeExpiry, saysDeliveryMode, saysKind, saysLifecycle } from '#shared/utils/training'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { trainingModulesList } from '#shared/utils/training-modules-list'
 import type { TableColumn } from '@nuxt/ui'
+import type { FilterOption } from '#shared/utils/list-filters'
 import type { DeliveryMode, ExpiryMode, ModuleKind, ModuleLifecycle } from '#shared/utils/training'
 
-// The table half of the catalogue screen: search, the department toggles and the rows
-// themselves. The editor is a sibling the page wires up (moved out whole, G-129).
+// The table half of the catalogue screen: its own paged read, its own declared filters (K-129),
+// and the rows. The editor is a sibling the page wires up (moved out whole, G-129).
 
 interface Material { label: string, url: string }
 
@@ -36,42 +37,35 @@ export interface CatalogueModule {
 }
 
 interface Department { code: string, name: string }
+interface Listing { items: CatalogueModule[], total: number, pageSize: number, pages: number }
 
-const props = defineProps<{
-  modules: CatalogueModule[]
-  departments: Department[]
-  loading: boolean
-}>()
-
+const props = defineProps<{ departments: Department[] }>()
 const emit = defineEmits<{ add: [], edit: [module: CatalogueModule] }>()
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
 
-const search = ref('')
-const department = ref<string | null>(null)
+const request = useRequestFetch()
+const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
-const shown = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  return props.modules.filter(module =>
-    (!department.value || module.department === department.value)
-    && (!term || [module.id, module.name].some(field => field.toLowerCase().includes(term))))
-})
+const departmentOptions = computed<Record<string, FilterOption[]>>(() => ({
+  department: props.departments.map(one => ({ value: one.code, label: `${one.code} ${one.name}` })),
+}))
 
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (department.value) {
-    active.push({ key: 'department', label: department.value, icon: 'i-lucide-building-2', clear: () => {
-      department.value = null
-    } })
-  }
-  return active
-})
+// Search, filters, sort and page live in the URL (K-129); the table refetches when any changes.
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(trainingModulesList, { options: departmentOptions })
+
+// defineExpose cannot follow an await, so the page's ref calls through this rather than the
+// composable's own refresh, which does not exist until the fetch below resolves.
+const holder = { refresh: async () => {} }
+defineExpose({ refresh: () => holder.refresh() })
+
+const { data, status: loading, refresh } = await useAsyncData(
+  'training-modules',
+  () => request<Listing>('/api/admin/training/modules', { query: query.value }),
+  { watch: [query], default: empty },
+)
+holder.refresh = refresh
 
 const columns: TableColumn<CatalogueModule>[] = [
   {
@@ -145,28 +139,20 @@ const columns: TableColumn<CatalogueModule>[] = [
   <div class="space-y-6">
     <AdminToolbar
       v-model:search="search"
-      placeholder="A module id or its title"
-      :active="activeFilters"
-      :loading="loading"
-      @clear="search = ''; department = null"
+      :placeholder="trainingModulesList.search?.placeholder"
+      :active="active"
+      :loading="loading === 'pending'"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Department">
-          <div class="flex flex-wrap gap-1">
-            <UButton
-              v-for="option in departments"
-              :key="option.code"
-              size="sm"
-              :color="department === option.code ? 'primary' : 'neutral'"
-              :variant="department === option.code ? 'solid' : 'outline'"
-              :aria-pressed="department === option.code"
-              :data-test="`filter-department-${option.code}`"
-              @click="department = department === option.code ? null : option.code"
-            >
-              {{ option.code }}
-            </UButton>
-          </div>
-        </UFormField>
+        <ConsoleFilters
+          :spec="trainingModulesList"
+          :conditions="conditions"
+          :sort="sort"
+          :options="departmentOptions"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -182,25 +168,33 @@ const columns: TableColumn<CatalogueModule>[] = [
     </AdminToolbar>
 
     <UTable
-      :data="shown"
+      :data="data.items"
       :columns="columns"
-      :loading="loading"
+      :loading="loading === 'pending'"
       data-test="modules-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
           {{ departments.length === 0
             ? 'Add a department first: every module belongs to one.'
-            : 'Nothing in the catalogue yet. Add a module and it starts as a draft.' }}
+            : filtered ? 'No module matches that.' : 'Nothing in the catalogue yet. Add a module and it starts as a draft.' }}
         </p>
       </template>
     </UTable>
 
-    <p
-      data-test="modules-total"
-      class="text-sm text-muted"
-    >
-      {{ plural(shown.length, 'module') }}
-    </p>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p
+        data-test="modules-total"
+        class="text-sm text-muted"
+      >
+        {{ plural(data.total, 'module') }}
+      </p>
+      <UPagination
+        v-if="data.pages > 1"
+        v-model:page="page"
+        :total="data.total"
+        :items-per-page="data.pageSize"
+      />
+    </div>
   </div>
 </template>

@@ -496,6 +496,17 @@ log's `type`) now searches as everywhere else does, a substring match on `search
 dedicated query key; each still finds the same row for the full-string links already in use, since
 a value matches its own substring.
 
+The training catalogue is migrated (`shared/utils/training-modules-list.ts`, `GET /api/admin/training/modules`,
+G-129): department is a `search-list` field, since its options exist only at runtime, the way a
+season does; kind, status (`lifecycle`) and delivery mode are closed lists against the catalogue's
+own vocabulary. A lead's own departments are a fixed predicate, `scopedClause`, ANDed on after
+`whereFrom` rather than a field the reader could turn off (G-110). The clause, the paged query and
+the row shape live in `server/utils/training-modules-list.ts` rather than beside the rest of the
+catalogue's server code in `server/utils/training.ts`, because that file leans on Nitro's ambient
+auto-imports and is never imported directly by a test; a declaration a test reads through
+`whereFrom` needs the explicit imports `server/utils/list-filters.ts` sets the precedent for
+(CONTRIBUTING, 0055).
+
 ## Scheduled tasks
 
 All Nitro scheduled tasks mirrored in wrangler cron triggers. The system notices, humans
