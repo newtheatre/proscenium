@@ -1,0 +1,17 @@
+{
+  "name": "proscenium",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers-extra/features/bun:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+  "postCreateCommand": "bun install --frozen-lockfile",
+  "remoteUser": "vscode",
+  "forwardPorts": [3000, 3101],
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "Vue.volar"]
+    }
+  }
+}
