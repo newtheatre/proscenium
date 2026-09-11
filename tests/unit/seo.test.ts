@@ -102,6 +102,22 @@ describe('every crawlable page carries a description (K-125 criterion 1)', () =>
     expect(missing).toEqual([])
   })
 
+  // J-111 criterion 4: a page a visitor can open is a page somebody shares, crawlable or not, so
+  // the booking form and the waiting list describe themselves too.
+  test('every page a visitor can open without an account describes itself', async () => {
+    const missing: string[] = []
+    for (const file of pageFiles()) {
+      if (FROM_CONTENT.has(file)) continue
+      const source = await Bun.file(join(PAGES, file)).text()
+      // A redirect has no page to describe, and a page wearing another shell is not the public
+      // site: the console's own screens answer to `admin-conventions.test.ts` instead.
+      const apart = /definePageMeta\(\{[\s\S]*?\b(?:middleware|redirect|layout)\b/.test(source)
+      if (apart) continue
+      if (!/useSeoMeta\(\{[\s\S]*?\bdescription\b/.test(source)) missing.push(file)
+    }
+    expect(missing).toEqual([])
+  })
+
   test('each public content page describes itself in its frontmatter', async () => {
     const missing: string[] = []
     for (const path of contentRoutes()) {

@@ -23,9 +23,21 @@ const columns = computed(() => [
   <div class="dark">
     <UFooter :ui="{ root: 'bg-default' }">
       <template #left>
-        <p class="text-sm text-muted">
-          The Nottingham New Theatre, the country's only entirely student-run theatre.
-        </p>
+        <div class="flex flex-col gap-3">
+          <p class="text-sm text-muted">
+            The Nottingham New Theatre, the country's only entirely student-run theatre.
+          </p>
+          <!-- Not the sticker variant: the footer is on every view, and the sticker is a budget
+               of one per view that a public page should be free to spend on itself. -->
+          <UBadge
+            color="secondary"
+            variant="subtle"
+            class="self-start"
+            data-test="footer-centenary"
+          >
+            100 years, 1926 to 2026
+          </UBadge>
+        </div>
       </template>
       <template #right>
         <nav
