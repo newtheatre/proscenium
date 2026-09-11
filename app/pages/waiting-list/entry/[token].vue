@@ -69,10 +69,16 @@ async function claim(): Promise<void> {
 }
 
 async function leave(): Promise<void> {
+  notice.value = null
   removing.value = true
   try {
     await $fetch(`/api/waiting-list/${token.value}/remove`, { method: 'POST' })
     removed.value = true
+  }
+  catch {
+    // The route refuses a forged, rotated or purged token alike, and cannot tell them apart:
+    // one sentence covers all three without guessing which happened.
+    notice.value = 'That link has already been used or is no longer valid.'
   }
   finally {
     removing.value = false
@@ -207,6 +213,13 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         icon="i-lucide-clock"
         title="Still on the list"
         description="We'll email you the moment a seat frees up."
+      />
+      <UAlert
+        v-if="notice"
+        color="error"
+        variant="subtle"
+        :description="notice"
+        data-test="waiting-list-leave-notice"
       />
       <UButton
         variant="link"

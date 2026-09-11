@@ -13,6 +13,7 @@ const guestEmail = ref('')
 const submitting = ref(false)
 const notice = ref<string | null>(null)
 const joined = ref(false)
+const emailed = ref(true)
 
 async function join(): Promise<void> {
   notice.value = null
@@ -30,7 +31,8 @@ async function join(): Promise<void> {
     }
     if (!account.value.signedIn) body.guest = { name: guestName.value.trim(), email: guestEmail.value.trim() }
 
-    await $fetch(`/api/performances/${performanceId.value}/waiting-list`, { method: 'POST', body })
+    const result = await $fetch<{ emailed: boolean }>(`/api/performances/${performanceId.value}/waiting-list`, { method: 'POST', body })
+    emailed.value = result.emailed
     joined.value = true
   }
   catch (error) {
@@ -59,11 +61,21 @@ useSeoMeta({ title: 'Join the waiting list' })
       data-test="waiting-list-joined"
     >
       <UAlert
+        v-if="emailed"
         color="success"
         variant="subtle"
         icon="i-lucide-clock"
         title="You're on the list"
         description="We'll email you the moment seats free up, in the order people joined. Every email carries a link to leave the list."
+      />
+      <UAlert
+        v-else
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-mail-warning"
+        title="You're on the list, but we could not email you"
+        description="Your place is held in the order people joined. The confirmation did not go out, so ask the box office to check your entry before the performance."
+        data-test="waiting-list-not-emailed"
       />
       <UButton
         to="/whats-on"
