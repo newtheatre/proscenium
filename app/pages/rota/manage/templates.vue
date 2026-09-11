@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { can, manageRota } from '#shared/utils/abilities'
 import { MAX_SLOT_COUNT, SHIFT_ROLES, orderedSlots, saysShiftRole, templateRefusal } from '#shared/utils/rota'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import type { ShiftRole, TemplateSlot } from '#shared/utils/rota'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -17,28 +17,32 @@ interface VenueTemplate {
   slots: TemplateSlot[]
 }
 
+interface Listing {
+  venues: VenueTemplate[]
+  page: number
+  pageSize: number
+  total: number
+  pages: number
+}
+
 const request = useRequestFetch()
 const toast = useToast()
 // Tidiness rather than enforcement: the routes are what refuse, and this is what stops a reader
 // being shown three buttons that all answer 403 (0040).
 const writes = computed(() => can(useViewer().value, manageRota))
-const search = ref('')
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
+// Search, filters, sort and page live in the URL (K-129).
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(rotaTemplatesList)
+
+const empty = (): Listing => ({ venues: [], page: 1, pageSize: 0, total: 0, pages: 1 })
+
 const { data, status, refresh } = await useAsyncData(
   'rota-shift-templates',
-  () => request<{ venues: VenueTemplate[] }>('/api/admin/rota/templates'),
-  { default: (): { venues: VenueTemplate[] } => ({ venues: [] }) },
+  () => request<Listing>('/api/admin/rota/templates', { query: query.value }),
+  { watch: [query], default: empty },
 )
-
-// Searched in the browser: the theatre has a handful of venues, and a round trip to filter them
-// would be slower than the typing.
-const shown = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  if (!term) return data.value.venues
-  return data.value.venues.filter(venue => venue.venueName.toLowerCase().includes(term))
-})
 
 const editing = ref<VenueTemplate | null>(null)
 const open = ref(false)
@@ -121,16 +125,6 @@ async function stamp(venue: VenueTemplate): Promise<void> {
   }
 }
 
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  return active
-})
-
 const columns: TableColumn<VenueTemplate>[] = [
   {
     id: 'venue',
@@ -202,31 +196,49 @@ const columns: TableColumn<VenueTemplate>[] = [
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A venue"
-      :active="activeFilters"
+      :placeholder="rotaTemplatesList.search?.placeholder"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''"
-    />
+      @clear="clear"
+    >
+      <template #filters>
+        <ConsoleFilters
+          :spec="rotaTemplatesList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
+      </template>
+    </AdminToolbar>
 
     <UTable
-      :data="shown"
+      :data="data.venues"
       :columns="columns"
       :loading="status === 'pending'"
       data-test="templates-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          No venues yet. A template belongs to a venue, so add one first.
+          {{ filtered ? 'No venue matches that.' : 'No venues yet. A template belongs to a venue, so add one first.' }}
         </p>
       </template>
     </UTable>
 
-    <p
-      data-test="templates-total"
-      class="text-sm text-muted"
-    >
-      {{ plural(shown.length, 'venue') }}
-    </p>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p
+        data-test="templates-total"
+        class="text-sm text-muted"
+      >
+        {{ plural(data.total, 'venue') }}
+      </p>
+      <UPagination
+        v-if="data.pages > 1"
+        v-model:page="page"
+        :total="data.total"
+        :items-per-page="data.pageSize"
+      />
+    </div>
 
     <UModal
       v-model:open="open"

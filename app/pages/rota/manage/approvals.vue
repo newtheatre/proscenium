@@ -2,6 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { formatLondon } from '#shared/utils/london'
 import { saysShiftRole, shiftDeclineForm } from '#shared/utils/rota'
+import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
 import type { ShiftRole } from '#shared/utils/rota'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
@@ -27,27 +28,24 @@ interface Listing {
   pages: number
 }
 
+const request = useRequestFetch()
 const toast = useToast()
-const page = ref(1)
-const search = ref('')
 const failure = ref<string | null>(null)
 const deciding = ref<string | null>(null)
 const declining = ref<PendingApproval | null>(null)
 const declineForm = useTemplateRef('declineForm')
 const decline = reactive<{ reason?: string }>({})
 
-const { data: listing, status, refresh } = await useFetch<Listing>('/api/admin/rota/approvals', {
-  query: computed(() => ({ page: page.value })),
-  watch: [page],
-  default: (): Listing => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1 }),
-})
+// Search, filters, sort and page live in the URL (K-129).
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(rotaApprovalsList)
 
-const shown = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  if (!term) return listing.value.items
-  return listing.value.items.filter(row =>
-    row.claimantName.toLowerCase().includes(term) || row.showTitle.toLowerCase().includes(term))
-})
+const empty = (): Listing => ({ items: [], page: 1, pageSize: 0, total: 0, pages: 1 })
+
+const { data: listing, status, refresh } = await useAsyncData(
+  'rota-approvals',
+  () => request<Listing>('/api/admin/rota/approvals', { query: query.value }),
+  { watch: [query], default: empty },
+)
 
 function spanOf(startsAt: number): string {
   return formatLondon(new Date(startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
@@ -149,21 +147,31 @@ const columns: TableColumn<PendingApproval>[] = [
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A name or a show"
-      :filterable="false"
+      :placeholder="rotaApprovalsList.search?.placeholder"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''"
-    />
+      @clear="clear"
+    >
+      <template #filters>
+        <ConsoleFilters
+          :spec="rotaApprovalsList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
+      </template>
+    </AdminToolbar>
 
     <UTable
-      :data="shown"
+      :data="listing.items"
       :columns="columns"
       :loading="status === 'pending'"
       data-test="approvals-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          Nothing waiting. Every claim is confirmed or declined already.
+          {{ filtered ? 'Nothing matches that.' : 'Nothing waiting. Every claim is confirmed or declined already.' }}
         </p>
       </template>
     </UTable>

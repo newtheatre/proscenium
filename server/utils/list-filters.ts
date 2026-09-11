@@ -2,6 +2,7 @@ import { and, getTableColumns, sql } from 'drizzle-orm'
 // Named rather than auto-imported: `tests/` typechecks this file under Bun (CONTRIBUTING, 0055).
 import { MAX_SEARCH_COLUMNS, capOf, conditionsOf, fieldOf } from '#shared/utils/list-filters'
 import { endOfLondonDay, startOfLondonDay } from '#shared/utils/london'
+import { showNightBounds } from '#shared/utils/show-night'
 import type { Column, SQL, Table } from 'drizzle-orm'
 import type { FilterCondition, FilterField, ListQuery, ListSpec, SortDirection, SortField } from '#shared/utils/list-filters'
 
@@ -90,6 +91,21 @@ function unixDayPredicate(condition: FilterCondition, column: Reference): SQL {
   }
 }
 
+// A unix column against the show night, 04:00 to 04:00, never the calendar day: a performance
+// starting at 01:00 belongs to the night that began the evening before (0014, K-129).
+function nightPredicate(condition: FilterCondition, column: Reference): SQL {
+  const [first, second] = condition.values as [string, string]
+  const from = (night: string): number => seconds(showNightBounds(night).from)
+  const to = (night: string): number => seconds(showNightBounds(night).to)
+  switch (condition.operator) {
+    case 'is': return sql`${column} >= ${from(first)} AND ${column} < ${to(first)}`
+    case 'before': return sql`${column} < ${from(first)}`
+    case 'after': return sql`${column} >= ${to(first)}`
+    case 'between': return sql`${column} >= ${from(first)} AND ${column} < ${to(second)}`
+    default: return sql`${column} IS NULL`
+  }
+}
+
 function valuePredicate(condition: FilterCondition, column: Reference): SQL {
   const [first] = condition.values as [string]
   switch (condition.operator) {
@@ -105,7 +121,10 @@ function columnPredicate(field: FilterField, condition: FilterCondition, column:
   const [first, second] = condition.values
   switch (field.kind) {
     case 'yes-no': return sql`${column} = ${yes(condition) ? 1 : 0}`
-    case 'date-range': return field.dateAs === 'unix' ? unixDayPredicate(condition, column) : rangePredicate(condition, column, first, second)
+    case 'date-range':
+      if (field.dateAs === 'unix') return unixDayPredicate(condition, column)
+      if (field.dateAs === 'night') return nightPredicate(condition, column)
+      return rangePredicate(condition, column, first, second)
     case 'number-range': return rangePredicate(condition, column, Number(first), Number(second))
     default: return valuePredicate(condition, column)
   }

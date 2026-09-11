@@ -16,9 +16,19 @@ import { barCategoriesList } from '#shared/utils/bar-categories-list'
 import { barItemsList } from '#shared/utils/bar-items-list'
 import { barMovementsList } from '#shared/utils/bar-movements-list'
 import { barProductsList } from '#shared/utils/bar-products-list'
+import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
+import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
+import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
+import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import { showsList } from '#shared/utils/shows-list'
 import { stocktakesList } from '#shared/utils/stocktakes-list'
+import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import type { FilterField, ListSpec } from '#shared/utils/list-filters'
+
+// The rota module's five declarations, migrated alongside accounts and shows (K-129).
+const rotaLists = [unfilledShiftsList, rotaApprovalsList, rotaTemplatesList, checklistVenuesList, emergencyCardsList]
+// The bar module's declarations, migrated in the same pass (K-129).
+const barLists = [barCategoriesList, barProductsList, barItemsList, barMovementsList, stocktakesList]
 
 // One declaration derives the query schema, the builder and the chips (K-129 criterion 1, 0032).
 // What the predicates do against real rows is tests/integration/list-filters.test.ts.
@@ -155,7 +165,7 @@ describe('an "is any of" list is capped so no statement grows with the data (cri
     // Search binds one per column at most three, paging binds two, and each condition binds up
     // to its cap: the bound is a property of the declaration, never of the rows.
     expect(maxBoundParameters(spec)).toBe(2 + 2 + DEFAULT_ANY_CAP + 2 + 2 + 1 + 3)
-    for (const declared of [accountsList, showsList, barCategoriesList, barProductsList, barItemsList, barMovementsList, stocktakesList]) {
+    for (const declared of [accountsList, showsList, ...rotaLists, ...barLists]) {
       expect(maxBoundParameters(declared)).toBeLessThan(MAX_BOUND_PARAMETERS)
     }
   })
@@ -228,8 +238,17 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
     expect(season?.column).toBe('season_id')
   })
 
+  test('a rota list filters on a night, against the show night rather than the calendar day', () => {
+    const night = fieldOf(unfilledShiftsList, 'night')
+    expect(night?.dateAs).toBe('night')
+    expect(night?.column).toBe('p.starts_at')
+    const staffed = fieldOf(rotaTemplatesList, 'staffed')
+    expect(staffed?.column).toBeUndefined()
+    expect(staffed?.kind).toBe('yes-no')
+  })
+
   test('every declared key is unique and no field shares a key with the paging or search keys', () => {
-    for (const declared of [accountsList, showsList, barCategoriesList, barProductsList, barItemsList, barMovementsList, stocktakesList]) {
+    for (const declared of [accountsList, showsList, ...rotaLists, ...barLists]) {
       const keys = declared.fields.map(one => one.key)
       expect(new Set(keys).size).toBe(keys.length)
       for (const reserved of ['page', 'pageSize', 'search', 'sort', 'direction']) expect(keys).not.toContain(reserved)

@@ -49,8 +49,9 @@ export interface FilterField {
   operators?: readonly FilterOperator[]
   cap?: number
   icon?: string
-  // A date column holds either a YYYY-MM-DD day or unix seconds; the predicate differs.
-  dateAs?: 'day' | 'unix'
+  // A date column holds a YYYY-MM-DD day, unix seconds against the calendar day, or unix
+  // seconds against the show night, 04:00 to 04:00 (0014).
+  dateAs?: 'day' | 'unix' | 'night'
   // What a yes-or-no chip says when the answer is no, where "Not ..." would misread.
   negated?: string
 }

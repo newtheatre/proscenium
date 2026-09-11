@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { currentCardQuery, currentCardsQuery, recordCardStatement } from '#server/utils/venue-emergency'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
+import { currentCardQuery, currentCardsQuery, emergencyCardsClause, recordCardStatement } from '#server/utils/venue-emergency'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -7,6 +9,10 @@ import type { EmergencyCardInput } from '#shared/utils/venue-emergency'
 import type { SQL } from 'drizzle-orm'
 
 // E-113 against the real migrations. `tests/unit/venue-emergency.test.ts` pins the pure validation.
+
+// The list with nothing asked of it: the default sort and no predicate (K-129).
+const everyCardSchema = filterQuerySchema(emergencyCardsList)
+const everyCard = () => emergencyCardsClause(everyCardSchema.parse({}))
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()
@@ -99,7 +105,7 @@ describe('the committee overview (criterion 1)', () => {
     await withDatabase(async (database) => {
       testVenue(database, { suffix: 'no-card' })
 
-      const [row] = run(database, currentCardsQuery())
+      const [row] = run(database, currentCardsQuery(everyCard(), 25, 0))
       expect(row).toMatchObject({ id: null, venueId: 'venue-no-card', assemblyPoint: null })
     })
   })
@@ -112,7 +118,7 @@ describe('the committee overview (criterion 1)', () => {
       run(database, recordCardStatement(a.id, card({ assemblyPoint: 'A car park' }), officer, 'vei-a').statement)
       run(database, recordCardStatement(b.id, card({ assemblyPoint: 'B car park' }), officer, 'vei-b').statement)
 
-      const found = run(database, currentCardsQuery()) as { venueId: string, assemblyPoint: string }[]
+      const found = run(database, currentCardsQuery(everyCard(), 25, 0)) as { venueId: string, assemblyPoint: string }[]
       expect(found.find(row => row.venueId === a.id)?.assemblyPoint).toBe('A car park')
       expect(found.find(row => row.venueId === b.id)?.assemblyPoint).toBe('B car park')
     })
