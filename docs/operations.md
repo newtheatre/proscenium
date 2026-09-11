@@ -129,18 +129,68 @@ already applied on its next run and does nothing further; it is not skipped, onl
 
 The identity import is rehearsed weekly and applied once, at cutover. Everything but the export
 runs offline against dumps, and nothing in `migration/` can write to a remote database
-(`migration/README.md`).
+(`migration/README.md`). **The export reads the live serving database directly**
+(`wrangler d1 export --remote`, `migration/export.sh`), not a backup: there is no separate backup
+to read instead, and Time Travel is what stands in for one, which is why the cutover load below
+takes a bookmark first. Epic #338's first item said "backup" for a while; that was wrong, Matt has
+corrected it, and this document should not repeat the mistake.
 
-A rehearsal, which is what `bun run migration:dry-run <target>` does after `bun run migration:export`,
-against a target that already carries the real application schema (`migration/README.md`):
+### Pre-flight checklist for a rehearsal
 
-1. `inventory.ts` records per-table counts and domain checksums from the dumps.
-2. `transform-identity.ts` builds `out/unified.sqlite`, reusing `out/id-map.tsv` so the same person
-   keeps the id they were given last week.
-3. `reconcile.ts` verifies the counts and the invariants, and **exits non-zero** on any failure.
-4. `load.ts` writes `out/load.sql` and applies it to the target, reporting the row count per table.
-5. `transform-bookings.ts` and `transform-money.ts` run against the same target, now that the
-   users `room_bookings` and `ledger_entries` key to already exist there.
+A target with the real application schema first, then the training and ticketing catalogues a
+rehearsal cannot invent (see "Two kinds of map" in `migration/README.md`): **rooms, union venues
+and ticket types must already be authored through their own admin screens before this runs.**
+Venues and seasons do not belong on that list; `transform-programme.ts` mints those itself, the
+same way `transform-identity.ts` mints a person. On the very first rehearsal, before anyone has
+touched the room or ticket type admin screens, the reference maps below draft mostly blank and
+the transforms that need them correctly refuse: that is the checklist working, not the pipeline
+being broken.
+
+```bash
+bun run migration:export                          # wrangler d1 export --remote, four databases
+bun migration/inventory.ts                         # per-table counts and checksums from the dumps
+bun migration/transform-identity.ts                # builds out/unified.sqlite; reuses out/id-map.tsv
+bun migration/reconcile.ts                         # exits non-zero on any failure: fix the transform, not the numbers
+bun migration/load.ts <target>                     # writes out/load.sql, applies it, reports row counts
+bun migration/generate-reference-maps.ts <target>  # drafts room, space and ticket-type maps
+bun migration/transform-bookings.ts <target>       # refuses if a reference map still has a blank line
+bun migration/transform-training.ts <target>       # refuses without a training catalogue
+bun migration/transform-programme.ts <target>      # venues, seasons, shows, performances
+bun migration/transform-reservations.ts <target>   # run early: see below
+bun migration/transform-money.ts <target>          # ticket revenue into the real ledger
+```
+
+What a bad result looks like at each step, checked before moving to the next:
+
+- **`reconcile.ts` exits non-zero.** Read the printed problem, not just the exit code: it names
+  the invariant that broke (a Workspace password not wiped, an old role never mapped, a count
+  mismatch). Fix `migration/identity.ts`, never adjust the reconciliation to match what came out.
+- **A transform prints exceptions.** An exceptions file with a handful of rows naming a specific
+  orphaned reference (a booking whose room never came across, a record whose module did not
+  import) is normal: every transform is built to refuse a guess rather than invent one. **An
+  exceptions file that is unexpectedly large, or dominated by one message (`no performance`, `no
+  ticket type`, `no canonical account`), is a different thing and should be read as a key
+  convention mismatch before it is read as missing data.** `out/performance-map.tsv` keyed on the
+  wrong shape did exactly this on 10 September: every reservation "failed to resolve", and the
+  fix was a naming convention, not the data.
+- **`transform-bookings.ts` or `transform-training.ts` refuses outright**, naming a blank
+  reference map line or a missing catalogue. Author the missing room, venue or ticket type and
+  rerun `generate-reference-maps.ts`, or confirm the blank by hand if it already exists under a
+  different name (`migration/README.md`, "Two kinds of map"). Never edit a transform to skip the
+  refusal.
+
+**Run `transform-reservations.ts` early, not last.** Its old-estate column names are inferred,
+not confirmed against a real export, because nobody building it had one to check against
+(#840, "What I do not have"). `bun:sqlite` throws loudly and
+immediately on a column that does not exist; that is a cheap, obvious failure, and the first real
+export is the first time it can actually happen. Finding it in the second half of a long rehearsal
+sequence costs more than finding it third or fourth.
+
+**The first real export is the first genuine test of every cross-transform key convention, not
+only of column names.** Two transforms agreeing on a table's columns is not the same claim as two
+transforms agreeing on how a map file is keyed; nothing before a real export exercises the second
+kind of mismatch, because every existing test builds its own fixture to the convention its own
+author assumed.
 
 The load upserts on identity and **never deletes**: a person or a grant that disappeared upstream
 stays until somebody decides what should happen to them.
@@ -151,6 +201,56 @@ rehearsal imports is a tombstone or a disabled account, not a live one. A rehear
 active account with roles and a second factor carries across" is exercising roughly one row in
 six; the tombstone-and-disabled path is the dominant case, not the edge case, whatever two
 consecutive green runs are read to demonstrate for the Phase 2 gate (`docs/roadmap.md`).
+
+### Memberships do not migrate: every member reads as lapsed on day one
+
+**Deliberate, not a gap that was missed.** `migration/identity.ts` writes users, role grants and
+authenticators; nothing reads the old estate's membership state, and nothing in `migration/` ever
+will. Matt decided against a fifth transform days before the rehearsal, in favour of a rough first
+week: members claim their membership themselves, and an officer clears the queue (A-130). Building
+a membership transform was the alternative on the table, not an oversight. **A-130 is not built as
+of this writing**, so it is a precondition of this plan, not a description of the current state:
+confirm it has landed before cutover, or the claim path this section describes does not exist yet
+and support has nothing to point a lapsed member at beyond a manual officer grant.
+
+**What this means on the morning of cutover, stated plainly for whoever is on support:**
+
+- **Every migrated member reads as lapsed**, because `currentMembership` finds no row for them at
+  all, not an expired one. This is expected. The first person who reports it is not finding a bug.
+- **Room booking refuses outright.** `judge()` fails every proposal with `NO_MEMBERSHIP`
+  ("Booking a room needs a current membership. Renew it at the Students' Union.") until the
+  person's claim is recorded; the same failure shows up in an officer's own pending-request queue
+  (`server/utils/queue.ts`), so a request queue full of `NO_MEMBERSHIP` on day one is the same
+  fact surfacing twice, not two problems.
+- **Ticket booking degrades rather than refuses.** A member-restricted ticket type
+  (`ticket_types.restricted_to = 'MEMBER'`) silently stops being offered to a lapsed-reading
+  account (`readBookableTicketTypes`, `server/utils/reservations.ts`); ordinary ticket types are
+  unaffected. A member who priced a show against a member rate last week sees a different, higher
+  price this week, with nothing on screen explaining why.
+- **The retention sweep's dry-run preview over-reports candidates.**
+  `server/utils/retention-candidates.ts` excludes a current member from the pool it hands to
+  `sweepRetention`;
+  with nobody current, an inactive-but-real member who was previously protected by their
+  membership now shows up as a candidate if their `lastLoginAt` is old enough. `RETENTION_ARMED`
+  defaults `false`, so nothing is actually anonymised by this alone, and arming it is a deliberate,
+  separate action planned for December, by which point the claim queue should be well clear; but
+  read the preview list in the meantime knowing it is inflated by this gap, not by a sudden wave of
+  real inactivity.
+- **Check before assuming there is nothing else.** Room booking and ticket pricing are the two
+  found so far; the third one, if there is one, will be found by a member hitting it, not by this
+  list. `currentMembership`, `hasCurrentMembership` and `hasMembership` in a context object are the
+  names to search for when checking whether a new screen gates on it.
+
+**Clearing the officer queue is a first-week task with a named owner, not a background chore.** A
+queue nobody is told to clear is a queue that stays full while members cannot book rooms. A-130
+gives officers holding `members.write` an awaiting-record filter on `/people/members`; whoever
+takes this on (the IT Manager, or whoever they name for the week) should be checking it daily
+until it is empty, not weekly. Record who that is before cutover, the same way the restore drill
+has a named owner (K-108).
+
+**`migration/schema-core.sql` still carries a pre-0031 `memberships` shape that nothing writes.**
+Left as is: it is recorded here, and a migration tidy-up is not something to start days before the
+rehearsal.
 
 ### At cutover
 
