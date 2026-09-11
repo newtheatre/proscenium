@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
-import { saysPrice } from '#shared/utils/ticket-types'
-import type { Availability, PublicPerformance, PublicShow } from '#shared/utils/programme'
+import type { ListedShow } from '#shared/utils/programme'
 
 // Deliberately public: what is on is how somebody decides to come, and no account is needed
 // (D-101). Every state on this page is computed by the server, never in the browser.
@@ -10,46 +8,40 @@ useSeoMeta({
   description: 'Every show on at the Nottingham New Theatre, when it runs and what a ticket costs.',
 })
 
-interface Price { name: string, description: string | null, price: number }
-
-interface Listed extends PublicPerformance {
-  availability: Availability
-  remaining: number | null
-  says: string
-  prices: Price[]
-}
-
-interface ListedShow {
-  show: PublicShow
-  categoryName: string | null
-  performances: Listed[]
-}
-
 interface Listing { items: ListedShow[], total: number, page: number, pageSize: number, pages: number }
 
 const page = ref(1)
+const venue = ref('')
 
 const { data, status } = await useFetch<Listing>('/api/whats-on', {
-  query: { page },
+  query: { page, venue },
   default: (): Listing => ({ items: [], total: 0, page: 1, pageSize: 25, pages: 1 }),
 })
 
-// The Worker runs in UTC and a theatregoer reads a clock, so every date is pinned (0014).
-const saysWhen = (at: number): string =>
-  formatLondon(new Date(at * 1000), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+// The venues with something on, read from the unfiltered first load and then kept: filtering by
+// one of them must not narrow the list of the others down to itself.
+const venues = ref<string[]>([])
+watchEffect(() => {
+  if (venue.value) return
+  venues.value = [...new Set(data.value.items.flatMap(listed => listed.performances.map(one => one.venueName)))].sort()
+})
 
-const COLOURS: Record<Availability, 'success' | 'warning' | 'neutral'> = {
-  AVAILABLE: 'success',
-  LIMITED: 'warning',
-  SOLD_OUT: 'neutral',
-  BOOKING_CLOSED: 'neutral',
-}
+const tabs = computed(() => [
+  { label: 'All', value: '' },
+  ...venues.value.map(name => ({ label: name, value: name })),
+])
 
-// The cheapest ticket on offer, which is what a listing quotes: the whole chain is on the show
-// page (D-101 criterion 4).
-function from(performance: Listed): string | null {
-  const cheapest = performance.prices[0]
-  return cheapest ? saysPrice(cheapest.price) : null
+watch(venue, () => {
+  page.value = 1
+})
+
+// The first card selling fast or already full carries the view's one sticker; the rest say their
+// state in a badge, which is words and colour rather than colour alone (K-101).
+const flagged = computed(() => data.value.items.find(listed =>
+  listed.performances.some(one => !one.cancelled && (one.availability === 'LIMITED' || one.availability === 'SOLD_OUT')))?.show.slug ?? null)
+
+function flagFor(listed: ListedShow): string {
+  return listed.performances.some(one => !one.cancelled && one.availability === 'LIMITED') ? 'Selling fast' : 'House full'
 }
 </script>
 
@@ -62,7 +54,17 @@ function from(performance: Listed): string | null {
       description="Everything here is written, directed, built and performed by students. Tickets are paid for at the theatre, so booking online holds your seats and the box office takes payment on the night."
     />
 
-    <UContainer class="max-w-4xl py-16">
+    <UContainer class="py-12">
+      <UTabs
+        v-if="venues.length > 1"
+        v-model="venue"
+        variant="link"
+        :content="false"
+        :items="tabs"
+        class="mb-8 overflow-x-auto"
+        data-test="whats-on-venues"
+      />
+
       <p
         v-if="status !== 'pending' && data.items.length === 0"
         class="text-muted"
@@ -71,129 +73,25 @@ function from(performance: Listed): string | null {
         Nothing is on sale at the moment. The next season is announced here first.
       </p>
 
-      <div class="space-y-8">
-        <UCard
+      <UPageGrid v-else>
+        <ShowPosterCard
           v-for="listed in data.items"
           :key="listed.show.slug"
-          :data-test="`show-${listed.show.slug}`"
+          :listed="listed"
         >
-          <template #header>
-            <div class="flex flex-wrap items-baseline justify-between gap-2">
-              <div>
-                <h2 class="nnt-headline text-2xl">
-                  <ULink :to="`/shows/${listed.show.slug}`">
-                    {{ listed.show.title }}
-                  </ULink>
-                </h2>
-                <p
-                  v-if="listed.show.subtitle"
-                  class="text-sm text-muted"
-                >
-                  {{ listed.show.subtitle }}
-                </p>
-              </div>
-              <UBadge
-                v-if="listed.categoryName"
-                color="neutral"
-                variant="subtle"
-              >
-                {{ listed.categoryName }}
-              </UBadge>
-            </div>
-          </template>
-
-          <p
-            v-if="listed.show.description"
-            class="text-sm text-muted"
+          <template
+            v-if="listed.show.slug === flagged"
+            #flag
           >
-            {{ listed.show.description }}
-          </p>
-
-          <ul class="mt-4 divide-y divide-default">
-            <li
-              v-for="performance in listed.performances"
-              :key="performance.id"
-              class="flex flex-wrap items-center gap-x-4 gap-y-2 py-3"
-              :data-test="`performance-${performance.id}`"
+            <UBadge
+              variant="sticker"
+              size="sm"
             >
-              <span class="font-medium">{{ saysWhen(performance.startsAt) }}</span>
-              <span class="text-sm text-muted">{{ performance.venueName }}</span>
-              <span
-                v-if="performance.durationMinutes"
-                class="text-sm text-muted"
-              >
-                {{ performance.durationMinutes }} minutes
-              </span>
-              <span
-                v-if="from(performance)"
-                class="text-sm text-muted"
-              >
-                From {{ from(performance) }}
-              </span>
-
-              <div class="ms-auto flex flex-wrap items-center gap-2">
-                <UBadge
-                  v-if="performance.cancelled"
-                  color="error"
-                  variant="subtle"
-                  :data-test="`cancelled-${performance.id}`"
-                >
-                  Cancelled
-                </UBadge>
-                <!-- saleRefusal refuses a link-out, so its availability reads booking closed;
-                   saying that beside a working link would be a contradiction. -->
-                <UBadge
-                  v-else-if="performance.externalBookingUrl"
-                  color="neutral"
-                  variant="subtle"
-                  :data-test="`availability-${performance.id}`"
-                >
-                  Tickets sold elsewhere
-                </UBadge>
-                <UBadge
-                  v-else
-                  :color="COLOURS[performance.availability]"
-                  variant="subtle"
-                  :data-test="`availability-${performance.id}`"
-                >
-                  {{ performance.says }}
-                </UBadge>
-
-                <!-- An externally ticketed performance links out and offers no internal button:
-                   the money is taken by whoever runs that box office (D-101 criterion 5). -->
-                <UButton
-                  v-if="performance.externalBookingUrl && !performance.cancelled"
-                  :to="performance.externalBookingUrl"
-                  target="_blank"
-                  rel="noopener"
-                  size="sm"
-                  trailing-icon="i-lucide-external-link"
-                  :data-test="`external-${performance.id}`"
-                >
-                  Book elsewhere
-                </UButton>
-                <UButton
-                  v-else-if="performance.availability === 'AVAILABLE' || performance.availability === 'LIMITED'"
-                  :to="`/book/${performance.id}`"
-                  size="sm"
-                  :data-test="`book-${performance.id}`"
-                >
-                  Book
-                </UButton>
-                <UButton
-                  v-else-if="performance.availability === 'SOLD_OUT'"
-                  :to="`/waiting-list/${performance.id}`"
-                  variant="subtle"
-                  size="sm"
-                  :data-test="`waiting-${performance.id}`"
-                >
-                  Join the waiting list
-                </UButton>
-              </div>
-            </li>
-          </ul>
-        </UCard>
-      </div>
+              {{ flagFor(listed) }}
+            </UBadge>
+          </template>
+        </ShowPosterCard>
+      </UPageGrid>
 
       <div
         v-if="data.pages > 1"

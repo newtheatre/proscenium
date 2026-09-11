@@ -259,3 +259,64 @@ describe('a show page answers for one published show only (D-101 criterion 1)', 
     })
   })
 })
+
+// J-111 criterion 6: what's on filters by venue, and the count answers the same question the
+// page does, or the pager offers a page that is not there.
+describe('the listing narrows to one venue by name (J-111)', () => {
+  test('only the shows with a performance in that venue are listed', async () => {
+    await withDatabase((database) => {
+      const first = tonightsPerformance(database, { suffix: 'a', venueName: 'The Main Hall' })
+      tonightsPerformance(database, { suffix: 'b', venueName: 'The Studio' })
+      const at = first.startsAt - 3600
+
+      const listed = read<{ slug: string }>(database, listedShowsQuery(at, 25, 0, 'The Studio'))
+      expect(listed.map(show => show.slug)).toEqual(['a-test-show-b'])
+    })
+  })
+
+  test('the count narrows with the page', async () => {
+    await withDatabase((database) => {
+      const first = tonightsPerformance(database, { suffix: 'a', venueName: 'The Main Hall' })
+      tonightsPerformance(database, { suffix: 'b', venueName: 'The Studio' })
+      const at = first.startsAt - 3600
+
+      const [counted] = read<{ total: number }>(database, countListedShowsQuery(at, 'The Studio'))
+      expect(counted?.total).toBe(1)
+    })
+  })
+
+  test('a venue nobody holds lists nothing, rather than everything', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database, { suffix: 'a', venueName: 'The Main Hall' })
+      expect(read(database, listedShowsQuery(seeded.startsAt - 3600, 25, 0, 'The Attic'))).toEqual([])
+    })
+  })
+
+  test('no venue is every venue, which is what the unfiltered page is', async () => {
+    await withDatabase((database) => {
+      const first = tonightsPerformance(database, { suffix: 'a', venueName: 'The Main Hall' })
+      tonightsPerformance(database, { suffix: 'b', venueName: 'The Studio' })
+      const at = first.startsAt - 3600
+      expect(read<{ slug: string }>(database, listedShowsQuery(at, 25, 0, null)).length).toBe(2)
+    })
+  })
+
+  // A show on in two venues is one row under either name, never two under one.
+  test('a show with a performance in each venue is listed once under either', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database, { suffix: 'a', venueName: 'The Main Hall' })
+      testVenue(database, { suffix: 'studio', name: 'The Studio' })
+      database.batch([[
+        `INSERT INTO performances (id, show_id, venue_id, starts_at, doors_at, duration_minutes, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        'performance-a2', 'show-a', 'venue-studio', seeded.startsAt + 86_400, null, 120, 'ON_SALE',
+      ]])
+      const at = seeded.startsAt - 3600
+
+      expect(read<{ slug: string }>(database, listedShowsQuery(at, 25, 0, 'The Studio')).map(show => show.slug))
+        .toEqual(['a-test-show-a'])
+      expect(read<{ slug: string }>(database, listedShowsQuery(at, 25, 0, 'The Main Hall')).map(show => show.slug))
+        .toEqual(['a-test-show-a'])
+    })
+  })
+})

@@ -39,6 +39,12 @@ const SIZES = 'xs:100vw sm:100vw md:100vw lg:100vw xl:100vw 2xl:100vw'
       :ui="{ title: 'nnt-headline text-highlighted', description: 'text-default' }"
     >
       <template
+        v-if="$slots.headline"
+        #headline
+      >
+        <slot name="headline" />
+      </template>
+      <template
         v-if="$slots.links"
         #links
       >
