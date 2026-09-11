@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { formatLondon } from './london'
+import { posterUrl } from './seo'
 
 // The publish flow and the booking window (D-121, D-112). A show is draft until somebody
 // publishes it; a performance is on sale, off sale or cancelled, one at a time and never per day.
@@ -172,6 +173,8 @@ export interface PublicShow {
   longDescription: string | null
   ageGuidance: string | null
   latecomerPolicy: LatecomerPolicy | null
+  // Where the poster is served from, or null: the blob key itself never leaves the server.
+  posterUrl: string | null
 }
 
 export interface PublicPerformance {
@@ -193,7 +196,7 @@ export function isPublishedShow(show: { status: ShowStatus }): boolean {
 
 // A draft show has no public page at all, so this answers with nothing rather than a thinner row:
 // the listing and the show page both refuse from the same answer (D-101, D-102).
-export function publicShow(show: PublicShow & { status: ShowStatus }): PublicShow | null {
+export function publicShow(show: Omit<PublicShow, 'posterUrl'> & { posterKey: string | null, status: ShowStatus }): PublicShow | null {
   if (!isPublishedShow(show)) return null
   return {
     slug: show.slug,
@@ -203,6 +206,7 @@ export function publicShow(show: PublicShow & { status: ShowStatus }): PublicSho
     longDescription: show.longDescription,
     ageGuidance: show.ageGuidance,
     latecomerPolicy: show.latecomerPolicy,
+    posterUrl: posterUrl(show.posterKey),
   }
 }
 

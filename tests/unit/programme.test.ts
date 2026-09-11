@@ -25,7 +25,9 @@ const seconds = (at: Date): number => Math.floor(at.getTime() / 1000)
 
 const CURTAIN = fromLondonWallClock(2026, 10, 17, 19, 30)
 
-const drafted = (over: Partial<PublicShow & { status: ShowStatus }> = {}): PublicShow & { status: ShowStatus } => ({
+type ShowRow = Omit<PublicShow, 'posterUrl'> & { posterKey: string | null, status: ShowStatus }
+
+const drafted = (over: Partial<ShowRow> = {}): ShowRow => ({
   status: 'DRAFT',
   slug: 'the-seagull',
   title: 'The Seagull',
@@ -34,6 +36,7 @@ const drafted = (over: Partial<PublicShow & { status: ShowStatus }> = {}): Publi
   longDescription: null,
   ageGuidance: '12+',
   latecomerPolicy: 'AT_INTERVAL',
+  posterKey: null,
   ...over,
 })
 
@@ -51,7 +54,13 @@ describe('a show is draft until it is published, and a draft is invisible (D-121
       longDescription: null,
       ageGuidance: '12+',
       latecomerPolicy: 'AT_INTERVAL',
+      posterUrl: null,
     })
+  })
+
+  // The key never leaves the server; the address it is served at does (K-125 criterion 3).
+  test('a poster key becomes the address it is served at', () => {
+    expect(publicShow(drafted({ status: 'PUBLISHED', posterKey: 'posters/seagull.jpg' }))?.posterUrl).toBe('/posters/seagull.jpg')
   })
 
   // An allow-list is what stops a column added later leaking by default, so the projection is
@@ -60,9 +69,9 @@ describe('a show is draft until it is published, and a draft is invisible (D-121
     const projected = publicShow({
       ...drafted({ status: 'PUBLISHED' }),
       ...{ contentNotes: 'the director is nervous', productionId: 'b-1', status: 'PUBLISHED' },
-    } as PublicShow & { status: ShowStatus })
+    } as ShowRow)
     expect(Object.keys(projected ?? {}).sort()).toEqual([
-      'ageGuidance', 'description', 'latecomerPolicy', 'longDescription', 'slug', 'subtitle', 'title',
+      'ageGuidance', 'description', 'latecomerPolicy', 'longDescription', 'posterUrl', 'slug', 'subtitle', 'title',
     ])
   })
 

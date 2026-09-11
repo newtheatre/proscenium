@@ -101,9 +101,12 @@ export function saysRestriction(restrictedTo: string | null): string | null {
   return restrictedTo === 'MEMBER' ? 'Current members only' : null
 }
 
+// Pence in, pounds out, unprefixed: the figure a machine reads, such as a schema.org offer.
+export const pounds = (pence: number): string => (pence / 100).toFixed(2)
+
 // Pence in, pounds out, formatted the one way every screen shows money (0004).
 export function saysPrice(price: number): string {
-  return `£${(price / 100).toFixed(2)}`
+  return `£${pounds(price)}`
 }
 
 // Which level of the chain answered. The story's vocabulary is base, show and performance, which

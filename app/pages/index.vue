@@ -1,7 +1,13 @@
 <script setup lang="ts">
 const { account } = useAccount()
 
-useSeoMeta({ title: 'The Nottingham New Theatre' })
+useSeoMeta({
+  title: 'The Nottingham New Theatre',
+  description: 'The country\'s only entirely student-run theatre, at the University of Nottingham: what is on, how to book a ticket, and how to get involved.',
+})
+
+// The one page whose title is already the house's name, so the site template would read it twice.
+useHead({ titleTemplate: '%s' })
 </script>
 
 <template>
