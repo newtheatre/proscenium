@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { codeForStep, stepFor } from '#shared/utils/totp'
+import { adminSession, forgetSpentStep, markVerified, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
-import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
+import { click, fill, fillPin, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -19,7 +20,14 @@ let admin: TestMember
 let foh: TestMember
 let member: TestMember
 let house: { venueId: string, showId: string, performanceId: string }
+let gatingModule = ''
 const fohPassword = generatePassword()
+
+// A browser session needs a known password and its own confirmed factor: the API session
+// `adminSession()` returns never leaves the process, so it cannot drive a sign-in form.
+const adminBrowserPassword = generatePassword()
+const adminBrowser = { ...syntheticPerson(83), email: registrableAddress('templates-admin') }
+let adminBrowserSecret = ''
 
 beforeAll(async () => {
   if (skip) return
@@ -31,6 +39,25 @@ beforeAll(async () => {
   await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
 
   house = programme('house')
+
+  await request(app, 'POST', '/api/auth/register', { email: adminBrowser.email, name: adminBrowser.name, password: adminBrowserPassword })
+  markVerified(app, adminBrowser.email)
+  const first = await request(app, 'POST', '/api/auth/sign-in', { email: adminBrowser.email, password: adminBrowserPassword })
+  const firstCookie = (first.headers.get('set-cookie') ?? '').split(';')[0]!
+  adminBrowserSecret = (await (await request(app, 'POST', '/api/account/mfa/enrol', {}, firstCookie)).json() as { secret: string }).secret
+  await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(adminBrowserSecret, stepFor(new Date())) }, firstCookie)
+  expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', adminBrowser.email, app.databaseFile]).exitCode).toBe(0)
+
+  const department = `ROT${crypto.randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')}`
+  await request(app, 'POST', '/api/admin/training/departments', { code: department, name: 'Rota gating' }, admin.cookie)
+  gatingModule = `${department}-BAR`
+  await request(app, 'POST', '/api/admin/training/modules', {
+    id: gatingModule,
+    department,
+    kind: 'MODULE',
+    name: 'Bar service',
+    status: 'ACTIVE',
+  }, admin.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -333,6 +360,54 @@ describe.skipIf(skip !== null)('the screen the officer works from', () => {
     }
   }, 120_000)
 })
+
+// DECISION #933, K-129 for the picker: the mapping from shift role to gating module is
+// configuration, and this is where a training officer looks for it, labelled per role.
+describe.skipIf(skip !== null)('shift eligibility is set from the templates screen', () => {
+  afterAll(async () => {
+    await request(app, 'PUT', '/api/admin/config/SHIFT_ELIGIBILITY_BAR_MODULE', { value: null }, admin.cookie)
+  })
+
+  test('an administrator names the module that unlocks a bar shift, and it holds after a reload', async () => {
+    const view = await visitAsAdmin('/rota/manage/templates')
+    try {
+      await waitFor(view, `!!document.querySelector('[data-test="eligibility-BAR"]')`)
+      await pickOption(view, '[data-test="eligibility-BAR"]', gatingModule)
+      await waitFor(view, 'document.body.innerText.includes(\'Shift eligibility saved\')')
+
+      await visit(view, `${app.baseURL}/rota/manage/templates`, '[data-test="shift-eligibility"]')
+      expect(await textOf(view, '[data-test="shift-eligibility"]')).toContain('Bar service')
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  test('a front of house manager, who holds no config permission, sees no such card', async () => {
+    const view = await visitAsFoh('/rota/manage/templates')
+    try {
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="templates-table"]\')')).toBe(true)
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="shift-eligibility"]\')')).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+})
+
+async function visitAsAdmin(path: string): Promise<Bun.WebView> {
+  forgetSpentStep(app, adminBrowser.email)
+  const view = await openSignedOutView(app.baseURL)
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', adminBrowser.email)
+  await fill(view, 'form input[type="password"]', adminBrowserPassword)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, `document.querySelectorAll('[data-test="mfa-challenge"] input').length >= 6`)
+  await fillPin(view, '[data-test="mfa-challenge"] input', await codeForStep(adminBrowserSecret, stepFor(new Date()) + 1))
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+  await visit(view, `${app.baseURL}${path}`, '[data-test="templates-table"]')
+  return view
+}
 
 async function visitAsFoh(path: string): Promise<Bun.WebView> {
   const view = await openSignedOutView(app.baseURL)
