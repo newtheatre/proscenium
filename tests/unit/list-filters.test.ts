@@ -23,6 +23,7 @@ import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
 import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
 import { externalSpacesList } from '#shared/utils/external-spaces-list'
 import { fellowshipsList } from '#shared/utils/fellowships-list'
+import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { membershipsList } from '#shared/utils/memberships-list'
 import { performancesList } from '#shared/utils/performances-list'
@@ -76,7 +77,7 @@ const parse = (query: Record<string, string>) => filterQuerySchema(spec).safePar
 // The rooms module's declarations (K-129).
 const roomsLists = [roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList]
 // Every migrated declaration; the cross-declaration checks below walk this list.
-const MIGRATED = [accountsList, showsList, performancesList, ...roomsLists, ...rotaLists, ...barLists, ...smallLists, trainingModulesList]
+const MIGRATED = [accountsList, showsList, performancesList, ...roomsLists, ...rotaLists, ...barLists, ...smallLists, trainingModulesList, ledgerEntriesList]
 
 describe('the schema is derived from the declaration (criterion 1)', () => {
   test('an empty query is the first page, the default sort and no conditions', () => {

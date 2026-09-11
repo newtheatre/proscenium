@@ -5,7 +5,11 @@ import { sql } from 'drizzle-orm'
 import { committeeYearEnd, fromLondonWallClock, startOfLondonDay } from '#shared/utils/london'
 import { foregone } from './finance-reports'
 import { londonDayOf } from '#shared/utils/ledger'
+import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
+import { aliasColumns, whereFrom } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { PeriodInput, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
+import type { ListClause } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 
 // The season dashboard (I-105): every figure a query scoped by a predicate over a resolved
@@ -110,34 +114,32 @@ export async function seasonSummary(period: PeriodInput): Promise<SeasonSummary>
 
 export interface SeasonEntry { id: string, happenedAt: number, source: string, tender: string, totalPence: number }
 
-// Every figure drills down to its ledger entries (criterion 3): scoped by the same range plus an
-// optional source, paged in SQL, never a bare array.
-function sourceFilter(source: string | undefined): SQL {
-  return source ? sql`AND le.source = ${source}` : sql``
+// The drill-down list's own declaration (K-129, I-105 criterion 3): when, source and tender are
+// filters a treasurer picks, never a query string edited by hand.
+export function ledgerEntriesClause(query: ListQuery): ListClause {
+  return whereFrom(ledgerEntriesList, query, { column: aliasColumns('le') })
 }
 
-export function seasonEntriesQuery(fromAt: number, toAt: number, source: string | undefined, limit: number, offset: number): SQL {
+const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
+
+export function ledgerEntriesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT le.id AS id, le.happened_at AS happenedAt, le.source AS source, le.tender AS tender, le.total_pence AS totalPence
-    FROM ledger_entries le
-    WHERE le.tender = 'CARD' AND le.happened_at >= ${fromAt} AND le.happened_at < ${toAt} ${sourceFilter(source)}
-    ORDER BY le.happened_at DESC
+    FROM ledger_entries le${predicate(clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export function seasonEntriesCountQuery(fromAt: number, toAt: number, source: string | undefined): SQL {
-  return sql`
-    SELECT count(*) AS total
-    FROM ledger_entries le
-    WHERE le.tender = 'CARD' AND le.happened_at >= ${fromAt} AND le.happened_at < ${toAt} ${sourceFilter(source)}
-  `
+export async function countLedgerEntries(clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM ledger_entries le${predicate(clause)}`)
+  return Number(row?.total ?? 0)
 }
 
-export async function seasonEntries(fromAt: number, toAt: number, source: string | undefined, limit: number, offset: number): Promise<{ items: SeasonEntry[], total: number }> {
-  const [items, [count]] = await Promise.all([
-    db.all<SeasonEntry>(seasonEntriesQuery(fromAt, toAt, source, limit, offset)),
-    db.all<{ total: number }>(seasonEntriesCountQuery(fromAt, toAt, source)),
+export async function ledgerEntries(clause: ListClause, limit: number, offset: number): Promise<{ items: SeasonEntry[], total: number }> {
+  const [items, total] = await Promise.all([
+    db.all<SeasonEntry>(ledgerEntriesQuery(clause, limit, offset)),
+    countLedgerEntries(clause),
   ])
-  return { items, total: count?.total ?? 0 }
+  return { items, total }
 }

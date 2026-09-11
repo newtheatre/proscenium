@@ -1,15 +1,25 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  ledgerEntriesClause,
+  ledgerEntriesQuery,
   openVarianceQuery,
   periodBounds,
   revenueBySourceQuery,
-  seasonEntriesCountQuery,
-  seasonEntriesQuery,
   seasonRefundsQuery,
 } from '#server/utils/season-dashboard'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
+
+const entriesSchema = filterQuerySchema(ledgerEntriesList)
+
+// happenedAt is required for every real request (the page defaults to today), but a test that
+// wants every entry regardless of when it posted asks for a range wide enough to hold them all.
+function entriesQuery(raw: Record<string, string> = {}): ReturnType<typeof entriesSchema.parse> {
+  return entriesSchema.parse({ happenedAt: 'between:2020-01-01,2030-01-01', ...raw })
+}
 
 // I-105 against the real migrations: every figure scoped by a predicate over a resolved range,
 // never one parameter per row it covers (0001, 0003, 0006).
@@ -173,22 +183,42 @@ describe('the open variance total (criterion 2)', () => {
   })
 })
 
-describe('drill-down entries, paged in SQL (criterion 3)', () => {
+const NOON_ON = (day: string): number => Math.floor(new Date(`${day}T12:00:00Z`).getTime() / 1000)
+
+describe('drill-down entries, filtered by declaration and paged in SQL (K-129, criterion 3)', () => {
   test('scoped to the range and an optional source, never a bare array', async () => {
     await withDatabase(async (database) => {
-      const desk = entry(database, 'DESK', 'CARD', 1000, '2026-09-15')
+      const desk = entry(database, 'DESK', 'CARD', NOON_ON('2026-09-15'), '2026-09-15')
       line(database, desk, 'WALK_UP', 900)
-      const bar = entry(database, 'TILL', 'CARD', 1500, '2026-09-15')
+      const bar = entry(database, 'TILL', 'CARD', NOON_ON('2026-09-15'), '2026-09-15')
       line(database, bar, 'BAR_ITEM', 400)
 
-      const all = read<{ id: string }>(database, seasonEntriesQuery(0, 2000, undefined, 10, 0))
+      const all = read<{ id: string }>(database, ledgerEntriesQuery(ledgerEntriesClause(entriesQuery()), 10, 0))
       expect(all.map(row => row.id).sort()).toEqual([bar, desk].sort())
 
-      const deskOnly = read<{ id: string }>(database, seasonEntriesQuery(0, 2000, 'DESK', 10, 0))
+      const deskOnly = read<{ id: string }>(database, ledgerEntriesQuery(ledgerEntriesClause(entriesQuery({ source: 'is:DESK' })), 10, 0))
       expect(deskOnly.map(row => row.id)).toEqual([desk])
+    })
+  })
 
-      const [count] = read<{ total: number }>(database, seasonEntriesCountQuery(0, 2000, undefined))
-      expect(count?.total).toBe(2)
+  test('a day outside the happenedAt range is excluded', async () => {
+    await withDatabase(async (database) => {
+      const inRange = entry(database, 'DESK', 'CARD', NOON_ON('2026-09-15'), '2026-09-15')
+      entry(database, 'DESK', 'CARD', NOON_ON('2026-09-01'), '2026-09-01')
+
+      const rowsFound = read<{ id: string }>(database, ledgerEntriesQuery(ledgerEntriesClause(entriesQuery({ happenedAt: 'is:2026-09-15' })), 10, 0))
+      expect(rowsFound.map(row => row.id)).toEqual([inRange])
+    })
+  })
+
+  test('tender narrows the drill-down, unlike the CARD-only revenue figure', async () => {
+    await withDatabase(async (database) => {
+      const card = entry(database, 'DESK', 'CARD', NOON_ON('2026-09-15'), '2026-09-15')
+      const comp = entry(database, 'DESK', 'COMP', NOON_ON('2026-09-15'), '2026-09-15')
+
+      const compOnly = read<{ id: string }>(database, ledgerEntriesQuery(ledgerEntriesClause(entriesQuery({ tender: 'is:COMP' })), 10, 0))
+      expect(compOnly.map(row => row.id)).toEqual([comp])
+      expect(card).not.toBe(comp)
     })
   })
 })

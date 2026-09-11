@@ -1,17 +1,16 @@
-import { z } from 'zod'
-import { periodForm } from '#shared/utils/season-dashboard'
-import { ENTRY_SOURCES } from '#shared/utils/ledger'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
 
-const query = periodForm.and(pageQuery).and(z.object({ source: z.enum(ENTRY_SOURCES).optional() }))
+const query = filterQuerySchema(ledgerEntriesList)
 
-// Any figure on the dashboard drills down to its ledger entries (criterion 3), paged in SQL and
-// never a bare array; treasurer and administrators only, never the committee's summary view.
+// Every figure on the dashboard drills down to its ledger entries (I-105 criterion 3), filtered
+// by its own declaration (K-129), paged in SQL and never a bare array. Treasurer and administrators only.
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'finance.read')
-  const { page, pageSize, source, ...period } = await getValidatedQueryOrThrow(event, query)
-  const { fromAt, toAt } = periodBounds(period)
+  const input = await getValidatedQueryOrThrow(event, query)
+  const clause = ledgerEntriesClause(input)
 
-  const { items, total } = await seasonEntries(fromAt, toAt, source, pageSize, offsetFor(page, pageSize))
+  const { items, total } = await ledgerEntries(clause, input.pageSize, offsetFor(input.page, input.pageSize))
 
-  return envelope(items, total, page, pageSize)
+  return envelope(items, total, input.page, input.pageSize)
 })
