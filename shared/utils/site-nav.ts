@@ -175,6 +175,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Revenue by show', icon: 'i-lucide-drama', to: '/money/shows', ability: viewFinanceReports },
       { label: 'Comps and discounts', icon: 'i-lucide-gift', to: '/money/reports', ability: viewFinanceReports },
       { label: 'Daily reconciliation', icon: 'i-lucide-scale', to: '/money/reconciliation', ability: viewFinanceReports },
+      { label: 'Ledger entries', icon: 'i-lucide-receipt', to: '/money/entries', ability: viewFinanceReports },
     ],
   },
 

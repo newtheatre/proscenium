@@ -50,8 +50,13 @@ const summaryFailure = computed(() => (error.value ? refusalText(error.value, 'T
 
 const mayDrillDown = computed(() => can(useViewer().value, viewFinanceReports))
 
+// The drill-down page owns its own declaration (K-129): the range travels as its happenedAt
+// filter, the day the dashboard already resolved, never the period's own kind and day pair.
 function entriesUrl(source?: string): string {
-  const params = new URLSearchParams(query.value)
+  if (!data.value) return '/money/entries'
+  const params = new URLSearchParams({
+    happenedAt: data.value.fromDay === data.value.toDay ? data.value.fromDay : `between:${data.value.fromDay},${data.value.toDay}`,
+  })
   if (source) params.set('source', source)
   return `/money/entries?${params.toString()}`
 }
