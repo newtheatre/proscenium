@@ -139,6 +139,13 @@ export interface AdminShow {
   performanceCount: number
   onSaleCount: number
   soldTickets: number
+  // Seats held but not yet paid for: the queue the desk still has to take money for (D-132).
+  unpaidTickets: number
+  // The house this theatre sells itself, and the next performance still to come. Both counted
+  // from the performances, so the strip cannot state a figure the rows disagree with.
+  capacity: number
+  nextPerformanceAt: number | null
+  nextPerformanceVenue: string | null
   // Counted from the junction, so "confirmed clear" and "nobody has looked" stay distinct
   // states rather than one empty list (D-102 criterion 2).
   warningsConfirmedNone: boolean
@@ -175,6 +182,7 @@ export interface AdminPerformance {
   status: PerformanceStatus
   notes: string | null
   soldTickets: number
+  unpaidTickets: number
 }
 
 // The columns a visitor may see. Anything absent here is absent from every public payload, which
