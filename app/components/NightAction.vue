@@ -5,10 +5,11 @@ withDefaults(defineProps<{
   label: string
   icon?: string
   color?: 'primary' | 'error' | 'neutral'
+  variant?: 'solid' | 'subtle' | 'outline'
   disabled?: boolean
   loading?: boolean
   to?: string
-}>(), { color: 'primary' })
+}>(), { color: 'primary', variant: 'solid' })
 
 const emit = defineEmits<{ press: [] }>()
 </script>
@@ -17,6 +18,7 @@ const emit = defineEmits<{ press: [] }>()
   <UButton
     :to="to"
     :color="color"
+    :variant="variant"
     :icon="icon"
     :disabled="disabled"
     :loading="loading"

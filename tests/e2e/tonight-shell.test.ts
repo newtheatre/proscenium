@@ -67,12 +67,12 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
     }
   }, CASE_TIMEOUT_MS)
 
-  // Criterion 2: the primary action is at least 48 by 48, sits in the bottom third, and is on
-  // screen without scrolling, because a thumb does not scroll to find the admit button.
-  test('the primary action is thumb-sized and under the thumb', async () => {
+  // Criterion 2 on a screen that still owns a sticky action: at least 48 by 48, in the bottom
+  // third, and on screen without scrolling, because a thumb does not scroll to find it.
+  test('a sticky primary action is thumb-sized and under the thumb', async () => {
     const view = await openView(PHONE)
     try {
-      await visit(view, `${app.baseURL}/tonight`)
+      await visit(view, `${app.baseURL}/tonight/glance`)
       // The window is not the viewport: the browser's own chrome takes a slice, and measuring the
       // action against the window instead would pass on one that had scrolled out of sight.
       const viewport = await view.evaluate<number>('window.innerHeight')
@@ -87,16 +87,28 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
     }
   }, CASE_TIMEOUT_MS)
 
-  // A navigational link outside the sticky slot is not the primary action the cardinality half
-  // of criterion 2 governs, but the thumb-sized half still applies to anything a thumb taps.
-  test('the hub\'s navigational links are thumb-sized too', async () => {
+  // The hub spends its whole screen on the six actions rather than a sticky slot, so the target
+  // floor is what governs there: every tile is a tap target in its own right (E-112 criterion 1).
+  test('every tile on the hub is a thumb-sized target', async () => {
     const view = await openView(PHONE)
     try {
       await visit(view, `${app.baseURL}/tonight`)
-      for (const selector of ['[data-test="link-incidents"]', '[data-test="link-age-checks"]', '[data-test="link-checklist"]', '[data-test="link-emergency"]', '[data-test="link-board"]']) {
-        const link = await boxOf(view, selector)
-        expect(link.height).toBeGreaterThanOrEqual(NIGHT_TAP_TARGET_PX)
+      for (const selector of ['[data-test="tile-scan"]', '[data-test="tile-glance"]', '[data-test="tile-passes"]', '[data-test="tile-backstage"]', '[data-test="tile-emergency"]', '[data-test="tile-contacts"]']) {
+        const tile = await boxOf(view, selector)
+        expect(`${selector}: ${tile.height >= NIGHT_TAP_TARGET_PX && tile.width >= NIGHT_TAP_TARGET_PX}`).toBe(`${selector}: true`)
       }
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // The one line the design settled and the hub must never lose (the show-night design, part 1).
+  test('the hub says the door never sells tickets', async () => {
+    const view = await openView(PHONE)
+    try {
+      await visit(view, `${app.baseURL}/tonight`)
+      expect(await view.evaluate<string>('document.body.innerText')).toContain('The door never sells tickets')
     }
     finally {
       view.close()
@@ -124,7 +136,7 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
   test('the stale label names the London minute it last synced, and the action refreshes it', async () => {
     const view = await openView(PHONE)
     try {
-      await visit(view, `${app.baseURL}/tonight`)
+      await visit(view, `${app.baseURL}/tonight/glance`)
       await waitFor(view, `/Last synced \\d\\d:\\d\\d/.test(document.querySelector('[data-test="night-stale"]')?.innerText ?? '')`)
       const before = await textOf(view, '[data-test="night-stale"]')
       expect(acceptableLabels(0)).toContain(before)
