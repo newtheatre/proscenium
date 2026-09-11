@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 // Enforces the comment rules in CONTRIBUTING.md §Comments. Run by CI.
 
+import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 const MAX_LINES = 2
@@ -20,13 +21,23 @@ const HISTORY = /\b(used to|originally|an earlier version|previously|it used to|
 // numbers do not, so they are not flagged.
 const FIGURES = /\b\d{1,3}(,\d{3})+\b|\b\d+\.\d+%/
 
-// Paths relative to the repository root, dot-directories included so a skipped one is
-// refused by name here rather than by the glob's default.
+// Forward-slashed paths from the root, walked one top-level entry at a time so a skipped
+// directory (node_modules above all) is never entered: filtering afterwards is ruinous on Windows.
 function files(exts: string[]): string[] {
   const glob = new Bun.Glob(`**/*.{${exts.join(',')}}`)
-  return [...glob.scanSync({ cwd: ROOT, dot: true, onlyFiles: true })]
-    .filter(path => !path.split('/').some(segment => SKIP.has(segment)))
-    .sort()
+  const found: string[] = []
+  for (const entry of readdirSync(ROOT, { withFileTypes: true })) {
+    if (SKIP.has(entry.name)) continue
+    if (entry.isDirectory()) {
+      for (const path of glob.scanSync({ cwd: join(ROOT, entry.name), dot: true, onlyFiles: true })) {
+        found.push(`${entry.name}/${path.replaceAll('\\', '/')}`)
+      }
+    }
+    else if (exts.some(ext => entry.name.endsWith(`.${ext}`))) {
+      found.push(entry.name)
+    }
+  }
+  return found.sort()
 }
 
 interface Block { line: number, text: string[] }
@@ -100,7 +111,8 @@ for (const rel of files(EXTS)) {
 // Em dashes, everywhere. Generated output and the migration dumps are skipped by files(),
 // so a generated file cannot fail the build.
 for (const rel of files(EM_DASH_EXTS)) {
-  if (rel === join('scripts', 'check-comments.ts')) continue
+  // Forward-slashed literally: files() above always returns that shape, on every platform.
+  if (rel === 'scripts/check-comments.ts') continue
   const source = await read(rel)
   if (source === null || !EM_DASH.test(source)) continue
   source.split('\n').forEach((line, i) => {
