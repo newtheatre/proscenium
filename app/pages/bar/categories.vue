@@ -27,6 +27,7 @@ const { data, status, error, refresh } = await useAsyncData(
 
 const editing = ref<BarCategory | null>(null)
 const open = ref(false)
+const removing = ref<BarCategory | null>(null)
 
 watch(open, (isOpen) => {
   if (!isOpen) failure.value = null
@@ -60,6 +61,26 @@ async function save(): Promise<void> {
       color: 'success',
     })
     open.value = false
+    await refresh()
+  }
+  catch (refused) {
+    failure.value = refusalText(refused)
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+async function remove(): Promise<void> {
+  const category = removing.value
+  if (!category) return
+
+  saving.value = true
+  failure.value = null
+  try {
+    await $fetch(`/api/admin/bar/categories/${category.id}`, { method: 'DELETE' })
+    toast.add({ title: 'Category deleted', icon: 'i-lucide-check', color: 'success' })
+    removing.value = null
     await refresh()
   }
   catch (refused) {
@@ -177,6 +198,18 @@ const columns: TableColumn<BarCategory>[] = [
         'data-test': `edit-${row.original.id}`,
         'onClick': () => edit(row.original),
       }, () => 'Edit'),
+      row.original.productCount > 0
+        ? null
+        : h(resolveComponent('UButton'), {
+            'size': 'sm',
+            'color': 'error',
+            'variant': 'ghost',
+            'data-test': `delete-${row.original.id}`,
+            'onClick': () => {
+              failure.value = null
+              removing.value = row.original
+            },
+          }, () => 'Delete'),
     ]),
   },
 ]
@@ -197,7 +230,7 @@ const columns: TableColumn<BarCategory>[] = [
       variant="subtle"
       icon="i-lucide-layout-grid"
       title="The order here is the order on the till"
-      description="A category's place is read when the till draws its buttons, so a change is a save and never a deploy. A category with products in it cannot be removed; rename it instead."
+      description="A category's place is read when the till draws its buttons, so a change is a save and never a deploy. A category with products or a price history in it cannot be removed; rename it instead. One with neither can be deleted outright."
     />
 
     <AdminToolbar
@@ -432,6 +465,47 @@ const columns: TableColumn<BarCategory>[] = [
             </template>
           </UTable>
         </div>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="removing !== null"
+      :title="removing ? `Delete ${removing.name}` : ''"
+      description="Nothing has ever been sold in this category, so there is no history to keep."
+      @update:open="removing = null; failure = null"
+    >
+      <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="delete-failure"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
+        <p
+          v-else
+          class="text-sm text-muted"
+        >
+          This cannot be undone, and there is nothing behind it to lose.
+        </p>
+      </template>
+
+      <template #footer>
+        <UButton
+          color="error"
+          :loading="saving"
+          data-test="confirm-delete"
+          @click="remove"
+        >
+          Delete it
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="removing = null"
+        >
+          Back
+        </UButton>
       </template>
     </UModal>
   </div>

@@ -244,6 +244,32 @@ describe.skipIf(skip !== null)('a product is retired, never destroyed (F-111 cri
   })
 })
 
+// #908 item 4: a category with nothing against it can be deleted, rather than only ever renamed.
+describe.skipIf(skip !== null)('a category with nothing against it can be deleted outright', () => {
+  test('an empty category is deleted', async () => {
+    const categoryId = await addCategory()
+    expect((await send('DELETE', `/api/admin/bar/categories/${categoryId}`)).status).toBe(200)
+    expect((await send('DELETE', `/api/admin/bar/categories/${categoryId}`)).status).toBe(404)
+  })
+
+  test('a category with a product in it is refused, naming the count', async () => {
+    const categoryId = await addCategory()
+    await addProduct(categoryId)
+    const answered = await send('DELETE', `/api/admin/bar/categories/${categoryId}`)
+    expect(answered.status).toBe(409)
+    expect((await answered.json() as { message?: string }).message).toContain('1 product')
+  })
+
+  test('a category with a price history is refused: prices are append-only, so it can only be renamed', async () => {
+    const categoryId = await addCategory()
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+    await send('POST', `/api/admin/bar/categories/${categoryId}/prices`, { servingKind: 'single', pricePence: 100, effectiveFrom: today })
+    const answered = await send('DELETE', `/api/admin/bar/categories/${categoryId}`)
+    expect(answered.status).toBe(409)
+    expect((await answered.json() as { message?: string }).message).toContain('price history')
+  })
+})
+
 describe.skipIf(skip !== null)('the till layout is read, not deployed (F-111 criterion 4)', () => {
   test('changing the order changes the order the list comes back in', async () => {
     const first = await addCategory({ name: named('Aaa'), sort: 1 })
@@ -585,6 +611,8 @@ describe.skipIf(skip !== null)('the screens', () => {
     // The console shell renders no <main>, so each screen names an element of its own.
     await visit(view, `${app.baseURL}/bar/products`, '[data-test="bar-products-table"]')
     expect(await textOf(view, '[data-test="bar-products-table"]')).toContain(productName)
+    // #908 item 2: the retire-versus-delete copy reads as a sentence, matching box-office/venues.
+    expect(await textOf(view, 'body')).toContain('A product nothing has ever been sold as can be deleted outright.')
 
     await visit(view, `${app.baseURL}/bar/stock`, '[data-test="bar-items-table"]')
     const stock = await textOf(view, '[data-test="bar-items-table"]')
