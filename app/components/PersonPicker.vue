@@ -6,8 +6,8 @@ interface Person {
   id: string
   name: string
   email: string
-  studentId: string | null
-  anonymisedAt: number | null
+  studentId?: string | null
+  anonymisedAt?: number | null
 }
 
 interface Listing { items: Person[] }
@@ -30,10 +30,15 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
   // A tombstone is a real account and a valid target for some things, and never for others.
   includeErased?: boolean
+  // A screen with no accounts.read searches its own scoped route instead (K-123 criterion 1).
+  endpoint?: string
+  searchParam?: string
 }>(), {
   placeholder: 'Search by name, address or student number',
   disabled: false,
   includeErased: false,
+  endpoint: '/api/admin/accounts',
+  searchParam: 'search',
 })
 
 const searchTerm = ref('')
@@ -47,8 +52,10 @@ const { data, status } = await useAsyncData(
   // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
   () => settled.value.trim().length < 2
     ? Promise.resolve({ items: [] } as Listing)
-    : $fetch<Listing>('/api/admin/accounts', {
-        query: { search: settled.value.trim(), pageSize: 10, includeAnonymised: props.includeErased },
+    : $fetch<Listing>(props.endpoint, {
+        query: props.endpoint === '/api/admin/accounts'
+          ? { [props.searchParam]: settled.value.trim(), pageSize: 10, includeAnonymised: props.includeErased }
+          : { [props.searchParam]: settled.value.trim() },
       }),
   { watch: [settled], default: (): Listing => ({ items: [] }), getCachedData: () => undefined },
 )
@@ -61,8 +68,8 @@ const items = computed<Item[]>(() => (data.value?.items ?? []).map(person => ({
   label: person.name,
   value: person.id,
   email: person.email,
-  hint: person.studentId,
-  erased: person.anonymisedAt !== null,
+  hint: person.studentId ?? null,
+  erased: (person.anonymisedAt ?? null) !== null,
 })))
 
 const shown = computed<Item[]>(() =>
@@ -80,6 +87,15 @@ function choose(item: Item | undefined): void {
 watch(model, (value) => {
   if (!value) chosen.value = null
 })
+
+// A caller that already knows who was chosen, such as fulfilling a request by name, shows them
+// without a round trip through search (#940 criterion 3).
+function preset(person: { id: string, name: string, email: string }): void {
+  chosen.value = { label: person.name, value: person.id, email: person.email, hint: null, erased: false }
+  model.value = person.id
+}
+
+defineExpose({ preset })
 </script>
 
 <template>

@@ -59,6 +59,7 @@ interface ReservationDetail {
   compRequest: ReservationCompRequest | null
 }
 
+const request = useRequestFetch()
 const toast = useToast()
 const night = ref<string | null>(null)
 const performanceId = ref<string | undefined>(undefined)
@@ -68,11 +69,15 @@ const scanning = ref(false)
 const searchFailure = ref<string | null>(null)
 const scanFailure = ref<string | null>(null)
 
-const { data: nightly, refresh: refreshNightly } = await useAsyncData<Nightly>(
+const { data: nightly, refresh: refreshNightly, error: nightlyError } = await useAsyncData<Nightly>(
   'desk-nightly',
-  () => $fetch('/api/box-office/desk/performances', { query: night.value ? { night: night.value } : {} }),
+  () => request('/api/box-office/desk/performances', { query: night.value ? { night: night.value } : {} }),
   { watch: [night] },
 )
+
+// The failure is shown rather than left to a silent "no results", since a fetch a shift opens on
+// can refuse for reasons the empty state cannot say (#899).
+const nightlyFailure = computed(() => (nightlyError.value ? refusalText(nightlyError.value, 'Tonight could not be read.') : null))
 
 watch(nightly, (value) => {
   if (value && !performanceId.value) performanceId.value = value.performances[0]?.id
@@ -104,11 +109,13 @@ async function search(): Promise<void> {
   }
 }
 
+// Immediate, since the nightly watcher above may already have set performanceId synchronously
+// before this one registers, and a shift that opens the desk fresh still wants tonight's list (#940).
 watch(performanceId, () => {
   results.value = []
   q.value = ''
   void search()
-})
+}, { immediate: true })
 
 const selected = ref<ReservationDetail | null>(null)
 const open = ref(false)
@@ -312,6 +319,14 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
       </p>
     </div>
 
+    <UAlert
+      v-if="nightlyFailure"
+      color="error"
+      variant="subtle"
+      :description="nightlyFailure"
+      data-test="desk-nightly-failure"
+    />
+
     <UCard>
       <template #header>
         <div class="flex flex-wrap items-center gap-2">
@@ -452,9 +467,12 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
 
           <template v-if="selected.status === 'PENDING'">
             <UFormField label="Tender">
-              <USelect
+              <!-- A URadioGroup, not USelect: choosing a value inside a select nested in this modal
+                   left its own backdrop swallowing clicks after close (#939, Nuxt UI issue). -->
+              <URadioGroup
                 v-model="tender"
-                :items="tenderOptions"
+                orientation="horizontal"
+                :items="tenderOptions.map(value => ({ label: value === 'COMP' ? 'Comp' : 'Card', value }))"
                 data-test="desk-tender"
               />
             </UFormField>
