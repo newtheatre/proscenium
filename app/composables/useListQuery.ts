@@ -14,6 +14,9 @@ export interface ListSort {
 export interface ListQueryOptions {
   // Labels for the fields whose options are only known at runtime (a season, a category).
   options?: MaybeRefOrGetter<Record<string, FilterOption[]> | undefined>
+  // Keys the page owns beside the list, such as which tab is open. They stay in the URL and
+  // never reach the endpoint, whose schema is strict about what it has not declared.
+  ignore?: readonly string[]
 }
 
 const RESERVED = ['page', 'pageSize', 'search', 'sort', 'direction']
@@ -111,7 +114,8 @@ export function useListQuery<S extends ListSpec>(spec: S, settings: ListQueryOpt
     if (settledSearch.value) asked.search = settledSearch.value
     for (const condition of conditions.value) asked[condition.key] = encodeCondition(condition)
     for (const [key, value] of Object.entries(current.value)) {
-      if (!RESERVED.includes(key) && !fieldOf(spec, key)) asked[key] = value
+      if (RESERVED.includes(key) || fieldOf(spec, key) || settings.ignore?.includes(key)) continue
+      asked[key] = value
     }
     return JSON.stringify(asked)
   })

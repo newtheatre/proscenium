@@ -2,8 +2,9 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 // A function import only: `capacity.ts` imports `soldReferences` from this file, and importing a
 // constant back would be a circular value that is not there yet the first time either module runs.
-import { heldSeatsSubquery } from './capacity'
+import { heldSeatsSubquery, showUnpaidSeatsColumn, unpaidSeatsColumn } from './capacity'
 import { aliasColumns, whereFrom, yesNo } from './list-filters'
+import { performancesList } from '#shared/utils/performances-list'
 import { showsList } from '#shared/utils/shows-list'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
@@ -181,11 +182,25 @@ const SHOW_COLUMNS = sql`
   s.status AS status
 `
 
+// What the status strip states in words (D-132 criterion 2). The house counts the performances
+// this theatre sells itself: an externally ticketed one has no seats of ours to add.
+const SHOW_HOUSE = sql`
+  (SELECT coalesce(sum(coalesce(p.capacity_override, v.capacity)), 0)
+     FROM performances p JOIN venues v ON v.id = p.venue_id
+    WHERE p.show_id = s.id AND p.status <> 'CANCELLED' AND p.external_booking_url IS NULL) AS capacity,
+  (SELECT min(p.starts_at) FROM performances p
+    WHERE p.show_id = s.id AND p.status <> 'CANCELLED' AND p.starts_at >= unixepoch()) AS nextPerformanceAt,
+  (SELECT v.name FROM performances p JOIN venues v ON v.id = p.venue_id
+    WHERE p.show_id = s.id AND p.status <> 'CANCELLED' AND p.starts_at >= unixepoch()
+    ORDER BY p.starts_at LIMIT 1) AS nextPerformanceVenue
+`
+
 // Counted rather than stored, so the console cannot show a figure the rows disagree with.
 const SHOW_COUNTS = sql`
   (SELECT count(*) FROM performances p WHERE p.show_id = s.id) AS performanceCount,
   (SELECT count(*) FROM performances p WHERE p.show_id = s.id AND p.status = 'ON_SALE') AS onSaleCount,
-  (SELECT count(*) FROM show_content_warnings w WHERE w.show_id = s.id) AS warningCount
+  (SELECT count(*) FROM show_content_warnings w WHERE w.show_id = s.id) AS warningCount,
+  ${SHOW_HOUSE}
 `
 
 // A published show nobody has assessed is what the overview flags, so the predicate is one
@@ -200,7 +215,8 @@ const ON_SALE = sql`exists (SELECT 1 FROM performances p WHERE p.show_id = s.id 
 
 export function showsQuery(clause: ListClause, limit: number, offset: number, references = soldReferences()): SQL {
   return sql`
-    SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s', references)} AS soldTickets
+    SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s', references)} AS soldTickets,
+           ${showUnpaidSeatsColumn('s')} AS unpaidTickets
     FROM shows s${predicate(clause)}
     ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
@@ -218,7 +234,8 @@ export async function countShows(clause: ListClause): Promise<number> {
 
 export async function showById(id: string): Promise<AdminShow | undefined> {
   const [row] = await db.all<ShowRow>(sql`
-    SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s')} AS soldTickets
+    SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s')} AS soldTickets,
+           ${showUnpaidSeatsColumn('s')} AS unpaidTickets
     FROM shows s WHERE s.id = ${id}
   `)
   return row ? readShow(row) : undefined
@@ -228,7 +245,8 @@ export async function showById(id: string): Promise<AdminShow | undefined> {
 export async function showBySlug(slug: string, exceptId?: string): Promise<AdminShow | undefined> {
   const except = exceptId ? sql` AND s.id <> ${exceptId}` : sql``
   const [row] = await db.all<ShowRow>(sql`
-    SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s')} AS soldTickets
+    SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s')} AS soldTickets,
+           ${showUnpaidSeatsColumn('s')} AS unpaidTickets
     FROM shows s WHERE s.slug = ${slug}${except} LIMIT 1
   `)
   return row ? readShow(row) : undefined
@@ -257,12 +275,59 @@ const PERFORMANCE_COLUMNS = sql`
 // venue may run a matinee and an evening, so nothing here groups by day or venue (E-127).
 export function showPerformancesQuery(showId: string, references = soldReferences()): SQL {
   return sql`
-    SELECT ${PERFORMANCE_COLUMNS}, ${performanceSoldColumn('p', references)} AS soldTickets
+    SELECT ${PERFORMANCE_COLUMNS}, ${performanceSoldColumn('p', references)} AS soldTickets,
+           ${unpaidSeatsColumn('p')} AS unpaidTickets
     FROM performances p
     JOIN venues v ON v.id = p.venue_id
     WHERE p.show_id = ${showId}
     ORDER BY p.starts_at, v.name, p.id
   `
+}
+
+// The declaration's predicates and order, through the aliases the statement below uses. A sort
+// field naming another table spells it out (`v.name`); everything else is the performance's own.
+const performanceColumn = (name: string): SQL => sql.raw(name.includes('.') ? name : `p.${name}`)
+
+export function performancesClause(query: ListQuery): ListClause {
+  return whereFrom(performancesList, query, {
+    column: performanceColumn,
+    search: [sql`v.name`],
+    fields: { external: yesNo(sql`p.external_booking_url IS NOT NULL`) },
+  })
+}
+
+// The show id is the endpoint's own predicate, bound once beside whatever the filters add: a
+// filtered list is still one show's list (D-132).
+const scoped = (showId: string, clause: ListClause): SQL =>
+  (clause.where ? sql`p.show_id = ${showId} AND ${clause.where}` : sql`p.show_id = ${showId}`)
+
+export function pagedPerformancesQuery(showId: string, clause: ListClause, limit: number, offset: number, references = soldReferences()): SQL {
+  return sql`
+    SELECT ${PERFORMANCE_COLUMNS}, ${performanceSoldColumn('p', references)} AS soldTickets,
+           ${unpaidSeatsColumn('p')} AS unpaidTickets
+    FROM performances p
+    JOIN venues v ON v.id = p.venue_id
+    WHERE ${scoped(showId, clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}, p.id
+    LIMIT ${limit} OFFSET ${offset}
+  `
+}
+
+export function countPerformancesQuery(showId: string, clause: ListClause): SQL {
+  return sql`
+    SELECT count(*) AS total FROM performances p
+    JOIN venues v ON v.id = p.venue_id
+    WHERE ${scoped(showId, clause)}
+  `
+}
+
+export async function listShowPerformances(showId: string, clause: ListClause, limit: number, offset: number): Promise<AdminPerformance[]> {
+  return db.all<AdminPerformance>(pagedPerformancesQuery(showId, clause, limit, offset))
+}
+
+export async function countShowPerformances(showId: string, clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(countPerformancesQuery(showId, clause))
+  return Number(row?.total ?? 0)
 }
 
 export async function showPerformances(showId: string): Promise<AdminPerformance[]> {
@@ -272,7 +337,6 @@ export async function showPerformances(showId: string): Promise<AdminPerformance
 export interface PerformanceWithShow extends AdminPerformance {
   showStatus: ShowStatus
   showTitle: string
-  showSlug: string
   showBookingClosesHoursBefore: number | null
 }
 
@@ -280,9 +344,9 @@ export async function performanceById(id: string): Promise<PerformanceWithShow |
   const [row] = await db.all<PerformanceWithShow>(sql`
     SELECT ${PERFORMANCE_COLUMNS},
            ${performanceSoldColumn('p')} AS soldTickets,
+           ${unpaidSeatsColumn('p')} AS unpaidTickets,
            s.status AS showStatus,
            s.title AS showTitle,
-           s.slug AS showSlug,
            s.booking_closes_hours_before AS showBookingClosesHoursBefore
     FROM performances p
     JOIN shows s ON s.id = p.show_id

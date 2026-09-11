@@ -121,7 +121,10 @@ useSeoMeta({ title: 'My rota' })
 </script>
 
 <template>
-  <UContainer class="max-w-3xl py-16">
+  <UContainer
+    class="max-w-3xl py-16"
+    data-test="rota-page"
+  >
     <UPageHeader
       title="My rota"
       description="Shifts you already hold, and open ones you currently qualify for. What is locked names what would unlock it."

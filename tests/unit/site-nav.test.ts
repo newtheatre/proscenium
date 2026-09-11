@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
 import { ABILITY_PERMISSIONS } from '#shared/utils/abilities'
 import { PERMISSIONS } from '#shared/utils/roles'
-import { CONSOLE_HOME, CONSOLE_NAV, MEMBER_NAV, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor } from '#shared/utils/site-nav'
+import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, MY_NAV, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor } from '#shared/utils/site-nav'
 
 // The navigation conventions are a test rather than a review habit (0040), the same way the admin
 // component conventions are (0032). What review still judges is whether a label reads well.
@@ -50,7 +50,7 @@ function routeOf(path: string): string {
   return `/${route === 'index' ? '' : route}`.replace(/\/$/, '') || '/'
 }
 
-const everyEntry = [CONSOLE_HOME, ...CONSOLE_NAV.flatMap(group => group.items), ...MEMBER_NAV, ...SHELL_NAV, ...PUBLIC_NAV]
+const everyEntry = [CONSOLE_HOME, ...CONSOLE_NAV.flatMap(group => group.items), ...MY_NAV, ...ACCOUNT_NAV, ...SHELL_NAV, ...PUBLIC_NAV]
 
 describe('every console screen is in the navigation (0040)', () => {
   test('no console page is missing from the declaration', async () => {
@@ -105,6 +105,21 @@ describe('the vocabulary has not drifted from the permission map (0009)', () => 
 
   test('every navigable entry carries an ability', () => {
     expect(everyEntry.filter(entry => typeof entry.ability?.execute !== 'function').map(entry => entry.to)).toEqual([])
+  })
+})
+
+describe('the members area and the account settings never overlap (K-127 criterion 2)', () => {
+  test('MY_NAV opens on /my', () => {
+    expect(MY_NAV[0]?.to).toBe('/my')
+  })
+
+  test('ACCOUNT_NAV is exactly the three account routes', () => {
+    expect(ACCOUNT_NAV.map(entry => entry.to)).toEqual(['/account/profile', '/account/security', '/account/notifications'])
+  })
+
+  test('no destination sits in both lists', () => {
+    const inBoth = MY_NAV.filter(entry => ACCOUNT_NAV.some(other => other.to === entry.to))
+    expect(inBoth).toEqual([])
   })
 })
 

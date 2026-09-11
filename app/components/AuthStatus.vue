@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { can } from '#shared/utils/abilities'
 import { formatLondon, startOfLondonDay } from '#shared/utils/london'
-import { MEMBER_NAV, SHELL_NAV } from '#shared/utils/site-nav'
+import { ACCOUNT_NAV, SHELL_NAV } from '#shared/utils/site-nav'
 import type { NavEntry } from '#shared/utils/site-nav'
 import type { DropdownMenuItem } from '@nuxt/ui'
 
@@ -46,7 +46,7 @@ const items = computed<DropdownMenuItem[][]>(() => [
     { label: account.value.user?.name ?? '', type: 'label' as const },
     ...(membershipItem.value ? [membershipItem.value] : []),
   ],
-  MEMBER_NAV.map(entry),
+  ACCOUNT_NAV.map(entry),
   [...shells.value.map(entry), { label: 'Back to the site', icon: 'i-lucide-home', to: '/' }],
   [{
     label: 'Sign out',

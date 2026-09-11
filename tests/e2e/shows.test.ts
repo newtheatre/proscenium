@@ -465,7 +465,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `new URLSearchParams(location.search).get('status') === 'is:DRAFT'`)
     expect(await textOf(view, '[data-test="shows-table"]')).toContain(title)
 
-    await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="performances-table"]')
+    await visit(view, `${app.baseURL}/box-office/shows/${id}?tab=performances`, '[data-test="performances-table"]')
     expect(await textOf(view, '[data-test="show-status"]')).toContain('Draft')
     expect(await textOf(view, '[data-test="performances-table"]')).toContain('Closes at curtain-up')
     view.close()
@@ -476,7 +476,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   test('adding a performance from the screen puts it on the table', async () => {
     const id = await newShow({ title: named('Added on screen') })
     const view = await signedIn()
-    await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="performances-table"]')
+    await visit(view, `${app.baseURL}/box-office/shows/${id}?tab=performances`, '[data-test="performances-table"]')
 
     await click(view, '[data-test="add-performance"]')
     await waitFor(view, `document.querySelector('[data-test="performance-form"]')`)
@@ -497,7 +497,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await addPerformance(id, { externalBookingUrl: 'https://tickets.example.org/seagull' })
 
     const view = await signedIn()
-    await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="performances-table"]')
+    await visit(view, `${app.baseURL}/box-office/shows/${id}?tab=performances`, '[data-test="performances-table"]')
 
     const text = await textOf(view, '[data-test="performances-table"]')
     expect(text).toContain('Externally ticketed')
@@ -510,7 +510,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await addPerformance(id)
 
     const view = await signedIn()
-    await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="performances-table"]')
+    await visit(view, `${app.baseURL}/box-office/shows/${id}?tab=performances`, '[data-test="performances-table"]')
 
     await click(view, '[data-test^="edit-performance-"]')
     await waitFor(view, `document.querySelector('[data-test="performance-form"]')`)

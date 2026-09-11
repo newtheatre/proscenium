@@ -206,6 +206,36 @@ export interface PrerequisiteRow {
   requiresKind: string
 }
 
+export interface NextSession {
+  id: string
+  heldOn: string
+  startsAt: string
+  place: string | null
+}
+
+// The earliest open session teaching each module, one grouped query over every session rather
+// than an id list built from the catalogue's own rows (0003, G-129).
+export async function nextOpenSessions(today: string, now = new Date()): Promise<Map<string, NextSession>> {
+  const rows = await db.all<NextSession & { moduleId: string }>(sql`
+    SELECT moduleId, id, heldOn, startsAt, place FROM (
+      SELECT sm.module_id AS moduleId, s.id AS id, s.held_on AS heldOn, s.starts_at AS startsAt, s.place AS place,
+        row_number() OVER (PARTITION BY sm.module_id ORDER BY s.held_on ASC, s.starts_at ASC) AS rank
+      FROM session_modules sm
+      JOIN training_sessions s ON s.id = sm.session_id
+      WHERE s.status = 'OPEN' AND s.held_on >= ${today}
+        AND (s.opens_at IS NULL OR s.opens_at <= ${Math.floor(now.getTime() / 1000)})
+    ) WHERE rank = 1
+  `)
+  return new Map(rows.map(row => [row.moduleId, { id: row.id, heldOn: row.heldOn, startsAt: row.startsAt, place: row.place }]))
+}
+
+// A member's own open requests, one bound parameter whatever the catalogue holds (0003).
+export async function openRequestsOf(userId: string): Promise<Set<string>> {
+  const rows = await db.select({ moduleId: schema.moduleRequests.moduleId }).from(schema.moduleRequests)
+    .where(and(eq(schema.moduleRequests.userId, userId), eq(schema.moduleRequests.status, 'OPEN')))
+  return new Set(rows.map(row => row.moduleId))
+}
+
 // Which modules somebody currently holds, expiring included, as a set the caller can ask of any
 // prerequisite (G-108 criterion 5, G-101 criterion 3).
 export async function modulesHeldBy(userId: string, today: string): Promise<Set<string>> {
