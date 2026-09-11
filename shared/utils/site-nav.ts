@@ -231,6 +231,7 @@ export const MEMBER_NAV: NavEntry[] = [
 
   // Module A: identity
 
+  { label: 'Membership', icon: 'i-lucide-badge-check', to: '/account/membership', ability: signedIn },
   { label: 'My profile', icon: 'i-lucide-user', to: '/account/profile', ability: signedIn },
   { label: 'Sign-in and security', icon: 'i-lucide-shield', to: '/account/security', ability: signedIn },
 

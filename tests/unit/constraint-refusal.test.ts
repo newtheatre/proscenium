@@ -28,6 +28,15 @@ describe('a recognised constraint reads as a refusal', () => {
     expect(constraintRefusal(TABLE, wrapped)?.statusMessage).toContain('duty manager')
   })
 
+  // Drizzle wraps the driver's error as "Failed query: ..." and keeps the real one on `cause`.
+  test('a drizzle-wrapped failure is read from its cause', () => {
+    const wrapped = new Error('Failed query: insert into shifts ...\nparams: a,b', {
+      cause: new Error('D1_ERROR: UNIQUE constraint failed: shifts.performance_id: SQLITE_CONSTRAINT'),
+    })
+    expect(constraintRefusal(TABLE, wrapped)?.statusMessage).toContain('duty manager')
+    expect(constraintRefusal(TABLE, new Error('Failed query: insert into shifts ...', { cause: new Error('disk I/O error') }))).toBeNull()
+  })
+
   // The slot index names three columns and the duty manager index names one of them: a substring
   // match would answer the wrong refusal.
   test('a longer violated name is not read as the shorter one it starts with', () => {

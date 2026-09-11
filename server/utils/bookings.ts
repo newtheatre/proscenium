@@ -1,7 +1,8 @@
 import { db, schema } from '@nuxthub/db'
-import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { newId } from './accounts'
 import { configValue } from './configuration'
+import { longestTerm } from './membership-claims'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING), since D-113 reaches `hasCurrentMembership`.
@@ -163,17 +164,7 @@ export async function bookingFor(id: string): Promise<BookingRow | undefined> {
 }
 
 export async function hasCurrentMembership(event: H3Event, userId: string, now: Date): Promise<boolean> {
-  // The longest-running term the person holds: a three-year membership outlives a one-year one
-  // bought later, and either counts (0031).
-  const [term] = await db.select({
-    startsOn: schema.memberships.startsOn,
-    expiresOn: schema.memberships.expiresOn,
-  })
-    .from(schema.memberships)
-    .where(eq(schema.memberships.userId, userId))
-    .orderBy(desc(schema.memberships.expiresOn))
-    .limit(1)
-
+  const term = await longestTerm(userId)
   if (!term) return false
   return isCurrent(term, londonDay(now), await configValue(event, 'MEMBERSHIP_GRACE_DAYS'))
 }

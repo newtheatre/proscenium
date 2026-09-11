@@ -78,6 +78,20 @@ export const MESSAGE_TYPES = {
     template: 'membership-expiring',
   },
 
+  // An answer to something the member asked for, so transactional: no topic may suppress it, and
+  // the inbox keeps the reason where a declined member can find it again (A-130 criterion 3).
+  'membership.claim.recorded': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'membership-claim-recorded',
+  },
+
+  'membership.claim.declined': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'membership-claim-declined',
+  },
+
   // A handover is planned rather than discovered, so this is transactional: no topic may
   // suppress the notice that somebody's standing authority is about to end (A-119 criterion 1).
   'role.expiring': {
