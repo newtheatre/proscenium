@@ -282,7 +282,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
   {
     name: 'reservations',
     column: 'user_id',
-    section: 'bookings',
+    section: 'reservations',
     columns: ['reference', 'performance_id', 'status', 'source', 'created_at'],
     erasure: 'scrub',
     scrub: ['customer_notes', 'staff_notes'],
@@ -667,7 +667,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
   {
     name: 'notification_digest_entries',
     column: 'user_id',
-    section: 'messages',
+    section: 'digests',
     columns: ['topic', 'type', 'subject', 'body', 'created_at'],
     erasure: 'scrub',
     // Held only until its digest sends or prunes with it (H-104); the count survives, the
