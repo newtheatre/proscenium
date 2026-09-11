@@ -62,6 +62,12 @@ describe('the personal data registry (K-109, K-110)', () => {
     }
   })
 
+  test('no two exported tables share a section, because the bundle keys by section (A-124)', async () => {
+    const { PERSONAL_TABLES } = await import('#shared/utils/personal-data')
+    const sections = PERSONAL_TABLES.map(entry => entry.section).filter(Boolean)
+    expect(sections.filter((section, index) => sections.indexOf(section) !== index)).toEqual([])
+  })
+
   test('every entry says why, because the next person has to be able to disagree with it', async () => {
     const { PERSONAL_TABLES } = await import('#shared/utils/personal-data')
     for (const entry of PERSONAL_TABLES) {
