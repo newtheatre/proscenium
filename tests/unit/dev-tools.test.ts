@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { PERSONAS, PERSONA_PASSWORD } from '#shared/utils/personas'
+import { PERSONA_PASSWORD, PERSONA_TOTP_SECRET, PERSONAS } from '#shared/utils/personas'
+import { base32Decode } from '#shared/utils/totp'
 
 // The developer tools sign in without a password, so the guarantee that matters is that they are
 // not in a build at all (K-124 criterion 3).
@@ -23,7 +24,7 @@ describe('the developer tools do not ship', () => {
     const offenders: string[] = []
     for (const chunk of chunks) {
       const source = await Bun.file(`.output/${chunk}`).text()
-      if (source.includes('sign-in-as') || source.includes(PERSONA_PASSWORD)) offenders.push(chunk)
+      if (source.includes('sign-in-as') || source.includes(PERSONA_PASSWORD) || source.includes(PERSONA_TOTP_SECRET)) offenders.push(chunk)
     }
     expect(offenders).toEqual([])
   })
@@ -42,6 +43,12 @@ describe('the personas cover the states that are easy to forget', () => {
   // A password in the repository is only ever acceptable because this one cannot reach production.
   test('the shared password is obviously a development one', () => {
     expect(PERSONA_PASSWORD).toContain('development')
+  })
+
+  // Seeding confirms this as every 'full' persona's second factor (K-124 criterion 1), so it has
+  // to decode to the byte length a real enrolment would produce.
+  test('the shared authenticator secret is valid base32 of the right length', () => {
+    expect(base32Decode(PERSONA_TOTP_SECRET).length).toBe(20)
   })
 })
 

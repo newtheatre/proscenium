@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { renderSVG } from 'uqr'
 import type { Persona } from '#shared/utils/personas'
 
 // Development only: nuxt.config keeps this file out of a production build (K-124).
@@ -13,6 +14,7 @@ interface Tools {
   session: { id: string, name: string, email: string, roles: string[], permissions: string[], factor: boolean } | null
   personas: Row[]
   mailbox: Letter[]
+  totp: { secret: string, uri: string }
 }
 
 const toast = useToast()
@@ -20,6 +22,7 @@ const { refresh: refreshAccount } = useAccount()
 const tools = ref<Tools | null>(null)
 const working = ref('')
 const reading = ref<Letter | null>(null)
+const totpQr = computed(() => tools.value ? `data:image/svg+xml;base64,${btoa(renderSVG(tools.value.totp.uri))}` : '')
 
 async function load(): Promise<void> {
   tools.value = await $fetch<Tools>('/api/dev')
@@ -147,6 +150,36 @@ onMounted(load)
           >Not seeded</span>
         </li>
       </ul>
+    </UCard>
+
+    <UCard>
+      <template #header>
+        <h2 class="nnt-headline text-lg">
+          Authenticator app
+        </h2>
+      </template>
+
+      <div class="flex flex-wrap items-center gap-4">
+        <img
+          data-test="dev-totp-qr"
+          :src="totpQr"
+          alt="QR code for the shared persona authenticator secret"
+          class="size-32 rounded border border-default"
+        >
+        <div class="space-y-1 text-sm">
+          <p class="text-muted">
+            Every seeded 'full' persona already has this confirmed as its second factor, so no
+            admin screen refuses one for lacking an authenticator. Scan it once and the same code
+            works for any of them, across every reseed.
+          </p>
+          <p
+            data-test="dev-totp-secret"
+            class="font-mono text-muted"
+          >
+            {{ tools?.totp.secret }}
+          </p>
+        </div>
+      </div>
     </UCard>
 
     <UCard>
