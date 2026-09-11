@@ -574,6 +574,9 @@ of a price change live in the audit trail as `ticket-type.price.changed`.
 drops archived types and every flagged one, and allow-lists `id`, `name`, `description` and
 `price`. An entitled booker's access types are D-128's own resolution, never a widening of this.
 
+`GET /api/performances/[id]/booking` also names what is being booked, so the form need not fetch
+the show again: `show` is its slug and title, `performance` its curtain and venue, and no more.
+
 **Entitlement (D-109).** `restricted_to = 'MEMBER'` drops a type from what
 `GET /api/performances/[id]/booking` and `POST /api/reservations` offer a caller who is not
 currently a member (`hasCurrentMembership()`, checked fresh at each, since a membership can lapse
