@@ -269,6 +269,7 @@ const SHOTS: Shot[] = [
   { name: '30b-show-details-phone', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=details`, marker: '[data-test="show-copy"]', width: PHONE },
   { name: '31-show-performances', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances`, marker: '[data-test="performances-table"]' },
   { name: '31a-show-performances-narrow', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances`, marker: '[data-test="performances-table"]', width: NARROW },
+  { name: '31b-show-performances-filters', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances&status=is:ON_SALE`, marker: '[data-test="toolbar-active"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '32-show-ticket-types', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=ticket-types`, marker: '[data-test="show-prices"]' },
   { name: '33-show-warnings', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=warnings`, marker: '[data-test="show-warnings"]' },
   { name: '34-show-sales', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=sales`, marker: '[data-test="show-sales"]' },
