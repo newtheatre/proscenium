@@ -11,6 +11,7 @@ import { londonDay } from '../shared/utils/membership'
 const OUT = process.env.SHOTS_OUT ?? '.shots'
 const WIDE = 1400
 const NARROW = 900
+const PHONE = 390
 
 const password = `shots-${crypto.randomUUID()}`
 const email = `shots-${crypto.randomUUID().slice(0, 8)}@e2e.newtheatre.org.uk`
@@ -134,6 +135,14 @@ sql(`INSERT INTO venue_emergency_info (id, venue_id, assembly_point, updated_by)
 sql(`INSERT INTO checklist_items (id, venue_id, phase, label, sort, required) VALUES (?, ?, ?, ?, ?, ?)`,
   crypto.randomUUID(), 'shots-venue', 'PRE', 'Fire exits checked', 1, 1)
 
+// D-132 block begins: a published show with two performances on sale, so the show screen's tabs,
+// its status strip and its sales table are never pictures of an empty run.
+const SHOW_FOR_SHOTS = 'shots-show'
+sql(`INSERT INTO performances (id, show_id, venue_id, starts_at, doors_at, duration_minutes, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+'shots-performance-2', SHOW_FOR_SHOTS, 'shots-venue', shotsNow + 28 * 3600, shotsNow + 27.5 * 3600, 120, 'ON_SALE')
+// D-132 block ends.
+
 const roomsForShots = await (await send('GET', '/api/admin/rooms', undefined, cookie)).json() as { items: { id: string, name: string }[] }
 const studio = roomsForShots.items.find(room => room.name === 'The Studio') ?? roomsForShots.items[0]
 if (studio) {
@@ -253,6 +262,21 @@ const SHOTS: Shot[] = [
   { name: '16g-rota-emergency', path: '/rota/manage/emergency', marker: '[data-test="emergency-table"]' },
   { name: '11-config', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
   { name: '12-dev-tools', path: '/dev', marker: '[data-test="dev-seed"]' },
+  // D-132 shots begin: every tab of the show screen, wide and narrow, plus the phone widths the
+  // strip and the tabs are judged at.
+  { name: '30-show-details', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=details`, marker: '[data-test="show-copy"]' },
+  { name: '30a-show-details-narrow', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=details`, marker: '[data-test="show-copy"]', width: NARROW },
+  { name: '30b-show-details-phone', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=details`, marker: '[data-test="show-copy"]', width: PHONE },
+  { name: '31-show-performances', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances`, marker: '[data-test="performances-table"]' },
+  { name: '31a-show-performances-narrow', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances`, marker: '[data-test="performances-table"]', width: NARROW },
+  { name: '32-show-ticket-types', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=ticket-types`, marker: '[data-test="show-prices"]' },
+  { name: '33-show-warnings', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=warnings`, marker: '[data-test="show-warnings"]' },
+  { name: '34-show-sales', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=sales`, marker: '[data-test="show-sales"]' },
+  { name: '34a-show-sales-narrow', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=sales`, marker: '[data-test="show-sales"]', width: NARROW },
+  { name: '35-show-performance-modal', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances`, marker: '[data-test="performances-table"]', after: `document.querySelector('[data-test="add-performance"]').click()` },
+  { name: '36-shows-index-narrow', path: '/box-office/shows', marker: '[data-test="shows-table"]', width: NARROW },
+  { name: '36a-show-tabs-phone', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances`, marker: '[data-test="performances-table"]', width: PHONE },
+  // D-132 shots end.
   { name: '13-people-narrow', path: '/admin/people', marker: '[data-test="directory-table"]', width: NARROW },
   { name: '14-members-narrow', path: '/admin/members', marker: '[data-test="members-table"]', width: NARROW },
   { name: '15-config-narrow', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]', width: NARROW },
