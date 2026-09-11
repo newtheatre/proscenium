@@ -1,32 +1,34 @@
 import { EXTERNAL_STATUSES, OPEN_STATUSES } from '#shared/utils/external-requests'
+import { conditionsOf, filterQuerySchema } from '#shared/utils/list-filters'
 import { inQueueOrder } from '#shared/utils/queue'
 import { noteFor, warningFor } from '#shared/utils/external-spaces'
-import { z } from 'zod'
+import { roomsQueueList } from '#shared/utils/rooms-queue-list'
 import type { QueueItem } from '#shared/utils/queue'
 import type { H3Event } from 'h3'
 
-const query = z.object({
-  // Settled rows stay readable, so a decision can be looked up rather than remembered.
-  when: z.enum(['open', 'all']).default('open'),
-  kind: z.enum(['all', 'room', 'unlisted']).default('all'),
-  room: z.string().max(64).optional(),
-})
+const query = filterQuerySchema(roomsQueueList)
 
-// Every room request, whoever manages the room.
+// Every room request, whoever manages the room, filtered by its declaration (K-129). The cap and
+// the envelope stay bespoke: a queue is tens of rows, not a paged list.
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'rooms.write')
   const input = await getValidatedQueryOrThrow(event, query)
+  const conditions = conditionsOf(roomsQueueList, input)
 
-  const ours = input.kind === 'unlisted' ? [] : await pendingRoomRequests(event, input.when, input.room)
+  const when = (conditions.find(condition => condition.key === 'when')?.values[0] as 'open' | 'all' | undefined) ?? 'open'
+  const kind = (conditions.find(condition => condition.key === 'kind')?.values[0] as 'all' | 'room' | 'unlisted' | undefined) ?? 'all'
+  const room = conditions.find(condition => condition.key === 'room')?.values[0]
+
+  const ours = kind === 'unlisted' ? [] : await pendingRoomRequests(event, when, room)
   // A room filter names one of ours, so it excludes everything we do not manage by construction.
-  const theirs = input.kind === 'room' || input.room ? [] : await unlistedRequests(event, input.when)
+  const theirs = kind === 'room' || room ? [] : await unlistedRequests(event, when)
 
   const found = [...ours, ...theirs]
   const items = inQueueOrder(found).slice(0, LIST_CAP)
 
   return {
-    when: input.when,
-    kind: input.kind,
+    when,
+    kind,
     items,
     total: items.length,
     more: found.length > LIST_CAP,

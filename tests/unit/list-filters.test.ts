@@ -12,7 +12,12 @@ import {
   saysCondition,
 } from '#shared/utils/list-filters'
 import { accountsList } from '#shared/utils/accounts-list'
+import { blackoutsList } from '#shared/utils/blackouts-list'
+import { externalSpacesList } from '#shared/utils/external-spaces-list'
+import { roomsList } from '#shared/utils/rooms-list'
+import { roomsQueueList } from '#shared/utils/rooms-queue-list'
 import { showsList } from '#shared/utils/shows-list'
+import { utilisationList } from '#shared/utils/utilisation-list'
 import type { FilterField, ListSpec } from '#shared/utils/list-filters'
 
 // One declaration derives the query schema, the builder and the chips (K-129 criterion 1, 0032).
@@ -150,7 +155,7 @@ describe('an "is any of" list is capped so no statement grows with the data (cri
     // Search binds one per column at most three, paging binds two, and each condition binds up
     // to its cap: the bound is a property of the declaration, never of the rows.
     expect(maxBoundParameters(spec)).toBe(2 + 2 + DEFAULT_ANY_CAP + 2 + 2 + 1 + 3)
-    for (const declared of [accountsList, showsList]) {
+    for (const declared of [accountsList, showsList, roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList]) {
       expect(maxBoundParameters(declared)).toBeLessThan(MAX_BOUND_PARAMETERS)
     }
   })
@@ -211,7 +216,9 @@ describe('a chip says what it filters in words (criterion 3)', () => {
   })
 })
 
-describe('the two migrated declarations (criteria 1 and 6)', () => {
+const MIGRATED = [accountsList, showsList, roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList]
+
+describe('the migrated declarations (criteria 1 and 6)', () => {
   test('accounts filters on a role, which is not a column, and shows on a season, which is', () => {
     const role = fieldOf(accountsList, 'role')
     expect(role?.column).toBeUndefined()
@@ -224,10 +231,87 @@ describe('the two migrated declarations (criteria 1 and 6)', () => {
   })
 
   test('every declared key is unique and no field shares a key with the paging or search keys', () => {
-    for (const declared of [accountsList, showsList]) {
+    for (const declared of MIGRATED) {
       const keys = declared.fields.map(one => one.key)
       expect(new Set(keys).size).toBe(keys.length)
       for (const reserved of ['page', 'pageSize', 'search', 'sort', 'direction']) expect(keys).not.toContain(reserved)
     }
+  })
+
+  // A field with no column is answered by an expression in the server binding (server/utils/
+  // rooms.ts, blackouts.ts, external-spaces.ts, directory.ts, programme.ts); whereFrom throws at
+  // request time if one is missing, and this is the same coverage held statically.
+  const ANSWERED_BY_BINDING: Record<string, readonly string[]> = {
+    [accountsList.key]: ['role', 'holdsRole', 'membership', 'anonymised', 'authenticator', 'privilegedWithoutFactor', 'approachingRetention', 'neverSignedIn'],
+    [showsList.key]: ['unassessed', 'onSale'],
+    [roomsList.key]: [],
+    [blackoutsList.key]: ['past'],
+    [externalSpacesList.key]: [],
+  }
+
+  test('every declared column-less field is named in its server binding', () => {
+    const declarations: ListSpec[] = [accountsList, showsList, roomsList, blackoutsList, externalSpacesList]
+    for (const declared of declarations) {
+      const columnLess = declared.fields.filter(field => field.column === undefined).map(field => field.key)
+      expect(new Set(columnLess)).toEqual(new Set(ANSWERED_BY_BINDING[declared.key]))
+    }
+  })
+
+  // The queue and the utilisation report never call whereFrom: the queue is judged and ordered
+  // by hand (C-109), and the report is aggregated in memory (C-117).
+  test('the queue and the report declare fields for the URL and the schema, not for whereFrom', () => {
+    expect(roomsQueueList.fields.map(field => field.key)).toEqual(['when', 'kind', 'room'])
+    expect(utilisationList.fields.map(field => field.key)).toEqual(['by'])
+  })
+})
+
+// None of the rooms declarations offer "any of": every field the module exposed before migrating
+// was a single choice, and multi-select would be a new capability rather than a migrated one.
+describe('the rooms declarations keep the choices their controls already offered', () => {
+  test('no rooms field narrows to "any", because none offered multiple values before', () => {
+    for (const declared of [roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList]) {
+      for (const field of declared.fields) expect(operatorsOf(field)).not.toContain('any')
+    }
+  })
+})
+
+describe('the triage queue reads its old bare-value links (K-129, C-109, C-120)', () => {
+  const parse = (query: Record<string, string>) => filterQuerySchema(roomsQueueList).safeParse(query)
+
+  test('a bare when, kind or room still parses, so the emailed su-requests link keeps working', () => {
+    const parsed = parse({ when: 'all', kind: 'unlisted' })
+    expect(parsed.success).toBe(true)
+    if (!parsed.success) return
+    expect(conditionsOf(roomsQueueList, parsed.data)).toEqual([
+      { key: 'when', operator: 'is', values: ['all'] },
+      { key: 'kind', operator: 'is', values: ['unlisted'] },
+    ])
+  })
+
+  test('an unrecognised kind is refused by the schema rather than shown as unfiltered', () => {
+    expect(parse({ kind: 'nowhere' }).success).toBe(false)
+  })
+
+  test('an empty query carries no condition, which the endpoint reads as open and every room', () => {
+    const parsed = parse({})
+    expect(parsed.success).toBe(true)
+    if (parsed.success) expect(conditionsOf(roomsQueueList, parsed.data)).toEqual([])
+  })
+})
+
+describe('the utilisation report reads its old bare "by" link (K-129, C-117)', () => {
+  test('a bare by still parses, and an empty query carries no condition', () => {
+    const query = filterQuerySchema(utilisationList)
+    const byTier = query.safeParse({ by: 'tier' })
+    expect(byTier.success).toBe(true)
+    if (byTier.success) expect(conditionsOf(utilisationList, byTier.data)).toEqual([{ key: 'by', operator: 'is', values: ['tier'] }])
+
+    const empty = query.safeParse({})
+    expect(empty.success).toBe(true)
+    if (empty.success) expect(conditionsOf(utilisationList, empty.data)).toEqual([])
+  })
+
+  test('a breakdown outside room or tier is refused', () => {
+    expect(filterQuerySchema(utilisationList).safeParse({ by: 'season' }).success).toBe(false)
   })
 })

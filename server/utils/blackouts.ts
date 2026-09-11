@@ -1,7 +1,12 @@
 import { and, asc, eq, gte, lt, or, sql } from 'drizzle-orm'
 import { CANCELLABLE } from '#shared/utils/bookings'
 import { formatLondon } from '#shared/utils/london'
+import { blackoutsList } from '#shared/utils/blackouts-list'
+import { conditionsOf } from '#shared/utils/list-filters'
+import { tableColumns, whereFrom, yesNo } from './list-filters'
 import type { Blackout } from '#shared/utils/blackouts'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { H3Event } from 'h3'
 
 // Reading and applying blackouts (C-114). A closed room refuses a booking with its reason
@@ -110,8 +115,20 @@ export async function repointSeries(stranded: Stranded[], now: number): Promise<
   for (const id of series) await promoteHead(id, now)
 }
 
+// The closures declaration (K-129): search over the room and the reason, "past" hidden unless
+// asked, the same default the bookable estate uses for a retired room.
+export function blackoutsClause(query: ListQuery, now: number): ListClause {
+  const clause = whereFrom(blackoutsList, query, {
+    column: tableColumns(schema.roomBlackouts),
+    search: [sql`coalesce(${schema.rooms.name}, 'every room')`, schema.roomBlackouts.reason],
+    fields: { past: yesNo(lt(schema.roomBlackouts.endsAt, now)) },
+  })
+  const asked = conditionsOf(blackoutsList, query).some(condition => condition.key === 'past')
+  return asked ? clause : { ...clause, where: and(gte(schema.roomBlackouts.endsAt, now), clause.where) }
+}
+
 // The blackouts a screen shows, newest span first, with who closed the room.
-export async function listBlackouts(since: number): Promise<(Blackout & { room: string | null, by: string | null, createdAt: number })[]> {
+export async function listBlackouts(clause: ListClause): Promise<(Blackout & { room: string | null, by: string | null, createdAt: number })[]> {
   return db.select({
     id: schema.roomBlackouts.id,
     roomId: schema.roomBlackouts.roomId,
@@ -125,6 +142,6 @@ export async function listBlackouts(since: number): Promise<(Blackout & { room: 
     .from(schema.roomBlackouts)
     .leftJoin(schema.rooms, eq(schema.rooms.id, schema.roomBlackouts.roomId))
     .leftJoin(schema.users, eq(schema.users.id, schema.roomBlackouts.createdBy))
-    .where(gte(schema.roomBlackouts.endsAt, since))
-    .orderBy(asc(schema.roomBlackouts.startsAt))
+    .where(clause.where)
+    .orderBy(...clause.orderBy)
 }

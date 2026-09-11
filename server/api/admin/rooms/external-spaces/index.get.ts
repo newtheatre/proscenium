@@ -1,16 +1,16 @@
-import { z } from 'zod'
+import { externalSpacesList } from '#shared/utils/external-spaces-list'
+import { filterQuerySchema } from '#shared/utils/list-filters'
 
-const query = z.object({
-  search: z.string().trim().max(120).default(''),
-  includeRetired: z.coerce.boolean().default(false),
-})
+const query = filterQuerySchema(externalSpacesList)
 
-// The SU catalogue, with every note against each room.
+const CATALOGUE_CAP = 200
+
+// The SU catalogue, with every note against each room, filtered by its declaration (K-129).
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'rooms.read')
   const input = await getValidatedQueryOrThrow(event, query)
 
-  const items = await searchSpaces(input.search, 200, input.includeRetired)
+  const items = await listSpacesFiltered(spacesClause(input), CATALOGUE_CAP)
   const notes = await notesFor({ spaceIds: items.map(space => space.id) })
 
   return {

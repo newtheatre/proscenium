@@ -1,5 +1,10 @@
 import { and, asc, eq, like, or, sql } from 'drizzle-orm'
 import { BOUND_PARAMETER_CHUNK, chunked } from '#shared/utils/approvals'
+import { externalSpacesList } from '#shared/utils/external-spaces-list'
+import { conditionsOf } from '#shared/utils/list-filters'
+import { tableColumns, whereFrom } from './list-filters'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { SpaceNote, Verdict } from '#shared/utils/external-spaces'
 
 // Reading the catalogue (C-119). Searched rather than listed: there are hundreds of rooms
@@ -48,6 +53,26 @@ export async function searchSpaces(term: string, limit: number, includeRetired =
         : undefined,
     ))
     .orderBy(asc(schema.externalSpaces.name))
+    .limit(limit)
+}
+
+// The catalogue's declaration (K-129): search over name, building and campus, and a retired
+// room hidden unless the officer asks, the same default the bookable estate uses.
+export function spacesClause(query: ListQuery): ListClause {
+  const clause = whereFrom(externalSpacesList, query, {
+    column: tableColumns(schema.externalSpaces),
+    search: [schema.externalSpaces.name, schema.externalSpaces.building, schema.externalSpaces.campus],
+  })
+  const asked = conditionsOf(externalSpacesList, query).some(condition => condition.key === 'active')
+  return asked ? clause : { ...clause, where: and(eq(schema.externalSpaces.isActive, true), clause.where) }
+}
+
+// Bounded rather than paged: the catalogue an officer edits is tens of rooms (C-119 criterion 3).
+export async function listSpacesFiltered(clause: ListClause, limit: number): Promise<SpaceRow[]> {
+  return db.select(SPACE_COLUMNS)
+    .from(schema.externalSpaces)
+    .where(clause.where)
+    .orderBy(...clause.orderBy)
     .limit(limit)
 }
 

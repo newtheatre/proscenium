@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { BLACKOUT_REASON_LIMIT } from '#shared/utils/blackouts'
+import { blackoutsList } from '#shared/utils/blackouts-list'
 import { formatLondon, fromLondonWallClock } from '#shared/utils/london'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Closures', middleware: 'console' })
@@ -22,11 +22,10 @@ interface Closure {
 
 const EVERY_ROOM = 'all'
 
-const listing = ref<{ items: Closure[], total: number } | null>(null)
+interface Listing { items: Closure[], total: number }
+
+const request = useRequestFetch()
 const rooms = ref<{ id: string, name: string, isActive: boolean }[]>([])
-const when = ref<'upcoming' | 'all'>('upcoming')
-const search = ref('')
-const loading = ref(false)
 const failure = ref<string | null>(null)
 const toast = useToast()
 
@@ -41,21 +40,18 @@ const form = reactive({
   to: '18:00',
 })
 
-async function load(): Promise<void> {
-  loading.value = true
-  failure.value = null
-  try {
-    listing.value = await $fetch<{ items: Closure[], total: number }>('/api/admin/rooms/blackouts', {
-      query: { when: when.value },
-    })
-  }
-  catch (error) {
-    failure.value = refusalText(error)
-  }
-  finally {
-    loading.value = false
-  }
-}
+// Search, filter and sort live in the URL (K-129).
+const { search, conditions, sort, query, active, filtered, set, setSort, clear } = useListQuery(blackoutsList)
+
+const { data: listing, status, refresh, error } = await useAsyncData(
+  'rooms-blackouts',
+  () => request<Listing>('/api/admin/rooms/blackouts', { query: query.value }),
+  { watch: [query], default: (): Listing => ({ items: [], total: 0 }) },
+)
+
+watch(error, (raised) => {
+  if (raised) failure.value = refusalText(raised)
+})
 
 async function loadRooms(): Promise<void> {
   rooms.value = (await $fetch<{ items: typeof rooms.value }>('/api/admin/rooms')).items
@@ -94,7 +90,7 @@ async function close(): Promise<void> {
     })
     closing.value = false
     form.reason = ''
-    await load()
+    await refresh()
   }
   catch (error) {
     failure.value = refusalText(error)
@@ -118,7 +114,7 @@ async function remove(): Promise<void> {
       color: 'success',
     })
     removing.value = null
-    await load()
+    await refresh()
   }
   catch (error) {
     failure.value = refusalText(error)
@@ -128,36 +124,11 @@ async function remove(): Promise<void> {
   }
 }
 
-const shown = computed(() => {
-  const items = listing.value?.items ?? []
-  const term = search.value.trim().toLowerCase()
-  if (!term) return items
-  return items.filter(item => [item.reason, item.room ?? 'every room']
-    .some(field => field.toLowerCase().includes(term)))
-})
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (when.value !== 'upcoming') {
-    active.push({ key: 'when', label: 'Including past', icon: 'i-lucide-history', clear: () => {
-      when.value = 'upcoming'
-    } })
-  }
-  return active
-})
-
 function spanOf(closure: Closure): string {
   const from = formatLondon(new Date(closure.startsAt * 1000), { dateStyle: 'medium', timeStyle: 'short' })
   const to = formatLondon(new Date(closure.endsAt * 1000), { timeStyle: 'short' })
   return `${from} to ${to}`
 }
-
-watch(when, load)
 
 const columns: TableColumn<Closure>[] = [
   {
@@ -189,9 +160,7 @@ const columns: TableColumn<Closure>[] = [
   },
 ]
 
-onMounted(async () => {
-  await Promise.all([load(), loadRooms()])
-})
+onMounted(loadRooms)
 </script>
 
 <template>
@@ -215,20 +184,18 @@ onMounted(async () => {
     <AdminToolbar
       v-model:search="search"
       placeholder="A room or a reason"
-      :active="activeFilters"
-      :loading="loading"
-      @clear="search = ''; when = 'upcoming'"
+      :active="active"
+      :loading="status === 'pending'"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Show">
-          <USelect
-            v-model="when"
-            data-test="blackouts-when"
-            :items="[{ label: 'Still to come', value: 'upcoming' }, { label: 'Including past', value: 'all' }]"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="blackoutsList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -243,14 +210,14 @@ onMounted(async () => {
     </AdminToolbar>
 
     <UTable
-      :data="shown"
+      :data="listing.items"
       :columns="columns"
-      :loading="loading"
+      :loading="status === 'pending'"
       data-test="blackouts-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          No rooms are closed.
+          {{ filtered ? 'No closure matches that.' : 'No rooms are closed.' }}
         </p>
       </template>
     </UTable>
@@ -259,7 +226,7 @@ onMounted(async () => {
       data-test="blackouts-total"
       class="text-sm text-muted"
     >
-      {{ plural(shown.length, 'closure') }}
+      {{ plural(listing.total, 'closure') }}
     </p>
 
     <UModal
