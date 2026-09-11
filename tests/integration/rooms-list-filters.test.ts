@@ -11,9 +11,8 @@ import type { ListClause } from '#server/utils/list-filters'
 import type { ListQuery, ListSpec } from '#shared/utils/list-filters'
 import type { TestDatabase } from '#tests/helpers/database'
 
-// The rooms module's own declarations, proved against the real migrations (K-129 criterion 5).
-// The two endpoints migrated first are shared/utils/accounts-list.ts and shows-list.ts; this
-// covers the three that follow: the bookable estate, its closures and the SU catalogue.
+// The rooms module's declarations, proved against the real migrations (K-129 criterion 5):
+// the bookable estate, its closures and the SU catalogue.
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()

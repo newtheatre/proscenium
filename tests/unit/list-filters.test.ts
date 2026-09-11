@@ -238,9 +238,8 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
     }
   })
 
-  // A field with no column is answered by an expression in the server binding (server/utils/
-  // rooms.ts, blackouts.ts, external-spaces.ts, directory.ts, programme.ts); whereFrom throws at
-  // request time if one is missing, and this is the same coverage held statically.
+  // A column-less field is answered by an expression in the server binding; whereFrom throws
+  // at request time if one is missing, and this holds the same coverage statically.
   const ANSWERED_BY_BINDING: Record<string, readonly string[]> = {
     [accountsList.key]: ['role', 'holdsRole', 'membership', 'anonymised', 'authenticator', 'privilegedWithoutFactor', 'approachingRetention', 'neverSignedIn'],
     [showsList.key]: ['unassessed', 'onSale'],
