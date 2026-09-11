@@ -207,42 +207,49 @@ export const CONSOLE_NAV: NavGroup[] = [
   },
 ]
 
-// The member's own screens. The footer shows these to everybody and sends a signed-out visitor
-// through /sign-in?next=, so somebody who followed a link still arrives where they meant to.
-export const MEMBER_NAV: NavEntry[] = [
-  // Module D: ticketing
+// The member's own screens: what is mine right now (K-127 criterion 2). A signed-out visitor
+// who followed a link is sent through /sign-in?next= to arrive where they meant to.
+export const MY_NAV: NavEntry[] = [
+  // Module K: platform
 
-  { label: 'Access requirements', icon: 'i-lucide-accessibility', to: '/account/access', ability: signedIn },
-  { label: 'Passes', icon: 'i-lucide-wallet-cards', to: '/account/passes', ability: signedIn },
-
-  // Module C: spaces
-
-  { label: 'My bookings', icon: 'i-lucide-calendar-check', to: '/rooms/mine', ability: signedIn },
-  { label: 'Book a room', icon: 'i-lucide-door-open', to: '/rooms', ability: signedIn, exact: true },
+  { label: 'My NNT', icon: 'i-lucide-house', to: '/my', ability: signedIn, exact: true },
 
   // Module E: show night
 
   { label: 'My rota', icon: 'i-lucide-clipboard-list', to: '/rota', ability: signedIn, exact: true },
+
+  // Module C: spaces
+
+  { label: 'Book a room', icon: 'i-lucide-door-open', to: '/rooms', ability: signedIn, exact: true },
+  { label: 'My bookings', icon: 'i-lucide-calendar-check', to: '/rooms/mine', ability: signedIn },
 
   // Module G: training
 
   { label: 'My training', icon: 'i-lucide-graduation-cap', to: '/training', ability: signedIn, exact: true },
   { label: 'Training sessions', icon: 'i-lucide-calendar-days', to: '/training/sessions', ability: signedIn },
 
-  // Module A: identity
+  // Module D: ticketing
 
+  { label: 'Passes', icon: 'i-lucide-wallet-cards', to: '/account/passes', ability: signedIn },
+  { label: 'Access requirements', icon: 'i-lucide-accessibility', to: '/account/access', ability: signedIn },
+
+  // Module A: identity. A membership refusal always lands here (A-129), so it reads as "mine
+  // right now" rather than a setting, and sits in this list rather than ACCOUNT_NAV.
   { label: 'Membership', icon: 'i-lucide-badge-check', to: '/account/membership', ability: signedIn },
-  { label: 'My profile', icon: 'i-lucide-user', to: '/account/profile', ability: signedIn },
+]
+
+// The three account settings pages: how somebody is known to the system, not what they are doing
+// tonight (K-127 criterion 3). `AccountSettings.vue` renders these as the settings side list.
+export const ACCOUNT_NAV: NavEntry[] = [
+  { label: 'Profile', icon: 'i-lucide-user', to: '/account/profile', ability: signedIn },
   { label: 'Sign-in and security', icon: 'i-lucide-shield', to: '/account/security', ability: signedIn },
-
-  // Module H: communications
-
   { label: 'Notifications', icon: 'i-lucide-bell', to: '/account/notifications', ability: signedIn },
 ]
 
 // The account menu is the only place all four shells are reachable from each other, because it is
 // the one component every shell renders (0040).
 export const SHELL_NAV: NavEntry[] = [
+  { label: 'My NNT', icon: 'i-lucide-house', to: '/my', ability: signedIn },
   { label: 'Tonight', icon: 'i-lucide-moon-star', to: '/tonight', ability: workTonight },
   { label: 'Manage', icon: 'i-lucide-layout-dashboard', to: '/admin', ability: reachConsole },
   // Reachable whether or not a viewer holds a standing permission, since an operational-only

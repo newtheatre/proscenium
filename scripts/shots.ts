@@ -11,6 +11,7 @@ import { londonDay } from '../shared/utils/membership'
 const OUT = process.env.SHOTS_OUT ?? '.shots'
 const WIDE = 1400
 const NARROW = 900
+const PHONE = 390
 
 const password = `shots-${crypto.randomUUID()}`
 const email = `shots-${crypto.randomUUID().slice(0, 8)}@e2e.newtheatre.org.uk`
@@ -134,6 +135,14 @@ sql(`INSERT INTO venue_emergency_info (id, venue_id, assembly_point, updated_by)
 sql(`INSERT INTO checklist_items (id, venue_id, phase, label, sort, required) VALUES (?, ?, ?, ?, ?, ?)`,
   crypto.randomUUID(), 'shots-venue', 'PRE', 'Fire exits checked', 1, 1)
 
+// D-132 block begins: a published show with two performances on sale, so the show screen's tabs,
+// its status strip and its sales table are never pictures of an empty run.
+const SHOW_FOR_SHOTS = 'shots-show'
+sql(`INSERT INTO performances (id, show_id, venue_id, starts_at, doors_at, duration_minutes, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+'shots-performance-2', SHOW_FOR_SHOTS, 'shots-venue', shotsNow + 28 * 3600, shotsNow + 27.5 * 3600, 120, 'ON_SALE')
+// D-132 block ends.
+
 const roomsForShots = await (await send('GET', '/api/admin/rooms', undefined, cookie)).json() as { items: { id: string, name: string }[] }
 const studio = roomsForShots.items.find(room => room.name === 'The Studio') ?? roomsForShots.items[0]
 if (studio) {
@@ -203,13 +212,13 @@ const OPEN_MEMBERSHIP = `(async () => {
 
 const SHOTS: Shot[] = [
   { name: '01-overview', path: '/admin', marker: 'h1' },
-  { name: '02-people', path: '/admin/people', marker: '[data-test="directory-table"]' },
-  { name: '03-people-filters', path: '/admin/people', marker: '[data-test="directory-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
-  { name: '04-account', path: `/admin/people/${ids[0]}`, marker: '[data-test="account-name"]' },
-  { name: '05-members', path: '/admin/members', marker: '[data-test="members-table"]' },
-  { name: '06-members-modal', path: '/admin/members', marker: '[data-test="members-table"]', after: OPEN_MEMBERSHIP },
-  { name: '07-fellows', path: '/admin/fellows', marker: '[data-test="fellows-table"]' },
-  { name: '08-fellows-modal', path: '/admin/fellows', marker: '[data-test="fellows-table"]', after: `document.querySelector('[data-test="award"]').click()` },
+  { name: '02-people', path: '/people/accounts', marker: '[data-test="directory-table"]' },
+  { name: '03-people-filters', path: '/people/accounts', marker: '[data-test="directory-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '04-account', path: `/people/accounts/${ids[0]}`, marker: '[data-test="account-name"]' },
+  { name: '05-members', path: '/people/members', marker: '[data-test="members-table"]' },
+  { name: '06-members-modal', path: '/people/members', marker: '[data-test="members-table"]', after: OPEN_MEMBERSHIP },
+  { name: '07-fellows', path: '/people/fellows', marker: '[data-test="fellows-table"]' },
+  { name: '08-fellows-modal', path: '/people/fellows', marker: '[data-test="fellows-table"]', after: `document.querySelector('[data-test="award"]').click()` },
   { name: '09-audit', path: '/admin/audit', marker: '[data-test="audit-table"]' },
   { name: '09a-audit-filters', path: '/admin/audit', marker: '[data-test="audit-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '10-audit-modal', path: '/admin/audit', marker: '[data-test="audit-table"]', after: `document.querySelector('[data-test="audit-record"]').click()` },
@@ -251,11 +260,38 @@ const SHOTS: Shot[] = [
   { name: '16e-rota-templates-filters', path: '/rota/manage/templates', marker: '[data-test="templates-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '16f-rota-checklists', path: '/rota/manage/checklists', marker: '[data-test="checklists-table"]' },
   { name: '16g-rota-emergency', path: '/rota/manage/emergency', marker: '[data-test="emergency-table"]' },
-  { name: '11-config', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
+  { name: '11-config', path: '/admin/settings', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
   { name: '12-dev-tools', path: '/dev', marker: '[data-test="dev-seed"]' },
-  { name: '13-people-narrow', path: '/admin/people', marker: '[data-test="directory-table"]', width: NARROW },
-  { name: '14-members-narrow', path: '/admin/members', marker: '[data-test="members-table"]', width: NARROW },
-  { name: '15-config-narrow', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]', width: NARROW },
+  { name: '13-people-narrow', path: '/people/accounts', marker: '[data-test="directory-table"]', width: NARROW },
+  { name: '14-members-narrow', path: '/people/members', marker: '[data-test="members-table"]', width: NARROW },
+  { name: '15-config-narrow', path: '/admin/settings', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]', width: NARROW },
+  { name: '20-my', path: '/my', marker: '[data-test="my-page"]' },
+  { name: '20a-my-narrow', path: '/my', marker: '[data-test="my-page"]', width: NARROW },
+  { name: '20b-my-phone', path: '/my', marker: '[data-test="my-page"]', width: PHONE },
+  { name: '21-account-profile', path: '/account/profile', marker: '[data-test="account-profile-page"]' },
+  { name: '21a-account-profile-phone', path: '/account/profile', marker: '[data-test="account-profile-page"]', width: PHONE },
+  { name: '22-account-security', path: '/account/security', marker: '[data-test="account-security-page"]' },
+  { name: '23-account-notifications', path: '/account/notifications', marker: '[data-test="account-notifications-page"]' },
+  { name: '24-rota', path: '/rota', marker: '[data-test="rota-page"]' },
+  { name: '25-training', path: '/training', marker: '[data-test="training-page"]' },
+  { name: '26-rooms-mine', path: '/rooms/mine', marker: '[data-test="rooms-mine-page"]' },
+  { name: '27-passes', path: '/account/passes', marker: '[data-test="account-passes-page"]' },
+  // D-132 shots begin: every tab of the show screen, wide and narrow, plus the phone widths the
+  // strip and the tabs are judged at.
+  { name: '30-show-details', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=details`, marker: '[data-test="show-copy"]' },
+  { name: '30a-show-details-narrow', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=details`, marker: '[data-test="show-copy"]', width: NARROW },
+  { name: '30b-show-details-phone', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=details`, marker: '[data-test="show-copy"]', width: PHONE },
+  { name: '31-show-performances', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances`, marker: '[data-test="performances-table"]' },
+  { name: '31a-show-performances-narrow', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances`, marker: '[data-test="performances-table"]', width: NARROW },
+  { name: '31b-show-performances-filters', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances&status=is:ON_SALE`, marker: '[data-test="toolbar-active"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '32-show-ticket-types', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=ticket-types`, marker: '[data-test="show-prices"]' },
+  { name: '33-show-warnings', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=warnings`, marker: '[data-test="show-warnings"]' },
+  { name: '34-show-sales', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=sales`, marker: '[data-test="show-sales"]' },
+  { name: '34a-show-sales-narrow', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=sales`, marker: '[data-test="show-sales"]', width: NARROW },
+  { name: '35-show-performance-modal', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances`, marker: '[data-test="performances-table"]', after: `document.querySelector('[data-test="add-performance"]').click()` },
+  { name: '36-shows-index-narrow', path: '/box-office/shows', marker: '[data-test="shows-table"]', width: NARROW },
+  { name: '36a-show-tabs-phone', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances`, marker: '[data-test="performances-table"]', width: PHONE },
+  // D-132 shots end.
 ]
 
 const wanted = process.argv.slice(2)

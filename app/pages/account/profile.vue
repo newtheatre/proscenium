@@ -67,13 +67,12 @@ useSeoMeta({ title: 'Profile' })
 </script>
 
 <template>
-  <UContainer class="max-w-xl py-16">
-    <UPageHeader
-      title="Profile"
-      description="What the theatre holds about you, and who can see each part of it."
-    />
-
-    <UPageCard class="mt-8">
+  <AccountSettings
+    data-test="account-profile-page"
+    title="Profile"
+    description="What the theatre holds about you, and who can see each part of it."
+  >
+    <UPageCard>
       <div
         v-if="loading"
         class="flex items-center gap-3 text-muted"
@@ -216,5 +215,5 @@ useSeoMeta({ title: 'Profile' })
         </UButton>
       </UForm>
     </UPageCard>
-  </UContainer>
+  </AccountSettings>
 </template>

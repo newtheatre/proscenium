@@ -157,7 +157,7 @@ member-facing routes are `GET /api/account/membership` (the longest-running term
 `membershipState()` computes it from `MEMBERSHIP_GRACE_DAYS`, and the newest claim with its
 reason), `POST /api/account/membership/claim` (Zod: `studentId`, `startsOn` not after today,
 `term` 1 or 3) and `DELETE /api/account/membership/claim` (withdraws the open claim by predicate;
-idempotent). The screen is `/account/membership`, a `MEMBER_NAV` entry.
+idempotent). The screen is `/account/membership`, a `MY_NAV` entry.
 
 **Recording is the officer's act** (`members.write`). `GET /api/admin/memberships/claims` is the
 queue behind the register's "Awaiting record" filter at `/people/members`: oldest first (a
