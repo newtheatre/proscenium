@@ -58,6 +58,16 @@ export async function personaAccounts(): Promise<Map<string, PersonaAccount>> {
   return found
 }
 
+// Idempotent on a made or a held persona alike (#927): a persona whose row lacks one must not
+// stay stuck needing an authenticator app forever just because seeding found it already there.
+async function confirmSecondFactor(userId: string): Promise<void> {
+  await db.insert(schema.totpSecrets).values({
+    userId,
+    secret: PERSONA_TOTP_SECRET,
+    confirmedAt: Math.floor(Date.now() / 1000),
+  }).onConflictDoNothing()
+}
+
 // The persona accounts only, idempotently. The rest of the seed is `bun run seed`, which cannot
 // run from here: its builders read as they write, and D1 in a worker is async (operations.md).
 export async function seedPersonas(): Promise<{ made: number, held: number }> {
@@ -73,6 +83,9 @@ export async function seedPersonas(): Promise<{ made: number, held: number }> {
       // an erased one cannot be found by its address afterwards (0011).
       map[persona.email] = existing.id
       held++
+      // A database seeded before the factor was added to this branch still holds this persona
+      // without one (#927): a held persona needs it just as much as a freshly made one.
+      if (persona.shape === 'full') await confirmSecondFactor(existing.id)
       continue
     }
 
@@ -97,13 +110,7 @@ export async function seedPersonas(): Promise<{ made: number, held: number }> {
     }
     // Confirmed outright: a privileged role needs a second factor (A-112), and re-enrolling one
     // by hand every reseed is exactly what this file exists to save (K-124 criterion 1).
-    if (persona.shape === 'full') {
-      await db.insert(schema.totpSecrets).values({
-        userId: id,
-        secret: PERSONA_TOTP_SECRET,
-        confirmedAt: Math.floor(Date.now() / 1000),
-      }).onConflictDoNothing()
-    }
+    if (persona.shape === 'full') await confirmSecondFactor(id)
     if (persona.shape === 'tombstone') await eraseAccount(id, null)
   }
 
