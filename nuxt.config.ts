@@ -44,7 +44,9 @@ export default defineNuxtConfig({
     image: {
       provider: 'cloudflare',
       cloudflare: {
-        baseURL: 'https://newtheatre.org.uk/',
+        // Relative: whichever host serves the page transforms its own files, so no host ever
+        // depends on another holding the same pictures (K-126).
+        baseURL: '/',
       },
     },
   },

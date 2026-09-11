@@ -32,7 +32,15 @@ useSeoMeta({
 
 <template>
   <div>
+    <PhotoHero
+      v-if="page!.banner"
+      :src="page!.banner"
+      :alt="page!.bannerAlt"
+      :title="page!.title"
+      :description="page!.description"
+    />
     <UPageHero
+      v-else
       :title="page!.title"
       :description="page!.description"
     />
