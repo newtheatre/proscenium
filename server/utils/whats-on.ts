@@ -25,15 +25,17 @@ import type { SQL } from 'drizzle-orm'
 const listable = (at: number): SQL =>
   sql`p.status <> 'DRAFT' AND p.starts_at >= ${at}`
 
-// Listed, on an alias `s`: published, with a performance still to come, so a finished run drops off
-// on its own. The listing, its count and the sitemap all read this one predicate (K-125).
-export const listedShowPredicate = (at: number): SQL => sql`
+// Listed, on alias `s`: published, with a performance still to come, optionally in one venue.
+// The listing, its count and the sitemap read this one predicate, so they cannot disagree (K-125).
+export const listedShowPredicate = (at: number, venue?: string | null): SQL => sql`
   s.status = 'PUBLISHED'
   AND EXISTS (SELECT 1 FROM performances p
-               WHERE p.show_id = s.id AND p.status = 'ON_SALE' AND p.starts_at >= ${at})
+               JOIN venues v ON v.id = p.venue_id
+               WHERE p.show_id = s.id AND p.status = 'ON_SALE' AND p.starts_at >= ${at}
+                 ${venue ? sql`AND v.name = ${venue}` : sql``})
 `
 
-export function listedShowsQuery(at: number, limit: number, offset: number): SQL {
+export function listedShowsQuery(at: number, limit: number, offset: number, venue?: string | null): SQL {
   return sql`
     SELECT s.id AS id, s.slug AS slug, s.title AS title, s.subtitle AS subtitle,
            s.description AS description, s.long_description AS longDescription,
@@ -45,20 +47,20 @@ export function listedShowsQuery(at: number, limit: number, offset: number): SQL
              WHERE p.show_id = s.id AND p.status = 'ON_SALE' AND p.starts_at >= ${at}) AS opensAt
     FROM shows s
     LEFT JOIN show_categories c ON c.id = s.category_id
-    WHERE ${listedShowPredicate(at)}
+    WHERE ${listedShowPredicate(at, venue)}
     ORDER BY opensAt, s.title COLLATE NOCASE
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export function countListedShowsQuery(at: number): SQL {
-  return sql`SELECT count(*) AS total FROM shows s WHERE ${listedShowPredicate(at)}`
+export function countListedShowsQuery(at: number, venue?: string | null): SQL {
+  return sql`SELECT count(*) AS total FROM shows s WHERE ${listedShowPredicate(at, venue)}`
 }
 
 // The page's shows again as a subquery rather than an id list read back from the first result
 // set: the parameter count is the same whether the page holds one show or a hundred (0003, 0006).
-export const listedShowScope = (at: number, limit: number, offset: number): SQL =>
-  sql`SELECT id FROM (${listedShowsQuery(at, limit, offset)})`
+export const listedShowScope = (at: number, limit: number, offset: number, venue?: string | null): SQL =>
+  sql`SELECT id FROM (${listedShowsQuery(at, limit, offset, venue)})`
 
 // One published show by its address, which is the same scope narrowed to one row.
 export const oneShowScope = (slug: string): SQL =>
@@ -245,16 +247,17 @@ export async function publicListing(
   page: number,
   pageSize: number,
   now: Date = new Date(),
+  venue?: string | null,
 ): Promise<PublicListing> {
   const at = Math.floor(now.getTime() / 1000)
-  const scope = listedShowScope(at, pageSize, offsetFor(page, pageSize))
+  const scope = listedShowScope(at, pageSize, offsetFor(page, pageSize), venue)
 
   const [shows, performances, prices, warnings, counted] = await Promise.all([
-    db.all<ShowRow>(listedShowsQuery(at, pageSize, offsetFor(page, pageSize))),
+    db.all<ShowRow>(listedShowsQuery(at, pageSize, offsetFor(page, pageSize), venue)),
     db.all<PerformanceRow>(listedPerformancesQuery(scope, at)),
     db.all<PriceRow>(listedPricesQuery(scope, at)),
     db.all<ShowWarningRow>(warningsForListedShowsQuery(scope)),
-    db.all<{ total: number }>(countListedShowsQuery(at)),
+    db.all<{ total: number }>(countListedShowsQuery(at, venue)),
   ])
 
   const items = assemble(shows, performances, prices, warnings, limitedPercent, now)
