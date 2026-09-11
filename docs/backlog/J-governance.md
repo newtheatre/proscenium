@@ -188,8 +188,18 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
   4. The public pages use the restored photography, scrimmed, inside the expressive budget
      (`docs/design-language.md`), and every page carries a title and a description.
   5. `bun run check` passes: no unknown or sensitive token anywhere under `content/`.
+  6. The home page and what's on present the programme as a grid of poster cards: one card per
+     show, its dates, its venue, its cheapest price and one booking action, with the no-art state
+     in one component so a poster placeholder replaces it in one place.
+  7. The show page opens on a dark hero band carrying the poster, the practical facts and the one
+     booking action, and lists its performances as a ticket stub a visitor picks a night from.
+  8. The booking flow reads as an order: the choices on the left, a ticket-stub summary quoting
+     what is due at the theatre on the right, and the reservation as the view's one call to action.
+  9. Every public view spends at most one marquee, one sticker and one spotlight, counted by
+     `tests/e2e/shells.test.ts` over the public pages this story touches.
 - Source: Pre-cutover review, 10 September 2026; the known-issues row on unsigned-off policy
-  prose; 0012, 0051.
+  prose; 0012, 0051. Criteria 6 to 9 added 11 September 2026, after the committee's review of the
+  public-site mockups widened the story from the policy wording to the whole public site.
 
 ## J-201: The handover run and the atomic access flip
 
