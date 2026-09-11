@@ -2,7 +2,14 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { SERVING_KINDS, effectivePriceRow } from '#shared/utils/bar'
+import { barCategoriesList } from '#shared/utils/bar-categories-list'
+import { barItemsList } from '#shared/utils/bar-items-list'
+import { barMovementsList } from '#shared/utils/bar-movements-list'
+import { barProductsList } from '#shared/utils/bar-products-list'
+import { aliasColumns, whereFrom, yesNo } from './list-filters'
 import type { BarCategory, BarProduct, CategoryPrice, ChoiceGroup, ProductVariant, StockItem, StockMovement, VariantComponent, VariantPrice } from '#shared/utils/bar'
+import type { ListQuery } from '#shared/utils/list-filters'
+import type { ListClause, Reference } from './list-filters'
 
 // Reading the bar's catalogue and its stock. Two questions the module leans on live here: what a
 // product needs before it may be sold, and what is on hand. Neither is a column.
@@ -224,38 +231,35 @@ export async function onHand(itemId: string): Promise<number> {
   return Number(row?.onHand ?? 0)
 }
 
-// A typed percent sign is a character somebody is looking for, not a wildcard.
-const contains = (term: string): string => `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
-
-const search = (term: string | undefined, column: string): SQL[] =>
-  term ? [sql`${sql.raw(column)} LIKE ${contains(term)} ESCAPE '\\'`] : []
-
-const where = (terms: SQL[]): SQL => (terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``)
-
 interface Counted { total: number }
 
 const count = async (statement: SQL): Promise<number> =>
   Number((await db.all<Counted>(statement))[0]?.total ?? 0)
 
-export interface CategoryFilters { search?: string }
+const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
+
+// The declaration's predicates and order, through the `c` alias the raw SQL below uses (K-129).
+export function categoriesClause(query: ListQuery): ListClause {
+  return whereFrom(barCategoriesList, query, { column: aliasColumns('c'), search: [sql`c.name`] })
+}
 
 // Allow-listed columns rather than a whole row, here as everywhere a payload leaves the database.
-export function categoriesQuery(filters: CategoryFilters, limit: number, offset: number): SQL {
+export function categoriesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT c.id AS id, c.name AS name, c.sort AS sort, c.colour AS colour,
            (SELECT count(*) FROM bar_products p WHERE p.category_id = c.id) AS productCount
-    FROM bar_categories c${where(search(filters.search, 'c.name'))}
-    ORDER BY c.sort, c.name COLLATE NOCASE
+    FROM bar_categories c${predicate(clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function listCategories(filters: CategoryFilters, limit: number, offset: number): Promise<BarCategory[]> {
-  return db.all<BarCategory>(categoriesQuery(filters, limit, offset))
+export async function listCategories(clause: ListClause, limit: number, offset: number): Promise<BarCategory[]> {
+  return db.all<BarCategory>(categoriesQuery(clause, limit, offset))
 }
 
-export async function countCategories(filters: CategoryFilters): Promise<number> {
-  return count(sql`SELECT count(*) AS total FROM bar_categories c${where(search(filters.search, 'c.name'))}`)
+export async function countCategories(clause: ListClause): Promise<number> {
+  return count(sql`SELECT count(*) AS total FROM bar_categories c${predicate(clause)}`)
 }
 
 export async function categoryById(id: string): Promise<BarCategory | undefined> {
@@ -274,12 +278,6 @@ export async function categoryNamed(name: string, exceptId?: string): Promise<Ba
     FROM bar_categories c WHERE c.name = ${name} COLLATE NOCASE${except} LIMIT 1
   `)
   return row
-}
-
-export interface ProductFilters {
-  includeRetired: boolean
-  categoryId?: string
-  search?: string
 }
 
 interface ProductRow extends Omit<BarProduct, 'staffedOnly' | 'ageRestricted' | 'everSold'> {
@@ -308,31 +306,39 @@ export const PRODUCT_COLUMNS = sql`
   p.allergen_note AS allergenNote
 `
 
-// Two bound parameters at most, whatever the filters and however many products there are (0003).
-function productPredicate(filters: ProductFilters): SQL {
-  const terms: SQL[] = [...search(filters.search, 'p.name')]
-  if (!filters.includeRetired) terms.push(sql`p.status <> 'RETIRED'`)
-  if (filters.categoryId) terms.push(sql`p.category_id = ${filters.categoryId}`)
-  return where(terms)
+// The category's own columns sit behind their own key, so a sort by them still runs one query
+// across the join (K-129); everything else is the product's own column, through the `p` alias.
+function productColumns(name: string): Reference {
+  if (name === 'category_sort') return sql`c.sort`
+  if (name === 'category_name') return sql`c.name`
+  return aliasColumns('p')(name)
 }
 
-export function productsQuery(filters: ProductFilters, limit: number, offset: number): SQL {
+export function productsClause(query: ListQuery): ListClause {
+  return whereFrom(barProductsList, query, {
+    column: productColumns,
+    search: [sql`p.name`],
+    fields: { retired: yesNo(sql`p.status = 'RETIRED'`) },
+  })
+}
+
+export function productsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT ${PRODUCT_COLUMNS}, ${productEverSoldColumn('p')} AS everSold
-    FROM bar_products p JOIN bar_categories c ON c.id = p.category_id${productPredicate(filters)}
-    ORDER BY c.sort, c.name COLLATE NOCASE, p.sort, p.name COLLATE NOCASE
+    FROM bar_products p JOIN bar_categories c ON c.id = p.category_id${predicate(clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function listProducts(filters: ProductFilters, limit: number, offset: number): Promise<BarProduct[]> {
-  return (await db.all<ProductRow>(productsQuery(filters, limit, offset))).map(readProduct)
+export async function listProducts(clause: ListClause, limit: number, offset: number): Promise<BarProduct[]> {
+  return (await db.all<ProductRow>(productsQuery(clause, limit, offset))).map(readProduct)
 }
 
-export async function countProducts(filters: ProductFilters): Promise<number> {
+export async function countProducts(clause: ListClause): Promise<number> {
   return count(sql`
     SELECT count(*) AS total FROM bar_products p
-    JOIN bar_categories c ON c.id = p.category_id${productPredicate(filters)}
+    JOIN bar_categories c ON c.id = p.category_id${predicate(clause)}
   `)
 }
 
@@ -352,11 +358,6 @@ export async function productNamed(name: string, exceptId?: string): Promise<Bar
     WHERE p.name = ${name} COLLATE NOCASE${except} LIMIT 1
   `)
   return row ? readProduct(row) : undefined
-}
-
-export interface ItemFilters {
-  includeRetired: boolean
-  search?: string
 }
 
 interface ItemRow extends Omit<StockItem, 'ageRestricted' | 'hasMovements'> {
@@ -385,27 +386,29 @@ const ITEM_COLUMNS = sql`
 
 const MOVED = sql`CASE WHEN EXISTS (SELECT 1 FROM stock_movements m WHERE m.item_id = i.id) THEN 1 ELSE 0 END`
 
-function itemPredicate(filters: ItemFilters): SQL {
-  const terms: SQL[] = [...search(filters.search, 'i.name')]
-  if (!filters.includeRetired) terms.push(sql`i.status = 'ACTIVE'`)
-  return where(terms)
+export function itemsClause(query: ListQuery): ListClause {
+  return whereFrom(barItemsList, query, {
+    column: aliasColumns('i'),
+    search: [sql`i.name`],
+    fields: { retired: yesNo(sql`i.status = 'RETIRED'`) },
+  })
 }
 
-export function itemsQuery(filters: ItemFilters, limit: number, offset: number): SQL {
+export function itemsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT ${ITEM_COLUMNS}, ${onHandColumn('i')} AS onHand, ${MOVED} AS hasMovements
-    FROM bar_items i${itemPredicate(filters)}
-    ORDER BY i.status, i.name COLLATE NOCASE
+    FROM bar_items i${predicate(clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function listItems(filters: ItemFilters, limit: number, offset: number): Promise<StockItem[]> {
-  return (await db.all<ItemRow>(itemsQuery(filters, limit, offset))).map(readItem)
+export async function listItems(clause: ListClause, limit: number, offset: number): Promise<StockItem[]> {
+  return (await db.all<ItemRow>(itemsQuery(clause, limit, offset))).map(readItem)
 }
 
-export async function countItems(filters: ItemFilters): Promise<number> {
-  return count(sql`SELECT count(*) AS total FROM bar_items i${itemPredicate(filters)}`)
+export async function countItems(clause: ListClause): Promise<number> {
+  return count(sql`SELECT count(*) AS total FROM bar_items i${predicate(clause)}`)
 }
 
 export async function itemById(id: string): Promise<StockItem | undefined> {
@@ -595,12 +598,6 @@ export async function categoryPriceHistory(categoryId: string, on: string): Prom
   return history.map(price => ({ ...price, effective: price.id === winners.get(price.servingKind) }))
 }
 
-export interface MovementFilters {
-  itemId?: string
-  kind?: string
-  search?: string
-}
-
 const MOVEMENT_COLUMNS = sql`
   m.id AS id,
   m.item_id AS itemId,
@@ -624,30 +621,27 @@ interface MovementRow extends Omit<StockMovement, 'reversed'> {
 
 const readMovement = (row: MovementRow): StockMovement => ({ ...row, reversed: row.reversed === 1 })
 
-function movementPredicate(filters: MovementFilters): SQL {
-  const terms: SQL[] = [...search(filters.search, 'i.name')]
-  if (filters.itemId) terms.push(sql`m.item_id = ${filters.itemId}`)
-  if (filters.kind) terms.push(sql`m.kind = ${filters.kind}`)
-  return where(terms)
+export function movementsClause(query: ListQuery): ListClause {
+  return whereFrom(barMovementsList, query, { column: aliasColumns('m'), search: [sql`i.name`] })
 }
 
-export function movementsQuery(filters: MovementFilters, limit: number, offset: number): SQL {
+export function movementsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT ${MOVEMENT_COLUMNS}
-    FROM stock_movements m JOIN bar_items i ON i.id = m.item_id${movementPredicate(filters)}
-    ORDER BY m.created_at DESC, m.id DESC
+    FROM stock_movements m JOIN bar_items i ON i.id = m.item_id${predicate(clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function listMovements(filters: MovementFilters, limit: number, offset: number): Promise<StockMovement[]> {
-  return (await db.all<MovementRow>(movementsQuery(filters, limit, offset))).map(readMovement)
+export async function listMovements(clause: ListClause, limit: number, offset: number): Promise<StockMovement[]> {
+  return (await db.all<MovementRow>(movementsQuery(clause, limit, offset))).map(readMovement)
 }
 
-export async function countMovements(filters: MovementFilters): Promise<number> {
+export async function countMovements(clause: ListClause): Promise<number> {
   return count(sql`
     SELECT count(*) AS total FROM stock_movements m
-    JOIN bar_items i ON i.id = m.item_id${movementPredicate(filters)}
+    JOIN bar_items i ON i.id = m.item_id${predicate(clause)}
   `)
 }
 

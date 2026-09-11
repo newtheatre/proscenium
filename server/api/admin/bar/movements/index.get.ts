@@ -1,20 +1,17 @@
-import { z } from 'zod'
-import { MAX_BAR_NAME, STOCK_MOVEMENT_KINDS } from '#shared/utils/bar'
+import { barMovementsList } from '#shared/utils/bar-movements-list'
+import { filterQuerySchema } from '#shared/utils/list-filters'
 
-const query = pageQuery.extend({
-  itemId: z.string().trim().min(1).optional(),
-  kind: z.enum(STOCK_MOVEMENT_KINDS).optional(),
-  search: z.string().trim().max(MAX_BAR_NAME).optional(),
-})
+const query = filterQuerySchema(barMovementsList)
 
-// The movement history, newest first: what every on-hand figure is the sum of.
+// The movement history, filtered and ordered by its declaration (K-129): what every on-hand
+// figure is the sum of.
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'bar.read')
-  const { page, pageSize, itemId, kind, search } = await getValidatedQueryOrThrow(event, query)
-  const filters = { itemId: itemId || undefined, kind, search: search || undefined }
+  const input = await getValidatedQueryOrThrow(event, query)
+  const clause = movementsClause(input)
 
-  const total = await countMovements(filters)
-  const items = await listMovements(filters, pageSize, offsetFor(page, pageSize))
+  const total = await countMovements(clause)
+  const items = await listMovements(clause, input.pageSize, offsetFor(input.page, input.pageSize))
 
-  return envelope(items, total, page, pageSize)
+  return envelope(items, total, input.page, input.pageSize)
 })

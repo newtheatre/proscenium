@@ -1261,6 +1261,18 @@ erDiagram
   bar_items ||--o{ stock_movements : sums_to_on_hand
 ```
 
+**The console lists (F-111, F-114, F-115, K-129).** `/bar/categories`, `/bar/products`,
+`/bar/stock`, `/bar/stock/movements` and `/bar/stock/stocktakes`, over these routes, `bar.read`
+for each listing:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/admin/bar/categories` | The paged envelope, each row carrying its product count. Filtered by its declaration (`shared/utils/bar-categories-list.ts`, K-129): no field yet, only `search` over the name and `sort` by till order or name. |
+| `GET /api/admin/bar/products` | The paged envelope, every status included, each row carrying whether it has ever sold. Filtered by its declaration (`shared/utils/bar-products-list.ts`, K-129): `categoryId` and `retired`, with `search` over the name and `sort` by category, category name, till order within the category, or product name. |
+| `GET /api/admin/bar/items` | The paged envelope, each row carrying what is on hand: the sum of its movements. Filtered by its declaration (`shared/utils/bar-items-list.ts`, K-129): `retired`, with `search` over the name and `sort` by status or name. |
+| `GET /api/admin/bar/movements` | The paged envelope, newest first. Filtered by its declaration (`shared/utils/bar-movements-list.ts`, K-129): `itemId` and `kind`, with `search` over the stocked item's name and `sort` by when or `recordedOrder`, the row's own insertion order, which breaks a tie within the same second. |
+| `GET /api/admin/bar/stocktakes` | The paged envelope, newest opened first. Filtered by its declaration (`shared/utils/stocktakes-list.ts`, K-129): `status`, which is also the only column the `search` box runs over. |
+
 ### bar_items  (stocked things)
 `id` PK · `name` unique, case-insensitively · `unit` CHECK `ML|ITEM` · `container_ml` NULL for
 whole items, **immutable once movements exist**, as is `unit`, both by trigger · `par_qty` in the

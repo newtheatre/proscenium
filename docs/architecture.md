@@ -449,6 +449,13 @@ documented in `docs/data-model.md` beside their tables. Rota followed: `GET /api
 than a flat table (0006). Migration runs one module per pull request; `tests/unit/admin-conventions.test.ts`
 holds the migrated pages to the declaration now and the whole console once the last module lands.
 
+The bar module (`shared/utils/bar-categories-list.ts`, `bar-products-list.ts`, `bar-items-list.ts`,
+`bar-movements-list.ts`, `stocktakes-list.ts`) is migrated: categories, products, stocked items,
+stock movements and stocktakes each declare their fields and read them through `useListQuery` and
+`ConsoleFilters`. A product's or a stocked item's `retired` is a question about `status`, not a
+column of its own; `movements-list.ts`'s `recordedOrder` sort field is `rowid`, the table's own
+insertion order, which is what a same-second tie now breaks on rather than the random `id`.
+
 ## Scheduled tasks
 
 All Nitro scheduled tasks mirrored in wrangler cron triggers. The system notices, humans
