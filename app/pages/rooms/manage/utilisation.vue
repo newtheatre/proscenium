@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { saysShare, usedShare } from '#shared/utils/utilisation'
+import { utilisationList } from '#shared/utils/utilisation-list'
 import type { UtilisationRow } from '#shared/utils/utilisation'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Utilisation', middleware: 'console' })
@@ -30,58 +30,34 @@ function yearToDate(): { from: string, to: string } {
 }
 
 const span = reactive(yearToDate())
-const by = ref<'room' | 'tier'>('room')
-const page = ref(1)
-const search = ref('')
-const report = ref<Report | null>(null)
-const loading = ref(false)
 const failure = ref<string | null>(null)
 
-async function load(): Promise<void> {
-  loading.value = true
-  failure.value = null
-  try {
-    report.value = await $fetch<Report>('/api/admin/rooms/reports/utilisation', {
-      query: { from: span.from, to: span.to, by: by.value, page: page.value },
-    })
-  }
-  catch (error) {
-    failure.value = refusalText(error)
-  }
-  finally {
-    loading.value = false
-  }
-}
+// The breakdown, search, sort and page live in the URL (K-129); the span does not, because it is
+// a report parameter rather than a filter over a fixed set of rows.
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(utilisationList)
 
-const shown = computed(() => {
-  const items = report.value?.items ?? []
-  const term = search.value.trim().toLowerCase()
-  return term ? items.filter(item => item.label.toLowerCase().includes(term)) : items
+const by = computed<'room' | 'tier'>(() => (conditions.value.find(condition => condition.key === 'by')?.values[0] as 'room' | 'tier' | undefined) ?? 'room')
+
+const empty = (): Report => ({ from: span.from, to: span.to, by: 'room', items: [], page: 1, pageSize: 0, total: 0, pages: 1, totals: { confirmedHours: 0, cancelledHours: 0, noShowHours: 0, openHours: 0, bookings: 0 } })
+
+const request = useRequestFetch()
+const { data: report, status, error } = await useAsyncData(
+  'rooms-utilisation',
+  () => request<Report>('/api/admin/rooms/reports/utilisation', { query: { ...query.value, from: span.from, to: span.to } }),
+  { watch: [query, () => span.from, () => span.to], default: empty },
+)
+
+watch(error, (raised) => {
+  failure.value = raised ? refusalText(raised) : null
+})
+
+// A span change is not a URL filter, so it resets the page itself.
+watch([() => span.from, () => span.to], () => {
+  page.value = 1
 })
 
 const exportUrl = computed(() =>
   `/api/admin/rooms/reports/export?${new URLSearchParams({ from: span.from, to: span.to, by: by.value })}`)
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (by.value !== 'room') {
-    active.push({ key: 'by', label: 'By tier', icon: 'i-lucide-layers', clear: () => {
-      by.value = 'room'
-    } })
-  }
-  return active
-})
-
-watch([() => span.from, () => span.to, by], () => {
-  page.value = 1
-  void load()
-})
-watch(page, load)
 
 const columns = computed<TableColumn<UtilisationRow>[]>(() => [
   { accessorKey: 'label', header: by.value === 'room' ? 'Room' : 'Kind' },
@@ -113,8 +89,6 @@ const columns = computed<TableColumn<UtilisationRow>[]>(() => [
   },
   { accessorKey: 'bookings', header: 'Bookings', meta: { class: { td: 'text-sm text-muted' } } },
 ])
-
-onMounted(load)
 </script>
 
 <template>
@@ -138,20 +112,18 @@ onMounted(load)
     <AdminToolbar
       v-model:search="search"
       placeholder="A room or a kind"
-      :active="activeFilters"
-      :loading="loading"
-      @clear="search = ''; by = 'room'"
+      :active="active"
+      :loading="status === 'pending'"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Break down by">
-          <USelect
-            v-model="by"
-            data-test="report-by"
-            :items="[{ label: 'Room', value: 'room' }, { label: 'Kind of booking', value: 'tier' }]"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="utilisationList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
         <UFormField label="From">
           <DateField
             v-model="span.from"
@@ -181,14 +153,14 @@ onMounted(load)
     </AdminToolbar>
 
     <UTable
-      :data="shown"
+      :data="report.items"
       :columns="columns"
-      :loading="loading"
+      :loading="status === 'pending'"
       data-test="utilisation-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          Nothing was booked in that span.
+          {{ filtered ? 'Nothing matches that.' : 'Nothing was booked in that span.' }}
         </p>
       </template>
     </UTable>
@@ -198,12 +170,12 @@ onMounted(load)
         data-test="utilisation-totals"
         class="text-sm text-muted"
       >
-        {{ report?.totals.confirmedHours ?? 0 }}h used across
-        {{ plural(report?.totals.bookings ?? 0, 'booking') }},
-        {{ report?.totals.noShowHours ?? 0 }}h not turned up to.
+        {{ report.totals.confirmedHours }}h used across
+        {{ plural(report.totals.bookings, 'booking') }},
+        {{ report.totals.noShowHours }}h not turned up to.
       </p>
       <UPagination
-        v-if="report && report.pages > 1"
+        v-if="report.pages > 1"
         v-model:page="page"
         :total="report.total"
         :items-per-page="report.pageSize"

@@ -103,7 +103,8 @@ describe.skipIf(skip !== null)('describing the bookable estate (C-101)', () => {
     const active = await (await send('GET', '/api/admin/rooms')).json() as Listing
     expect(active.items.some(room => room.id === id)).toBe(false)
 
-    const all = await (await send('GET', '/api/admin/rooms?includeInactive=true')).json() as Listing
+    // The declared filter contract (K-129): asking for inactive rooms explicitly, not the old flag.
+    const all = await (await send('GET', '/api/admin/rooms?active=false')).json() as Listing
     expect(all.items.some(room => room.id === id)).toBe(true)
   })
 

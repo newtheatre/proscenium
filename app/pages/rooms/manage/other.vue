@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { SPACE_NOTE_REASON_LIMIT, VERDICTS, saysVerdict, spaceForm } from '#shared/utils/external-spaces'
+import { externalSpacesList } from '#shared/utils/external-spaces-list'
 import { describePurpose } from '#shared/utils/bookings'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Other rooms', middleware: 'console' })
@@ -25,16 +25,15 @@ interface Space {
 
 const request = useRequestFetch()
 const toast = useToast()
-const search = ref('')
-const includeRetired = ref(false)
 const failure = ref<string | null>(null)
+
+// Search, filter and sort live in the URL (K-129).
+const { search, conditions, sort, query, active, filtered, set, setSort, clear } = useListQuery(externalSpacesList)
 
 const { data, status, refresh } = await useAsyncData(
   'other-rooms',
-  () => request<{ items: Space[], total: number }>('/api/admin/rooms/external-spaces', {
-    query: { includeRetired: includeRetired.value },
-  }),
-  { watch: [includeRetired], default: (): { items: Space[], total: number } => ({ items: [], total: 0 }) },
+  () => request<{ items: Space[], total: number }>('/api/admin/rooms/external-spaces', { query: query.value }),
+  { watch: [query], default: (): { items: Space[], total: number } => ({ items: [], total: 0 }) },
 )
 
 const { data: rules } = await useAsyncData(
@@ -42,15 +41,6 @@ const { data: rules } = await useAsyncData(
   () => request<{ purposes: string[] }>('/api/rooms/policy'),
   { default: () => ({ purposes: [] as string[] }) },
 )
-
-// Searched in the browser: the catalogue an officer edits is tens of rooms, and a round trip to
-// filter them would be slower than the typing. The member's picker searches on the server.
-const shown = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  if (!term) return data.value.items
-  return data.value.items.filter(space => [space.name, space.building ?? '', space.campus ?? '']
-    .some(field => field.toLowerCase().includes(term)))
-})
 
 const editing = ref<Space | null>(null)
 const open = ref(false)
@@ -138,21 +128,6 @@ async function forget(space: Space, purpose: string): Promise<void> {
     failure.value = refusalText(error)
   }
 }
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (includeRetired.value) {
-    active.push({ key: 'retired', label: 'Including retired', icon: 'i-lucide-history', clear: () => {
-      includeRetired.value = false
-    } })
-  }
-  return active
-})
 
 const purposeOptions = computed(() =>
   rules.value.purposes.map(purpose => ({ label: describePurpose(purpose), value: purpose })))
@@ -244,18 +219,18 @@ const columns: TableColumn<Space>[] = [
     <AdminToolbar
       v-model:search="search"
       placeholder="A room, a building or a campus"
-      :active="activeFilters"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''; includeRetired = false"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Show">
-          <USwitch
-            v-model="includeRetired"
-            label="Including retired rooms"
-            data-test="spaces-retired"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="externalSpacesList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -270,14 +245,14 @@ const columns: TableColumn<Space>[] = [
     </AdminToolbar>
 
     <UTable
-      :data="shown"
+      :data="data.items"
       :columns="columns"
       :loading="status === 'pending'"
       data-test="spaces-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          No rooms are listed here yet. Add one and members can ask for it by name.
+          {{ filtered ? 'No room matches that.' : 'No rooms are listed here yet. Add one and members can ask for it by name.' }}
         </p>
       </template>
     </UTable>
@@ -286,7 +261,7 @@ const columns: TableColumn<Space>[] = [
       data-test="spaces-total"
       class="text-sm text-muted"
     >
-      {{ plural(shown.length, 'room') }}
+      {{ plural(data.total, 'room') }}
     </p>
 
     <UModal

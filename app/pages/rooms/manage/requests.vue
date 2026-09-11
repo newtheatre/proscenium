@@ -5,7 +5,8 @@ import { describePurpose, saysBookingState } from '#shared/utils/bookings'
 import { EXTERNAL_REASON_LIMIT, saysExternalState, saysExternalStatus } from '#shared/utils/external-requests'
 import { saysVerdict } from '#shared/utils/external-spaces'
 import { formatLondon } from '#shared/utils/london'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { roomsQueueList } from '#shared/utils/rooms-queue-list'
+import type { FilterOption } from '#shared/utils/list-filters'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Room requests', middleware: 'console' })
@@ -54,22 +55,42 @@ interface Request {
 
 interface Outcome { id: string, ok: boolean, says?: string }
 
-const EVERY_ROOM = 'all'
+interface Listing { items: Request[], total: number, more: boolean, counts: { room: number, unlisted: number } }
 
-const listing = ref<{ items: Request[], total: number, more: boolean, counts: { room: number, unlisted: number } } | null>(null)
 const rooms = ref<{ id: string, name: string, isActive: boolean }[]>([])
-// Read from the query, because /admin/su-requests redirects here filtered and officers were
-// emailed that path. A value we do not recognise falls back rather than showing nothing.
-const route = useRoute()
-const asKind = String(route.query.kind ?? '')
-const when = ref<'open' | 'all'>(String(route.query.when ?? '') === 'all' ? 'all' : 'open')
-const kind = ref<'all' | 'room' | 'unlisted'>(asKind === 'room' || asKind === 'unlisted' ? asKind : 'all')
-const room = ref(EVERY_ROOM)
-const search = ref('')
-const loading = ref(false)
 const failure = ref<string | null>(null)
 const selected = ref<string[]>([])
 const toast = useToast()
+const request = useRequestFetch()
+
+// The active rooms, as filter options and as the choices the "move it" pickers offer.
+const filterRoomOptions = computed<FilterOption[]>(() =>
+  rooms.value.filter(one => one.isActive).map(one => ({ value: one.id, label: one.name })))
+
+// When, kind and room live in the URL (K-129); /admin/su-requests redirects here with ?kind=,
+// which useListQuery reads the same way. Free text stays client-side over a bespoke queue.
+const { search, conditions, sort, query, active, set, setSort, clear } = useListQuery(roomsQueueList, {
+  options: computed(() => ({ room: filterRoomOptions.value })),
+})
+
+const when = computed<'open' | 'all'>(() => (conditions.value.find(condition => condition.key === 'when')?.values[0] as 'open' | 'all' | undefined) ?? 'open')
+
+const empty = (): Listing => ({ items: [], total: 0, more: false, counts: { room: 0, unlisted: 0 } })
+
+const { data: listing, status, refresh, error } = await useAsyncData(
+  'rooms-queue',
+  () => request<Listing>('/api/admin/rooms/queue', { query: query.value }),
+  { watch: [query], default: empty },
+)
+
+watch(error, (raised) => {
+  if (raised) failure.value = refusalText(raised)
+})
+
+async function reload(): Promise<void> {
+  await refresh()
+  selected.value = selected.value.filter(id => listing.value.items.some(item => item.id === id))
+}
 
 const rejecting = ref(false)
 const rejectionReason = ref('')
@@ -131,7 +152,7 @@ async function act(path: string, body: Record<string, unknown>, said: string): P
   try {
     await $fetch(path, { method: 'POST', body })
     toast.add({ title: said, icon: 'i-lucide-check', color: 'success' })
-    await load()
+    await reload()
     return true
   }
   catch (error) {
@@ -215,32 +236,15 @@ function begin(which: 'submit' | 'assign' | 'refuse' | 'reject', one: Request): 
   if (which === 'reject') unlistedRejecting.value = one
 }
 
-async function load(): Promise<void> {
-  loading.value = true
-  failure.value = null
-  try {
-    listing.value = await $fetch<typeof listing.value & object>('/api/admin/rooms/queue', {
-      query: { when: when.value, kind: kind.value, ...(room.value === EVERY_ROOM ? {} : { room: room.value }) },
-    })
-    selected.value = selected.value.filter(id => listing.value!.items.some(item => item.id === id))
-  }
-  catch (error) {
-    failure.value = refusalText(error)
-  }
-  finally {
-    loading.value = false
-  }
-}
-
 async function loadRooms(): Promise<void> {
   const answered = await $fetch<{ items: { id: string, name: string, isActive: boolean }[] }>('/api/admin/rooms')
   rooms.value = answered.items
 }
 
 // Searched here rather than in SQL: a triage queue is tens of rows, and every one of them is
-// already on the page.
+// already on the page (K-129).
 const shown = computed(() => {
-  const items = listing.value?.items ?? []
+  const items = listing.value.items
   const term = search.value.trim().toLowerCase()
   if (!term) return items
   return items.filter(item => [item.requester, item.where ?? '', item.title, item.reason ?? '']
@@ -283,7 +287,7 @@ async function decide(ids: string[], action: 'APPROVE' | 'REJECT', body: Record<
     })
 
     selected.value = selected.value.filter(id => refused.some(outcome => outcome.id === id))
-    await load()
+    await reload()
   }
   catch (error) {
     failure.value = refusalText(error)
@@ -315,48 +319,9 @@ async function confirmMove(): Promise<void> {
   moving.value = false
 }
 
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (room.value !== EVERY_ROOM) {
-    active.push({ key: 'room', label: rooms.value.find(one => one.id === room.value)?.name ?? 'One room', icon: 'i-lucide-door-open', clear: () => {
-      room.value = EVERY_ROOM
-    } })
-  }
-  if (when.value !== 'open') {
-    active.push({ key: 'when', label: 'Including settled', icon: 'i-lucide-history', clear: () => {
-      when.value = 'open'
-    } })
-  }
-  if (kind.value !== 'all') {
-    active.push({ key: 'kind', label: kind.value === 'room' ? 'Our rooms' : 'Rooms we do not manage', icon: 'i-lucide-filter', clear: () => {
-      kind.value = 'all'
-    } })
-  }
-  return active
-})
-
-function clearFilters(): void {
-  search.value = ''
-  room.value = EVERY_ROOM
-  when.value = 'open'
-  kind.value = 'all'
-}
-
-const roomOptions = computed(() => [
-  { label: 'Every room', value: EVERY_ROOM },
-  ...rooms.value.filter(one => one.isActive).map(one => ({ label: one.name, value: one.id })),
-])
-
 const moveOptions = computed(() => rooms.value
-  .filter(one => one.isActive && one.id !== listing.value?.items.find(item => item.id === decidingOn.value[0])?.roomId)
+  .filter(one => one.isActive && one.id !== listing.value.items.find(item => item.id === decidingOn.value[0])?.roomId)
   .map(one => ({ label: one.name, value: one.id })))
-
-watch([when, room, kind], load)
 
 const columns = computed<TableColumn<Request>[]>(() => [
   ...(when.value === 'open'
@@ -499,9 +464,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
     } satisfies TableColumn<Request>]),
 ])
 
-onMounted(async () => {
-  await Promise.all([load(), loadRooms()])
-})
+onMounted(loadRooms)
 </script>
 
 <template>
@@ -525,42 +488,19 @@ onMounted(async () => {
     <AdminToolbar
       v-model:search="search"
       placeholder="A name, a room or what it is for"
-      :active="activeFilters"
-      :loading="loading"
-      @clear="clearFilters"
+      :active="active"
+      :loading="status === 'pending'"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Show">
-          <USelect
-            v-model="when"
-            data-test="requests-when"
-            :items="[{ label: 'Open', value: 'open' }, { label: 'Everything', value: 'all' }]"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
-        <UFormField label="Kind">
-          <USelect
-            v-model="kind"
-            data-test="requests-kind"
-            :items="[
-              { label: 'All rooms', value: 'all' },
-              { label: 'Our rooms', value: 'room' },
-              { label: 'Rooms we do not manage', value: 'unlisted' },
-            ]"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
-        <UFormField label="Room">
-          <USelect
-            v-model="room"
-            data-test="requests-room"
-            :items="roomOptions"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="roomsQueueList"
+          :conditions="conditions"
+          :sort="sort"
+          :options="{ room: filterRoomOptions }"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -590,7 +530,7 @@ onMounted(async () => {
     <UTable
       :data="shown"
       :columns="columns"
-      :loading="loading"
+      :loading="status === 'pending'"
       data-test="requests-table"
     >
       <template #empty>
@@ -1009,7 +949,7 @@ onMounted(async () => {
           <UFormField label="Room">
             <USelect
               v-model="moveRoom"
-              :items="roomOptions.filter(one => one.value !== EVERY_ROOM)"
+              :items="filterRoomOptions"
               value-key="value"
               class="w-full"
               data-test="relist-room"

@@ -1479,6 +1479,11 @@ there is no delete endpoint at all rather than one that refuses. Capacity is com
 booking's attendee count as a **warning, never a refusal**: the old estate recorded both and
 compared neither.
 
+`GET /api/admin/rooms` filters by its declaration (`shared/utils/rooms-list.ts`, K-129): `active`,
+with `search` over the name and `sort` by name. A retired room is hidden unless `active` asks for
+one, the directory's `anonymised` default reused. Small and unpaged by design: it returns its
+whole filtered set rather than a windowed page, the estate being a handful of rooms.
+
 ### room_hours
 `id` PK · `room_id` cascade · `weekday` 0..6 CHECK · `opens` `HH:MM` · `closes` `HH:MM`, CHECK
 `closes > opens`. **No rows at all = open whenever**: most rooms have no restriction worth
@@ -1563,11 +1568,17 @@ and lapses it past `ROOM_REQUEST_EXPIRE_HOURS`, both guarded on the status they 
 deciding at the same moment wins. Approvers are whoever holds `rooms.write`; there is no approver
 role, and C-109's queue reads it the same way.
 
-The queue is `GET /api/admin/rooms/requests`, gated on `rooms.write`, and it **re-judges every
+The queue is `GET /api/admin/rooms/queue`, gated on `rooms.write`, and it **re-judges every
 waiting request as it reads it** rather than recalling the verdict from when it was written: a
 request made on Monday may have run out of notice by Thursday, and the officer deciding needs what
 is true now (C-109 criterion 1). The requester's standing is what it judges against, never the
 reader's.
+
+`when`, `kind` and `room` are declared (`shared/utils/rooms-queue-list.ts`, K-129) and live in the
+URL, but the queue keeps its own envelope (`items`, `total`, `more`, `counts`) and its server-side
+cap rather than paging: a triage queue is tens of rows, not a paged list. The free-text search over
+the requester, the room, the title and the reason stays client-side, now reading through
+`useListQuery` rather than a page-local ref.
 
 `POST /api/admin/rooms/requests/decide` answers one or up to a hundred at once. Each decision is
 **its own guarded statement**, never one `UPDATE` over an id list: the clash rule rides the
@@ -1636,6 +1647,12 @@ as "no opening hours recorded", never as nought per cent.
 
 The span is London days, so a report of one month neither gains nor loses an hour when the clocks
 move inside it (0014). Figures survive an erasure, because the bookings do (0011, criterion 4).
+
+The breakdown, the search box and the page now live in the URL through a declaration
+(`shared/utils/utilisation-list.ts`, K-129): `by` is `room` or `tier`, and `search` matches a
+room's or a tier's label against the already-aggregated rows, in memory rather than in SQL, since
+there are never more of them than rooms or tiers. `from` and `to` stay page-local rather than
+declared fields: they are the report's span, not an optional filter over a fixed set of rows.
 
 Breakdown by production, and the pre-migration flag on imported bookings, arrive with the stories
 that create those things (C-118, module B).
@@ -1792,6 +1809,11 @@ per result the verdict and warning for the purpose asked about, so a member is w
 is ever troubled. Notes for a set of spaces are read in one statement, split at 90 because the ids
 come from a result set (0003, 0006).
 
+`GET /api/admin/rooms/external-spaces`, the officer's catalogue screen, filters by its own
+declaration instead (`shared/utils/external-spaces-list.ts`, K-129): `active`, with `search` over
+name, building and campus and `sort` by name, a retired room hidden unless `active` asks for one.
+Bounded rather than paged, the same as `rooms-list.ts`.
+
 Erasure scrubs `written_by` and keeps the note: what we learned about a room outlives whoever wrote
 it down, and the audit trail keeps who. The wording never enters an audit detail, because a note may
 describe a person's experience (0011).
@@ -1818,6 +1840,11 @@ told once, however many of their bookings went, naming each (C-113 criterion 2).
 
 Removal **restores nothing** (criterion 5). A cancelled booking stays cancelled and has to be made
 again, because its slot may be somebody else's by then. Creation and removal are both audited.
+
+`GET /api/admin/rooms/blackouts` filters by its declaration (`shared/utils/blackouts-list.ts`,
+K-129): `past`, with `search` over the room and the reason and `sort` by when the closure starts.
+A past closure is hidden unless `past` asks for one, the same default `rooms-list.ts` uses for a
+retired room; it too returns its whole filtered set rather than a windowed page.
 
 Erasure scrubs `created_by` to null and keeps the closure: the room was shut, which is a fact
 about the room; who typed it in lives in the audit trail (0010, 0011).

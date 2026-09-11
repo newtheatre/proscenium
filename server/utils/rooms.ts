@@ -1,7 +1,13 @@
-import { asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { roomHoursForm } from '#shared/utils/rooms'
+import { conditionsOf } from '#shared/utils/list-filters'
+import { roomsList } from '#shared/utils/rooms-list'
+import { tableColumns, whereFrom } from './list-filters'
 import type { RoomHours, RoomInput } from '#shared/utils/rooms'
 import type { EstatePolicy } from '#shared/utils/booking-policy'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
+import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
 // Reading and writing the bookable estate. A room's opening hours are replaced wholesale rather
@@ -60,9 +66,23 @@ function collect(rows: { roomId: string, weekday: number, opens: string, closes:
 }
 
 export async function listRooms(includeInactive: boolean): Promise<RoomRow[]> {
-  const wanted = includeInactive ? undefined : eq(schema.rooms.isActive, true)
+  return listRoomsWhere(includeInactive ? undefined : eq(schema.rooms.isActive, true))
+}
 
-  const rows = await db.select(COLUMNS).from(schema.rooms).where(wanted).orderBy(asc(schema.rooms.name))
+// The estate's own declaration (K-129): search, the active state and the name sort. Retired rooms
+// are hidden unless the officer asks, the same default accounts uses for an anonymised row.
+export function roomsClause(query: ListQuery): ListClause {
+  const clause = whereFrom(roomsList, query, { column: tableColumns(schema.rooms), search: [schema.rooms.name] })
+  const asked = conditionsOf(roomsList, query).some(condition => condition.key === 'active')
+  return asked ? clause : { ...clause, where: and(eq(schema.rooms.isActive, true), clause.where) }
+}
+
+export async function listRoomsFiltered(clause: ListClause): Promise<RoomRow[]> {
+  return listRoomsWhere(clause.where, clause.orderBy)
+}
+
+async function listRoomsWhere(wanted: SQL | undefined, orderBy: SQL[] = [asc(schema.rooms.name)]): Promise<RoomRow[]> {
+  const rows = await db.select(COLUMNS).from(schema.rooms).where(wanted).orderBy(...orderBy)
 
   // Scoped by subquery on the same predicate, never by an IN list built from the rows above
   // (0003, 0006): the parameter count must not grow with the number of rooms.

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { WEEKDAYS, minutesOpen, roomForm } from '#shared/utils/rooms'
+import { roomsList } from '#shared/utils/rooms-list'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { RoomHours } from '#shared/utils/rooms'
 import type { z } from 'zod'
 
@@ -45,8 +45,6 @@ const BLANK_ESTATE: Estate = {
 }
 
 const toast = useToast()
-const search = ref('')
-const showRetired = ref(false)
 const open = ref(false)
 const editing = ref<Room | null>(null)
 const saving = ref(false)
@@ -55,25 +53,19 @@ const saving = ref(false)
 // unauthenticated, came back empty, and hydration had no reason to ask again.
 const request = useRequestFetch()
 
+// Search, filter and sort live in the URL (K-129).
+const { search, conditions, sort, query, active, filtered, set, setSort, clear } = useListQuery(roomsList)
+
 const { data: listing, status, refresh } = await useAsyncData(
-  () => `rooms-${showRetired.value}`,
-  () => request<Listing>('/api/admin/rooms', { query: { includeInactive: showRetired.value } }),
-  { watch: [showRetired], default: (): Listing => ({ items: [], total: 0, estate: BLANK_ESTATE }) },
+  'rooms',
+  () => request<Listing>('/api/admin/rooms', { query: query.value }),
+  { watch: [query], default: (): Listing => ({ items: [], total: 0, estate: BLANK_ESTATE }) },
 )
 
 const estate = computed(() => listing.value.estate)
 
 // What a blank override means, said where the blank is.
 const fallsBackTo = (value: number | boolean): string => `Estate default: ${value}`
-
-// Searched in the browser on purpose: the estate is a handful of rooms, and a round trip to
-// filter five names would be slower than the typing.
-const rooms = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  return listing.value.items.filter((room) => {
-    return !term || room.name.toLowerCase().includes(term)
-  })
-})
 
 const state = reactive({
   name: '',
@@ -155,32 +147,6 @@ async function retire(room: Room): Promise<void> {
   }
 }
 
-const active = computed<ActiveFilter[]>(() => {
-  const filters: ActiveFilter[] = []
-  if (showRetired.value) {
-    filters.push({
-      key: 'retired',
-      label: 'Including retired',
-      icon: 'i-lucide-archive',
-      clear: () => { showRetired.value = false },
-    })
-  }
-  if (search.value) {
-    filters.push({
-      key: 'search',
-      label: `Matching ${search.value}`,
-      icon: 'i-lucide-search',
-      clear: () => { search.value = '' },
-    })
-  }
-  return filters
-})
-
-function clearFilters(): void {
-  search.value = ''
-  showRetired.value = false
-}
-
 const openDaysCount = computed(() => WEEKDAYS.filter(day => hours.value[day.index]?.open).length)
 
 const OVERRIDES = ['minBookingMinutes', 'maxBookingHours', 'noticeHours', 'horizonWeeks', 'activeBookingsCap'] as const
@@ -217,15 +183,16 @@ const columns: TableColumn<Room>[] = [
       placeholder="A room name"
       :active="active"
       :loading="status === 'pending'"
-      @clear="clearFilters"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Retired rooms">
-          <USwitch
-            v-model="showRetired"
-            label="Show rooms no longer in use"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="roomsList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -250,13 +217,14 @@ const columns: TableColumn<Room>[] = [
     </AdminToolbar>
 
     <UTable
-      :data="rooms"
+      :data="listing.items"
       :columns="columns"
+      :loading="status === 'pending'"
       data-test="rooms-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          No rooms yet. Add the first one and it appears on the calendar.
+          {{ filtered ? 'No room matches that.' : 'No rooms yet. Add the first one and it appears on the calendar.' }}
         </p>
       </template>
 
@@ -328,7 +296,7 @@ const columns: TableColumn<Room>[] = [
     </UTable>
 
     <p class="text-sm text-muted">
-      {{ plural(rooms.length, 'room') }}
+      {{ plural(listing.total, 'room') }}
     </p>
 
     <UModal
