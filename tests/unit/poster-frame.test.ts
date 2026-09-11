@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
-// A show has no artwork until poster upload exists (docs/known-issues.md), so every public
-// surface draws the same no-art state. Keeping it in one component is what makes the real
-// poster a one-file change later (J-111 criterion 6).
+// No show has artwork until poster upload exists, so one component draws both the art and its
+// absence: the real poster is then a one-file change (J-111 criterion 6).
 
 const FRAME = 'app/components/PosterFrame.vue'
 
