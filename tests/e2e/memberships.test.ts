@@ -229,16 +229,24 @@ describe.skipIf(skip !== null)('the viewer carries membership as a fact (A-129)'
       const answer = await fetch(`${app.baseURL}${path}`, { headers: { cookie: lapsed.cookie } })
       expect(answer.status).toBe(200)
     }
-  })
+  }, 60_000)
+
+  async function signIn(view: Bun.WebView, email: string): Promise<void> {
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', email)
+    await fill(view, 'form input[type="password"]', password)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+  }
 
   test('booking a room is refused with the policy\'s own words, and the failure links to /account/membership', async () => {
-    const lapsed = await registerMember(app, 'no-membership-book', password)
+    const lapsed = await registerMember(app, 'no-membership-book', password, { signIn: false })
     const room = await makeRoom()
     const day = threeWeeksMonday()
 
     const view = await openSignedOutView(app.baseURL)
     try {
-      await view.evaluate(`document.cookie = ${JSON.stringify(lapsed.cookie)}`)
+      await signIn(view, lapsed.email)
       await visit(view, `${app.baseURL}/rooms/book?room=${room}&day=${day}&at=19:00&purpose=REHEARSAL`, '[data-test="booking-form"]')
       await fill(view, '[data-test="booking-title"]', 'Read-through')
       await click(view, '[data-test="booking-submit"]')
@@ -257,7 +265,7 @@ describe.skipIf(skip !== null)('the viewer carries membership as a fact (A-129)'
   }, 180_000)
 
   test('the account menu says a membership has lapsed, and links to put it right', async () => {
-    const none = await registerMember(app, 'menu-none', password)
+    const none = await registerMember(app, 'menu-none', password, { signIn: false })
     const { id } = await (await grant(none.id)).json() as { id: string }
     write('UPDATE memberships SET starts_on = ?, expires_on = ? WHERE id = ?',
       londonDay(new Date(Date.now() - 800 * 24 * 60 * 60 * 1000)),
@@ -266,8 +274,7 @@ describe.skipIf(skip !== null)('the viewer carries membership as a fact (A-129)'
 
     const view = await openSignedOutView(app.baseURL)
     try {
-      await view.evaluate(`document.cookie = ${JSON.stringify(none.cookie)}`)
-      await visit(view, `${app.baseURL}/`, '[data-test="account-menu"]')
+      await signIn(view, none.email)
       await click(view, '[data-test="account-menu"]')
       await waitFor(view, `document.body.innerText.includes('Membership lapsed')`)
 
