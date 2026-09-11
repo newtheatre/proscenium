@@ -13,8 +13,8 @@ import {
   saysAvailability,
 } from '#shared/utils/programme'
 import { resolvePrice } from '#shared/utils/ticket-types'
-import type { PublicContentWarning, ShowContentWarning, WarningAssessment } from '#shared/utils/content-warnings'
-import type { Availability, PublicPerformance, PublicShow } from '#shared/utils/programme'
+import type { ShowContentWarning } from '#shared/utils/content-warnings'
+import type { ListedPerformance, ListedShow, PublicPrice, PublicShow } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 
 // The public programme (D-101, D-102). Every payload here goes through the allow-listed
@@ -145,30 +145,6 @@ export function listedPricesQuery(scope: SQL, at: number): SQL {
     WHERE p.show_id IN (${scope}) AND ${listable(at)}
     ORDER BY p.id, t.price, t.name COLLATE NOCASE
   `
-}
-
-export interface PublicPrice {
-  name: string
-  description: string | null
-  price: number
-  restrictedTo: string | null
-}
-
-export interface ListedPerformance extends PublicPerformance {
-  availability: Availability
-  // Only while the state is LIMITED, which is the one case a visitor is told a figure. An exact
-  // unsold count on every performance is this theatre's sales, readable by anybody.
-  remaining: number | null
-  says: string
-  prices: PublicPrice[]
-}
-
-export interface ListedShow {
-  show: PublicShow
-  categoryName: string | null
-  assessment: WarningAssessment
-  warnings: PublicContentWarning[]
-  performances: ListedPerformance[]
 }
 
 export interface PublicListing {

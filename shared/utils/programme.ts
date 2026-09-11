@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { formatLondon } from './london'
 import { posterUrl } from './seo'
+import type { PublicContentWarning, WarningAssessment } from './content-warnings'
 
 // The publish flow and the booking window (D-121, D-112). A show is draft until somebody
 // publishes it; a performance is on sale, off sale or cancelled, one at a time and never per day.
@@ -400,6 +401,32 @@ export interface PerformanceHouse {
   // Null is an uncapped venue, which is never limited and never sold out.
   capacity: number | null
   sold: number
+}
+
+// What the public listing and the show page both answer with. Declared beside the projections
+// rather than beside the queries, so the browser reads the shape the server promises (D-101).
+export interface PublicPrice {
+  name: string
+  description: string | null
+  price: number
+  restrictedTo: string | null
+}
+
+export interface ListedPerformance extends PublicPerformance {
+  availability: Availability
+  // Only while the state is LIMITED, which is the one case a visitor is told a figure. An exact
+  // unsold count on every performance is this theatre's sales, readable by anybody.
+  remaining: number | null
+  says: string
+  prices: PublicPrice[]
+}
+
+export interface ListedShow {
+  show: PublicShow
+  categoryName: string | null
+  assessment: WarningAssessment
+  warnings: PublicContentWarning[]
+  performances: ListedPerformance[]
 }
 
 export function remainingSeats(house: PerformanceHouse): number | null {
