@@ -354,7 +354,7 @@ function pickerOptions(all: Option[], current: string | null): { label: string, 
     { label: 'None', value: null },
     ...all
       .filter(one => !one.archived || one.id === current)
-      .map(one => ({ label: one.archived ? `${one.name} (retired)` : one.name, value: one.id })),
+      .map(one => ({ label: saysReferenceName(one), value: one.id })),
   ]
 }
 

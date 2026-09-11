@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { containsPattern } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 import type { AdminVenue } from '#shared/utils/venues'
 
@@ -85,14 +86,11 @@ export interface VenueFilters {
   search?: string
 }
 
-// A typed percent sign is a character somebody is looking for, not a wildcard.
-const contains = (term: string): string => `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
-
 // Two bound parameters at most, whatever the filters and however many venues there are (0003).
 function predicate(filters: VenueFilters): SQL {
   const terms: SQL[] = []
   if (!filters.includeArchived) terms.push(sql`archived = 0`)
-  if (filters.search) terms.push(sql`name LIKE ${contains(filters.search)} ESCAPE '\\'`)
+  if (filters.search) terms.push(sql`name LIKE ${containsPattern(filters.search)} ESCAPE '\\'`)
   return terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``
 }
 

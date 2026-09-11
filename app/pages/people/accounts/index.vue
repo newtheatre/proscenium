@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { accountsList } from '#shared/utils/accounts-list'
 import { formatLondon } from '#shared/utils/london'
 import { ROLES } from '#shared/utils/roles'
+import type { FieldKey } from '#shared/utils/list-filters'
 import type { Role } from '#shared/utils/roles'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Accounts', middleware: 'console' })
@@ -31,125 +32,46 @@ interface Listing {
   pageSize: number
   total: number
   pages: number
-  awaiting: string | null
   banners: { privilegedWithoutFactor: number, insideRetentionWindow: number }
 }
 
-// The questions the directory is actually asked, in the order somebody asks them.
-const FILTERS = [
-  { value: 'everyone', label: 'Everyone' },
-  { value: 'role-holders', label: 'Role holders' },
-  { value: 'privileged-without-mfa', label: 'Privileged, no authenticator' },
-  { value: 'unverified', label: 'Unverified address' },
-  { value: 'members-current', label: 'Current members' },
-  { value: 'members-lapsed', label: 'Lapsed members' },
-  { value: 'guests-unclaimed', label: 'Guests who never signed in' },
-  { value: 'retention-window', label: 'Approaching retention' },
-  { value: 'disabled', label: 'Disabled' },
-  { value: 'anonymised', label: 'Anonymised' },
-]
+const request = useRequestFetch()
+const toast = useToast()
 
-const listing = ref<Listing | null>(null)
-const filter = ref('everyone')
-const role = ref<Role | undefined>(undefined)
-const search = ref('')
-const page = ref(1)
-const loading = ref(false)
+// Search, filters, sort and page live in the URL, so a triage list can be linked to (K-129).
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(accountsList)
+
+const empty = (): Listing => ({ items: [], page: 1, pageSize: 0, total: 0, pages: 1, banners: { privilegedWithoutFactor: 0, insideRetentionWindow: 0 } })
+
+const { data: listing, status, error, refresh } = await useAsyncData(
+  'people-accounts',
+  () => request<Listing>('/api/admin/accounts', { query: query.value }),
+  { watch: [query], default: empty },
+)
+
 const failure = ref<string | null>(null)
+const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The accounts could not be read.') : null))
+
+// A banner's "show them" is the same question as the filter it names, asked through the URL.
+const show = (key: FieldKey<typeof accountsList>): void => set(key, { key, operator: 'is', values: ['true'] })
 
 const inviting = ref(false)
 const invitation = reactive({ email: '', name: '', roles: [] as Role[] })
-const invited = ref<string | null>(null)
-
-async function load(): Promise<void> {
-  loading.value = true
-  failure.value = null
-  try {
-    listing.value = await $fetch<Listing>('/api/admin/accounts', {
-      query: {
-        filter: filter.value,
-        role: filter.value === 'role-holders' ? role.value : undefined,
-        search: search.value || undefined,
-        page: page.value,
-      },
-    })
-  }
-  catch (error) {
-    failure.value = refusalText(error)
-  }
-  finally {
-    loading.value = false
-  }
-}
-
-function show(next: string): void {
-  filter.value = next
-  page.value = 1
-  void load()
-}
-
-// A new search starts at the first page: staying on page four of the old result is nonsense.
-watch([search, role], () => {
-  page.value = 1
-  void load()
-})
-watch(page, load)
 
 async function invite(): Promise<void> {
   failure.value = null
   try {
     await $fetch('/api/admin/accounts', { method: 'POST', body: { ...invitation } })
-    invited.value = invitation.email
+    toast.add({ title: 'Account created', description: `${invitation.email} has a link to choose a password.`, icon: 'i-lucide-check', color: 'success' })
     inviting.value = false
     invitation.email = ''
     invitation.name = ''
     invitation.roles = []
-    await load()
+    await refresh()
   }
-  catch (error) {
-    failure.value = refusalText(error)
+  catch (refused) {
+    failure.value = refusalText(refused)
   }
-}
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({
-      key: 'search',
-      label: `Matching ${search.value}`,
-      icon: 'i-lucide-search',
-      clear: () => {
-        search.value = ''
-      },
-    })
-  }
-  if (filter.value !== 'everyone') {
-    active.push({
-      key: 'filter',
-      label: FILTERS.find(option => option.value === filter.value)!.label,
-      icon: 'i-lucide-filter',
-      clear: () => {
-        show('everyone')
-      },
-    })
-  }
-  if (role.value) {
-    active.push({
-      key: 'role',
-      label: role.value,
-      icon: 'i-lucide-shield',
-      clear: () => {
-        role.value = undefined
-      },
-    })
-  }
-  return active
-})
-
-function clearFilters(): void {
-  search.value = ''
-  role.value = undefined
-  show('everyone')
 }
 
 const seen = (at: number | null): string =>
@@ -193,21 +115,20 @@ const columns: TableColumn<Account>[] = [
     }),
   },
 ]
-
-onMounted(load)
 </script>
 
 <template>
   <div class="space-y-6">
     <UAlert
-      v-if="failure"
+      v-if="listingFailure"
+      data-test="listing-failure"
       color="error"
       variant="subtle"
-      :description="failure"
+      :description="listingFailure"
     />
 
     <div
-      v-if="listing?.banners.privilegedWithoutFactor || listing?.banners.insideRetentionWindow"
+      v-if="listing.banners.privilegedWithoutFactor || listing.banners.insideRetentionWindow"
       class="flex flex-col gap-2"
     >
       <UAlert
@@ -218,7 +139,7 @@ onMounted(load)
         icon="i-lucide-shield-alert"
         :title="`${plural(listing.banners.privilegedWithoutFactor, 'privileged account')} without an authenticator`"
         description="Their roles do not work until they enrol one."
-        :actions="[{ label: 'Show them', color: 'neutral', variant: 'subtle', onClick: () => show('privileged-without-mfa') }]"
+        :actions="[{ label: 'Show them', color: 'neutral', variant: 'subtle', onClick: () => show('privilegedWithoutFactor') }]"
       />
       <UAlert
         v-if="listing.banners.insideRetentionWindow"
@@ -228,41 +149,25 @@ onMounted(load)
         icon="i-lucide-clock"
         :title="`${plural(listing.banners.insideRetentionWindow, 'account')} approaching retention`"
         description="Dormant for longer than the retention window allows."
-        :actions="[{ label: 'Show them', color: 'neutral', variant: 'subtle', onClick: () => show('retention-window') }]"
+        :actions="[{ label: 'Show them', color: 'neutral', variant: 'subtle', onClick: () => show('approachingRetention') }]"
       />
     </div>
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A name, an address or a student number"
-      :active="activeFilters"
-      :loading="loading"
-      @clear="clearFilters"
+      :placeholder="accountsList.search?.placeholder"
+      :active="active"
+      :loading="status === 'pending'"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Show">
-          <USelect
-            v-model="filter"
-            data-test="directory-filter"
-            :items="FILTERS"
-            value-key="value"
-            class="w-full"
-            @update:model-value="show(filter)"
-          />
-        </UFormField>
-
-        <UFormField
-          v-if="filter === 'role-holders'"
-          label="Role"
-        >
-          <USelect
-            v-model="role"
-            data-test="directory-role"
-            :items="[{ label: 'Any role', value: undefined }, ...ROLES.map(name => ({ label: name, value: name }))]"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="accountsList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -276,33 +181,15 @@ onMounted(load)
       </template>
     </AdminToolbar>
 
-    <UAlert
-      v-if="listing?.awaiting"
-      data-test="directory-awaiting"
-      color="neutral"
-      variant="subtle"
-      :description="`Nothing to show here yet: this needs ${listing.awaiting}, which is not built.`"
-    />
-
-    <UAlert
-      v-if="invited"
-      data-test="invited"
-      color="success"
-      variant="subtle"
-      :description="`${invited} has an account and a link to choose a password.`"
-      close
-      @update:open="invited = null"
-    />
-
     <UTable
-      :data="listing?.items ?? []"
+      :data="listing.items"
       :columns="columns"
-      :loading="loading"
+      :loading="status === 'pending'"
       data-test="directory-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ activeFilters.length ? 'Nobody matches that.' : 'No accounts yet.' }}
+          {{ filtered ? 'Nobody matches that.' : 'No accounts yet.' }}
         </p>
       </template>
     </UTable>
@@ -312,10 +199,10 @@ onMounted(load)
         data-test="directory-total"
         class="text-sm text-muted"
       >
-        {{ plural(listing?.total ?? 0, 'account') }}
+        {{ plural(listing.total, 'account') }}
       </p>
       <UPagination
-        v-if="listing && listing.pages > 1"
+        v-if="listing.pages > 1"
         v-model:page="page"
         :total="listing.total"
         :items-per-page="listing.pageSize"
@@ -332,6 +219,13 @@ onMounted(load)
           class="space-y-4"
           @submit.prevent="invite"
         >
+          <UAlert
+            v-if="failure"
+            data-test="form-failure"
+            color="error"
+            variant="subtle"
+            :description="failure"
+          />
           <UFormField label="Name">
             <UInput
               v-model="invitation.name"

@@ -289,6 +289,14 @@ listing and `ticketing.write` for the rest:
 | `DELETE /api/admin/reference-data/venues/[id]` | Deletes a venue nothing has ever used. One in use is a 409 naming retirement as the way and what is holding it open. |
 | `GET /api/admin/reference-data/rooms` | Active rooms, id and name only, for the venue form's room picker; a narrower read than the rooms module's own screen, so box office needs no `rooms.read`. |
 
+**The directory (A-121, K-129).** `/people/accounts`, over these routes, `accounts.read` for the
+listing and `accounts.create` for adding somebody:
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/admin/accounts` | The paged envelope, allow-listed columns only, anonymised rows hidden unless `includeAnonymised=true` (the picker's flag) or the `anonymised` field asks for them, with the two triage banner counts. Filtered by its declaration (`shared/utils/accounts-list.ts`): `role`, `holdsRole`, `membership`, `verified`, `disabled`, `anonymised`, `authenticator`, `privilegedWithoutFactor`, `approachingRetention`, `neverSignedIn` and `lastLoginAt`, with `search` over name, address and student number and `sort` by name, last seen or joined. A key it does not declare is a 400. |
+| `POST /api/admin/accounts` | Creates an account with no password and sends a set-password link; a Workspace address gets none (0008). Roles may be granted in the same action. |
+
 **"In use" is a count over rows, never a column.** `VENUE_REFERENCES` in `server/utils/venues.ts`
 declares every table that points at `venues`: `performances`, `venue_emergency_info`,
 `shift_templates`, `checklist_items`, `night_reports`, `backstage_nights`, `comp_requests` and
@@ -418,7 +426,7 @@ for the two that read and `ticketing.write` for the rest:
 
 | Route | What it does |
 | --- | --- |
-| `GET /api/admin/shows` | The paged envelope, drafts included, each row carrying its performance count, how many are on sale, how many tickets have sold and how many content warnings it carries. `unassessed=true` narrows it to published shows nobody has assessed. |
+| `GET /api/admin/shows` | The paged envelope, drafts included, each row carrying its performance count, how many are on sale, how many tickets have sold and how many content warnings it carries. Filtered by its declaration (`shared/utils/shows-list.ts`, K-129): status, season, category, `unassessed` and `onSale`, with `search` over title and address and `sort` by status or title. `unassessed=true` narrows it to published shows nobody has assessed; `unassessed=false` now excludes them, a genuine third answer rather than the old "no filter" that any yes-or-no field not being sent already gives. |
 | `POST /api/admin/shows` | Adds one, always DRAFT. The address is refused if it is already held. |
 | `GET /api/admin/shows/[id]` | One show, every performance of it, the venues a performance may be put in, the category and season pickers (D-131), the warnings it carries and the vocabulary it may pick from. |
 | `PUT /api/admin/shows/[id]` | Changes the copy, the address, the age guidance, the latecomer policy and the booking window default. It does not take the status. |

@@ -3,6 +3,10 @@ import { sql } from 'drizzle-orm'
 // A function import only: `capacity.ts` imports `soldReferences` from this file, and importing a
 // constant back would be a circular value that is not there yet the first time either module runs.
 import { heldSeatsSubquery } from './capacity'
+import { aliasColumns, whereFrom, yesNo } from './list-filters'
+import { showsList } from '#shared/utils/shows-list'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { AdminPerformance, AdminShow, ShowStatus } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 
@@ -139,30 +143,26 @@ export function performanceSoldQuery(performanceId: string, references = soldRef
   return sql`SELECT ${sql.join(references.map(reference => heldTerm(reference, sql`${performanceId}`)), sql` + `)} AS sold`
 }
 
-export interface ShowFilters {
-  status?: ShowStatus
-  search?: string
-  // Published, warned about nothing and never confirmed clear: what D-102 criterion 2 flags.
-  unassessed?: boolean
-}
-
 interface ShowRow extends Omit<AdminShow, 'warningsConfirmedNone'> {
   warningsConfirmedNone: number
 }
 
 const readShow = (row: ShowRow): AdminShow => ({ ...row, warningsConfirmedNone: row.warningsConfirmedNone === 1 })
 
-// A typed percent sign is a character somebody is looking for, not a wildcard.
-const contains = (term: string): string => `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
-
-// Two bound parameters at most, whatever the filters and however many shows there are (0003).
-function predicate(filters: ShowFilters): SQL {
-  const terms: SQL[] = []
-  if (filters.status) terms.push(sql`s.status = ${filters.status}`)
-  if (filters.search) terms.push(sql`(s.title LIKE ${contains(filters.search)} ESCAPE '\\' OR s.slug LIKE ${contains(filters.search)} ESCAPE '\\')`)
-  if (filters.unassessed) terms.push(sql`(${UNASSESSED})`)
-  return terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``
+// The declaration's predicates and order, bound through the `s` alias the raw SQL below uses
+// (K-129). "Unassessed" and "on sale" are questions about other rows, answered here.
+export function showsClause(query: ListQuery): ListClause {
+  return whereFrom(showsList, query, {
+    column: aliasColumns('s'),
+    search: [sql`s.title`, sql`s.slug`],
+    fields: {
+      unassessed: yesNo(UNASSESSED),
+      onSale: yesNo(ON_SALE),
+    },
+  })
 }
+
+const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
 
 const SHOW_COLUMNS = sql`
   s.id AS id,
@@ -175,6 +175,7 @@ const SHOW_COLUMNS = sql`
   s.latecomer_policy AS latecomerPolicy,
   s.category_id AS categoryId,
   s.season_id AS seasonId,
+  (SELECT se.name FROM seasons se WHERE se.id = s.season_id) AS seasonName,
   s.booking_closes_hours_before AS bookingClosesHoursBefore,
   s.warnings_confirmed_none AS warningsConfirmedNone,
   s.status AS status
@@ -195,21 +196,23 @@ const UNASSESSED = sql`
   AND NOT EXISTS (SELECT 1 FROM show_content_warnings w WHERE w.show_id = s.id)
 `
 
-export function showsQuery(filters: ShowFilters, limit: number, offset: number, references = soldReferences()): SQL {
+const ON_SALE = sql`exists (SELECT 1 FROM performances p WHERE p.show_id = s.id AND p.status = 'ON_SALE')`
+
+export function showsQuery(clause: ListClause, limit: number, offset: number, references = soldReferences()): SQL {
   return sql`
     SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s', references)} AS soldTickets
-    FROM shows s${predicate(filters)}
-    ORDER BY s.status, s.title COLLATE NOCASE
+    FROM shows s${predicate(clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function listShows(filters: ShowFilters, limit: number, offset: number): Promise<AdminShow[]> {
-  return (await db.all<ShowRow>(showsQuery(filters, limit, offset))).map(readShow)
+export async function listShows(clause: ListClause, limit: number, offset: number): Promise<AdminShow[]> {
+  return (await db.all<ShowRow>(showsQuery(clause, limit, offset))).map(readShow)
 }
 
-export async function countShows(filters: ShowFilters): Promise<number> {
-  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM shows s${predicate(filters)}`)
+export async function countShows(clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM shows s${predicate(clause)}`)
   return Number(row?.total ?? 0)
 }
 

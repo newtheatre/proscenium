@@ -195,7 +195,7 @@ describe.skipIf(skip !== null)('erasing somebody else (A-125 criterion 6)', () =
     const listing = await (await send('GET', `/api/admin/accounts?search=${encodeURIComponent(person.email)}`, null, cookie)).json() as { total: number }
     expect(listing.total).toBe(0)
 
-    const tombstones = await (await send('GET', '/api/admin/accounts?filter=anonymised', null, cookie)).json() as { items: { id: string }[] }
+    const tombstones = await (await send('GET', '/api/admin/accounts?anonymised=true', null, cookie)).json() as { items: { id: string }[] }
     expect(tombstones.items.map(item => item.id)).toContain(person.id)
   })
 

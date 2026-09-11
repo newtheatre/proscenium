@@ -2,6 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { saleRefusal } from '#shared/utils/programme'
 import { showNightBounds, showNightOf } from '#shared/utils/show-night'
+import { seconds } from './list-filters'
 import type { PerformanceSaleState, PerformanceStatus, SalesChannel, ShowStatus } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 
@@ -10,8 +11,6 @@ import type { SQL } from 'drizzle-orm'
 
 // The programme's states and the sale predicate are declared once, with the rest of the domain
 // rules in `shared/utils/programme.ts`; nothing here holds a second copy of either.
-
-const seconds = (at: Date): number => Math.floor(at.getTime() / 1000)
 
 // A stored curtain is integer seconds UTC; a Date is accepted so a caller with an instant in
 // hand does not have to convert one just to ask.

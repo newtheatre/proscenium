@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { DEFAULT_PAGE_SIZE } from '#shared/utils/pagination'
+import { ROLES } from '#shared/utils/roles'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
@@ -85,7 +86,6 @@ interface Listing {
   pageSize: number
   total: number
   pages: number
-  awaiting: string | null
   banners: { privilegedWithoutFactor: number, insideRetentionWindow: number }
 }
 
@@ -141,18 +141,18 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
 
   test('an unverified account is found by the filter and a verified one is not', async () => {
     const email = await member('unverified', false)
-    expect(emails(await directory('?filter=unverified'))).toContain(email)
+    expect(emails(await directory('?verified=false'))).toContain(email)
 
     write('UPDATE users SET verified = 1 WHERE email = ?', email)
-    expect(emails(await directory('?filter=unverified'))).not.toContain(email)
+    expect(emails(await directory('?verified=false'))).not.toContain(email)
   })
 
   test('a disabled account is found only by its own filter', async () => {
     const email = await member('disabled', false)
     write('UPDATE users SET disabled = 1 WHERE email = ?', email)
 
-    expect(emails(await directory('?filter=disabled'))).toContain(email)
-    expect(emails(await directory(`?filter=unverified&search=${encodeURIComponent(email)}`))).toContain(email)
+    expect(emails(await directory('?disabled=true'))).toContain(email)
+    expect(emails(await directory(`?verified=false&search=${encodeURIComponent(email)}`))).toContain(email)
     write('UPDATE users SET disabled = 0 WHERE email = ?', email)
   })
 
@@ -162,7 +162,7 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
     write('UPDATE users SET anonymised_at = ? WHERE email = ?', Math.floor(Date.now() / 1000), email)
 
     expect(emails(await directory(`?search=${encodeURIComponent(email)}`))).not.toContain(email)
-    expect(emails(await directory('?filter=anonymised'))).toContain(email)
+    expect(emails(await directory('?anonymised=true'))).toContain(email)
     expect(emails(await directory(`?includeAnonymised=true&search=${encodeURIComponent(email)}`))).toContain(email)
   })
 
@@ -171,9 +171,9 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
     const id = read<{ id: string }>('SELECT id FROM users WHERE email = ?', email)!.id
     expect((await send('POST', '/api/admin/roles', { userId: id, role: 'BOX_OFFICE' }, cookie)).status).toBe(200)
 
-    expect(emails(await directory('?filter=role-holders'))).toContain(email)
-    expect(emails(await directory('?filter=role-holders&role=BOX_OFFICE'))).toContain(email)
-    expect(emails(await directory('?filter=role-holders&role=FOH_MANAGER'))).not.toContain(email)
+    expect(emails(await directory('?holdsRole=true'))).toContain(email)
+    expect(emails(await directory('?role=is:BOX_OFFICE'))).toContain(email)
+    expect(emails(await directory('?role=is:FOH_MANAGER'))).not.toContain(email)
   })
 
   // The A-112 banner: the same rule requiresSecondFactor applies per account, over the table.
@@ -183,7 +183,7 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
 
     expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', email, app.databaseFile, '--additional']).exitCode).toBe(0)
 
-    const listing = await directory('?filter=privileged-without-mfa')
+    const listing = await directory('?privilegedWithoutFactor=true')
     expect(emails(listing)).toContain(email)
     expect(emails(listing)).not.toContain(officer.email)
     expect(listing.banners.privilegedWithoutFactor).toBe(before + 1)
@@ -194,23 +194,25 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
     const longAgo = Math.floor(Date.now() / 1000) - 5 * 365 * 24 * 60 * 60
     write('UPDATE users SET last_login_at = ?, created_at = ? WHERE email = ?', longAgo, longAgo, email)
 
-    const listing = await directory('?filter=retention-window')
+    const listing = await directory('?approachingRetention=true')
     expect(emails(listing)).toContain(email)
     expect(emails(listing)).not.toContain(officer.email)
     expect(listing.banners.insideRetentionWindow).toBeGreaterThanOrEqual(1)
   })
 
-  // Two filters have no data to find until their stories exist, and say which one (A-116, A-117).
-  test('a filter whose story is not built returns nothing and names it', async () => {
-    for (const [filter, story] of [['members-current', 'A-117'], ['members-lapsed', 'A-117'], ['guests-unclaimed', 'A-116']] as const) {
-      const listing = await directory(`?filter=${filter}`)
-      expect(`${filter}: ${listing.awaiting}`).toBe(`${filter}: ${story}`)
-    }
-    expect((await directory('?filter=members-current')).total).toBe(0)
+  // A membership is a dated state read at query time (A-117, 0031); nobody here holds one.
+  test('a membership filter answers from the rows, and a role list past its cap is refused', async () => {
+    expect((await directory('?membership=is:current')).total).toBe(0)
+    expect(emails(await directory('?membership=is:none'))).toContain(officer.email)
+    const tooMany = [...ROLES, 'ADMIN'].join(',')
+    expect((await send('GET', `/api/admin/accounts?role=any:${tooMany}`, null, cookie)).status).toBe(400)
   })
 
-  test('an unknown filter or an oversized page is refused', async () => {
-    expect((await send('GET', '/api/admin/accounts?filter=nonsense', null, cookie)).status).toBe(400)
+  test('an unknown filter value, an undeclared sort or an oversized page is refused', async () => {
+    expect((await send('GET', '/api/admin/accounts?role=is:nonsense', null, cookie)).status).toBe(400)
+    // An obsolete triage link is refused, never answered with a plausible unfiltered listing.
+    expect((await send('GET', '/api/admin/accounts?filter=anonymised', null, cookie)).status).toBe(400)
+    expect((await send('GET', '/api/admin/accounts?sort=email', null, cookie)).status).toBe(400)
     expect((await send('GET', '/api/admin/accounts?pageSize=5000', null, cookie)).status).toBe(400)
   })
 
@@ -241,7 +243,7 @@ describe.skipIf(skip !== null)('creating an account from the console (A-121 crit
     `, email)
     expect(sent).toMatchObject({ type: 'account.set-password', status: 'SENT' })
 
-    expect(emails(await directory('?filter=role-holders&role=BOX_OFFICE'))).toContain(email)
+    expect(emails(await directory('?role=is:BOX_OFFICE'))).toContain(email)
   })
 
   test('the link sets a first password, and then signs the person in', async () => {
@@ -299,10 +301,17 @@ describe.skipIf(skip !== null)('the directory screen', () => {
       await visit(view, `${app.baseURL}/people/accounts`, '[data-test="toolbar-search"]')
       await waitFor(view, `document.body.innerText.includes(${JSON.stringify(known)})`)
 
-      // Searching narrows to one, and the total below the table says so.
+      // A filter arrives from the URL and shows as a chip, so a triage list can be linked to.
+      await visit(view, `${app.baseURL}/people/accounts?verified=false`, '[data-test="toolbar-active"]')
+      expect(await textOf(view, '[data-test="toolbar-active"]')).toContain('Address unverified')
+      await visit(view, `${app.baseURL}/people/accounts`, '[data-test="toolbar-search"]')
+      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(known)})`)
+
+      // Searching narrows to one, and the total below the table says so; the URL carries it.
       await fill(view, 'input[data-test="toolbar-search"]', known)
       await waitFor(view, 'document.querySelector(\'[data-test="directory-total"]\')?.innerText.startsWith("1 ")')
       expect(await textOf(view)).not.toContain(officer.email)
+      await waitFor(view, `new URLSearchParams(location.search).get('search') === ${JSON.stringify(known)}`)
 
       // Searching is shown back as a chip that can be taken off again (0032).
       await waitFor(view, `document.querySelector('[data-test="toolbar-active"]')?.innerText.includes(${JSON.stringify(known)})`)
@@ -311,7 +320,7 @@ describe.skipIf(skip !== null)('the directory screen', () => {
 
       // The filters live behind one button, which is what keeps the row from resizing.
       await click(view, '[data-test="toolbar-filters"]')
-      await waitFor(view, 'document.querySelector(\'[data-test="directory-filter"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="filter-role"]\')')
       await view.evaluate(`document.querySelector('[data-test="toolbar-filters"]').click()`)
       await Bun.sleep(500)
 
@@ -320,7 +329,7 @@ describe.skipIf(skip !== null)('the directory screen', () => {
       await fill(view, '[data-test="invite-name"]', 'Added By Hand (test)')
       await fill(view, '[data-test="invite-email"]', invitee)
       await click(view, '[data-test="invite-submit"]')
-      await waitFor(view, 'document.querySelector(\'[data-test="invited"]\')')
+      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(invitee)})`)
 
       expect(read('SELECT id FROM users WHERE email = ?', invitee)).toBeDefined()
     }

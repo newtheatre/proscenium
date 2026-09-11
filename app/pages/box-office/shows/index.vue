@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { SHOW_STATUSES, saysShowStatus, showForm, toSlug } from '#shared/utils/programme'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { saysReferenceName, saysShowStatus, showForm, toSlug } from '#shared/utils/programme'
+import { showsList } from '#shared/utils/shows-list'
+import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import type { TableColumn } from '@nuxt/ui'
-import type { AdminShow, ShowStatus } from '#shared/utils/programme'
+import type { FilterOption } from '#shared/utils/list-filters'
+import type { AdminShow } from '#shared/utils/programme'
 
 definePageMeta({ layout: 'console', title: 'Shows', middleware: 'console' })
 
@@ -11,35 +13,40 @@ const UBadge = resolveComponent('UBadge')
 
 const request = useRequestFetch()
 const toast = useToast()
-const search = ref('')
-const status = ref<ShowStatus | 'ALL'>('ALL')
-const page = ref(1)
 const failure = ref<string | null>(null)
 const saving = ref(false)
 const open = ref(false)
 
 interface Listing { items: AdminShow[], total: number, pageSize: number, pages: number }
+interface Named { items: { id: string, name: string, archived: boolean }[] }
 
 const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
-// Searched and paged in SQL, so what the table shows and what the count says are the same
-// question asked once (CONTRIBUTING).
-const { data, status: loading, error, refresh } = await useAsyncData(
-  'box-office-shows',
-  () => request<Listing>('/api/admin/shows', {
-    query: {
-      search: search.value.trim() || undefined,
-      status: status.value === 'ALL' ? undefined : status.value,
-      page: page.value,
-    },
-  }),
-  { watch: [page], default: empty },
+// The season and category pickers read the reference data once, the largest page of each;
+// the table names a show's own season from its row, so nothing here limits what it can say.
+const { data: reference } = await useAsyncData(
+  'box-office-shows-reference',
+  async () => {
+    const [seasons, categories] = await Promise.all([
+      request<Named>('/api/admin/reference-data/seasons', { query: { pageSize: MAX_PAGE_SIZE } }),
+      request<Named>('/api/admin/reference-data/show-categories', { query: { pageSize: MAX_PAGE_SIZE } }),
+    ])
+    const named = (rows: Named): FilterOption[] => rows.items.map(row => ({ value: row.id, label: saysReferenceName(row) }))
+    return { seasonId: named(seasons), categoryId: named(categories) }
+  },
+  { default: (): Record<string, FilterOption[]> => ({ seasonId: [], categoryId: [] }) },
 )
 
-watch([search, status], () => {
-  if (page.value === 1) void refresh()
-  else page.value = 1
-})
+// Search, filters, sort and page live in the URL (K-129); the list refetches when any changes.
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(showsList, { options: reference })
+
+// Searched and paged in SQL, so what the table shows and what the count says are the same
+// question asked once (CONTRIBUTING).
+const { data, status: loading, error } = await useAsyncData(
+  'box-office-shows',
+  () => request<Listing>('/api/admin/shows', { query: query.value }),
+  { watch: [query], default: empty },
+)
 
 const state = reactive({ title: '', slug: '' })
 
@@ -81,26 +88,6 @@ async function create(): Promise<void> {
 // describe.
 const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The shows could not be read.') : null))
 
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (status.value !== 'ALL') {
-    active.push({ key: 'status', label: saysShowStatus(status.value), icon: 'i-lucide-eye', clear: () => {
-      status.value = 'ALL'
-    } })
-  }
-  return active
-})
-
-const statusOptions = [
-  { label: 'Every show', value: 'ALL' },
-  ...SHOW_STATUSES.map(one => ({ label: saysShowStatus(one), value: one })),
-]
-
 const columns: TableColumn<AdminShow>[] = [
   {
     id: 'title',
@@ -116,6 +103,12 @@ const columns: TableColumn<AdminShow>[] = [
       ]),
       h('div', { class: 'text-xs text-muted' }, `/shows/${row.original.slug}`),
     ]),
+  },
+  {
+    id: 'season',
+    header: 'Season',
+    meta: { class: { td: 'whitespace-nowrap' } },
+    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.seasonName ?? 'None'),
   },
   {
     id: 'performances',
@@ -166,20 +159,20 @@ const columns: TableColumn<AdminShow>[] = [
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A show title or address"
-      :active="activeFilters"
+      :placeholder="showsList.search?.placeholder"
+      :active="active"
       :loading="loading === 'pending'"
-      @clear="search = ''; status = 'ALL'"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Show">
-          <USelect
-            v-model="status"
-            :items="statusOptions"
-            class="w-full"
-            data-test="shows-status"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="showsList"
+          :conditions="conditions"
+          :sort="sort"
+          :options="reference"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -201,7 +194,7 @@ const columns: TableColumn<AdminShow>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ search ? 'No show matches that.' : 'No shows yet. Add one, give it performances, then publish it.' }}
+          {{ filtered ? 'No show matches that.' : 'No shows yet. Add one, give it performances, then publish it.' }}
         </p>
       </template>
     </UTable>

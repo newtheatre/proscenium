@@ -408,6 +408,44 @@ Reading the table:
   module keeps its own `ConstraintRefusal[]` table beside the write path it guards, and calls the
   shared function; there is no central list to append to (0047).
 
+## Console list filters (K-129, 0032)
+
+Every console table shares one toolbar (`app/components/AdminToolbar.vue`) and, once migrated, one
+declaration of what it can be filtered by. The declaration is a `ListSpec` in `shared/utils/`
+(`accounts-list.ts`, `shows-list.ts`), naming each filterable field's key, label, kind (closed
+list, searchable list, date range, number range, yes or no, or a reference to a person, room or
+show), its SQL column where it is one, and the sort fields. A field need not be a column: a role
+or a membership is a question about other rows, answered by the endpoint. From the one
+declaration:
+
+- `filterQuerySchema(spec)` derives the endpoint's Zod query on top of `pageQuery`: `search`,
+  `sort` (a declared field only), `direction`, and one key per field.
+- `whereFrom(spec, query, binding)` (`server/utils/list-filters.ts`) turns the validated query into
+  Drizzle predicates and an order clause. The binding names the columns (`tableColumns(table)` for
+  the query builder, `aliasColumns('s')` for raw SQL), the text columns the search box runs over
+  (at most three), and a resolver for each field that is not a column.
+- `ConsoleFilters.vue` renders the builder inside the toolbar's popover from the same declaration,
+  and `useListQuery(spec)` holds search, filters, sort and page in the route query, debouncing the
+  search box and resetting the page when a filter changes.
+
+The query encoding is one key per field, `field=operator:value[,value]`, with the operator one of
+`is`, `not`, `any`, `between`, `before`, `after` or `empty`; a bare value reads as `is`, so
+`?unassessed=true` keeps working. Conditions combine with AND; one condition per field.
+Examples: `?status=is:DRAFT&seasonId=any:s1,s2`, `?lastLoginAt=before:2025-09-01`,
+`?role=empty`.
+
+Parameter discipline holds by construction: an `any` list is capped per field (`cap`, default
+`DEFAULT_ANY_CAP`), the schema refuses a longer one with a 400 and the helper refuses one that
+reaches it anyway, and `maxBoundParameters(spec)` is the declaration's worst case, which
+`tests/unit/list-filters.test.ts` holds under the chunk limit (0006). Dates on unix columns
+(`dateAs: 'unix'`) compare against London day boundaries (0014); "is not X" includes rows with no
+value at all, and "is empty" finds them.
+
+The two endpoints migrated first are `GET /api/admin/accounts` and `GET /api/admin/shows`, both
+documented in `docs/data-model.md` beside their tables. Migration runs one module per pull
+request; `tests/unit/admin-conventions.test.ts` holds the migrated pages to the declaration now
+and the whole console once the last module lands.
+
 ## Scheduled tasks
 
 All Nitro scheduled tasks mirrored in wrangler cron triggers. The system notices, humans
