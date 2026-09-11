@@ -272,6 +272,7 @@ export async function showPerformances(showId: string): Promise<AdminPerformance
 export interface PerformanceWithShow extends AdminPerformance {
   showStatus: ShowStatus
   showTitle: string
+  showSlug: string
   showBookingClosesHoursBefore: number | null
 }
 
@@ -281,6 +282,7 @@ export async function performanceById(id: string): Promise<PerformanceWithShow |
            ${performanceSoldColumn('p')} AS soldTickets,
            s.status AS showStatus,
            s.title AS showTitle,
+           s.slug AS showSlug,
            s.booking_closes_hours_before AS showBookingClosesHoursBefore
     FROM performances p
     JOIN shows s ON s.id = p.show_id
