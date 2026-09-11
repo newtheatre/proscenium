@@ -1,4 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { Database } from 'bun:sqlite'
+import { sqliteTarget } from '#tests/helpers/database'
+import { adminSession } from '#tests/helpers/accounts'
+import { testVenue } from '#tests/helpers/programme'
 import { openView, skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
@@ -6,9 +10,42 @@ const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 
+// The programme pages are only themselves with a show on them, so the budget is counted on a
+// real one rather than on an empty listing (J-111 criterion 9).
+let showSlug = ''
+let performanceId = ''
+
+async function seedShow(cookie: string): Promise<void> {
+  const database = new Database(app.databaseFile)
+  let venueId: string
+  try {
+    venueId = testVenue(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8), capacity: 60 }).id
+  }
+  finally {
+    database.close()
+  }
+
+  const send = (path: string, body: unknown): Promise<Response> =>
+    fetch(`${app.baseURL}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify(body),
+    })
+
+  showSlug = `shells-${crypto.randomUUID().slice(0, 8)}`
+  const show = await (await send('/api/admin/shows', { title: 'A Midsummer Night\'s Dream', slug: showSlug })).json() as { id: string }
+  const startsAt = Math.floor(Date.now() / 1000) + 7 * 86_400
+  const performance = await (await send(`/api/admin/shows/${show.id}/performances`, {
+    venueId, startsAt, durationMinutes: 120, intervalCount: 1, intervalMinutes: 15,
+  })).json() as { id: string }
+  performanceId = performance.id
+  await send(`/api/admin/shows/${show.id}/publish`, { published: true, cascadePerformances: true })
+}
+
 beforeAll(async () => {
   if (skip) return
   app = await startApp()
+  await seedShow((await adminSession(app)).cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -53,13 +90,17 @@ describe.skipIf(skip !== null)('the three shells (docs/design-language.md)', () 
   // At most one marquee CTA, one sticker and one spotlight per view. The budget is a rule and
   // not a suggestion, so it is a test rather than a habit.
   test('a public view spends its expressive budget at most once each', async () => {
-    for (const path of ['/', '/sign-in', '/register', '/verify', '/reset', '/magic', '/training/modules']) {
+    const paths = [
+      '/', '/sign-in', '/register', '/verify', '/reset', '/magic', '/training/modules',
+      '/whats-on', `/shows/${showSlug}`, `/book/${performanceId}`, '/about', '/policies/booking',
+    ]
+    for (const path of paths) {
       const counts = await inspect<Record<string, number>>(path, KIT_COUNTS)
       for (const [element, count] of Object.entries(counts)) {
         expect(`${path} ${element}: ${count <= 1}`).toBe(`${path} ${element}: true`)
       }
     }
-  }, 60_000)
+  }, 150_000)
 
   // No poster kit in the console. On /dev because it wears the console layout and holds no
   // middleware, so a signed-out view renders the shell rather than the sign-in screen (0040).

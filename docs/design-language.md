@@ -145,7 +145,10 @@ better than any gradient. Two rules:
    ours; what is inside it is theirs.
 
 The house photographs live under `public/images/`, the logos under `public/images/logos/`, and
-`PhotoHero` is the one component that draws a banner, so rule 1 is applied in one place. A banner
+`PhotoHero` is the one component that draws a banner, so rule 1 is applied in one place.
+`PosterFrame` is the matching one place for show artwork: it draws the poster when there is one
+and the title in the display face when there is not, which is why a show with no artwork yet looks
+deliberate rather than broken, and why real posters will land in one component (J-111). A banner
 is WebP or AVIF, at most 1920 pixels wide and under 300 KB; the camera originals stay out of the
 repository. `tests/unit/static-assets.test.ts` holds the budget and refuses a reference to a picture
 that is not there (K-126). The default Open Graph image, `public/og-default.png`, is the what's-on
