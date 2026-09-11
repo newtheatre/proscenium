@@ -1,23 +1,9 @@
 import { z } from 'zod'
-import { CHANNELS, NOTIFICATION_STATUSES, NOTIFICATION_TOPICS } from './notifications'
 import { pageQuery } from './pagination'
 
 // The operations view of what was sent (H-106): filters over `notification_log`, read-only.
-// Kept out of `notify.ts`'s own file, which H-105 owns.
-
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A date is YYYY-MM-DD')
-
-export const sendLogFilters = pageQuery.extend({
-  type: z.string().trim().min(1).max(100).optional(),
-  topic: z.enum(NOTIFICATION_TOPICS).optional(),
-  channel: z.enum(CHANNELS).optional(),
-  status: z.enum(NOTIFICATION_STATUSES).optional(),
-  // Both London civil days; `to` is inclusive, matching the report period fields elsewhere.
-  from: isoDate.optional(),
-  to: isoDate.optional(),
-})
-
-export type SendLogFilters = z.output<typeof sendLogFilters>
+// Kept out of `notify.ts`'s own file, which H-105 owns. The query schema is derived from
+// `send-log-list.ts`'s declaration (K-129).
 
 export interface SendLogRow {
   id: string

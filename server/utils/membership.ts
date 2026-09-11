@@ -1,6 +1,51 @@
+import { db, schema } from '@nuxthub/db'
 import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm'
+import { createError } from 'h3'
+import { conditionsOf } from '#shared/utils/list-filters'
 import { daysAfter, londonDay } from '#shared/utils/membership'
+import { membershipsList } from '#shared/utils/memberships-list'
+import { tableColumns, whereFrom } from './list-filters'
+import type { ListClause, ListQuery } from '#shared/utils/list-filters'
 import type { H3Event } from 'h3'
+import type { SQL } from 'drizzle-orm'
+
+export const MEMBER_FILTERS = ['current', 'awaiting-check', 'lapsed', 'everyone'] as const
+
+function inTermPredicate(grace: number): SQL {
+  const today = londonDay(new Date())
+  return sql`${schema.memberships.startsOn} <= ${today}
+    and date(${schema.memberships.expiresOn}, ${`+${grace} days`}) >= ${today}`
+}
+
+// The register's own four states; "awaiting record" is the claims queue, a different screen and
+// a different table, never a predicate here (A-130, K-129).
+export function registerFilterPredicate(filter: typeof MEMBER_FILTERS[number], grace: number): SQL | undefined {
+  const inTerm = inTermPredicate(grace)
+  if (filter === 'current') return inTerm
+  if (filter === 'lapsed') return sql`not (${inTerm})`
+  if (filter === 'awaiting-check') return and(isNull(schema.memberships.confirmedAt), inTerm)
+  return undefined
+}
+
+// The register's own declaration, read through one predicate (K-129): current is the hidden
+// default, the same shape the accounts directory gives anonymised rows.
+export function membershipsClause(query: ListQuery, grace: number): ListClause {
+  const clause = whereFrom(membershipsList, query, {
+    column: tableColumns(schema.memberships),
+    search: [schema.users.name, schema.users.email, sql`coalesce(${schema.users.studentId}, '')`],
+    fields: {
+      filter: (condition) => {
+        const value = condition.values[0]!
+        if (!(MEMBER_FILTERS as readonly string[]).includes(value)) {
+          throw createError({ statusCode: 400, statusMessage: `${value} is not a register filter; the claims queue answers awaiting-record` })
+        }
+        return registerFilterPredicate(value as typeof MEMBER_FILTERS[number], grace)
+      },
+    },
+  })
+  const asked = conditionsOf(membershipsList, query).some(condition => condition.key === 'filter')
+  return asked ? clause : { ...clause, where: and(registerFilterPredicate('current', grace)!, clause.where) }
+}
 
 // One person, one student number, held on the account rather than repeated on every membership
 // (0031). It is how the committee finds somebody against the SU's own record.

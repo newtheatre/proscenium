@@ -1,21 +1,14 @@
 import { desc, eq } from 'drizzle-orm'
-import { z } from 'zod'
-import { AUDIT_ACTION_NAMES, AUDIT_MODULES } from '#shared/utils/audit-actions'
+import { auditList } from '#shared/utils/audit-list'
+import { conditionsOf, filterQuerySchema } from '#shared/utils/list-filters'
 import { formatLondon } from '#shared/utils/london'
-import type { AuditActionName } from '#shared/utils/audit-actions'
-import { auditPredicate } from '#server/utils/audit-search'
+import { auditClause } from '#server/utils/audit-search'
+import type { ListQuery } from '#shared/utils/list-filters'
 
 // A technical bound rather than a policy one, so it is a constant and not a setting (0012).
 const EXPORT_LIMIT = 5000
 
-const query = z.object({
-  actor: z.string().max(64).optional(),
-  action: z.enum(AUDIT_ACTION_NAMES as [AuditActionName, ...AuditActionName[]]).optional(),
-  module: z.enum(AUDIT_MODULES).optional(),
-  target: z.string().max(200).optional(),
-  from: z.coerce.number().int().nonnegative().optional(),
-  to: z.coerce.number().int().nonnegative().optional(),
-})
+const query = filterQuerySchema(auditList)
 
 const COLUMNS = ['id', 'occurred', 'actorId', 'actor', 'action', 'target', 'detail'] as const
 
@@ -25,11 +18,23 @@ function cell(value: unknown): string {
   return `"${String(value ?? '').replaceAll('"', '""')}"`
 }
 
-// Export the current filter as CSV (J-103 criterion 5). The name of the file is in the
+// What was asked for, in words rather than as encoded conditions: read back on the entry this
+// export writes for itself (criterion 5).
+function askedFor(input: ListQuery): Record<string, unknown> {
+  const asked: Record<string, unknown> = {}
+  for (const condition of conditionsOf(auditList, input)) {
+    asked[condition.key] = condition.values.length === 1 ? condition.values[0] : condition.values
+  }
+  if (input.search) asked.target = input.search
+  return asked
+}
+
+// Export the current filter as CSV (J-103 criterion 5, K-129). The name of the file is in the
 // disposition header: an extension in the path would be a route segment, not a format.
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'audit.read')
   const input = await getValidatedQueryOrThrow(event, query)
+  const { where } = auditClause(input)
 
   const rows = await db.select({
     id: schema.auditLog.id,
@@ -42,7 +47,7 @@ export default defineEventHandler(async (event) => {
   })
     .from(schema.auditLog)
     .leftJoin(schema.users, eq(schema.users.id, schema.auditLog.actorId))
-    .where(auditPredicate(input))
+    .where(where)
     .orderBy(desc(schema.auditLog.createdAt), desc(schema.auditLog.id))
     .limit(EXPORT_LIMIT)
 
@@ -51,7 +56,7 @@ export default defineEventHandler(async (event) => {
     actorId: resolved.account.id,
     action: 'audit.exported',
     target: null,
-    detail: { ...input, rows: rows.length, capped: rows.length === EXPORT_LIMIT },
+    detail: { ...askedFor(input), rows: rows.length, capped: rows.length === EXPORT_LIMIT },
   }))
 
   const lines = [COLUMNS.join(',')]

@@ -1,29 +1,35 @@
-import { and, asc, eq, isNull, like, or, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { filterQuerySchema } from '#shared/utils/list-filters'
 import { CLAIM_STATUSES } from '#shared/utils/membership-claims'
-import { envelope, offsetFor, pageQuery } from '#shared/utils/pagination'
+import { membershipClaimsList } from '#shared/utils/membership-claims-list'
+import { envelope, offsetFor } from '#shared/utils/pagination'
+import { tableColumns, whereFrom } from '#server/utils/list-filters'
+import type { Reference } from '#server/utils/list-filters'
 
-const query = pageQuery.extend({
+// Status stays fixed at OPEN: nothing on the screen offers to see a decided claim, so it rides
+// beside the declared fields rather than joining them (K-129).
+const query = filterQuerySchema(membershipClaimsList).extend({
   status: z.enum(CLAIM_STATUSES).default('OPEN'),
-  search: z.string().trim().max(200).optional(),
 })
 
+// `id` is not a guide to insertion order; `rowid` is, and is not a Drizzle column (0006).
+function claimsColumn(name: string): Reference | undefined {
+  if (name === 'rowid') return sql`${schema.membershipClaims}.rowid`
+  return tableColumns(schema.membershipClaims)(name)
+}
+
 // The claims queue, oldest first, paged in SQL for the week after cutover when it holds
-// hundreds (A-130 criterion 2). An erased person's claim is nobody's to answer.
+// hundreds (A-130 criterion 2, K-129). An erased person's claim is nobody's to answer.
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'members.read')
   const input = await getValidatedQueryOrThrow(event, query)
 
-  const terms = [eq(schema.membershipClaims.status, input.status), isNull(schema.users.anonymisedAt)]
-  if (input.search) {
-    const wanted = `%${input.search.toLowerCase()}%`
-    terms.push(or(
-      like(sql`lower(${schema.users.name})`, wanted),
-      like(sql`lower(${schema.users.email})`, wanted),
-      like(sql`lower(${schema.membershipClaims.studentId})`, wanted),
-    )!)
-  }
-  const where = and(...terms)
+  const clause = whereFrom(membershipClaimsList, input, {
+    column: claimsColumn,
+    search: [schema.users.name, schema.users.email, schema.membershipClaims.studentId],
+  })
+  const where = and(eq(schema.membershipClaims.status, input.status), isNull(schema.users.anonymisedAt), clause.where)
 
   const [total] = await db.select({ count: sql<number>`count(*)` })
     .from(schema.membershipClaims)
@@ -50,8 +56,7 @@ export default defineEventHandler(async (event) => {
     .from(schema.membershipClaims)
     .innerJoin(schema.users, eq(schema.users.id, schema.membershipClaims.userId))
     .where(where)
-    // Two claims in one second tie on created_at; insertion order is what oldest-first means.
-    .orderBy(asc(schema.membershipClaims.createdAt), asc(sql`${schema.membershipClaims}.rowid`))
+    .orderBy(...clause.orderBy)
     .limit(input.pageSize)
     .offset(offsetFor(input.page, input.pageSize))
 

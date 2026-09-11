@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { formatLondon } from '#shared/utils/london'
-import { CHANNELS, NOTIFICATION_STATUSES, NOTIFICATION_TOPICS, TOPIC_LABELS } from '#shared/utils/notifications'
+import { sendLogList } from '#shared/utils/send-log-list'
 import type { DailyCount, SendLogRow } from '#shared/utils/notification-log'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Send log', middleware: 'console' })
@@ -28,14 +27,10 @@ const STATUS_COLOR: Record<string, 'success' | 'error' | 'warning' | 'neutral'> 
   PENDING: 'neutral',
 }
 
+// Search, filters, sort and page live in the URL (K-129).
+const { search, conditions, sort, page, query, active, set, setSort, clear } = useListQuery(sendLogList)
+
 const listing = ref<Listing | null>(null)
-const type = ref('')
-const topic = ref<(typeof NOTIFICATION_TOPICS)[number] | undefined>(undefined)
-const channel = ref<(typeof CHANNELS)[number] | undefined>(undefined)
-const status = ref<(typeof NOTIFICATION_STATUSES)[number] | undefined>(undefined)
-const from = ref('')
-const to = ref('')
-const page = ref(1)
 const loading = ref(false)
 const failure = ref<string | null>(null)
 
@@ -45,17 +40,7 @@ async function load(): Promise<void> {
   loading.value = true
   failure.value = null
   try {
-    listing.value = await $fetch<Listing>('/api/admin/comms/send-log', {
-      query: {
-        type: type.value || undefined,
-        topic: topic.value,
-        channel: channel.value,
-        status: status.value,
-        from: from.value || undefined,
-        to: to.value || undefined,
-        page: page.value,
-      },
-    })
+    listing.value = await $fetch<Listing>('/api/admin/comms/send-log', { query: query.value })
   }
   catch (error) {
     failure.value = refusalText(error)
@@ -70,63 +55,7 @@ async function loadDaily(): Promise<void> {
   daily.value = response.days
 }
 
-watch([topic, channel, status, from, to], () => {
-  page.value = 1
-  void load()
-})
-watch(page, load)
-watch(type, () => {
-  page.value = 1
-  void load()
-})
-
-function clearFilters(): void {
-  type.value = ''
-  topic.value = undefined
-  channel.value = undefined
-  status.value = undefined
-  from.value = ''
-  to.value = ''
-  page.value = 1
-  void load()
-}
-
-function clearType(): void {
-  type.value = ''
-}
-function clearTopic(): void {
-  topic.value = undefined
-}
-function clearChannel(): void {
-  channel.value = undefined
-}
-function clearStatus(): void {
-  status.value = undefined
-}
-function clearRange(): void {
-  from.value = ''
-  to.value = ''
-}
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (type.value) {
-    active.push({ key: 'type', label: `Type ${type.value}`, icon: 'i-lucide-tag', clear: clearType })
-  }
-  if (topic.value) {
-    active.push({ key: 'topic', label: TOPIC_LABELS[topic.value], icon: 'i-lucide-layers', clear: clearTopic })
-  }
-  if (channel.value) {
-    active.push({ key: 'channel', label: channel.value, icon: 'i-lucide-radio', clear: clearChannel })
-  }
-  if (status.value) {
-    active.push({ key: 'status', label: status.value, icon: 'i-lucide-flag', clear: clearStatus })
-  }
-  if (from.value || to.value) {
-    active.push({ key: 'range', label: `${from.value || 'start'} to ${to.value || 'now'}`, icon: 'i-lucide-calendar', clear: clearRange })
-  }
-  return active
-})
+watch(query, load)
 
 const when = (at: number | null): string => at ? formatLondon(new Date(at * 1000), { dateStyle: 'medium', timeStyle: 'short' }) : 'Not sent'
 
@@ -212,52 +141,20 @@ onMounted(() => {
     </section>
 
     <AdminToolbar
-      v-model:search="type"
-      placeholder="A message type, such as shift.reminder"
-      :active="activeFilters"
+      v-model:search="search"
+      :placeholder="sendLogList.search?.placeholder"
+      :active="active"
       :loading="loading"
-      @clear="clearFilters"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Topic">
-          <USelect
-            v-model="topic"
-            data-test="filter-topic"
-            :items="[{ label: 'Any topic', value: undefined }, ...NOTIFICATION_TOPICS.map(value => ({ label: TOPIC_LABELS[value], value }))]"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
-        <UFormField label="Channel">
-          <USelect
-            v-model="channel"
-            data-test="filter-channel"
-            :items="[{ label: 'Any channel', value: undefined }, ...CHANNELS.map(value => ({ label: value, value }))]"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
-        <UFormField label="Outcome">
-          <USelect
-            v-model="status"
-            data-test="filter-status"
-            :items="[{ label: 'Any outcome', value: undefined }, ...NOTIFICATION_STATUSES.map(value => ({ label: value, value }))]"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
-        <UFormField label="From">
-          <DateField
-            v-model="from"
-            data-test="filter-from"
-          />
-        </UFormField>
-        <UFormField label="To">
-          <DateField
-            v-model="to"
-            data-test="filter-to"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="sendLogList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
     </AdminToolbar>
 
@@ -269,7 +166,7 @@ onMounted(() => {
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ activeFilters.length ? 'Nothing matches that.' : 'Nothing sent yet.' }}
+          {{ active.length ? 'Nothing matches that.' : 'Nothing sent yet.' }}
         </p>
       </template>
     </UTable>

@@ -12,6 +12,8 @@ import {
   saysCondition,
 } from '#shared/utils/list-filters'
 import { accountsList } from '#shared/utils/accounts-list'
+import { auditList } from '#shared/utils/audit-list'
+import { backupDrillsList } from '#shared/utils/backup-drills-list'
 import { barCategoriesList } from '#shared/utils/bar-categories-list'
 import { barItemsList } from '#shared/utils/bar-items-list'
 import { barMovementsList } from '#shared/utils/bar-movements-list'
@@ -20,10 +22,14 @@ import { blackoutsList } from '#shared/utils/blackouts-list'
 import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
 import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
 import { externalSpacesList } from '#shared/utils/external-spaces-list'
+import { fellowshipsList } from '#shared/utils/fellowships-list'
+import { membershipClaimsList } from '#shared/utils/membership-claims-list'
+import { membershipsList } from '#shared/utils/memberships-list'
 import { roomsList } from '#shared/utils/rooms-list'
 import { roomsQueueList } from '#shared/utils/rooms-queue-list'
 import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
+import { sendLogList } from '#shared/utils/send-log-list'
 import { showsList } from '#shared/utils/shows-list'
 import { stocktakesList } from '#shared/utils/stocktakes-list'
 import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
@@ -34,6 +40,9 @@ import type { FilterField, ListSpec } from '#shared/utils/list-filters'
 const rotaLists = [unfilledShiftsList, rotaApprovalsList, rotaTemplatesList, checklistVenuesList, emergencyCardsList]
 // The bar module's declarations, migrated in the same pass (K-129).
 const barLists = [barCategoriesList, barProductsList, barItemsList, barMovementsList, stocktakesList]
+// The small-module pass: audit, backups, the send log, the register, the claims queue and the
+// roll of Fellows (K-129).
+const smallLists = [auditList, backupDrillsList, sendLogList, membershipsList, membershipClaimsList, fellowshipsList]
 
 // One declaration derives the query schema, the builder and the chips (K-129 criterion 1, 0032).
 // What the predicates do against real rows is tests/integration/list-filters.test.ts.
@@ -65,7 +74,7 @@ const parse = (query: Record<string, string>) => filterQuerySchema(spec).safePar
 // The rooms module's declarations (K-129).
 const roomsLists = [roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList]
 // Every migrated declaration; the cross-declaration checks below walk this list.
-const MIGRATED = [accountsList, showsList, ...roomsLists, ...rotaLists, ...barLists]
+const MIGRATED = [accountsList, showsList, ...roomsLists, ...rotaLists, ...barLists, ...smallLists]
 
 describe('the schema is derived from the declaration (criterion 1)', () => {
   test('an empty query is the first page, the default sort and no conditions', () => {
@@ -258,6 +267,25 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
     expect(staffed?.kind).toBe('yes-no')
   })
 
+  test('the audit trail filters a module and an action as single choices, and an actor as a person', () => {
+    const module = fieldOf(auditList, 'module')
+    expect(module?.column).toBeUndefined()
+    expect(operatorsOf(module!)).toEqual(['is'])
+    const action = fieldOf(auditList, 'action')
+    expect(action?.column).toBe('action')
+    expect(operatorsOf(action!)).toEqual(['is'])
+    const actor = fieldOf(auditList, 'actor')
+    expect(actor?.kind).toBe('person')
+    expect(actor?.column).toBe('actor_id')
+  })
+
+  test('the register keeps awaiting record among its choices, so the runbook link still parses', () => {
+    const filter = fieldOf(membershipsList, 'filter')
+    expect(filter?.options?.map(option => option.value)).toEqual(['current', 'awaiting-record', 'awaiting-check', 'lapsed', 'everyone'])
+    const parsed = parseCondition(filter!, 'awaiting-record')
+    expect('condition' in parsed && parsed.condition).toEqual({ key: 'filter', operator: 'is', values: ['awaiting-record'] })
+  })
+
   test('every declared key is unique and no field shares a key with the paging or search keys', () => {
     for (const declared of MIGRATED) {
       const keys = declared.fields.map(one => one.key)
@@ -274,10 +302,16 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
     [roomsList.key]: [],
     [blackoutsList.key]: ['past'],
     [externalSpacesList.key]: [],
+    [auditList.key]: ['module'],
+    [backupDrillsList.key]: [],
+    [sendLogList.key]: ['topic'],
+    [membershipsList.key]: ['filter'],
+    [membershipClaimsList.key]: [],
+    [fellowshipsList.key]: ['show'],
   }
 
   test('every declared column-less field is named in its server binding', () => {
-    const declarations: ListSpec[] = [accountsList, showsList, roomsList, blackoutsList, externalSpacesList]
+    const declarations: ListSpec[] = [accountsList, showsList, roomsList, blackoutsList, externalSpacesList, ...smallLists]
     for (const declared of declarations) {
       const columnLess = declared.fields.filter(field => field.column === undefined).map(field => field.key)
       expect(new Set(columnLess)).toEqual(new Set(ANSWERED_BY_BINDING[declared.key]))

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { AUDIT_ACTIONS, AUDIT_ACTION_NAMES, AUDIT_MODULES, MANUAL_ACTION_NAMES, describeAction } from '#shared/utils/audit-actions'
+import { AUDIT_ACTIONS, MANUAL_ACTION_NAMES, describeAction } from '#shared/utils/audit-actions'
+import { auditList } from '#shared/utils/audit-list'
 import { formatLondon } from '#shared/utils/london'
 import { manualEntryForm } from '#shared/utils/admin-forms'
 import type { ManualEntryForm } from '#shared/utils/admin-forms'
-import type { AuditActionName, AuditModule } from '#shared/utils/audit-actions'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import type { AuditActionName } from '#shared/utils/audit-actions'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Audit trail', middleware: 'console' })
@@ -31,15 +31,10 @@ interface Listing {
   pages: number
 }
 
-const ANY = 'any'
+// Search, every declared filter, sort and page live in the URL (K-129).
+const { search, conditions, sort, page, query, active, set, setSort, clear } = useListQuery(auditList)
 
 const listing = ref<Listing | null>(null)
-const module = ref<AuditModule | typeof ANY>(ANY)
-const action = ref<AuditActionName | typeof ANY>(ANY)
-const target = ref('')
-const since = ref('')
-const until = ref('')
-const page = ref(1)
 const loading = ref(false)
 const failure = ref<string | null>(null)
 
@@ -54,22 +49,12 @@ const entry = reactive<Partial<ManualEntryForm>>({
 // A date on this screen is a London day, and the API wants the second it starts or ends (0014).
 const startOf = (day: string): number | undefined =>
   day ? Math.floor(new Date(`${day}T00:00:00`).getTime() / 1000) : undefined
-const endOf = (day: string): number | undefined =>
-  day ? Math.floor(new Date(`${day}T23:59:59`).getTime() / 1000) : undefined
-
-const filters = computed(() => ({
-  module: module.value === ANY ? undefined : module.value,
-  action: action.value === ANY ? undefined : action.value,
-  target: target.value || undefined,
-  from: startOf(since.value),
-  to: endOf(until.value),
-}))
 
 async function load(): Promise<void> {
   loading.value = true
   failure.value = null
   try {
-    listing.value = await $fetch<Listing>('/api/admin/audit', { query: { ...filters.value, page: page.value } })
+    listing.value = await $fetch<Listing>('/api/admin/audit', { query: query.value })
   }
   catch (error) {
     failure.value = refusalText(error)
@@ -125,76 +110,15 @@ async function record(event: FormSubmitEvent<ManualEntryForm>): Promise<void> {
   }
 }
 
-// The export carries the filter rather than the page, so what is saved is what was asked for.
+// The export carries the same declared query rather than the page, so what is saved is what
+// was asked for.
 const exportUrl = computed(() => {
-  const query = new URLSearchParams()
-  for (const [key, value] of Object.entries(filters.value)) {
-    if (value !== undefined) query.set(key, String(value))
-  }
-  return `/api/admin/audit/export?${query.toString()}`
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(query.value)) params.set(key, String(value))
+  return `/api/admin/audit/export?${params.toString()}`
 })
 
-const MODULE_OPTIONS = [
-  { label: 'Every module', value: ANY },
-  ...AUDIT_MODULES.map(name => ({ label: name, value: name })),
-]
-
-// Narrowed to the chosen module, because an action filter offering every action in the estate is
-// a list nobody reads.
-const actionOptions = computed(() => [
-  { label: 'Every action', value: ANY },
-  ...AUDIT_ACTION_NAMES
-    .filter(name => module.value === ANY || AUDIT_ACTIONS[name].module === module.value)
-    .map(name => ({ label: AUDIT_ACTIONS[name].label, value: name })),
-])
-
-// Reset here rather than in a watcher: narrowing the list a select is rendering while that same
-// select is open is what tears its content down mid-update.
-function chooseModule(): void {
-  if (module.value !== ANY && action.value !== ANY && AUDIT_ACTIONS[action.value].module !== module.value) {
-    action.value = ANY
-  }
-}
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (module.value !== ANY) {
-    active.push({ key: 'module', label: module.value, icon: 'i-lucide-layers', clear: () => {
-      module.value = ANY
-    } })
-  }
-  if (action.value !== ANY) {
-    active.push({ key: 'action', label: describeAction(action.value).label, icon: 'i-lucide-activity', clear: () => {
-      action.value = ANY
-    } })
-  }
-  if (target.value) {
-    active.push({ key: 'target', label: `About ${target.value}`, icon: 'i-lucide-crosshair', clear: () => {
-      target.value = ''
-    } })
-  }
-  if (since.value) active.push({ key: 'from', label: `From ${since.value}`, icon: 'i-lucide-calendar', clear: () => {
-    since.value = ''
-  } })
-  if (until.value) active.push({ key: 'to', label: `To ${until.value}`, icon: 'i-lucide-calendar', clear: () => {
-    until.value = ''
-  } })
-  return active
-})
-
-function clearFilters(): void {
-  module.value = ANY
-  action.value = ANY
-  target.value = ''
-  since.value = ''
-  until.value = ''
-}
-
-watch([module, action, target, since, until], () => {
-  page.value = 1
-  void load()
-})
-watch(page, load)
+watch(query, load)
 
 // Raw JSON ran off the edge of the table and told nobody anything. A diff has a shape (0027), so
 // it reads as one; everything else reads as its own keys and values.
@@ -276,52 +200,20 @@ onMounted(load)
     />
 
     <AdminToolbar
-      v-model:search="target"
-      placeholder="Who or what an entry is about"
-      :active="activeFilters"
+      v-model:search="search"
+      :placeholder="auditList.search?.placeholder"
+      :active="active"
       :loading="loading"
-      @clear="clearFilters"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Module">
-          <USelect
-            v-model="module"
-            data-test="audit-module"
-            :items="MODULE_OPTIONS"
-            value-key="value"
-            class="w-full"
-            @update:model-value="chooseModule"
-          />
-        </UFormField>
-
-        <UFormField label="Action">
-          <USelectMenu
-            v-model="action"
-            data-test="audit-action"
-            :items="actionOptions"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
-
-        <UFormField
-          label="From"
-          help="The day an entry was written, not the day it describes."
-        >
-          <DateField
-            v-model="since"
-            data-test="audit-from"
-            class="w-full"
-          />
-        </UFormField>
-
-        <UFormField label="To">
-          <DateField
-            v-model="until"
-            data-test="audit-to"
-            class="w-full"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="auditList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -354,7 +246,7 @@ onMounted(load)
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ activeFilters.length
+          {{ active.length
             ? 'No entry matches that.'
             : 'Nothing on the trail yet. Every privileged action lands here.' }}
         </p>

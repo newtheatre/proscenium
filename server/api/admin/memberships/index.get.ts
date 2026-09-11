@@ -1,26 +1,18 @@
-import { and, desc, eq, isNull, like, or, sql } from 'drizzle-orm'
-import { z } from 'zod'
-import { envelope, offsetFor, pageQuery } from '#shared/utils/pagination'
-import { londonDay } from '#shared/utils/membership'
+import { and, eq, like, or, sql } from 'drizzle-orm'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { membershipsList } from '#shared/utils/memberships-list'
+import { envelope, offsetFor } from '#shared/utils/pagination'
+import { MEMBER_FILTERS, membershipsClause, registerFilterPredicate } from '#server/utils/membership'
 import type { SQL } from 'drizzle-orm'
 
-export const MEMBER_FILTERS = ['current', 'awaiting-check', 'lapsed', 'everyone'] as const
+export { MEMBER_FILTERS }
 
-const query = pageQuery.extend({
-  filter: z.enum(MEMBER_FILTERS).default('current'),
-  search: z.string().trim().max(200).optional(),
-})
-
-// The membership register, which is what an SU return is taken from (A-117 criterion 5).
+// Kept for the CSV export, which answers the same four states without paging, sorting or search
+// living in the URL (A-117 criterion 5).
 export function registerPredicate(filter: typeof MEMBER_FILTERS[number], search: string | undefined, grace: number): SQL | undefined {
-  const today = londonDay(new Date())
-  const inTerm = sql`${schema.memberships.startsOn} <= ${today}
-    and date(${schema.memberships.expiresOn}, ${`+${grace} days`}) >= ${today}`
-
   const terms: SQL[] = []
-  if (filter === 'current') terms.push(inTerm)
-  if (filter === 'lapsed') terms.push(sql`not (${inTerm})`)
-  if (filter === 'awaiting-check') terms.push(isNull(schema.memberships.confirmedAt), inTerm)
+  const filterTerm = registerFilterPredicate(filter, grace)
+  if (filterTerm) terms.push(filterTerm)
   if (search) {
     const wanted = `%${search.toLowerCase()}%`
     terms.push(or(
@@ -32,11 +24,15 @@ export function registerPredicate(filter: typeof MEMBER_FILTERS[number], search:
   return terms.length ? and(...terms) : undefined
 }
 
+const query = filterQuerySchema(membershipsList)
+
+// The membership register, which is what an SU return is taken from (A-117 criterion 5, K-129).
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'members.read')
   const input = await getValidatedQueryOrThrow(event, query)
   const grace = await configValue(event, 'MEMBERSHIP_GRACE_DAYS')
-  const where = registerPredicate(input.filter, input.search, grace)
+
+  const { where, orderBy } = membershipsClause(input, grace)
 
   const [total] = await db.select({ count: sql<number>`count(*)` })
     .from(schema.memberships)
@@ -58,7 +54,7 @@ export default defineEventHandler(async (event) => {
     .from(schema.memberships)
     .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
     .where(where)
-    .orderBy(desc(schema.memberships.expiresOn))
+    .orderBy(...orderBy)
     .limit(input.pageSize)
     .offset(offsetFor(input.page, input.pageSize))
 
