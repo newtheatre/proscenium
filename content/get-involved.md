@@ -2,6 +2,8 @@
 title: Get involved
 description: How to join the Nottingham New Theatre and what there is to do.
 placeholder: true
+banner: /images/banners/get-involved.webp
+bannerAlt: A performer lit in red, green and blue on the New Theatre stage
 ---
 
 This page is a placeholder. The headings below mark out what belongs on it; none of the prose

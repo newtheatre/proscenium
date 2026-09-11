@@ -12,6 +12,10 @@ export default defineContentConfig({
         // Set while the committee has not yet supplied the real copy (D-103). The page renders
         // its content-editor's placeholder banner while this is true.
         placeholder: z.boolean().default(false),
+        // A path under public/ drawn behind the page's title, scrimmed (K-126). A page without
+        // one gets the plain hero.
+        banner: z.string().optional(),
+        bannerAlt: z.string().optional(),
       }),
     }),
     // Operator documentation, one page per module (J-109). Edited by editing the file and

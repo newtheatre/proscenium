@@ -2,6 +2,8 @@
 title: About us
 description: Who the Nottingham New Theatre is, and where to find us.
 placeholder: true
+banner: /images/banners/about.webp
+bannerAlt: A cast on stage at the Nottingham New Theatre
 ---
 
 This page is a placeholder. The headings below mark out what belongs on it; none of the prose
