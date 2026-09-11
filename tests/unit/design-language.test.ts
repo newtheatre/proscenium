@@ -98,3 +98,20 @@ describe('colour is never the only thing saying it (K-101)', () => {
     expect(offenders).toEqual([])
   })
 })
+
+// #915: a raw type="time" hands the control to the OS picker, with none of the theme, the
+// twenty-four-hour cycle or the focus ring TimeField gives every other time in the system.
+// Scoped to box office for now: rooms/book.vue and its manage screens carry the same defect
+// and are another stream's files (#915 tracks them too).
+describe('a time is always the shared TimeField (#915)', () => {
+  test('no UInput in box office takes type="time"', async () => {
+    const offenders: string[] = []
+    for (const file of (await appFiles()).filter(path => path.startsWith('app/components/box-office/') || path.startsWith('app/pages/box-office/'))) {
+      const source = await Bun.file(file).text()
+      for (const input of source.matchAll(/<UInput\b[^>]*?\btype\s*=\s*"time"[^>]*?\/?>/g)) {
+        offenders.push(`${file}  ${input[0].trim()}`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})
