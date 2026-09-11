@@ -21,6 +21,7 @@ export const ROBOTS_DISALLOW = [
   '/docs',
   '/magic',
   '/money',
+  '/my',
   '/passes',
   '/people',
   '/qr',

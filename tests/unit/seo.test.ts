@@ -10,7 +10,7 @@ import {
   posterUrl,
   siteIndexable,
 } from '#shared/utils/seo'
-import { CONSOLE_HOME, CONSOLE_NAV, MEMBER_NAV, PUBLIC_NAV, SHELL_NAV } from '#shared/utils/site-nav'
+import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, MY_NAV, PUBLIC_NAV, SHELL_NAV } from '#shared/utils/site-nav'
 
 // K-125: the crawl list is held against the navigation declaration (0040) with the robots
 // module's own matcher, so a screen cannot be indexed, or hidden, by accident.
@@ -46,7 +46,8 @@ describe('the crawl list and the navigation agree (K-125 criterion 2)', () => {
       CONSOLE_HOME.to,
       ...CONSOLE_NAV.map(group => group.prefix),
       ...CONSOLE_NAV.flatMap(group => group.items.map(item => item.to)),
-      ...MEMBER_NAV.map(entry => entry.to),
+      ...MY_NAV.map(entry => entry.to),
+      ...ACCOUNT_NAV.map(entry => entry.to),
       ...SHELL_NAV.map(entry => entry.to),
     ]
     expect(closed.filter(path => isCrawlable(path))).toEqual([])

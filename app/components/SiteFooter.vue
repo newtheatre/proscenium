@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MEMBER_NAV, PUBLIC_NAV } from '#shared/utils/site-nav'
+import { ACCOUNT_NAV, MY_NAV, PUBLIC_NAV } from '#shared/utils/site-nav'
 import type { NavEntry } from '#shared/utils/site-nav'
 
 // Stage black in both colour modes, done by marking the subtree rather than overriding slot
@@ -13,7 +13,8 @@ function href(entry: NavEntry): string {
 }
 
 const columns = computed(() => [
-  { label: 'My theatre', links: MEMBER_NAV, public: false },
+  { label: 'My theatre', links: MY_NAV, public: false },
+  { label: 'Your account', links: ACCOUNT_NAV, public: false },
   { label: 'The theatre', links: PUBLIC_NAV, public: true },
 ].filter(column => column.links.length > 0))
 </script>

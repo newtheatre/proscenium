@@ -64,13 +64,12 @@ useSeoMeta({ title: 'Notifications' })
 </script>
 
 <template>
-  <UContainer class="max-w-3xl py-16">
-    <UPageHeader
-      title="Notifications"
-      description="Choose what we tell you about, by topic rather than by which part of the theatre sends it. Tickets, receipts, security emails and safety notices always arrive: those answer something you just did, and no preference here silences one."
-    />
-
-    <UPageCard class="mt-8">
+  <AccountSettings
+    data-test="account-notifications-page"
+    title="Notifications"
+    description="Choose what we tell you about, by topic rather than by which part of the theatre sends it. Tickets, receipts, security emails and safety notices always arrive: those answer something you just did, and no preference here silences one."
+  >
+    <UPageCard>
       <div
         v-if="loading"
         class="flex items-center gap-3 text-muted"
@@ -144,7 +143,7 @@ useSeoMeta({ title: 'Notifications' })
     </UPageCard>
 
     <UPageCard
-      class="mt-8"
+      class="mt-6"
       title="Recent messages"
       description="Everything the theatre sent you that a preference could have silenced lands here as well, so switching email off never loses a message."
       data-test="inbox"
@@ -192,5 +191,5 @@ useSeoMeta({ title: 'Notifications' })
         </li>
       </ul>
     </UPageCard>
-  </UContainer>
+  </AccountSettings>
 </template>
