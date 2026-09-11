@@ -119,6 +119,8 @@ interface PriceRow {
   showActive: number | null
   performancePrice: number | null
   performanceActive: number | null
+  // MEMBER or null (D-119), carried so the public page can say a price needs one (A-129).
+  restrictedTo: string | null
 }
 
 // Archived types and every flagged one are excluded in SQL as well as in the projection, so an
@@ -133,7 +135,8 @@ export function listedPricesQuery(scope: SQL, at: number): SQL {
            so.price AS showPrice,
            so.active AS showActive,
            po.price AS performancePrice,
-           po.active AS performanceActive
+           po.active AS performanceActive,
+           t.restricted_to AS restrictedTo
     FROM performances p
     JOIN shows s ON s.id = p.show_id
     JOIN ticket_types t ON t.archived = 0 AND t.access_kind IS NULL AND t.kind = 'SINGLE'
@@ -148,6 +151,7 @@ export interface PublicPrice {
   name: string
   description: string | null
   price: number
+  restrictedTo: string | null
 }
 
 export interface ListedPerformance extends PublicPerformance {
@@ -212,7 +216,7 @@ function assemble(
     )
     if (!resolved.active) continue
     const held = pricesFor.get(row.performanceId) ?? []
-    held.push({ name: row.name, description: row.description, price: resolved.price })
+    held.push({ name: row.name, description: row.description, price: resolved.price, restrictedTo: row.restrictedTo })
     pricesFor.set(row.performanceId, held)
   }
 

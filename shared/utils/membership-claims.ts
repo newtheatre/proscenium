@@ -1,10 +1,12 @@
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { constraintRefusal } from './constraint-refusal'
-import { daysAfter, isCurrent, isInGrace, londonDayField, londonDay } from './membership'
+import { londonDayField, londonDay } from './membership'
 import type { AuditRow } from './audit'
-import type { Term } from './membership'
 import type { SQL } from 'drizzle-orm'
+
+// membershipState and its MembershipState now live in membership.ts, which the viewer's ability
+// resolvers read too (A-129); import from there rather than here.
 
 // A member saying what they bought at the SU (A-130). Never a membership on its own: an officer
 // records it or declines it, and SUMS stays the system of record (0031, A-202).
@@ -43,22 +45,6 @@ export const claimDeclineForm = z.object({
 })
 
 export type ClaimDeclineInput = z.output<typeof claimDeclineForm>
-
-export type MembershipState
-  = | { kind: 'none' }
-    | { kind: 'current', until: string }
-    | { kind: 'grace', until: string, expiredOn: string }
-    | { kind: 'lapsed', expiredOn: string }
-
-// What the account page says, from the same sums the register uses (0031).
-export function membershipState(term: Term | null, today: string, graceDays: number): MembershipState {
-  if (!term) return { kind: 'none' }
-  if (isInGrace(term, today, graceDays)) {
-    return { kind: 'grace', until: daysAfter(term.expiresOn, graceDays), expiredOn: term.expiresOn }
-  }
-  if (isCurrent(term, today, graceDays)) return { kind: 'current', until: term.expiresOn }
-  return { kind: 'lapsed', expiredOn: term.expiresOn }
-}
 
 // A trail entry that lands only while the claim is still open, so a decision that lost a race
 // leaves nothing behind (0006).

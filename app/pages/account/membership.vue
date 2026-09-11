@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { formatLondon, startOfLondonDay } from '#shared/utils/london'
 import { MEMBERSHIP_TERMS, londonDay } from '#shared/utils/membership'
+import type { MembershipState } from '#shared/utils/membership'
 import { membershipClaimForm } from '#shared/utils/membership-claims'
-import type { MembershipClaimInput, MembershipState } from '#shared/utils/membership-claims'
+import type { MembershipClaimInput } from '#shared/utils/membership-claims'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in' })

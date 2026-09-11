@@ -1,10 +1,16 @@
+import { londonDay, membershipState } from '#shared/utils/membership'
+
 // Who the caller is and what they hold, re-read from the account rather than from the cookie
 // (0007, 0009). The permissions are what the chrome filters itself by; guards refuse regardless.
 export default defineEventHandler(async (event) => {
   const account = await currentAccount(event)
   if (!account) return { signedIn: false as const }
 
-  const grants = await liveGrants(account.id)
+  const [grants, term, graceDays] = await Promise.all([
+    liveGrants(account.id),
+    longestTerm(account.id),
+    configValue(event, 'MEMBERSHIP_GRACE_DAYS'),
+  ])
   return {
     signedIn: true as const,
     user: { id: account.id, name: account.name, email: account.email, verified: account.verified },
@@ -14,5 +20,6 @@ export default defineEventHandler(async (event) => {
     onShiftTonight: false,
     leadsDepartment: (await liveLeads(account.id)).length > 0,
     isTrainer: (await trainerStandingOf(account.id, londonToday())).trainer,
+    membershipState: membershipState(term, londonDay(new Date()), graceDays),
   }
 })

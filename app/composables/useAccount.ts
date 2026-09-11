@@ -1,3 +1,4 @@
+import type { MembershipState } from '#shared/utils/membership'
 import type { Permission } from '#shared/utils/roles'
 
 export interface AccountSnapshot {
@@ -9,7 +10,10 @@ export interface AccountSnapshot {
   onShiftTonight: boolean
   leadsDepartment: boolean
   isTrainer: boolean
+  membershipState: MembershipState
 }
+
+const noMembership: MembershipState = { kind: 'none' }
 
 // The account row is the source of truth, not the sealed cookie (0007), so this reads the route
 // that re-reads it rather than useUserSession(), which would read the cookie.
@@ -20,6 +24,7 @@ export function useAccount(): { account: Ref<AccountSnapshot>, refresh: () => Pr
     onShiftTonight: false,
     leadsDepartment: false,
     isTrainer: false,
+    membershipState: noMembership,
   }))
   // Plain $fetch sends none of the incoming request's headers while rendering, so every
   // server-side read would report nobody signed in.
@@ -27,7 +32,14 @@ export function useAccount(): { account: Ref<AccountSnapshot>, refresh: () => Pr
 
   async function refresh(): Promise<void> {
     const answer = await request('/api/auth/session')
-    account.value = { permissions: [], onShiftTonight: false, leadsDepartment: false, isTrainer: false, ...answer }
+    account.value = {
+      permissions: [],
+      onShiftTonight: false,
+      leadsDepartment: false,
+      isTrainer: false,
+      membershipState: noMembership,
+      ...answer,
+    }
   }
 
   // useState and not useAsyncData: async data is cleared when the component that asked for it

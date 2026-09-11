@@ -226,6 +226,10 @@ function instantOf(day: string, clock: string): string {
 const capacity = computed(() => room.value?.capacity ?? undefined)
 const tooMany = computed(() => overCapacity(room.value?.capacity ?? null, state.attendees ?? null))
 
+// The server refuses NO_MEMBERSHIP outright (0031), so the form's job is to say where to put it
+// right rather than to invent its own wording (A-129).
+const needsMembership = computed(() => failures.value.some(failure => failure.reason === 'NO_MEMBERSHIP'))
+
 // Said before submitting, not after: a room somebody else books, or one that always asks, is
 // worth knowing about while the form is still being filled in (C-105 criterion 5).
 const warnsUpFront = computed(() => {
@@ -573,6 +577,16 @@ useSeoMeta({ title: 'Book a room' })
             >
               Ask for it anyway, and somebody will decide. The slot is held while they do.
             </p>
+            <UButton
+              v-if="needsMembership"
+              class="mt-2"
+              size="sm"
+              variant="subtle"
+              to="/account/membership"
+              data-test="booking-membership-link"
+            >
+              Sort out your membership
+            </UButton>
           </template>
         </UAlert>
 

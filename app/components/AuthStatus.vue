@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { can } from '#shared/utils/abilities'
+import { formatLondon, startOfLondonDay } from '#shared/utils/london'
 import { MEMBER_NAV, SHELL_NAV } from '#shared/utils/site-nav'
 import type { NavEntry } from '#shared/utils/site-nav'
 import type { DropdownMenuItem } from '@nuxt/ui'
@@ -22,8 +23,29 @@ async function signOut(): Promise<void> {
 
 const entry = (item: NavEntry): DropdownMenuItem => ({ label: item.label, icon: item.icon, to: item.to })
 
+const sayDay = (day: string): string => formatLondon(startOfLondonDay(day), { day: 'numeric', month: 'short', year: 'numeric' })
+
+// The one place membership state is worth a line in the chrome (A-129 criterion 4): a lapsed or
+// unrecorded membership links to where it is put right, current and grace are read-only.
+const membershipItem = computed<DropdownMenuItem | null>(() => {
+  const state = account.value.membershipState
+  if (state.kind === 'current') {
+    return { label: `Member until ${sayDay(state.until)}`, icon: 'i-lucide-badge-check', type: 'label' as const }
+  }
+  if (state.kind === 'grace') {
+    return { label: `In grace until ${sayDay(state.until)}`, icon: 'i-lucide-clock-alert', type: 'label' as const }
+  }
+  if (state.kind === 'lapsed') {
+    return { label: 'Membership lapsed', icon: 'i-lucide-triangle-alert', to: '/account/membership' }
+  }
+  return { label: 'No membership on record', icon: 'i-lucide-circle-help', to: '/account/membership' }
+})
+
 const items = computed<DropdownMenuItem[][]>(() => [
-  [{ label: account.value.user?.name ?? '', type: 'label' as const }],
+  [
+    { label: account.value.user?.name ?? '', type: 'label' as const },
+    ...(membershipItem.value ? [membershipItem.value] : []),
+  ],
   MEMBER_NAV.map(entry),
   [...shells.value.map(entry), { label: 'Back to the site', icon: 'i-lucide-home', to: '/' }],
   [{

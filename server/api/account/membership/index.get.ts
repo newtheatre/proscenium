@@ -1,5 +1,4 @@
-import { londonDay } from '#shared/utils/membership'
-import { membershipState } from '#shared/utils/membership-claims'
+import { londonDay, membershipState } from '#shared/utils/membership'
 
 // Your membership as the register sees it, and your newest claim (A-130 criterion 4).
 export default defineEventHandler(async (event) => {

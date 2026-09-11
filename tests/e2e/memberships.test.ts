@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { endOfTerm, londonDay } from '#shared/utils/membership'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
@@ -206,6 +206,80 @@ describe.skipIf(skip !== null)('reminding a membership that is running out (A-11
     expect((await fetch(`${app.baseURL}/_nitro/tasks/daily:sweeps`, { method: 'POST' })).status).toBe(200)
     expect(noticed(soonId)).toBe(first)
   })
+})
+
+describe.skipIf(skip !== null)('the viewer carries membership as a fact (A-129)', () => {
+  async function makeRoom(): Promise<string> {
+    const answered = await send('POST', '/api/admin/rooms', { name: `Room ${crypto.randomUUID().slice(0, 8)}` }, cookie)
+    return (await answered.json() as { id: string }).id
+  }
+
+  // Three weeks out clears notice and short-notice checks, so NO_MEMBERSHIP is the one failure.
+  function threeWeeksMonday(): string {
+    const at = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000)
+    while (at.getUTCDay() !== 1) at.setUTCDate(at.getUTCDate() + 1)
+    return londonDay(at)
+  }
+
+  test('every member screen renders for a lapsed member, who is refused only at the write path', async () => {
+    const lapsed = await registerMember(app, 'no-membership', password)
+
+    // Navigation is not filtered by membership, and no membership middleware exists (0040).
+    for (const path of ['/account/membership', '/account/profile', '/rooms', '/rooms/mine', '/rooms/book', '/rooms/external', '/rota', '/training', '/training/sessions']) {
+      const answer = await fetch(`${app.baseURL}${path}`, { headers: { cookie: lapsed.cookie } })
+      expect(answer.status).toBe(200)
+    }
+  })
+
+  test('booking a room is refused with the policy\'s own words, and the failure links to /account/membership', async () => {
+    const lapsed = await registerMember(app, 'no-membership-book', password)
+    const room = await makeRoom()
+    const day = threeWeeksMonday()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await view.evaluate(`document.cookie = ${JSON.stringify(lapsed.cookie)}`)
+      await visit(view, `${app.baseURL}/rooms/book?room=${room}&day=${day}&at=19:00&purpose=REHEARSAL`, '[data-test="booking-form"]')
+      await fill(view, '[data-test="booking-title"]', 'Read-through')
+      await click(view, '[data-test="booking-submit"]')
+
+      await waitFor(view, `document.querySelector('[data-test="booking-membership-link"]')`, 30_000)
+      expect(await textOf(view, '[data-test="booking-failures"]'))
+        .toContain('Booking a room needs a current membership. Renew it at the Students\' Union.')
+      const href = await view.evaluate<string>(
+        `document.querySelector('[data-test="booking-membership-link"]').getAttribute('href')`,
+      )
+      expect(href).toBe('/account/membership')
+    }
+    finally {
+      view.close()
+    }
+  }, 180_000)
+
+  test('the account menu says a membership has lapsed, and links to put it right', async () => {
+    const none = await registerMember(app, 'menu-none', password)
+    const { id } = await (await grant(none.id)).json() as { id: string }
+    write('UPDATE memberships SET starts_on = ?, expires_on = ? WHERE id = ?',
+      londonDay(new Date(Date.now() - 800 * 24 * 60 * 60 * 1000)),
+      londonDay(new Date(Date.now() - ((await register()).graceDays + 30) * 24 * 60 * 60 * 1000)),
+      id)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await view.evaluate(`document.cookie = ${JSON.stringify(none.cookie)}`)
+      await visit(view, `${app.baseURL}/`, '[data-test="account-menu"]')
+      await click(view, '[data-test="account-menu"]')
+      await waitFor(view, `document.body.innerText.includes('Membership lapsed')`)
+
+      const href = await view.evaluate<string>(
+        `document.querySelector('a[href="/account/membership"]')?.getAttribute('href') ?? ''`,
+      )
+      expect(href).toBe('/account/membership')
+    }
+    finally {
+      view.close()
+    }
+  }, 180_000)
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
