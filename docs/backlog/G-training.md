@@ -2,7 +2,7 @@
 
 Training was the old estate's best module, and this backlog carries its judgement wholesale: records are append-only with validity derived at read time, marking a register is the single act that awards records for taught sessions, and clockwork notices expiry but never enacts anything. The unified system removes the API seam between records and the surfaces they gate (shifts, the till, kit loans), so a gate reads live competence with nothing to fail open. New in this system are delivery modes: in-person, self-directed online, or hybrid; mode and external material links are MVP schema, while quiz assessment, hybrid completion and the question channel are V2, and a safety-critical module can never be fully self-directed.
 
-Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 11 V2 stories (G-201 to G-211), 2 Later stubs (G-301, G-302), 3 resolved (G-124 and G-126 withdrawn, G-127 won't build). 42 total.
+Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 12 V2 stories (G-201 to G-212), 2 Later stubs (G-301, G-302), 3 resolved (G-124 and G-126 withdrawn, G-127 won't build). 43 total.
 
 ## Open questions
 
@@ -595,6 +595,20 @@ Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 11 V2 stories (G-2
   5. While a member is in practice mode, the operational surface for that tool is locked for them, so a rehearsal cannot be mistaken for a real transaction.
   6. Entering practice mode is not an audited privileged act, because it grants nothing: it is audited only where it locks an operational surface.
 - Source: 0042; committee direction, 2 September 2026
+
+## G-212: Training sessions book the room estate
+
+- Role: Training officer
+- Phase: V2
+- Story: As a training officer, I want a session's room to be a real booking against the room estate so that a session cannot be scheduled against a room another booking already holds, and so it shows on the calendar and in utilisation like any other use of the space.
+- Depends on: G-105, C-105
+- Acceptance criteria:
+  1. Scheduling a session against a room from the estate books it through the same conflict check every other booking goes through (C-107); a clash is refused with the same wording a member booking sees.
+  2. A session's booking appears on the room calendar (C-101) and counts in utilisation reporting (C-117), attributed to training rather than left invisible to both.
+  3. A room not in the estate (an external or unmanaged space) remains free text, exactly as it works today; this story only changes what happens when the officer picks a room the estate knows about.
+  4. Cancelling or moving a session releases or moves its booking; the booking's own lifecycle stays subordinate to the session's, never edited independently on the calendar.
+  5. Existing sessions with a free-text place are unaffected; migrating them into real bookings is not part of this story.
+- Source: raised in the 11 September 2026 manual audit as issue #938; committee direction, 11 September 2026 (build as V2).
 
 ## G-301: Certification auto-suspension (stub)
 

@@ -382,9 +382,8 @@ useSeoMeta({ title: 'Book a room' })
             name="from"
             required
           >
-            <UInput
+            <TimeField
               v-model="state.from"
-              type="time"
               class="w-full"
               data-test="booking-from"
             />
@@ -395,9 +394,8 @@ useSeoMeta({ title: 'Book a room' })
             name="to"
             required
           >
-            <UInput
+            <TimeField
               v-model="state.to"
-              type="time"
               class="w-full"
               data-test="booking-to"
             />
