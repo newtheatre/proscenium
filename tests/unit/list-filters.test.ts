@@ -12,11 +12,16 @@ import {
   saysCondition,
 } from '#shared/utils/list-filters'
 import { accountsList } from '#shared/utils/accounts-list'
+import { barCategoriesList } from '#shared/utils/bar-categories-list'
+import { barItemsList } from '#shared/utils/bar-items-list'
+import { barMovementsList } from '#shared/utils/bar-movements-list'
+import { barProductsList } from '#shared/utils/bar-products-list'
 import { blackoutsList } from '#shared/utils/blackouts-list'
 import { externalSpacesList } from '#shared/utils/external-spaces-list'
 import { roomsList } from '#shared/utils/rooms-list'
 import { roomsQueueList } from '#shared/utils/rooms-queue-list'
 import { showsList } from '#shared/utils/shows-list'
+import { stocktakesList } from '#shared/utils/stocktakes-list'
 import { utilisationList } from '#shared/utils/utilisation-list'
 import type { FilterField, ListSpec } from '#shared/utils/list-filters'
 
@@ -45,6 +50,12 @@ const spec: ListSpec = {
 }
 
 const parse = (query: Record<string, string>) => filterQuerySchema(spec).safeParse(query)
+
+// Every declaration migrated so far, shared by the cross-cutting checks below (K-129 criterion 6).
+const MIGRATED = [
+  accountsList, showsList, roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList,
+  barCategoriesList, barProductsList, barItemsList, barMovementsList, stocktakesList,
+]
 
 describe('the schema is derived from the declaration (criterion 1)', () => {
   test('an empty query is the first page, the default sort and no conditions', () => {
@@ -155,7 +166,7 @@ describe('an "is any of" list is capped so no statement grows with the data (cri
     // Search binds one per column at most three, paging binds two, and each condition binds up
     // to its cap: the bound is a property of the declaration, never of the rows.
     expect(maxBoundParameters(spec)).toBe(2 + 2 + DEFAULT_ANY_CAP + 2 + 2 + 1 + 3)
-    for (const declared of [accountsList, showsList, roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList]) {
+    for (const declared of MIGRATED) {
       expect(maxBoundParameters(declared)).toBeLessThan(MAX_BOUND_PARAMETERS)
     }
   })
@@ -215,8 +226,6 @@ describe('a chip says what it filters in words (criterion 3)', () => {
     expect(saysCondition(worded, { key: 'live', operator: 'is', values: ['false'] })).toBe('Retired')
   })
 })
-
-const MIGRATED = [accountsList, showsList, roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList]
 
 describe('the migrated declarations (criteria 1 and 6)', () => {
   test('accounts filters on a role, which is not a column, and shows on a season, which is', () => {

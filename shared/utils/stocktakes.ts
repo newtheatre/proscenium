@@ -8,6 +8,10 @@ import type { StockUnit } from '#shared/utils/bar'
 export const STOCKTAKE_STATUSES = ['OPEN', 'APPLIED'] as const
 export type StocktakeStatus = (typeof STOCKTAKE_STATUSES)[number]
 
+export function saysStocktakeStatus(status: StocktakeStatus): string {
+  return status === 'OPEN' ? 'Open' : 'Applied'
+}
+
 export interface Stocktake {
   id: string
   status: StocktakeStatus

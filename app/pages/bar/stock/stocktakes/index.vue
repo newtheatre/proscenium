@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { saysStocktakeStatus } from '#shared/utils/stocktakes'
+import { stocktakesList } from '#shared/utils/stocktakes-list'
 import type { Stocktake } from '#shared/utils/stocktakes'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -12,31 +14,24 @@ const request = useRequestFetch()
 const toast = useToast()
 const failure = ref<string | null>(null)
 const opening = ref(false)
-const search = ref('')
-const page = ref(1)
 
 interface Listing<T> { items: T[], total: number, pageSize: number, pages: number }
 const noStocktakes = (): Listing<Stocktake> => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
+// Search, filters, sort and page live in the URL (K-129): a search now spans every stocktake,
+// not only the page already on screen.
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(stocktakesList)
+
 const { data, status, error } = await useAsyncData(
   'bar-stocktakes',
-  () => request<Listing<Stocktake>>('/api/admin/bar/stocktakes', { query: { page: page.value } }),
-  { watch: [page], default: noStocktakes },
+  () => request<Listing<Stocktake>>('/api/admin/bar/stocktakes', { query: query.value }),
+  { watch: [query], default: noStocktakes },
 )
 
 const when = (at: number): string =>
   formatLondon(new Date(at * 1000), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
-const label = (item: Stocktake): string => (item.status === 'OPEN' ? 'Open' : 'Applied')
-
-// Filters this page only, the same reach a page-at-a-time list has everywhere else: a search
-// spanning every stocktake would need the server's own predicate, which nothing here asks for yet.
-const filtered = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  if (!term) return data.value.items
-  return data.value.items.filter(item =>
-    label(item).toLowerCase().includes(term) || when(item.openedAt).toLowerCase().includes(term))
-})
+const label = (item: Stocktake): string => saysStocktakeStatus(item.status)
 
 async function openStocktake(): Promise<void> {
   opening.value = true
@@ -111,10 +106,20 @@ const columns: TableColumn<Stocktake>[] = [
     <AdminToolbar
       v-model:search="search"
       placeholder="Open or applied"
-      :filterable="false"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''"
+      @clear="clear"
     >
+      <template #filters>
+        <ConsoleFilters
+          :spec="stocktakesList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
+      </template>
+
       <template #actions>
         <UButton
           data-test="open-stocktake"
@@ -128,14 +133,14 @@ const columns: TableColumn<Stocktake>[] = [
     </AdminToolbar>
 
     <UTable
-      :data="filtered"
+      :data="data.items"
       :columns="columns"
       :loading="status === 'pending'"
       data-test="bar-stocktakes-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          No stocktakes yet.
+          {{ filtered ? 'No stocktake matches that.' : 'No stocktakes yet.' }}
         </p>
       </template>
     </UTable>
