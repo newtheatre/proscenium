@@ -144,6 +144,14 @@ better than any gradient. Two rules:
    world of colour. The house frames it and never restyles, tints, or overlays it. The frame is
    ours; what is inside it is theirs.
 
+The house photographs live under `public/images/`, the logos under `public/images/logos/`, and
+`PhotoHero` is the one component that draws a banner, so rule 1 is applied in one place. A banner
+is WebP or AVIF, at most 1920 pixels wide and under 300 KB; the camera originals stay out of the
+repository. `tests/unit/static-assets.test.ts` holds the budget and refuses a reference to a picture
+that is not there (K-126). The default Open Graph image, `public/og-default.png`, is the what's-on
+banner scrimmed with the white logo over it, so a shared link looks like the house even for a page
+with no picture of its own.
+
 ## What belongs here
 
 A colour, a font or a token change belongs in `theme.css`, and a component variant belongs in
