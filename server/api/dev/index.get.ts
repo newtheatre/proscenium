@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
-import { PERSONAS } from '#shared/utils/personas'
+import { PERSONAS, PERSONA_TOTP_SECRET } from '#shared/utils/personas'
+import { enrolmentUri } from '#shared/utils/totp'
 
 // What a developer needs to know before doing anything: who is signed in, what that resolves to,
 // who they could be instead, and what the system has tried to send (K-124).
@@ -31,5 +32,7 @@ export default defineEventHandler(async (event) => {
       account: seeded.get(persona.email) ?? null,
     })),
     mailbox: await mailbox(),
+    // One secret, shared by every seeded 'full' persona: enrol it once and it survives a reseed.
+    totp: { secret: PERSONA_TOTP_SECRET, uri: enrolmentUri(PERSONA_TOTP_SECRET, 'any seeded persona') },
   }
 })

@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 // The writer's own constant, so the tools cannot read a path the centre stopped writing to.
 import { MAILBOX } from './mailbox'
-import { PERSONAS, PERSONA_PASSWORD } from '#shared/utils/personas'
+import { PERSONAS, PERSONA_PASSWORD, PERSONA_TOTP_SECRET } from '#shared/utils/personas'
 
 // Development-only helpers (K-124). Every caller is guarded, and nuxt.config keeps the routes out
 // of a production build entirely rather than trusting a guard to be remembered.
@@ -93,6 +93,15 @@ export async function seedPersonas(): Promise<{ made: number, held: number }> {
         userId: id,
         role: persona.role,
         expiresAt: defaultRoleExpiry(new Date()),
+      }).onConflictDoNothing()
+    }
+    // Confirmed outright: a privileged role needs a second factor (A-112), and re-enrolling one
+    // by hand every reseed is exactly what this file exists to save (K-124 criterion 1).
+    if (persona.shape === 'full') {
+      await db.insert(schema.totpSecrets).values({
+        userId: id,
+        secret: PERSONA_TOTP_SECRET,
+        confirmedAt: Math.floor(Date.now() / 1000),
       }).onConflictDoNothing()
     }
     if (persona.shape === 'tombstone') await eraseAccount(id, null)
