@@ -18,7 +18,7 @@ withDefaults(defineProps<{
   // A page with nothing behind the button says so rather than offering an empty panel.
   filterable?: boolean
   // A period report has nothing a search box would narrow, so it omits the input rather than
-  // rendering one that filters nothing (#908).
+  // rendering one that filters nothing (issue 908).
   searchable?: boolean
 }>(), {
   placeholder: 'Search',
