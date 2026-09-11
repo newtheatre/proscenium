@@ -113,7 +113,9 @@ describe('a default Open Graph image exists (K-126 criterion 3)', () => {
   })
 
   test('the app declares it as the image for a shared link', async () => {
-    expect(await Bun.file('app/app.vue').text()).toContain('ogImage: \'/og-default.png\'')
+    const source = await Bun.file('app/app.vue').text()
+    expect(source).toContain('DEFAULT_OG_IMAGE')
+    expect(source).toContain('ogImage: DEFAULT_OG_IMAGE')
   })
 })
 
