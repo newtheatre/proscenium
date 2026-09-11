@@ -41,6 +41,20 @@ const props = withDefaults(defineProps<{
   searchParam: 'search',
 })
 
+// Held separately so the chosen person still reads as a name after the search that found them has
+// been cleared.
+const chosen = ref<Item | null>(null)
+
+// A caller that already knows who was chosen, such as fulfilling a request by name, shows them
+// without a round trip through search (#940 criterion 3). Exposed before the await below: after
+// one, defineExpose no longer attaches to this component's instance.
+function preset(person: { id: string, name: string, email: string }): void {
+  chosen.value = { label: person.name, value: person.id, email: person.email, hint: null, erased: false }
+  model.value = person.id
+}
+
+defineExpose({ preset })
+
 const searchTerm = ref('')
 const settled = useDebounced(searchTerm, 250)
 
@@ -59,10 +73,6 @@ const { data, status } = await useAsyncData(
       }),
   { watch: [settled], default: (): Listing => ({ items: [] }), getCachedData: () => undefined },
 )
-
-// Held separately so the chosen person still reads as a name after the search that found them has
-// been cleared.
-const chosen = ref<Item | null>(null)
 
 const items = computed<Item[]>(() => (data.value?.items ?? []).map(person => ({
   label: person.name,
@@ -87,15 +97,6 @@ function choose(item: Item | undefined): void {
 watch(model, (value) => {
   if (!value) chosen.value = null
 })
-
-// A caller that already knows who was chosen, such as fulfilling a request by name, shows them
-// without a round trip through search (#940 criterion 3).
-function preset(person: { id: string, name: string, email: string }): void {
-  chosen.value = { label: person.name, value: person.id, email: person.email, hint: null, erased: false }
-  model.value = person.id
-}
-
-defineExpose({ preset })
 </script>
 
 <template>

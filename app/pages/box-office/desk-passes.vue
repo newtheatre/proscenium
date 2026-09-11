@@ -181,16 +181,16 @@ async function issue(): Promise<void> {
           </p>
           <ul class="space-y-1 text-sm">
             <li
-              v-for="request in requests"
-              :key="request.id"
+              v-for="pending in requests"
+              :key="pending.id"
               class="flex items-center justify-between"
             >
-              <span>{{ request.name }}</span>
+              <span>{{ pending.name }}</span>
               <UButton
                 size="xs"
                 variant="subtle"
-                :data-test="`desk-pass-fulfil-${request.id}`"
-                @click="fulfilRequest(request)"
+                :data-test="`desk-pass-fulfil-${pending.id}`"
+                @click="fulfilRequest(pending)"
               >
                 Choose
               </UButton>
