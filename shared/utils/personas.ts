@@ -12,6 +12,10 @@ export interface Persona {
 
 export const PERSONA_PASSWORD = 'development-only-password'
 
+// Shared by every 'full' persona, so a developer's authenticator app keeps working across a
+// reseed instead of enrolling again each time (K-124 criterion 1).
+export const PERSONA_TOTP_SECRET = 'CH6VSTK2YBU4ANNZA3ER25KVXHJAOAJ5'
+
 export const PERSONAS: Persona[] = [
   // Module A: identity
 
