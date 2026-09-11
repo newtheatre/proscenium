@@ -34,8 +34,8 @@ const NOW = 1_780_000_000
 
 function addTicketType(database: TestDatabase, id: string, name: string, price: number, over: Record<string, unknown> = {}): void {
   database.batch([[
-    'INSERT INTO ticket_types (id, name, price, kind, access_kind, archived, active_by_default) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    id, name, price, over.kind ?? 'SINGLE', over.accessKind ?? null, over.archived ?? 0, over.activeByDefault ?? 1,
+    'INSERT INTO ticket_types (id, name, price, kind, access_kind, archived, active_by_default, restricted_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    id, name, price, over.kind ?? 'SINGLE', over.accessKind ?? null, over.archived ?? 0, over.activeByDefault ?? 1, over.restrictedTo ?? null,
   ]])
 }
 
@@ -163,6 +163,22 @@ describe('the public payload is column allow-listed (D-101 criterion 3)', () => 
       const at = seeded.startsAt - 3600
       const prices = read<{ name: string }>(database, listedPricesQuery(listedShowScope(at, 25, 0), at))
       expect(prices.map(price => price.name)).toEqual(['Standard'])
+    })
+  })
+
+  // A-129 criterion 5: the show page needs to know which price is member-only to say so.
+  test('a member-restricted price carries its restriction to the public row', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      addTicketType(database, 'tt-standard', 'Standard', 900)
+      addTicketType(database, 'tt-member', 'Member', 500, { restrictedTo: 'MEMBER' })
+
+      const at = seeded.startsAt - 3600
+      const prices = read<{ name: string, restrictedTo: string | null }>(
+        database, listedPricesQuery(listedShowScope(at, 25, 0), at),
+      )
+      expect(prices.find(price => price.name === 'Standard')?.restrictedTo).toBeNull()
+      expect(prices.find(price => price.name === 'Member')?.restrictedTo).toBe('MEMBER')
     })
   })
 

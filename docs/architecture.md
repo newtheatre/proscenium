@@ -216,15 +216,22 @@ becomes interactive.
      the `requireTrainer` guard: somebody is a trainer if and only if they currently hold a
      record on a module marked trainer-granting, and expiring counts as held. It is never a role
      and never a flag, so revoking the certification is the whole of taking the standing away
-     (0037, G-111). Show-night authority resolves in `server/utils/night-authority.ts` behind
-     `requireNightAuthority`, and has a section of its own below.
+     (0037, G-111). Membership resolves the same way: `hasCurrentMembership`
+     (`server/utils/bookings.ts`) reads the longest-running term against today and the grace
+     window, never a grant (0009, 0031). Show-night authority resolves in
+     `server/utils/night-authority.ts` behind `requireNightAuthority`, and has a section of its
+     own below.
   3. **Ownership**: the row's own user id.
 - Guards are server-side and fail closed; route middleware is rendering convenience only.
 - `nuxt-authorization` abilities (`shared/utils/abilities.ts`) are named views over the same
   permission map, used to decide what the chrome shows. Two resolvers hand an ability its viewer:
   `server/plugins/authorisation.ts` from the account row and its live grants,
   `app/plugins/authorization.ts` from the account snapshot. Neither reads authority from the
-  cookie, and neither replaces `requirePermission`, which also holds the MFA gate (0040).
+  cookie, and neither replaces `requirePermission`, which also holds the MFA gate (0040). The
+  `Viewer` also carries `membershipState` (`current`, `grace`, `lapsed` or `none`, never two
+  booleans), and `member` and `memberOrGrace` read it; navigation is not filtered by either, so a
+  lapsed member sees every member screen and is refused only at the write path it tries
+  (`docs/access-matrix.md`, A-129).
 - MFA (TOTP + passkeys) is enforced at guard level for permission-bearing roles (0008).
 - A passkey is a complete sign-in and no challenge follows it: the authenticator verified the
   person before it would sign, so the credential step and the second step happened at once

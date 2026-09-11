@@ -2,7 +2,7 @@
 import { saysAssessment, saysWarningLevel } from '#shared/utils/content-warnings'
 import { formatLondon } from '#shared/utils/london'
 import { saysLatecomerPolicy } from '#shared/utils/programme'
-import { pounds, saysPrice } from '#shared/utils/ticket-types'
+import { pounds, saysPrice, saysRestriction } from '#shared/utils/ticket-types'
 import { DEFAULT_OG_IMAGE, SITE_ADDRESS } from '#shared/utils/seo'
 import type { PublicContentWarning, WarningAssessment } from '#shared/utils/content-warnings'
 import type { Availability, PublicPerformance, PublicShow } from '#shared/utils/programme'
@@ -10,7 +10,7 @@ import type { Availability, PublicPerformance, PublicShow } from '#shared/utils/
 // Deliberately public: one show, its warnings and the practical details somebody needs before they
 // decide (D-101, D-102). A draft show has no page here at all, which is a 404 and not a thin one.
 
-interface Price { name: string, description: string | null, price: number }
+interface Price { name: string, description: string | null, price: number, restrictedTo: string | null }
 
 interface Listed extends PublicPerformance {
   availability: Availability
@@ -342,7 +342,7 @@ function saysInterval(performance: Listed): string {
           <span
             v-for="(price, index) in performance.prices"
             :key="price.name"
-          >{{ index ? ' · ' : '' }}{{ price.name }} {{ saysPrice(price.price) }}</span>
+          >{{ index ? ' · ' : '' }}{{ price.name }} {{ saysPrice(price.price) }}<template v-if="saysRestriction(price.restrictedTo)"> ({{ saysRestriction(price.restrictedTo) }})</template></span>
         </p>
       </li>
     </ul>
