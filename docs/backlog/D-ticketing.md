@@ -39,7 +39,8 @@ Open questions:
      draft and archived shows return 404 on their public URLs.
   2. Each performance states one of four availability states (available, limited, sold out,
      booking closed) computed server-side; a sold-out performance shows the waiting-list entry
-     point (D-113) instead of a booking button.
+     point (D-113) instead of a booking button. The booking screen answers the same way: an old
+     link to a full house refuses the form up front with that entry point, never at submit.
   3. Listing responses are edge-cacheable and column allow-listed; no internal notes, no cost
      data and no access or companion ticket types appear in the public payload.
   4. Each performance shows its effective prices from the resolved override chain (D-120), dates

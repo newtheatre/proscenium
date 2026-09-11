@@ -1,5 +1,6 @@
+import { db } from '@nuxthub/db'
 import { MAX_ACCESS_TICKETS_PER_PERFORMANCE, isEntitledToAccessTickets } from '#shared/utils/access-profiles'
-import { saleRefusal } from '#shared/utils/programme'
+import { remainingSeats, saleRefusal } from '#shared/utils/programme'
 
 // Deliberately public: what the booking form needs before it asks for a name and an email
 // (D-104). This route, never the cacheable public listing, is where entitlement is read (D-109 criterion 2).
@@ -8,7 +9,16 @@ export default defineEventHandler(async (event) => {
   const performance = await performanceById(id)
   if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
 
-  const refusal = saleRefusal(performance, new Date(), 'CUSTOMER')
+  const saleState = saleRefusal(performance, new Date(), 'CUSTOMER')
+
+  // A full house refuses the form up front rather than at submit, with the same waiting-list
+  // offer the show page already makes for the same performance (D-101 criterion 2, D-113).
+  const [house] = await db.all<{ held: number }>(heldSeatsQuery(id))
+  const soldOut = !saleState && remainingSeats({ capacity: effectiveCapacity(performance), sold: Number(house?.held ?? 0) }) === 0
+  const refusal = saleState ?? (soldOut
+    ? { reason: 'SOLD_OUT' as const, says: 'This performance is sold out. Join the waiting list and we will email you the moment a seat frees up.' }
+    : null)
+
   const account = await currentAccount(event)
   const isMember = account ? await hasCurrentMembership(event, account.id, new Date()) : false
 
@@ -41,7 +51,13 @@ export default defineEventHandler(async (event) => {
     showId: performance.showId,
     show: { slug: performance.showSlug, title: performance.showTitle },
     performance: { startsAt: performance.startsAt, venueName: performance.venueName },
-    refusal: refusal && { reason: refusal.reason, says: refusal.says, closedAt: refusal.closedAt, externalBookingUrl: refusal.externalBookingUrl },
+    refusal: refusal && {
+      reason: refusal.reason,
+      says: refusal.says,
+      closedAt: 'closedAt' in refusal ? refusal.closedAt : undefined,
+      externalBookingUrl: 'externalBookingUrl' in refusal ? refusal.externalBookingUrl : undefined,
+      waitingListUrl: soldOut ? `/waiting-list/${id}` : undefined,
+    },
     cap: await configValue(event, 'PUBLIC_ORDER_SEAT_CAP'),
     ticketTypes: visible,
     accessEntitlement: remaining,
