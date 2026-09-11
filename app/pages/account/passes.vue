@@ -68,94 +68,101 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
 </script>
 
 <template>
-  <div
-    class="space-y-6"
+  <UContainer
+    class="max-w-3xl py-10"
     data-test="account-passes-page"
   >
-    <UCard>
-      <template #header>
-        <h2 class="nnt-headline text-lg">
-          Your passes
-        </h2>
-      </template>
+    <UPageHeader
+      title="Passes"
+      description="Passes you hold, and any request still with an officer."
+    />
 
-      <ul
-        v-if="data.passes.length > 0"
-        class="space-y-2 text-sm"
-      >
-        <li
-          v-for="pass in data.passes"
-          :key="pass.id"
-          class="flex items-center justify-between"
+    <div class="mt-6 space-y-6">
+      <UCard>
+        <template #header>
+          <h2 class="nnt-headline text-lg">
+            Your passes
+          </h2>
+        </template>
+
+        <ul
+          v-if="data.passes.length > 0"
+          class="space-y-2 text-sm"
         >
-          <span>{{ pass.passTypeName }} ({{ pass.priceLabel }}, {{ saysPrice(pass.pricePaid) }}), reference {{ pass.reference }}</span>
-          <UBadge :color="statusColor[pass.status] ?? 'neutral'">
-            {{ pass.status }}
-          </UBadge>
-        </li>
-      </ul>
-      <p
-        v-else
-        class="py-4 text-center text-sm text-muted"
-      >
-        You hold no passes yet.
-      </p>
-    </UCard>
-
-    <UCard v-if="data.requests.length > 0">
-      <template #header>
-        <h2 class="nnt-headline text-lg">
-          Your requests
-        </h2>
-      </template>
-
-      <ul class="space-y-2 text-sm">
-        <li
-          v-for="req in data.requests"
-          :key="req.id"
-          class="flex items-center justify-between"
-        >
-          <span>{{ req.passTypeName }}</span>
-          <UBadge :color="statusColor[req.status] ?? 'neutral'">
-            {{ req.status }}
-          </UBadge>
-        </li>
-      </ul>
-    </UCard>
-
-    <UCard v-if="data.sellable.length > 0">
-      <template #header>
-        <h2 class="nnt-headline text-lg">
-          Request a pass
-        </h2>
-      </template>
-
-      <UAlert
-        v-if="requestFailure"
-        color="error"
-        variant="subtle"
-        :description="requestFailure"
-        class="mb-4"
-      />
-
-      <ul class="space-y-2 text-sm">
-        <li
-          v-for="type in data.sellable"
-          :key="type.id"
-          class="flex items-center justify-between"
-        >
-          <span>{{ type.name }}</span>
-          <UButton
-            size="sm"
-            variant="subtle"
-            :loading="requesting === type.id"
-            :data-test="`account-pass-request-${type.id}`"
-            @click="request(type.id)"
+          <li
+            v-for="pass in data.passes"
+            :key="pass.id"
+            class="flex items-center justify-between"
           >
-            Request
-          </UButton>
-        </li>
-      </ul>
-    </UCard>
-  </div>
+            <span>{{ pass.passTypeName }} ({{ pass.priceLabel }}, {{ saysPrice(pass.pricePaid) }}), reference {{ pass.reference }}</span>
+            <UBadge :color="statusColor[pass.status] ?? 'neutral'">
+              {{ pass.status }}
+            </UBadge>
+          </li>
+        </ul>
+        <p
+          v-else
+          class="py-4 text-center text-sm text-muted"
+        >
+          You hold no passes yet.
+        </p>
+      </UCard>
+
+      <UCard v-if="data.requests.length > 0">
+        <template #header>
+          <h2 class="nnt-headline text-lg">
+            Your requests
+          </h2>
+        </template>
+
+        <ul class="space-y-2 text-sm">
+          <li
+            v-for="req in data.requests"
+            :key="req.id"
+            class="flex items-center justify-between"
+          >
+            <span>{{ req.passTypeName }}</span>
+            <UBadge :color="statusColor[req.status] ?? 'neutral'">
+              {{ req.status }}
+            </UBadge>
+          </li>
+        </ul>
+      </UCard>
+
+      <UCard v-if="data.sellable.length > 0">
+        <template #header>
+          <h2 class="nnt-headline text-lg">
+            Request a pass
+          </h2>
+        </template>
+
+        <UAlert
+          v-if="requestFailure"
+          color="error"
+          variant="subtle"
+          :description="requestFailure"
+          class="mb-4"
+        />
+
+        <ul class="space-y-2 text-sm">
+          <li
+            v-for="type in data.sellable"
+            :key="type.id"
+            class="flex items-center justify-between"
+          >
+            <span>{{ type.name }}</span>
+            <UButton
+              size="sm"
+              variant="subtle"
+              :loading="requesting === type.id"
+              :data-test="`account-pass-request-${type.id}`"
+              @click="request(type.id)"
+            >
+              Request
+            </UButton>
+          </li>
+        </ul>
+      </UCard>
+    </div>
+  </UContainer>
 </template>
