@@ -32,6 +32,7 @@ interface BookingInfo {
   performance: { startsAt: number, venueName: string }
   refusal: { reason: string, says: string, closedAt?: number, externalBookingUrl?: string, waitingListUrl?: string } | null
   cap: number
+  holdReleaseMinutes: number
   ticketTypes: BookableTicketType[]
   accessEntitlement: AccessEntitlement | null
   redeemablePass: RedeemablePass | null
@@ -41,6 +42,16 @@ interface Confirmation {
   reference: string
   totalPence: number
   qrToken: string
+}
+
+interface RunPerformance {
+  id: string
+  startsAt: number
+  venueName: string
+  availability: 'AVAILABLE' | 'LIMITED' | 'SOLD_OUT' | 'BOOKING_CLOSED'
+  says: string
+  cancelled: boolean
+  externalBookingUrl: string | null
 }
 
 const route = useRoute()
@@ -53,6 +64,12 @@ if (!data.value) {
 }
 
 const { account } = useAccount()
+
+// The run's other nights, from the public listing the show page already reads: picking one is a
+// navigation, so the chosen night is always in the address (booking.png).
+const { data: run } = await useFetch<{ performances: RunPerformance[] }>(() => `/api/shows/${data.value?.show.slug ?? ''}`)
+
+const nights = computed(() => (run.value?.performances ?? []).filter(one => !one.cancelled && !one.externalBookingUrl))
 
 const quantities = reactive<Record<string, number>>(
   Object.fromEntries(data.value.ticketTypes.map(type => [type.id, 0])),
@@ -90,6 +107,9 @@ const when = computed(() => (data.value
     })
   : ''))
 
+const nightWhen = (at: number): string =>
+  formatLondon(new Date(at * 1000), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+
 const guestName = ref('')
 const guestEmail = ref('')
 
@@ -98,18 +118,42 @@ const notice = ref<string | null>(null)
 const externalUrl = ref<string | null>(null)
 const confirmation = ref<Confirmation | null>(null)
 
+// Field-level, in the house's words: the server's own "Invalid request: guest.email" never
+// reaches a reader, and neither does a Zod default (K-128, docs/copy-style.md).
+const fieldErrors = reactive<{ name: string | null, email: string | null }>({ name: null, email: null })
+
+function checkDetails(): boolean {
+  fieldErrors.name = guestName.value.trim() ? null : 'Tell us the name the booking is under.'
+  fieldErrors.email = !guestEmail.value.trim()
+    ? 'Tell us where to send your booking reference.'
+    : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.value.trim())
+      ? null
+      : 'That does not look like an email address. Check it and try again.'
+  return fieldErrors.name === null && fieldErrors.email === null
+}
+
+// The route answers 400 with the field paths it rejected, so the refusal lands on the field it
+// concerns rather than as a sentence naming a parameter (server/utils/validation.ts).
+function mapFieldRefusal(error: unknown): boolean {
+  const says = refusalText(error, '')
+  if (!says.startsWith('Invalid request:')) return false
+  const paths = says.slice('Invalid request:'.length).split(',').map(path => path.trim())
+  if (paths.includes('guest.email')) fieldErrors.email = 'That does not look like an email address. Check it and try again.'
+  if (paths.includes('guest.name')) fieldErrors.name = 'Tell us the name the booking is under.'
+  return fieldErrors.email !== null || fieldErrors.name !== null
+}
+
 async function book(): Promise<void> {
   notice.value = null
   externalUrl.value = null
+  fieldErrors.name = null
+  fieldErrors.email = null
 
   if (lines.value.length === 0) {
     notice.value = 'Choose at least one ticket'
     return
   }
-  if (!account.value.signedIn && (!guestName.value.trim() || !guestEmail.value.trim())) {
-    notice.value = 'A name and an email address are required to book as a guest'
-    return
-  }
+  if (!account.value.signedIn && !checkDetails()) return
 
   submitting.value = true
   try {
@@ -123,7 +167,7 @@ async function book(): Promise<void> {
     confirmation.value = result
   }
   catch (error) {
-    notice.value = refusalText(error)
+    if (!mapFieldRefusal(error)) notice.value = refusalText(error)
     externalUrl.value = refusalData<{ externalBookingUrl?: string }>(error)?.externalBookingUrl ?? null
   }
   finally {
@@ -167,11 +211,19 @@ useSeoMeta({
     class="max-w-5xl py-12"
     data-test="book-page"
   >
+    <UBreadcrumb
+      class="mb-6"
+      :items="[
+        { label: data!.show.title, to: `/shows/${data!.show.slug}` },
+        { label: 'Book tickets' },
+      ]"
+      data-test="booking-breadcrumb"
+    />
+
     <UPageHeader
-      :title="`Book: ${data!.show.title}`"
+      :title="`Book · ${data!.show.title}`"
       :description="`${when} · ${data!.performance.venueName}`"
       :ui="{ title: 'nnt-headline' }"
-      :links="[{ label: 'About the show', to: `/shows/${data!.show.slug}`, variant: 'link', color: 'primary' }]"
     />
 
     <div
@@ -306,9 +358,42 @@ useSeoMeta({
           />
         </UCard>
 
+        <section
+          v-if="nights.length > 1"
+          data-test="pick-performance"
+        >
+          <h2 class="nnt-headline text-xl">
+            1 · Pick a performance
+          </h2>
+
+          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <NuxtLink
+              v-for="night in nights"
+              :key="night.id"
+              :to="`/book/${night.id}`"
+              class="rounded-lg border p-4 transition-colors"
+              :class="night.id === performanceId
+                ? 'border-primary bg-primary/5'
+                : 'border-default hover:border-primary'"
+              :aria-current="night.id === performanceId ? 'page' : undefined"
+              :data-test="`night-${night.id}`"
+            >
+              <p class="font-medium">
+                {{ nightWhen(night.startsAt) }}
+              </p>
+              <p
+                class="text-sm"
+                :class="night.availability === 'LIMITED' ? 'text-gold-700 dark:text-gold-400' : 'text-muted'"
+              >
+                {{ night.availability === 'SOLD_OUT' ? 'Full' : night.availability === 'AVAILABLE' ? night.venueName : night.says }}
+              </p>
+            </NuxtLink>
+          </div>
+        </section>
+
         <section>
           <h2 class="nnt-headline text-xl">
-            1 · Tickets
+            {{ nights.length > 1 ? '2' : '1' }} · Tickets
           </h2>
 
           <ul class="mt-4 divide-y divide-default">
@@ -358,14 +443,17 @@ useSeoMeta({
           </p>
         </section>
 
+        <!-- H-201's marketing consent is a V2 story and has nowhere to be stored yet, so this
+             section asks for nothing it cannot keep (booking.png, H-201). -->
         <section v-if="!account.signedIn">
           <h2 class="nnt-headline text-xl">
-            2 · Your details
+            {{ nights.length > 1 ? '3' : '2' }} · Your details
           </h2>
           <div class="mt-4 grid gap-4 sm:grid-cols-2">
             <UFormField
               label="Name"
               required
+              :error="fieldErrors.name ?? undefined"
             >
               <UInput
                 v-model="guestName"
@@ -377,13 +465,15 @@ useSeoMeta({
             <UFormField
               label="Email address"
               required
-              description="Your reference and the amount due are sent here."
+              description="Your tickets land here."
+              :error="fieldErrors.email ?? undefined"
             >
               <UInput
                 v-model="guestEmail"
                 type="email"
                 class="w-full"
                 autocomplete="email"
+                icon="i-lucide-mail"
                 data-test="guest-email"
               />
             </UFormField>
@@ -399,11 +489,14 @@ useSeoMeta({
         data-test="booking-summary"
       >
         <template #header>
-          <h2 class="font-semibold">
+          <p class="font-mono text-xs uppercase tracking-wide text-muted">
             Your order
+          </p>
+          <h2 class="mt-1 font-semibold">
+            {{ data!.show.title }}
           </h2>
           <p class="text-sm text-muted">
-            {{ data!.show.title }}
+            {{ when }} · {{ data!.performance.venueName }}
           </p>
         </template>
 
@@ -428,7 +521,12 @@ useSeoMeta({
           Nothing chosen yet.
         </p>
 
-        <div class="mt-4 flex items-baseline justify-between gap-4">
+        <div class="mt-4 flex items-baseline justify-between gap-4 text-sm text-muted">
+          <span>Paid online</span>
+          <span class="font-mono">{{ saysPrice(0) }}, ever</span>
+        </div>
+
+        <div class="mt-2 flex items-baseline justify-between gap-4">
           <span class="font-medium">To pay at the theatre</span>
           <span
             class="font-mono text-lg"
@@ -478,8 +576,12 @@ useSeoMeta({
           >
             Book elsewhere
           </UButton>
-          <p class="mt-3 text-sm text-muted">
-            A reservation holds your seats until shortly before curtain, then they go back on sale.
+          <p
+            class="mt-3 text-sm text-muted"
+            data-test="hold-release"
+          >
+            Reservations hold until {{ data!.holdReleaseMinutes }} minutes before curtain, then the
+            tickets go back on sale for walk-ups.
           </p>
         </template>
       </UCard>
