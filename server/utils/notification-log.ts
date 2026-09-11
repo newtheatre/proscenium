@@ -2,10 +2,14 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
+import { aliasColumns, whereFrom } from './list-filters'
 import { daysAfter, londonDay } from '#shared/utils/membership'
 import { MESSAGE_TYPES } from '#shared/utils/notifications'
+import { sendLogList } from '#shared/utils/send-log-list'
 import { startOfLondonDay } from '#shared/utils/london'
-import type { DailyCount, PersonHistoryRow, SendLogFilters, SendLogRow } from '#shared/utils/notification-log'
+import type { DailyCount, PersonHistoryRow, SendLogRow } from '#shared/utils/notification-log'
+import type { ListQuery } from '#shared/utils/list-filters'
+import type { ListClause } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 
 // The operations view of what was sent (H-106), read-only over the log H-105 writes. Never
@@ -19,56 +23,50 @@ function typesForTopic(topic: string): string[] {
     .map(([name]) => name)
 }
 
-// `to` is the last day included, so the bound is midnight the day after (0014).
-function dateWindow(from?: string, to?: string): { fromAt?: number, toAt?: number } {
-  return {
-    fromAt: from ? Math.floor(startOfLondonDay(from).getTime() / 1000) : undefined,
-    toAt: to ? Math.floor(startOfLondonDay(daysAfter(to, 1)).getTime() / 1000) : undefined,
-  }
-}
-
-function sendLogPredicate(filters: SendLogFilters): SQL {
-  const terms: SQL[] = []
-  if (filters.type) terms.push(sql`l.type = ${filters.type}`)
-  if (filters.topic) {
-    const types = typesForTopic(filters.topic)
-    terms.push(types.length ? sql`l.type IN (${sql.join(types.map(name => sql`${name}`), sql`, `)})` : sql`1 = 0`)
-  }
-  if (filters.channel) terms.push(sql`l.channel = ${filters.channel}`)
-  if (filters.status) terms.push(sql`l.status = ${filters.status}`)
-  const { fromAt, toAt } = dateWindow(filters.from, filters.to)
-  if (fromAt !== undefined) terms.push(sql`l.created_at >= ${fromAt}`)
-  if (toAt !== undefined) terms.push(sql`l.created_at < ${toAt}`)
-  return terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``
+// The send log's predicate and order clause, from its declaration (K-129). Topic is not a
+// column: it widens to the types the catalogue names under it, at query time.
+export function sendLogClause(query: ListQuery): ListClause {
+  return whereFrom(sendLogList, query, {
+    column: aliasColumns('l'),
+    search: [sql`l.type`],
+    fields: {
+      topic: (condition) => {
+        const types = typesForTopic(condition.values[0]!)
+        return types.length ? sql`l.type IN (${sql.join(types.map(name => sql`${name}`), sql`, `)})` : sql`1 = 0`
+      },
+    },
+  })
 }
 
 // Allow-listed columns: a subject line and a provider error, but never `retry_payload`, which
 // H-105 stores only to replay a send and never to answer this or any other read (0056).
-export function sendLogQuery(filters: SendLogFilters, limit: number, offset: number): SQL {
+export function sendLogQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT l.id AS id, l.user_id AS userId, u.name AS recipientName, l.type AS type,
            l.channel AS channel, l.status AS status, l.subject AS subject, l.error AS error,
            l.created_at AS createdAt, l.sent_at AS sentAt
     FROM notification_log l
-    LEFT JOIN users u ON u.id = l.user_id${sendLogPredicate(filters)}
-    ORDER BY l.created_at DESC
+    LEFT JOIN users u ON u.id = l.user_id
+    ${clause.where ? sql`WHERE ${clause.where}` : sql``}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export function countSendLogQuery(filters: SendLogFilters): SQL {
+export function countSendLogQuery(clause: ListClause): SQL {
   return sql`
     SELECT count(*) AS total
-    FROM notification_log l${sendLogPredicate(filters)}
+    FROM notification_log l
+    ${clause.where ? sql`WHERE ${clause.where}` : sql``}
   `
 }
 
-export async function sendLog(filters: SendLogFilters, limit: number, offset: number): Promise<SendLogRow[]> {
-  return db.all<SendLogRow>(sendLogQuery(filters, limit, offset))
+export async function sendLog(clause: ListClause, limit: number, offset: number): Promise<SendLogRow[]> {
+  return db.all<SendLogRow>(sendLogQuery(clause, limit, offset))
 }
 
-export async function countSendLog(filters: SendLogFilters): Promise<number> {
-  const [row] = await db.all<{ total: number }>(countSendLogQuery(filters))
+export async function countSendLog(clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(countSendLogQuery(clause))
   return Number(row?.total ?? 0)
 }
 

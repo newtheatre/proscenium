@@ -4,9 +4,10 @@ import { recordMembership } from '#shared/utils/admin-forms'
 import { formatLondon } from '#shared/utils/london'
 import { MEMBERSHIP_TERMS, isInGrace, londonDay } from '#shared/utils/membership'
 import { claimDeclineForm } from '#shared/utils/membership-claims'
+import { membershipsList } from '#shared/utils/memberships-list'
 import type { RecordMembership } from '#shared/utils/admin-forms'
 import type { ClaimDeclineInput } from '#shared/utils/membership-claims'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import type { FilterOption } from '#shared/utils/list-filters'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Members', middleware: 'console' })
@@ -61,23 +62,14 @@ interface ClaimListing {
 // waiting for an officer to write it down (A-130).
 const AWAITING_RECORD = 'awaiting-record'
 
-const FILTERS = [
-  { label: 'Current', value: 'current', icon: 'i-lucide-badge-check' },
-  { label: 'Awaiting record', value: AWAITING_RECORD, icon: 'i-lucide-inbox' },
-  { label: 'Awaiting a check', value: 'awaiting-check', icon: 'i-lucide-clock' },
-  { label: 'Lapsed', value: 'lapsed', icon: 'i-lucide-history' },
-  { label: 'Everyone ever', value: 'everyone', icon: 'i-lucide-users' },
-]
+// Search, the register filter, sort and page live in the URL (K-129). A bare `?filter=` link
+// keeps working, so the runbook's bookmark to the queue is unaffected.
+const { search, conditions, sort, page, query, active, set, setSort, clear } = useListQuery(membershipsList)
 
-const route = useRoute()
 const listing = ref<Listing | null>(null)
 const claims = ref<ClaimListing | null>(null)
 // How many are waiting, shown on the filter so the queue is visible from every other view.
 const waiting = ref<number | null>(null)
-// Reachable by link, so the week after cutover has a bookmark for the queue.
-const filter = ref(FILTERS.some(option => option.value === route.query.filter) ? String(route.query.filter) : 'current')
-const search = ref('')
-const page = ref(1)
 const loading = ref(false)
 const failure = ref<string | null>(null)
 const toast = useToast()
@@ -90,12 +82,13 @@ const declining = ref<Claim | null>(null)
 const decline = reactive<Partial<ClaimDeclineInput>>({ reason: '' })
 const deciding = ref<string | null>(null)
 
+// No condition means the default view, current, the same hidden default the endpoint applies.
+const filter = computed(() => conditions.value.find(one => one.key === 'filter')?.values[0] ?? 'current')
 const onQueue = computed(() => filter.value === AWAITING_RECORD)
 
-const filterItems = computed(() => FILTERS.map(option => ({
-  ...option,
-  label: option.value === AWAITING_RECORD && waiting.value !== null ? `${option.label} (${waiting.value})` : option.label,
-})))
+// The live count rides on the option's label, the runtime-known slot ConsoleFilters offers (0032).
+const filterOptions = computed<FilterOption[]>(() => membershipsList.fields[0]!.options.map(option =>
+  option.value === AWAITING_RECORD && waiting.value !== null ? { ...option, label: `${option.label} (${waiting.value})` } : option))
 
 async function countWaiting(): Promise<void> {
   try {
@@ -119,9 +112,7 @@ async function load(): Promise<void> {
       else void countWaiting()
     }
     else {
-      listing.value = await $fetch<Listing>('/api/admin/memberships', {
-        query: { filter: filter.value, search: search.value || undefined, page: page.value },
-      })
+      listing.value = await $fetch<Listing>('/api/admin/memberships', { query: query.value })
     }
   }
   catch (error) {
@@ -221,43 +212,13 @@ async function declineClaim(event: FormSubmitEvent<ClaimDeclineInput>): Promise<
   }
 }
 
-// What is filtered, said out loud and removable one at a time (0032).
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (filter.value !== 'current') {
-    active.push({
-      key: 'filter',
-      label: FILTERS.find(option => option.value === filter.value)!.label,
-      icon: FILTERS.find(option => option.value === filter.value)!.icon,
-      clear: () => {
-        filter.value = 'current'
-      },
-    })
-  }
-  return active
-})
-
-function clearFilters(): void {
-  search.value = ''
-  filter.value = 'current'
-}
-
 const exportUrl = computed(() => {
-  const query = new URLSearchParams({ filter: filter.value })
-  if (search.value) query.set('search', search.value)
-  return `/api/admin/memberships/export?${query.toString()}`
+  const params = new URLSearchParams({ filter: filter.value })
+  if (search.value) params.set('search', search.value)
+  return `/api/admin/memberships/export?${params.toString()}`
 })
 
-watch([filter, search], () => {
-  page.value = 1
-  void load()
-})
-watch(page, load)
+watch(query, load)
 
 const columns: TableColumn<Member>[] = [
   {
@@ -390,29 +351,25 @@ onMounted(() => {
       variant="subtle"
       icon="i-lucide-badge-check"
       title="Membership is bought at the Students' Union"
-      description="This records what somebody bought and when it runs out. A membership counts from the moment it is recorded: checking it against the SU's own list happens afterwards and never holds up a member price."
+      description="This records what somebody bought and when it runs out. A membership counts from the moment it is recorded: checking it against the SU's own list happens afterwards and never holds up a member price. Current counts the grace window after a term ends; awaiting record is what members have claimed and nobody has written down yet."
     />
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A name, an address or a student number"
-      :active="activeFilters"
+      :placeholder="membershipsList.search?.placeholder"
+      :active="active"
       :loading="loading"
-      @clear="clearFilters"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField
-          label="Show"
-          help="Current counts the grace window after a term ends. Awaiting record is what members have claimed and nobody has written down yet."
-        >
-          <USelect
-            v-model="filter"
-            data-test="members-filter"
-            :items="filterItems"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="membershipsList"
+          :conditions="conditions"
+          :sort="sort"
+          :options="{ filter: filterOptions }"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>

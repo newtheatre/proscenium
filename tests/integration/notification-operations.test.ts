@@ -1,9 +1,12 @@
 import { describe, expect, test } from 'bun:test'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { sendLogList } from '#shared/utils/send-log-list'
 import {
   countPersonHistoryQuery,
   countSendLogQuery,
   dailyCountsQuery,
   personHistoryQuery,
+  sendLogClause,
   sendLogQuery,
 } from '#server/utils/notification-log'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
@@ -56,7 +59,15 @@ function logged(database: TestDatabase, over: {
   return id
 }
 
-describe('the send log (criterion 1)', () => {
+// The declaration's own schema, so a filter here is proved through the same parsing the
+// endpoint applies (K-129).
+function clause(query: Record<string, string>) {
+  const result = filterQuerySchema(sendLogList).safeParse(query)
+  if (!result.success) throw new Error(result.error.issues.map(issue => issue.message).join('; '))
+  return sendLogClause(result.data)
+}
+
+describe('the send log (criterion 1, K-129)', () => {
   test('filters by type, channel and outcome', async () => {
     await withDatabase(async (database) => {
       const alice = person(database, 'u-alice')
@@ -64,13 +75,13 @@ describe('the send log (criterion 1)', () => {
       logged(database, { userId: alice, type: 'shift.reminder', channel: 'INBOX', status: 'SENT', createdAt: 1_700_000_001 })
       logged(database, { userId: alice, type: 'training.expiry.window', channel: 'EMAIL', status: 'FAILED', createdAt: 1_700_000_002 })
 
-      const byType = read(database, sendLogQuery({ type: 'shift.reminder', page: 1, pageSize: 25 }, 25, 0))
+      const byType = read(database, sendLogQuery(clause({ search: 'shift.reminder' }), 25, 0))
       expect(byType).toHaveLength(2)
 
-      const byChannel = read(database, sendLogQuery({ channel: 'INBOX', page: 1, pageSize: 25 }, 25, 0))
+      const byChannel = read(database, sendLogQuery(clause({ channel: 'INBOX' }), 25, 0))
       expect(byChannel).toHaveLength(1)
 
-      const byStatus = read(database, sendLogQuery({ status: 'FAILED', page: 1, pageSize: 25 }, 25, 0))
+      const byStatus = read(database, sendLogQuery(clause({ status: 'FAILED' }), 25, 0))
       expect(byStatus).toHaveLength(1)
     })
   })
@@ -82,10 +93,10 @@ describe('the send log (criterion 1)', () => {
       logged(database, { type: 'shift.reminder', status: 'SENT', createdAt: 1_700_000_000 })
       logged(database, { type: 'room.booking.confirmed', status: 'SENT', createdAt: 1_700_000_001 })
 
-      const shifts = read(database, sendLogQuery({ topic: 'SHIFTS', page: 1, pageSize: 25 }, 25, 0))
+      const shifts = read(database, sendLogQuery(clause({ topic: 'SHIFTS' }), 25, 0))
       expect(shifts).toHaveLength(1)
 
-      const rooms = read(database, sendLogQuery({ topic: 'ROOMS', page: 1, pageSize: 25 }, 25, 0))
+      const rooms = read(database, sendLogQuery(clause({ topic: 'ROOMS' }), 25, 0))
       expect(rooms).toHaveLength(1)
     })
   })
@@ -99,10 +110,10 @@ describe('the send log (criterion 1)', () => {
       // The next London day.
       logged(database, { type: 'shift.reminder', status: 'SENT', createdAt: Math.floor(Date.UTC(2026, 0, 15, 1, 0) / 1000) })
 
-      const onlyThe14th = read(database, sendLogQuery({ from: '2026-01-14', to: '2026-01-14', page: 1, pageSize: 25 }, 25, 0))
+      const onlyThe14th = read(database, sendLogQuery(clause({ createdAt: 'is:2026-01-14' }), 25, 0))
       expect(onlyThe14th).toHaveLength(1)
 
-      const both = read(database, sendLogQuery({ from: '2026-01-14', to: '2026-01-15', page: 1, pageSize: 25 }, 25, 0))
+      const both = read(database, sendLogQuery(clause({ createdAt: 'between:2026-01-14,2026-01-15' }), 25, 0))
       expect(both).toHaveLength(2)
     })
   })
@@ -111,10 +122,10 @@ describe('the send log (criterion 1)', () => {
     await withDatabase(async (database) => {
       for (let i = 0; i < 5; i++) logged(database, { type: 'shift.reminder', status: 'SENT', createdAt: 1_700_000_000 + i })
 
-      const [{ total }] = read<{ total: number }>(database, countSendLogQuery({ type: 'shift.reminder', page: 1, pageSize: 25 }))
+      const [{ total }] = read<{ total: number }>(database, countSendLogQuery(clause({ search: 'shift.reminder' })))
       expect(total).toBe(5)
 
-      const page = read(database, sendLogQuery({ type: 'shift.reminder', page: 1, pageSize: 2 }, 2, 0))
+      const page = read(database, sendLogQuery(clause({ search: 'shift.reminder' }), 2, 0))
       expect(page).toHaveLength(2)
     })
   })

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { backupDrillsList } from '#shared/utils/backup-drills-list'
 import { restoreDrillForm } from '#shared/utils/backup'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { RestoreDrillForm } from '#shared/utils/backup'
@@ -32,10 +33,11 @@ interface Listing {
   pageSize: number
 }
 
+// Search, sort and page live in the URL (K-129); nothing on this screen is filterable yet.
+const { search, conditions, sort, page, query, active, set, setSort, clear } = useListQuery(backupDrillsList)
+
 const status = ref<Status | null>(null)
 const listing = ref<Listing | null>(null)
-const page = ref(1)
-const search = ref('')
 const loading = ref(false)
 const failure = ref<string | null>(null)
 const recording = ref(false)
@@ -50,7 +52,7 @@ async function load(): Promise<void> {
   try {
     const [statusResult, listingResult] = await Promise.all([
       $fetch<Status>('/api/admin/backups'),
-      $fetch<Listing>('/api/admin/backups/drills', { query: { page: page.value, search: search.value || undefined } }),
+      $fetch<Listing>('/api/admin/backups/drills', { query: query.value }),
     ])
     status.value = statusResult
     listing.value = listingResult
@@ -83,11 +85,7 @@ async function record(event: FormSubmitEvent<RestoreDrillForm>): Promise<void> {
   }
 }
 
-watch(page, load)
-watch(search, () => {
-  page.value = 1
-  void load()
-})
+watch(query, load)
 
 const columns: TableColumn<Drill>[] = [
   { accessorKey: 'ranAt', header: 'Ran', meta: { class: { td: 'font-mono text-sm whitespace-nowrap' } } },
@@ -147,11 +145,21 @@ onMounted(load)
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A name or a note"
+      :placeholder="backupDrillsList.search?.placeholder"
+      :active="active"
       :loading="loading"
-      :filterable="false"
-      @clear="search = ''"
+      @clear="clear"
     >
+      <template #filters>
+        <ConsoleFilters
+          :spec="backupDrillsList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
+      </template>
+
       <template #actions>
         <UButton
           data-test="record-drill"

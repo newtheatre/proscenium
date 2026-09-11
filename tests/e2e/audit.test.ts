@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { daysAfter, londonDay } from '#shared/utils/membership'
 import { DEFAULT_PAGE_SIZE } from '#shared/utils/pagination'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
@@ -92,6 +93,7 @@ async function trail(query = ''): Promise<Listing> {
 }
 
 const YESTERDAY = Math.floor(Date.now() / 1000) - 24 * 60 * 60
+const YESTERDAY_DAY = daysAfter(londonDay(new Date()), -1)
 
 describe.skipIf(skip !== null)('reading the audit trail (J-103)', () => {
   test('it answers with an envelope and pages in SQL, never a bare array', async () => {
@@ -116,16 +118,16 @@ describe.skipIf(skip !== null)('reading the audit trail (J-103)', () => {
     const carries = (listing: Listing): boolean =>
       listing.items.some(item => item.action === 'role.granted' && item.target === target)
 
-    expect(carries(await trail(`?target=${encodeURIComponent(target)}`))).toBe(true)
-    expect(carries(await trail(`?actor=${officerId}&target=${encodeURIComponent(target)}`))).toBe(true)
-    expect(carries(await trail(`?action=role.granted&target=${encodeURIComponent(target)}`))).toBe(true)
-    expect(carries(await trail(`?module=identity&target=${encodeURIComponent(target)}`))).toBe(true)
-    expect(carries(await trail(`?from=${YESTERDAY}&target=${encodeURIComponent(target)}`))).toBe(true)
+    expect(carries(await trail(`?search=${encodeURIComponent(target)}`))).toBe(true)
+    expect(carries(await trail(`?actor=${officerId}&search=${encodeURIComponent(target)}`))).toBe(true)
+    expect(carries(await trail(`?action=role.granted&search=${encodeURIComponent(target)}`))).toBe(true)
+    expect(carries(await trail(`?module=identity&search=${encodeURIComponent(target)}`))).toBe(true)
+    expect(carries(await trail(`?createdAt=after:${YESTERDAY_DAY}&search=${encodeURIComponent(target)}`))).toBe(true)
 
     // Each filter has to exclude as well as include, or it is decoration.
-    expect(carries(await trail(`?module=governance&target=${encodeURIComponent(target)}`))).toBe(false)
-    expect(carries(await trail(`?action=role.revoked&target=${encodeURIComponent(target)}`))).toBe(false)
-    expect(carries(await trail(`?to=${YESTERDAY}&target=${encodeURIComponent(target)}`))).toBe(false)
+    expect(carries(await trail(`?module=governance&search=${encodeURIComponent(target)}`))).toBe(false)
+    expect(carries(await trail(`?action=role.revoked&search=${encodeURIComponent(target)}`))).toBe(false)
+    expect(carries(await trail(`?createdAt=before:${YESTERDAY_DAY}&search=${encodeURIComponent(target)}`))).toBe(false)
   })
 
   test('the response carries no password hash and names an erased actor by its tombstone', async () => {

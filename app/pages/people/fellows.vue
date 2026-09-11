@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { awardFellowship, revokeFellowship } from '#shared/utils/admin-forms'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { fellowshipsList } from '#shared/utils/fellowships-list'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { AwardFellowship } from '#shared/utils/admin-forms'
 
@@ -29,16 +29,10 @@ interface Listing {
   pages: number
 }
 
-const SHOW = [
-  { label: 'Current Fellows', value: 'current', icon: 'i-lucide-award' },
-  { label: 'Revoked', value: 'revoked', icon: 'i-lucide-ban' },
-  { label: 'Everyone ever', value: 'everyone', icon: 'i-lucide-users' },
-]
+// Search, the show filter, sort and page live in the URL (K-129).
+const { search, conditions, sort, page, query, active, set, setSort, clear } = useListQuery(fellowshipsList)
 
 const listing = ref<Listing | null>(null)
-const show = ref('current')
-const search = ref('')
-const page = ref(1)
 const loading = ref(false)
 const failure = ref<string | null>(null)
 
@@ -55,9 +49,7 @@ async function load(): Promise<void> {
   loading.value = true
   failure.value = null
   try {
-    listing.value = await $fetch<Listing>('/api/admin/fellowships', {
-      query: { show: show.value, search: search.value || undefined, page: page.value },
-    })
+    listing.value = await $fetch<Listing>('/api/admin/fellowships', { query: query.value })
   }
   catch (error) {
     failure.value = refusalText(error)
@@ -114,36 +106,7 @@ async function revoke(event: FormSubmitEvent<{ reason: string }>): Promise<void>
   }
 }
 
-watch([show, search], () => {
-  page.value = 1
-  void load()
-})
-watch(page, load)
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (show.value !== 'current') {
-    active.push({
-      key: 'show',
-      label: SHOW.find(option => option.value === show.value)!.label,
-      icon: SHOW.find(option => option.value === show.value)!.icon,
-      clear: () => {
-        show.value = 'current'
-      },
-    })
-  }
-  return active
-})
-
-function clearFilters(): void {
-  search.value = ''
-  show.value = 'current'
-}
+watch(query, load)
 
 const columns: TableColumn<Fellow>[] = [
   { accessorKey: 'awardedOn', header: 'Awarded', meta: { class: { td: 'font-mono text-sm whitespace-nowrap' } } },
@@ -208,21 +171,19 @@ onMounted(load)
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A name, an address or a citation"
-      :active="activeFilters"
+      :placeholder="fellowshipsList.search?.placeholder"
+      :active="active"
       :loading="loading"
-      @clear="clearFilters"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Show">
-          <USelect
-            v-model="show"
-            data-test="fellows-show"
-            :items="SHOW"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="fellowshipsList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -244,7 +205,7 @@ onMounted(load)
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ search || show !== 'current'
+          {{ active.length
             ? 'Nobody on the roll matches that.'
             : 'The roll is empty. The committee assembles it, and it is entered here by hand.' }}
         </p>

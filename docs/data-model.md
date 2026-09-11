@@ -130,6 +130,14 @@ CHECK `expires_on > starts_on`. Current membership = today inside the term or in
 `MEMBERSHIP_GRACE_DAYS` after it, read at query time (0031). A renewal is another row: history is
 never rewritten.
 
+`GET /api/admin/memberships` is the register at `/people/members`. Filtered by its declaration
+(`shared/utils/memberships-list.ts`, K-129): `filter` (`current`, `awaiting-check`, `lapsed` or
+`everyone`, with `current` the hidden default when nothing is asked), and `search` over name,
+address and student number. `awaiting-record` is a fifth option the declaration carries so a link
+to it still parses, but this endpoint refuses it: that state is the claims queue below, a
+different table the page reaches through a different request instead. Sorted by `expiresOn`,
+latest first.
+
 ### membership_claims
 `id` PK · `user_id` → users cascade · `student_id` (as the member typed it; NOT NULL, blanked
 rather than nulled by erasure) · `starts_on` (London date, never in the future) · `term` CHECK
@@ -152,8 +160,11 @@ reason), `POST /api/account/membership/claim` (Zod: `studentId`, `startsOn` not 
 idempotent). The screen is `/account/membership`, a `MEMBER_NAV` entry.
 
 **Recording is the officer's act** (`members.write`). `GET /api/admin/memberships/claims` is the
-queue behind the register's "Awaiting record" filter at `/people/members`: oldest first, paged in
-SQL, searchable by name, address or claimed number, and never showing an erased person's claim.
+queue behind the register's "Awaiting record" filter at `/people/members`: oldest first (a
+same-second tie breaks on `rowid`), paged in SQL, searchable by name, address or claimed number,
+and never showing an erased person's claim. Filtered by its declaration
+(`shared/utils/membership-claims-list.ts`, K-129): nothing yet beyond `search`, `sort` and page;
+`status` stays fixed at `OPEN`, the endpoint's own job rather than a toolbar control.
 `POST /api/admin/memberships/claims/[id]/record` runs `recordClaimStatements()`
 (`shared/utils/membership-claims.ts`) as one batch, every write guarded on the claim still being
 `OPEN`: the number to `users.student_id` (refused with 409 if another account holds it, exactly as
@@ -184,6 +195,11 @@ A revoked fellowship stops future admissions and rewrites nothing (0023): awardi
 (A-127 criterion 3); revoking cancels that pass in the same batch as the revocation
 (`cancelFellowshipPassStatement`), and an anonymised holder never admits on it either way
 (0062). Every admission already taken stands, append-only and untouched (0010).
+
+`GET /api/admin/fellowships` is the roll at `/people/fellows`. Filtered by its declaration
+(`shared/utils/fellowships-list.ts`, K-129): `show` (`current`, `revoked` or `everyone`, with
+`current` the hidden default when nothing is asked), and `search` over name, address and
+citation. Sorted by the date awarded.
 
 ### role_grants
 `id` PK · `user_id` → users cascade · `role` (namespace-free officer role, validated against
@@ -2339,6 +2355,12 @@ The refs carry **no foreign key**. The ledger outlives what it refers to, and a 
 fact about the past that deleting a record must not rewrite. `user_id` is the exception and is
 `set null`, so an erased person's messages stay counted without naming them.
 
+`GET /api/admin/comms/send-log` is the operations view at `/comms/operations`. Filtered by its
+declaration (`shared/utils/send-log-list.ts`, K-129): `topic` (resolved against the message
+catalogue, since there is no `topic` column here), `channel`, `status` and `createdAt` (a London
+day range), with `search` over `type` rather than an exact match, so `shift` now finds every
+`shift.*` type. Sorted by `createdAt`, newest first.
+
 ### notification_digest_entries
 `id` PK · `user_id` cascade · `topic` CHECK `BOOKINGS|SHIFTS|TRAINING|ROOMS|ANNOUNCEMENTS` ·
 `type` · `subject` · `body` · `digest_log_id` NULL, no foreign key · `created_at`. Indexed on
@@ -2415,6 +2437,15 @@ the system. Its `actor_id` is the officer who signed it, and its detail carries 
 `created_at`). Everybody a manual entry names is an account on this system: the trail never holds a
 name it could not later anonymise (0028).
 
+`GET /api/admin/audit` is the trail at `/admin/audit`, and `GET /api/admin/audit/export` its CSV
+(J-103), both read through the same predicate (`auditClause`, `server/utils/audit-search.ts`, one
+question answered once). Filtered by their shared declaration (`shared/utils/audit-list.ts`,
+K-129): `actor` (a person, matching or excluding, with "is empty" finding a system entry),
+`module` and `action` (single choices, matching the screen they replace), and `createdAt` (a
+London day range against when the entry was recorded, not what it describes). `search` runs over
+`target`, so it now finds a substring rather than needing the exact `kind:id`. Sorted by
+`createdAt`, newest first, a same-second tie breaking on `rowid` rather than the random `id`.
+
 ### mfa_attempts
 `id` PK · `user_id` → users cascade · `expires_at` · `created_at`. A first credential that has
 been proven but not yet answered with a second factor (A-111). Five minutes, single use: a
@@ -2431,6 +2462,10 @@ password step. Swept on a schedule; an expired attempt returns the user to the f
 drill, never an edit. `/admin/backups` (`backups.read`/`backups.write`) reads the last drill that
 **passed** and flags it overdue past `BACKUP_DRILL_INTERVAL_DAYS` (`isDrillOverdue`,
 `shared/utils/backup.ts`); a failed drill does not clear the flag (K-108, J-107).
+
+`GET /api/admin/backups/drills` is the log on the same screen. Filtered by its declaration
+(`shared/utils/backup-drills-list.ts`, K-129): nothing yet, only `search` over the operator's name
+and the note. Sorted by the day run, newest first, a same-day tie breaking on `rowid`.
 
 ### health_incidents
 `id` PK · `status` CHECK `OPEN|CLOSED` · `opened_at` · `closed_at`. At most one `OPEN` row

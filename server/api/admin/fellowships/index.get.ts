@@ -1,30 +1,30 @@
-import { and, asc, eq, isNull, isNotNull, like, or, sql } from 'drizzle-orm'
-import { z } from 'zod'
-import { envelope, offsetFor, pageQuery } from '#shared/utils/pagination'
-import type { SQL } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm'
+import { conditionsOf, filterQuerySchema } from '#shared/utils/list-filters'
+import { fellowshipsList } from '#shared/utils/fellowships-list'
+import { envelope, offsetFor } from '#shared/utils/pagination'
+import { tableColumns, whereFrom } from '#server/utils/list-filters'
 
-const query = pageQuery.extend({
-  search: z.string().trim().max(200).optional(),
-  show: z.enum(['current', 'revoked', 'everyone']).default('current'),
-})
+const query = filterQuerySchema(fellowshipsList)
 
-// The roll of Fellows (A-127).
+// The roll of Fellows (A-127, K-129). "Show" defaults to current when nothing is asked, the same
+// hidden default the accounts directory gives anonymised rows.
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'fellowships.read')
   const input = await getValidatedQueryOrThrow(event, query)
 
-  const terms: SQL[] = []
-  if (input.show === 'current') terms.push(isNull(schema.fellowships.revokedAt))
-  if (input.show === 'revoked') terms.push(isNotNull(schema.fellowships.revokedAt))
-  if (input.search) {
-    const wanted = `%${input.search.toLowerCase()}%`
-    terms.push(or(
-      like(sql`lower(${schema.users.name})`, wanted),
-      like(sql`lower(${schema.users.email})`, wanted),
-      like(sql`lower(${schema.fellowships.citation})`, wanted),
-    )!)
-  }
-  const where = terms.length ? and(...terms) : undefined
+  const clause = whereFrom(fellowshipsList, input, {
+    column: tableColumns(schema.fellowships),
+    search: [schema.users.name, schema.users.email, schema.fellowships.citation],
+    fields: {
+      show: (condition) => {
+        if (condition.values[0] === 'revoked') return isNotNull(schema.fellowships.revokedAt)
+        if (condition.values[0] === 'everyone') return undefined
+        return isNull(schema.fellowships.revokedAt)
+      },
+    },
+  })
+  const asked = conditionsOf(fellowshipsList, input).some(condition => condition.key === 'show')
+  const where = asked ? clause.where : and(isNull(schema.fellowships.revokedAt), clause.where)
 
   const [total] = await db.select({ count: sql<number>`count(*)` })
     .from(schema.fellowships)
@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
     .from(schema.fellowships)
     .innerJoin(schema.users, eq(schema.users.id, schema.fellowships.userId))
     .where(where)
-    .orderBy(asc(schema.fellowships.awardedOn))
+    .orderBy(...clause.orderBy)
     .limit(input.pageSize)
     .offset(offsetFor(input.page, input.pageSize))
 

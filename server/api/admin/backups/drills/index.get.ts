@@ -1,25 +1,28 @@
-import { desc, eq, like, or, sql } from 'drizzle-orm'
-import { z } from 'zod'
-import { envelope, offsetFor, pageQuery } from '#shared/utils/pagination'
-import type { SQL } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
+import { backupDrillsList } from '#shared/utils/backup-drills-list'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { envelope, offsetFor } from '#shared/utils/pagination'
+import { tableColumns, whereFrom } from '#server/utils/list-filters'
+import type { Reference } from '#server/utils/list-filters'
 
-const query = pageQuery.extend({
-  search: z.string().trim().max(200).optional(),
-})
+const query = filterQuerySchema(backupDrillsList)
 
-// Every recorded drill, newest first (K-108 criterion 3, J-107 criterion 3).
+// `rowid` is insertion order and not a Drizzle column; `created_at` is second precision and ties.
+// Qualified: the listing joins `users`, which has a `rowid` of its own.
+function drillColumn(name: string): Reference | undefined {
+  if (name === 'rowid') return sql`${schema.backupDrills}.rowid`
+  return tableColumns(schema.backupDrills)(name)
+}
+
+// Every recorded drill, newest first (K-108 criterion 3, J-107 criterion 3, K-129).
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'backups.read')
   const input = await getValidatedQueryOrThrow(event, query)
 
-  let where: SQL | undefined
-  if (input.search) {
-    const wanted = `%${input.search.toLowerCase()}%`
-    where = or(
-      like(sql`lower(${schema.users.name})`, wanted),
-      like(sql`lower(${schema.backupDrills.notes})`, wanted),
-    )
-  }
+  const { where, orderBy } = whereFrom(backupDrillsList, input, {
+    column: drillColumn,
+    search: [schema.users.name, schema.backupDrills.notes],
+  })
 
   const [total] = await db.select({ count: sql<number>`count(*)` })
     .from(schema.backupDrills)
@@ -41,7 +44,7 @@ export default defineEventHandler(async (event) => {
     .from(schema.backupDrills)
     .innerJoin(schema.users, eq(schema.users.id, schema.backupDrills.operatorId))
     .where(where)
-    .orderBy(desc(schema.backupDrills.ranAt), desc(schema.backupDrills.createdAt))
+    .orderBy(...orderBy)
     .limit(input.pageSize)
     .offset(offsetFor(input.page, input.pageSize))
 
