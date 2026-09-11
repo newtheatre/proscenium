@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { readTeamRow } from '#server/utils/tonight'
-import { activePerformanceId } from '#shared/utils/tonight'
+import { activePerformanceId, saysPerformanceChoice } from '#shared/utils/tonight'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
 // The duty manager's tonight screen (E-112). What the database returns is proved against the
@@ -78,5 +78,19 @@ describe('which performance is active, one venue running more than one today (E-
 
   test('nothing running tonight answers nothing, not a guess', () => {
     expect(activePerformanceId([], 1000)).toBeNull()
+  })
+})
+
+describe('a picker names the performance rather than its id (issue 901)', () => {
+  // 2026-09-11T20:31Z is 21:31 in London, the seeded pair's own curtain.
+  const startsAt = Math.floor(Date.UTC(2026, 8, 11, 20, 31) / 1000)
+
+  test('the title and the curtain time, in the London wall clock', () => {
+    expect(saysPerformanceChoice({ showTitle: 'The Seagull', startsAt })).toBe('The Seagull, 21:31')
+  })
+
+  test('a winter curtain reads in GMT, not in the summer offset', () => {
+    const winter = Math.floor(Date.UTC(2026, 11, 5, 19, 30) / 1000)
+    expect(saysPerformanceChoice({ showTitle: 'Machinal', startsAt: winter })).toBe('Machinal, 19:30')
   })
 })
