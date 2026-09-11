@@ -40,6 +40,18 @@ export function heldSeatsColumn(alias: string): SQL {
   return heldSeatsSubquery(sql`${sql.raw(alias)}.id`)
 }
 
+// How many seats one booking is bringing through the door, counted by the same rule as the house:
+// its own unrefunded tickets while the reservation still holds them.
+export function reservationSeatsSubquery(reservationId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    WHERE t.reservation_id = ${reservationId}
+      AND t.refunded_at IS NULL
+      AND r.status IN (${holding})
+  )`
+}
+
 // Seats held but not yet paid for: a PENDING reservation is somebody coming who still owes the
 // desk, which is the queue D-132 criterion 2 names.
 export function unpaidSeatsSubquery(performanceId: SQL): SQL {
