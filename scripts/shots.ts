@@ -11,6 +11,7 @@ import { londonDay } from '../shared/utils/membership'
 const OUT = process.env.SHOTS_OUT ?? '.shots'
 const WIDE = 1400
 const NARROW = 900
+const PHONE = 390
 
 const password = `shots-${crypto.randomUUID()}`
 const email = `shots-${crypto.randomUUID().slice(0, 8)}@e2e.newtheatre.org.uk`
@@ -173,6 +174,36 @@ const barItem = await (await send('POST', '/api/admin/bar/items', { name: 'House
 await send('POST', '/api/admin/bar/movements', { itemId: barItem.id, kind: 'DELIVERY', qty: 4500, unitCostPence: 480 }, cookie)
 await send('POST', '/api/admin/bar/stocktakes', undefined, cookie)
 
+// --- J-111: the public programme. One published show with two nights on sale and two prices,
+// so the listing, the show page and the booking form are all pictures of something real.
+await send('POST', '/api/admin/ticket-types', { name: 'Standard', price: 500 }, cookie)
+await send('POST', '/api/admin/ticket-types', { name: 'Member', price: 400, restrictedTo: 'MEMBER' }, cookie)
+
+const publicShow = await (await send('POST', '/api/admin/shows', {
+  title: 'A Midsummer Night\'s Dream',
+  slug: 'a-midsummer-nights-dream',
+  subtitle: 'Shakespeare, at the end of a long night',
+  description: 'Shakespeare\'s wildest night out, lit by fairy-light and bad decisions.',
+  longDescription: 'Four lovers flee into the woods outside Athens. A gang of tradesmen follow them in to rehearse. Unfortunately for everyone, the woods are already occupied, and the fairy king and queen are mid-divorce.',
+  ageGuidance: '8 and over',
+  latecomerPolicy: 'AT_INTERVAL',
+}, cookie)).json() as { id: string }
+
+const publicPerformances: string[] = []
+for (const days of [7, 8]) {
+  const created = await (await send('POST', `/api/admin/shows/${publicShow.id}/performances`, {
+    venueId: 'shots-venue',
+    startsAt: shotsNow + days * 86_400,
+    durationMinutes: 130,
+    intervalCount: 1,
+    intervalMinutes: 15,
+  }, cookie)).json() as { id: string }
+  publicPerformances.push(created.id)
+}
+await send('POST', `/api/admin/shows/${publicShow.id}/publish`, { published: true, cascadePerformances: true }, cookie)
+const publicPerformanceId = publicPerformances[0]!
+// --- end J-111
+
 const view = await openSignedOutView(app.baseURL)
 await visit(view, `${app.baseURL}/sign-in`)
 await fill(view, 'form input[type="email"]', email)
@@ -190,6 +221,8 @@ interface Shot {
   marker?: string
   after?: string
   width?: number
+  // A tall public page is judged on the whole of itself, not on the fold.
+  height?: number
 }
 
 const OPEN_MEMBERSHIP = `(async () => {
@@ -256,13 +289,29 @@ const SHOTS: Shot[] = [
   { name: '13-people-narrow', path: '/admin/people', marker: '[data-test="directory-table"]', width: NARROW },
   { name: '14-members-narrow', path: '/admin/members', marker: '[data-test="members-table"]', width: NARROW },
   { name: '15-config-narrow', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]', width: NARROW },
+
+  // --- J-111: the public site, at all three widths the design pass checks.
+  { name: '50-home', path: '/', marker: '[data-test="photo-hero"]', height: 2600 },
+  { name: '50a-home-narrow', path: '/', marker: '[data-test="photo-hero"]', width: NARROW },
+  { name: '50b-home-phone', path: '/', marker: '[data-test="photo-hero"]', width: PHONE },
+  { name: '51-whats-on', path: '/whats-on', marker: '[data-test="whats-on-page"]' },
+  { name: '51a-whats-on-phone', path: '/whats-on', marker: '[data-test="whats-on-page"]', width: PHONE },
+  { name: '52-show', path: '/shows/a-midsummer-nights-dream', marker: '[data-test="show-page"]' },
+  { name: '52a-show-narrow', path: '/shows/a-midsummer-nights-dream', marker: '[data-test="show-page"]', width: NARROW },
+  { name: '52b-show-phone', path: '/shows/a-midsummer-nights-dream', marker: '[data-test="show-page"]', width: PHONE },
+  { name: '53-book', path: `/book/${publicPerformanceId}`, marker: '[data-test="book-page"]' },
+  { name: '53a-book-phone', path: `/book/${publicPerformanceId}`, marker: '[data-test="book-page"]', width: PHONE },
+  { name: '54-about', path: '/about', marker: '[data-test="photo-hero"]' },
+  { name: '55-policy-booking', path: '/policies/booking', marker: '[data-test="policy-value"]' },
+  { name: '55a-policy-booking-phone', path: '/policies/booking', marker: '[data-test="policy-value"]', width: PHONE },
+  // --- end J-111
 ]
 
 const wanted = process.argv.slice(2)
 for (const shot of SHOTS) {
   if (wanted.length && !wanted.some(term => shot.name.includes(term))) continue
 
-  view.resize(shot.width ?? WIDE, 1000)
+  view.resize(shot.width ?? WIDE, shot.height ?? 1000)
   await visit(view, `${app.baseURL}${shot.path}`, shot.marker)
   await Bun.sleep(1200)
   if (shot.after) {
