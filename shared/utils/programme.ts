@@ -145,6 +145,18 @@ export interface AdminShow {
   warningCount: number
 }
 
+// A season, a category or a venue as a picker sees it: named, and retired ones still shown where
+// the row already carries one (D-131 criterion 5).
+export interface ShowReference {
+  id: string
+  name: string
+  archived: boolean
+}
+
+export interface ShowVenue extends ShowReference {
+  capacity: number | null
+}
+
 export interface AdminPerformance {
   id: string
   showId: string
