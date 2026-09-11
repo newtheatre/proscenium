@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { firstNameOf, groupedBoardCode, hubKpis, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine } from '#shared/utils/night-hub'
 
-// The show-night hub's wording and numbers (E-112, E-127, #905). The screens place these; what
+// The show-night hub's wording and numbers (E-112, E-127, issue 905). The screens place these; what
 // they say is decided here, so one test holds it.
 
 describe('the header line names the day, the curtain and the room (E-112 criterion 1)', () => {
@@ -88,7 +88,7 @@ describe('pass pressure answers the door, not a statistician (E-112 criterion 1)
   })
 })
 
-describe('the running time line (E-112 criterion 1, #905)', () => {
+describe('the running time line (E-112 criterion 1, issue 905)', () => {
   test('hours, minutes and the interval in one line', () => {
     expect(runningTimeLine(130, 1, 20)).toBe('2h 10 · one interval of 20 minutes')
   })
@@ -102,7 +102,7 @@ describe('the running time line (E-112 criterion 1, #905)', () => {
   })
 })
 
-describe('tonight\'s board code is read out, not read off (#905)', () => {
+describe('tonight\'s board code is read out, not read off (issue 905)', () => {
   test('six digits group as two threes', () => {
     expect(groupedBoardCode('253082')).toBe('253 082')
   })
