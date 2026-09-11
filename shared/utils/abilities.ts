@@ -84,6 +84,12 @@ export const recordZReadings = defineAbility((viewer: Viewer) => holds(viewer, '
 // The season dashboard's aggregates: the treasurer's own full read, or the committee's narrower
 // summary-only one (I-105 criterion 5).
 export const viewSeasonSummary = defineAbility((viewer: Viewer) => holds(viewer, 'finance.read') || holds(viewer, 'finance.summary'))
+// Closing a period, and changing an SU nominal mapping, are the treasurer's own writes (I-107, I-108).
+export const closeFinancePeriods = defineAbility((viewer: Viewer) => holds(viewer, 'finance.write'))
+export const manageNominalMappings = defineAbility((viewer: Viewer) => holds(viewer, 'finance.write'))
+// Reopening requires an administrator, never the treasurer alone (I-107 criterion 4).
+export const reopenFinancePeriods = defineAbility((viewer: Viewer) => holds(viewer, 'finance.reopen'))
+export const exportFinance = defineAbility((viewer: Viewer) => holds(viewer, 'finance.export'))
 
 // Planning the rota is sit-down work done days ahead, so it is a standing permission and the
 // officer bypass is not what opens it (0009, 0046, E-101 criterion 2).
@@ -155,6 +161,10 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewFinanceReports: 'finance.read',
   recordZReadings: 'finance.write',
   viewSeasonSummary: 'finance.summary',
+  closeFinancePeriods: 'finance.write',
+  manageNominalMappings: 'finance.write',
+  reopenFinancePeriods: 'finance.reopen',
+  exportFinance: 'finance.export',
   verifyAccessProfiles: 'access.verify',
   viewRota: 'rota.read',
   manageRota: 'rota.write',
