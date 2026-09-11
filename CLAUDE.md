@@ -41,6 +41,15 @@ code and documentation a successor can pick up cold.
 - Everything record-like keys to a performance, never to a day or a venue.
 - The live schema carries no legacy-id columns (0015).
 
+## Tests run on CI only
+
+The test suites (`bun run test`, `bun run test:e2e`, `bun run shots`, and the cold verification
+that goes with them) run on CI, the one reproducible environment: they pass on Linux and do not
+on Windows. Locally, run `lint`, `typecheck`, `typecheck:bun`, `check` and `build`; push the branch
+and read the CI result for the rest. Do not fight a suite on a developer machine, and never
+mark a PR verified on a local test run. A later pass over local test reproducibility is tracked
+as a GitHub issue.
+
 ## Comments
 
 Enforced by CI, no exemptions: two lines maximum; a comment carries what the code cannot (a
