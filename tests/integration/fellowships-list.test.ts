@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm'
+import { and, isNotNull, isNull, sql } from 'drizzle-orm'
 import { schema } from '@nuxthub/db'
 import { conditionsOf, filterQuerySchema } from '#shared/utils/list-filters'
 import { fellowshipsList } from '#shared/utils/fellowships-list'

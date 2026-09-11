@@ -1,9 +1,8 @@
 import { z } from 'zod'
 import { pageQuery } from './pagination'
 
-// The operations view of what was sent (H-106): filters over `notification_log`, read-only.
-// Kept out of `notify.ts`'s own file, which H-105 owns. The query schema is derived from
-// `send-log-list.ts`'s declaration (K-129).
+// The operations view of what was sent (H-106), read-only, kept out of `notify.ts`'s own file
+// (H-105). Its query schema is derived from `send-log-list.ts`'s declaration (K-129).
 
 export interface SendLogRow {
   id: string

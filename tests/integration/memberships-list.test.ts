@@ -8,8 +8,7 @@ import { boundStatement, createTestDatabase, rows } from '#tests/helpers/databas
 import type { TestDatabase } from '#tests/helpers/database'
 
 // The register through its declaration (K-129, A-117, A-130). "Awaiting record" is a declared
-// option so the runbook link keeps parsing, but is never answered by this predicate: the queue
-// is a different table, reached through a different endpoint the page chooses instead.
+// option so the runbook link keeps parsing, though the queue itself is a different table.
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()

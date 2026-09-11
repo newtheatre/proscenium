@@ -8,7 +8,8 @@ import { MESSAGE_TYPES } from '#shared/utils/notifications'
 import { sendLogList } from '#shared/utils/send-log-list'
 import { startOfLondonDay } from '#shared/utils/london'
 import type { DailyCount, PersonHistoryRow, SendLogRow } from '#shared/utils/notification-log'
-import type { ListClause, ListQuery } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
+import type { ListClause } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 
 // The operations view of what was sent (H-106), read-only over the log H-105 writes. Never
