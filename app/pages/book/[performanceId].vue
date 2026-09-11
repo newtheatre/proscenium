@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatLondon } from '#shared/utils/london'
 import { overCapReason } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 
@@ -27,6 +28,8 @@ interface RedeemablePass {
 interface BookingInfo {
   performanceId: string
   showId: string
+  show: { slug: string, title: string }
+  performance: { startsAt: number, venueName: string }
   refusal: { reason: string, says: string, closedAt?: number, externalBookingUrl?: string } | null
   cap: number
   ticketTypes: BookableTicketType[]
@@ -70,10 +73,22 @@ function maxFor(type: BookableTicketType): number {
   return data.value!.cap
 }
 
-const totalPence = computed(() => lines.value.reduce((total, line) => {
-  const type = data.value?.ticketTypes.find(one => one.id === line.ticketTypeId)
-  return total + (type ? type.price * line.quantity : 0)
-}, 0))
+const typeFor = (id: string): BookableTicketType | undefined => data.value?.ticketTypes.find(one => one.id === id)
+
+// What the stub reads back: the same lines the request carries, priced in pence to the last step.
+const ordered = computed(() => lines.value.flatMap((line) => {
+  const type = typeFor(line.ticketTypeId)
+  return type ? [{ id: type.id, name: type.name, quantity: line.quantity, pence: type.price * line.quantity }] : []
+}))
+
+const totalPence = computed(() => ordered.value.reduce((total, line) => total + line.pence, 0))
+const seats = computed(() => ordered.value.reduce((total, line) => total + line.quantity, 0))
+
+const when = computed(() => (data.value
+  ? formatLondon(new Date(data.value.performance.startsAt * 1000), {
+      weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+    })
+  : ''))
 
 const guestName = ref('')
 const guestEmail = ref('')
@@ -141,17 +156,23 @@ async function redeemPass(): Promise<void> {
   }
 }
 
-useSeoMeta({ title: 'Book tickets' })
+useSeoMeta({
+  title: 'Book tickets',
+  description: () => `Hold seats for ${data.value?.show.title ?? 'a show'} at the Nottingham New Theatre. Payment is taken at the theatre, in person.`,
+})
 </script>
 
 <template>
   <UContainer
-    class="max-w-2xl py-16"
+    class="max-w-5xl py-12"
     data-test="book-page"
   >
-    <h1 class="nnt-headline text-3xl">
-      Book tickets
-    </h1>
+    <UPageHeader
+      :title="`Book: ${data!.show.title}`"
+      :description="`${when} · ${data!.performance.venueName}`"
+      :ui="{ title: 'nnt-headline' }"
+      :links="[{ label: 'About the show', to: `/shows/${data!.show.slug}`, variant: 'link', color: 'primary' }]"
+    />
 
     <div
       v-if="confirmation"
@@ -215,7 +236,7 @@ useSeoMeta({ title: 'Book tickets' })
         color="neutral"
         variant="subtle"
         icon="i-lucide-ticket-x"
-        :title="'Booking is not open'"
+        title="Booking is not open"
         :description="data!.refusal.says"
         data-test="booking-refused"
       />
@@ -233,177 +254,226 @@ useSeoMeta({ title: 'Book tickets' })
 
     <div
       v-else
-      class="mt-8 space-y-6"
+      class="mt-8 grid gap-10 lg:grid-cols-[1fr_340px]"
     >
-      <UAlert
-        v-if="notice"
-        color="error"
-        variant="subtle"
-        :description="notice"
-        data-test="booking-notice"
-      />
-      <UButton
-        v-if="externalUrl"
-        :to="externalUrl"
-        target="_blank"
-        rel="noopener"
-        trailing-icon="i-lucide-external-link"
-      >
-        Book elsewhere
-      </UButton>
-
-      <UAlert
-        v-if="data!.accessEntitlement"
-        color="info"
-        variant="subtle"
-        icon="i-lucide-accessibility"
-        :description="`Your access entitlement: ${data!.accessEntitlement.access} access ticket and up to ${data!.accessEntitlement.companion} companion ticket(s) still available for this performance.`"
-        data-test="access-entitlement"
-      />
-
-      <UCard
-        v-if="data!.redeemablePass"
-        data-test="redeemable-pass"
-      >
-        <template #header>
-          <h2 class="font-semibold">
-            Your pass
-          </h2>
-        </template>
-        <div class="flex items-center justify-between gap-4">
-          <p class="text-sm text-muted">
-            {{ data!.redeemablePass.passTypeName }} ({{ data!.redeemablePass.reference }}) covers this performance.
-          </p>
-          <UButton
-            :loading="redeeming"
-            data-test="redeem-pass"
-            @click="redeemPass"
-          >
-            Use my pass
-          </UButton>
-        </div>
+      <div class="space-y-8">
         <UAlert
-          v-if="redeemNotice"
-          class="mt-3"
-          color="error"
+          v-if="data!.accessEntitlement"
+          color="info"
           variant="subtle"
-          :description="redeemNotice"
-          data-test="redeem-notice"
+          icon="i-lucide-accessibility"
+          :description="`Your access entitlement: ${data!.accessEntitlement.access} access ticket and up to ${data!.accessEntitlement.companion} companion ticket(s) still available for this performance.`"
+          data-test="access-entitlement"
         />
-      </UCard>
 
-      <UCard>
+        <UCard
+          v-if="data!.redeemablePass"
+          data-test="redeemable-pass"
+        >
+          <template #header>
+            <h2 class="font-semibold">
+              Your pass
+            </h2>
+          </template>
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <p class="text-sm text-muted">
+              {{ data!.redeemablePass.passTypeName }} ({{ data!.redeemablePass.reference }}) covers this performance.
+            </p>
+            <UButton
+              :loading="redeeming"
+              data-test="redeem-pass"
+              @click="redeemPass"
+            >
+              Use my pass
+            </UButton>
+          </div>
+          <UAlert
+            v-if="redeemNotice"
+            class="mt-3"
+            color="error"
+            variant="subtle"
+            :description="redeemNotice"
+            data-test="redeem-notice"
+          />
+        </UCard>
+
+        <section>
+          <h2 class="nnt-headline text-xl">
+            1 · Tickets
+          </h2>
+
+          <ul class="mt-4 divide-y divide-default">
+            <li
+              v-for="type in data!.ticketTypes"
+              :key="type.id"
+              class="flex flex-wrap items-center justify-between gap-4 py-4"
+              :data-test="`ticket-type-${type.id}`"
+            >
+              <div>
+                <p class="font-medium">
+                  {{ type.name }}
+                  <UBadge
+                    v-if="type.accessKind"
+                    size="sm"
+                    variant="subtle"
+                    color="info"
+                  >
+                    {{ type.accessKind === 'ACCESS' ? 'Access' : 'Companion' }}
+                  </UBadge>
+                </p>
+                <p
+                  v-if="type.description"
+                  class="text-sm text-muted"
+                >
+                  {{ type.description }}
+                </p>
+              </div>
+              <div class="flex items-center gap-4">
+                <span class="font-mono">{{ saysPrice(type.price) }}</span>
+                <UInputNumber
+                  v-model="quantities[type.id]"
+                  :min="0"
+                  :max="maxFor(type)"
+                  class="w-28"
+                  :data-test="`quantity-${type.id}`"
+                />
+              </div>
+            </li>
+          </ul>
+
+          <p
+            v-if="data!.ticketTypes.length === 0"
+            class="mt-4 text-muted"
+          >
+            Nothing is on sale for this performance yet.
+          </p>
+        </section>
+
+        <section v-if="!account.signedIn">
+          <h2 class="nnt-headline text-xl">
+            2 · Your details
+          </h2>
+          <div class="mt-4 grid gap-4 sm:grid-cols-2">
+            <UFormField
+              label="Name"
+              required
+            >
+              <UInput
+                v-model="guestName"
+                class="w-full"
+                autocomplete="name"
+                data-test="guest-name"
+              />
+            </UFormField>
+            <UFormField
+              label="Email address"
+              required
+              description="Your reference and the amount due are sent here."
+            >
+              <UInput
+                v-model="guestEmail"
+                type="email"
+                class="w-full"
+                autocomplete="email"
+                data-test="guest-email"
+              />
+            </UFormField>
+          </div>
+        </section>
+      </div>
+
+      <!-- The order as a ticket stub, and the view's one marquee at the foot of it. Below lg it
+           follows the form, which is the order a phone reads in. -->
+      <UCard
+        variant="ticket"
+        class="self-start lg:sticky lg:top-24"
+        data-test="booking-summary"
+      >
         <template #header>
           <h2 class="font-semibold">
-            Tickets
+            Your order
           </h2>
+          <p class="text-sm text-muted">
+            {{ data!.show.title }}
+          </p>
         </template>
 
-        <ul class="divide-y divide-default">
+        <ul
+          v-if="ordered.length"
+          class="space-y-2"
+        >
           <li
-            v-for="type in data!.ticketTypes"
-            :key="type.id"
-            class="flex items-center justify-between gap-4 py-3"
-            :data-test="`ticket-type-${type.id}`"
+            v-for="line in ordered"
+            :key="line.id"
+            class="flex items-baseline justify-between gap-4 font-mono text-sm"
+            :data-test="`order-line-${line.id}`"
           >
-            <div>
-              <p class="font-medium">
-                {{ type.name }}
-                <UBadge
-                  v-if="type.accessKind"
-                  size="sm"
-                  variant="subtle"
-                  color="info"
-                >
-                  {{ type.accessKind === 'ACCESS' ? 'Access' : 'Companion' }}
-                </UBadge>
-              </p>
-              <p
-                v-if="type.description"
-                class="text-sm text-muted"
-              >
-                {{ type.description }}
-              </p>
-              <p class="text-sm text-muted">
-                {{ saysPrice(type.price) }}
-              </p>
-            </div>
-            <UInputNumber
-              v-model="quantities[type.id]"
-              :min="0"
-              :max="maxFor(type)"
-              class="w-28"
-              :data-test="`quantity-${type.id}`"
-            />
+            <span>{{ line.name }} × {{ line.quantity }}</span>
+            <span>{{ saysPrice(line.pence) }}</span>
           </li>
         </ul>
-
         <p
-          v-if="data!.ticketTypes.length === 0"
-          class="text-muted"
+          v-else
+          class="text-sm text-muted"
         >
-          Nothing is on sale for this performance yet.
+          Nothing chosen yet.
         </p>
-      </UCard>
 
-      <UAlert
-        v-if="capReason"
-        color="warning"
-        variant="subtle"
-        :description="capReason"
-        data-test="booking-over-cap"
-      />
-
-      <UCard v-if="!account.signedIn">
-        <template #header>
-          <h2 class="font-semibold">
-            Your details
-          </h2>
-        </template>
-        <div class="space-y-4">
-          <UFormField
-            label="Name"
-            required
-          >
-            <UInput
-              v-model="guestName"
-              class="w-full"
-              autocomplete="name"
-              data-test="guest-name"
-            />
-          </UFormField>
-          <UFormField
-            label="Email address"
-            required
-            description="Your reference and the amount due are sent here."
-          >
-            <UInput
-              v-model="guestEmail"
-              type="email"
-              class="w-full"
-              autocomplete="email"
-              data-test="guest-email"
-            />
-          </UFormField>
+        <div class="mt-4 flex items-baseline justify-between gap-4">
+          <span class="font-medium">To pay at the theatre</span>
+          <span
+            class="font-mono text-lg"
+            data-test="booking-total"
+          >{{ saysPrice(totalPence) }}</span>
         </div>
-      </UCard>
-
-      <div class="flex items-center justify-between">
-        <p
-          class="text-lg font-medium"
-          data-test="booking-total"
-        >
-          Total due at the desk: {{ saysPrice(totalPence) }}
+        <p class="mt-1 text-sm text-muted">
+          Nothing is paid online, ever. Settle up at the box office when you arrive.
         </p>
-        <UButton
-          :loading="submitting"
-          :disabled="lines.length === 0 || capReason !== null"
-          data-test="booking-submit"
-          @click="book"
-        >
-          Hold these seats
-        </UButton>
-      </div>
+
+        <template #footer>
+          <UAlert
+            v-if="notice"
+            class="mb-3"
+            color="error"
+            variant="subtle"
+            :description="notice"
+            data-test="booking-notice"
+          />
+          <UAlert
+            v-if="capReason"
+            class="mb-3"
+            color="warning"
+            variant="subtle"
+            :description="capReason"
+            data-test="booking-over-cap"
+          />
+          <UButton
+            variant="marquee"
+            size="lg"
+            block
+            :loading="submitting"
+            :disabled="lines.length === 0 || capReason !== null"
+            data-test="booking-submit"
+            @click="book"
+          >
+            {{ seats === 0 ? 'Reserve your seats' : `Reserve ${seats} ${seats === 1 ? 'ticket' : 'tickets'}` }}
+          </UButton>
+          <UButton
+            v-if="externalUrl"
+            class="mt-3"
+            :to="externalUrl"
+            target="_blank"
+            rel="noopener"
+            trailing-icon="i-lucide-external-link"
+            block
+          >
+            Book elsewhere
+          </UButton>
+          <p class="mt-3 text-sm text-muted">
+            A reservation holds your seats until shortly before curtain, then they go back on sale.
+          </p>
+        </template>
+      </UCard>
     </div>
   </UContainer>
 </template>

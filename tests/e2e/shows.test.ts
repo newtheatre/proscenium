@@ -521,3 +521,23 @@ describe.skipIf(skip !== null)('the screen', () => {
     view.close()
   }, 120_000)
 })
+
+// J-111 criterion 8: the booking form names what is being booked, so it never has to fetch the
+// show again. Allow-listed, like every other public payload (D-121 criterion 1).
+describe.skipIf(skip !== null)('the booking form is told what it is booking (J-111)', () => {
+  test('the payload names the show and the performance, and carries nothing else about them', async () => {
+    const id = await newShow({ title: `A Midsummer Night's Dream ${crypto.randomUUID().slice(0, 8)}` })
+    const performanceId = await addPerformance(id)
+    expect((await send('POST', `/api/admin/shows/${id}/publish`, { published: true, cascadePerformances: true })).status).toBe(200)
+
+    const answered = await send('GET', `/api/performances/${performanceId}/booking`, undefined, '')
+    expect(answered.status).toBe(200)
+    const payload = await answered.json() as {
+      show: Record<string, unknown>
+      performance: Record<string, unknown>
+    }
+
+    expect(Object.keys(payload.show).sort()).toEqual(['slug', 'title'])
+    expect(Object.keys(payload.performance).sort()).toEqual(['startsAt', 'venueName'])
+  }, 120_000)
+})

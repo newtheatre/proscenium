@@ -34,9 +34,13 @@ export default defineEventHandler(async (event) => {
   // nothing is offered against a performance that is not on sale in the first place.
   const redeemablePass = !refusal && account ? await redeemablePassFor(account.id, id, performance.showId, now) : null
 
+  // Allow-listed, and only what the form's own heading and summary read back: what a visitor is
+  // about to book, so the page never has to fetch the show again to name it (D-104).
   return {
     performanceId: id,
     showId: performance.showId,
+    show: { slug: performance.showSlug, title: performance.showTitle },
+    performance: { startsAt: performance.startsAt, venueName: performance.venueName },
     refusal: refusal && { reason: refusal.reason, says: refusal.says, closedAt: refusal.closedAt, externalBookingUrl: refusal.externalBookingUrl },
     cap: await configValue(event, 'PUBLIC_ORDER_SEAT_CAP'),
     ticketTypes: visible,
