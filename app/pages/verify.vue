@@ -41,7 +41,10 @@ async function resend(payload: FormSubmitEvent<z.output<typeof addressOnly>>): P
   outcome.value = 'sent'
 }
 
-useSeoMeta({ title: 'Confirm your address' })
+useSeoMeta({
+  title: 'Confirm your address',
+  description: 'Confirming the email address on a Nottingham New Theatre account.',
+})
 </script>
 
 <template>

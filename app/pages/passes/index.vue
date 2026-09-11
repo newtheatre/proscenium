@@ -29,7 +29,10 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error'> = {
   EXPIRED: 'neutral',
 }
 
-useSeoMeta({ title: 'Your pass' })
+useSeoMeta({
+  title: 'Your pass',
+  description: 'The pass held on this device, and what it admits you to.',
+})
 </script>
 
 <template>

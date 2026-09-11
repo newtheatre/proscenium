@@ -37,7 +37,10 @@ async function signedIn(): Promise<void> {
   await navigateTo('/')
 }
 
-useSeoMeta({ title: 'Signing you in' })
+useSeoMeta({
+  title: 'Signing you in',
+  description: 'Finishing a sign-in from the link sent to your email address.',
+})
 </script>
 
 <template>
