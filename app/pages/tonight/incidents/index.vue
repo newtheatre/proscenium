@@ -31,8 +31,8 @@ const items = ref<Entry[]>([])
 // What tonight's log is scoped to, resolved once on load: none of BAR, DOOR or DUTY_MANAGER is
 // asked to name a performance, so the first role that resolves says which ones are running.
 const performanceIds = ref<string[]>([])
-// Named where the authority route says what is running, an id where it does not yet: #953 adds
-// `performances` and a shared label, and this falls back until that lands.
+// Named where the authority route says what is running, an id where it does not yet: issue 953
+// adds `performances` and a shared label, and this falls back until that lands.
 const performances = ref<{ id: string, showTitle: string, startsAt: number }[]>([])
 const authorityFailure = ref<string | null>(null)
 

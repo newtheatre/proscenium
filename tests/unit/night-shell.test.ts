@@ -105,15 +105,27 @@ describe('the tonight shell (K-102 criteria 1 and 3)', () => {
     expect(await component('NightScreen')).toMatch(/\bmax-w-/)
   })
 
-  test('every page under /tonight wears the layout and is a NightScreen', async () => {
+  // The hub is the exception, and only the hub: it is the navigation rather than a screen with
+  // work on it, so it spends the whole viewport on its six tiles (E-112 criterion 1).
+  const THE_HUB = 'index.vue'
+
+  test('every page under /tonight wears the layout, and every one but the hub is a NightScreen', async () => {
     const pages = [...new Bun.Glob('**/*.vue').scanSync({ cwd: 'app/pages/tonight', onlyFiles: true })].sort()
     expect(pages.length).toBeGreaterThan(0)
     const offenders: string[] = []
     for (const page of pages) {
       const source = await read(`app/pages/tonight/${page}`)
       if (!/layout:\s*'tonight'/.test(source)) offenders.push(`${page}: not on the tonight layout`)
-      if (!source.includes('<NightScreen')) offenders.push(`${page}: not a NightScreen`)
+      if (page !== THE_HUB && !source.includes('<NightScreen')) offenders.push(`${page}: not a NightScreen`)
     }
     expect(offenders).toEqual([])
+  })
+
+  // The hub still has to be a show-night screen in every other respect, so the two primitives it
+  // does use are checked here rather than left to the e2e suite alone.
+  test('the hub is built from the show-night primitives it does use', async () => {
+    const source = await read(`app/pages/tonight/${THE_HUB}`)
+    expect(source).toContain('<NightTile')
+    expect(source).toContain('<NightStale')
   })
 })
