@@ -505,7 +505,10 @@ the row shape live in `server/utils/training-modules-list.ts` rather than beside
 catalogue's server code in `server/utils/training.ts`, because that file leans on Nitro's ambient
 auto-imports and is never imported directly by a test; a declaration a test reads through
 `whereFrom` needs the explicit imports `server/utils/list-filters.ts` sets the precedent for
-(CONTRIBUTING, 0055).
+(CONTRIBUTING, 0055). The public catalogue (`GET /api/training/catalogue`) separately gains
+`nextSession` (the earliest open session teaching a module, one query with a `row_number()`
+partition over every session rather than an id list built from the catalogue's own rows, 0003) and
+`requested` (a signed-in member's own open request, one bound parameter).
 
 ## Scheduled tasks
 
