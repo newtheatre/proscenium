@@ -491,6 +491,35 @@ const CHOOSE = (label: string): string => `(() => {
   return true
 })()`
 
+// Whether the pointer sequence above actually committed: the listbox unmounts on a real pick,
+// so one still open means the option ignored it, as one nested inside a popover does.
+const STILL_OPEN = `Boolean(document.querySelector('[role="option"]'))`
+
+// The item a select nested inside a popover ignores from a pointer: it never reaches whatever
+// pointer-captured state Reka's own click handling wants, so it is walked to and taken by key.
+function highlighted(label: string): string {
+  return `(() => {
+    const wanted = ${JSON.stringify(label)}
+    const options = [...document.querySelectorAll('[role="option"]')]
+    const target = options.find(item => item.innerText.trim() === wanted)
+      ?? options.find(item => item.innerText.trim().startsWith(wanted))
+    return target ? target.hasAttribute('data-highlighted') : null
+  })()`
+}
+
+async function commitByKeyboard(view: Bun.WebView, label: string): Promise<boolean> {
+  for (let step = 0; step < 20; step++) {
+    const ready = await view.evaluate<boolean | null>(highlighted(label))
+    if (ready === null) return false
+    if (ready) break
+    await view.evaluate(`document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))`)
+    await Bun.sleep(80)
+  }
+  await view.evaluate(`document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))`)
+  await Bun.sleep(200)
+  return true
+}
+
 async function narrow(view: Bun.WebView, term: string): Promise<void> {
   const typed = await view.evaluate<boolean>(`(() => {
     const panel = document.querySelector('[data-reka-popper-content-wrapper]')
@@ -522,7 +551,8 @@ export async function pickOption(view: Bun.WebView, selector: string, label: str
     await narrow(view, label)
     if (await view.evaluate<boolean>(CHOOSE(label))) {
       await Bun.sleep(300)
-      return
+      if (!(await view.evaluate<boolean>(STILL_OPEN))) return
+      if (await commitByKeyboard(view, label)) return
     }
     await view.evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
     await Bun.sleep(200)
