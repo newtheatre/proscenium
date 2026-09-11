@@ -8,8 +8,7 @@ import type { MySummary } from '#shared/utils/my-summary'
 import type { Availability } from '#shared/utils/programme'
 
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
-// Bun, where nothing is auto-imported (CONTRIBUTING). Only bun-safe utilities are imported here:
-// the endpoint fetches the training pieces itself and hands this file the shaped result.
+// Bun (CONTRIBUTING). Bun-safe only: the endpoint fetches training data itself and hands it in.
 
 export interface NextRoomBooking {
   bookingId: string
