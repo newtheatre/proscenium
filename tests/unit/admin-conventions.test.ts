@@ -23,6 +23,25 @@ async function screens(): Promise<{ path: string, source: string }[]> {
 const offenders = async (test: (source: string) => boolean): Promise<string[]> =>
   (await screens()).filter(screen => test(screen.source)).map(screen => screen.path)
 
+// A section of a console screen is a component, so the table rules follow the table out of the
+// page and into wherever it lives now (D-132 criterion 1).
+const COMPONENTS = 'app/components'
+
+async function tables(): Promise<{ path: string, source: string }[]> {
+  const found = (await screens()).filter(screen => screen.source.includes('<UTable'))
+  for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: COMPONENTS, onlyFiles: true })) {
+    const path = join(COMPONENTS, entry)
+    const source = await Bun.file(path).text()
+    // One spelling whatever the platform separates directories with, so an allow-list matches.
+    if (source.includes('<UTable')) found.push({ path: path.replaceAll('\\', '/'), source })
+  }
+  return found.sort((a, b) => a.path.localeCompare(b.path))
+}
+
+// A fixed report of one thing's own rows, with nothing to search or filter: the toolbar would be
+// an empty row of controls. Everything else answers to the rule.
+const REPORTS_WITHOUT_A_TOOLBAR = ['app/components/box-office/show/Sales.vue']
+
 describe('an input is the component for its value (0032)', () => {
   test('a date is UInputDate, never a native date input', async () => {
     expect(await offenders(source => /type="date"/.test(source))).toEqual([])
@@ -51,7 +70,7 @@ describe('filters sit in a toolbar at a fixed width (0032)', () => {
   // One search of a fixed width and one button, with the filters behind it, is what stops a row
   // resizing as its values change.
   test('every list uses the shared toolbar', async () => {
-    const lists = (await screens()).filter(screen => screen.source.includes('<UTable'))
+    const lists = (await tables()).filter(screen => !REPORTS_WITHOUT_A_TOOLBAR.includes(screen.path))
     expect(lists.length).toBeGreaterThan(0)
     expect(lists.filter(screen => !screen.source.includes('<AdminToolbar')).map(screen => screen.path)).toEqual([])
   })
@@ -62,7 +81,7 @@ describe('filters sit in a toolbar at a fixed width (0032)', () => {
 const FILTERS_DECLARED_EVERYWHERE = false
 
 describe('a console list filters by its declaration (K-129)', () => {
-  const lists = async () => (await screens()).filter(screen => screen.source.includes('<UTable'))
+  const lists = tables
 
   test('a list that has migrated does not also hand-write its chips or its filter refs', async () => {
     const migrated = (await lists()).filter(screen => screen.source.includes('<ConsoleFilters'))
@@ -83,9 +102,9 @@ describe('feedback goes where it belongs (0032)', () => {
   // A confirmation the reader does not have to act on is a toast, not something that sits on the
   // page until it is dismissed.
   test('every table says what would be there when it is empty', async () => {
-    const tables = (await screens()).filter(screen => screen.source.includes('<UTable'))
-    expect(tables.length).toBeGreaterThan(0)
-    expect(tables.filter(screen => !screen.source.includes('#empty')).map(screen => screen.path)).toEqual([])
+    const all = await tables()
+    expect(all.length).toBeGreaterThan(0)
+    expect(all.filter(screen => !screen.source.includes('#empty')).map(screen => screen.path)).toEqual([])
   })
 
   test('nothing counts things as "account(s)"', async () => {

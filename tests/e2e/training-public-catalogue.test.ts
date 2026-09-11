@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession } from '#tests/helpers/accounts'
-import { openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { adminSession, markVerified } from '#tests/helpers/accounts'
+import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
+import { click, fill, openSignedOutView, openView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-128. The catalogue is read by somebody deciding whether to join, so it answers without an
@@ -14,11 +15,17 @@ let app: AppUnderTest
 let cookie = ''
 let department = ''
 
+const password = generatePassword()
+const member = { ...syntheticPerson(53), email: registrableAddress('catalogue-card') }
+
 beforeAll(async () => {
   if (skip) return
   app = await startApp()
   cookie = (await adminSession(app)).cookie
   department = await addDepartment()
+
+  await send('POST', '/api/auth/register', { email: member.email, name: member.name, password }, '')
+  markVerified(app, member.email)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -122,6 +129,70 @@ describe.skipIf(skip !== null)('the catalogue answers without an account (G-128)
       expect(await view.evaluate<boolean>(
         `!!document.querySelector('[data-test="module-sign-in-note"]')`,
       )).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the catalogue names each module\'s earliest open session, from one grouped query (G-129)', async () => {
+    const soon = await addModule({ name: 'Working the desk' })
+    const untaught = await addModule({ name: 'Rigging a lantern' })
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+    const later = new Date(Date.now() + 172_800_000).toISOString().slice(0, 10)
+
+    // Two sessions teach the same module; the catalogue names the earlier one.
+    await send('POST', '/api/admin/training/sessions', {
+      heldOn: later, startsAt: '18:00', endsAt: '20:00', place: 'Green room', capacity: 10, moduleIds: [soon],
+    })
+    const answered = await send('POST', '/api/admin/training/sessions', {
+      heldOn: tomorrow, startsAt: '18:00', endsAt: '20:00', place: 'Studio', capacity: 10, moduleIds: [soon],
+    })
+    expect(answered.status).toBe(200)
+
+    const { items } = await (await send('GET', '/api/training/catalogue', undefined, '')).json() as {
+      items: { id: string, nextSession: { heldOn: string, place: string } | null }[]
+    }
+    expect(items.find(item => item.id === soon)?.nextSession).toMatchObject({ heldOn: tomorrow, place: 'Studio' })
+    expect(items.find(item => item.id === untaught)?.nextSession).toBeNull()
+  }, CASE_TIMEOUT_MS)
+
+  test('a signed-in member sees their own open request against the module, and nobody else\'s', async () => {
+    const asked = await addModule({ name: 'Rigging a lantern' })
+    const untouched = await addModule({ name: 'Working the desk' })
+    await send('POST', '/api/training/requests', { moduleId: asked })
+
+    const { items } = await (await send('GET', '/api/training/catalogue')).json() as {
+      items: { id: string, requested: boolean | null }[]
+    }
+    expect(items.find(item => item.id === asked)?.requested).toBe(true)
+    expect(items.find(item => item.id === untouched)?.requested).toBe(false)
+
+    const anonymous = await (await send('GET', '/api/training/catalogue', undefined, '')).json() as {
+      items: { id: string, requested: boolean | null }[]
+    }
+    expect(anonymous.items.find(item => item.id === asked)?.requested).toBeNull()
+  }, CASE_TIMEOUT_MS)
+
+  test('a signed-in member can request a module directly from the catalogue card (G-129)', async () => {
+    const id = await addModule({ name: 'Rigging a lantern' })
+    const view = await openView()
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', member.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+
+      await visit(view, `${app.baseURL}/training/modules`, '[data-test="catalogue-page"]')
+      await waitFor(view, `document.body.innerText.includes('Rigging a lantern')`, 30_000)
+      await click(view, `[data-test="catalogue-module-${id}"] [data-test="request-module"]`)
+      await waitFor(view, `document.querySelector('[data-test="ask-note"]')`, 30_000)
+      await click(view, '[data-test="ask-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="catalogue-module-${id}"] [data-test="module-requested"]')`, 30_000)
+
+      // Clicking the request control did not also follow the card's own link.
+      expect(await view.evaluate<string>('window.location.pathname')).toBe('/training/modules')
     }
     finally {
       view.close()
