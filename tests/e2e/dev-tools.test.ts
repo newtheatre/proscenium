@@ -27,6 +27,9 @@ interface Tools {
 
 describe('a seeded persona already carries a second factor', () => {
   test.skipIf(Boolean(skip))('a privileged role reaches an admin screen with no enrolment step', async () => {
+    // Twice, deliberately (#927): the second run takes the held branch for every persona, which
+    // is the one a database seeded on an earlier build exercises, and must still carry a factor.
+    await request(app, 'POST', '/api/dev/seed')
     await request(app, 'POST', '/api/dev/seed')
 
     const before = await (await request(app, 'GET', '/api/dev')).json() as Tools
