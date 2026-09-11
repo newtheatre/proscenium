@@ -2,8 +2,6 @@
 // One notification centre (0013, H-101 criterion 1). If any code but the centre can reach the
 // mail binding, every rule the centre enforces becomes optional.
 
-import { join } from 'node:path'
-
 // The one file allowed to touch the binding, and the one place the rules live.
 const CENTRE = 'server/utils/notify.ts'
 
@@ -16,8 +14,8 @@ const COMPOSES_A_MESSAGE = /\.\s*send\s*\(\s*\{[^}]*\bfrom\s*:/s
 // binding, because nothing there runs in a request.
 function serverFiles(): string[] {
   return [...new Bun.Glob('**/*.ts').scanSync({ cwd: 'server', onlyFiles: true })]
-    .map(path => join('server', path))
-    .filter(path => path !== CENTRE && !path.startsWith(join('server', 'db')))
+    .map(path => `server/${path.replaceAll('\\', '/')}`)
+    .filter(path => path !== CENTRE && !path.startsWith('server/db'))
     .sort()
 }
 
