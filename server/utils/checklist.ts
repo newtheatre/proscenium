@@ -1,10 +1,16 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { aliasColumns, whereFrom, yesNo } from './list-filters'
+import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
+import type { ListClause } from './list-filters'
 import type { ChecklistItemInput, Phase, SystemCheck } from '#shared/utils/checklist'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { SQL } from 'drizzle-orm'
 
 // The pre and post-show checklist (E-114), keyed to a performance rather than a venue and a
 // night (E-128). Configuration in `checklist_items`, stamped once (E-101's own pattern).
+
+const predicateOf = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
 
 export interface ChecklistItemRow {
   id: string
@@ -45,17 +51,51 @@ export interface VenueChecklist {
   items: ChecklistItemRow[]
 }
 
-// Every venue and its active checklist items, for the committee's own overview screen, the same
-// shape `listVenueTemplates()` returns for E-101.
-export async function listVenueChecklists(): Promise<VenueChecklist[]> {
-  const rows = await db.all<{ venueId: string, venueName: string, id: string | null, phase: Phase | null, label: string | null, sort: number | null, required: number | null, systemCheck: SystemCheck | null, active: number | null, updatedAt: number | null }>(sql`
+// Search and "configured" through the declaration (K-129); paging scopes the outer join by a
+// subquery over the venues it covers, never by an id list read back from a result set (0006).
+export function checklistVenuesClause(query: ListQuery): ListClause {
+  return whereFrom(checklistVenuesList, query, {
+    column: aliasColumns('vp'),
+    search: [sql`vp.name`],
+    fields: {
+      configured: yesNo(sql`exists (select 1 from checklist_items ci where ci.venue_id = vp.id and ci.active = 1)`),
+    },
+  })
+}
+
+interface VenueChecklistRow {
+  venueId: string
+  venueName: string
+  id: string | null
+  phase: Phase | null
+  label: string | null
+  sort: number | null
+  required: number | null
+  systemCheck: SystemCheck | null
+  active: number | null
+  updatedAt: number | null
+}
+
+export function venueChecklistsQuery(clause: ListClause, limit: number, offset: number): SQL {
+  return sql`
     SELECT v.id AS venueId, v.name AS venueName,
            i.id AS id, i.phase AS phase, i.label AS label, i.sort AS sort,
            i.required AS required, i.system_check AS systemCheck, i.active AS active, i.updated_at AS updatedAt
     FROM venues v
     LEFT JOIN checklist_items i ON i.venue_id = v.id AND i.active = 1
+    WHERE v.id IN (
+      SELECT vp.id FROM venues vp${predicateOf(clause)}
+      ORDER BY ${sql.join(clause.orderBy, sql`, `)}
+      LIMIT ${limit} OFFSET ${offset}
+    )
     ORDER BY v.name COLLATE NOCASE, ${phaseOrder(sql`i.phase`)}, i.sort, i.label COLLATE NOCASE
-  `)
+  `
+}
+
+// Every matching venue and its active checklist items, for the committee's own overview screen,
+// the same shape `listVenueTemplates()` returns for E-101.
+export async function listVenueChecklists(clause: ListClause, limit: number, offset: number): Promise<VenueChecklist[]> {
+  const rows = await db.all<VenueChecklistRow>(venueChecklistsQuery(clause, limit, offset))
 
   const venues = new Map<string, VenueChecklist>()
   for (const row of rows) {
@@ -69,6 +109,11 @@ export async function listVenueChecklists(): Promise<VenueChecklist[]> {
     venues.set(row.venueId, held)
   }
   return [...venues.values()]
+}
+
+export async function countVenueChecklists(clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM venues vp${predicateOf(clause)}`)
+  return row?.total ?? 0
 }
 
 export function insertItemStatement(input: ChecklistItemInput, updatedBy: string, id: string): SQL {

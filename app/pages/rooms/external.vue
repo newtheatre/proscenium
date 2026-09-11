@@ -54,6 +54,10 @@ function instantOf(day: string, clock: string): string {
 
 const ready = computed(() => Boolean(state.title.trim() && state.purpose && state.day && state.to > state.from))
 
+// The server refuses NO_MEMBERSHIP outright (0031), so the form's job is to say where to put it
+// right rather than to invent its own wording (A-129).
+const needsMembership = computed(() => failures.value.some(failure => failure.reason === 'NO_MEMBERSHIP'))
+
 async function ask(): Promise<void> {
   saving.value = true
   failures.value = []
@@ -224,6 +228,16 @@ useSeoMeta({ title: 'Book a room not listed here' })
                 {{ failure.says }}
               </li>
             </ul>
+            <UButton
+              v-if="needsMembership"
+              class="mt-2"
+              size="sm"
+              variant="subtle"
+              to="/account/membership"
+              data-test="external-membership-link"
+            >
+              Sort out your membership
+            </UButton>
           </template>
         </UAlert>
 

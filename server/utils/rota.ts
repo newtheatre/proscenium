@@ -3,12 +3,24 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
+import { aliasColumns, whereFrom, yesNo } from './list-filters'
+import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
+import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
+import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { ShiftRole, ShiftStatus, TemplateSlot } from '#shared/utils/rota'
 import type { SQL } from 'drizzle-orm'
 
 // Reading and writing the rota (E-101, E-102, E-106). Every statement here binds a fixed number
 // of parameters however many performances or slots it covers (0003, 0006).
+
+// A column already qualified by its own alias (`s.role`, `p.starts_at`): the declarations below
+// name several joined tables, so one alias would not do (K-129).
+const rawColumn = (name: string): SQL => sql.raw(name)
+
+const predicateOf = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
 
 export interface VenueTemplate {
   venueId: string
@@ -19,15 +31,36 @@ export interface VenueTemplate {
 // `role` is null for a venue with no template, which is what the LEFT JOIN is for.
 interface TemplateRow { venueId: string, venueName: string, role: ShiftRole | null, count: number }
 
-// Every venue, with the slots its template holds. A venue with no template is here with an empty
-// list, because "this venue stamps nothing" is the thing the screen has to show (E-101).
-export async function listVenueTemplates(): Promise<VenueTemplate[]> {
-  const rows = await db.all<TemplateRow>(sql`
+// Search and "staffed" through the declaration (K-129); paging scopes the outer join by a
+// subquery over the venues it covers, never by an id list read back from a result set (0006).
+export function venueTemplatesClause(query: ListQuery): ListClause {
+  return whereFrom(rotaTemplatesList, query, {
+    column: aliasColumns('vp'),
+    search: [sql`vp.name`],
+    fields: {
+      staffed: yesNo(sql`exists (select 1 from shift_templates st where st.venue_id = vp.id)`),
+    },
+  })
+}
+
+export function venueTemplatesQuery(clause: ListClause, limit: number, offset: number): SQL {
+  return sql`
     SELECT v.id AS venueId, v.name AS venueName, t.role AS role, t."count" AS "count"
     FROM venues v
     LEFT JOIN shift_templates t ON t.venue_id = v.id
+    WHERE v.id IN (
+      SELECT vp.id FROM venues vp${predicateOf(clause)}
+      ORDER BY ${sql.join(clause.orderBy, sql`, `)}
+      LIMIT ${limit} OFFSET ${offset}
+    )
     ORDER BY v.name COLLATE NOCASE, t.role
-  `)
+  `
+}
+
+// Every matching venue, with the slots its template holds. A venue with no template is here
+// with an empty list, because "this venue stamps nothing" is the thing the screen has to show.
+export async function listVenueTemplates(clause: ListClause, limit: number, offset: number): Promise<VenueTemplate[]> {
+  const rows = await db.all<TemplateRow>(venueTemplatesQuery(clause, limit, offset))
 
   const templates = new Map<string, VenueTemplate>()
   for (const row of rows) {
@@ -36,6 +69,11 @@ export async function listVenueTemplates(): Promise<VenueTemplate[]> {
     templates.set(row.venueId, held)
   }
   return [...templates.values()]
+}
+
+export async function countVenueTemplates(clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM venues vp${predicateOf(clause)}`)
+  return row?.total ?? 0
 }
 
 export async function templateSlotsFor(venueId: string): Promise<TemplateSlot[]> {
@@ -354,9 +392,20 @@ export interface PendingApprovalRow {
   claimedAt: number | null
 }
 
+// Search, a role and a night through the declaration (K-129); "claimed" is the base predicate
+// every approval shares, never something a reader could filter away.
+export function pendingApprovalsClause(query: ListQuery): ListClause {
+  const clause = whereFrom(rotaApprovalsList, query, {
+    column: rawColumn,
+    search: [sql`sh.title`, sql`u.name`],
+  })
+  const base = sql`s.status = 'CLAIMED'`
+  return { ...clause, where: clause.where ? sql`${base} AND (${clause.where})` : base }
+}
+
 // The FOH officer's approval list: every claim waiting on a decision, oldest performance first
-// (E-105 criterion 2).
-export function pendingApprovalsQuery(limit: number, offset: number): SQL {
+// by default (E-105 criterion 2).
+export function pendingApprovalsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT s.id AS shiftId, s.role AS role, p.id AS performanceId, p.starts_at AS startsAt,
            v.name AS venueName, sh.title AS showTitle,
@@ -366,14 +415,22 @@ export function pendingApprovalsQuery(limit: number, offset: number): SQL {
     JOIN venues v ON v.id = p.venue_id
     JOIN shows sh ON sh.id = p.show_id
     JOIN users u ON u.id = s.user_id
-    WHERE s.status = 'CLAIMED'
-    ORDER BY p.starts_at, s.role, s.slot
+    WHERE ${clause.where}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export function countPendingApprovalsQuery(): SQL {
-  return sql`SELECT count(*) AS total FROM shifts WHERE status = 'CLAIMED'`
+export function countPendingApprovalsQuery(clause: ListClause): SQL {
+  return sql`
+    SELECT count(*) AS total
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    JOIN venues v ON v.id = p.venue_id
+    JOIN shows sh ON sh.id = p.show_id
+    JOIN users u ON u.id = s.user_id
+    WHERE ${clause.where}
+  `
 }
 
 // What shift-scoped authority resolves against (E-111 criterion 1, 0044). A fixed number of
@@ -443,9 +500,20 @@ export interface UnfilledShiftRow {
   declineReason: string | null
 }
 
+// Search, a role, a status and a night through the declaration (K-129); the base predicate is
+// what "unfilled" means and stays outside a reader's reach.
+export function unfilledShiftsClause(query: ListQuery, now: number): ListClause {
+  const clause = whereFrom(unfilledShiftsList, query, {
+    column: rawColumn,
+    search: [sql`sh.title`, sql`v.name`],
+  })
+  const base = sql`s.status IN ('OPEN', 'DECLINED') AND p.status <> 'CANCELLED' AND p.starts_at >= ${now}`
+  return { ...clause, where: clause.where ? sql`${base} AND (${clause.where})` : base }
+}
+
 // Everything an officer might fill by hand: open because nobody has claimed it, or declined
 // because a claim did not work out. Neither reopens itself (E-107 criterion 3).
-export function unfilledShiftsQuery(now: number, limit: number, offset: number): SQL {
+export function unfilledShiftsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT s.id AS shiftId, s.role AS role, s.status AS status, p.id AS performanceId,
            v.id AS venueId, v.name AS venueName, sh.title AS showTitle, p.starts_at AS startsAt,
@@ -454,17 +522,19 @@ export function unfilledShiftsQuery(now: number, limit: number, offset: number):
     JOIN performances p ON p.id = s.performance_id
     JOIN venues v ON v.id = p.venue_id
     JOIN shows sh ON sh.id = p.show_id
-    WHERE s.status IN ('OPEN', 'DECLINED') AND p.status <> 'CANCELLED' AND p.starts_at >= ${now}
-    ORDER BY p.starts_at, s.role, s.slot
+    WHERE ${clause.where}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export function countUnfilledShiftsQuery(now: number): SQL {
+export function countUnfilledShiftsQuery(clause: ListClause): SQL {
   return sql`
     SELECT count(*) AS total
     FROM shifts s
     JOIN performances p ON p.id = s.performance_id
-    WHERE s.status IN ('OPEN', 'DECLINED') AND p.status <> 'CANCELLED' AND p.starts_at >= ${now}
+    JOIN venues v ON v.id = p.venue_id
+    JOIN shows sh ON sh.id = p.show_id
+    WHERE ${clause.where}
   `
 }

@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { can, manageEmergencyCard } from '#shared/utils/abilities'
 import { formatLondon } from '#shared/utils/london'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Emergency cards', middleware: 'console' })
@@ -22,24 +22,30 @@ interface VenueCard {
   updatedAt: number | null
 }
 
+interface Listing {
+  venues: VenueCard[]
+  page: number
+  pageSize: number
+  total: number
+  pages: number
+}
+
 const request = useRequestFetch()
 const toast = useToast()
 const writes = computed(() => can(useViewer().value, manageEmergencyCard))
-const search = ref('')
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
+// Search, filters, sort and page live in the URL (K-129).
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(emergencyCardsList)
+
+const empty = (): Listing => ({ venues: [], page: 1, pageSize: 0, total: 0, pages: 1 })
+
 const { data, status, refresh } = await useAsyncData(
   'emergency-cards',
-  () => request<{ venues: VenueCard[] }>('/api/admin/venues/emergency'),
-  { default: (): { venues: VenueCard[] } => ({ venues: [] }) },
+  () => request<Listing>('/api/admin/venues/emergency', { query: query.value }),
+  { watch: [query], default: empty },
 )
-
-const shown = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  if (!term) return data.value.venues
-  return data.value.venues.filter(venue => venue.venueName.toLowerCase().includes(term))
-})
 
 interface FormState {
   assemblyPoint: string
@@ -89,16 +95,6 @@ async function save(): Promise<void> {
     saving.value = false
   }
 }
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  return active
-})
 
 function asOf(at: number | null): string {
   return at === null ? 'Never set' : formatLondon(new Date(at * 1000), { dateStyle: 'medium', timeStyle: 'short' })
@@ -155,24 +151,49 @@ const columns: TableColumn<VenueCard>[] = [
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A venue"
-      :active="activeFilters"
+      :placeholder="emergencyCardsList.search?.placeholder"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''"
-    />
+      @clear="clear"
+    >
+      <template #filters>
+        <ConsoleFilters
+          :spec="emergencyCardsList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
+      </template>
+    </AdminToolbar>
 
     <UTable
-      :data="shown"
+      :data="data.venues"
       :columns="columns"
       :loading="status === 'pending'"
       data-test="emergency-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          No venues yet.
+          {{ filtered ? 'No venue matches that.' : 'No venues yet.' }}
         </p>
       </template>
     </UTable>
+
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p
+        data-test="emergency-total"
+        class="text-sm text-muted"
+      >
+        {{ plural(data.total, 'venue') }}
+      </p>
+      <UPagination
+        v-if="data.pages > 1"
+        v-model:page="page"
+        :total="data.total"
+        :items-per-page="data.pageSize"
+      />
+    </div>
 
     <UModal
       v-model:open="open"

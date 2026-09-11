@@ -46,3 +46,20 @@ export function isCurrent(term: Term, today: string, graceDays: number): boolean
 export function isInGrace(term: Term, today: string, graceDays: number): boolean {
   return today > term.expiresOn && isCurrent(term, today, graceDays)
 }
+
+// The one fact the viewer, the account menu and the register all read off the same sums (0031,
+// A-129): never two booleans, because grace needs its own date and lapsed needs its own.
+export type MembershipState
+  = | { kind: 'none' }
+    | { kind: 'current', until: string }
+    | { kind: 'grace', until: string, expiredOn: string }
+    | { kind: 'lapsed', expiredOn: string }
+
+export function membershipState(term: Term | null, today: string, graceDays: number): MembershipState {
+  if (!term) return { kind: 'none' }
+  if (isInGrace(term, today, graceDays)) {
+    return { kind: 'grace', until: daysAfter(term.expiresOn, graceDays), expiredOn: term.expiresOn }
+  }
+  if (isCurrent(term, today, graceDays)) return { kind: 'current', until: term.expiresOn }
+  return { kind: 'lapsed', expiredOn: term.expiresOn }
+}

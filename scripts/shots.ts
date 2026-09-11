@@ -115,6 +115,25 @@ sql(`INSERT INTO memberships (id, user_id, starts_on, expires_on, source)
      VALUES (?, (SELECT id FROM users WHERE email = ?), date('now', '-30 days'), date('now', '+300 days'), 'MANUAL')`,
 crypto.randomUUID().replaceAll('-', ''), email)
 
+// A venue, a show and two performances tonight, staffed and claimed enough that the rota
+// console lists (K-129) are never a picture of an empty table.
+sql(`INSERT INTO venues (id, name, capacity, room_id) VALUES (?, ?, ?, NULL)`, 'shots-venue', 'The Space (test)', 80)
+sql(`INSERT INTO shows (id, slug, title, status) VALUES (?, ?, ?, ?)`, 'shots-show', 'shots-the-seagull', 'The Seagull (test)', 'PUBLISHED')
+sql(`INSERT INTO shift_templates (id, venue_id, role, "count") VALUES (?, ?, ?, ?)`, crypto.randomUUID(), 'shots-venue', 'DUTY_MANAGER', 1)
+sql(`INSERT INTO shift_templates (id, venue_id, role, "count") VALUES (?, ?, ?, ?)`, crypto.randomUUID(), 'shots-venue', 'DOOR', 2)
+const shotsNow = Math.floor(Date.now() / 1000)
+sql(`INSERT INTO performances (id, show_id, venue_id, starts_at, doors_at, duration_minutes, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+'shots-performance', 'shots-show', 'shots-venue', shotsNow + 4 * 3600, shotsNow + 3.5 * 3600, 120, 'ON_SALE')
+sql(`INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)`,
+  'shots-shift-open', 'shots-performance', 'DOOR', 1, 'OPEN')
+sql(`INSERT INTO shifts (id, performance_id, role, slot, status, user_id, claimed_at) VALUES (?, ?, ?, ?, ?, ?, unixepoch())`,
+  'shots-shift-claimed', 'shots-performance', 'DOOR', 2, 'CLAIMED', ids[2])
+sql(`INSERT INTO venue_emergency_info (id, venue_id, assembly_point, updated_by) VALUES (?, ?, ?, (SELECT id FROM users WHERE email = ?))`,
+  crypto.randomUUID(), 'shots-venue', 'The car park behind the building', email)
+sql(`INSERT INTO checklist_items (id, venue_id, phase, label, sort, required) VALUES (?, ?, ?, ?, ?, ?)`,
+  crypto.randomUUID(), 'shots-venue', 'PRE', 'Fire exits checked', 1, 1)
+
 const roomsForShots = await (await send('GET', '/api/admin/rooms', undefined, cookie)).json() as { items: { id: string, name: string }[] }
 const studio = roomsForShots.items.find(room => room.name === 'The Studio') ?? roomsForShots.items[0]
 if (studio) {
@@ -222,6 +241,13 @@ const SHOTS: Shot[] = [
   { name: '10j-bar-stock', path: '/bar/stock', marker: '[data-test="bar-items-table"]' },
   { name: '10k-bar-movements', path: '/bar/stock/movements', marker: '[data-test="bar-movements-table"]' },
   { name: '10l-bar-stocktakes', path: '/bar/stock/stocktakes', marker: '[data-test="bar-stocktakes-table"]' },
+  { name: '16a-rota-shifts', path: '/rota/manage/shifts', marker: '[data-test="unfilled-shifts-table"]' },
+  { name: '16b-rota-shifts-filters', path: '/rota/manage/shifts', marker: '[data-test="unfilled-shifts-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '16c-rota-approvals', path: '/rota/manage/approvals', marker: '[data-test="approvals-table"]' },
+  { name: '16d-rota-templates', path: '/rota/manage/templates', marker: '[data-test="templates-table"]' },
+  { name: '16e-rota-templates-filters', path: '/rota/manage/templates', marker: '[data-test="templates-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '16f-rota-checklists', path: '/rota/manage/checklists', marker: '[data-test="checklists-table"]' },
+  { name: '16g-rota-emergency', path: '/rota/manage/emergency', marker: '[data-test="emergency-table"]' },
   { name: '11-config', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
   { name: '12-dev-tools', path: '/dev', marker: '[data-test="dev-seed"]' },
   { name: '13-people-narrow', path: '/admin/people', marker: '[data-test="directory-table"]', width: NARROW },

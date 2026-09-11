@@ -17,13 +17,23 @@ import { barItemsList } from '#shared/utils/bar-items-list'
 import { barMovementsList } from '#shared/utils/bar-movements-list'
 import { barProductsList } from '#shared/utils/bar-products-list'
 import { blackoutsList } from '#shared/utils/blackouts-list'
+import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
+import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
 import { externalSpacesList } from '#shared/utils/external-spaces-list'
 import { roomsList } from '#shared/utils/rooms-list'
 import { roomsQueueList } from '#shared/utils/rooms-queue-list'
+import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
+import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import { showsList } from '#shared/utils/shows-list'
 import { stocktakesList } from '#shared/utils/stocktakes-list'
+import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import { utilisationList } from '#shared/utils/utilisation-list'
 import type { FilterField, ListSpec } from '#shared/utils/list-filters'
+
+// The rota module's five declarations, migrated alongside accounts and shows (K-129).
+const rotaLists = [unfilledShiftsList, rotaApprovalsList, rotaTemplatesList, checklistVenuesList, emergencyCardsList]
+// The bar module's declarations, migrated in the same pass (K-129).
+const barLists = [barCategoriesList, barProductsList, barItemsList, barMovementsList, stocktakesList]
 
 // One declaration derives the query schema, the builder and the chips (K-129 criterion 1, 0032).
 // What the predicates do against real rows is tests/integration/list-filters.test.ts.
@@ -52,10 +62,10 @@ const spec: ListSpec = {
 const parse = (query: Record<string, string>) => filterQuerySchema(spec).safeParse(query)
 
 // Every declaration migrated so far, shared by the cross-cutting checks below (K-129 criterion 6).
-const MIGRATED = [
-  accountsList, showsList, roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList,
-  barCategoriesList, barProductsList, barItemsList, barMovementsList, stocktakesList,
-]
+// The rooms module's declarations (K-129).
+const roomsLists = [roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList]
+// Every migrated declaration; the cross-declaration checks below walk this list.
+const MIGRATED = [accountsList, showsList, ...roomsLists, ...rotaLists, ...barLists]
 
 describe('the schema is derived from the declaration (criterion 1)', () => {
   test('an empty query is the first page, the default sort and no conditions', () => {
@@ -237,6 +247,15 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
     expect(operatorsOf(role!)).not.toContain('empty')
     const season = fieldOf(showsList, 'seasonId')
     expect(season?.column).toBe('season_id')
+  })
+
+  test('a rota list filters on a night, against the show night rather than the calendar day', () => {
+    const night = fieldOf(unfilledShiftsList, 'night')
+    expect(night?.dateAs).toBe('night')
+    expect(night?.column).toBe('p.starts_at')
+    const staffed = fieldOf(rotaTemplatesList, 'staffed')
+    expect(staffed?.column).toBeUndefined()
+    expect(staffed?.kind).toBe('yes-no')
   })
 
   test('every declared key is unique and no field shares a key with the paging or search keys', () => {

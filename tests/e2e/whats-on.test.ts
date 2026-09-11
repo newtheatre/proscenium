@@ -69,7 +69,7 @@ interface PublicPerformance {
   availability: string
   remaining: number | null
   says: string
-  prices: { name: string, description: string | null, price: number }[]
+  prices: { name: string, description: string | null, price: number, restrictedTo: string | null }[]
 }
 
 interface PublicShow {
@@ -472,6 +472,24 @@ describe.skipIf(skip !== null)('the pages read without an account', () => {
       await visit(view, `${app.baseURL}/shows/${show.slug}`, '[data-test="show-page"]')
       await waitFor(view, `document.querySelector('[data-test="warnings-none"]') !== null`)
       expect(await textOf(view, '[data-test="warnings"]')).toContain('has been assessed')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // A-129 criterion 5: a lapsed visitor deciding whether to book needs to know a price is not
+  // simply theirs, without signing in to find out.
+  test('a member price on the show page says it needs a current membership', async () => {
+    const name = named('Member')
+    expect((await send('POST', '/api/admin/ticket-types', { name, price: 500, restrictedTo: 'MEMBER' })).status).toBe(200)
+    const show = await publishedShow()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/shows/${show.slug}`, '[data-test="show-page"]')
+      await waitFor(view, `document.querySelector('[data-test="prices-${show.performanceId}"]') !== null`)
+      expect(await textOf(view, `[data-test="prices-${show.performanceId}"]`)).toContain('Current members only')
     }
     finally {
       view.close()

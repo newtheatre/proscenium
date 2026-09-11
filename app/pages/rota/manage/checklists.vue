@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { can, manageChecklist } from '#shared/utils/abilities'
 import { PHASES, SYSTEM_CHECKS, checklistItemForm, saysPhase, saysSystemCheck } from '#shared/utils/checklist'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
 import type { Phase, SystemCheck } from '#shared/utils/checklist'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -14,25 +14,31 @@ const UButton = resolveComponent('UButton')
 interface Item { id: string, phase: Phase, label: string, sort: number, required: boolean, systemCheck: SystemCheck | null }
 interface VenueChecklist { venueId: string, venueName: string, items: Item[] }
 
+interface Listing {
+  venues: VenueChecklist[]
+  page: number
+  pageSize: number
+  total: number
+  pages: number
+}
+
 const request = useRequestFetch()
 const toast = useToast()
 // Tidiness rather than enforcement: the routes are what refuse (0040).
 const writes = computed(() => can(useViewer().value, manageChecklist))
-const search = ref('')
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
+// Search, filters, sort and page live in the URL (K-129).
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(checklistVenuesList)
+
+const empty = (): Listing => ({ venues: [], page: 1, pageSize: 0, total: 0, pages: 1 })
+
 const { data, status, refresh } = await useAsyncData(
   'checklist-venues',
-  () => request<{ venues: VenueChecklist[] }>('/api/admin/checklist'),
-  { default: (): { venues: VenueChecklist[] } => ({ venues: [] }) },
+  () => request<Listing>('/api/admin/checklist', { query: query.value }),
+  { watch: [query], default: empty },
 )
-
-const shown = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  if (!term) return data.value.venues
-  return data.value.venues.filter(venue => venue.venueName.toLowerCase().includes(term))
-})
 
 interface FormState {
   venueId: string
@@ -94,16 +100,6 @@ async function setActive(venueId: string, item: Item, active: boolean): Promise<
     failure.value = refusalText(error)
   }
 }
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  return active
-})
 
 const refusal = computed(() => (checklistItemForm.safeParse(state).success ? null : 'Give the item a label'))
 
@@ -175,24 +171,49 @@ const columns: TableColumn<VenueChecklist>[] = [
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A venue"
-      :active="activeFilters"
+      :placeholder="checklistVenuesList.search?.placeholder"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''"
-    />
+      @clear="clear"
+    >
+      <template #filters>
+        <ConsoleFilters
+          :spec="checklistVenuesList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
+      </template>
+    </AdminToolbar>
 
     <UTable
-      :data="shown"
+      :data="data.venues"
       :columns="columns"
       :loading="status === 'pending'"
       data-test="checklists-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          No venues yet.
+          {{ filtered ? 'No venue matches that.' : 'No venues yet.' }}
         </p>
       </template>
     </UTable>
+
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p
+        data-test="checklists-total"
+        class="text-sm text-muted"
+      >
+        {{ plural(data.total, 'venue') }}
+      </p>
+      <UPagination
+        v-if="data.pages > 1"
+        v-model:page="page"
+        :total="data.total"
+        :items-per-page="data.pageSize"
+      />
+    </div>
 
     <UModal
       v-model:open="open"

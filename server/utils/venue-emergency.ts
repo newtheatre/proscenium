@@ -1,10 +1,16 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { aliasColumns, whereFrom, yesNo } from './list-filters'
+import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { EmergencyCardInput } from '#shared/utils/venue-emergency'
 import type { SQL } from 'drizzle-orm'
 
 // The venue emergency card (E-113), append-only like `incidents`: an edit is a new row, and the
 // latest one per venue is the current card.
+
+const predicateOf = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
 
 export interface RecordedCard { id: string, statement: SQL }
 
@@ -65,9 +71,21 @@ export type VenueCardRow = Omit<EmergencyCard, 'id' | 'updatedByName' | 'updated
   updatedAt: number | null
 }
 
-// Every venue's current card in one query, for the committee's own overview screen, the same
-// join-and-pick-latest shape `listVenueChecklists()` uses for its own per-venue rows.
-export function currentCardsQuery(): SQL {
+// Search and "filed" through the declaration (K-129); paging scopes the outer join by a
+// subquery over the venues it covers, never by an id list read back from a result set (0006).
+export function emergencyCardsClause(query: ListQuery): ListClause {
+  return whereFrom(emergencyCardsList, query, {
+    column: aliasColumns('vp'),
+    search: [sql`vp.name`],
+    fields: {
+      filed: yesNo(sql`exists (select 1 from venue_emergency_info ei where ei.venue_id = vp.id)`),
+    },
+  })
+}
+
+// Every matching venue's current card in one query, for the committee's own overview screen,
+// the same join-and-pick-latest shape `listVenueChecklists()` uses for its own per-venue rows.
+export function currentCardsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT ${CARD_COLUMNS}
     FROM venues v
@@ -75,10 +93,20 @@ export function currentCardsQuery(): SQL {
       SELECT id FROM venue_emergency_info WHERE venue_id = v.id ORDER BY updated_at DESC LIMIT 1
     )
     LEFT JOIN users u ON u.id = e.updated_by
+    WHERE v.id IN (
+      SELECT vp.id FROM venues vp${predicateOf(clause)}
+      ORDER BY ${sql.join(clause.orderBy, sql`, `)}
+      LIMIT ${limit} OFFSET ${offset}
+    )
     ORDER BY v.name COLLATE NOCASE
   `
 }
 
-export async function currentCards(): Promise<VenueCardRow[]> {
-  return db.all<VenueCardRow>(currentCardsQuery())
+export async function currentCards(clause: ListClause, limit: number, offset: number): Promise<VenueCardRow[]> {
+  return db.all<VenueCardRow>(currentCardsQuery(clause, limit, offset))
+}
+
+export async function countVenuesForCards(clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM venues vp${predicateOf(clause)}`)
+  return row?.total ?? 0
 }

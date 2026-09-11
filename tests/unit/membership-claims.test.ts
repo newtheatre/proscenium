@@ -1,12 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { daysAfter, londonDay } from '#shared/utils/membership'
+import { daysAfter, londonDay, membershipState } from '#shared/utils/membership'
 import {
   CLAIM_STATUSES,
   CLAIM_REASON_LIMIT,
   canTransition,
   claimDeclineForm,
   membershipClaimForm,
-  membershipState,
 } from '#shared/utils/membership-claims'
 import { MEMBER_NAV } from '#shared/utils/site-nav'
 

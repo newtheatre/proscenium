@@ -1,6 +1,7 @@
 import { defineAbility } from 'nuxt-authorization/utils'
 import type { BouncerAbility } from 'nuxt-authorization/utils'
 import { OPERATIONAL_PERMISSIONS } from './roles'
+import type { MembershipState } from './membership'
 import type { Permission } from './roles'
 
 // Named views over the permission map, never a second vocabulary: an ability says which screen a
@@ -13,6 +14,9 @@ export interface Viewer {
   // trainer runs a session without either holding a standing permission (0009, G-110, G-111).
   leadsDepartment: boolean
   isTrainer: boolean
+  // A dated fact, never a grant (0009, 0031): one shape carries current, grace and lapsed rather
+  // than two booleans that could disagree.
+  membershipState: MembershipState
 }
 
 const holds = (viewer: Viewer, permission: Permission): boolean => viewer.permissions.includes(permission)
@@ -46,6 +50,12 @@ export const viewTrainingCatalogue = defineAbility((viewer: Viewer) => holds(vie
 
 // Running a session derives from a current trainer certification (requireTrainer, G-111).
 export const runTrainingSessions = defineAbility((viewer: Viewer) => holds(viewer, 'training.write') || viewer.isTrainer)
+
+// A membership is a dated fact, not a grant (0009, 0031). Grace counts for what these guard;
+// the refusal names the policy, never the ability (A-129).
+export const member = defineAbility((viewer: Viewer) => viewer.membershipState.kind === 'current')
+export const memberOrGrace = defineAbility((viewer: Viewer) =>
+  viewer.membershipState.kind === 'current' || viewer.membershipState.kind === 'grace')
 
 // The programme's configuration is sit-down work, so it is a standing permission like the
 // catalogue's, and nothing here opens a door or a till (0009, D-119).
