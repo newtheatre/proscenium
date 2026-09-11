@@ -17,11 +17,15 @@ withDefaults(defineProps<{
   loading?: boolean
   // A page with nothing behind the button says so rather than offering an empty panel.
   filterable?: boolean
+  // A period report has nothing a search box would narrow, so it omits the input rather than
+  // rendering one that filters nothing (#908).
+  searchable?: boolean
 }>(), {
   placeholder: 'Search',
   active: () => [],
   loading: false,
   filterable: true,
+  searchable: true,
 })
 
 const emit = defineEmits<{ clear: [] }>()
@@ -31,6 +35,7 @@ const emit = defineEmits<{ clear: [] }>()
   <div class="space-y-3">
     <div class="flex flex-wrap items-center gap-2">
       <UInput
+        v-if="searchable"
         v-model="search"
         icon="i-lucide-search"
         :placeholder="placeholder"

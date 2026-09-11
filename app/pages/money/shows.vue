@@ -22,7 +22,10 @@ const reportFailure = computed(() => (error.value ? refusalText(error.value, 'Th
 
 <template>
   <div class="space-y-6">
-    <AdminToolbar :filterable="false">
+    <AdminToolbar
+      :filterable="false"
+      :searchable="false"
+    >
       <template #actions>
         <UInputNumber
           v-model="year"

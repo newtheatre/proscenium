@@ -63,7 +63,10 @@ async function record(): Promise<void> {
 
 <template>
   <div class="space-y-6">
-    <AdminToolbar :filterable="false">
+    <AdminToolbar
+      :filterable="false"
+      :searchable="false"
+    >
       <template #actions>
         <DateField
           v-model="night"
