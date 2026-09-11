@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { recordMembership } from '#shared/utils/admin-forms'
+import { formatLondon } from '#shared/utils/london'
 import { MEMBERSHIP_TERMS, isInGrace, londonDay } from '#shared/utils/membership'
+import { claimDeclineForm } from '#shared/utils/membership-claims'
 import type { RecordMembership } from '#shared/utils/admin-forms'
+import type { ClaimDeclineInput } from '#shared/utils/membership-claims'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
@@ -32,15 +35,47 @@ interface Listing {
   graceDays: number
 }
 
+interface Claim {
+  id: string
+  userId: string
+  name: string
+  email: string
+  studentId: string
+  heldStudentId: string | null
+  startsOn: string
+  term: number
+  status: string
+  createdAt: number
+  heldUntil: string | null
+}
+
+interface ClaimListing {
+  items: Claim[]
+  page: number
+  pageSize: number
+  total: number
+  pages: number
+}
+
+// The claims queue is a different table under the same screen: what members said they bought,
+// waiting for an officer to write it down (A-130).
+const AWAITING_RECORD = 'awaiting-record'
+
 const FILTERS = [
   { label: 'Current', value: 'current', icon: 'i-lucide-badge-check' },
+  { label: 'Awaiting record', value: AWAITING_RECORD, icon: 'i-lucide-inbox' },
   { label: 'Awaiting a check', value: 'awaiting-check', icon: 'i-lucide-clock' },
   { label: 'Lapsed', value: 'lapsed', icon: 'i-lucide-history' },
   { label: 'Everyone ever', value: 'everyone', icon: 'i-lucide-users' },
 ]
 
+const route = useRoute()
 const listing = ref<Listing | null>(null)
-const filter = ref('current')
+const claims = ref<ClaimListing | null>(null)
+// How many are waiting, shown on the filter so the queue is visible from every other view.
+const waiting = ref<number | null>(null)
+// Reachable by link, so the week after cutover has a bookmark for the queue.
+const filter = ref(FILTERS.some(option => option.value === route.query.filter) ? String(route.query.filter) : 'current')
 const search = ref('')
 const page = ref(1)
 const loading = ref(false)
@@ -51,13 +86,43 @@ const grantForm = useTemplateRef('grantForm')
 const granting = ref(false)
 const grant = reactive<Partial<RecordMembership>>({ years: 1 })
 
+const declining = ref<Claim | null>(null)
+const decline = reactive<Partial<ClaimDeclineInput>>({ reason: '' })
+const deciding = ref<string | null>(null)
+
+const onQueue = computed(() => filter.value === AWAITING_RECORD)
+
+const filterItems = computed(() => FILTERS.map(option => ({
+  ...option,
+  label: option.value === AWAITING_RECORD && waiting.value !== null ? `${option.label} (${waiting.value})` : option.label,
+})))
+
+async function countWaiting(): Promise<void> {
+  try {
+    const answer = await $fetch<ClaimListing>('/api/admin/memberships/claims', { query: { pageSize: 1 } })
+    waiting.value = answer.total
+  }
+  catch {
+    waiting.value = null
+  }
+}
+
 async function load(): Promise<void> {
   loading.value = true
   failure.value = null
   try {
-    listing.value = await $fetch<Listing>('/api/admin/memberships', {
-      query: { filter: filter.value, search: search.value || undefined, page: page.value },
-    })
+    if (onQueue.value) {
+      claims.value = await $fetch<ClaimListing>('/api/admin/memberships/claims', {
+        query: { search: search.value || undefined, page: page.value },
+      })
+      if (!search.value) waiting.value = claims.value.total
+      else void countWaiting()
+    }
+    else {
+      listing.value = await $fetch<Listing>('/api/admin/memberships', {
+        query: { filter: filter.value, search: search.value || undefined, page: page.value },
+      })
+    }
   }
   catch (error) {
     failure.value = refusalText(error)
@@ -101,6 +166,58 @@ async function confirm(member: Member): Promise<void> {
   }
   catch (error) {
     failure.value = refusalText(error)
+  }
+}
+
+// Focus moves to the next claim's button, so a queue of hundreds is worked from the keyboard.
+async function focusNextClaim(): Promise<void> {
+  await nextTick()
+  const next = document.querySelector<HTMLElement>('[data-test^="claim-record-"]')
+  next?.focus()
+}
+
+async function recordClaim(claim: Claim): Promise<void> {
+  failure.value = null
+  deciding.value = claim.id
+  try {
+    await $fetch(`/api/admin/memberships/claims/${claim.id}/record`, { method: 'POST' })
+    toast.add({ title: `${claim.name} recorded`, icon: 'i-lucide-badge-check', color: 'success' })
+    await Promise.all([load(), countWaiting()])
+    await focusNextClaim()
+  }
+  catch (error) {
+    failure.value = refusalText(error)
+    await load()
+  }
+  finally {
+    deciding.value = null
+  }
+}
+
+function askWhy(claim: Claim): void {
+  decline.reason = ''
+  declining.value = claim
+}
+
+async function declineClaim(event: FormSubmitEvent<ClaimDeclineInput>): Promise<void> {
+  const claim = declining.value
+  if (!claim) return
+  failure.value = null
+  deciding.value = claim.id
+  try {
+    await $fetch(`/api/admin/memberships/claims/${claim.id}/decline`, { method: 'POST', body: event.data })
+    toast.add({ title: `${claim.name} told why`, icon: 'i-lucide-message-square-warning', color: 'neutral' })
+    declining.value = null
+    await Promise.all([load(), countWaiting()])
+    await focusNextClaim()
+  }
+  catch (error) {
+    failure.value = refusalText(error)
+    declining.value = null
+    await load()
+  }
+  finally {
+    deciding.value = null
   }
 }
 
@@ -189,7 +306,73 @@ const columns: TableColumn<Member>[] = [
   },
 ]
 
-onMounted(load)
+const sayWhen = (at: number): string => formatLondon(new Date(at * 1000), { day: 'numeric', month: 'short' })
+
+const claimColumns: TableColumn<Claim>[] = [
+  {
+    id: 'name',
+    header: 'Member',
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, row.original.name),
+      h('div', { class: 'text-xs text-muted' }, row.original.email),
+    ]),
+  },
+  {
+    id: 'studentId',
+    header: 'Student number',
+    cell: ({ row }) => h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
+      h('span', { class: 'font-mono text-sm' }, row.original.studentId),
+      row.original.heldStudentId && row.original.heldStudentId !== row.original.studentId
+        ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm', title: `The account holds ${row.original.heldStudentId}` }, () => 'Differs')
+        : null,
+    ]),
+  },
+  { accessorKey: 'startsOn', header: 'Bought', meta: { class: { td: 'font-mono text-sm whitespace-nowrap' } } },
+  {
+    id: 'term',
+    header: 'Term',
+    cell: ({ row }) => `${row.original.term} year${row.original.term === 1 ? '' : 's'}`,
+    meta: { class: { td: 'text-sm whitespace-nowrap' } },
+  },
+  {
+    id: 'since',
+    header: 'Waiting since',
+    cell: ({ row }) => h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
+      h('span', {}, sayWhen(row.original.createdAt)),
+      row.original.heldUntil && row.original.heldUntil >= londonDay(new Date())
+        ? h(UBadge, { 'color': 'info', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-held' }, () => `Holds one until ${row.original.heldUntil}`)
+        : null,
+    ]),
+    meta: { class: { td: 'text-sm text-muted' } },
+  },
+  {
+    id: 'decide',
+    header: '',
+    meta: { class: { td: 'text-right whitespace-nowrap' } },
+    cell: ({ row }) => h('div', { class: 'flex justify-end gap-2' }, [
+      h(UButton, {
+        'size': 'sm',
+        'icon': 'i-lucide-check',
+        'data-test': `claim-record-${row.original.id}`,
+        'loading': deciding.value === row.original.id,
+        'onClick': () => recordClaim(row.original),
+      }, () => 'Record'),
+      h(UButton, {
+        'size': 'sm',
+        'color': 'neutral',
+        'variant': 'outline',
+        'data-test': `claim-decline-${row.original.id}`,
+        'disabled': deciding.value === row.original.id,
+        'onClick': () => askWhy(row.original),
+      }, () => 'Decline'),
+    ]),
+  },
+]
+
+onMounted(() => {
+  void load()
+  void countWaiting()
+})
 </script>
 
 <template>
@@ -220,12 +403,12 @@ onMounted(load)
       <template #filters>
         <UFormField
           label="Show"
-          help="Current counts the grace window after a term ends."
+          help="Current counts the grace window after a term ends. Awaiting record is what members have claimed and nobody has written down yet."
         >
           <USelect
             v-model="filter"
             data-test="members-filter"
-            :items="FILTERS"
+            :items="filterItems"
             value-key="value"
             class="w-full"
           />
@@ -242,6 +425,7 @@ onMounted(load)
         </UButton>
 
         <UButton
+          v-if="!onQueue"
           data-test="members-export"
           icon="i-lucide-download"
           color="neutral"
@@ -255,6 +439,21 @@ onMounted(load)
     </AdminToolbar>
 
     <UTable
+      v-if="onQueue"
+      :data="claims?.items ?? []"
+      :columns="claimColumns"
+      :loading="loading"
+      data-test="claims-table"
+    >
+      <template #empty>
+        <p class="py-6 text-center text-sm text-muted">
+          {{ search ? 'No claim matches that.' : 'Nothing waiting to be recorded.' }}
+        </p>
+      </template>
+    </UTable>
+
+    <UTable
+      v-else
       :data="listing?.items ?? []"
       :columns="columns"
       :loading="loading"
@@ -274,15 +473,59 @@ onMounted(load)
         data-test="members-total"
         class="text-sm text-muted"
       >
-        {{ plural(listing?.total ?? 0, 'membership') }}
+        {{ onQueue ? plural(claims?.total ?? 0, 'claim') : plural(listing?.total ?? 0, 'membership') }}
       </p>
       <UPagination
-        v-if="listing && listing.pages > 1"
+        v-if="onQueue ? claims && claims.pages > 1 : listing && listing.pages > 1"
         v-model:page="page"
-        :total="listing.total"
-        :items-per-page="listing.pageSize"
+        :total="onQueue ? claims?.total ?? 0 : listing?.total ?? 0"
+        :items-per-page="onQueue ? claims?.pageSize ?? 25 : listing?.pageSize ?? 25"
       />
     </div>
+
+    <UModal
+      :open="declining !== null"
+      title="Decline this claim"
+      description="The member reads what you write here, so say what to put right."
+      @update:open="value => { if (!value) declining = null }"
+    >
+      <template #body>
+        <UForm
+          :schema="claimDeclineForm"
+          :state="decline"
+          class="space-y-4"
+          @submit="declineClaim"
+        >
+          <p
+            v-if="declining"
+            class="text-sm text-muted"
+          >
+            {{ declining.name }}, student number {{ declining.studentId }}, bought on {{ declining.startsOn }}.
+          </p>
+          <UFormField
+            name="reason"
+            label="Why"
+            required
+          >
+            <UTextarea
+              v-model="decline.reason"
+              data-test="claim-decline-reason"
+              :rows="3"
+              autofocus
+              class="w-full"
+            />
+          </UFormField>
+          <UButton
+            type="submit"
+            data-test="claim-decline-submit"
+            color="neutral"
+            :loading="deciding !== null"
+          >
+            Decline and tell them
+          </UButton>
+        </UForm>
+      </template>
+    </UModal>
 
     <UModal
       v-model:open="granting"

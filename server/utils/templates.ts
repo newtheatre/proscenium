@@ -1251,6 +1251,51 @@ The Nottingham New Theatre`,
     }
   },
 
+  'membership-claim-recorded': (context: TemplateContext): Rendered => {
+    const until = String(context.expiresOn)
+    const url = String(context.membershipUrl)
+    return {
+      subject: 'Your membership is recorded',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>The membership you told us about is now on your account. It runs until ${until}.</p>
+<p>Member prices and the members area work from now. The committee checks memberships against
+the Students' Union's own list afterwards, and that check never holds anything up.</p>
+<p><a href="${url}">See your membership</a></p>`),
+      text: `Hello ${context.name},
+
+The membership you told us about is now on your account. It runs until ${until}.
+
+Member prices and the members area work from now. The committee checks memberships against the
+Students' Union's own list afterwards, and that check never holds anything up.
+
+See your membership: ${url}
+
+The Nottingham New Theatre`,
+    }
+  },
+  'membership-claim-declined': (context: TemplateContext): Rendered => {
+    const reason = String(context.reason ?? '')
+    const url = String(context.membershipUrl)
+    return {
+      subject: 'We could not record your membership',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>We could not record the membership you told us about.</p>
+<p>Why: ${reason}</p>
+<p>If that can be put right, <a href="${url}">claim it again</a> with the corrected details, or
+speak to the membership secretary.</p>`),
+      text: `Hello ${context.name},
+
+We could not record the membership you told us about.
+
+Why: ${reason}
+
+If that can be put right, claim it again with the corrected details, or speak to the membership
+secretary: ${url}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   // Says plainly that a lapsing grant is not a lapsing shift: authority on the night derives from
   // tonight's confirmed shift, never from a standing grant (0009, A-119 criterion 1).
   'role-expiring': (context: TemplateContext): Rendered => {

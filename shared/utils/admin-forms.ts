@@ -1,16 +1,16 @@
 import { z } from 'zod'
 import { MANUAL_ACTION_NAMES } from './audit-actions'
+import { londonDayField } from './membership'
 import type { AuditActionName } from './audit-actions'
 
 // One schema per admin form, validating the request and driving the form that sends it (0032).
 // Two definitions drift; this one cannot.
 
 const accountId = z.string().min(1).max(64)
-const londonDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Give the date as YYYY-MM-DD')
 
 export const awardFellowship = z.object({
   userId: accountId,
-  awardedOn: londonDate,
+  awardedOn: londonDayField,
   // The meeting, never an individual: the theatre awards this (0023).
   awardedBy: z.string().trim().min(1, 'Name the meeting that resolved it').max(200),
   citation: z.string().trim().min(1, 'The citation is the public wording').max(1000),
@@ -22,7 +22,7 @@ export const revokeFellowship = z.object({
 
 export const recordMembership = z.object({
   userId: accountId,
-  startsOn: londonDate,
+  startsOn: londonDayField,
   years: z.union([z.literal(1), z.literal(3)]),
   evidence: z.string().trim().max(200).optional(),
   studentId: z.string().trim().max(32).optional(),
@@ -42,7 +42,7 @@ export const manualEntryForm = z.object({
   action: z.enum(MANUAL_ACTION_NAMES as [AuditActionName, ...AuditActionName[]]),
   target: accountId,
   onBehalfOf: accountId,
-  occurredOn: londonDate,
+  occurredOn: londonDayField,
 })
 
 export type ManualEntryForm = z.output<typeof manualEntryForm>

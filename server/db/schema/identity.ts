@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import { check, index, integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 const id = () => text('id').primaryKey()
 const now = sql`(unixepoch())`
@@ -78,6 +78,32 @@ export const memberships = sqliteTable('memberships', {
   // Membership is bought at the SU, never here, so there is no purchase source (0005).
   check('memberships_source', sql`${table.source} IN ('MANUAL', 'ROSTER')`),
   check('memberships_term', sql`${table.expiresOn} > ${table.startsOn}`),
+])
+
+// A member saying what they bought at the SU. It creates no membership: an officer records it
+// from the register, or says why not, and the claim closes either way (A-130, 0031).
+export const membershipClaims = sqliteTable('membership_claims', {
+  id: id(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // As typed. It reaches `users.student_id` only when an officer records the claim.
+  studentId: text('student_id').notNull(),
+  startsOn: text('starts_on').notNull(),
+  term: integer('term').notNull(),
+  status: text('status').notNull().default('OPEN'),
+  // What the officer wrote back. The member is shown it, so it is a reply rather than a verdict.
+  reason: text('reason'),
+  decidedBy: text('decided_by').references(() => users.id, { onDelete: 'set null' }),
+  decidedAt: integer('decided_at'),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  // Criterion 1, in the database rather than in a handler: one open claim per person, and a
+  // withdrawn or answered row leaves the index so the next claim is free to be made.
+  uniqueIndex('membership_claims_open').on(table.userId).where(sql`status = 'OPEN'`),
+  index('membership_claims_status_created').on(table.status, table.createdAt),
+  index('membership_claims_user').on(table.userId),
+  check('membership_claims_status', sql`${table.status} IN ('OPEN', 'RECORDED', 'DECLINED', 'WITHDRAWN')`),
+  // The SU sells one and three years and nothing else (0031).
+  check('membership_claims_term', sql`${table.term} IN (1, 3)`),
 ])
 
 // An honour, not a grant: permanent, singular, and the theatre's own record. `restrict` is the

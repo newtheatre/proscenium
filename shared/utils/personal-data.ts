@@ -56,6 +56,19 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'How many members there were in a year must survive; the evidence for one need not.',
   },
   {
+    name: 'membership_claims',
+    column: 'user_id',
+    section: 'membership-claims',
+    // The reply is exported as well as scrubbed: it is a thing written about them and shown to
+    // them, the way a module request's is.
+    columns: ['student_id', 'starts_on', 'term', 'status', 'reason', 'decided_at', 'created_at'],
+    erasure: 'scrub',
+    scrub: ['student_id', 'reason'],
+    // NOT NULL, because a claim without a number is not a claim; erasure blanks it instead.
+    scrubTo: { student_id: '' },
+    why: 'What this person said they bought at the SU. How many claimed and what came of it is worth keeping; the number they typed, and what was written back, is not.',
+  },
+  {
     name: 'fellowships',
     column: 'user_id',
     section: 'fellowship',

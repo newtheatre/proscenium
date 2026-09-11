@@ -14,8 +14,14 @@ const CONSTRAINT_FAILURE
 // Unrecognised is always a defect the caller rethrows, never a guess: answering 409 for an error
 // nobody named would hide it instead of surfacing it.
 export function constraintRefusal(table: ConstraintRefusal[], error: unknown): { statusCode: 409, statusMessage: string } | null {
-  const said = error instanceof Error ? error.message : String(error)
-  const violated = CONSTRAINT_FAILURE.exec(said)?.[1]?.trim()
-  const matched = table.find(refusal => refusal.violated === violated)
-  return matched ? { statusCode: 409, statusMessage: matched.says } : null
+  // Drizzle wraps the driver's error as "Failed query: ..." and keeps the real one on `cause`, so
+  // the chain is walked to the first message that names a constraint.
+  for (let held: unknown = error; held !== undefined && held !== null; held = (held as { cause?: unknown }).cause) {
+    const said = held instanceof Error ? held.message : String(held)
+    const violated = CONSTRAINT_FAILURE.exec(said)?.[1]?.trim()
+    const matched = table.find(refusal => refusal.violated === violated)
+    if (matched) return { statusCode: 409, statusMessage: matched.says }
+    if (held === (held as { cause?: unknown }).cause) break
+  }
+  return null
 }
