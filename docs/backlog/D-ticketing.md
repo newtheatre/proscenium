@@ -288,14 +288,18 @@ Open questions:
 - Depends on: D-101, D-106
 - Acceptance criteria:
   1. A sold-out performance offers a waiting-list form (name, email, party size); joining is
-     confirmed by email and duplicate joins for the same email and performance are refused.
+     confirmed by email and duplicate joins for the same email and performance are refused. The
+     entry's own link is minted before the row is written, so a signing failure refuses the join
+     outright rather than leaving an entry nobody holds a link to; a confirmation that cannot be
+     sent past that point says so on the page and never fails the join that already happened.
   2. When tickets free (expiry, cancellation, refund, capacity raise), the list is offered in
      join order: an offer email carries a claim link valid for a configurable window, and the
      claim converts to an ordinary reservation through D-104's write path, capacity-checked.
   3. An unclaimed offer lapses on its window and the next entry is offered; each offer and lapse
      is recorded, and the claim is race-safe so one freed ticket can never be claimed twice.
   4. Waiting-list entries for a performance are purged after that performance's night; the booker
-     can remove themselves at any time from a link in every email.
+     can remove themselves at any time from a link in every email. A link that no longer resolves
+     says so on the page, on both the leave page and the entry page's own leave button.
   5. The desk sees the list's length and next entries on the performance screen, and can offer to
      the list manually.
 - Source: Prompt Book D-1, D-2, D-5; audit PR-15 (no predecessor: new behaviour)

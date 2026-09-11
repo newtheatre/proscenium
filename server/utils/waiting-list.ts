@@ -26,6 +26,9 @@ export interface JoinWaitingListWriteInput {
   performanceId: string
   userId: string
   partySize: number
+  // The caller may fix the id, so it can mint the entry's token before anything is committed and
+  // leave no orphaned row behind a signing failure (D-113 criterion 1).
+  id?: string
 }
 
 export interface JoinWaitingListResult {
@@ -45,7 +48,7 @@ export function joinEntryStatement(id: string, performanceId: string, userId: st
 }
 
 export async function joinWaitingList(input: JoinWaitingListWriteInput): Promise<JoinWaitingListResult> {
-  const id = newId()
+  const id = input.id ?? newId()
   const entry = auditEntry({
     actorId: input.userId,
     action: 'waiting-list.joined',
