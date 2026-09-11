@@ -103,6 +103,8 @@ application is the cautionary tale.
 - Write for the successor: the committee turns over yearly; assume the reader has no context
   and nobody to ask.
 - Work is attributed to the person who submitted it. No tool attributions anywhere.
+- `docs/copy-style.md` is the house style for every string a person reads on a screen, in an
+  email or in a notification (K-128).
 
 ## Testing philosophy
 
