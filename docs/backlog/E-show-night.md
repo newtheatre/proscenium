@@ -185,11 +185,12 @@ Counts: 28 MVP stories (E-101 to E-128), 4 V2 stories (E-201 to E-204), 1 Later 
 - Story: As tonight's duty manager, I want the whole evening on one phone screen so that running the night is checklists and glances, not tabs.
 - Depends on: E-111; Prompt Book D-5
 - Acceptance criteria:
-  1. One phone-first screen shows tonight's performance: live house numbers (sold, admitted, remaining capacity, with an explicit uncapped state), running time and interval calls, content warnings and age guidance, and the latecomer policy.
+  1. `/tonight` is a hub of six actions (scan a ticket, tonight at a glance, admit a pass holder, backstage, emergency, contacts and incidents), under a show-night header naming the show, the curtain, the venue and who is on shift, and three tiles carrying reserved against capacity, collected, and walk-up headroom. A seventh tile reaches the till where the viewer's own authority resolves a bar role. The glance is one tap away at `/tonight/glance` and carries the rest: the numbers with the collected-or-expected progress, pass pressure, show info (running time and interval calls, latecomer policy, age guidance and content warnings) and access tonight.
   2. Tonight's team is listed by role with one-tap contact where the member has consented to shift-visible contact details; an unfilled slot shows as unfilled, never as a blank name.
   3. House numbers update without manual refresh; on connection loss the screen shows the last-fetched values with a visible staleness indicator, never a spinner.
-  4. Quick links reach the incident log, the Challenge 25 register, near-miss reporting, the checklists, the backstage board and close-night, each within one tap.
+  4. Everything the night needs is at most two taps from the hub: the incident log and the backstage board are one tap from it; the checklists and close-night are one tap on from the glance; the Challenge 25 register is one tap on from the door screen, which is the hub's first tile; near-miss reporting is one tap on from the incident log.
   5. The screen is usable one-handed on a phone in a dark foyer and meets WCAG 2.2 AA.
+  6. Access tonight lists each consented access booking for the selected performance by first name, party size and the wording the officer agreed. The flags themselves stay inside the encrypted payload: the door reads what was agreed, never the categories behind it (D-127 criterion 3).
 - Source: Prompt Book E-2, P8, K-1; audit PR-9 (tonight screen carries).
 
 ## E-113: The emergency card, cached offline

@@ -1,30 +1,19 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
-import { saysWarningLevel } from '#shared/utils/content-warnings'
-import { saysLatecomerPolicy } from '#shared/utils/programme'
-import { saysShiftRole } from '#shared/utils/rota'
+import { hubKpis, nightHeaderLine } from '#shared/utils/night-hub'
 import { activePerformanceId } from '#shared/utils/tonight'
-import type { ShiftRole } from '#shared/utils/rota'
+import type { HubHouse } from '#shared/utils/night-hub'
 
 definePageMeta({ layout: 'tonight' })
 useSeoMeta({ title: 'Tonight' })
 
-interface TeamMember { shiftId: string, role: ShiftRole, filled: boolean, name: string | null, phone: string | null }
-interface Warning { title: string, level: string | null }
 interface Performance {
   performanceId: string
   showTitle: string
   venueName: string
   startsAt: number
   doorsAt: number | null
-  durationMinutes: number | null
-  intervalCount: number
-  intervalMinutes: number | null
-  latecomerPolicy: string | null
-  ageGuidance: string | null
-  house: { sold: number, admitted: number, capacity: number | null, remaining: number | null }
-  warnings: Warning[]
-  team: TeamMember[]
+  house: HubHouse
 }
 interface DutyManagerTonight { night: string, venueId: string, performances: Performance[] }
 interface ChecklistEntry { phase: 'PRE' | 'POST', label: string, required: boolean, done: boolean }
@@ -37,10 +26,10 @@ const data = ref<DutyManagerTonight | null>(null)
 const checklist = ref<ChecklistEntry[]>([])
 const syncedAt = ref<Date | null>(null)
 const staleness = ref<string | null>(null)
-// Assumed true until the first answer says otherwise, so the screen never flashes the fallback
-// hub before it has asked.
-const isDutyManager = ref(true)
 const asked = ref(false)
+
+const authority = useNightAuthority()
+const chosenId = ref<string | null>(null)
 
 let timer: ReturnType<typeof setInterval> | undefined
 
@@ -56,13 +45,11 @@ async function load(): Promise<void> {
     data.value = dutyManager.value
     syncedAt.value = new Date()
     staleness.value = null
-    isDutyManager.value = true
   }
   else {
-    // Not tonight's duty manager: the fallback hub below, not a failure banner. Still a definite
-    // answer from the server, so it still counts as synced (NightStale is never hidden).
+    // Not tonight's duty manager: the tiles below stand on their own, since each screen guards
+    // itself (E-111 criterion 5). Still a definite answer, so it still counts as synced.
     if (refusalStatus(dutyManager.reason) === 403 || refusalStatus(dutyManager.reason) === 401) {
-      isDutyManager.value = false
       syncedAt.value = new Date()
       staleness.value = null
     }
@@ -73,26 +60,42 @@ async function load(): Promise<void> {
     }
   }
 
-  // Best-effort: a screen that cannot reach the checklist still shows the rest (criterion 6
+  // Best-effort: a screen that cannot reach the checklist still shows the rest (E-114 criterion 6
   // is a warning, not a blocker of the house numbers above it).
   if (checklistFetch.status === 'fulfilled') checklist.value = checklistFetch.value.items
 
   asked.value = true
 }
 
+const performances = computed(() => data.value?.performances ?? [])
+
+// The clock chooses until somebody taps, and then the tap holds: a duty manager looking at the
+// matinee while the evening's doors open is looking at it deliberately (E-127 criterion 2).
+const activeId = computed(() => activePerformanceId(performances.value, Date.now() / 1000))
+const selectedId = computed(() => chosenId.value ?? activeId.value)
+const selected = computed(() => performances.value.find(one => one.performanceId === selectedId.value) ?? null)
+
+const kpis = computed(() => selected.value ? hubKpis(selected.value.house) : null)
+
+setNightSubject(() => ({
+  title: selected.value?.showTitle ?? 'Tonight',
+  meta: selected.value ? nightHeaderLine(selected.value.startsAt, selected.value.venueName) : null,
+}))
+
 // From house open: doors, or curtain where none is set (E-114 criterion 6).
 const houseOpen = computed(() => {
   const now = Date.now() / 1000
-  return (data.value?.performances ?? []).some(performance => now >= (performance.doorsAt ?? performance.startsAt))
+  return performances.value.some(performance => now >= (performance.doorsAt ?? performance.startsAt))
 })
 const incompletePre = computed(() => checklist.value.filter(item => item.phase === 'PRE' && item.required && !item.done))
 
-// The one unmistakable "which house" answer a matinee day needs (E-127 criterion 2); a single
-// performance has nothing to switch between, so the badge and the tab bar both stay hidden.
-const activeId = computed(() => activePerformanceId(data.value?.performances ?? [], Date.now() / 1000))
+// Only the screens that already take a performance carry it; the rest resolve tonight's own.
+const scoped = (to: string): string => selectedId.value ? `${to}?performanceId=${selectedId.value}` : to
 
-function jumpTo(performanceId: string): void {
-  document.querySelector(`[data-test="performance-${performanceId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+const showsTill = computed(() => authority.value.roles.includes('BAR'))
+
+function timeOf(at: number): string {
+  return formatLondon(new Date(at * 1000), { timeStyle: 'short' })
 }
 
 onMounted(() => {
@@ -102,54 +105,17 @@ onMounted(() => {
 onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
-
-function spanOf(startsAt: number): string {
-  return formatLondon(new Date(startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
-}
-
-function timeOf(at: number): string {
-  return formatLondon(new Date(at * 1000), { timeStyle: 'short' })
-}
-
-function houseLine(house: Performance['house']): string {
-  const remaining = house.remaining === null ? 'uncapped' : `${house.remaining} left`
-  return `${house.sold} sold · ${house.admitted} admitted · ${remaining}`
-}
-
-// Shown only on request, never polled or cached: a code sitting on screen is a code anyone
-// walking past has read (E-120 criteria 2, 5).
-const boardCode = ref<string | null>(null)
-const boardCodeFailure = ref<string | null>(null)
-const revealingCode = ref(false)
-
-// Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
-async function revealCode(): Promise<void> {
-  revealingCode.value = true
-  boardCodeFailure.value = null
-  try {
-    boardCode.value = (await $fetch<{ code: string }>('/api/tonight/board/code')).code
-  }
-  catch (refused) {
-    boardCodeFailure.value = refusalText(refused)
-  }
-  finally {
-    revealingCode.value = false
-  }
-}
-
-function hideCode(): void {
-  boardCode.value = null
-  boardCodeFailure.value = null
-}
 </script>
 
 <template>
-  <NightScreen
-    title="Tonight"
-    :hint="isDutyManager ? undefined : 'Your own shifts open their screens below.'"
-    :stale="syncedAt"
-    :busy="!asked"
-  >
+  <div class="mx-auto w-full max-w-md space-y-4">
+    <div class="flex justify-end">
+      <NightStale
+        :at="syncedAt"
+        :busy="!asked"
+      />
+    </div>
+
     <UAlert
       v-if="staleness"
       data-test="tonight-stale-warning"
@@ -167,285 +133,110 @@ function hideCode(): void {
       :description="incompletePre.map(item => item.label).join(', ')"
     />
 
+    <!-- One tap to the house you are working, on a matinee day (E-127 criterion 2); a single
+         performance has nothing to switch between, so this stays out of the way entirely. -->
     <div
-      v-if="isDutyManager && data"
-      class="space-y-6"
-      data-test="duty-manager-screen"
+      v-if="performances.length > 1"
+      class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+      data-test="performance-switcher"
     >
-      <!-- Running order, one tap to the active house (E-127 criterion 2); a single performance
-           has nothing to switch between, so this stays out of the way entirely. -->
-      <div
-        v-if="data.performances.length > 1"
-        class="flex flex-wrap gap-2"
-        data-test="performance-switcher"
-      >
-        <UButton
-          v-for="performance in data.performances"
-          :key="performance.performanceId"
-          size="sm"
-          :color="performance.performanceId === activeId ? 'primary' : 'neutral'"
-          :variant="performance.performanceId === activeId ? 'solid' : 'subtle'"
-          :data-test="`jump-${performance.performanceId}`"
-          @click="jumpTo(performance.performanceId)"
-        >
-          {{ performance.showTitle }}, {{ timeOf(performance.startsAt) }}
-        </UButton>
-      </div>
-
-      <section
-        v-for="performance in data.performances"
+      <UButton
+        v-for="performance in performances"
         :key="performance.performanceId"
-        class="space-y-4 rounded-lg border p-4"
-        :class="performance.performanceId === activeId ? 'border-primary' : 'border-default'"
-        :data-test="`performance-${performance.performanceId}`"
+        size="sm"
+        class="min-h-12 shrink-0"
+        :color="performance.performanceId === selectedId ? 'primary' : 'neutral'"
+        :variant="performance.performanceId === selectedId ? 'solid' : 'subtle'"
+        :data-test="`choose-${performance.performanceId}`"
+        @click="chosenId = performance.performanceId"
       >
-        <div>
-          <p class="nnt-headline flex items-center gap-2 text-lg">
-            {{ performance.showTitle }}
-            <UBadge
-              v-if="performance.performanceId === activeId && data.performances.length > 1"
-              color="primary"
-              variant="subtle"
-              size="sm"
-              data-test="active-now"
-            >
-              Active now
-            </UBadge>
-          </p>
-          <p class="text-sm text-muted">
-            {{ spanOf(performance.startsAt) }}
-            <template v-if="performance.doorsAt">
-              · doors {{ timeOf(performance.doorsAt) }}
-            </template>
-          </p>
-        </div>
-
-        <div data-test="house-numbers">
-          <p class="text-sm text-muted">
-            House
-          </p>
-          <p class="text-base font-semibold">
-            {{ houseLine(performance.house) }}
-          </p>
-        </div>
-
-        <p
-          v-if="performance.intervalCount > 0"
-          class="text-sm"
-        >
-          {{ performance.intervalCount }} interval{{ performance.intervalCount > 1 ? 's' : '' }}
-          <template v-if="performance.intervalMinutes">
-            of {{ performance.intervalMinutes }} minutes
-          </template>
-        </p>
-
-        <p class="text-sm">
-          {{ saysLatecomerPolicy(performance.latecomerPolicy) }}
-        </p>
-
-        <p
-          v-if="performance.ageGuidance"
-          class="text-sm"
-        >
-          {{ performance.ageGuidance }}
-        </p>
-
-        <ul
-          v-if="performance.warnings.length"
-          class="flex flex-wrap gap-2"
-          data-test="content-warnings"
-        >
-          <li
-            v-for="warning in performance.warnings"
-            :key="warning.title"
-          >
-            <UBadge
-              color="neutral"
-              variant="subtle"
-              size="sm"
-            >
-              {{ warning.title }}<template v-if="warning.level">
-                : {{ saysWarningLevel(warning.level) }}
-              </template>
-            </UBadge>
-          </li>
-        </ul>
-
-        <div>
-          <p class="text-sm text-muted">
-            Team
-          </p>
-          <ul
-            class="mt-1 divide-y divide-default"
-            data-test="team-list"
-          >
-            <li
-              v-for="member in performance.team"
-              :key="member.shiftId"
-              class="flex items-center justify-between gap-3 py-2"
-              :data-test="`team-${member.shiftId}`"
-            >
-              <span>{{ saysShiftRole(member.role) }}</span>
-              <span
-                v-if="member.filled"
-                class="flex items-center gap-2"
-              >
-                {{ member.name }}
-                <UButton
-                  v-if="member.phone"
-                  :to="`tel:${member.phone}`"
-                  size="xs"
-                  variant="subtle"
-                  icon="i-lucide-phone"
-                  :aria-label="`Call ${member.name}`"
-                />
-              </span>
-              <span
-                v-else
-                class="text-muted"
-              >
-                Unfilled
-              </span>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <p
-        v-if="data.performances.length === 0"
-        class="text-muted"
-      >
-        Nothing running tonight.
-      </p>
-
-      <div
-        class="rounded-lg border border-default p-4"
-        data-test="board-code"
-      >
-        <p class="text-sm text-muted">
-          Backstage board
-        </p>
-        <UAlert
-          v-if="boardCodeFailure"
-          data-test="board-code-failure"
-          color="error"
-          variant="subtle"
-          :description="boardCodeFailure"
-        />
-        <p
-          v-else-if="boardCode"
-          class="mt-1 flex items-center justify-between gap-2"
-        >
-          <span
-            class="font-mono text-2xl tracking-widest"
-            data-test="board-code-value"
-          >{{ boardCode }}</span>
-          <UButton
-            size="xs"
-            color="neutral"
-            variant="ghost"
-            data-test="board-code-hide"
-            @click="hideCode"
-          >
-            Hide
-          </UButton>
-        </p>
-        <UButton
-          v-else
-          size="sm"
-          color="neutral"
-          variant="subtle"
-          class="mt-1"
-          :loading="revealingCode"
-          data-test="board-code-reveal"
-          @click="revealCode"
-        >
-          Show tonight's code
-        </UButton>
-      </div>
+        {{ performance.showTitle }}, {{ timeOf(performance.startsAt) }}
+      </UButton>
     </div>
 
-    <p
-      v-else-if="!isDutyManager"
-      class="text-muted"
+    <div
+      v-if="kpis"
+      class="grid grid-cols-3 gap-2"
+      data-test="tonight-kpis"
     >
-      Open your own screen below, or ask the FOH officer if you expect to see tonight's evening
-      here.
-    </p>
-
-    <!-- Navigational, not the primary action: a grid in the content, not the sticky thumb-zone
-         slot (E-112 criterion 4), but still thumb-sized rather than `NightAction`'s own selector. -->
-    <div class="mt-6 grid grid-cols-2 gap-2">
-      <UButton
-        to="/tonight/incidents"
-        color="neutral"
-        variant="subtle"
-        icon="i-lucide-clipboard-list"
-        size="lg"
-        class="min-h-12"
-        data-test="link-incidents"
-      >
-        Incident log
-      </UButton>
-      <UButton
-        to="/tonight/age-checks"
-        color="neutral"
-        variant="subtle"
-        icon="i-lucide-id-card"
-        size="lg"
-        class="min-h-12"
-        data-test="link-age-checks"
-      >
-        Challenge 25
-      </UButton>
-      <UButton
-        to="/tonight/checklist"
-        color="neutral"
-        variant="subtle"
-        icon="i-lucide-list-checks"
-        size="lg"
-        class="min-h-12"
-        data-test="link-checklist"
-      >
-        Checklist
-      </UButton>
-      <UButton
-        to="/tonight/emergency"
-        color="neutral"
-        variant="subtle"
-        icon="i-lucide-siren"
-        size="lg"
-        class="min-h-12"
-        data-test="link-emergency"
-      >
-        Emergency card
-      </UButton>
-      <UButton
-        to="/tonight/board"
-        color="neutral"
-        variant="subtle"
-        icon="i-lucide-radio"
-        size="lg"
-        class="min-h-12"
-        data-test="link-board"
-      >
-        Backstage board
-      </UButton>
+      <NightKpi
+        :value="String(kpis.reserved)"
+        :of="kpis.capacity === null ? null : String(kpis.capacity)"
+        label="reserved"
+      />
+      <NightKpi
+        :value="String(kpis.collected)"
+        label="collected"
+        tone="gold"
+      />
+      <NightKpi
+        :value="kpis.headroom === null ? 'Uncapped' : String(kpis.headroom)"
+        label="walk-up headroom"
+        tone="good"
+      />
     </div>
 
-    <template #actions>
-      <NightAction
-        label="Door"
-        icon="i-lucide-door-open"
-        color="neutral"
+    <div
+      class="grid grid-cols-2 gap-3"
+      data-test="tonight-hub"
+    >
+      <NightTile
+        label="Scan ticket"
+        hint="QR · ref · name"
+        icon="i-lucide-scan-line"
+        tone="gold"
         to="/tonight/door"
+        data-test="tile-scan"
       />
-      <NightAction
+      <NightTile
+        label="Tonight at a glance"
+        hint="Numbers · show info"
+        icon="i-lucide-gauge"
+        :to="scoped('/tonight/glance')"
+        data-test="tile-glance"
+      />
+      <NightTile
+        label="Admit pass holder"
+        hint="Season and comp passes"
+        icon="i-lucide-contact"
+        to="/tonight/door?mode=pass"
+        data-test="tile-passes"
+      />
+      <NightTile
+        label="Backstage"
+        hint="House open · clearance"
+        icon="i-lucide-messages-square"
+        to="/tonight/board"
+        data-test="tile-backstage"
+      />
+      <NightTile
+        label="Emergency"
+        hint="Evac · first aid · 999"
+        icon="i-lucide-siren"
+        tone="danger"
+        to="/tonight/emergency"
+        data-test="tile-emergency"
+      />
+      <NightTile
+        label="Contacts and incidents"
+        hint="Who's on · log"
+        icon="i-lucide-phone"
+        :to="scoped('/tonight/incidents')"
+        data-test="tile-contacts"
+      />
+      <!-- A bar shift works the till from here rather than from a menu it cannot see (F-101). -->
+      <NightTile
+        v-if="showsTill"
         label="Till"
+        hint="Bar sales"
         icon="i-lucide-store"
-        color="neutral"
         to="/tonight/till"
+        data-test="tile-till"
       />
-    </template>
-  </NightScreen>
+    </div>
+
+    <p class="pt-2 text-center text-sm text-muted">
+      The door never sells tickets: unpaid and walk-ups go to the bar.
+    </p>
+  </div>
 </template>

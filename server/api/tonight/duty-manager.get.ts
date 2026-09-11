@@ -8,10 +8,12 @@ export default defineEventHandler(async (event) => {
     if (!performance) return null
 
     const capacity = effectiveCapacity({ capacityOverride: performance.capacityOverride, venueCapacity: performance.venueCapacity })
-    const [house, team, warnings] = await Promise.all([
+    const [house, team, warnings, passesCovering, access] = await Promise.all([
       tonightHouse(performanceId, capacity),
       tonightTeam(performanceId),
       showWarnings(performance.showId),
+      passPressure(performanceId, performance.showId),
+      accessTonight(performanceId),
     ])
 
     return {
@@ -26,6 +28,8 @@ export default defineEventHandler(async (event) => {
       latecomerPolicy: performance.latecomerPolicy,
       ageGuidance: performance.ageGuidance,
       house,
+      passesCovering,
+      access,
       warnings: warnings.map(warning => ({ title: warning.title, level: warning.level })),
       team,
     }
