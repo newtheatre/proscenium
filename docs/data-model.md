@@ -328,9 +328,14 @@ Feature vocabulary and junction (both cascade). Not yet built: no story reads th
 Wave 0 contract does not list them.
 
 ### venue_emergency_info  APPEND-ONLY
-`id` PK · `venue_id` → venues restrict · `assembly_point` · `exits` · `isolation_points` ·
+`id` PK · `venue_id` → venues restrict · `address` · `assembly_point` · `exits` ·
+`isolation_points` · `first_aid_kit` · `defibrillator` · `first_aiders` · `fire_panel` ·
 `what3words` · `notes` (free text, safe: describes the building, never a person) ·
-`updated_by` → users restrict · `updated_at`. Versioned, not a single row per venue (E-113
+`updated_by` → users restrict · `updated_at`. Every column is nullable, `address` included,
+because the versions filed before migration 0100 predate it and an append-only table cannot be
+rewritten to fill them in; the form requires it instead, and a venue only counts as filed once
+its latest version carries one (issue 902). `first_aiders` is free text until the training
+catalogue carries a first-aid module to derive tonight's from. Versioned, not a single row per venue (E-113
 criterion 1): an edit is a new row, and the latest per venue by `updated_at` is the current
 card. Rebuilt from a single-row-per-venue shape in migration 0071, which also hand-corrects a
 `drizzle-kit` bug in the generated copy-forward `INSERT` (it named a column, `id`, the old

@@ -233,11 +233,16 @@ export function seedProgramme(target: SeedTarget, people: People, now: number): 
     target.batch([insert('venue_emergency_info', {
       id: seedId('emergency', 'house'),
       venue_id: venues.get('house')!,
+      address: 'The Nottingham New Theatre, Cherry Tree Hill, University Park, Nottingham NG7 2RD',
       assembly_point: 'The car park behind the Portland Building',
       exits: 'Two: stage left to the alley, and the foyer to Portland Hill.',
       isolation_points: 'Lighting isolation is in the box; gas is in the workshop corridor.',
+      first_aid_kit: 'Behind the bar',
+      defibrillator: 'Inside the Portland Building foyer',
+      first_aiders: 'Ask the duty manager who is trained tonight',
+      fire_panel: 'The foyer, left of the main doors; silence only after the sweep',
       what3words: 'towns.match.press',
-      notes: 'The nearest defibrillator is inside the Portland Building foyer.',
+      notes: null,
       updated_by: officer,
     })])
   }
