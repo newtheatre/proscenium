@@ -72,7 +72,7 @@ A prefix names the domain; the shell follows the posture of the work rather than
 | Prefix | Shell | Who |
 | --- | --- | --- |
 | `/`, `/sign-in`, `/register`, `/verify`, `/reset`, `/magic`, every `content/*.md` path | `default` | Anybody |
-| `/rooms`, `/rooms/mine`, `/account/*` | `member` | A member, about themselves |
+| `/my`, `/rooms`, `/rooms/mine`, `/account/*` | `member` | A member, about themselves |
 | `/rooms/manage/*`, `/people/*`, `/box-office/*`, `/bar/*`, `/money/*`, `/admin/*` | `console` | Somebody working for the theatre |
 | `/tonight/*` | `tonight` | Somebody on shift, on a phone |
 
@@ -80,7 +80,9 @@ A domain with both audiences puts the member's screens at the top and the consol
 (`/rooms` against `/rooms/manage/requests`). A domain with no member surface sits flat
 (`/people/accounts`, `/bar/products` and `/bar/stock`). Every navigable destination is declared once
 in `shared/utils/site-nav.ts`, which the console sidebar renders and the console middleware guards
-from, so a deep link and the sidebar cannot disagree.
+from, so a deep link and the sidebar cannot disagree. `MY_NAV` is a member's own screens (`/my`
+first, K-127); `ACCOUNT_NAV` is the three settings pages the member menu and `AccountSettings.vue`
+render. Neither is guarded by `entryFor`, which scans console entries only.
 
 ### Route namespaces
 
@@ -1505,6 +1507,18 @@ the cache.
 
 No screen adopts this yet: F-103 (till) and D-126 (door) build the writes that will call it. This
 is the mechanism K-103 set the precedent for landing ahead of the screens that need it.
+
+### The member's own summary (K-127)
+
+`GET /api/my/summary` is the one request `/my` makes. `shared/utils/my-summary.ts` declares
+`MySummary`, a column allow-list for the eight tiles; `server/utils/my-summary.ts` exports the
+pure `assembleMySummary()`, which shapes it from already-fetched facts and derives
+`onShiftTonight`, the membership state word and a room booking's `cancellable` flag, and nothing
+in it reaches a database, which is what makes the allow-list provable in a unit test. The
+endpoint itself does the fetching, one bounded read per tile (`myShiftsQuery`, `longestTerm`,
+`ownClaim`, a new `nextRoomBooking`, `listModules`/`modulesHeldBy`/`whatsNextFor`,
+`sessionsForMember`, a new `activePasses`/`openPassRequest`, `recentInbox`, `publicListing`), run
+with `Promise.all` rather than in sequence.
 
 ## Environments
 

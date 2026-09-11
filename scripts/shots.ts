@@ -212,13 +212,13 @@ const OPEN_MEMBERSHIP = `(async () => {
 
 const SHOTS: Shot[] = [
   { name: '01-overview', path: '/admin', marker: 'h1' },
-  { name: '02-people', path: '/admin/people', marker: '[data-test="directory-table"]' },
-  { name: '03-people-filters', path: '/admin/people', marker: '[data-test="directory-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
-  { name: '04-account', path: `/admin/people/${ids[0]}`, marker: '[data-test="account-name"]' },
-  { name: '05-members', path: '/admin/members', marker: '[data-test="members-table"]' },
-  { name: '06-members-modal', path: '/admin/members', marker: '[data-test="members-table"]', after: OPEN_MEMBERSHIP },
-  { name: '07-fellows', path: '/admin/fellows', marker: '[data-test="fellows-table"]' },
-  { name: '08-fellows-modal', path: '/admin/fellows', marker: '[data-test="fellows-table"]', after: `document.querySelector('[data-test="award"]').click()` },
+  { name: '02-people', path: '/people/accounts', marker: '[data-test="directory-table"]' },
+  { name: '03-people-filters', path: '/people/accounts', marker: '[data-test="directory-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '04-account', path: `/people/accounts/${ids[0]}`, marker: '[data-test="account-name"]' },
+  { name: '05-members', path: '/people/members', marker: '[data-test="members-table"]' },
+  { name: '06-members-modal', path: '/people/members', marker: '[data-test="members-table"]', after: OPEN_MEMBERSHIP },
+  { name: '07-fellows', path: '/people/fellows', marker: '[data-test="fellows-table"]' },
+  { name: '08-fellows-modal', path: '/people/fellows', marker: '[data-test="fellows-table"]', after: `document.querySelector('[data-test="award"]').click()` },
   { name: '09-audit', path: '/admin/audit', marker: '[data-test="audit-table"]' },
   { name: '09a-audit-filters', path: '/admin/audit', marker: '[data-test="audit-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '10-audit-modal', path: '/admin/audit', marker: '[data-test="audit-table"]', after: `document.querySelector('[data-test="audit-record"]').click()` },
@@ -260,8 +260,22 @@ const SHOTS: Shot[] = [
   { name: '16e-rota-templates-filters', path: '/rota/manage/templates', marker: '[data-test="templates-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '16f-rota-checklists', path: '/rota/manage/checklists', marker: '[data-test="checklists-table"]' },
   { name: '16g-rota-emergency', path: '/rota/manage/emergency', marker: '[data-test="emergency-table"]' },
-  { name: '11-config', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
+  { name: '11-config', path: '/admin/settings', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
   { name: '12-dev-tools', path: '/dev', marker: '[data-test="dev-seed"]' },
+  { name: '13-people-narrow', path: '/people/accounts', marker: '[data-test="directory-table"]', width: NARROW },
+  { name: '14-members-narrow', path: '/people/members', marker: '[data-test="members-table"]', width: NARROW },
+  { name: '15-config-narrow', path: '/admin/settings', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]', width: NARROW },
+  { name: '20-my', path: '/my', marker: '[data-test="my-page"]' },
+  { name: '20a-my-narrow', path: '/my', marker: '[data-test="my-page"]', width: NARROW },
+  { name: '20b-my-phone', path: '/my', marker: '[data-test="my-page"]', width: PHONE },
+  { name: '21-account-profile', path: '/account/profile', marker: '[data-test="account-profile-page"]' },
+  { name: '21a-account-profile-phone', path: '/account/profile', marker: '[data-test="account-profile-page"]', width: PHONE },
+  { name: '22-account-security', path: '/account/security', marker: '[data-test="account-security-page"]' },
+  { name: '23-account-notifications', path: '/account/notifications', marker: '[data-test="account-notifications-page"]' },
+  { name: '24-rota', path: '/rota', marker: '[data-test="rota-page"]' },
+  { name: '25-training', path: '/training', marker: '[data-test="training-page"]' },
+  { name: '26-rooms-mine', path: '/rooms/mine', marker: '[data-test="rooms-mine-page"]' },
+  { name: '27-passes', path: '/account/passes', marker: '[data-test="account-passes-page"]' },
   // D-132 shots begin: every tab of the show screen, wide and narrow, plus the phone widths the
   // strip and the tabs are judged at.
   { name: '30-show-details', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=details`, marker: '[data-test="show-copy"]' },
@@ -277,9 +291,6 @@ const SHOTS: Shot[] = [
   { name: '36-shows-index-narrow', path: '/box-office/shows', marker: '[data-test="shows-table"]', width: NARROW },
   { name: '36a-show-tabs-phone', path: `/box-office/shows/${SHOW_FOR_SHOTS}?tab=performances`, marker: '[data-test="performances-table"]', width: PHONE },
   // D-132 shots end.
-  { name: '13-people-narrow', path: '/admin/people', marker: '[data-test="directory-table"]', width: NARROW },
-  { name: '14-members-narrow', path: '/admin/members', marker: '[data-test="members-table"]', width: NARROW },
-  { name: '15-config-narrow', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]', width: NARROW },
 ]
 
 const wanted = process.argv.slice(2)

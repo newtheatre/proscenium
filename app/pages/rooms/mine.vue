@@ -192,7 +192,10 @@ useSeoMeta({ title: 'My bookings' })
 </script>
 
 <template>
-  <UContainer class="max-w-3xl py-16">
+  <UContainer
+    class="max-w-3xl py-16"
+    data-test="rooms-mine-page"
+  >
     <UPageHeader
       title="My bookings"
       description="What you hold, and what became of what you held. Cancelling frees the slot straight away."
