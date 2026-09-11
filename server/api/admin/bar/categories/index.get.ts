@@ -1,18 +1,16 @@
-import { z } from 'zod'
-import { MAX_BAR_NAME } from '#shared/utils/bar'
+import { barCategoriesList } from '#shared/utils/bar-categories-list'
+import { filterQuerySchema } from '#shared/utils/list-filters'
 
-const query = pageQuery.extend({
-  search: z.string().trim().max(MAX_BAR_NAME).optional(),
-})
+const query = filterQuerySchema(barCategoriesList)
 
-// The till's categories, in the order they appear on it.
+// The till's categories, filtered and ordered by their declaration (K-129).
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'bar.read')
-  const { page, pageSize, search } = await getValidatedQueryOrThrow(event, query)
-  const filters = { search: search || undefined }
+  const input = await getValidatedQueryOrThrow(event, query)
+  const clause = categoriesClause(input)
 
-  const total = await countCategories(filters)
-  const items = await listCategories(filters, pageSize, offsetFor(page, pageSize))
+  const total = await countCategories(clause)
+  const items = await listCategories(clause, input.pageSize, offsetFor(input.page, input.pageSize))
 
-  return envelope(items, total, page, pageSize)
+  return envelope(items, total, input.page, input.pageSize)
 })

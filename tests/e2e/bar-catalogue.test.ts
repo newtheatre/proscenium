@@ -227,7 +227,7 @@ describe.skipIf(skip !== null)('a product is retired, never destroyed (F-111 cri
     const id = await addProduct(await addCategory())
     expect((await send('POST', `/api/admin/bar/products/${id}/status`, { status: 'RETIRED' })).status).toBe(200)
 
-    expect((await products('&includeRetired=false')).map(product => product.id)).not.toContain(id)
+    expect((await products('&retired=false')).map(product => product.id)).not.toContain(id)
     expect((await products()).find(product => product.id === id)?.status).toBe('RETIRED')
   })
 

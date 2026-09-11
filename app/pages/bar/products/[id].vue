@@ -43,7 +43,7 @@ const { data, status, error, refresh } = await useAsyncData(
 // The recipe editor needs the stocked items to choose from, up to the page cap.
 const { data: stock } = await useAsyncData(
   'bar-variants-stock',
-  () => request<Listing>('/api/admin/bar/items', { query: { pageSize: 100, includeRetired: false } }),
+  () => request<Listing>('/api/admin/bar/items', { query: { pageSize: 100, retired: 'false' } }),
   { default: (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 }) },
 )
 

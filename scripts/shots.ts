@@ -147,6 +147,13 @@ if (studio) {
   }, cookie)
 }
 
+// Enough that the bar's console lists are not empty tables either.
+const barCategory = await (await send('POST', '/api/admin/bar/categories', { name: 'Wine', sort: 10 }, cookie)).json() as { id: string }
+await send('POST', '/api/admin/bar/products', { name: 'House red', categoryId: barCategory.id }, cookie)
+const barItem = await (await send('POST', '/api/admin/bar/items', { name: 'House red 750ml', unit: 'ML', containerMl: 750 }, cookie)).json() as { id: string }
+await send('POST', '/api/admin/bar/movements', { itemId: barItem.id, kind: 'DELIVERY', qty: 4500, unitCostPence: 480 }, cookie)
+await send('POST', '/api/admin/bar/stocktakes', undefined, cookie)
+
 const view = await openSignedOutView(app.baseURL)
 await visit(view, `${app.baseURL}/sign-in`)
 await fill(view, 'form input[type="email"]', email)
@@ -203,6 +210,12 @@ const SHOTS: Shot[] = [
   { name: '10d2-shows-filters', path: '/box-office/shows?status=is:DRAFT', marker: '[data-test="toolbar-active"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '10e-other-rooms', path: '/admin/other-rooms', marker: '[data-test="spaces-table"]' },
   { name: '10f-requests-unlisted', path: '/admin/requests?kind=unlisted', marker: '[data-test="requests-table"]' },
+  { name: '10g-bar-categories', path: '/bar/categories', marker: '[data-test="bar-categories-table"]' },
+  { name: '10h-bar-products', path: '/bar/products', marker: '[data-test="bar-products-table"]' },
+  { name: '10i-bar-products-filters', path: '/bar/products', marker: '[data-test="bar-products-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '10j-bar-stock', path: '/bar/stock', marker: '[data-test="bar-items-table"]' },
+  { name: '10k-bar-movements', path: '/bar/stock/movements', marker: '[data-test="bar-movements-table"]' },
+  { name: '10l-bar-stocktakes', path: '/bar/stock/stocktakes', marker: '[data-test="bar-stocktakes-table"]' },
   { name: '11-config', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
   { name: '12-dev-tools', path: '/dev', marker: '[data-test="dev-seed"]' },
   { name: '13-people-narrow', path: '/admin/people', marker: '[data-test="directory-table"]', width: NARROW },

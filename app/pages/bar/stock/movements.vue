@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { STOCK_MOVEMENT_KINDS, says, saysMoney, saysQuantity } from '#shared/utils/bar'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
-import type { MovementReason, StockItem, StockMovement, StockMovementKind } from '#shared/utils/bar'
+import { says, saysMoney, saysQuantity } from '#shared/utils/bar'
+import { barMovementsList } from '#shared/utils/bar-movements-list'
+import type { FilterOption } from '#shared/utils/list-filters'
+import type { MovementReason, StockItem, StockMovement } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Stock movements', middleware: 'console' })
@@ -11,10 +12,6 @@ const UBadge = resolveComponent('UBadge')
 
 const request = useRequestFetch()
 const toast = useToast()
-const search = ref('')
-const itemId = ref<string | undefined>(undefined)
-const kind = ref<StockMovementKind | undefined>(undefined)
-const page = ref(1)
 const failure = ref<string | null>(null)
 const saving = ref(false)
 const reversing = ref<StockMovement | null>(null)
@@ -25,27 +22,24 @@ interface Listing<T> { items: T[], total: number, pageSize: number, pages: numbe
 const noMovements = (): Listing<StockMovement> => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 const noItems = (): Listing<StockItem> => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
-const { data, status, error, refresh } = await useAsyncData(
-  'bar-movements',
-  () => request<Listing<StockMovement>>('/api/admin/bar/movements', {
-    query: { itemId: itemId.value, kind: kind.value, search: search.value.trim() || undefined, page: page.value },
-  }),
-  { watch: [page], default: noMovements },
-)
-
 const { data: items } = await useAsyncData(
   'bar-movements-items',
   () => request<Listing<StockItem>>('/api/admin/bar/items', { query: { pageSize: 100 } }),
   { default: noItems },
 )
 
-watch([search, itemId, kind], () => {
-  if (page.value === 1) void refresh()
-  else page.value = 1
-})
-
 const itemOptions = computed(() => items.value.items.map(item => ({ label: item.name, value: item.id })))
-const kindOptions = STOCK_MOVEMENT_KINDS.map(value => ({ label: says(value), value }))
+const filterOptions = computed<Record<string, FilterOption[]>>(() => ({ itemId: itemOptions.value }))
+
+// Search, filters, sort and page live in the URL (K-129).
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(barMovementsList, { options: filterOptions })
+
+const { data, status, error, refresh } = await useAsyncData(
+  'bar-movements',
+  () => request<Listing<StockMovement>>('/api/admin/bar/movements', { query: query.value }),
+  { watch: [query], default: noMovements },
+)
+
 const reasonOptions = MOVEMENT_REASONS.map(value => ({ label: says(value), value }))
 
 // Pinned to Europe/London, because the worker runs in UTC and half the year would read wrong.
@@ -88,27 +82,6 @@ async function reverse(): Promise<void> {
 }
 
 const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The movements could not be read.') : null))
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (itemId.value) {
-    const named = items.value.items.find(item => item.id === itemId.value)?.name ?? 'one item'
-    active.push({ key: 'item', label: `For ${named}`, icon: 'i-lucide-package', clear: () => {
-      itemId.value = undefined
-    } })
-  }
-  if (kind.value) {
-    active.push({ key: 'kind', label: says(kind.value), icon: 'i-lucide-filter', clear: () => {
-      kind.value = undefined
-    } })
-  }
-  return active
-})
 
 const columns: TableColumn<StockMovement>[] = [
   {
@@ -188,29 +161,19 @@ const columns: TableColumn<StockMovement>[] = [
     <AdminToolbar
       v-model:search="search"
       placeholder="A stocked item"
-      :active="activeFilters"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''; itemId = undefined; kind = undefined"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Stocked item">
-          <USelect
-            v-model="itemId"
-            :items="itemOptions"
-            placeholder="Every item"
-            class="w-48"
-            data-test="movements-item"
-          />
-        </UFormField>
-        <UFormField label="What happened">
-          <USelect
-            v-model="kind"
-            :items="kindOptions"
-            placeholder="Everything"
-            class="w-48"
-            data-test="movements-kind"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="barMovementsList"
+          :conditions="conditions"
+          :sort="sort"
+          :options="filterOptions"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
     </AdminToolbar>
 
@@ -222,7 +185,7 @@ const columns: TableColumn<StockMovement>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          No movements yet. Record a delivery and stock starts adding up.
+          {{ filtered ? 'No movement matches that.' : 'No movements yet. Record a delivery and stock starts adding up.' }}
         </p>
       </template>
     </UTable>

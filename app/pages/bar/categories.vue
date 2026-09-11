@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h } from 'vue'
 import { SERVING_KINDS, categoryForm, categoryPriceForm, says, saysMoney } from '#shared/utils/bar'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { barCategoriesList } from '#shared/utils/bar-categories-list'
 import type { BarCategory, CategoryPrice, ServingKind } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -9,8 +9,6 @@ definePageMeta({ layout: 'console', title: 'Bar categories', middleware: 'consol
 
 const request = useRequestFetch()
 const toast = useToast()
-const search = ref('')
-const page = ref(1)
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
@@ -18,18 +16,14 @@ interface Listing { items: BarCategory[], total: number, pageSize: number, pages
 
 const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
+// Search, sort and page live in the URL (K-129); the till order is the only sort there is yet.
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(barCategoriesList)
+
 const { data, status, error, refresh } = await useAsyncData(
   'bar-categories',
-  () => request<Listing>('/api/admin/bar/categories', {
-    query: { search: search.value.trim() || undefined, page: page.value },
-  }),
-  { watch: [page], default: empty },
+  () => request<Listing>('/api/admin/bar/categories', { query: query.value }),
+  { watch: [query], default: empty },
 )
-
-watch(search, () => {
-  if (page.value === 1) void refresh()
-  else page.value = 1
-})
 
 const editing = ref<BarCategory | null>(null)
 const open = ref(false)
@@ -151,12 +145,6 @@ const priceColumns: TableColumn<CategoryPrice>[] = [
 
 const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The categories could not be read.') : null))
 
-const activeFilters = computed<ActiveFilter[]>(() => (search.value
-  ? [{ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } }]
-  : []))
-
 const columns: TableColumn<BarCategory>[] = [
   {
     id: 'name',
@@ -215,11 +203,20 @@ const columns: TableColumn<BarCategory>[] = [
     <AdminToolbar
       v-model:search="search"
       placeholder="A category"
-      :filterable="false"
-      :active="activeFilters"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''"
+      @clear="clear"
     >
+      <template #filters>
+        <ConsoleFilters
+          :spec="barCategoriesList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
+      </template>
+
       <template #actions>
         <UButton
           data-test="add-category"
@@ -239,7 +236,7 @@ const columns: TableColumn<BarCategory>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ search ? 'No category matches that.' : 'No categories yet. Add one and products have somewhere to sit.' }}
+          {{ filtered ? 'No category matches that.' : 'No categories yet. Add one and products have somewhere to sit.' }}
         </p>
       </template>
     </UTable>
