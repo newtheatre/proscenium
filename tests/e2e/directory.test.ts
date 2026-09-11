@@ -303,7 +303,7 @@ describe.skipIf(skip !== null)('the directory screen', () => {
 
       // A filter arrives from the URL and shows as a chip, so a triage list can be linked to.
       await visit(view, `${app.baseURL}/people/accounts?verified=false`, '[data-test="toolbar-active"]')
-      expect(await textOf(view, '[data-test="toolbar-active"]')).toContain('Not address verified')
+      expect(await textOf(view, '[data-test="toolbar-active"]')).toContain('Address unverified')
       await visit(view, `${app.baseURL}/people/accounts`, '[data-test="toolbar-search"]')
       await waitFor(view, `document.body.innerText.includes(${JSON.stringify(known)})`)
 

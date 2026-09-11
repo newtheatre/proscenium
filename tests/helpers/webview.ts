@@ -473,7 +473,8 @@ async function openMenu(view: Bun.WebView, selector: string): Promise<void> {
   await waitFor(view, `document.querySelector('[role="option"]')`, 15_000)
 }
 
-// Reka commits on pointerup rather than on click, so the whole sequence is sent.
+// Reka commits on pointerup rather than on click, and only for a pointer it recognises: a plain
+// MouseEvent has no pointerType, and an item inside a popover ignores it, so real pointer events.
 const CHOOSE = (label: string): string => `(() => {
   const wanted = ${JSON.stringify(label)}
   const option = [...document.querySelectorAll('[role="option"]')]
@@ -481,8 +482,11 @@ const CHOOSE = (label: string): string => `(() => {
     ?? [...document.querySelectorAll('[role="option"]')]
       .find(item => item.innerText.trim().startsWith(wanted))
   if (!option) return false
-  for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
-    option.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }))
+  const init = { bubbles: true, cancelable: true, button: 0 }
+  for (const type of ['pointermove', 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+    option.dispatchEvent(type.startsWith('pointer')
+      ? new PointerEvent(type, { ...init, pointerType: 'mouse', isPrimary: true })
+      : new MouseEvent(type, init))
   }
   return true
 })()`
