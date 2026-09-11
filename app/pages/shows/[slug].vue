@@ -2,7 +2,8 @@
 import { saysAssessment, saysWarningLevel } from '#shared/utils/content-warnings'
 import { formatLondon } from '#shared/utils/london'
 import { saysLatecomerPolicy } from '#shared/utils/programme'
-import { saysPrice } from '#shared/utils/ticket-types'
+import { pounds, saysPrice } from '#shared/utils/ticket-types'
+import { DEFAULT_OG_IMAGE, SITE_ADDRESS } from '#shared/utils/seo'
 import type { PublicContentWarning, WarningAssessment } from '#shared/utils/content-warnings'
 import type { Availability, PublicPerformance, PublicShow } from '#shared/utils/programme'
 
@@ -40,7 +41,42 @@ const show = computed(() => data.value!.show)
 useSeoMeta({
   title: () => show.value.title,
   description: () => show.value.description ?? `${show.value.title} at the Nottingham New Theatre.`,
+  // The poster when the show has one, the house image otherwise (K-125 criterion 3).
+  ogImage: () => show.value.posterUrl ?? DEFAULT_OG_IMAGE,
 })
+
+const AVAILABILITY: Record<Availability, 'InStock' | 'LimitedAvailability' | 'SoldOut' | 'OutOfStock'> = {
+  AVAILABLE: 'InStock',
+  LIMITED: 'LimitedAvailability',
+  SOLD_OUT: 'SoldOut',
+  BOOKING_CLOSED: 'OutOfStock',
+}
+
+const iso = (seconds: number): string => new Date(seconds * 1000).toISOString()
+
+// One TheaterEvent per performance with an offer per price (K-125 criterion 4). An offer points
+// at this page, not the booking form, which crawlers are kept off; the organiser is the site.
+useSchemaOrg(computed(() => (data.value?.performances ?? []).map(performance => defineEvent({
+  '@type': 'TheaterEvent',
+  'name': show.value.title,
+  'description': show.value.description ?? undefined,
+  'image': show.value.posterUrl ?? DEFAULT_OG_IMAGE,
+  'startDate': iso(performance.startsAt),
+  'endDate': performance.durationMinutes !== null ? iso(performance.startsAt + performance.durationMinutes * 60) : undefined,
+  'eventStatus': performance.cancelled ? 'EventCancelled' : 'EventScheduled',
+  'eventAttendanceMode': 'OfflineEventAttendanceMode',
+  'location': { '@type': 'Place', 'name': performance.venueName, 'address': SITE_ADDRESS },
+  'organizer': { '@id': '#identity' },
+  'offers': performance.prices.map(price => ({
+    '@type': 'Offer',
+    'name': price.name,
+    'price': pounds(price.price),
+    'priceCurrency': 'GBP',
+    'availability': AVAILABILITY[performance.availability],
+    'url': performance.externalBookingUrl ?? `/shows/${show.value.slug}`,
+    'validThrough': iso(performance.bookingClosesAt),
+  })),
+}))))
 
 const saysWhen = (at: number): string =>
   formatLondon(new Date(at * 1000), { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
