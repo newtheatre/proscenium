@@ -7,7 +7,7 @@ import {
   claimDeclineForm,
   membershipClaimForm,
 } from '#shared/utils/membership-claims'
-import { MEMBER_NAV } from '#shared/utils/site-nav'
+import { MY_NAV } from '#shared/utils/site-nav'
 
 // A-130. A claim is a request to have something bought at the SU written down, so its life is
 // short: open, then answered or withdrawn, and never reopened (criterion 1).
@@ -85,7 +85,7 @@ describe('what the page says about a membership (A-130 criterion 4)', () => {
 })
 
 describe('the members area reaches it (A-130 criterion 4)', () => {
-  test('Membership is a MEMBER_NAV entry', () => {
-    expect(MEMBER_NAV.find(entry => entry.to === '/account/membership')?.label).toBe('Membership')
+  test('Membership is a MY_NAV entry', () => {
+    expect(MY_NAV.find(entry => entry.to === '/account/membership')?.label).toBe('Membership')
   })
 })

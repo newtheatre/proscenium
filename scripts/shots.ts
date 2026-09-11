@@ -11,6 +11,7 @@ import { londonDay } from '../shared/utils/membership'
 const OUT = process.env.SHOTS_OUT ?? '.shots'
 const WIDE = 1400
 const NARROW = 900
+const PHONE = 390
 
 const password = `shots-${crypto.randomUUID()}`
 const email = `shots-${crypto.randomUUID().slice(0, 8)}@e2e.newtheatre.org.uk`
@@ -203,13 +204,13 @@ const OPEN_MEMBERSHIP = `(async () => {
 
 const SHOTS: Shot[] = [
   { name: '01-overview', path: '/admin', marker: 'h1' },
-  { name: '02-people', path: '/admin/people', marker: '[data-test="directory-table"]' },
-  { name: '03-people-filters', path: '/admin/people', marker: '[data-test="directory-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
-  { name: '04-account', path: `/admin/people/${ids[0]}`, marker: '[data-test="account-name"]' },
-  { name: '05-members', path: '/admin/members', marker: '[data-test="members-table"]' },
-  { name: '06-members-modal', path: '/admin/members', marker: '[data-test="members-table"]', after: OPEN_MEMBERSHIP },
-  { name: '07-fellows', path: '/admin/fellows', marker: '[data-test="fellows-table"]' },
-  { name: '08-fellows-modal', path: '/admin/fellows', marker: '[data-test="fellows-table"]', after: `document.querySelector('[data-test="award"]').click()` },
+  { name: '02-people', path: '/people/accounts', marker: '[data-test="directory-table"]' },
+  { name: '03-people-filters', path: '/people/accounts', marker: '[data-test="directory-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '04-account', path: `/people/accounts/${ids[0]}`, marker: '[data-test="account-name"]' },
+  { name: '05-members', path: '/people/members', marker: '[data-test="members-table"]' },
+  { name: '06-members-modal', path: '/people/members', marker: '[data-test="members-table"]', after: OPEN_MEMBERSHIP },
+  { name: '07-fellows', path: '/people/fellows', marker: '[data-test="fellows-table"]' },
+  { name: '08-fellows-modal', path: '/people/fellows', marker: '[data-test="fellows-table"]', after: `document.querySelector('[data-test="award"]').click()` },
   { name: '09-audit', path: '/admin/audit', marker: '[data-test="audit-table"]' },
   { name: '09a-audit-filters', path: '/admin/audit', marker: '[data-test="audit-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '10-audit-modal', path: '/admin/audit', marker: '[data-test="audit-table"]', after: `document.querySelector('[data-test="audit-record"]').click()` },
@@ -251,11 +252,14 @@ const SHOTS: Shot[] = [
   { name: '16e-rota-templates-filters', path: '/rota/manage/templates', marker: '[data-test="templates-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '16f-rota-checklists', path: '/rota/manage/checklists', marker: '[data-test="checklists-table"]' },
   { name: '16g-rota-emergency', path: '/rota/manage/emergency', marker: '[data-test="emergency-table"]' },
-  { name: '11-config', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
+  { name: '11-config', path: '/admin/settings', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]' },
   { name: '12-dev-tools', path: '/dev', marker: '[data-test="dev-seed"]' },
-  { name: '13-people-narrow', path: '/admin/people', marker: '[data-test="directory-table"]', width: NARROW },
-  { name: '14-members-narrow', path: '/admin/members', marker: '[data-test="members-table"]', width: NARROW },
-  { name: '15-config-narrow', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]', width: NARROW },
+  { name: '13-people-narrow', path: '/people/accounts', marker: '[data-test="directory-table"]', width: NARROW },
+  { name: '14-members-narrow', path: '/people/members', marker: '[data-test="members-table"]', width: NARROW },
+  { name: '15-config-narrow', path: '/admin/settings', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]', width: NARROW },
+  { name: '20-my', path: '/my', marker: '[data-test="my-page"]' },
+  { name: '20a-my-narrow', path: '/my', marker: '[data-test="my-page"]', width: NARROW },
+  { name: '20b-my-phone', path: '/my', marker: '[data-test="my-page"]', width: PHONE },
 ]
 
 const wanted = process.argv.slice(2)

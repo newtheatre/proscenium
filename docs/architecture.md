@@ -72,7 +72,7 @@ A prefix names the domain; the shell follows the posture of the work rather than
 | Prefix | Shell | Who |
 | --- | --- | --- |
 | `/`, `/sign-in`, `/register`, `/verify`, `/reset`, `/magic`, every `content/*.md` path | `default` | Anybody |
-| `/rooms`, `/rooms/mine`, `/account/*` | `member` | A member, about themselves |
+| `/my`, `/rooms`, `/rooms/mine`, `/account/*` | `member` | A member, about themselves |
 | `/rooms/manage/*`, `/people/*`, `/box-office/*`, `/bar/*`, `/money/*`, `/admin/*` | `console` | Somebody working for the theatre |
 | `/tonight/*` | `tonight` | Somebody on shift, on a phone |
 
@@ -80,7 +80,9 @@ A domain with both audiences puts the member's screens at the top and the consol
 (`/rooms` against `/rooms/manage/requests`). A domain with no member surface sits flat
 (`/people/accounts`, `/bar/products` and `/bar/stock`). Every navigable destination is declared once
 in `shared/utils/site-nav.ts`, which the console sidebar renders and the console middleware guards
-from, so a deep link and the sidebar cannot disagree.
+from, so a deep link and the sidebar cannot disagree. `MY_NAV` is a member's own screens (`/my`
+first, K-127); `ACCOUNT_NAV` is the three settings pages the member menu and `AccountSettings.vue`
+render. Neither is guarded by `entryFor`, which scans console entries only.
 
 ### Route namespaces
 
