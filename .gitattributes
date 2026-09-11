@@ -1,0 +1,10 @@
+# Every text file is LF in the working tree on every platform. Binary media is left alone.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.sqlite binary
+*.db binary

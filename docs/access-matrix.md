@@ -14,6 +14,12 @@ Membership itself is `hasMembership` on the `Viewer`, carried as `membershipStat
 window, which is what every write path below actually checks, because a renewal in hand should
 not be a refusal at a desk (0031).
 
+## My NNT
+
+| Route | Ability | Membership requirement | Sent to |
+| --- | --- | --- | --- |
+| `/my` | `signedIn` | None: a lapsed member sees every tile, including "Membership" reading lapsed (A-129 criterion 2). | n/a |
+
 ## Account
 
 | Route | Ability | Membership requirement | Sent to |

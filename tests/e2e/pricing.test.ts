@@ -288,7 +288,7 @@ describe.skipIf(skip !== null)('the screen shows why a price is what it is (D-12
 
     const view = await openConsole()
     try {
-      await visit(view, `${app.baseURL}/box-office/shows/${show.id}`, '[data-test="show-copy"]')
+      await visit(view, `${app.baseURL}/box-office/shows/${show.id}?tab=ticket-types`, '[data-test="show-prices"]')
       await waitFor(view, `document.querySelector('[data-test="resolved-${type}"]') !== null`)
       const text = await textOf(view, `[data-test="resolved-${type}"]`)
       expect(text).toContain('£7.00')
@@ -306,7 +306,7 @@ describe.skipIf(skip !== null)('the screen shows why a price is what it is (D-12
 
     const view = await openConsole()
     try {
-      await visit(view, `${app.baseURL}/box-office/shows/${show.id}`, '[data-test="show-copy"]')
+      await visit(view, `${app.baseURL}/box-office/shows/${show.id}?tab=performances`, '[data-test="performances-table"]')
       await waitFor(view, `document.querySelector('[data-test="prices-${performance}"]') !== null`)
       await click(view, `[data-test="prices-${performance}"]`)
       await waitFor(view, `document.querySelector('[data-test="price-field-${type}"]') !== null`)

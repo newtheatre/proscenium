@@ -25,6 +25,7 @@ import { externalSpacesList } from '#shared/utils/external-spaces-list'
 import { fellowshipsList } from '#shared/utils/fellowships-list'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { membershipsList } from '#shared/utils/memberships-list'
+import { performancesList } from '#shared/utils/performances-list'
 import { roomsList } from '#shared/utils/rooms-list'
 import { roomsQueueList } from '#shared/utils/rooms-queue-list'
 import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
@@ -75,7 +76,7 @@ const parse = (query: Record<string, string>) => filterQuerySchema(spec).safePar
 // The rooms module's declarations (K-129).
 const roomsLists = [roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList]
 // Every migrated declaration; the cross-declaration checks below walk this list.
-const MIGRATED = [accountsList, showsList, ...roomsLists, ...rotaLists, ...barLists, ...smallLists, trainingModulesList]
+const MIGRATED = [accountsList, showsList, performancesList, ...roomsLists, ...rotaLists, ...barLists, ...smallLists, trainingModulesList]
 
 describe('the schema is derived from the declaration (criterion 1)', () => {
   test('an empty query is the first page, the default sort and no conditions', () => {
@@ -259,6 +260,14 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
     expect(season?.column).toBe('season_id')
   })
 
+  test('the performances of one show filter on status, venue and curtain day (D-132)', () => {
+    expect(operatorsOf(fieldOf(performancesList, 'status')!)).toEqual(['is', 'not'])
+    expect(fieldOf(performancesList, 'venueId')?.column).toBe('venue_id')
+    expect(fieldOf(performancesList, 'startsAt')?.dateAs).toBe('unix')
+    expect(fieldOf(performancesList, 'external')?.column).toBeUndefined()
+    expect(performancesList.sort.default).toBe('startsAt')
+  })
+
   test('a rota list filters on a night, against the show night rather than the calendar day', () => {
     const night = fieldOf(unfilledShiftsList, 'night')
     expect(night?.dateAs).toBe('night')
@@ -300,6 +309,7 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
   const ANSWERED_BY_BINDING: Record<string, readonly string[]> = {
     [accountsList.key]: ['role', 'holdsRole', 'membership', 'anonymised', 'authenticator', 'privilegedWithoutFactor', 'approachingRetention', 'neverSignedIn'],
     [showsList.key]: ['unassessed', 'onSale'],
+    [performancesList.key]: ['external'],
     [roomsList.key]: [],
     [blackoutsList.key]: ['past'],
     [externalSpacesList.key]: [],
@@ -312,7 +322,7 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
   }
 
   test('every declared column-less field is named in its server binding', () => {
-    const declarations: ListSpec[] = [accountsList, showsList, roomsList, blackoutsList, externalSpacesList, ...smallLists]
+    const declarations: ListSpec[] = [accountsList, showsList, performancesList, roomsList, blackoutsList, externalSpacesList, ...smallLists]
     for (const declared of declarations) {
       const columnLess = declared.fields.filter(field => field.column === undefined).map(field => field.key)
       expect(new Set(columnLess)).toEqual(new Set(ANSWERED_BY_BINDING[declared.key]))

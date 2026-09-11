@@ -123,15 +123,14 @@ useSeoMeta({ title: 'Security' })
 </script>
 
 <template>
-  <UContainer class="max-w-xl py-16">
-    <UPageHeader
-      title="Security"
-      description="An authenticator app is a second step at sign-in, so a stolen password is not enough on its own."
-    />
+  <AccountSettings
+    data-test="account-security-page"
+    title="Sign-in and security"
+    description="An authenticator app is a second step at sign-in, so a stolen password is not enough on its own."
+  >
+    <SignInMethods />
 
-    <SignInMethods class="mt-8" />
-
-    <UPageCard class="mt-8">
+    <UPageCard class="mt-6">
       <UAlert
         v-if="notice"
         class="mb-6"
@@ -194,22 +193,22 @@ useSeoMeta({ title: 'Security' })
           {{ secret }}
         </p>
 
-        <div
+        <UForm
+          :state="{ digits }"
           data-test="mfa-confirm"
           class="space-y-2"
         >
-          <p class="text-sm">
-            Enter the six digits it shows to finish.
-          </p>
-          <UPinInput
-            v-model="digits"
-            :length="CODE_LENGTH"
-            :disabled="working"
-            otp
-            size="lg"
-            @complete="confirm"
-          />
-        </div>
+          <UFormField label="Enter the six digits it shows to finish.">
+            <UPinInput
+              v-model="digits"
+              :length="CODE_LENGTH"
+              :disabled="working"
+              otp
+              size="lg"
+              @complete="confirm"
+            />
+          </UFormField>
+        </UForm>
       </div>
 
       <div
@@ -326,9 +325,10 @@ useSeoMeta({ title: 'Security' })
       description="Your name and address are removed and the account cannot be used again. Download your data first if you want it."
     >
       <template #body>
-        <form
+        <UForm
+          :state="confirmation"
           class="space-y-4"
-          @submit.prevent="closeAccount"
+          @submit="closeAccount"
         >
           <UAlert
             color="warning"
@@ -354,7 +354,7 @@ useSeoMeta({ title: 'Security' })
           >
             Close my account
           </UButton>
-        </form>
+        </UForm>
       </template>
     </UModal>
 
@@ -362,5 +362,5 @@ useSeoMeta({ title: 'Security' })
       v-model:open="reauthenticating"
       @reauthenticated="retryAfterReauthentication"
     />
-  </UContainer>
+  </AccountSettings>
 </template>
