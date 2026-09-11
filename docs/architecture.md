@@ -438,13 +438,16 @@ Parameter discipline holds by construction: an `any` list is capped per field (`
 `DEFAULT_ANY_CAP`), the schema refuses a longer one with a 400 and the helper refuses one that
 reaches it anyway, and `maxBoundParameters(spec)` is the declaration's worst case, which
 `tests/unit/list-filters.test.ts` holds under the chunk limit (0006). Dates on unix columns
-(`dateAs: 'unix'`) compare against London day boundaries (0014); "is not X" includes rows with no
-value at all, and "is empty" finds them.
+(`dateAs: 'unix'`) compare against London day boundaries; `dateAs: 'night'` compares against the
+show night, 04:00 to 04:00, instead (0014), the rota module's own extension for a field naming a
+performance's start. "Is not X" includes rows with no value at all, and "is empty" finds them.
 
-The two endpoints migrated first are `GET /api/admin/accounts` and `GET /api/admin/shows`, both
-documented in `docs/data-model.md` beside their tables. Migration runs one module per pull
-request; `tests/unit/admin-conventions.test.ts` holds the migrated pages to the declaration now
-and the whole console once the last module lands.
+The first endpoints migrated were `GET /api/admin/accounts` and `GET /api/admin/shows`, both
+documented in `docs/data-model.md` beside their tables. Rota followed: `GET /api/admin/rota/shifts`,
+`GET /api/admin/rota/approvals`, `GET /api/admin/rota/templates`, `GET /api/admin/checklist` and
+`GET /api/admin/venues/emergency`, the last three paging a subquery-scoped join over venues rather
+than a flat table (0006). Migration runs one module per pull request; `tests/unit/admin-conventions.test.ts`
+holds the migrated pages to the declaration now and the whole console once the last module lands.
 
 ## Scheduled tasks
 
@@ -714,7 +717,8 @@ cancelled performance tells them (E-101, E-102, committee direction 4 September 
 
 Templates are administered at `/rota/manage/templates` under `rota.read` and `rota.write`. A
 member's own `/rota` (E-103) shows what they already hold and the open shifts on the diary, each
-carrying live eligibility rather than a cached one.
+carrying live eligibility rather than a cached one. `GET /api/admin/rota/templates` filters by
+venue name and by `staffed` through `shared/utils/rota-templates-list.ts` (K-129).
 
 ### Claiming, confirming and declining (E-104, E-105)
 
@@ -734,12 +738,16 @@ the row's resulting state, which a winner has already set, the same shape `perfo
 
 `GET /api/admin/rota/approvals`, `POST /api/admin/rota/approvals/[id]/approve` and
 `.../decline` are E-105's queue, gated on `rota.write`, the audience E-101 already gave the
-templates to (module E open question 1). Approving and declining both ride the same
+templates to (module E open question 1). The list filters by role and by `night`, against the
+show night rather than the calendar day, through `shared/utils/rota-approvals-list.ts` (K-129).
+Approving and declining both ride the same
 `changes() = 1` shape; a decline's reason lands on `shifts.decline_reason`, which the claimant is
 emailed, never in the audit trail, which keeps only that the status changed (0011). A declined
 shift still stays off the open list rather than reopening itself, but it is no longer invisible:
 `GET /api/admin/rota/shifts` (`/rota/manage/shifts`) lists every `OPEN` or `DECLINED` shift on a
-performance still to come, which is what an officer now reassigns from (E-107 criterion 3).
+performance still to come, which is what an officer now reassigns from (E-107 criterion 3). It
+filters by role, status and night through `shared/utils/unfilled-shifts-list.ts`, the same
+`dateAs: 'night'` extension the approvals list uses (K-129, 0014).
 
 ### Release and reassignment (E-107)
 
@@ -1059,6 +1067,10 @@ a night). An edit to `checklist_items` afterwards changes nothing already stampe
 `RETURNING` via `auditedWrite()` (0049); a system-verified stamp's `system_check IS NULL`
 predicate is what refuses a hand-tick outright, matched by its own CHECK at the schema layer too.
 
+`GET /api/admin/checklist`, the committee's own overview, filters by venue name and by
+`configured` through `shared/utils/checklist-venues-list.ts` (K-129); a venue with nothing
+configured yet still lists, its `items` empty.
+
 A system-verified item's done state is never stored: `noShowHoldsReleased()` and
 `incidentsReviewed()` (`server/utils/checklist.ts`) run live against this performance's own
 `reservations` and `incidents`/`audit_log` on every read, so a matinee's checklist never waits
@@ -1110,6 +1122,9 @@ of tables requires (0010).
 `requireAnyNightAuthority(event, ['DUTY_MANAGER', 'DOOR', 'BAR'])` resolves; `PUT
 /api/admin/venues/[id]/emergency` writes a new version, gated by a new standing permission pair,
 `emergency-card.read`/`write`, granted to `FOH_MANAGER` alongside `checklist.*` and `rota.*`.
+`GET /api/admin/venues/emergency`, the committee's overview, filters by venue name and by
+`filed` through `shared/utils/emergency-cards-list.ts` (K-129); the `venues` envelope it answers
+also carries paging, though a venue with no card yet still lists.
 
 **Closes K-103 criterion 3's own gap, cited from that section**: `app/layouts/tonight.vue`
 (platform's, `onMounted`) fetches `/api/tonight/emergency` once and calls `primeNightCache()`

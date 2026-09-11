@@ -2,6 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { formatLondon } from '#shared/utils/london'
 import { saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
+import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -29,9 +30,8 @@ interface Listing {
 
 interface Candidate { id: string, name: string, email: string, eligible: boolean }
 
+const request = useRequestFetch()
 const toast = useToast()
-const page = ref(1)
-const search = ref('')
 const failure = ref<string | null>(null)
 const assigning = ref<UnfilledShift | null>(null)
 const submitting = ref(false)
@@ -39,18 +39,16 @@ const candidateSearch = ref('')
 const candidateSettled = useDebounced(candidateSearch, 250)
 const chosen = ref<Candidate | null>(null)
 
-const { data: listing, status, refresh } = await useFetch<Listing>('/api/admin/rota/shifts', {
-  query: computed(() => ({ page: page.value })),
-  watch: [page],
-  default: (): Listing => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1 }),
-})
+// Search, filters, sort and page live in the URL (K-129).
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(unfilledShiftsList)
 
-const shown = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  if (!term) return listing.value.items
-  return listing.value.items.filter(row =>
-    row.showTitle.toLowerCase().includes(term) || row.venueName.toLowerCase().includes(term))
-})
+const empty = (): Listing => ({ items: [], page: 1, pageSize: 0, total: 0, pages: 1 })
+
+const { data: listing, status, refresh } = await useAsyncData(
+  'unfilled-shifts',
+  () => request<Listing>('/api/admin/rota/shifts', { query: query.value }),
+  { watch: [query], default: empty },
+)
 
 // Scoped to the shift being assigned: eligibility depends on the role, which changes with it.
 const { data: candidateData, status: candidateStatus } = await useAsyncData(
@@ -150,21 +148,31 @@ const columns: TableColumn<UnfilledShift>[] = [
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A show or a venue"
-      :filterable="false"
+      :placeholder="unfilledShiftsList.search?.placeholder"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''"
-    />
+      @clear="clear"
+    >
+      <template #filters>
+        <ConsoleFilters
+          :spec="unfilledShiftsList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
+      </template>
+    </AdminToolbar>
 
     <UTable
-      :data="shown"
+      :data="listing.items"
       :columns="columns"
       :loading="status === 'pending'"
       data-test="unfilled-shifts-table"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          Nothing unfilled right now.
+          {{ filtered ? 'Nothing matches that.' : 'Nothing unfilled right now.' }}
         </p>
       </template>
     </UTable>
