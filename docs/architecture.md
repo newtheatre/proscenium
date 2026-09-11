@@ -745,7 +745,35 @@ released or reassigned shift stops resolving on its very next request, because t
 `GET /api/tonight/authority?role=&night=&venueId=&performanceId=` is that resolution as a route. It
 returns the allow-listed shape above and is the pattern every other `/api/tonight/**` and
 `/api/till/**` route follows; `tests/unit/night-authority.test.ts` fails when a route under either
-namespace does not call the guard.
+namespace does not call the guard. Beside the ids it answers with
+`performances: { id, showTitle, startsAt, venueName, active }[]`, `active` being
+`activePerformanceId()`'s own answer, so a picker names a show and a curtain rather than a database
+id and a screen opening cold starts on the house running now (E-127 criterion 2).
+
+## The door (D-126, E-127, E-129)
+
+`/tonight/door` is door mode and nothing else: admit or redirect, with no price, no email address
+and no booking history on screen (the show-night screen design, section 2.1). It opens the rear
+camera through `app/components/QrScanner.vue`, decoding with `BarcodeDetector` where the browser
+has it and jsQR everywhere else, and falls back to the typed reference field with one line when
+there is no camera or the permission is refused.
+
+`POST /api/tonight/door/resolve` is the one seam between a decoded code and an admission. It takes
+whatever the lens or the keyboard produced, and answers with a reference:
+
+| Decoded form | What it is | How it resolves |
+| --- | --- | --- |
+| `/qr/<token>` | What D-108's confirmation email and booking page encode | `verifyQrToken()`, then the reservation's own reference |
+| `/passes/<token>` | What D-124's pass QR encodes | `verifyPassQrToken()`, then the pass's own reference |
+| `/t/<ref>` | The form the show-night design names | the reference itself |
+| `K7M4PQ` | A reference read aloud, or typed by a hardware scanner | itself |
+
+The reference then goes through `/api/tonight/door/tickets/scan` and `/api/tonight/door/passes/scan`
+as it always did, so a signed token is never unpacked in the browser and there is exactly one
+admission state machine. `shared/utils/door.ts` holds the pure half: `readScannedCode()`,
+`isRepeatScan()` (one code in front of the lens admits once), and `doorVerdict()`, which turns an
+outcome into the PAID, UNPAID or refused card the screen paints and is where the box office's
+"amount due" wording is dropped for "Send to the bar to pay".
 
 ## The rota (E-101, E-102, E-106, 0046)
 

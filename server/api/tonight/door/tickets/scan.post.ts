@@ -24,10 +24,27 @@ export default defineEventHandler(async (event) => {
       : null,
   )
 
-  if (!outcome.admit) throw createError({ statusCode: 409, statusMessage: outcome.detail ?? outcome.headline })
+  // The door's own card reads `data`; the message is unchanged, so the desk still gets the
+  // amount due while the screen shows the wording (E-129 criterion 7).
+  const party = await doorParty(reservation.id)
+  const unpaid = reservation.status === 'PENDING' && reservation.performanceId === input.performanceId
+
+  if (!outcome.admit) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: outcome.detail ?? outcome.headline,
+      data: { verdict: doorVerdict(outcome, unpaid), reference: reservation.reference, ...party },
+    })
+  }
 
   const admitted = await admitAtDoor(reservation.id, resolved.account.id)
   if (!admitted) throw createError({ statusCode: 409, statusMessage: 'This booking has already been admitted tonight' })
 
-  return { decision: 'ADMIT' as const, showTitle: reservation.showTitle }
+  return {
+    decision: 'ADMIT' as const,
+    showTitle: reservation.showTitle,
+    reference: reservation.reference,
+    verdict: doorVerdict(outcome, false),
+    ...party,
+  }
 })
