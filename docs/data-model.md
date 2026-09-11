@@ -470,7 +470,7 @@ two routes that take no session at all:
 
 | Route | What it does |
 | --- | --- |
-| `GET /api/whats-on` | The paged envelope of published shows with at least one future on-sale performance, each with its public performances, availability and prices. |
+| `GET /api/whats-on` | The paged envelope of published shows with at least one future on-sale performance, each with its public performances, availability and prices. `?venue=<name>` narrows it to the shows playing that venue; the page and its count share one predicate, so they cannot disagree (J-111). |
 | `GET /api/shows/[slug]` | One published show. A draft show and an address nobody holds both answer 404, so the listing cannot be read backwards. |
 
 Both build every field through `publicShow()` and `publicPerformance()` in
