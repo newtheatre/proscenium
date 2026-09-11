@@ -260,6 +260,14 @@ const SHOTS: Shot[] = [
   { name: '20-my', path: '/my', marker: '[data-test="my-page"]' },
   { name: '20a-my-narrow', path: '/my', marker: '[data-test="my-page"]', width: NARROW },
   { name: '20b-my-phone', path: '/my', marker: '[data-test="my-page"]', width: PHONE },
+  { name: '21-account-profile', path: '/account/profile', marker: '[data-test="account-profile-page"]' },
+  { name: '21a-account-profile-phone', path: '/account/profile', marker: '[data-test="account-profile-page"]', width: PHONE },
+  { name: '22-account-security', path: '/account/security', marker: '[data-test="account-security-page"]' },
+  { name: '23-account-notifications', path: '/account/notifications', marker: '[data-test="account-notifications-page"]' },
+  { name: '24-rota', path: '/rota', marker: '[data-test="rota-page"]' },
+  { name: '25-training', path: '/training', marker: '[data-test="training-page"]' },
+  { name: '26-rooms-mine', path: '/rooms/mine', marker: '[data-test="rooms-mine-page"]' },
+  { name: '27-passes', path: '/account/passes', marker: '[data-test="account-passes-page"]' },
 ]
 
 const wanted = process.argv.slice(2)
