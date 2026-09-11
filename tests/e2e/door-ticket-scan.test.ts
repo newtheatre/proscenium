@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue, ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
+import { activePerformanceId } from '#shared/utils/tonight'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -63,7 +64,7 @@ function write(statement: string, ...parameters: unknown[]): void {
 }
 
 // A matinee and an evening at the same venue tonight, the exact shape E-127 exists for.
-function houseWithTwoPerformances(): { matineeId: string, eveningId: string } {
+function houseWithTwoPerformances(): { venueId: string, matineeId: string, eveningId: string } {
   const suffix = crypto.randomUUID().slice(0, 8)
   const database = new Database(app.databaseFile)
   try {
@@ -71,7 +72,7 @@ function houseWithTwoPerformances(): { matineeId: string, eveningId: string } {
     const venueId = testVenue(target, { suffix }).id
     const matinee = tonightsPerformance(target, { suffix: `${suffix}-matinee`, venueId, curtainHoursAfterNightStart: 10 })
     const evening = tonightsPerformance(target, { suffix: `${suffix}-evening`, venueId, curtainHoursAfterNightStart: 15.5 })
-    return { matineeId: matinee.performanceId, eveningId: evening.performanceId }
+    return { venueId, matineeId: matinee.performanceId, eveningId: evening.performanceId }
   }
   finally {
     database.close()
@@ -166,6 +167,41 @@ describe.skipIf(skip !== null)('an unpaid or cancelled ticket refuses distinctly
     const { matineeId } = houseWithTwoPerformances()
     const answered = await send('POST', '/api/tonight/door/tickets/scan', { reference: 'ZZZZZZ', performanceId: matineeId })
     expect(answered.status).toBe(404)
+  }, CASE_TIMEOUT_MS)
+})
+
+describe.skipIf(skip !== null)('the authority payload names each performance and which is running (issue 901)', () => {
+  test('every covered performance carries its title, curtain and venue, and exactly one is active', async () => {
+    const { venueId, matineeId, eveningId } = houseWithTwoPerformances()
+
+    const answered = await send('GET', `/api/tonight/authority?role=DOOR&venueId=${venueId}`)
+    expect(answered.status).toBe(200)
+    const { performances } = await answered.json() as {
+      performances: { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }[]
+    }
+
+    expect(performances.map(one => one.id).sort()).toEqual([matineeId, eveningId].sort())
+    for (const one of performances) {
+      expect(one.showTitle).toBe('A Test Show')
+      expect(one.venueName.length).toBeGreaterThan(0)
+      expect(one.startsAt).toBeGreaterThan(0)
+    }
+    expect(performances.filter(one => one.active).length).toBe(1)
+  }, CASE_TIMEOUT_MS)
+
+  // What the door defaults to, derived the one way `/tonight` already badges "Active now": the
+  // fixture's doors are curtain less thirty minutes, which is what the payload is checked against.
+  test('the active one is what activePerformanceId picks from the same rows', async () => {
+    const { venueId } = houseWithTwoPerformances()
+
+    const { performances } = await (await send('GET', `/api/tonight/authority?role=DOOR&venueId=${venueId}`)).json() as {
+      performances: { id: string, startsAt: number, active: boolean }[]
+    }
+    const expected = activePerformanceId(
+      performances.map(one => ({ performanceId: one.id, startsAt: one.startsAt, doorsAt: one.startsAt - 1800 })),
+      Date.now() / 1000,
+    )
+    expect(performances.find(one => one.active)?.id ?? null).toBe(expected)
   }, CASE_TIMEOUT_MS)
 })
 

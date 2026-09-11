@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { saysPerformanceChoice } from '#shared/utils/tonight'
+
 definePageMeta({ layout: 'tonight' })
 useSeoMeta({ title: 'Door' })
 
-interface Authority { performanceIds: string[] }
+interface CoveredPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }
+interface Authority { performanceIds: string[], performances: CoveredPerformance[] }
 interface TicketScanResult { decision: 'ADMIT', showTitle: string }
 interface PassScanResult { decision: 'ADMIT', passTypeName: string }
 
@@ -10,7 +13,7 @@ const request = useRequestFetch()
 
 const authorised = ref(false)
 const authorityFailure = ref<string | null>(null)
-const performanceIds = ref<string[]>([])
+const performances = ref<CoveredPerformance[]>([])
 const performanceId = ref('')
 const syncedAt = ref<Date | null>(null)
 const busy = ref(true)
@@ -19,8 +22,10 @@ async function resolveAuthority(): Promise<void> {
   busy.value = true
   try {
     const resolved = await request<Authority>('/api/tonight/authority', { query: { role: 'DOOR' } })
-    performanceIds.value = resolved.performanceIds
-    performanceId.value = resolved.performanceIds[0] ?? ''
+    performances.value = resolved.performances
+    // The house running now, never whichever id sorted first: a matinee ticket refused at an
+    // evening the volunteer never chose is the bug this closes (issue 901).
+    performanceId.value = (resolved.performances.find(one => one.active) ?? resolved.performances[0])?.id ?? ''
     authorised.value = true
     authorityFailure.value = null
   }
@@ -36,7 +41,10 @@ async function resolveAuthority(): Promise<void> {
 
 onMounted(resolveAuthority)
 
-const performanceOptions = computed(() => performanceIds.value.map(id => ({ label: id, value: id })))
+const performanceOptions = computed(() => performances.value.map(one => ({
+  label: saysPerformanceChoice(one),
+  value: one.id,
+})))
 
 // Typed or read from a hardware scanner acting as a keyboard (no camera scanner exists yet,
 // docs/known-issues.md); a ticket and a pass share one reference alphabet, so one box tries both.

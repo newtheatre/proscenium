@@ -2,6 +2,7 @@
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
 import { ID_TYPES, REFUSAL_REASONS, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
 import { londonClock } from '#shared/utils/london'
+import { saysPerformanceChoice } from '#shared/utils/tonight'
 import type { AgeCheckOutcome, IdType, RefusalReason } from '#shared/utils/age-checks'
 
 definePageMeta({ layout: 'tonight' })
@@ -23,6 +24,7 @@ interface Entry {
 }
 
 interface Listing { items: Entry[], total: number }
+interface CoveredPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -35,13 +37,13 @@ const items = ref<Entry[]>([])
 // property of an entry: the row's own `performanceId` may still be null either way).
 const authorised = ref(false)
 const authorityFailure = ref<string | null>(null)
-const performanceIds = ref<string[]>([])
+const performances = ref<CoveredPerformance[]>([])
 
 async function resolveAuthority(): Promise<void> {
   for (const role of NIGHT_ROLES) {
     try {
-      const resolved = await request<{ performanceIds: string[] }>('/api/tonight/authority', { query: { role } })
-      performanceIds.value = resolved.performanceIds
+      const resolved = await request<{ performances: CoveredPerformance[] }>('/api/tonight/authority', { query: { role } })
+      performances.value = resolved.performances
       authorised.value = true
       authorityFailure.value = null
       return
@@ -75,7 +77,7 @@ onMounted(async () => {
 
 const performanceOptions = computed(() => [
   { label: 'No performance (checked outside a show)', value: '' },
-  ...performanceIds.value.map(id => ({ label: id, value: id })),
+  ...performances.value.map(one => ({ label: saysPerformanceChoice(one), value: one.id })),
 ])
 
 interface FormState {
@@ -89,7 +91,7 @@ interface FormState {
 }
 
 const blankForm = (): FormState => ({
-  performanceId: performanceIds.value[0] ?? '',
+  performanceId: (performances.value.find(one => one.active) ?? performances.value[0])?.id ?? '',
   outcome: 'ACCEPTED',
   idType: undefined,
   reason: undefined,
@@ -285,7 +287,7 @@ async function submitCorrect(): Promise<void> {
           />
 
           <UFormField
-            v-if="performanceIds.length > 0"
+            v-if="performances.length > 0"
             label="Performance"
           >
             <USelect
