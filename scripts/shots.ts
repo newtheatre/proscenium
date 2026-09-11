@@ -173,6 +173,31 @@ const barItem = await (await send('POST', '/api/admin/bar/items', { name: 'House
 await send('POST', '/api/admin/bar/movements', { itemId: barItem.id, kind: 'DELIVERY', qty: 4500, unitCostPence: 480 }, cookie)
 await send('POST', '/api/admin/bar/stocktakes', undefined, cookie)
 
+// G-129: two departments, a module needing another and a scheduled session, so the training
+// catalogue and its manage screen are never a picture of an empty table.
+const trainingDeptA = await (await send('POST', '/api/admin/training/departments', { code: 'SHOTS-TECH', name: 'Technical (test)' }, cookie)).json() as { code: string }
+const trainingDeptB = await (await send('POST', '/api/admin/training/departments', { code: 'SHOTS-FOH', name: 'Front of house (test)' }, cookie)).json() as { code: string }
+await send('POST', '/api/admin/training/modules', {
+  id: 'SHOTS-BASE', department: trainingDeptA.code, kind: 'MODULE', name: 'Working at height (test)',
+  description: 'How to use the tallescope safely.', status: 'ACTIVE',
+}, cookie)
+await send('POST', '/api/admin/training/modules', {
+  id: 'SHOTS-RIG', department: trainingDeptA.code, kind: 'CERTIFICATION', name: 'Rigging (test)',
+  description: 'Hanging and focusing a lantern from the bars.', status: 'ACTIVE',
+  expiryMode: 'MONTHS', expiryMonths: 24, safetyCritical: true,
+}, cookie)
+await send('POST', '/api/admin/training/modules/SHOTS-RIG/prerequisites', { requiresId: 'SHOTS-BASE' }, cookie)
+await send('POST', '/api/admin/training/modules', {
+  id: 'SHOTS-FOH1', department: trainingDeptB.code, kind: 'BRIEF', name: 'Front of house welcome (test)',
+  description: 'Meeting an audience at the door.', status: 'ACTIVE',
+}, cookie)
+const trainingSoon = new Date()
+trainingSoon.setDate(trainingSoon.getDate() + 5)
+await send('POST', '/api/admin/training/sessions', {
+  heldOn: trainingSoon.toISOString().slice(0, 10), startsAt: '18:00', endsAt: '20:00',
+  place: 'The Studio', capacity: 12, moduleIds: ['SHOTS-BASE'],
+}, cookie)
+
 const view = await openSignedOutView(app.baseURL)
 await visit(view, `${app.baseURL}/sign-in`)
 await fill(view, 'form input[type="email"]', email)
@@ -256,6 +281,15 @@ const SHOTS: Shot[] = [
   { name: '13-people-narrow', path: '/admin/people', marker: '[data-test="directory-table"]', width: NARROW },
   { name: '14-members-narrow', path: '/admin/members', marker: '[data-test="members-table"]', width: NARROW },
   { name: '15-config-narrow', path: '/admin/config', marker: '[data-test="setting-BAR_TAB_CAP_PENCE"]', width: NARROW },
+  // G-129: the public catalogue and the console's manage screen. No PHONE width yet (K-127 adds
+  // it); a NARROW twin stands in until then.
+  { name: '40-catalogue', path: '/training/modules', marker: '[data-test="catalogue-page"]' },
+  { name: '40a-catalogue-narrow', path: '/training/modules', marker: '[data-test="catalogue-page"]', width: NARROW },
+  { name: '41-module', path: '/training/modules/SHOTS-RIG', marker: '[data-test="module-page"]' },
+  { name: '42-manage', path: '/training/manage', marker: '[data-test="modules-table"]' },
+  { name: '42a-manage-narrow', path: '/training/manage', marker: '[data-test="modules-table"]', width: NARROW },
+  { name: '43-manage-filters', path: '/training/manage', marker: '[data-test="modules-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '44-manage-editor', path: '/training/manage', marker: '[data-test="modules-table"]', after: `document.querySelector('[data-test="edit-module-SHOTS-RIG"]').click()` },
 ]
 
 const wanted = process.argv.slice(2)

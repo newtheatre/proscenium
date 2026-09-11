@@ -433,7 +433,10 @@ Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 11 V2 stories (G-2
   4. `app/pages/training/manage/index.vue` is split into components (catalogue table, module
      editor, department filter) with no behaviour change: the existing tests pass untouched.
   5. Before-and-after captures from `bun run shots` are attached to the pull request.
-- Source: Pre-cutover review, 10 September 2026.
+- Source: Pre-cutover review, 10 September 2026. Criterion 1's "level" and "duration" have no
+  columns of their own: level reads as the module's kind (`saysKind`) and duration as how long it
+  is worth (`describeExpiry`). If "duration" was meant as teaching time, that needs a column and
+  its own story; this session proceeded with the mapping above and flagged it in the pull request.
 
 ## G-201: Self-directed module delivery
 
