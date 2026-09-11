@@ -7,6 +7,20 @@ import type { BoundStatement } from './database'
 // 19:30 London, which is 15.5 hours after the night's 04:00 start whatever the clocks did.
 const CURTAIN_HOURS_AFTER_NIGHT_START = 15.5
 
+// Later of 19:30 and two hours from now, capped short of the night's 04:00 close (0014): a
+// query filtering on `starts_at >= now` must still find tonight's fixture ahead, whatever now is.
+function defaultCurtainHours(night: string): number {
+  const bounds = showNightBounds(night)
+  const nightLengthHours = (bounds.to.getTime() - bounds.from.getTime()) / 3_600_000
+  const hoursElapsed = (Date.now() - bounds.from.getTime()) / 3_600_000
+  const HOURS_AHEAD_OF_NOW = 2
+  const CLOSE_MARGIN_HOURS = 0.5
+  return Math.min(
+    Math.max(CURTAIN_HOURS_AFTER_NIGHT_START, hoursElapsed + HOURS_AHEAD_OF_NOW),
+    nightLengthHours - CLOSE_MARGIN_HOURS,
+  )
+}
+
 export interface TonightsPerformanceOptions {
   night?: string
   // Distinguishes a second fixture in the same suite: ids, the venue name and the slug take it.
@@ -68,7 +82,7 @@ export function testVenue(into: AcceptsStatements, options: TestVenueOptions = {
 export function tonightsPerformance(into: AcceptsStatements, options: TonightsPerformanceOptions = {}): TonightsPerformance {
   const night = options.night ?? currentShowNight()
   const suffix = options.suffix ?? 'a'
-  const hours = options.curtainHoursAfterNightStart ?? CURTAIN_HOURS_AFTER_NIGHT_START
+  const hours = options.curtainHoursAfterNightStart ?? defaultCurtainHours(night)
   const startsAt = Math.floor(showNightBounds(night).from.getTime() / 1000) + Math.round(hours * 3600)
 
   const venueId = options.venueId ?? `venue-${suffix}`
