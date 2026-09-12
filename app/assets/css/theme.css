@@ -100,11 +100,13 @@
 /* A limelight beam on stage black. Hero sections, show pages, end of night. */
 @utility nnt-spotlight {
   background-color: var(--ui-color-neutral-950);
+  /* Both beams are centred inside the box and fade out before its edges: an ellipse centred off
+     an edge is cut flat by it, which reads as a clipped trapezoid rather than a beam. */
   background-image:
-    radial-gradient(ellipse 55% 45% at 70% -10%,
-      color-mix(in oklab, var(--ui-color-secondary-400) 26%, transparent), transparent 70%),
-    radial-gradient(ellipse 70% 60% at 25% 110%,
-      color-mix(in oklab, var(--ui-color-primary-500) 22%, transparent), transparent 70%);
+    radial-gradient(ellipse 45% 48% at 66% 40%,
+      color-mix(in oklab, var(--ui-color-secondary-400) 26%, transparent), transparent 72%),
+    radial-gradient(ellipse 48% 48% at 34% 60%,
+      color-mix(in oklab, var(--ui-color-primary-500) 22%, transparent), transparent 72%);
 }
 
 /* Hard offset shadow: hand-printed show-poster energy. Composed through

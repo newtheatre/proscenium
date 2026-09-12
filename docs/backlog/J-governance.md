@@ -201,6 +201,11 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
   10. The public header carries the wordmark, the visitor's few destinations (declared once in
      `HEADER_NAV`, the rest of the public nav staying in the footer) and a booking button, and
      the same links reach a phone through the header menu rather than a panel that opens empty.
+  11. The home page opens on a left-aligned scrimmed hero carrying the centenary sticker, the
+     two-line headline and the two actions; then the term's shows, the centenary band, and the
+     invitation to join. The footer carries the wordmark, the public pages in columns each entry
+     declares for itself, and a copyright line. Both colour modes read: the chrome, the hero and
+     the centenary band stay stage black while the page between them turns.
 - Source: Pre-cutover review, 10 September 2026; the known-issues row on unsigned-off policy
   prose; 0012, 0051. Criteria 6 to 9 added 11 September 2026, after the committee's review of the
   public-site mockups widened the story from the policy wording to the whole public site.

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
 import { ABILITY_PERMISSIONS } from '#shared/utils/abilities'
 import { PERMISSIONS } from '#shared/utils/roles'
-import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, MY_NAV, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor } from '#shared/utils/site-nav'
+import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor } from '#shared/utils/site-nav'
 
 // The navigation conventions are a test rather than a review habit (0040), the same way the admin
 // component conventions are (0032). What review still judges is whether a label reads well.
@@ -145,5 +145,25 @@ describe('the middleware and the sidebar read the same declaration', () => {
     expect(groupFor('/rooms/manage/closures')?.key).toBe('spaces')
     expect(groupFor('/people/members')?.key).toBe('people')
     expect(groupFor('/admin/audit')?.key).toBe('system')
+  })
+})
+
+describe('the public half of the navigation (J-111, D-103)', () => {
+  // The footer renders a column per group, so an entry with none would be declared and then not
+  // drawn anywhere: present in the file, absent from the site.
+  test('every public entry names the footer column it belongs to', () => {
+    const homeless = PUBLIC_NAV.filter(entry => !entry.group || !PUBLIC_GROUPS.includes(entry.group))
+    expect(homeless.map(entry => entry.to)).toEqual([])
+  })
+
+  test('no group is declared with nothing in it', () => {
+    const empty = PUBLIC_GROUPS.filter(group => !PUBLIC_NAV.some(entry => entry.group === group))
+    expect(empty).toEqual([])
+  })
+
+  // The header is a slice of the footer's list rather than a second list of its own (0040).
+  test('every header link is a public entry', () => {
+    const stray = HEADER_NAV.filter(entry => !PUBLIC_NAV.includes(entry))
+    expect(stray.map(entry => entry.to)).toEqual([])
   })
 })
