@@ -21,6 +21,7 @@ import { checklistVenuesClause, insertItemStatement, venueChecklistsQuery } from
 import { currentCardsQuery, emergencyCardsClause, recordCardStatement } from '#server/utils/venue-emergency'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
+import type { EmergencyCardInput } from '#shared/utils/venue-emergency'
 import type { FilterField } from '#shared/utils/list-filters'
 import type { TestDatabase } from '#tests/helpers/database'
 
@@ -330,13 +331,29 @@ describe('checklist venues (E-114, K-129)', () => {
   })
 })
 
+// Every field the card carries, so adding one to the form is a change here and not a silent
+// hole in a fixture (E-113 criterion 1).
+const emergencyCard = (overrides: Partial<EmergencyCardInput> = {}): EmergencyCardInput => ({
+  address: 'The Nottingham New Theatre, Nottingham NG7 2RD',
+  assemblyPoint: null,
+  exits: null,
+  isolationPoints: null,
+  firstAidKit: null,
+  defibrillator: null,
+  firstAiders: null,
+  firePanel: null,
+  what3words: null,
+  notes: null,
+  ...overrides,
+})
+
 describe('emergency cards (E-113, K-129)', () => {
   test('every field the declaration names is answered', async () => {
     await withDatabase((database) => {
       const officer = 'emergency-answered-officer'
       person(database, officer)
       const venue = testVenue(database, { suffix: 'emergency-answered' })
-      run(database, recordCardStatement(venue.id, { assemblyPoint: 'x', exits: null, isolationPoints: null, what3words: null, notes: null }, officer, 'card-answered').statement)
+      run(database, recordCardStatement(venue.id, emergencyCard({ assemblyPoint: 'x' }), officer, 'card-answered').statement)
 
       for (const field of emergencyCardsList.fields as readonly FilterField[]) {
         for (const operator of operatorsOf(field)) {
@@ -354,7 +371,7 @@ describe('emergency cards (E-113, K-129)', () => {
       person(database, officer)
       const filed = testVenue(database, { suffix: 'emergency-filed' })
       const bare = testVenue(database, { suffix: 'emergency-bare' })
-      run(database, recordCardStatement(filed.id, { assemblyPoint: 'The car park', exits: null, isolationPoints: null, what3words: null, notes: null }, officer, 'card-filed').statement)
+      run(database, recordCardStatement(filed.id, emergencyCard({ assemblyPoint: 'The car park' }), officer, 'card-filed').statement)
 
       const filedOnly = emergencyCardsClause(parseEmergency({ filed: 'true' }))
       const found = run(database, currentCardsQuery(filedOnly, 25, 0)) as { venueId: string }[]

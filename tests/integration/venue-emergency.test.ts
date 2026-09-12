@@ -35,8 +35,19 @@ function person(database: TestDatabase, id: string): string {
   return id
 }
 
-const card = (overrides: Partial<EmergencyCardInput> = {}): EmergencyCardInput =>
-  ({ assemblyPoint: 'The car park', exits: null, isolationPoints: null, what3words: null, notes: null, ...overrides })
+const card = (overrides: Partial<EmergencyCardInput> = {}): EmergencyCardInput => ({
+  address: 'The Nottingham New Theatre, Nottingham NG7 2RD',
+  assemblyPoint: 'The car park',
+  exits: null,
+  isolationPoints: null,
+  firstAidKit: null,
+  defibrillator: null,
+  firstAiders: null,
+  firePanel: null,
+  what3words: null,
+  notes: null,
+  ...overrides,
+})
 
 describe('recording a version (criterion 1)', () => {
   test('a fresh version writes, and reading it back names the venue and the editor', async () => {
@@ -47,6 +58,30 @@ describe('recording a version (criterion 1)', () => {
 
       const [row] = run(database, currentCardQuery(venue.id))
       expect(row).toMatchObject({ id: 'vei-1', venueId: venue.id, assemblyPoint: 'The car park', updatedByName: `Someone ${officer}` })
+    })
+  })
+
+  // Issue 902: the line read to a 999 handler, the two first-aid locations and the fire panel all
+  // survive the round trip, or the screen that reads them back shows nothing where they were.
+  test('the address, the first-aid locations and the fire panel all come back', async () => {
+    await withDatabase(async (database) => {
+      const officer = person(database, 'officer')
+      const venue = testVenue(database)
+      run(database, recordCardStatement(venue.id, card({
+        firstAidKit: 'Behind the bar',
+        defibrillator: 'Foyer wall by the box office',
+        firstAiders: 'Marian, Tuck',
+        firePanel: 'Foyer, left of the main doors',
+      }), officer, 'vei-1').statement)
+
+      const [row] = run(database, currentCardQuery(venue.id))
+      expect(row).toMatchObject({
+        address: 'The Nottingham New Theatre, Nottingham NG7 2RD',
+        firstAidKit: 'Behind the bar',
+        defibrillator: 'Foyer wall by the box office',
+        firstAiders: 'Marian, Tuck',
+        firePanel: 'Foyer, left of the main doors',
+      })
     })
   })
 
