@@ -130,7 +130,7 @@ describe.skipIf(skip !== null)('archived, never destroyed, once anything sold un
 
     expect((await send('POST', `/api/admin/ticket-types/${id}/archive`, { archived: true })).status).toBe(200)
 
-    expect((await listing('&includeArchived=false')).map(type => type.id)).not.toContain(id)
+    expect((await listing('&archived=false')).map(type => type.id)).not.toContain(id)
     expect((await listing()).find(type => type.id === id)).toMatchObject({ name, archived: true })
   })
 
