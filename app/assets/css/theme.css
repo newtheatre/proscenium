@@ -154,6 +154,19 @@
   outline-offset: 3px;
 }
 
+/* A show with no artwork yet. The two hues come from the slug (`posterTint`) and are the only
+   thing that varies: the depth, the chroma and the shape of the beams are the house's. */
+@utility nnt-poster-none {
+  --poster-from: 0;
+  --poster-to: 140;
+  background-color: var(--ui-color-neutral-950);
+  background-image:
+    linear-gradient(to top, var(--ui-color-neutral-950) 4%,
+      color-mix(in oklab, var(--ui-color-neutral-950) 30%, transparent) 30%, transparent 55%),
+    radial-gradient(ellipse 105% 85% at 12% 2%, oklch(0.54 0.19 var(--poster-from)), transparent 75%),
+    radial-gradient(ellipse 115% 95% at 92% 88%, oklch(0.46 0.18 var(--poster-to)), transparent 78%);
+}
+
 /* Poster headline: display face, tight, balanced. */
 @utility nnt-headline {
   font-family: var(--font-display);
