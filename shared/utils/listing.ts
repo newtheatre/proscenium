@@ -14,8 +14,8 @@ export function listingFlag(listed: ListedShow): ListingFlag | null {
   return onSale.some(one => one.availability === 'LIMITED') ? 'Selling fast' : null
 }
 
-// A show with no artwork still needs a frame of its own, so the two hues come from its title: the
-// same show keeps its colours between loads and between machines, and no two neighbours match.
+// A show with no artwork still needs a frame of its own, so the two hues come from a stable seed:
+// the same show keeps its colours between loads and between machines, and no two neighbours match.
 export function posterTint(seed: string): { from: number, to: number } {
   let hash = 0
   for (const character of seed) hash = (hash * 31 + character.charCodeAt(0)) % 360

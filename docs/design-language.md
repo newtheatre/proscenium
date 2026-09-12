@@ -151,9 +151,11 @@ The house photographs live under `public/images/`, the logos under `public/image
 and, when there is not, the show's own two hues under its title in the display face, which is why
 a show with no artwork yet looks deliberate rather than broken, and why real posters will land in
 one component (J-111). The hues and the corner glyph come from `posterTint` and `posterGlyph` in
-`shared/utils/listing.ts`, seeded by the title, so a show keeps its frame wherever it is drawn and
-no card is a guess. The artless frame is a landscape band below `sm`, a poster above it: three
-cards on a phone are three cards and not three screens. A banner
+`shared/utils/listing.ts`, seeded by the frame's `slug` and falling back to the title, so a show
+keeps its frame wherever it is drawn; every caller passes `slug` or none of them does, because two
+seeding differently give one show two frames. `titled` is how a caller with a heading of its own
+keeps the frame from printing the title a second time. The artless frame is a landscape band below
+`sm`, a poster above it: three cards on a phone are three cards and not three screens. A banner
 is WebP or AVIF, at most 1920 pixels wide and under 300 KB; the camera originals stay out of the
 repository. `tests/unit/static-assets.test.ts` holds the budget and refuses a reference to a picture
 that is not there (K-126). The default Open Graph image, `public/og-default.png`, is the what's-on

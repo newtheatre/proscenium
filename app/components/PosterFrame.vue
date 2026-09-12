@@ -6,13 +6,17 @@ import { posterGlyph, posterTint } from '#shared/utils/listing'
 const props = withDefaults(defineProps<{
   title: string
   posterUrl?: string | null
+  // What the artless frame's colours are seeded from. Every caller passes this or none of them:
+  // two seeding differently would give one show two frames on two pages.
+  slug?: string
+  // False where a heading already sits beside the frame, so nobody reads the title twice.
+  titled?: boolean
   sizes?: string
-}>(), { posterUrl: null, sizes: 'xs:90vw sm:45vw md:45vw lg:30vw xl:30vw 2xl:30vw' })
+}>(), { posterUrl: null, slug: '', titled: true, sizes: 'xs:90vw sm:45vw md:45vw lg:30vw xl:30vw 2xl:30vw' })
 
-// The title and nothing else seeds the artless frame, so a card and the show page behind it
-// always draw the same show the same way.
-const tint = computed(() => posterTint(props.title))
-const glyph = computed(() => posterGlyph(props.title))
+const seed = computed(() => props.slug || props.title)
+const tint = computed(() => posterTint(seed.value))
+const glyph = computed(() => posterGlyph(seed.value))
 </script>
 
 <template>
@@ -44,6 +48,9 @@ const glyph = computed(() => posterGlyph(props.title))
       class="absolute end-4 top-4 size-8 text-white/60"
       aria-hidden="true"
     />
-    <span class="nnt-headline text-2xl text-white drop-shadow-md">{{ title }}</span>
+    <span
+      v-if="titled"
+      class="nnt-headline text-2xl text-white drop-shadow-md"
+    >{{ title }}</span>
   </div>
 </template>
