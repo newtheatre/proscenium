@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { can, manageFellows } from '#shared/utils/abilities'
 import { awardFellowship, revokeFellowship } from '#shared/utils/admin-forms'
 import { fellowshipsList } from '#shared/utils/fellowships-list'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
@@ -35,6 +36,7 @@ const { search, conditions, sort, page, query, active, set, setSort, clear } = u
 const listing = ref<Listing | null>(null)
 const loading = ref(false)
 const failure = ref<string | null>(null)
+const writes = computed(() => can(useViewer().value, manageFellows))
 
 const toast = useToast()
 const awardForm = useTemplateRef('awardForm')
@@ -133,7 +135,7 @@ const columns: TableColumn<Fellow>[] = [
         'icon': 'i-lucide-user',
         'aria-label': `Open ${row.original.name}`,
       }),
-      row.original.revokedAt
+      (row.original.revokedAt || writes.value === false)
         ? null
         : h(UButton, {
             'variant': 'ghost',
@@ -188,6 +190,7 @@ onMounted(load)
 
       <template #actions>
         <UButton
+          v-if="writes"
           data-test="award"
           icon="i-lucide-award"
           @click="awarding = true"
