@@ -33,6 +33,9 @@ export const reachConsole = defineAbility((viewer: Viewer) =>
   viewer.permissions.some(permission => !OPERATIONAL_PERMISSIONS.includes(permission)))
 
 export const viewAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.read'))
+export const disableAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.disable'))
+export const grantRoles = defineAbility((viewer: Viewer) => holds(viewer, 'roles.grant'))
+export const revokeRoles = defineAbility((viewer: Viewer) => holds(viewer, 'roles.revoke'))
 export const viewMembers = defineAbility((viewer: Viewer) => holds(viewer, 'members.read'))
 export const viewFellows = defineAbility((viewer: Viewer) => holds(viewer, 'fellowships.read'))
 export const viewRooms = defineAbility((viewer: Viewer) => holds(viewer, 'rooms.read'))
@@ -136,6 +139,9 @@ export function can(viewer: Viewer | null, ability: BouncerAbility<Viewer>): boo
 // The permission each ability stands on, so a test can prove the vocabulary has not drifted.
 export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewAccounts: 'accounts.read',
+  disableAccounts: 'accounts.disable',
+  grantRoles: 'roles.grant',
+  revokeRoles: 'roles.revoke',
   viewMembers: 'members.read',
   viewFellows: 'fellowships.read',
   viewRooms: 'rooms.read',

@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
+import { can, disableAccounts, grantRoles, revokeRoles } from '#shared/utils/abilities'
+import { ROLES, saysRole } from '#shared/utils/roles'
+import type { Role } from '#shared/utils/roles'
 
 definePageMeta({ layout: 'console', title: 'Account', middleware: 'console' })
 
@@ -30,6 +33,86 @@ const mergeFailure = ref<string | null>(null)
 const mergePreview = ref<MergePreview | null>(null)
 const mergeConfirmEmail = ref('')
 const mergeWorking = ref(false)
+
+const sees = computed(() => ({
+  grants: can(useViewer().value, grantRoles),
+  revokes: can(useViewer().value, revokeRoles),
+  disables: can(useViewer().value, disableAccounts),
+}))
+
+// A role already held live is not offered again: the server would silently no-op the insert
+// rather than say why, and offering it invites exactly that confusion.
+const availableRoles = computed(() => {
+  const held = new Set((view.value?.grants ?? []).filter(grant => grant.live).map(grant => grant.role))
+  return ROLES.filter(role => !held.has(role)).map(role => ({ label: saysRole(role), value: role }))
+})
+
+const roleToGrant = ref<Role | undefined>(undefined)
+const permanentGrant = ref(false)
+const grantWorking = ref(false)
+const grantFailure = ref<string | null>(null)
+
+async function grantRole(): Promise<void> {
+  if (!roleToGrant.value) return
+  grantWorking.value = true
+  grantFailure.value = null
+  try {
+    await $fetch('/api/admin/roles', {
+      method: 'POST',
+      body: {
+        userId: route.params.id,
+        role: roleToGrant.value,
+        // Omitted defaults to the committee year end server-side (0009); explicit null is permanent.
+        ...(permanentGrant.value ? { expiresAt: null } : {}),
+      },
+    })
+    roleToGrant.value = undefined
+    permanentGrant.value = false
+    await load()
+  }
+  catch (error) {
+    grantFailure.value = refusalText(error)
+  }
+  finally {
+    grantWorking.value = false
+  }
+}
+
+async function revokeRole(role: string): Promise<void> {
+  working.value = `revoke-${role}`
+  failure.value = null
+  try {
+    await $fetch('/api/admin/roles', { method: 'DELETE', body: { userId: route.params.id, role } })
+    await load()
+  }
+  catch (error) {
+    failure.value = refusalText(error)
+  }
+  finally {
+    working.value = ''
+  }
+}
+
+// Erasure gets the same typed confirmation as the merge card, because both are one-way (0011).
+const eraseReveal = ref(false)
+const eraseConfirmEmail = ref('')
+
+async function eraseAccount(): Promise<void> {
+  working.value = 'erase'
+  failure.value = null
+  try {
+    await $fetch(`/api/admin/accounts/${route.params.id}/security`, { method: 'POST', body: { operation: 'erase' } })
+    eraseReveal.value = false
+    eraseConfirmEmail.value = ''
+    await load()
+  }
+  catch (error) {
+    failure.value = refusalText(error)
+  }
+  finally {
+    working.value = ''
+  }
+}
 
 async function previewMerge(): Promise<void> {
   mergeFailure.value = null
@@ -199,14 +282,73 @@ onMounted(load)
           <li
             v-for="grant in view.grants"
             :key="grant.role"
+            class="flex items-center justify-between gap-2"
           >
-            <span class="font-mono">{{ grant.role }}</span>
-            <span class="text-muted">
-              {{ grant.live ? 'until' : 'lapsed' }}
-              {{ grant.expiresAt ? when(grant.expiresAt) : 'further notice' }}
+            <span>
+              <span class="font-mono">{{ grant.role }}</span>
+              <span class="text-muted">
+                {{ grant.live ? 'until' : 'lapsed' }}
+                {{ grant.expiresAt ? when(grant.expiresAt) : 'further notice' }}
+              </span>
             </span>
+            <UButton
+              v-if="grant.live && sees.revokes"
+              size="xs"
+              color="error"
+              variant="ghost"
+              :loading="working === `revoke-${grant.role}`"
+              :data-test="`revoke-${grant.role}`"
+              @click="revokeRole(grant.role)"
+            >
+              Revoke
+            </UButton>
           </li>
         </ul>
+
+        <UAlert
+          v-if="grantFailure"
+          data-test="grant-failure"
+          color="error"
+          variant="subtle"
+          :description="grantFailure"
+          class="mt-3"
+        />
+
+        <div
+          v-if="sees.grants"
+          class="mt-3 flex flex-wrap items-end gap-2 border-t border-default pt-3"
+        >
+          <UFormField label="Grant a role">
+            <USelect
+              v-model="roleToGrant"
+              :items="availableRoles"
+              value-key="value"
+              placeholder="Choose a role"
+              class="w-48"
+              data-test="grant-role"
+            />
+          </UFormField>
+          <UFormField label="Permanent">
+            <USwitch
+              v-model="permanentGrant"
+              data-test="grant-permanent"
+            />
+          </UFormField>
+          <UButton
+            :loading="grantWorking"
+            :disabled="!roleToGrant"
+            data-test="grant-submit"
+            @click="grantRole"
+          >
+            Grant it
+          </UButton>
+        </div>
+        <p
+          v-if="sees.grants"
+          class="mt-1 text-xs text-muted"
+        >
+          Expires at the committee year end unless marked permanent (0009).
+        </p>
       </UPageCard>
 
       <UPageCard
@@ -298,6 +440,54 @@ onMounted(load)
             Reset the authenticator
           </UButton>
         </div>
+
+        <template v-if="sees.disables && !view.account.anonymisedAt">
+          <UButton
+            v-if="!eraseReveal"
+            class="mt-4"
+            color="error"
+            variant="soft"
+            data-test="erase-reveal"
+            @click="eraseReveal = true"
+          >
+            Erase this account
+          </UButton>
+
+          <div
+            v-else
+            class="mt-4 space-y-3 border-t border-default pt-3"
+            data-test="erase-confirm"
+          >
+            <p class="text-sm">
+              Anonymises the account in one transaction. Bookings, records and shifts stay; nothing
+              personal about {{ view.account.email }} survives it. This cannot be undone.
+            </p>
+            <UFormField :label="`Type ${view.account.email} to confirm`">
+              <UInput
+                v-model="eraseConfirmEmail"
+                data-test="erase-confirm-email"
+              />
+            </UFormField>
+            <div class="flex gap-2">
+              <UButton
+                color="error"
+                variant="subtle"
+                :loading="working === 'erase'"
+                :disabled="eraseConfirmEmail.trim().toLowerCase() !== view.account.email.toLowerCase()"
+                data-test="erase-submit"
+                @click="eraseAccount"
+              >
+                Erase the account
+              </UButton>
+              <UButton
+                variant="ghost"
+                @click="eraseReveal = false; eraseConfirmEmail = ''"
+              >
+                Cancel
+              </UButton>
+            </div>
+          </div>
+        </template>
       </UPageCard>
 
       <UPageCard
