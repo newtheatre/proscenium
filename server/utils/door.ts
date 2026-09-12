@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { heldSeatsForReservation } from './capacity'
 import { auditedWrite } from './audit'
 import { auditEntry } from '#shared/utils/audit'
 import type { SQL } from 'drizzle-orm'
@@ -28,8 +29,7 @@ export interface DoorPartyRow { holderName: string | null, partySize: number }
 // by and how many to expect through. No email, no price, no history (E-129 criterion 7).
 export function doorPartyQuery(reservationId: string): SQL {
   return sql`
-    SELECT u.name AS holderName,
-           (SELECT count(*) FROM tickets t WHERE t.reservation_id = r.id) AS partySize
+    SELECT u.name AS holderName, ${heldSeatsForReservation(sql`r.id`)} AS partySize
     FROM reservations r
     LEFT JOIN users u ON u.id = r.user_id
     WHERE r.id = ${reservationId}
