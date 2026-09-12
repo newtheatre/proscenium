@@ -1,8 +1,7 @@
 import { RESERVATION_REFERENCE_LENGTH } from './reservations'
 
 // Door mode's own pure logic (E-129): what a camera hands the door, and what the verdict card is
-// allowed to say. Four code forms reach it: this build's own signed booking and pass URLs, the
-// `/t/<ref>` form the show-night design names, and a bare reference.
+// allowed to say. Four code forms reach it, listed on `ScannedKind` below.
 
 // A token is a credential, so the browser never unpacks one: the door sends it to
 // `/api/tonight/door/resolve`, which verifies the signature and answers with the reference.
