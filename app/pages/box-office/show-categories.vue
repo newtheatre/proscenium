@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { showCategoryForm } from '#shared/utils/show-categories'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { showCategoriesList } from '#shared/utils/show-categories-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { AdminShowCategory } from '#shared/utils/show-categories'
 
@@ -12,9 +12,6 @@ const UButton = resolveComponent('UButton')
 
 const request = useRequestFetch()
 const toast = useToast()
-const search = ref('')
-const includeArchived = ref(true)
-const page = ref(1)
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
@@ -22,20 +19,16 @@ interface Listing { items: AdminShowCategory[], total: number, pageSize: number,
 
 const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
+// Search, filters, sort and page live in the URL (K-129); the list refetches when any changes.
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(showCategoriesList)
+
 // Searched and paged in SQL, so what the table shows and what the count says are the same
 // question asked once (CONTRIBUTING).
 const { data, status, error, refresh } = await useAsyncData(
   'show-categories',
-  () => request<Listing>('/api/admin/reference-data/show-categories', {
-    query: { includeArchived: includeArchived.value, search: search.value.trim() || undefined, page: page.value },
-  }),
-  { watch: [page], default: empty },
+  () => request<Listing>('/api/admin/reference-data/show-categories', { query: query.value }),
+  { watch: [query], default: empty },
 )
-
-watch([search, includeArchived], () => {
-  if (page.value === 1) void refresh()
-  else page.value = 1
-})
 
 const editing = ref<AdminShowCategory | null>(null)
 const open = ref(false)
@@ -126,21 +119,6 @@ async function remove(): Promise<void> {
 
 const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The categories could not be read.') : null))
 
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (!includeArchived.value) {
-    active.push({ key: 'archived', label: 'Hiding retired', icon: 'i-lucide-archive', clear: () => {
-      includeArchived.value = true
-    } })
-  }
-  return active
-})
-
 const columns: TableColumn<AdminShowCategory>[] = [
   {
     id: 'name',
@@ -221,19 +199,19 @@ const columns: TableColumn<AdminShowCategory>[] = [
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A category"
-      :active="activeFilters"
+      :placeholder="showCategoriesList.search?.placeholder"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''; includeArchived = true"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Show">
-          <USwitch
-            v-model="includeArchived"
-            label="Including retired categories"
-            data-test="categories-archived"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="showCategoriesList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -255,7 +233,7 @@ const columns: TableColumn<AdminShowCategory>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ search ? 'No category matches that.' : 'No categories yet. Add one, and a show has something to belong to.' }}
+          {{ filtered ? 'No category matches that.' : 'No categories yet. Add one, and a show has something to belong to.' }}
         </p>
       </template>
     </UTable>
