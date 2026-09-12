@@ -15,17 +15,19 @@ export default defineEventHandler(async (event) => {
   const code = readScannedCode(input.scanned)
   if (!code) throw createError({ statusCode: 422, statusMessage: 'That code is not one of ours' })
 
-  if (code.kind === 'REFERENCE') return { reference: code.value }
+  // The kind travels back so a scanned pass lands in pass mode rather than in the ticket verdict
+  // (D-126); a bare reference names neither, since both alphabets are the same.
+  if (code.kind === 'REFERENCE') return { kind: code.kind, reference: code.value }
 
   if (code.kind === 'BOOKING_TOKEN') {
     const reservationId = await verifyQrToken(code.value)
     const reservation = reservationId ? await reservationCurrentState(reservationId) : undefined
     if (!reservation) throw createError({ statusCode: 404, statusMessage: 'That code does not match a booking' })
-    return { reference: reservation.reference }
+    return { kind: code.kind, reference: reservation.reference }
   }
 
   const passId = await verifyPassQrToken(code.value)
   const pass = passId ? await passCurrentState(passId) : undefined
   if (!pass) throw createError({ statusCode: 404, statusMessage: 'That code does not match a pass' })
-  return { reference: pass.reference }
+  return { kind: code.kind, reference: pass.reference }
 })
