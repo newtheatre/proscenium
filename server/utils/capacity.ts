@@ -34,6 +34,18 @@ export function heldSeatsQuery(performanceId: string): SQL {
   return sql`SELECT ${heldSeatsSubquery(sql`${performanceId}`)} AS held`
 }
 
+// The same predicate correlated to one booking rather than to a house: the party the door expects
+// through (E-129). A row count would call a refunded seat somebody arriving.
+export function heldSeatsForReservation(reservationId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    WHERE t.reservation_id = ${reservationId}
+      AND t.refunded_at IS NULL
+      AND r.status IN (${holding})
+  )`
+}
+
 // The same count correlated to a row already in hand, for a listing that reads many performances
 // at once without binding a parameter per performance (0006).
 export function heldSeatsColumn(alias: string): SQL {

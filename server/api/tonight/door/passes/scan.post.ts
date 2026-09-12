@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
     }
     const admitted = await admitAtDoor(existing.reservationId, resolved.account.id)
     if (!admitted) throw createError({ statusCode: 409, statusMessage: 'This pass has already been admitted tonight' })
-    return { decision: 'ADMIT' as const, passTypeName: state.passTypeName }
+    return { decision: 'ADMIT' as const, passTypeName: state.passTypeName, ...admittedPassVerdict(input.reference) }
   }
 
   const now = Math.floor(Date.now() / 1000)
@@ -55,5 +55,5 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: capacityFailure?.says ?? 'This performance no longer has room for that admission' })
   }
 
-  return { decision: 'ADMIT' as const, passTypeName: state.passTypeName }
+  return { decision: 'ADMIT' as const, passTypeName: state.passTypeName, ...admittedPassVerdict(input.reference) }
 })
