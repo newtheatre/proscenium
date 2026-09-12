@@ -69,7 +69,7 @@ const KIT_COUNTS = `(() => ({
   spotlight: document.querySelectorAll('.nnt-spotlight').length,
 }))()`
 
-describe.skipIf(skip !== null)('the three shells (docs/design-language.md)', () => {
+describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
   // Stage black in both colour modes, done by marking the subtree rather than overriding slot
   // classes: every token inside then resolves to its dark value on its own.
   test('the public chrome is stage black while the page is not', async () => {
@@ -116,6 +116,17 @@ describe.skipIf(skip !== null)('the three shells (docs/design-language.md)', () 
     }))()`)
     expect(seen.bg).toContain('oklch')
     expect(seen.dashboard).toBe(0)
+  })
+
+  // Issue 904: a resident device in the wings has no use for the public header, and one tap on
+  // "What's on" sends the crew out of the board mid-show.
+  test('the backstage board carries no site navigation at all', async () => {
+    const seen = await inspect<{ offBoard: string[], dark: number }>('/board', `(() => ({
+      offBoard: [...document.querySelectorAll('a[href]')].map(a => a.getAttribute('href')).filter(href => href !== null && !href.startsWith('/board')),
+      dark: document.querySelectorAll('.dark').length,
+    }))()`)
+    expect(seen.offBoard).toEqual([])
+    expect(seen.dark).toBeGreaterThan(0)
   })
 
   // The Google route refuses with a code; the wording lives on the page that shows it, so an
