@@ -23,10 +23,8 @@ interface Card {
 
 const request = useRequestFetch()
 
-// Rendered into the HTML, so a device opening this for the first time with no signal still has
-// the address to read out (E-113 criterion 4, issue 903). The cache is what carries it after.
-// A venue with no card, or no shift to resolve one, leaves `data` null and sets `error`, which is
-// the empty state below rather than an error page: this screen refuses to be the thing that fails.
+// Rendered into the HTML, so a first-ever visit with no signal still carries the address to read
+// out (E-113 criterion 4). No card and no shift both leave `data` null: the empty state, not a 500.
 const { data: served } = await useAsyncData('tonight-emergency', () => request<Card>('/api/tonight/emergency'), {
   default: () => null as Card | null,
 })
