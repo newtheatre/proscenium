@@ -42,7 +42,14 @@ export interface NavEntry {
   ability: BouncerAbility<Viewer>
   // Overview matches every console route unless it is told not to.
   exact?: boolean
+  // The footer column this entry sits under. Public entries only, and required of them, so a new
+  // public page joins a column by saying which rather than by being listed a second time.
+  group?: PublicGroup
 }
+
+export const PUBLIC_GROUPS = ['Visit', 'Join in', 'About'] as const
+
+export type PublicGroup = (typeof PUBLIC_GROUPS)[number]
 
 export interface NavGroup {
   key: string
@@ -262,21 +269,21 @@ export const SHELL_NAV: NavEntry[] = [
 export const PUBLIC_NAV: NavEntry[] = [
   // Module D: ticketing
 
-  { label: 'What\'s on', icon: 'i-lucide-drama', to: '/whats-on', ability: anybody },
-  { label: 'About us', icon: 'i-lucide-info', to: '/about', ability: anybody },
-  { label: 'Our history', icon: 'i-lucide-history', to: '/history', ability: anybody },
-  { label: 'Get involved', icon: 'i-lucide-heart-handshake', to: '/get-involved', ability: anybody },
-  { label: 'Technical specification', icon: 'i-lucide-wrench', to: '/technical-specification', ability: anybody },
+  { label: 'What\'s on', icon: 'i-lucide-drama', to: '/whats-on', ability: anybody, group: 'Visit' },
+  { label: 'About us', icon: 'i-lucide-info', to: '/about', ability: anybody, group: 'About' },
+  { label: 'Our history', icon: 'i-lucide-history', to: '/history', ability: anybody, group: 'About' },
+  { label: 'Get involved', icon: 'i-lucide-heart-handshake', to: '/get-involved', ability: anybody, group: 'Join in' },
+  { label: 'Technical specification', icon: 'i-lucide-wrench', to: '/technical-specification', ability: anybody, group: 'About' },
 
   // Module G: training
 
-  { label: 'What we teach', icon: 'i-lucide-graduation-cap', to: '/training/modules', ability: anybody },
+  { label: 'What we teach', icon: 'i-lucide-graduation-cap', to: '/training/modules', ability: anybody, group: 'Join in' },
 
   // Module J: governance
 
   // Policy pages, whose numbers are the live settings rather than prose about them (0012, J-110).
-  { label: 'Tickets and refunds', icon: 'i-lucide-receipt', to: '/policies/booking', ability: anybody },
-  { label: 'Room booking policy', icon: 'i-lucide-calendar-check', to: '/policies/rooms', ability: anybody },
+  { label: 'Tickets and refunds', icon: 'i-lucide-receipt', to: '/policies/booking', ability: anybody, group: 'Visit' },
+  { label: 'Room booking policy', icon: 'i-lucide-calendar-check', to: '/policies/rooms', ability: anybody, group: 'Visit' },
 ]
 
 // The few destinations a visitor arrives looking for, in the mockup's order; the rest of
