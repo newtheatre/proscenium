@@ -66,11 +66,13 @@ const saysWhen = (at: number): string =>
 const day = (at: number): string =>
   formatLondon(new Date(at * 1000), { weekday: 'short', day: 'numeric', month: 'short' })
 
-const COLOURS: Record<Availability, 'success' | 'warning' | 'neutral'> = {
-  AVAILABLE: 'success',
-  LIMITED: 'warning',
-  SOLD_OUT: 'neutral',
-  BOOKING_CLOSED: 'neutral',
+// Gold is the limelight: the night that is nearly gone is the one worth looking at twice
+// (show-page.png). Available says nothing extra, which is why it reads muted.
+const TAG_CLASS: Record<Availability, string> = {
+  AVAILABLE: 'text-muted',
+  LIMITED: 'text-gold-700 dark:text-gold-400',
+  SOLD_OUT: 'text-muted',
+  BOOKING_CLOSED: 'text-muted',
 }
 
 // Every performance of one show may differ in running time, so the practical details come from the
@@ -99,6 +101,19 @@ const venues = computed(() => [...new Set(onOffer.value.map(one => one.venueName
 const from = computed(() => {
   const prices = onOffer.value.flatMap(one => one.prices.map(price => price.price)).sort((a, b) => a - b)
   return prices[0] === undefined ? null : saysPrice(prices[0])
+})
+
+// The run's distinct prices as one line: cheapest first, each carrying its restriction so
+// "£4.00 members" reads as the condition it is (show-page.png).
+const tickets = computed(() => {
+  const seen = new Map<string, { price: number, restrictedTo: string | null }>()
+  for (const price of onOffer.value.flatMap(one => one.prices)) {
+    const key = `${price.price}:${price.restrictedTo ?? ''}`
+    if (!seen.has(key)) seen.set(key, { price: price.price, restrictedTo: price.restrictedTo })
+  }
+  return [...seen.values()]
+    .sort((a, b) => b.price - a.price)
+    .map(price => [saysPrice(price.price), saysRestriction(price.restrictedTo)].filter(Boolean).join(' '))
 })
 
 function saysInterval(performance: ListedPerformance): string {
@@ -147,15 +162,14 @@ function saysInterval(performance: ListedPerformance): string {
             {{ show.description }}
           </p>
 
-          <dl class="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
+          <!-- Four facts, in the body face: the ones somebody decides on. Interval and latecomers
+               are practical detail and sit with the prose below (show-page.png, D-102). -->
+          <dl class="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
             <div>
               <dt class="text-sm text-muted">
                 Dates
               </dt>
-              <dd
-                class="font-mono"
-                data-test="show-dates"
-              >
+              <dd data-test="show-dates">
                 {{ runs }}
               </dd>
             </div>
@@ -169,44 +183,25 @@ function saysInterval(performance: ListedPerformance): string {
             </div>
             <div>
               <dt class="text-sm text-muted">
-                Interval
+                Tickets
               </dt>
-              <dd data-test="interval">
-                {{ shape ? saysInterval(shape) : 'Not yet confirmed' }}
+              <dd data-test="show-tickets">
+                {{ tickets.length ? tickets.join(' · ') : 'Not yet priced' }}
               </dd>
             </div>
             <div>
               <dt class="text-sm text-muted">
-                Tickets from
-              </dt>
-              <dd
-                class="font-mono"
-                data-test="show-from"
-              >
-                {{ from ?? 'Not yet priced' }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-sm text-muted">
-                Age guidance
+                Guidance
               </dt>
               <dd data-test="age-guidance">
                 {{ show.ageGuidance ?? 'None stated' }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-sm text-muted">
-                Latecomers
-              </dt>
-              <dd data-test="latecomers">
-                {{ saysLatecomerPolicy(show.latecomerPolicy) }}
               </dd>
             </div>
           </dl>
 
           <div class="mt-8">
             <!-- The view's one marquee: the night a visitor most likely wants, which is the first
-                 still on sale here. -->
+                 still on sale here. The header's own action is a poster button. -->
             <UButton
               v-if="bookable"
               variant="marquee"
@@ -246,6 +241,15 @@ function saysInterval(performance: ListedPerformance): string {
           class="mt-4"
         >
           {{ show.description }}
+        </p>
+
+        <!-- The practical detail the hero's four facts leave out, kept on the page because the
+             show page is where D-102 criterion 3 says it belongs. -->
+        <p
+          class="mt-4 text-sm text-muted"
+          data-test="show-practical"
+        >
+          {{ shape ? saysInterval(shape) : 'Interval not yet confirmed' }}. {{ saysLatecomerPolicy(show.latecomerPolicy) }}
         </p>
 
         <!-- Three states, not two: nobody having looked is not the same answer as somebody having
@@ -326,9 +330,15 @@ function saysInterval(performance: ListedPerformance): string {
         data-test="show-performances"
       >
         <template #header>
-          <h2 class="font-semibold">
-            Performances
-          </h2>
+          <div class="flex items-baseline justify-between gap-3">
+            <h2 class="font-semibold">
+              Performances
+            </h2>
+            <span
+              v-if="venues.length === 1"
+              class="font-mono text-xs uppercase tracking-wide text-muted"
+            >{{ venues[0] }}</span>
+          </div>
         </template>
 
         <p
@@ -349,35 +359,37 @@ function saysInterval(performance: ListedPerformance): string {
             class="space-y-2 py-3"
             :data-test="`performance-${performance.id}`"
           >
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <span class="font-medium">{{ saysWhen(performance.startsAt) }}</span>
-              <div class="ms-auto flex flex-wrap items-center gap-2">
-                <UBadge
+            <div class="flex flex-wrap items-start gap-x-3 gap-y-2">
+              <div class="min-w-0">
+                <p class="font-medium">
+                  {{ saysWhen(performance.startsAt) }}
+                </p>
+                <!-- Colour plus words, never colour alone (docs/design-language.md). An external
+                     link reads booking closed, so it says where the tickets are instead. -->
+                <p
                   v-if="performance.cancelled"
-                  color="error"
-                  variant="subtle"
+                  class="text-sm text-error"
                   :data-test="`cancelled-${performance.id}`"
                 >
                   Cancelled
-                </UBadge>
-                <!-- saleRefusal refuses a link-out, so its availability reads booking closed; saying
-                     that beside a working link would be a contradiction. -->
-                <UBadge
+                </p>
+                <p
                   v-else-if="performance.externalBookingUrl"
-                  color="neutral"
-                  variant="subtle"
+                  class="text-sm text-muted"
                   :data-test="`availability-${performance.id}`"
                 >
                   Tickets sold elsewhere
-                </UBadge>
-                <UBadge
+                </p>
+                <p
                   v-else
-                  :color="COLOURS[performance.availability]"
-                  variant="subtle"
+                  class="text-sm"
+                  :class="TAG_CLASS[performance.availability]"
                   :data-test="`availability-${performance.id}`"
                 >
-                  {{ performance.says }}
-                </UBadge>
+                  {{ performance.availability === 'SOLD_OUT' ? 'Full' : performance.says }}
+                </p>
+              </div>
+              <div class="ms-auto flex flex-wrap items-center gap-2">
                 <UButton
                   v-if="performance.externalBookingUrl && !performance.cancelled"
                   :to="performance.externalBookingUrl"
@@ -401,6 +413,7 @@ function saysInterval(performance: ListedPerformance): string {
                   v-else-if="performance.availability === 'SOLD_OUT'"
                   :to="`/waiting-list/${performance.id}`"
                   variant="subtle"
+                  color="neutral"
                   size="sm"
                   :data-test="`waiting-${performance.id}`"
                 >
