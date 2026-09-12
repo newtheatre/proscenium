@@ -1,10 +1,20 @@
 import { describe, expect, test } from 'bun:test'
-import { contentWarningsQuery, showWarningsQuery, warningsForListedShowsQuery } from '#server/utils/content-warnings'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { contentWarningsList } from '#shared/utils/content-warnings-list'
+import { contentWarningsClause, contentWarningsQuery, showWarningsQuery, warningsForListedShowsQuery } from '#server/utils/content-warnings'
 import { oneShowScope } from '#server/utils/whats-on'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
+
+// K-129: the declaration is what turns a raw query into a clause, the same route it takes live.
+const contentWarningsSchema = filterQuerySchema(contentWarningsList)
+function parsedContentWarnings(raw: Record<string, string>) {
+  const result = contentWarningsSchema.safeParse(raw)
+  if (!result.success) throw new Error(result.error.issues.map(issue => issue.message).join('; '))
+  return contentWarningsClause(result.data)
+}
 
 // D-102 on the real migrations. The rules the write path holds are in
 // tests/unit/content-warnings.test.ts; this is what the vocabulary queries return.
@@ -48,7 +58,7 @@ describe('the vocabulary is a table, and a show picks from it (D-102 criterion 1
       addWarning(database, 'w-strobe', { title: 'Strobe lighting', kind: 'TECHNICAL' })
       carry(database, seeded.showId, 'w-death', 'DEPICTED')
 
-      const listed = read<{ id: string, showCount: number }>(database, contentWarningsQuery({ includeArchived: true }, 25, 0))
+      const listed = read<{ id: string, showCount: number }>(database, contentWarningsQuery(parsedContentWarnings({}), 25, 0))
       expect(listed.find(one => one.id === 'w-death')?.showCount).toBe(1)
       expect(listed.find(one => one.id === 'w-strobe')?.showCount).toBe(0)
     })
@@ -59,7 +69,7 @@ describe('the vocabulary is a table, and a show picks from it (D-102 criterion 1
       addWarning(database, 'w-live', { title: 'Live' })
       addWarning(database, 'w-retired', { title: 'Retired', archived: 1 })
 
-      const live = read<{ id: string }>(database, contentWarningsQuery({ includeArchived: false }, 25, 0))
+      const live = read<{ id: string }>(database, contentWarningsQuery(parsedContentWarnings({ archived: 'false' }), 25, 0))
       expect(live.map(one => one.id)).toEqual(['w-live'])
     })
   })
@@ -72,7 +82,7 @@ describe('the vocabulary is a table, and a show picks from it (D-102 criterion 1
       addWarning(database, 'w-b', { title: 'Blood', sort: 0 })
       addWarning(database, 'w-s', { title: 'Smoke', kind: 'TECHNICAL', sort: 9 })
 
-      const listed = read<{ id: string }>(database, contentWarningsQuery({ includeArchived: true }, 25, 0))
+      const listed = read<{ id: string }>(database, contentWarningsQuery(parsedContentWarnings({}), 25, 0))
       expect(listed.map(one => one.id)).toEqual(['w-s', 'w-b', 'w-a'])
     })
   })
@@ -82,7 +92,7 @@ describe('the vocabulary is a table, and a show picks from it (D-102 criterion 1
       addWarning(database, 'w-death', { slug: 'death', title: 'Death' })
       addWarning(database, 'w-blood', { slug: 'blood', title: 'Blood' })
 
-      const found = read<{ id: string }>(database, contentWarningsQuery({ includeArchived: true, search: 'dea' }, 25, 0))
+      const found = read<{ id: string }>(database, contentWarningsQuery(parsedContentWarnings({ search: 'dea' }), 25, 0))
       expect(found.map(one => one.id)).toEqual(['w-death'])
     })
   })

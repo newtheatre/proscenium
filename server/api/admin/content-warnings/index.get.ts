@@ -1,22 +1,17 @@
-import { z } from 'zod'
-import { MAX_WARNING_TITLE } from '#shared/utils/content-warnings'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { contentWarningsList } from '#shared/utils/content-warnings-list'
 
-const query = pageQuery.extend({
-  // An archived entry is still the warning a published show carries, so the console shows it by
-  // default and the show write path is what refuses a new use of one.
-  includeArchived: yesOrNo.default(true),
-  search: z.string().trim().max(MAX_WARNING_TITLE).optional(),
-})
+const query = filterQuerySchema(contentWarningsList)
 
-// The warning vocabulary. Each row says how many shows carry it, so an entry in use can be seen
-// to be in use before anybody tries to delete it (D-102 criterion 1).
+// The warning vocabulary, filtered and ordered by its declaration (K-129). Each row says how many
+// shows carry it, so an entry in use can be seen to be in use before anybody tries to delete it.
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'ticketing.read')
-  const { page, pageSize, includeArchived, search } = await getValidatedQueryOrThrow(event, query)
-  const filters = { includeArchived, search: search || undefined }
+  const input = await getValidatedQueryOrThrow(event, query)
+  const clause = contentWarningsClause(input)
 
-  const total = await countContentWarnings(filters)
-  const items = await listContentWarnings(filters, pageSize, offsetFor(page, pageSize))
+  const total = await countContentWarnings(clause)
+  const items = await listContentWarnings(clause, input.pageSize, offsetFor(input.page, input.pageSize))
 
-  return envelope(items, total, page, pageSize)
+  return envelope(items, total, input.page, input.pageSize)
 })
