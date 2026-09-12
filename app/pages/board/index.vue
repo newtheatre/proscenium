@@ -2,6 +2,8 @@
 import { boardJoinForm } from '#shared/utils/backstage'
 import { formatLondon } from '#shared/utils/london'
 
+definePageMeta({ layout: 'backstage' })
+
 // No account, no personal data: the code and a display label are the whole of the form
 // (E-120 criterion 1). A cookie, never the device store, which is `useNightCache`'s alone.
 const state = reactive({ code: '', label: '' })
@@ -151,7 +153,7 @@ function timeOf(at: number): string {
 </script>
 
 <template>
-  <UContainer class="max-w-md py-8">
+  <div class="mx-auto w-full max-w-md">
     <UPageCard v-if="!joined">
       <UForm
         :schema="boardJoinForm"
@@ -312,5 +314,5 @@ function timeOf(at: number): string {
         </div>
       </div>
     </div>
-  </UContainer>
+  </div>
 </template>
