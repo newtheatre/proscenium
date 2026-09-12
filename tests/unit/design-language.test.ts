@@ -99,10 +99,8 @@ describe('colour is never the only thing saying it (K-101)', () => {
   })
 })
 
-// #915: a raw type="time" hands the control to the OS picker, with none of the theme, the
-// twenty-four-hour cycle or the focus ring TimeField gives every other time in the system.
-// Scoped to box office for now: rooms/book.vue and its manage screens carry the same defect
-// and are another stream's files (#915 tracks them too).
+// A raw type="time" hands the control to the OS picker, with none of TimeField's theme or focus
+// ring. Scoped to box office: rooms/book.vue carries the same defect, and is another stream's file.
 describe('a time is always the shared TimeField (#915)', () => {
   test('no UInput in box office takes type="time"', async () => {
     const offenders: string[] = []
