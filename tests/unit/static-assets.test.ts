@@ -121,9 +121,10 @@ describe('a default Open Graph image exists (K-126 criterion 3)', () => {
 
 describe('the four pages draw their banners through NuxtImg behind a scrim (K-126 criterion 4)', () => {
   // A markdown page reaches its banner through the catch-all, which is where the hero must be.
+  // Get involved is the one landing page and draws its own (J-111).
   const renderers: Record<string, string> = {
     'content/about.md': 'app/pages/[...slug].vue',
-    'content/get-involved.md': 'app/pages/[...slug].vue',
+    'content/get-involved.md': 'app/pages/get-involved.vue',
   }
 
   const attribute = (tag: string, name: string): string => {

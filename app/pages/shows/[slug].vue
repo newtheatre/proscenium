@@ -171,7 +171,7 @@ function saysInterval(performance: ListedPerformance): string {
 
           <!-- Four facts, in the body face: the ones somebody decides on. Interval and latecomers
                are practical detail and sit with the prose below (show-page.png, D-102). -->
-          <dl class="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
+          <dl class="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 text-default sm:grid-cols-4">
             <div>
               <dt class="text-sm text-muted">
                 Dates
