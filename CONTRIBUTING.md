@@ -58,6 +58,13 @@ application is the cautionary tale.
 - The exception is directory creation, which Bun has no API for. `Bun.write` creates a file's
   parents; anything else keeps `mkdirSync` with a comment saying why.
 - Scripts are TypeScript run by `bun`, not `.mjs` run by `node`.
+- **`patches/` holds fixes to dependencies, applied by `patchedDependencies` in `package.json`.**
+  JSON carries no comments, so the reason lives here and in the decision record. `drizzle-orm` is
+  patched for decision 0067 (upstream issue 2277): its D1 `batch()` throws on any raw statement
+  that binds a parameter. `tests/unit/d1-batch-raw.test.ts` is that patch's contract, and the
+  patch may be dropped only on the day that test passes without it. A dependency bump that makes
+  a patch stop applying fails `bun install`, which is the behaviour wanted: re-apply it or retire
+  it deliberately, never delete it to make the install quiet.
 
 - **Domain rules live in `shared/utils/`**, which Nuxt auto-imports into both the application
   and the server. A route or a server utility names them with no import at all.

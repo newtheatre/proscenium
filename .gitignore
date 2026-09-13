@@ -9,6 +9,10 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Local worker secrets for `wrangler dev` (0067's reproduction recipe). Never committed.
+.dev.vars
+.dev.vars.*
 .DS_Store
 migration/dumps/
 migration/out/
