@@ -82,6 +82,67 @@ export function unpaidSeatsColumn(alias: string): SQL {
   return unpaidSeatsSubquery(sql`${sql.raw(alias)}.id`)
 }
 
+// Reserved in advance, paid or not: pending and collected are the two states a reservation
+// made ahead of the night can be in (Matt's ruling on #996). Door is a walk-up, never this.
+export function reservedSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    WHERE t.performance_id = ${performanceId}
+      AND t.refunded_at IS NULL
+      AND r.status IN ('PENDING', 'COLLECTED')
+  )`
+}
+
+// Reserved in advance and paid for at the desk.
+export function collectedSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    WHERE t.performance_id = ${performanceId}
+      AND t.refunded_at IS NULL
+      AND r.status = 'COLLECTED'
+  )`
+}
+
+// A walk-up sale, with no reservation made ahead of the night.
+export function doorSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    WHERE t.performance_id = ${performanceId}
+      AND t.refunded_at IS NULL
+      AND r.status = 'DOOR'
+  )`
+}
+
+// Held seats of one ticket-type kind, for the desk's "Tonight" card (D-132): a row is not a seat
+// until the same holding predicate the capacity rule uses says it is (D-105 criterion 2).
+export function heldSeatsOfKindSubquery(performanceId: SQL, kind: string): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    JOIN ticket_types tt ON tt.id = t.ticket_type_id
+    WHERE t.performance_id = ${performanceId}
+      AND t.refunded_at IS NULL
+      AND r.status IN (${holding})
+      AND tt.kind = ${kind}
+  )`
+}
+
+// Held seats whose type carries an access kind at all, whichever one (D-128).
+export function heldAccessSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    JOIN ticket_types tt ON tt.id = t.ticket_type_id
+    WHERE t.performance_id = ${performanceId}
+      AND t.refunded_at IS NULL
+      AND r.status IN (${holding})
+      AND tt.access_kind IS NOT NULL
+  )`
+}
+
 // The same count for a whole show, scoped through its performances by subquery rather than by an
 // id list read back from a result set (0006).
 export function showUnpaidSeatsColumn(alias: string): SQL {

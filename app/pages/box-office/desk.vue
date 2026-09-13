@@ -1,11 +1,19 @@
 <script setup lang="ts">
-import { DESK_TENDERS } from '#shared/utils/desk'
+import { DESK_STATUS_FILTERS, DESK_TENDERS } from '#shared/utils/desk'
+import { formatLondon } from '#shared/utils/london'
 import { saysPrice } from '#shared/utils/ticket-types'
-import type { DeskTender } from '#shared/utils/desk'
+import type { DeskStatusFilter, DeskTender } from '#shared/utils/desk'
 
 // Comp authority is the request and its approval now, not a permission the desk screen checks
 // itself (D-117): every tender is always offered, and the route is what actually decides.
 const tenderOptions = [...DESK_TENDERS]
+
+const STATUS_PILL_LABELS: Record<DeskStatusFilter, string> = {
+  ALL: 'All',
+  PENDING: 'Pending',
+  COLLECTED: 'Collected',
+  DOOR: 'Door',
+}
 
 definePageMeta({ layout: 'console', title: 'Desk', middleware: 'console' })
 
@@ -59,15 +67,69 @@ interface ReservationDetail {
   compRequest: ReservationCompRequest | null
 }
 
+interface DeskSummary {
+  capacity: number | null
+  reserved: number
+  collected: number
+  door: number
+  unpaidCount: number
+  unpaidOwedPence: number
+  accessBookings: number
+  passAdmissions: number
+  reservationsReleaseAt: number
+  onShift: string[]
+}
+
 const request = useRequestFetch()
 const toast = useToast()
 const night = ref<string | null>(null)
 const performanceId = ref<string | undefined>(undefined)
 const q = ref('')
+const statusFilter = ref<DeskStatusFilter>('ALL')
 const scanned = ref('')
 const scanning = ref(false)
 const searchFailure = ref<string | null>(null)
 const scanFailure = ref<string | null>(null)
+
+const summary = ref<DeskSummary | null>(null)
+const summaryFailure = ref<string | null>(null)
+
+async function loadSummary(): Promise<void> {
+  if (!performanceId.value) {
+    summary.value = null
+    return
+  }
+  summaryFailure.value = null
+  try {
+    summary.value = await $fetch<DeskSummary>('/api/box-office/desk/summary', { query: { performanceId: performanceId.value } })
+  }
+  catch (error) {
+    summaryFailure.value = refusalText(error)
+  }
+}
+
+// Capacity is uncapped for a general-admission house (D-105): headroom is then unbounded, so
+// there is nothing here to put a number on. Reserved and door between them are every seat taken.
+const walkUpHeadroom = computed(() => {
+  if (!summary.value || summary.value.capacity === null) return null
+  return Math.max(summary.value.capacity - summary.value.reserved - summary.value.door, 0)
+})
+
+const releaseTime = computed(() => (summary.value ? formatLondon(new Date(summary.value.reservationsReleaseAt * 1000), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : null))
+
+interface SummaryTile { key: string, label: string, value: string }
+
+const summaryTiles = computed<SummaryTile[]>(() => {
+  if (!summary.value) return []
+  const s = summary.value
+  return [
+    { key: 'capacity', label: 'Capacity', value: s.capacity === null ? 'Uncapped' : String(s.capacity) },
+    { key: 'reserved', label: 'Reserved', value: String(s.reserved) },
+    { key: 'collected', label: 'Collected', value: String(s.collected) },
+    { key: 'door', label: 'Door', value: String(s.door) },
+    { key: 'walk-up-headroom', label: 'Walk-up headroom', value: walkUpHeadroom.value === null ? 'Uncapped' : String(walkUpHeadroom.value) },
+  ]
+})
 
 const { data: nightly, refresh: refreshNightly, error: nightlyError } = await useAsyncData<Nightly>(
   'desk-nightly',
@@ -97,7 +159,7 @@ async function search(): Promise<void> {
   searchFailure.value = null
   try {
     const page = await $fetch<{ items: SearchRow[] }>('/api/box-office/desk/search', {
-      query: { performanceId: performanceId.value, q: q.value.trim() || undefined },
+      query: { performanceId: performanceId.value, q: q.value.trim() || undefined, status: statusFilter.value },
     })
     results.value = page.items
   }
@@ -114,8 +176,12 @@ async function search(): Promise<void> {
 watch(performanceId, () => {
   results.value = []
   q.value = ''
+  statusFilter.value = 'ALL'
   void search()
+  void loadSummary()
 }, { immediate: true })
+
+watch(statusFilter, () => void search())
 
 const selected = ref<ReservationDetail | null>(null)
 const open = ref(false)
@@ -200,6 +266,7 @@ async function collect(): Promise<void> {
     toast.add({ title: 'Booking collected', icon: 'i-lucide-check', color: 'success' })
     open.value = false
     await search()
+    void loadSummary()
   }
   catch (error) {
     collectFailure.value = refusalText(error)
@@ -228,6 +295,7 @@ async function refundTicket(ticket: TicketLine): Promise<void> {
     toast.add({ title: 'Ticket refunded', icon: 'i-lucide-check', color: 'success' })
     selected.value = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${selected.value.id}`)
     await search()
+    void loadSummary()
   }
   catch (error) {
     refundFailure.value = refusalText(error)
@@ -248,6 +316,7 @@ async function cancelCollected(): Promise<void> {
     toast.add({ title: 'Booking cancelled', icon: 'i-lucide-check', color: 'success' })
     open.value = false
     await search()
+    void loadSummary()
   }
   catch (error) {
     cancelFailure.value = refusalText(error)
@@ -327,96 +396,202 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
       data-test="desk-nightly-failure"
     />
 
-    <UCard>
-      <template #header>
-        <div class="flex flex-wrap items-center gap-2">
-          <UInput
-            v-model="scanned"
-            placeholder="Scan a booking's QR"
-            class="w-64"
-            data-test="desk-scan"
-            @keyup.enter="scan"
-          />
-          <UButton
-            :loading="scanning"
-            data-test="desk-scan-submit"
-            @click="scan"
-          >
-            Open
-          </UButton>
-          <UInput
-            v-model="q"
-            placeholder="Reference or name"
-            class="w-64"
-            data-test="desk-search"
-            @keyup.enter="search"
-          />
-          <UButton
-            :loading="searching"
-            color="neutral"
-            variant="subtle"
-            data-test="desk-search-submit"
-            @click="search"
-          >
-            Search
-          </UButton>
-        </div>
-      </template>
+    <UAlert
+      v-if="summaryFailure"
+      color="error"
+      variant="subtle"
+      :description="summaryFailure"
+      data-test="desk-summary-failure"
+    />
 
-      <UAlert
-        v-if="searchFailure || scanFailure"
-        color="error"
-        variant="subtle"
-        :description="searchFailure ?? scanFailure ?? ''"
-        class="mb-4"
-      />
+    <div
+      v-if="summary"
+      class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5"
+      data-test="desk-summary"
+    >
+      <UCard
+        v-for="tile in summaryTiles"
+        :key="tile.key"
+        :data-test="`desk-summary-${tile.key}`"
+      >
+        <p class="text-sm text-muted">
+          {{ tile.label }}
+        </p>
+        <p class="text-2xl font-semibold">
+          {{ tile.value }}
+        </p>
+      </UCard>
+    </div>
 
-      <table
-        class="w-full text-sm"
-        data-test="desk-results"
+    <UAlert
+      v-if="summary && summary.unpaidCount > 0"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-clock-alert"
+      :title="`${plural(summary.unpaidCount, 'unpaid reservation')} · ${saysPrice(summary.unpaidOwedPence)} owed`"
+      :description="`Unpaid reservations release at ${releaseTime} for walk-ups.`"
+      data-test="desk-unpaid-alert"
+    />
+
+    <div class="grid gap-6 lg:grid-cols-3">
+      <UCard class="lg:col-span-2">
+        <template #header>
+          <div class="flex flex-wrap items-center gap-2">
+            <UInput
+              v-model="scanned"
+              placeholder="Scan a booking's QR"
+              class="w-64"
+              data-test="desk-scan"
+              @keyup.enter="scan"
+            />
+            <UButton
+              :loading="scanning"
+              data-test="desk-scan-submit"
+              @click="scan"
+            >
+              Open
+            </UButton>
+            <UInput
+              v-model="q"
+              placeholder="Reference or name"
+              class="w-64"
+              data-test="desk-search"
+              @keyup.enter="search"
+            />
+            <UButton
+              :loading="searching"
+              color="neutral"
+              variant="subtle"
+              data-test="desk-search-submit"
+              @click="search"
+            >
+              Search
+            </UButton>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <UButton
+              v-for="pill in DESK_STATUS_FILTERS"
+              :key="pill"
+              size="sm"
+              :color="statusFilter === pill ? 'primary' : 'neutral'"
+              :variant="statusFilter === pill ? 'solid' : 'subtle'"
+              :data-test="`desk-status-${pill.toLowerCase()}`"
+              @click="statusFilter = pill"
+            >
+              {{ STATUS_PILL_LABELS[pill] }}
+            </UButton>
+          </div>
+        </template>
+
+        <UAlert
+          v-if="searchFailure || scanFailure"
+          color="error"
+          variant="subtle"
+          :description="searchFailure ?? scanFailure ?? ''"
+          class="mb-4"
+        />
+
+        <table
+          class="w-full text-sm"
+          data-test="desk-results"
+        >
+          <tbody>
+            <tr
+              v-for="row in results"
+              :key="row.id"
+              class="border-b border-default"
+            >
+              <td class="py-2 font-mono">
+                {{ row.reference }}
+              </td>
+              <td class="py-2">
+                {{ row.bookerName }}
+              </td>
+              <td class="py-2">
+                <UBadge
+                  :color="statusColor[row.status] ?? 'neutral'"
+                  variant="subtle"
+                >
+                  {{ row.status }}
+                </UBadge>
+              </td>
+              <td class="py-2 text-right">
+                {{ saysPrice(row.totalPence) }}
+              </td>
+              <td class="py-2 text-right">
+                <UButton
+                  size="sm"
+                  :data-test="`desk-open-${row.id}`"
+                  @click="open2(row.id)"
+                >
+                  Open
+                </UButton>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p
+          v-if="results.length === 0"
+          class="py-6 text-center text-sm text-muted"
+        >
+          No results yet. Search, or scan a booking's code.
+        </p>
+      </UCard>
+
+      <UCard
+        v-if="summary"
+        data-test="desk-tonight"
       >
-        <tbody>
-          <tr
-            v-for="row in results"
-            :key="row.id"
-            class="border-b border-default"
-          >
-            <td class="py-2 font-mono">
-              {{ row.reference }}
-            </td>
-            <td class="py-2">
-              {{ row.bookerName }}
-            </td>
-            <td class="py-2">
-              <UBadge
-                :color="statusColor[row.status] ?? 'neutral'"
-                variant="subtle"
+        <template #header>
+          <p class="font-medium">
+            Tonight
+          </p>
+        </template>
+        <dl class="space-y-3 text-sm">
+          <div class="flex items-baseline justify-between gap-2">
+            <dt class="text-muted">
+              Access bookings
+            </dt>
+            <dd data-test="desk-access-bookings">
+              {{ summary.accessBookings }}
+              <NuxtLink
+                to="/tonight/door"
+                class="text-xs text-muted underline"
               >
-                {{ row.status }}
-              </UBadge>
-            </td>
-            <td class="py-2 text-right">
-              {{ saysPrice(row.totalPence) }}
-            </td>
-            <td class="py-2 text-right">
-              <UButton
-                size="sm"
-                :data-test="`desk-open-${row.id}`"
-                @click="open2(row.id)"
-              >
-                Open
-              </UButton>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <p
-        v-if="results.length === 0"
-        class="py-6 text-center text-sm text-muted"
-      >
-        No results yet. Search, or scan a booking's code.
-      </p>
-    </UCard>
+                see the door screen
+              </NuxtLink>
+            </dd>
+          </div>
+          <div class="flex items-baseline justify-between gap-2">
+            <dt class="text-muted">
+              Pass admissions
+            </dt>
+            <dd data-test="desk-pass-admissions">
+              {{ summary.passAdmissions }}
+            </dd>
+          </div>
+          <div class="flex items-baseline justify-between gap-2">
+            <dt class="text-muted">
+              Reservations release
+            </dt>
+            <dd
+              class="font-mono"
+              data-test="desk-reservations-release"
+            >
+              {{ releaseTime }}
+            </dd>
+          </div>
+          <div class="flex items-baseline justify-between gap-2">
+            <dt class="text-muted">
+              On shift
+            </dt>
+            <dd data-test="desk-on-shift">
+              {{ summary.onShift.length > 0 ? summary.onShift.join(' · ') : 'Nobody confirmed yet' }}
+            </dd>
+          </div>
+        </dl>
+      </UCard>
+    </div>
 
     <UModal
       v-model:open="open"

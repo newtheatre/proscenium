@@ -11,9 +11,15 @@ import { saysPrice } from './ticket-types'
 export const DESK_TENDERS = ['CARD', 'COMP'] as const
 export type DeskTender = (typeof DESK_TENDERS)[number]
 
+// The desk's own status pills (D-132), the three reservation states named directly: pending is
+// reserved and unpaid, collected is reserved and now paid, door is a walk-up with no reservation.
+export const DESK_STATUS_FILTERS = ['ALL', 'PENDING', 'COLLECTED', 'DOOR'] as const
+export type DeskStatusFilter = (typeof DESK_STATUS_FILTERS)[number]
+
 export const deskSearchForm = pageQuery.extend({
   performanceId: z.string().trim().min(1, 'Say which performance you mean'),
   q: z.string().trim().max(200).optional(),
+  status: z.enum(DESK_STATUS_FILTERS).default('ALL'),
 })
 
 export type DeskSearchInput = z.output<typeof deskSearchForm>
