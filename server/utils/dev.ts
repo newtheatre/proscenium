@@ -10,17 +10,20 @@ import { PERSONAS, PERSONA_PASSWORD, PERSONA_TOTP_SECRET } from '#shared/utils/p
 // map written for the developer's own one.
 const DEV_DIR = process.env.NUXT_HUB_DIR ?? '.data'
 
-export interface Letter { name: string, to: string, subject: string, body: string }
+export interface Letter { name: string, to: string, subject: string, body: string, html: boolean }
 
-// The messages the notification centre wrote here instead of sending (0013).
+// The messages the notification centre wrote here instead of sending (0013). Only the text file
+// names a letter; its HTML rendering, if any, is the same stem beside it (K-124 criterion 5).
 export async function mailbox(): Promise<Letter[]> {
   const { readdir, readFile } = await import('node:fs/promises')
   try {
-    const names = (await readdir(MAILBOX)).sort().reverse().slice(0, 20)
+    const entries = await readdir(MAILBOX)
+    const htmlStems = new Set(entries.filter(name => name.endsWith('.html')).map(name => name.slice(0, -'.html'.length)))
+    const names = entries.filter(name => name.endsWith('.txt')).sort().reverse().slice(0, 20)
     return await Promise.all(names.map(async (name) => {
       const body = await readFile(`${MAILBOX}/${name}`, 'utf8')
       const header = (label: string): string => body.match(new RegExp(`^${label}: (.*)$`, 'm'))?.[1] ?? ''
-      return { name, to: header('To'), subject: header('Subject'), body }
+      return { name, to: header('To'), subject: header('Subject'), body, html: htmlStems.has(name.slice(0, -'.txt'.length)) }
     }))
   }
   catch {

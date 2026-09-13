@@ -535,6 +535,10 @@ Stories: 29. Phases: 24 MVP, 0 V2, 0 Later, 5 resolved.
      proves the built output contains neither the route nor its handler.
   4. A command captures the admin screens as images at two widths, so a visual change can be
      reviewed without running anything. It gates nothing.
+  5. Added 13 September 2026: the local mailbox writes each letter's HTML beside its text file
+     under the hub directory, and `/dev` opens it; the route serving it exists only in
+     development, is excluded from a production build like the rest of the surface, and the
+     build test proves it.
 - Source: Review of the admin surface, 30 August 2026; estate convention that a consumer app's
   dev login is guarded by `import.meta.dev` (workspace CLAUDE.md), applied here to the app that
   writes the session.
