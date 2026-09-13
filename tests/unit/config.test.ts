@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { ConfigKey } from '#shared/utils/config'
-import { CONFIG_KEYS, CONFIG_KEY_NAMES, hasDefault, isConfigKey } from '#shared/utils/config'
+import { CONFIG_KEYS, CONFIG_KEY_NAMES, ENFORCED_KEYS, hasDefault, isConfigKey, isEnforced } from '#shared/utils/config'
 
 // The keys the workshop register proposes no value for (0019). They ship unset, and the
 // features needing them wait rather than guessing. Typed, so a typo here is a build error.
@@ -30,6 +30,12 @@ describe('configuration surface (0012, 0019)', () => {
 
   test('retention ships disarmed', () => {
     expect(CONFIG_KEYS.RETENTION_ARMED.default).toBe(false)
+  })
+
+  test('the membership fee is proposed and quoted, but nothing enforces it', () => {
+    expect(CONFIG_KEYS.MEMBERSHIP_FEE_PENCE.default).toBe(600)
+    expect(isEnforced('MEMBERSHIP_FEE_PENCE')).toBe(false)
+    expect(ENFORCED_KEYS).not.toContain('MEMBERSHIP_FEE_PENCE')
   })
 
   test('an unknown key is not a configuration key', () => {

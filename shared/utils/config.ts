@@ -481,6 +481,14 @@ export const CONFIG_KEYS = {
     workshop: 'people-and-communications',
     describes: 'Days after a membership expires that it still counts, so a renewal in hand is not a refusal at the desk (0031).',
   },
+  // The SU sells membership and we only record it (A-117 criterion 1), so quoted for information
+  // only: absent from ENFORCED_KEYS, and J-110's mechanism marks it unenforced wherever it is shown.
+  MEMBERSHIP_FEE_PENCE: {
+    schema: z.number().int().nonnegative(),
+    default: 600,
+    workshop: 'people-and-communications',
+    describes: 'The SU\'s annual membership fee, in pence, as quoted to a member. Nothing in this system charges it.',
+  },
   MEMBERSHIP_RENEWAL_NOTICE_DAYS: {
     schema: z.number().int().positive(),
     default: 21,

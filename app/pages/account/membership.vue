@@ -5,6 +5,7 @@ import type { MembershipState } from '#shared/utils/membership'
 import { membershipClaimForm } from '#shared/utils/membership-claims'
 import type { MembershipClaimInput } from '#shared/utils/membership-claims'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import type { PolicyValues } from '#shared/utils/policy-tokens'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in' })
 
@@ -82,6 +83,13 @@ async function withdraw(): Promise<void> {
 
 const open = computed(() => data.value.claim?.status === 'OPEN' ? data.value.claim : null)
 const declined = computed(() => data.value.claim?.status === 'DECLINED' ? data.value.claim : null)
+
+// Read from /policies/membership rather than baked in, so a fee change needs no code edit (J-110).
+const { data: fee } = await useAsyncData(
+  'membership-fee',
+  () => $fetch<{ values: PolicyValues }>('/api/policies/values', { query: { path: '/policies/membership' } }),
+)
+const feeValue = computed(() => fee.value?.values.MEMBERSHIP_FEE_PENCE ?? null)
 
 useSeoMeta({ title: 'Membership' })
 </script>
@@ -163,7 +171,10 @@ useSeoMeta({ title: 'Membership' })
         variant="subtle"
         icon="i-lucide-badge-check"
         title="Membership is bought at the Students' Union"
-        description="We cannot sell it here. Once you have bought it, tell us below and an officer will record it on your account."
+        :description="feeValue
+          ? `We cannot sell it here. The current fee is ${feeValue.text}${feeValue.enforced ? '' : ' (not enforced yet)'}. Once you have bought it, tell us below and an officer will record it on your account.`
+          : 'We cannot sell it here. Once you have bought it, tell us below and an officer will record it on your account.'"
+        data-test="membership-fee"
       />
 
       <UPageCard v-if="open">
