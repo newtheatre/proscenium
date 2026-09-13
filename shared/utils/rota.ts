@@ -134,11 +134,30 @@ export function reassignRefusal(status: ShiftStatus): string {
   return 'That member already holds a shift on this performance'
 }
 
+// Why standing a confirmed shift down did not apply: the only state the write accepts is
+// CONFIRMED, so anything else names what it actually is (issue 933).
+export function unconfirmRefusal(status: ShiftStatus): string {
+  if (status === 'CANCELLED') return 'This shift has been cancelled'
+  if (status === 'OPEN') return 'This shift is already open'
+  return 'Only a confirmed shift can be unconfirmed'
+}
+
 // What an officer's assignment names: the shift is theirs to pick, the member is the input
 // (E-107 criterion 3).
 export const shiftAssignForm = z.object({
   userId: z.string().min(1).max(64),
 })
+
+// An ad hoc shift, outside the template: the officer names the role and the slot themselves,
+// with an optional person that confirms it at once (E-107 criterion 5, issue 933).
+export const addShiftForm = z.object({
+  performanceId: z.string().min(1).max(64),
+  role: z.enum(SHIFT_ROLES),
+  slot: z.number().int().min(1).max(MAX_SLOT_COUNT),
+  userId: z.string().min(1).max(64).optional(),
+})
+
+export type AddShiftInput = z.output<typeof addShiftForm>
 
 // What a refused write reads as. SQLite names the columns for a unique index and the constraint
 // name for a CHECK, so both spellings appear here (E-106 criterion 3).

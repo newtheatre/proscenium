@@ -123,7 +123,8 @@ Counts: 28 MVP stories (E-101 to E-128), 4 V2 stories (E-201 to E-204), 1 Later 
   3. The FOH officer can assign an eligible member to an open shift or replace a holder; assignment applies the same live eligibility gate as self-claiming, and an officer assignment is confirmed by definition, bypassing the E-105 queue.
   4. Replacing a confirmed duty manager is atomic: at no instant do two confirmed duty managers exist and at no instant is the change half-applied.
   5. Both the removed and the assigned member are notified with performance, role and time; every reassignment is audited with actor.
-- Source: Prompt Book E-1; audit PR-13 (claim and release carry).
+  6. The FOH officer can add a one-off shift to a performance directly, outside the venue's template, naming its role and slot and optionally a person; naming an eligible person confirms it at once, the same as an assignment. The officer can also stand a confirmed shift back down to open, distinct from a holder's own release, notifying whoever held it. Both are audited with actor.
+- Source: Prompt Book E-1; audit PR-13 (claim and release carry); issue 933 (criterion 6, confirming ad hoc shifts and unconfirm were in scope after all).
 
 ## E-108: Unstaffed escalation seven days ahead
 
