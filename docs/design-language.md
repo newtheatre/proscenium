@@ -125,7 +125,7 @@ decision record rather than a habit (`decisions/0040-navigation-is-shaped-by-pos
 `UDashboardSearch` is in the matrix above and is not built yet: it is the answer once the sidebar
 passes roughly forty items.
 
-Five rules follow:
+Six rules follow:
 
 1. **A permanently dark region is marked `dark`.** The public header and footer are stage black
    in both colour modes. That is one class on the subtree, after which every semantic token
@@ -136,16 +136,23 @@ Five rules follow:
    already been made. A list long enough to page uses `UPagination` bound to the server's page,
    never a client-side slice of everything: the endpoint pages in SQL and answers with an
    envelope (CONTRIBUTING), so the browser never holds the whole table.
-3. **The show-night screens are phone-first and work offline.** They cache their night on open
+3. **The show-night shell carries one header, and the screens fill it in.** `app/layouts/tonight.vue`
+   draws the back arrow, a mono uppercase eyebrow, the show title, the "Thu 5 Nov 19:30 Main Hall"
+   line and the on-shift badge. A screen says what goes in it through `setNightEyebrow` (which
+   `NightScreen` calls with its own title) and `setNightSubject` (which the screens that know
+   tonight's show call), so no page draws a heading of its own. The hub at `/tonight` is six
+   `NightTile` cards, a titled block is `NightBlock` and a single number is `NightKpi`; none of
+   the three is in the expressive kit, and all three are show-night only.
+4. **The show-night screens are phone-first and work offline.** They cache their night on open
    and render from cache when the network drops (`architecture.md`, module K). Anything that only
    looks right on a desk monitor is wrong for the surface it is on.
-4. **Navigation is declared once and filtered by ability.** Every destination in the console
+5. **Navigation is declared once and filtered by ability.** Every destination in the console
    sidebar, the member sub-nav (`MY_NAV`), account settings (`ACCOUNT_NAV`), the account menu, the
    public header (`HEADER_NAV`, a derived slice of `PUBLIC_NAV`) and the footer comes from
    `shared/utils/site-nav.ts`, and the console middleware guards a route from the same entry the
    sidebar renders. A screen added to a layout and not to the declaration fails
    `tests/unit/site-nav.test.ts` (0040).
-5. **A shell's title is not a link inside a link.** `UHeader` wraps its `#title` slot in its own
+6. **A shell's title is not a link inside a link.** `UHeader` wraps its `#title` slot in its own
    anchor, so the slot holds `SiteWordmark`, not a `NuxtLink`, and the destination is the `to`
    prop. `UHeader` does not carry its default slot into the mobile panel either, so a header with
    links gives the `#body` slot the same navigation.

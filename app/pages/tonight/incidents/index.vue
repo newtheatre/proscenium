@@ -2,6 +2,7 @@
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
 import { CATEGORIES, SEVERITIES, saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { londonClock } from '#shared/utils/london'
+import { saysPerformanceChoice } from '#shared/utils/tonight'
 import type { Category, Severity } from '#shared/utils/incidents'
 
 definePageMeta({ layout: 'tonight' })
@@ -31,13 +32,17 @@ const items = ref<Entry[]>([])
 // What tonight's log is scoped to, resolved once on load: none of BAR, DOOR or DUTY_MANAGER is
 // asked to name a performance, so the first role that resolves says which ones are running.
 const performanceIds = ref<string[]>([])
+// Named where the authority route says what is running, an id where it does not yet: a role can
+// resolve a performance the route did not label.
+const performances = ref<{ id: string, showTitle: string, startsAt: number }[]>([])
 const authorityFailure = ref<string | null>(null)
 
 async function resolveAuthority(): Promise<void> {
   for (const role of NIGHT_ROLES) {
     try {
-      const resolved = await request<{ performanceIds: string[] }>('/api/tonight/authority', { query: { role } })
+      const resolved = await request<{ performanceIds: string[], performances?: { id: string, showTitle: string, startsAt: number }[] }>('/api/tonight/authority', { query: { role } })
       performanceIds.value = resolved.performanceIds
+      performances.value = resolved.performances ?? []
       authorityFailure.value = null
       return
     }
@@ -68,7 +73,10 @@ onMounted(async () => {
   await load()
 })
 
-const performanceOptions = computed(() => performanceIds.value.map(id => ({ label: id, value: id })))
+const performanceOptions = computed(() => performanceIds.value.map((id) => {
+  const named = performances.value.find(one => one.id === id)
+  return { label: named ? saysPerformanceChoice(named) : id, value: id }
+}))
 
 interface FormState {
   performanceId: string
