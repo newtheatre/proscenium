@@ -372,3 +372,119 @@ describe.skipIf(skip !== null)('unfilled shifts (E-107, `docs/known-issues.md`)'
     expect(ids).not.toContain(confirmed.shiftId)
   })
 })
+
+describe.skipIf(skip !== null)('an officer adds a one-off shift outside the template (E-107 criterion 5, issue 933)', () => {
+  test('an open shift is added with no person named', async () => {
+    const house = performance(7, 'add-open')
+
+    const answered = await send('POST', '/api/admin/rota/shifts/add', {
+      performanceId: house.performanceId, role: 'BAR', slot: 2,
+    }, foh.cookie)
+    expect(answered.status).toBe(200)
+
+    expect(read<{ status: string, user_id: string | null }>(
+      `SELECT status, user_id FROM shifts WHERE performance_id = ? AND role = 'BAR' AND slot = 2`,
+      house.performanceId,
+    )).toMatchObject({ status: 'OPEN', user_id: null })
+  })
+
+  test('naming an eligible person confirms it at once, and they are told', async () => {
+    const house = performance(7, 'add-confirmed')
+    const member = await registerMember(app, 'add-shift-eligible', generatePassword())
+    await award(member.id)
+
+    const answered = await send('POST', '/api/admin/rota/shifts/add', {
+      performanceId: house.performanceId, role: 'DOOR', slot: 3, userId: member.id,
+    }, foh.cookie)
+    expect(answered.status).toBe(200)
+
+    expect(read<{ status: string, user_id: string }>(
+      `SELECT status, user_id FROM shifts WHERE performance_id = ? AND role = 'DOOR' AND slot = 3`,
+      house.performanceId,
+    )).toMatchObject({ status: 'CONFIRMED', user_id: member.id })
+    expect(notificationCount(member.id, 'shift.assigned')).toBeGreaterThan(0)
+  })
+
+  test('an ineligible person is refused, and nothing is added', async () => {
+    const house = performance(7, 'add-ineligible')
+    const member = await registerMember(app, 'add-shift-ineligible', generatePassword())
+
+    const answered = await send('POST', '/api/admin/rota/shifts/add', {
+      performanceId: house.performanceId, role: 'DOOR', slot: 4, userId: member.id,
+    }, foh.cookie)
+    expect(answered.status).toBe(403)
+    expect(read<{ n: number }>(
+      `SELECT count(*) AS n FROM shifts WHERE performance_id = ? AND role = 'DOOR' AND slot = 4`,
+      house.performanceId,
+    )?.n).toBe(0)
+  })
+
+  test('the same role and slot cannot be added twice', async () => {
+    const house = performance(7, 'add-duplicate')
+    expect((await send('POST', '/api/admin/rota/shifts/add', {
+      performanceId: house.performanceId, role: 'BAR', slot: 5,
+    }, foh.cookie)).status).toBe(200)
+
+    const repeated = await send('POST', '/api/admin/rota/shifts/add', {
+      performanceId: house.performanceId, role: 'BAR', slot: 5,
+    }, foh.cookie)
+    expect(repeated.status).toBe(409)
+  })
+
+  test('a missing performance 404s', async () => {
+    expect((await send('POST', '/api/admin/rota/shifts/add', {
+      performanceId: 'no-such-performance', role: 'BAR', slot: 1,
+    }, foh.cookie)).status).toBe(404)
+  })
+
+  test('an ordinary member cannot add a shift', async () => {
+    const member = await registerMember(app, 'add-shift-forbidden', generatePassword())
+    const house = performance(7, 'add-forbidden')
+    expect((await send('POST', '/api/admin/rota/shifts/add', {
+      performanceId: house.performanceId, role: 'BAR', slot: 6,
+    }, member.cookie)).status).toBe(403)
+  })
+})
+
+describe.skipIf(skip !== null)('an officer unconfirms a shift (E-107, issue 933)', () => {
+  test('a confirmed shift stands down to open, and the holder is told', async () => {
+    const holder = await registerMember(app, 'unconfirm-holder', generatePassword())
+    const house = performance(7, 'unconfirm-open')
+    claim(house.shiftId, holder.id)
+
+    const before = notificationCount(holder.id, 'shift.removed')
+    const answered = await send('POST', `/api/admin/rota/shifts/${house.shiftId}/unconfirm`, undefined, foh.cookie)
+    expect(answered.status).toBe(200)
+
+    expect(read<{ status: string, user_id: string | null }>('SELECT status, user_id FROM shifts WHERE id = ?', house.shiftId))
+      .toMatchObject({ status: 'OPEN', user_id: null })
+    expect(notificationCount(holder.id, 'shift.removed')).toBeGreaterThan(before)
+  })
+
+  test('an already open shift is refused', async () => {
+    const house = performance(7, 'unconfirm-already-open')
+    const answered = await send('POST', `/api/admin/rota/shifts/${house.shiftId}/unconfirm`, undefined, foh.cookie)
+    expect(answered.status).toBe(409)
+  })
+
+  test('a claimed but not yet confirmed shift is refused', async () => {
+    const claimant = await registerMember(app, 'unconfirm-claimant', generatePassword())
+    const house = performance(7, 'unconfirm-claimed')
+    claim(house.shiftId, claimant.id, 'CLAIMED')
+
+    const answered = await send('POST', `/api/admin/rota/shifts/${house.shiftId}/unconfirm`, undefined, foh.cookie)
+    expect(answered.status).toBe(409)
+    expect(read<{ status: string }>('SELECT status FROM shifts WHERE id = ?', house.shiftId)?.status).toBe('CLAIMED')
+  })
+
+  test('a missing shift 404s', async () => {
+    expect((await send('POST', '/api/admin/rota/shifts/no-such-shift/unconfirm', undefined, foh.cookie)).status).toBe(404)
+  })
+
+  test('an ordinary member cannot unconfirm', async () => {
+    const holder = await registerMember(app, 'unconfirm-forbidden', generatePassword())
+    const house = performance(7, 'unconfirm-forbidden')
+    claim(house.shiftId, holder.id)
+    expect((await send('POST', `/api/admin/rota/shifts/${house.shiftId}/unconfirm`, undefined, holder.cookie)).status).toBe(403)
+  })
+})

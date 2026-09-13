@@ -493,6 +493,10 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/rota/shifts.get.ts', exempt: 'reads the open and declined shifts an officer has to fill by hand' },
   { route: 'server/api/admin/rota/shifts/[id]/assign.post.ts', actions: ['shift.reassigned'] },
   { route: 'server/api/admin/rota/shifts/[id]/candidates.get.ts', exempt: 'reads who might be assigned, scoped to rota.write' },
+  { route: 'server/api/admin/rota/shifts/[id]/unconfirm.post.ts', actions: ['shift.unconfirmed'] },
+  { route: 'server/api/admin/rota/shifts/add.post.ts', actions: ['shift.added'] },
+  { route: 'server/api/admin/rota/shifts/board.get.ts', exempt: 'reads the per-performance rota, scoped to rota.write' },
+  { route: 'server/api/admin/rota/candidates.get.ts', exempt: 'reads who might take a role not yet on the rota, scoped to rota.write' },
 
   // Module F: bar
 
