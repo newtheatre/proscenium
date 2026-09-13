@@ -67,7 +67,7 @@ Counts: 28 MVP stories (E-101 to E-128), 4 V2 stories (E-201 to E-204), 1 Later 
   1. Eligibility is computed against my live training records by internal query at request time; there is no network seam, no cache window and no fail-open path. The old estate's 45-second cached API call with needsEligibilityReview fallback must not be recreated.
   2. Shifts I qualify for are claimable; each shift I do not qualify for is listed with the specific training module that would unlock it, linking to that module's catalogue page.
   3. A record in EXPIRING state still counts as held; the shift list uses the same derived-validity rules as the training module, never its own copy.
-  4. Which modules gate which shift roles is committee configuration, editable and audited; an empty or unreadable rule refuses eligibility rather than granting it to everyone.
+  4. Which modules gate which shift roles is committee configuration, editable and audited; an empty or unreadable rule refuses eligibility rather than granting it to everyone. Amended 11 September 2026: the generic settings screen edits the same three keys as a bare module id with no name lookup; `/rota/manage/templates` also carries a labelled "Shift eligibility" card, one field per role, so the mapping has one obvious, named place rather than only a raw config key (audit follow-up on #933).
   5. The list pages in SQL, filterable by role and date range, and returns a pagination envelope.
 - Source: Prompt Book E-1, G-1; audit PR-13, TR-8; get-in disposition (eligibility seam dissolves).
 
