@@ -572,7 +572,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     await addProduct(categoryId, { name: productName })
 
     const itemName = named('On screen bottle')
-    const itemId = await addItem({ name: itemName })
+    const itemId = await addItem({ name: itemName, parQty: 5000 })
     await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 4500, unitCostPence: 480 })
 
     const view = await openSignedOutView(app.baseURL)
@@ -590,6 +590,8 @@ describe.skipIf(skip !== null)('the screens', () => {
     const stock = await textOf(view, '[data-test="bar-items-table"]')
     expect(stock).toContain(itemName)
     expect(stock).toContain('4500 ml')
+    // 4500 on hand against a par of 5000 (#907): the row reads Below par, as words plus colour.
+    expect(await textOf(view, `[data-test="status-badge-${itemId}"]`)).toBe('Below par')
 
     await visit(view, `${app.baseURL}/bar/stock/movements`, '[data-test="bar-movements-table"]')
     const history = await textOf(view, '[data-test="bar-movements-table"]')

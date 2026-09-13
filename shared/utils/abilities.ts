@@ -76,6 +76,10 @@ export const verifyAccessProfiles = defineAbility((viewer: Viewer) => holds(view
 export const viewBarCatalogue = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read'))
 export const viewBarStock = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read'))
 
+// F-119 criterion 5 names the bar manager, the treasurer and administrators: the treasurer holds
+// no bar.read, so reports admit finance.read too, without opening the catalogue or stock (#906).
+export const viewBarReports = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read') || holds(viewer, 'finance.read'))
+
 // The treasurer's own read over the ledger, starting with foregone comp and discount value
 // (I-103); everything else module I builds on it gates the same way.
 export const viewFinanceReports = defineAbility((viewer: Viewer) => holds(viewer, 'finance.read'))
@@ -152,6 +156,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   managePassTypes: 'ticketing.manage',
   viewBarCatalogue: 'bar.read',
   viewBarStock: 'bar.read',
+  viewBarReports: 'bar.read',
   viewFinanceReports: 'finance.read',
   recordZReadings: 'finance.write',
   viewSeasonSummary: 'finance.summary',
