@@ -461,6 +461,13 @@ export async function fillTime(view: Bun.WebView, selector: string, time: string
   throw new Error(`${selector} would not take the time ${time}`)
 }
 
+// A time field has no single value to read: it is segments, joined the same way fillTime confirms
+// its own typing landed.
+export async function readTime(view: Bun.WebView, selector: string): Promise<string> {
+  const segments = JSON.stringify(`${selector} [data-reka-time-field-segment]`)
+  return view.evaluate<string>(`[...document.querySelectorAll(${segments})].map(segment => segment.innerText).join('')`)
+}
+
 // A Nuxt UI select is a listbox in a portal, so a value cannot be set on it the way an input takes
 // one: the trigger is opened and the option itself is clicked, the way a person does it.
 async function openMenu(view: Bun.WebView, selector: string): Promise<void> {

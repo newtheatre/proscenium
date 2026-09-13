@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, readTime, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -291,7 +291,7 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       await click(view, 'form button[type="submit"]')
 
       await waitFor(view, `document.querySelector('[data-test="booking-form"]')`, 30_000)
-      const at = await view.evaluate<string>(`document.querySelector('[data-test="booking-from"]').value`)
+      const at = await readTime(view, '[data-test="booking-from"]')
       expect(at).toBe('14:30')
     }
     finally {
@@ -360,8 +360,8 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       })()`)
 
       await waitFor(view, `document.querySelector('[data-test="booking-form"]')`, 30_000)
-      const from = await view.evaluate<string>(`document.querySelector('[data-test="booking-from"]').value`)
-      const to = await view.evaluate<string>(`document.querySelector('[data-test="booking-to"]').value`)
+      const from = await readTime(view, '[data-test="booking-from"]')
+      const to = await readTime(view, '[data-test="booking-to"]')
 
       // Four quarter hours, so the far edge of the fourth is an hour after the first.
       const minutes = (clock: string): number => Number(clock.split(':')[0]) * 60 + Number(clock.split(':')[1])
