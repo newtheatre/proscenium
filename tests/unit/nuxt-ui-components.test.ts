@@ -20,9 +20,12 @@ async function componentsInApp(): Promise<Map<string, string[]>> {
   return used
 }
 
+// Content, colour-mode and locale components sit a directory down and carry their own prefix in
+// the file name; only prose/ does not, and those are @nuxt/content's to resolve.
 function libraryComponents(): Set<string> {
-  return new Set([...new Bun.Glob('*.vue').scanSync({ cwd: LIBRARY, onlyFiles: true })]
-    .map(file => `U${file.replace('.vue', '')}`))
+  return new Set([...new Bun.Glob('**/*.vue').scanSync({ cwd: LIBRARY, onlyFiles: true })]
+    .filter(file => !file.replaceAll('\\', '/').startsWith('prose/'))
+    .map(file => `U${file.replaceAll('\\', '/').split('/').pop()!.replace('.vue', '')}`))
 }
 
 describe('every Nuxt UI component used is one that exists', () => {
