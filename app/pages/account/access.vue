@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ACCESS_FLAGS, ACCESS_FLAG_LABELS, declareAccessProfileForm } from '#shared/utils/access-profiles'
+import { ACCESS_FLAGS, ACCESS_FLAG_LABELS, declareAccessProfileForm, saysAccessProfileStatus } from '#shared/utils/access-profiles'
 import type { AccessFlag, DeclareAccessProfileInput, OwnAccessProfile } from '#shared/utils/access-profiles'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
@@ -111,7 +111,7 @@ useSeoMeta({ title: 'Access requirements' })
           :color="profile.status === 'VERIFIED' ? 'success' : profile.status === 'DECLINED' ? 'error' : 'neutral'"
           variant="subtle"
         >
-          {{ profile.status }}
+          {{ saysAccessProfileStatus(profile.status) }}
         </UBadge>
 
         <UForm

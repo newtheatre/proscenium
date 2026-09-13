@@ -66,6 +66,14 @@ export default defineAppConfig({
       },
     },
 
+    // Every modal's close sits absolute top-right; the title and description column needs
+    // room reserved so a wrapped description at a phone width never runs under it (issue 937).
+    modal: {
+      slots: {
+        header: 'items-start pe-12',
+      },
+    },
+
     // The admin table look is a theme, not a per-page decision
     // (proscenium ADR-0012). UTable merges any `:ui` a page passes over it.
     table: {

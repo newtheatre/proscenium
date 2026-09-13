@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { londonDay } from '#shared/utils/membership'
+
 // A trainer on a door, holding a phone in one hand. Big targets, no hover, nothing that needs a
 // wide viewport: the tonight shell, which 0040 named for exactly this (G-116 criterion 6).
 definePageMeta({ layout: 'tonight', title: 'Register', middleware: 'signed-in' })
@@ -115,6 +118,8 @@ function beginCorrecting(): void {
 }
 
 const open = computed(() => data.value?.registerOpenedAt !== null)
+// A day early the route still refuses it; this only stops a trainer tapping into that refusal.
+const sessionDayHasArrived = computed(() => data.value !== null && londonDay(new Date()) >= data.value.heldOn)
 const marked = computed(() => data.value?.markedAt !== null && !correcting.value)
 const attendees = computed(() => data.value?.attendees ?? [])
 const presentCount = computed(() => attendees.value.filter(one => present.value.has(one.userId)).length)
@@ -279,10 +284,13 @@ async function submit(): Promise<void> {
           size="xl"
           block
           :loading="working"
+          :disabled="!sessionDayHasArrived"
           data-test="open-register"
           @click="openRegister"
         >
-          Open the register
+          {{ sessionDayHasArrived || !data
+            ? 'Open the register'
+            : `Opens on ${formatLondon(startOfLondonDay(data.heldOn), { weekday: 'short', day: 'numeric', month: 'short' })}` }}
         </UButton>
       </template>
 
