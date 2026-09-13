@@ -106,6 +106,7 @@ from Nuxt UI's structural components:
 | A member's own screens | `member` | The site header, a `UNavigationMenu` sub-nav of `MY_NAV`, the shared footer. No sidebar. Account settings pages (`/account/profile`, `/account/security`, `/account/notifications`) additionally wrap in `AccountSettings.vue`, a `UPage` with a `UPageAside` of `ACCOUNT_NAV` |
 | Console: managing rooms, training, the bar, the box office, people, money | `console` | `UDashboardGroup`, `UDashboardSidebar`, `UDashboardPanel`, `UDashboardNavbar`, `UDashboardSearch`, `UTable` |
 | Show night | `tonight` | A plain dark subtree, because a phone held in a foyer is not a dashboard |
+| The way in (`/sign-in`, `/register`) | `default` | The site header and footer as usual, with the page itself a spotlight ground carrying the wordmark over one `UPageCard`. The `signed-out` middleware sends a visitor who already has a session on to `next` or home |
 
 The shell follows the posture of the work, not the URL, and which shell a screen takes is a
 decision record rather than a habit (`decisions/0040-navigation-is-shaped-by-posture-and-filtered-by-ability.md`).
