@@ -1,8 +1,7 @@
 import { eq, sql } from 'drizzle-orm'
 
-// Delete a category with no products and no price history. Nothing here retires a category, so
-// one with either stays; the refusal says why rather than raising the price table's own trigger
-// (category_prices is append-only, 0010). Renaming was the only option before this route (#908).
+// Delete a category with no products and no price history; one with either stays. The refusal
+// says why, rather than raising the price table's own append-only trigger (0010).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const resolved = await requirePermission(event, 'bar.write')
