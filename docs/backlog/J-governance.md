@@ -221,11 +221,20 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
       or more; on a phone that table of contents is a disclosure above the prose.
   16. A page with no banner photograph still opens on the house: the spotlight and the display
       face, rather than a plain black band.
+  17. Get involved is a landing page rather than a reading column: a hero carrying its flash and
+      the one action that matters, a grid of department tiles, the three steps of joining, and a
+      member's words on a spotlight band, with the committee's own sections as prose below it.
+      No figure appears on it, the membership fee included, until that fee is a configuration key.
+  18. Everything on that landing page is content: the headline, the flash, the tiles, the steps
+      and the quote are front-matter fields of `content/get-involved.md`, so a committee member
+      changing a department or a step never opens a Vue file. It keeps the placeholder treatment
+      until the committee's words land (D-103 criterion 5).
 - Source: Pre-cutover review, 10 September 2026; the known-issues row on unsigned-off policy
   prose; 0012, 0051. Criteria 6 to 9 added 11 September 2026, after the committee's review of the
   public-site mockups widened the story from the policy wording to the whole public site.
   Criteria 12 to 16 added 13 September 2026, from the what's-on mockup and the
-  findings in issues 917 and 920.
+  findings in issues 917 and 920. Criteria 17 and 18 added 13 September 2026, from the
+  get-involved mockup.
 
 ## J-201: The handover run and the atomic access flip
 
