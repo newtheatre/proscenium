@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, setSystemTime, test } from 'bun:test'
 import { EXPORTED_TABLES, PERSONAL_TABLES } from '#shared/utils/personal-data'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -73,12 +73,13 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
     ['INSERT INTO bar_items (id, name, unit) VALUES (?, ?, ?)', `bi-${id}`, 'House red', 'ML'],
     [`INSERT INTO stock_movements (id, item_id, qty, kind, reason, actor_id, created_at)
       VALUES (?, ?, -750, 'WASTAGE', 'BREAKAGE', ?, ?)`, `sm-${id}`, `bi-${id}`, id, now],
-    // Who opened and closed a night's till. Holds no free text, so it survives untouched too.
-    [`INSERT INTO till_sessions (id, venue_id, night, opened_by, closed_by, closed_at)
-      VALUES (?, ?, '2026-09-01', ?, ?, ?)`, `till-${id}`, `venue-${id}`, id, id, now],
-    // Who opened and applied a stocktake. Holds no free text either (F-115).
-    [`INSERT INTO stocktakes (id, status, opened_by, applied_by, applied_at)
-      VALUES (?, 'APPLIED', ?, ?, ?)`, `stk-${id}`, id, id, now],
+    // Who opened and closed a night's till. Both instants come from the one `now`, never a
+    // column default read separately, so a run near a day boundary can't close before it opens.
+    [`INSERT INTO till_sessions (id, venue_id, night, opened_by, opened_at, closed_by, closed_at)
+      VALUES (?, ?, '2026-09-01', ?, ?, ?, ?)`, `till-${id}`, `venue-${id}`, id, now, id, now],
+    // Who opened and applied a stocktake, both from the one `now` (same trap as till_sessions).
+    [`INSERT INTO stocktakes (id, status, opened_by, opened_at, applied_by, applied_at)
+      VALUES (?, 'APPLIED', ?, ?, ?, ?)`, `stk-${id}`, id, now, id, now],
     // A shift somebody worked, and the template the venue stamps. Who staffed a performance is
     // the staffing record; the note written on the slot is not (E-102, E-106).
     ['INSERT INTO shows (id, slug, title) VALUES (?, ?, ?)', `show-${id}`, `a-show-${id}`, 'A Show'],
@@ -301,6 +302,25 @@ describe('erasure (K-109, 0011)', () => {
         detail: REDACTED,
       })
     })
+  })
+})
+
+// Issue 967: the fixture once read the clock twice, once in JS and once as a column default,
+// so a tick between the two near the London day boundary could close a session before it opened.
+describe('the erasure fixture opens and closes a till session and a stocktake from one instant (issue 967)', () => {
+  test.each([
+    ['23:59 London (BST)', '2026-09-11T22:59:00Z'],
+    ['00:01 London the next day (BST)', '2026-09-11T23:01:00Z'],
+  ])('%s does not invert either pair of instants', async (_label, instant) => {
+    setSystemTime(new Date(instant))
+    try {
+      await withDatabase(async (database) => {
+        expect(() => seedPerson(database, 'u-midnight')).not.toThrow()
+      })
+    }
+    finally {
+      setSystemTime()
+    }
   })
 })
 
