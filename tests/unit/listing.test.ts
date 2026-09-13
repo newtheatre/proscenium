@@ -28,6 +28,7 @@ const run = (...performances: ListedPerformance[]): ListedShow => ({
   categoryName: null,
   assessment: 'NONE' as ListedShow['assessment'],
   warnings: [],
+  contentNotes: null,
   performances,
 })
 

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import {
+  CONTENT_WARNING_CATEGORIES,
+  CONTENT_WARNING_ICONS,
   CONTENT_WARNING_KINDS,
   contentWarningForm,
   saysWarningKind,
@@ -59,7 +61,19 @@ interface FormState {
 
 const state = reactive<FormState>({ slug: '', title: '', kind: 'GENERAL', sort: 0, archived: false })
 
-const kindOptions = CONTENT_WARNING_KINDS.map(kind => ({ label: saysWarningKind(kind), value: kind }))
+const KIND_HINTS: Record<ContentWarningKind, string> = {
+  TECHNICAL: 'A fact about the room: strobe, haze, a blackout. Either the show does it or it does not.',
+  GENERAL: 'A theme. Each show that carries it grades it mentioned, discussed or depicted.',
+}
+const kindOptions = CONTENT_WARNING_KINDS.map(kind => ({ label: saysWarningKind(kind), value: kind, hint: KIND_HINTS[kind] }))
+
+const categoryOptions: string[] = [...CONTENT_WARNING_CATEGORIES]
+const iconOptions: string[] = [...CONTENT_WARNING_ICONS]
+
+// A staging warning is its own group on every screen, so a heading on it would never be read.
+watch(() => state.kind, (kind) => {
+  if (kind === 'TECHNICAL') state.category = undefined
+})
 
 function edit(warning: ContentWarning | null): void {
   editing.value = warning
@@ -328,27 +342,35 @@ const columns: TableColumn<ContentWarning>[] = [
           <UFormField
             label="Kind"
             name="kind"
-            description="Content is graded mentioned, discussed or depicted. Staging is a fact about the room, and is not graded."
           >
-            <USelect
+            <URadioGroup
               v-model="state.kind"
               :items="kindOptions"
+              value-key="value"
+              label-key="label"
+              description-key="hint"
+              variant="card"
+              size="sm"
               :disabled="Boolean(editing && editing.showCount > 0)"
-              class="w-full"
               data-test="warning-kind"
             />
           </UFormField>
 
           <UFormField
+            v-if="state.kind === 'GENERAL'"
             label="Grouped under"
             name="category"
             hint="Optional"
-            description="A heading the show page groups warnings by."
+            description="The heading the editor offers it under. Pick one of the usual headings, or type a new one."
           >
-            <UInput
+            <UInputMenu
               v-model="state.category"
+              :items="categoryOptions"
+              create-item
+              placeholder="Other"
               class="w-full"
               data-test="warning-category"
+              @create="(value: string) => { state.category = value }"
             />
           </UFormField>
 
@@ -365,6 +387,35 @@ const columns: TableColumn<ContentWarning>[] = [
           </UFormField>
 
           <div class="grid gap-4 sm:grid-cols-2">
+            <UFormField
+              label="Icon"
+              name="icon"
+              hint="Optional"
+              description="Shown on the badge."
+            >
+              <USelectMenu
+                v-model="state.icon"
+                :items="iconOptions"
+                placeholder="None"
+                class="w-full"
+                data-test="warning-icon"
+              >
+                <template #leading>
+                  <UIcon
+                    v-if="state.icon"
+                    :name="state.icon"
+                    class="size-5"
+                  />
+                </template>
+                <template #item-leading="{ item }">
+                  <UIcon
+                    :name="item"
+                    class="size-5"
+                  />
+                </template>
+              </USelectMenu>
+            </UFormField>
+
             <UFormField
               label="Order"
               name="sort"

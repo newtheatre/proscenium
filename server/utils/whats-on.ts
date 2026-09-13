@@ -42,6 +42,7 @@ export function listedShowsQuery(at: number, limit: number, offset: number, venu
            s.age_guidance AS ageGuidance, s.latecomer_policy AS latecomerPolicy,
            s.poster_key AS posterKey,
            s.status AS status, s.warnings_confirmed_none AS warningsConfirmedNone,
+           s.content_notes AS contentNotes,
            c.name AS categoryName,
            (SELECT min(p.starts_at) FROM performances p
              WHERE p.show_id = s.id AND p.status = 'ON_SALE' AND p.starts_at >= ${at}) AS opensAt
@@ -162,6 +163,7 @@ interface ShowRow extends Omit<PublicShow, 'posterUrl'> {
   posterKey: string | null
   status: 'DRAFT' | 'PUBLISHED'
   warningsConfirmedNone: number
+  contentNotes: string | null
   categoryName: string | null
 }
 
@@ -235,6 +237,7 @@ function assemble(
         warningCount: carried.length,
       }),
       warnings: publicContentWarnings(carried),
+      contentNotes: row.contentNotes,
       performances: listed.get(row.id) ?? [],
     }]
   })
@@ -285,6 +288,7 @@ export async function publicShowBySlug(
              s.age_guidance AS ageGuidance, s.latecomer_policy AS latecomerPolicy,
              s.poster_key AS posterKey,
              s.status AS status, s.warnings_confirmed_none AS warningsConfirmedNone,
+             s.content_notes AS contentNotes,
              c.name AS categoryName
       FROM shows s
       LEFT JOIN show_categories c ON c.id = s.category_id

@@ -187,6 +187,7 @@ const SHOW_COLUMNS = sql`
   (SELECT se.name FROM seasons se WHERE se.id = s.season_id) AS seasonName,
   s.booking_closes_hours_before AS bookingClosesHoursBefore,
   s.warnings_confirmed_none AS warningsConfirmedNone,
+  s.content_notes AS contentNotes,
   s.poster_key AS posterKey,
   s.status AS status
 `

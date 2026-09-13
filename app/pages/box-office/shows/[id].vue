@@ -194,6 +194,7 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
             :warnings="warnings"
             :vocabulary="vocabulary"
             :confirmed-none="show.warningsConfirmedNone"
+            :content-notes="show.contentNotes"
             @saved="refresh()"
           />
 

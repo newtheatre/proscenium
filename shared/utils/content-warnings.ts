@@ -11,6 +11,55 @@ export type ContentWarningLevel = (typeof CONTENT_WARNING_LEVELS)[number]
 
 export const MAX_WARNING_TITLE = 80
 export const MAX_WARNING_SLUG = 80
+export const MAX_WARNING_NOTES = 2000
+
+// How strongly a content warning features, strongest first, which is the order a show page reads
+// them in: what is shown before what is talked about before what is only referred to.
+export const CONTENT_WARNING_LEVEL_DETAILS: readonly { level: ContentWarningLevel, label: string, hint: string, icon: string }[] = [
+  { level: 'DEPICTED', label: 'Depicted', hint: 'Shown as part of the action', icon: 'i-lucide-drama' },
+  { level: 'DISCUSSED', label: 'Discussed', hint: 'Talked about at length, but not shown', icon: 'i-lucide-messages-square' },
+  { level: 'MENTIONED', label: 'Mentioned', hint: 'Referred to in passing', icon: 'i-lucide-message-circle' },
+]
+
+// A staging warning has no level, so it is its own group with its own heading.
+export const CONTENT_WARNING_STAGING_GROUP = { label: 'Staging', hint: 'What the production does to the room', icon: 'i-lucide-zap' } as const
+
+// Suggested headings for content warnings, in display order. The column is plain text, so a
+// heading nobody suggested is still allowed; it simply sorts after these.
+export const CONTENT_WARNING_CATEGORIES = [
+  'Violence and death',
+  'Sexual content',
+  'Mental health',
+  'Substances',
+  'Discrimination',
+  'Language',
+  'Family and relationships',
+  'Health and body',
+  'Other',
+] as const
+
+// A shortlist rather than free text: the value renders straight into a badge, where a typo is a
+// blank space and not an error.
+export const CONTENT_WARNING_ICONS = [
+  'i-lucide-zap',
+  'i-lucide-volume-2',
+  'i-lucide-cloud-fog',
+  'i-lucide-wind',
+  'i-lucide-flame',
+  'i-lucide-cigarette',
+  'i-lucide-eye-off',
+  'i-lucide-users',
+  'i-lucide-swords',
+  'i-lucide-heart-crack',
+  'i-lucide-brain',
+  'i-lucide-pill',
+  'i-lucide-wine',
+  'i-lucide-message-square-warning',
+  'i-lucide-scale',
+  'i-lucide-stethoscope',
+  'i-lucide-ghost',
+  'i-lucide-triangle-alert',
+] as const
 
 // The same shape a show slug takes: lowercase words joined by single hyphens.
 export const WARNING_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -24,15 +73,21 @@ export const contentWarningForm = z.object({
   kind: z.enum(CONTENT_WARNING_KINDS),
   category: optionalText(80),
   description: optionalText(500),
-  icon: optionalText(80),
+  icon: optionalText(80).refine(
+    value => value == null || (CONTENT_WARNING_ICONS as readonly string[]).includes(value),
+    'An icon comes from the shortlist',
+  ),
   sort: z.number().int().min(0).max(9999).default(0),
   archived: z.boolean().default(false),
 })
 
-// Ids and a level, and nothing a person could type: free text here is what D-102 criterion 1
-// refuses, so the schema is strict rather than merely unused.
+// Ids and a level, and no words of the show's own: free text as a warning is what D-102 criterion
+// 1 refuses, so the schema is strict. Notes qualify the list (timings, how long) and are not one.
 export const showWarningsForm = z.object({
   confirmedNone: z.boolean(),
+  // Left out leaves the notes alone; blank clears them.
+  notes: z.string().trim().max(MAX_WARNING_NOTES).nullish()
+    .transform(value => (value === undefined ? undefined : value || null)),
   warnings: z.array(z.strictObject({
     warningId: z.string().trim().min(1, 'Say which content warning you mean'),
     level: z.enum(CONTENT_WARNING_LEVELS).nullable(),
@@ -150,4 +205,61 @@ export function publicContentWarnings(warnings: ShowContentWarning[]): PublicCon
       icon: warning.icon,
       level: warning.level,
     }))
+}
+
+export interface ContentWarningGroup<T> {
+  key: 'TECHNICAL' | ContentWarningLevel
+  label: string
+  hint: string
+  icon: string
+  warnings: T[]
+}
+
+// Staging first, then the strongest claim first, and nothing shown empty. The listing and the
+// console read the same grouping, so a warning sits in the same place on both.
+export function groupContentWarnings<T extends { kind: ContentWarningKind, level: ContentWarningLevel | null, title: string, sort?: number }>(
+  warnings: T[],
+): ContentWarningGroup<T>[] {
+  const ordered = [...warnings].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0) || a.title.localeCompare(b.title))
+  const groups: ContentWarningGroup<T>[] = [
+    { key: 'TECHNICAL', ...CONTENT_WARNING_STAGING_GROUP, warnings: ordered.filter(one => one.kind === 'TECHNICAL') },
+    ...CONTENT_WARNING_LEVEL_DETAILS.map(detail => ({
+      key: detail.level,
+      label: detail.label,
+      hint: detail.hint,
+      icon: detail.icon,
+      warnings: ordered.filter(one => one.kind === 'GENERAL' && one.level === detail.level),
+    })),
+  ]
+  return groups.filter(group => group.warnings.length > 0)
+}
+
+const categoryRank = (category: string): number => {
+  const index = (CONTENT_WARNING_CATEGORIES as readonly string[]).indexOf(category)
+  return index === -1 ? CONTENT_WARNING_CATEGORIES.length : index
+}
+
+// The content vocabulary under its headings, suggested ones first in their own order, the rest
+// alphabetically after. Staging warnings are left out: they are their own group on every screen.
+export function vocabularyByCategory<T extends { kind: ContentWarningKind, category: string | null, title: string, sort: number }>(
+  vocabulary: T[],
+): { category: string, warnings: T[] }[] {
+  const held = new Map<string, T[]>()
+  for (const warning of vocabulary) {
+    if (warning.kind !== 'GENERAL') continue
+    const category = warning.category ?? 'Other'
+    held.set(category, [...(held.get(category) ?? []), warning])
+  }
+  return [...held.entries()]
+    .sort(([a], [b]) => categoryRank(a) - categoryRank(b) || a.localeCompare(b))
+    .map(([category, warnings]) => ({
+      category,
+      warnings: [...warnings].sort((a, b) => a.sort - b.sort || a.title.localeCompare(b.title)),
+    }))
+}
+
+// A content warning picked and not yet graded. Nothing is defaulted: a silent "depicted" is a claim
+// about the production that nobody made, so the screen names these and refuses to save past them.
+export function ungradedWarnings(chosen: { title: string, kind: ContentWarningKind, level: ContentWarningLevel | null }[]): string[] {
+  return chosen.filter(one => one.kind === 'GENERAL' && one.level === null).map(one => one.title)
 }

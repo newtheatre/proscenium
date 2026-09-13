@@ -24,7 +24,7 @@ export const TICKET_TYPES = [
 ]
 
 const CONTENT_WARNINGS = [
-  { slug: 'strobe-lighting', title: 'Strobe lighting', kind: 'TECHNICAL', category: 'Lighting', sort: 0 },
+  { slug: 'strobe-lighting', title: 'Strobe lighting', kind: 'TECHNICAL', category: 'Lighting', icon: 'i-lucide-zap', sort: 0 },
   { slug: 'loud-noises', title: 'Loud noises and gunshot effects', kind: 'TECHNICAL', category: 'Sound', sort: 1 },
   { slug: 'haze', title: 'Haze and smoke effects', kind: 'TECHNICAL', category: 'Effects', sort: 2 },
   { slug: 'suicide', title: 'Suicide', kind: 'GENERAL', category: 'Themes', sort: 3 },
@@ -59,6 +59,7 @@ interface SeedShow {
   status: 'DRAFT' | 'PUBLISHED'
   ageGuidance?: string
   latecomerPolicy?: 'ADMITTED' | 'AT_INTERVAL' | 'NOT_ADMITTED'
+  contentNotes?: string
   warnings?: { slug: string, level: 'MENTIONED' | 'DISCUSSED' | 'DEPICTED' | null }[]
   confirmedNoWarnings?: true
   performances: SeedPerformance[]
@@ -77,6 +78,7 @@ const SHOWS: SeedShow[] = [
     status: 'PUBLISHED',
     ageGuidance: 'Recommended 14 and over',
     latecomerPolicy: 'AT_INTERVAL',
+    contentNotes: 'The strobe sequence lasts about 20 seconds, near the end of Act 2.',
     warnings: [
       { slug: 'strobe-lighting', level: null },
       { slug: 'firearms', level: 'DEPICTED' },
@@ -295,6 +297,7 @@ export function seedProgramme(target: SeedTarget, people: People, now: number): 
       title: warning.title,
       kind: warning.kind,
       category: warning.category,
+      icon: 'icon' in warning ? warning.icon : null,
       sort: warning.sort,
     }).id)
   }
@@ -316,6 +319,7 @@ export function seedProgramme(target: SeedTarget, people: People, now: number): 
       age_guidance: show.ageGuidance ?? null,
       latecomer_policy: show.latecomerPolicy ?? null,
       warnings_confirmed_none: show.confirmedNoWarnings ? 1 : 0,
+      content_notes: show.contentNotes ?? null,
       status: show.status,
     }).id
     shows.set(show.slug, showId)
