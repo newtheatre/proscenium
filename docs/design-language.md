@@ -161,7 +161,10 @@ better than any gradient. Two rules:
    ours; what is inside it is theirs.
 
 The house photographs live under `public/images/`, the logos under `public/images/logos/`, and
-`PhotoHero` is the one component that draws a banner, so rule 1 is applied in one place.
+`PhotoHero` is the one component that draws a banner, so rule 1 is applied in one place. It takes
+`compact` where the picture is a band rather than the whole first screen, and its `title` and
+`description` slots take over from the props where the headline carries a word in its own colour,
+as what's on does.
 `PosterFrame` is the matching one place for show artwork: it draws the poster when there is one
 and, when there is not, the show's own two hues under its title in the display face, which is why
 a show with no artwork yet looks deliberate rather than broken, and why real posters will land in

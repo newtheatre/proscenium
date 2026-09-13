@@ -104,6 +104,13 @@ export function committeeYearOf(at: Date): number {
   return at.getTime() <= committeeYearEnd(year).getTime() ? year : year + 1
 }
 
+// What the public calls the season an instant falls in, named by the two years it spans.
+// Derived from the committee year, so the site and role expiry turn on the same date (0009).
+export function saysSeason(at: Date = new Date()): string {
+  const ends = committeeYearOf(at)
+  return `${String(ends - 1).slice(-2)}/${String(ends).slice(-2)}`
+}
+
 // What a grant made now expires at, unless it is permanent (0009).
 export function nextCommitteeYearEnd(at: Date): Date {
   return committeeYearEnd(committeeYearOf(at))
