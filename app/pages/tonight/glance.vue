@@ -25,6 +25,7 @@ interface Performance {
   intervalMinutes: number | null
   latecomerPolicy: string | null
   ageGuidance: string | null
+  contentNotes: string | null
   house: HubHouse
   passesCovering: number
   access: AccessTonight[]
@@ -268,6 +269,18 @@ onUnmounted(() => {
               </dt>
               <dd class="text-right">
                 {{ guidance }}
+              </dd>
+            </div>
+            <div
+              v-if="selected.contentNotes"
+              class="py-2"
+              data-test="glance-content-notes"
+            >
+              <dt class="text-muted">
+                Notes
+              </dt>
+              <dd class="whitespace-pre-line">
+                {{ selected.contentNotes }}
               </dd>
             </div>
             <div

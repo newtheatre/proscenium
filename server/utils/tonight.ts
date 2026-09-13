@@ -94,6 +94,7 @@ export interface TonightPerformance {
   intervalMinutes: number | null
   latecomerPolicy: string | null
   ageGuidance: string | null
+  contentNotes: string | null
   capacityOverride: number | null
   venueCapacity: number | null
 }
@@ -106,6 +107,7 @@ export function tonightPerformanceQuery(performanceId: string): SQL {
            p.starts_at AS startsAt, p.doors_at AS doorsAt, p.duration_minutes AS durationMinutes,
            p.interval_count AS intervalCount, p.interval_minutes AS intervalMinutes,
            sh.latecomer_policy AS latecomerPolicy, sh.age_guidance AS ageGuidance,
+           sh.content_notes AS contentNotes,
            p.capacity_override AS capacityOverride, v.capacity AS venueCapacity
     FROM performances p
     JOIN shows sh ON sh.id = p.show_id

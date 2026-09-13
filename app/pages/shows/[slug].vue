@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysAssessment, saysWarningLevel } from '#shared/utils/content-warnings'
+import { groupContentWarnings, saysAssessment } from '#shared/utils/content-warnings'
 import { formatLondon } from '#shared/utils/london'
 import { saysLatecomerPolicy } from '#shared/utils/programme'
 import { pounds, saysPrice, saysRestriction } from '#shared/utils/ticket-types'
@@ -289,34 +289,53 @@ function saysInterval(performance: ListedPerformance): string {
             you.
           </p>
 
-          <ul
+          <!-- Staging first, then what is shown before what is talked about: the strongest claim
+               is the one somebody decides on, so it leads (D-102 criterion 1). -->
+          <div
             v-else
-            class="divide-y divide-default"
+            class="space-y-5"
             data-test="warnings-list"
           >
-            <li
-              v-for="warning in data.warnings"
-              :key="warning.slug"
-              class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3"
-              :data-test="`warning-${warning.slug}`"
+            <section
+              v-for="group in groupContentWarnings(data.warnings)"
+              :key="group.key"
+              :data-test="`warnings-${group.key.toLowerCase()}`"
             >
-              <span class="font-medium">{{ warning.title }}</span>
-              <UBadge
-                v-if="saysWarningLevel(warning.level)"
-                color="neutral"
-                variant="subtle"
-                size="sm"
-              >
-                {{ saysWarningLevel(warning.level) }}
-              </UBadge>
-              <span
-                v-if="warning.description"
-                class="text-sm text-muted"
-              >
-                {{ warning.description }}
-              </span>
-            </li>
-          </ul>
+              <div class="mb-2 flex flex-wrap items-baseline gap-x-2">
+                <UIcon
+                  :name="group.icon"
+                  class="size-4 shrink-0 self-center text-muted"
+                />
+                <h3 class="font-semibold">
+                  {{ group.label }}
+                </h3>
+                <span class="text-xs text-muted">{{ group.hint }}</span>
+              </div>
+              <ul class="flex flex-wrap gap-2">
+                <li
+                  v-for="warning in group.warnings"
+                  :key="warning.slug"
+                  :data-test="`warning-${warning.slug}`"
+                >
+                  <UBadge
+                    color="warning"
+                    variant="subtle"
+                    :icon="warning.icon ?? undefined"
+                    :label="warning.title"
+                    :title="warning.description ?? undefined"
+                  />
+                </li>
+              </ul>
+            </section>
+          </div>
+
+          <p
+            v-if="data.contentNotes"
+            class="mt-4 whitespace-pre-line text-sm text-muted"
+            data-test="warnings-notes"
+          >
+            {{ data.contentNotes }}
+          </p>
         </UCard>
 
         <UAlert

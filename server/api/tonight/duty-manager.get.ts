@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
       passesCovering,
       access,
       warnings: warnings.map(warning => ({ title: warning.title, level: warning.level })),
+      contentNotes: performance.contentNotes,
       team,
     }
   }))

@@ -180,6 +180,8 @@ export interface AdminShow {
   // states rather than one empty list (D-102 criterion 2).
   warningsConfirmedNone: boolean
   warningCount: number
+  // What the list cannot say: when the strobe comes, how long it lasts. Public, beside the list.
+  contentNotes: string | null
   // Where the poster is served from, or null. The blob key itself never leaves the server, on
   // the console as on the public site (D-132 criterion 6).
   posterUrl: string | null
@@ -582,6 +584,8 @@ export interface ListedShow {
   categoryName: string | null
   assessment: WarningAssessment
   warnings: PublicContentWarning[]
+  // Notes qualify the warnings and travel with them, never inside the show projection.
+  contentNotes: string | null
   performances: ListedPerformance[]
 }
 

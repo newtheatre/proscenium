@@ -67,7 +67,8 @@ Open questions:
      tickets, guidance); interval and latecomers are practical detail and sit with the prose.
   4. Warnings and age guidance set on the show flow through to the e-ticket (D-108) and the
      show-night screens (module E) from the same rows, never re-entered.
-- Source: Prompt Book D-1; audit PR-7 (vocabulary and confirmed-none carried from proscenium)
+- Source: Prompt Book D-1; audit PR-7 (vocabulary, confirmed-none, the grouped presentation, the
+  graded editor and the content notes beside the list carried from proscenium)
 
 ## D-103: Editorial content pages
 

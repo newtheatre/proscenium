@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { contentWarningsList } from '#shared/utils/content-warnings-list'
 import { contentWarningsClause, contentWarningsQuery, showWarningsQuery, warningsForListedShowsQuery } from '#server/utils/content-warnings'
-import { oneShowScope } from '#server/utils/whats-on'
+import { listedShowsQuery, oneShowScope } from '#server/utils/whats-on'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -177,6 +177,22 @@ describe('confirmed clear is a stored answer, not an empty list', () => {
       )
       expect(show?.warnings_confirmed_none).toBe(1)
       expect(read(database, showWarningsQuery(seeded.showId))).toEqual([])
+    })
+  })
+})
+
+describe('notes travel beside the warnings, on the show row', () => {
+  // The list says what; the notes say when and how long. Both reach the public page from the
+  // same row, so the listing and the single show cannot disagree about either.
+  test('the public listing reads the show\'s content notes with its warnings flag', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      database.batch([['UPDATE shows SET content_notes = ? WHERE id = ?', 'Strobe in act two, about 20 seconds.', seeded.showId]])
+
+      const listed = read<{ id: string, contentNotes: string | null }>(
+        database, listedShowsQuery(Math.floor(Date.now() / 1000) - 86_400, 25, 0),
+      )
+      expect(listed.find(one => one.id === seeded.showId)?.contentNotes).toBe('Strobe in act two, about 20 seconds.')
     })
   })
 })

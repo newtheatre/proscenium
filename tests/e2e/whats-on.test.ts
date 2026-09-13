@@ -77,6 +77,7 @@ interface PublicShow {
   categoryName: string | null
   assessment: string
   warnings: { slug: string, title: string, kind: string, level: string | null }[]
+  contentNotes: string | null
   performances: PublicPerformance[]
 }
 
@@ -310,6 +311,40 @@ describe.skipIf(skip !== null)('a warning comes from the vocabulary, never from 
     const answered = await publicShow(show.slug)
     expect(answered.assessment).toBe('WARNED')
     expect(answered.warnings.map(one => `${one.kind}:${one.level}`)).toEqual(['GENERAL:DEPICTED'])
+  })
+
+  // Notes qualify the list (when the strobe comes, how long it lasts) and reach the public page
+  // beside it. They are not a warning: a show with notes alone is still not assessed.
+  test('notes beside the warnings reach the show page, and leaving them out leaves them alone', async () => {
+    const warning = await addWarning({ title: named('Strobe lighting'), kind: 'TECHNICAL' })
+    const show = await publishedShow()
+    expect((await send('PUT', `/api/admin/shows/${show.id}/warnings`, {
+      confirmedNone: false,
+      warnings: [{ warningId: warning, level: null }],
+      notes: 'The strobe sequence lasts about 20 seconds in Act 2.',
+    })).status).toBe(200)
+    expect((await publicShow(show.slug)).contentNotes).toBe('The strobe sequence lasts about 20 seconds in Act 2.')
+
+    expect((await send('PUT', `/api/admin/shows/${show.id}/warnings`, {
+      confirmedNone: false,
+      warnings: [{ warningId: warning, level: null }],
+    })).status).toBe(200)
+    expect((await publicShow(show.slug)).contentNotes).toBe('The strobe sequence lasts about 20 seconds in Act 2.')
+
+    expect((await send('PUT', `/api/admin/shows/${show.id}/warnings`, {
+      confirmedNone: false,
+      warnings: [{ warningId: warning, level: null }],
+      notes: '',
+    })).status).toBe(200)
+    expect((await publicShow(show.slug)).contentNotes).toBeNull()
+  })
+
+  test('notes alone do not count as an assessment', async () => {
+    const show = await publishedShow()
+    expect((await send('PUT', `/api/admin/shows/${show.id}/warnings`, {
+      confirmedNone: false, warnings: [], notes: 'Nothing decided yet.',
+    })).status).toBe(200)
+    expect((await publicShow(show.slug)).assessment).toBe('NOT_ASSESSED')
   })
 
   test('a typed warning is refused at the write path', async () => {

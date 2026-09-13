@@ -406,6 +406,22 @@ warning and the level, so a show warns in the vocabulary's words or not at all, 
 warning about the same thing say it the same way. The request schema is strict: an unrecognised
 field is a 400 rather than an ignored one.
 
+**Notes qualify the list; they are not a warning.** `shows.content_notes` says what the vocabulary
+cannot (when the strobe comes, how long it lasts, how to step out for it) and is printed on the
+show page beside the warnings and on the duty manager's glance. A show with notes and no rows is
+still NOT_ASSESSED. The write path takes `notes` beside the ids: left out leaves them alone, blank
+clears them, and the audit entry records that they changed without quoting them (0011). This is
+the old estate's `content_warning_notes`, carried across by the programme import.
+
+**Grouped the way a reader weighs it.** `groupContentWarnings()` puts staging first, then depicted,
+discussed and mentioned, and drops an empty group; the show page and the console read the one
+function. In the editor the content vocabulary is offered under its `category` heading in the
+suggested order (`CONTENT_WARNING_CATEGORIES`), a picked warning is graded by its own control, and
+nothing is graded by default: a silent "depicted" is a claim about the production nobody made, so
+the screen names what is still to grade and refuses to save past it. `icon` is chosen from a
+shortlist (`CONTENT_WARNING_ICONS`) because it renders straight into a badge, where a typo is a
+blank space and not an error.
+
 **Administration (D-102).** `/box-office/content-warnings` is the vocabulary and the warnings
 editor sits on `/box-office/shows/[id]`, over these routes, `ticketing.read` for the listing and
 `ticketing.write` for the rest:
@@ -416,7 +432,7 @@ editor sits on `/box-office/shows/[id]`, over these routes, `ticketing.read` for
 | `POST /api/admin/content-warnings` | Adds one. The slug and the title are each refused if already held, the title without regard to capitals. |
 | `PUT /api/admin/content-warnings/[id]` | Changes everything including `archived`. The kind is refused while any show carries the entry, because it decides whether that show's level is legal. |
 | `DELETE /api/admin/content-warnings/[id]` | Deletes an entry no show carries. One a show carries is a 409 naming archiving as the way. |
-| `PUT /api/admin/shows/[id]/warnings` | Replaces a show's warnings and sets `warnings_confirmed_none`, in one batch. |
+| `PUT /api/admin/shows/[id]/warnings` | Replaces a show's warnings, sets `warnings_confirmed_none` and, when `notes` is sent, `content_notes`, in one batch. |
 
 A show may keep an archived entry it already carries, and may not take a new one: `warningKinds()`
 returns the live vocabulary plus whatever this show holds, so retiring a warning never rewrites a

@@ -38,17 +38,24 @@ export default defineEventHandler(async (event) => {
       level: warning.level,
     })),
     db.update(schema.shows)
-      .set({ warningsConfirmedNone: input.confirmedNone, updatedAt: Math.floor(Date.now() / 1000) })
+      .set({
+        warningsConfirmedNone: input.confirmedNone,
+        // Left out of the body leaves the notes as they were; blank clears them.
+        ...(input.notes === undefined ? {} : { contentNotes: input.notes }),
+        updatedAt: Math.floor(Date.now() / 1000),
+      })
       .where(eq(schema.shows.id, id)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'show.warnings.set',
       target: `show:${id}`,
-      // Slugs and a count, never a person and never prose (0011).
+      // Slugs and flags, never a person and never prose: the notes are recorded as changed, not
+      // quoted (0011).
       detail: {
         confirmedNone: input.confirmedNone,
         was: held.map(warning => warning.slug),
         now: input.warnings.map(warning => vocabulary.get(warning.warningId)?.slug ?? warning.warningId),
+        notesChanged: input.notes !== undefined && input.notes !== show.contentNotes,
       },
     })),
   ])
