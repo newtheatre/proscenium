@@ -103,6 +103,7 @@ from Nuxt UI's structural components:
 | Surface | Layout | Built from |
 | --- | --- | --- |
 | Public site | `default` | `UHeader`, `UMain`, `UFooter`, `UFooterColumns`, `UNavigationMenu`, the `UPage*` family |
+| Editorial and policy pages | `default`, through `app/pages/[...slug].vue` | A `PhotoHero` where the page has a banner and a spotlight band where it has none, then `UPage` with a prose-width `UPageBody` and `UContentToc` in the right slot from three sections up |
 | A member's own screens | `member` | The site header, a `UNavigationMenu` sub-nav of `MY_NAV`, the shared footer. No sidebar. Account settings pages (`/account/profile`, `/account/security`, `/account/notifications`) additionally wrap in `AccountSettings.vue`, a `UPage` with a `UPageAside` of `ACCOUNT_NAV` |
 | Console: managing rooms, training, the bar, the box office, people, money | `console` | `UDashboardGroup`, `UDashboardSidebar`, `UDashboardPanel`, `UDashboardNavbar`, `UDashboardSearch`, `UTable` |
 | Show night | `tonight` | A plain dark subtree, because a phone held in a foyer is not a dashboard |

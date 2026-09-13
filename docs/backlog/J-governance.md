@@ -205,10 +205,15 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
       listing still filters by it.
   12. The grid is headed, so a card's heading follows a heading one level above it rather than
       the page title. The listing is in the axe sweep in `tests/e2e/accessibility.test.ts`.
+  13. Every editorial and policy page sets its prose in a reading column rather than at the
+      container's full width, with a table of contents beside it once the page has three sections
+      or more; on a phone that table of contents is a disclosure above the prose.
+  14. A page with no banner photograph still opens on the house: the spotlight and the display
+      face, rather than a plain black band.
 - Source: Pre-cutover review, 10 September 2026; the known-issues row on unsigned-off policy
   prose; 0012, 0051. Criteria 6 to 9 added 11 September 2026, after the committee's review of the
   public-site mockups widened the story from the policy wording to the whole public site.
-  Criteria 10 to 12 added 13 September 2026, from the what's-on mockup and the accessibility
+  Criteria 10 to 14 added 13 September 2026, from the what's-on and get-involved mockups and the
   findings in issues 917 and 920.
 
 ## J-201: The handover run and the atomic access flip
