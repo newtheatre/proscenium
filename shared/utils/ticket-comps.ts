@@ -7,7 +7,7 @@ export const TICKET_COMP_REASON_LIMIT = 200
 export const TICKET_COMP_DECLINE_REASON_LIMIT = 200
 
 export const ticketCompRequestForm = z.strictObject({
-  reservationId: z.string().trim().min(1),
+  reservationId: z.string().trim().min(1, 'Say which reservation you mean'),
   reason: z.string().trim().min(1, 'Say why, because a comp needs a reason on the record').max(TICKET_COMP_REASON_LIMIT),
 })
 

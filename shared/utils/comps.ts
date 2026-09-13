@@ -9,8 +9,8 @@ export const COMP_REASON_LIMIT = 200
 export const COMP_DECLINE_REASON_LIMIT = 200
 
 export const compRequestForm = z.object({
-  venueId: z.string().trim().min(1).optional(),
-  performanceId: z.string().trim().min(1).optional(),
+  venueId: z.string().trim().min(1, 'Say which venue you mean').optional(),
+  performanceId: z.string().trim().min(1, 'Say which performance you mean').optional(),
   lines: z.array(basketLineForm).min(1, 'A comp needs at least one line'),
   reason: z.string().trim().min(1, 'Say why, because a comp needs a reason on the record').max(COMP_REASON_LIMIT),
 })
@@ -26,8 +26,8 @@ export type DeclineCompRequestInput = z.output<typeof declineCompRequestForm>
 // What spending an approved request submits: which venue tonight (the same scope a sale names),
 // the screen's own belief of what it gives away (0004), and a Challenge 25 outcome if it needs one.
 export const commitCompSaleForm = z.object({
-  venueId: z.string().trim().min(1).optional(),
-  performanceId: z.string().trim().min(1).optional(),
+  venueId: z.string().trim().min(1, 'Say which venue you mean').optional(),
+  performanceId: z.string().trim().min(1, 'Say which performance you mean').optional(),
   expectedForegonePence: z.number().int().nonnegative(),
   ageCheck: inlineAgeCheckForm.nullish().transform(value => value ?? null),
 })

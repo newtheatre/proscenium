@@ -23,7 +23,7 @@ const text = (max: number) => z.string().trim().max(max).nullish()
 const override = <T extends z.ZodTypeAny>(schema: T) => schema.nullish().transform(value => value ?? null)
 
 export const roomForm = z.object({
-  name: z.string().trim().min(1).max(120),
+  name: z.string().trim().min(1, 'Give the room a name people would recognise').max(120),
   description: text(2000),
   // Null is uncapped. Nought would be a room nobody may enter.
   capacity: z.number().int().positive().nullish().transform(value => value ?? null),

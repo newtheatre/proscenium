@@ -17,7 +17,7 @@ const londonDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A day is YYYY-MM-DD')
 // A named term, the range I-105's own TERM selector reads. A season needs none: its range is
 // computed, never stored (architecture.md).
 export const defineTermForm = z.object({
-  label: z.string().trim().min(1).max(120),
+  label: z.string().trim().min(1, 'Give the term a label').max(120),
   fromDay: londonDay,
   toDay: londonDay,
 }).refine(input => input.toDay >= input.fromDay, { path: ['toDay'], message: 'A term cannot end before it starts' })
@@ -37,7 +37,7 @@ export interface Period {
 export const closePeriodForm = z.object({
   fromDay: londonDay,
   toDay: londonDay,
-  label: z.string().trim().min(1).max(120).optional(),
+  label: z.string().trim().min(1, 'Give the period a label').max(120).optional(),
 }).refine(input => input.toDay >= input.fromDay, { path: ['toDay'], message: 'A period cannot end before it starts' })
 
 export type ClosePeriodInput = z.output<typeof closePeriodForm>

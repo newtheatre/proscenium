@@ -21,8 +21,8 @@ export interface TillSession {
 // Where to open one. Never a night: the till only ever acts on tonight's (F-101 criterion 1), and
 // a stale session is addressed by its own id, not asked for by scope.
 export const tillScopeForm = z.object({
-  venueId: z.string().trim().min(1).optional(),
-  performanceId: z.string().trim().min(1).optional(),
+  venueId: z.string().trim().min(1, 'Say which venue you mean').optional(),
+  performanceId: z.string().trim().min(1, 'Say which performance you mean').optional(),
 })
 
 export type TillScopeInput = z.output<typeof tillScopeForm>

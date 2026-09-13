@@ -32,7 +32,7 @@ export const closeTillSessionForm = z.object({
   actualZPence: pence,
   // Required only when the reader disagrees with the ledger; the route enforces that half, since
   // whether they disagree is only known once the expected figure is recomputed (criterion 3).
-  varianceNote: z.string().trim().min(1).max(500).optional(),
+  varianceNote: z.string().trim().min(1, 'Say why the reader and the ledger disagree').max(500).optional(),
 })
 
 export type CloseTillSessionInput = z.output<typeof closeTillSessionForm>

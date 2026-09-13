@@ -16,7 +16,7 @@ export interface IncidentTrendRow {
 export const incidentTrendFilter = z.object({
   category: z.enum(CATEGORIES).optional(),
   severity: z.enum(SEVERITIES).optional(),
-  venueId: z.string().trim().min(1).optional(),
+  venueId: z.string().trim().min(1, 'Say which venue you mean').optional(),
 })
 
 export type IncidentTrendFilter = z.output<typeof incidentTrendFilter>
@@ -36,7 +36,7 @@ export interface PerformanceReportRow {
 }
 
 export const performanceReportFilter = z.object({
-  venueId: z.string().trim().min(1).optional(),
+  venueId: z.string().trim().min(1, 'Say which venue you mean').optional(),
 })
 
 export type PerformanceReportFilter = z.output<typeof performanceReportFilter>

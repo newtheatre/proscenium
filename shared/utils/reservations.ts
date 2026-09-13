@@ -40,21 +40,21 @@ const MAX_LINE_QUANTITY = 999
 const MAX_LINES = 20
 
 export const reservationLineForm = z.object({
-  ticketTypeId: z.string().trim().min(1),
+  ticketTypeId: z.string().trim().min(1, 'Say which ticket type you mean'),
   quantity: z.number().int().positive().max(MAX_LINE_QUANTITY),
 })
 
 export const guestDetailsForm = z.object({
-  name: z.string().trim().min(1).max(200),
+  name: z.string().trim().min(1, 'Enter your name').max(200),
   // 320 is the longest address RFC 5321 permits: 64 local, an @, 255 domain.
-  email: z.string().email().max(320),
+  email: z.string().email('Enter a real email address').max(320),
 })
 
 export type GuestDetails = z.output<typeof guestDetailsForm>
 
 export const reservationForm = z.strictObject({
-  performanceId: z.string().trim().min(1),
-  lines: z.array(reservationLineForm).min(1).max(MAX_LINES)
+  performanceId: z.string().trim().min(1, 'Say which performance you mean'),
+  lines: z.array(reservationLineForm).min(1, 'A booking needs at least one line').max(MAX_LINES)
     .refine(
       lines => new Set(lines.map(line => line.ticketTypeId)).size === lines.length,
       'A ticket type appears once; add to its quantity instead of a second line',
@@ -106,13 +106,13 @@ export function holdReminderClaim(reservationId: string, expiresAt: number): str
 
 export const reservationResendForm = z.object({
   reference: z.string().trim().length(RESERVATION_REFERENCE_LENGTH),
-  email: z.string().email().max(320),
+  email: z.string().email('Enter a real email address').max(320),
 })
 
 // D-110: self-service edit while unpaid. Desired totals per type, the same shape a fresh
 // booking uses, so "each type appears at most once" is one rule either way (criterion 1).
 export const reservationEditForm = z.strictObject({
-  lines: z.array(reservationLineForm).min(1).max(MAX_LINES)
+  lines: z.array(reservationLineForm).min(1, 'A booking needs at least one line').max(MAX_LINES)
     .refine(
       lines => new Set(lines.map(line => line.ticketTypeId)).size === lines.length,
       'A ticket type appears once; add to its quantity instead of a second line',
@@ -122,7 +122,7 @@ export const reservationEditForm = z.strictObject({
 export type ReservationEditInput = z.output<typeof reservationEditForm>
 
 export const reservationExchangeForm = z.strictObject({
-  performanceId: z.string().trim().min(1),
+  performanceId: z.string().trim().min(1, 'Say which performance you mean'),
 })
 
 export type ReservationExchangeInput = z.output<typeof reservationExchangeForm>
@@ -228,8 +228,8 @@ export function qrStatusDisplay(
 
 // D-126's own shape: a pass reference typed or scanned, and the performance chosen at the door.
 export const doorTicketScanForm = z.strictObject({
-  reference: z.string().trim().min(1),
-  performanceId: z.string().trim().min(1),
+  reference: z.string().trim().min(1, 'Say which booking you mean'),
+  performanceId: z.string().trim().min(1, 'Say which performance you mean'),
 })
 
 export type DoorTicketScanInput = z.output<typeof doorTicketScanForm>

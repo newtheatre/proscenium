@@ -33,7 +33,7 @@ const instant = z.string().datetime()
 
 export const blackoutForm = z.object({
   // Null is every room. An empty string would be a room id nobody has.
-  roomId: z.string().min(1).max(64).nullish().transform(value => value ?? null),
+  roomId: z.string().min(1, 'Say which room you mean').max(64).nullish().transform(value => value ?? null),
   reason: z.string().trim().min(1, 'Say why the room is closed').max(BLACKOUT_REASON_LIMIT),
   startsAt: instant,
   endsAt: instant,

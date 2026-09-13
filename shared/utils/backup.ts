@@ -16,7 +16,7 @@ export const restoreDrillForm = z.object({
   timeToRestoreMinutes: z.number().int().positive(),
   rowCountsMatch: z.boolean(),
   moneyTotalsMatch: z.boolean(),
-  notes: z.string().trim().min(1).max(500).optional(),
+  notes: z.string().trim().min(1, 'Say what the drill found').max(500).optional(),
 })
 
 export type RestoreDrillForm = z.infer<typeof restoreDrillForm>

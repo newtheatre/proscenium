@@ -8,20 +8,20 @@ import { z } from 'zod'
 export const MAX_SETTLEMENT_CHARGES = 90
 
 export const tabHolderScopeForm = z.object({
-  venueId: z.string().trim().min(1).optional(),
-  performanceId: z.string().trim().min(1).optional(),
-  holderId: z.string().trim().min(1),
+  venueId: z.string().trim().min(1, 'Say which venue you mean').optional(),
+  performanceId: z.string().trim().min(1, 'Say which performance you mean').optional(),
+  holderId: z.string().trim().min(1, 'Say who holds the tab'),
 })
 
 export type TabHolderScopeInput = z.output<typeof tabHolderScopeForm>
 
 export const settleTabForm = z.object({
-  venueId: z.string().trim().min(1).optional(),
-  performanceId: z.string().trim().min(1).optional(),
-  holderId: z.string().trim().min(1),
+  venueId: z.string().trim().min(1, 'Say which venue you mean').optional(),
+  performanceId: z.string().trim().min(1, 'Say which performance you mean').optional(),
+  holderId: z.string().trim().min(1, 'Say who holds the tab'),
   // Captured by the screen at the moment it asked what was owed, so a charge landing after
   // cannot be swept in: the write is bounded to exactly these ids (criterion 3).
-  entryIds: z.array(z.string().trim().min(1)).min(1, 'A settlement needs at least one charge').max(MAX_SETTLEMENT_CHARGES),
+  entryIds: z.array(z.string().trim().min(1, 'Say which charge you mean')).min(1, 'A settlement needs at least one charge').max(MAX_SETTLEMENT_CHARGES),
   expectedTotalPence: z.number().int().nonnegative(),
 })
 

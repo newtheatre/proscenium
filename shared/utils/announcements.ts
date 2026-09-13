@@ -11,7 +11,7 @@ export const audienceDefinition = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('ALL_CURRENT_MEMBERS') }),
   z.object({ kind: z.literal('ROLE_HOLDERS'), role: z.enum(ROLES) }),
   z.object({ kind: z.literal('TONIGHT_ROTA') }),
-  z.object({ kind: z.literal('SESSION_SIGNUPS'), sessionId: z.string().min(1) }),
+  z.object({ kind: z.literal('SESSION_SIGNUPS'), sessionId: z.string().min(1, 'Say which session you mean') }),
 ])
 
 export type AudienceDefinition = z.output<typeof audienceDefinition>
@@ -25,8 +25,8 @@ export const AUDIENCE_LABELS: Record<AudienceKind, string> = {
 
 export const composeAnnouncementForm = z.object({
   audience: audienceDefinition,
-  subject: z.string().trim().min(1).max(150),
-  body: z.string().trim().min(1).max(10_000),
+  subject: z.string().trim().min(1, 'Give it a subject').max(150),
+  body: z.string().trim().min(1, 'Say what the announcement is about').max(10_000),
   // A safety notice is a different registered type, not a flag `notify()` reads (H-103
   // criterion 1): the composer's choice only picks which type name is enqueued.
   safetyNotice: z.boolean().default(false),

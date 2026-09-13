@@ -43,10 +43,10 @@ export const recordZReadingForm = z.object({
   readerPence: pence,
   // Required only when the reader disagrees with the ledger; the route enforces that half, since
   // whether they disagree is only known once the expected figure is recomputed (criterion 3).
-  note: z.string().trim().min(1).max(500).optional(),
+  note: z.string().trim().min(1, 'Say why the reader and the ledger disagree').max(500).optional(),
   // The reading this one resolves: a correction (a different readerPence) or a write-off (the
   // same one, accepted rather than restated) both name what they resolve (criterion 4).
-  supersedesId: z.string().trim().min(1).optional(),
+  supersedesId: z.string().trim().min(1, 'Say which reading this resolves').optional(),
   writtenOff: z.boolean().default(false),
 })
 

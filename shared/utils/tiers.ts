@@ -34,9 +34,9 @@ export function refusalToBump(
 
 export const bumpForm = z.object({
   // Who the room is being taken for, and what for. A bump is always somebody else's booking.
-  userId: z.string().min(1).max(64),
-  title: z.string().trim().min(1).max(200),
-  tier: z.string().min(1).max(32),
+  userId: z.string().min(1, 'Say who the room is being taken for').max(64),
+  title: z.string().trim().min(1, 'Give the booking a title').max(200),
+  tier: z.string().min(1, 'Say which priority tier this is').max(32),
   purpose: z.string().trim().min(1, 'Say what the room is for').max(32),
   reason: z.string().trim().min(1, 'Say why the room is being taken').max(BUMP_REASON_LIMIT),
 })

@@ -34,19 +34,19 @@ export function saysPassStatus(status: PassStatus | PassRequestStatus): string {
 // Criterion 1: sold on the reader under the same cross-check D-114 collection uses. `userId` is
 // the buyer's own account, chosen at the desk, never typed as an id (K-123 criterion 1).
 export const issuePassForm = z.strictObject({
-  passTypeId: z.string().trim().min(1),
-  passTypePriceId: z.string().trim().min(1),
-  userId: z.string().trim().min(1),
+  passTypeId: z.string().trim().min(1, 'Say which pass type you mean'),
+  passTypePriceId: z.string().trim().min(1, 'Say which price point you mean'),
+  userId: z.string().trim().min(1, 'Say which person you mean'),
   expectedTotalPence: z.number().int().min(0),
   // Fulfils the named request in the same batch as issuing, one-tap at payment (criterion 3).
-  requestId: z.string().trim().min(1).optional(),
+  requestId: z.string().trim().min(1, 'Say which request you mean').optional(),
 })
 
 export type IssuePassInput = z.output<typeof issuePassForm>
 
 // Criterion 3: a signed-in member names only which product; nothing about price or payment.
 export const requestPassForm = z.strictObject({
-  passTypeId: z.string().trim().min(1),
+  passTypeId: z.string().trim().min(1, 'Say which pass type you mean'),
 })
 
 export type RequestPassInput = z.output<typeof requestPassForm>
@@ -77,7 +77,7 @@ export function passSaleRefusal(type: PassTypeSaleState, now: number): string | 
 // D-125 redeems while reserving, D-126 at the door, D-130 for a Fellow's own pass: all three
 // share this shape. server/utils/pass-redemption.ts's `passAdmissionAllows` is what decides.
 export const redeemPassForm = z.strictObject({
-  performanceId: z.string().trim().min(1),
+  performanceId: z.string().trim().min(1, 'Say which performance you mean'),
 })
 
 export type RedeemPassInput = z.output<typeof redeemPassForm>
@@ -108,8 +108,8 @@ export function passRedemptionRefusal(pass: PassRedemptionState, now: number): s
 // D-126: the door reads a pass the same way a desk search reads a reservation, by its own
 // no-look-alike reference, never a QR token scheme built for the holder's own phone.
 export const doorPassScanForm = z.strictObject({
-  reference: z.string().trim().min(1),
-  performanceId: z.string().trim().min(1),
+  reference: z.string().trim().min(1, 'Say which pass you mean'),
+  performanceId: z.string().trim().min(1, 'Say which performance you mean'),
 })
 
 export type DoorPassScanInput = z.output<typeof doorPassScanForm>

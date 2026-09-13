@@ -43,7 +43,7 @@ export interface TemplateSlot {
 // template, and its performances stamp nothing (E-101 criterion 4).
 export const templateSlotForm = z.object({
   role: z.enum(SHIFT_ROLES),
-  count: z.number().int().min(1).max(MAX_SLOT_COUNT),
+  count: z.number().int().min(1, 'Enter a count of at least one').max(MAX_SLOT_COUNT),
 })
 
 export const shiftTemplateForm = z.object({
@@ -145,7 +145,7 @@ export function unconfirmRefusal(status: ShiftStatus): string {
 // What an officer's assignment names: the shift is theirs to pick, the member is the input
 // (E-107 criterion 3).
 export const shiftAssignForm = z.object({
-  userId: z.string().min(1).max(64),
+  userId: z.string().min(1, 'Say which person you mean').max(64),
 })
 
 // An ad hoc shift, outside the template: the officer names the role and the slot themselves,

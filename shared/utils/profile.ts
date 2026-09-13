@@ -34,7 +34,7 @@ const optionalText = (max: number) => z.string().trim().max(max).nullish()
   .transform(value => (value ?? '').trim() || null)
 
 export const profileForm = z.object({
-  name: z.string().trim().min(1).max(200),
+  name: z.string().trim().min(1, 'Enter your name').max(200),
   pronouns: optionalText(80),
   phone: optionalText(40),
   // Consent, not a fact recorded about somebody: whether tonight's duty manager sees this phone

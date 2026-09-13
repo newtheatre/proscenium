@@ -136,7 +136,7 @@ export interface PriceOverride {
 // sending null rather than deleting a row by hand (D-120 criterion 1).
 export const priceOverridesForm = z.object({
   overrides: z.array(z.strictObject({
-    ticketTypeId: z.string().trim().min(1),
+    ticketTypeId: z.string().trim().min(1, 'Say which ticket type you mean'),
     price: pence.nullable(),
     active: z.boolean().nullable(),
   })).max(100)

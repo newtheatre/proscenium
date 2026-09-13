@@ -12,18 +12,18 @@ export const MAX_BASKET_LINE_QTY = 50
 export const MAX_BASKET_LINES = 30
 
 export const basketLineForm = z.object({
-  variantId: z.string().trim().min(1),
+  variantId: z.string().trim().min(1, 'Say which variant you mean'),
   qty: z.number().int().positive('A line is a quantity of something').max(MAX_BASKET_LINE_QTY),
-  choiceItemId: z.string().trim().min(1).nullish(),
+  choiceItemId: z.string().trim().min(1, 'Say which choice you mean').nullish(),
 })
 
 export const basketForm = z.object({
-  venueId: z.string().trim().min(1).optional(),
-  performanceId: z.string().trim().min(1).optional(),
+  venueId: z.string().trim().min(1, 'Say which venue you mean').optional(),
+  performanceId: z.string().trim().min(1, 'Say which performance you mean').optional(),
   lines: z.array(basketLineForm).min(1, 'A basket needs at least one line').max(MAX_BASKET_LINES),
   // On both the price check and the sale itself, so a discount is never a surprise at charge time
   // that the screen never priced (F-104 criterion 1, F-117 criterion 4).
-  discountId: z.string().trim().min(1).nullish().transform(value => value ?? null),
+  discountId: z.string().trim().min(1, 'Say which discount you mean').nullish().transform(value => value ?? null),
 })
 
 export type BasketLineInput = z.output<typeof basketLineForm>
@@ -34,7 +34,7 @@ export type BasketInput = z.output<typeof basketForm>
 export const saleForm = basketForm.extend({
   expectedTotalPence: z.number().int().nonnegative(),
   ageCheck: inlineAgeCheckForm.nullish().transform(value => value ?? null),
-  tabHolderId: z.string().trim().min(1).nullish().transform(value => value ?? null),
+  tabHolderId: z.string().trim().min(1, 'Say who holds the tab').nullish().transform(value => value ?? null),
 })
 
 export type SaleInput = z.output<typeof saleForm>

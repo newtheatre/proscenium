@@ -14,7 +14,7 @@ export const venueForm = z.object({
   capacity: z.number().int().positive().nullish(),
   isExternal: z.boolean().default(false),
   description: z.string().trim().max(MAX_VENUE_DESCRIPTION).nullish(),
-  roomId: z.string().trim().min(1).nullish(),
+  roomId: z.string().trim().min(1, 'Say which room you mean').nullish(),
 }).strict()
 
 export const archiveVenueForm = z.object({ archived: z.boolean() }).strict()

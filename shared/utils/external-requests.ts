@@ -137,7 +137,7 @@ export const externalRequestForm = z.object({
   startsAt: instant,
   endsAt: instant,
   // A preference, never a promise: we may be given anything (C-120).
-  preferredSpaceId: z.string().min(1).max(64).nullish().transform(value => value ?? null),
+  preferredSpaceId: z.string().min(1, 'Say which space you mean').max(64).nullish().transform(value => value ?? null),
   notes: z.string().trim().max(1000).nullish().transform(value => (value ?? '').trim() || null),
 }).refine(request => new Date(request.endsAt) > new Date(request.startsAt), {
   path: ['endsAt'],
@@ -149,7 +149,7 @@ export const submitForm = z.object({
 })
 
 export const assignForm = z.object({
-  spaceId: z.string().min(1).max(64),
+  spaceId: z.string().min(1, 'Say which space you mean').max(64),
   suReference: z.string().trim().max(120).nullish().transform(value => (value ?? '').trim() || null),
   // Asserted past a room we have marked unsuitable, never defaulted: the whole complaint is that
   // nobody knew until they turned up to it.
@@ -157,12 +157,12 @@ export const assignForm = z.object({
 })
 
 export const refuseAssignmentForm = z.object({
-  spaceId: z.string().min(1).max(64),
+  spaceId: z.string().min(1, 'Say which space you mean').max(64),
   reason: z.string().trim().min(1, 'Say what was wrong with it').max(EXTERNAL_REASON_LIMIT),
   // Written in the same action, so the blacklist builds itself rather than being a separate chore.
   note: z.object({
     verdict: z.enum(['CAUTION', 'UNSUITABLE']),
-    reason: z.string().trim().min(1).max(EXTERNAL_REASON_LIMIT),
+    reason: z.string().trim().min(1, 'Say what was wrong with it').max(EXTERNAL_REASON_LIMIT),
   }).nullish().transform(value => value ?? null),
 })
 

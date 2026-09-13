@@ -74,7 +74,7 @@ export const lineForm = z.object({
   // What actually moved: net of any discount, and negative on a reversal. Zero is a comp, which
   // is a fact rather than an absence.
   amountPence: pence,
-  qty: z.number().int().min(1).default(1),
+  qty: z.number().int().min(1, 'Enter a quantity of at least one').default(1),
   unitPricePence: pence.nullish(),
   reservationId: z.string().max(64).nullish(),
   performanceId: z.string().max(64).nullish(),

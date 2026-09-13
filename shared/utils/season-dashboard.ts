@@ -11,7 +11,7 @@ export type PeriodKind = (typeof PERIOD_KINDS)[number]
 export const periodForm = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('DAY'), day: isoDate }),
   z.object({ kind: z.literal('WEEK'), day: isoDate }),
-  z.object({ kind: z.literal('MONTH'), year: z.coerce.number().int(), month: z.coerce.number().int().min(1).max(12) }),
+  z.object({ kind: z.literal('MONTH'), year: z.coerce.number().int(), month: z.coerce.number().int().min(1, 'Choose a month').max(12) }),
   z.object({ kind: z.literal('SEASON'), year: z.coerce.number().int() }),
   z.object({ kind: z.literal('TERM'), fromDay: isoDate, toDay: isoDate }),
 ])

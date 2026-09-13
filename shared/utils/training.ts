@@ -219,14 +219,14 @@ const link = z.string().trim().max(500).refine(
 )
 
 export const materialForm = z.object({
-  label: z.string().trim().min(1).max(120),
+  label: z.string().trim().min(1, 'Give it a label').max(120),
   url: link,
 })
 
 export type MaterialInput = z.output<typeof materialForm>
 
 export const departmentForm = z.object({
-  name: z.string().trim().min(1).max(120),
+  name: z.string().trim().min(1, 'Give the department a name').max(120),
   description: text(2000),
   isActive: z.boolean().default(true),
   sort: z.number().int().nonnegative().max(9999).default(0),
@@ -239,9 +239,9 @@ export const newDepartmentForm = departmentForm.extend({
 })
 
 const moduleFields = z.object({
-  department: z.string().trim().min(1).max(40),
+  department: z.string().trim().min(1, 'Say which department this belongs to').max(40),
   kind: z.enum(MODULE_KINDS),
-  name: z.string().trim().min(1).max(160),
+  name: z.string().trim().min(1, 'Give the module a name').max(160),
   description: text(2000),
   notes: text(2000),
   deliveryMode: z.enum(DELIVERY_MODES).default('IN_PERSON'),
@@ -372,8 +372,8 @@ export function expiryProblem(
 }
 
 export const signOffForm = z.object({
-  userId: z.string().trim().min(1).max(64),
-  moduleId: z.string().trim().min(1).max(32),
+  userId: z.string().trim().min(1, 'Say which person you mean').max(64),
+  moduleId: z.string().trim().min(1, 'Say which module you mean').max(32),
   awardedOn: z.string().regex(CIVIL_DATE, 'An award date reads as YYYY-MM-DD'),
   // Absent takes the module's policy. A date overrides it; null is the break-glass never, and
   // needs a permission the screen never offers (G-120 criterion 5).
@@ -386,14 +386,14 @@ export type SignOffInput = z.output<typeof signOffForm>
 export const EVIDENCE_REF_LIMIT = 500
 
 export const externalCertificateForm = z.object({
-  userId: z.string().trim().min(1).max(64),
-  moduleId: z.string().trim().min(1).max(32),
+  userId: z.string().trim().min(1, 'Say which person you mean').max(64),
+  moduleId: z.string().trim().min(1, 'Say which module you mean').max(32),
   awardedOn: z.string().regex(CIVIL_DATE, 'An award date reads as YYYY-MM-DD'),
   // Always explicit and never null: a certificate carries the issuer's term, and the module's
   // policy is what it never inherits (G-121 criterion 3).
   expiresOn: z.string().regex(CIVIL_DATE, 'An expiry reads as YYYY-MM-DD'),
   // Mandatory: it is the whole of what we trust in place of having assessed it (criterion 2).
-  evidenceRef: z.string().trim().min(1).max(EVIDENCE_REF_LIMIT),
+  evidenceRef: z.string().trim().min(1, 'Say what the evidence is').max(EVIDENCE_REF_LIMIT),
 })
 
 export type ExternalCertificateInput = z.output<typeof externalCertificateForm>
@@ -402,7 +402,7 @@ export const REVOKE_REASON_LIMIT = 500
 
 export const revokeForm = z.object({
   // Mandatory, because taking a record away is deliberate or it is a mistake (G-122 criterion 2).
-  reason: z.string().trim().min(1).max(REVOKE_REASON_LIMIT),
+  reason: z.string().trim().min(1, 'Say why the record is being revoked').max(REVOKE_REASON_LIMIT),
 })
 
 export const SESSION_STATUSES = ['PLANNED', 'OPEN', 'FULL', 'DELIVERED', 'CANCELLED'] as const
@@ -425,7 +425,7 @@ export const sessionForm = z.object({
   opensAt: z.number().int().positive().nullish().transform(value => value ?? null),
   description: text(2000),
   notes: text(2000),
-  moduleIds: z.array(z.string().trim().min(1).max(32)).min(1).max(10),
+  moduleIds: z.array(z.string().trim().min(1, 'Say which module you mean').max(32)).min(1, 'Choose at least one module').max(10),
 }).refine(session => session.endsAt > session.startsAt, {
   path: ['endsAt'],
   message: 'A session ends after it starts',
@@ -442,7 +442,7 @@ export function saysSessionStatus(status: string): string {
 }
 
 export const leadForm = z.object({
-  userId: z.string().trim().min(1).max(64),
+  userId: z.string().trim().min(1, 'Say which person you mean').max(64),
   // Blank takes the next handover; an explicit null is a permanent assignment (G-110 criterion 3).
   expiresAt: z.number().int().positive().nullish(),
 })
@@ -465,7 +465,7 @@ export function saysRequestStatus(status: string): string {
 }
 
 export const moduleRequestForm = z.object({
-  moduleId: z.string().trim().min(1).max(32),
+  moduleId: z.string().trim().min(1, 'Say which module you mean').max(32),
   // "When you are free, why you need it, who else wants it": what a lead can actually act on.
   note: text(REQUEST_NOTE_LIMIT),
 })
@@ -538,7 +538,7 @@ export const DELIVERY_RECORDS_PER_STATEMENT
   = Math.floor(BOUND_PARAMETER_CHUNK / DELIVERY_RECORD_COLUMNS)
 
 // Named twice is taught once: a repeated id would otherwise award the same person the same record.
-const distinct = (max: number) => z.array(z.string().trim().min(1).max(64)).min(1).max(max)
+const distinct = (max: number) => z.array(z.string().trim().min(1, 'Say which person you mean').max(64)).min(1, 'Choose at least one').max(max)
   .transform(ids => [...new Set(ids)])
 
 const deliveryFields = z.object({
@@ -555,7 +555,7 @@ export const deliveryLogForm = deliveryFields.extend({
   expectedCount: z.number().int().positive().max(DELIVERY_RECORDS_MAX),
   // One key per ordinary gap the trainer takes responsibility for. A safety-critical gap has no
   // key and no path: nothing in this body can wave one through (criterion 3).
-  acknowledged: z.array(z.string().trim().min(1).max(200)).max(DELIVERY_RECORDS_MAX).default([]),
+  acknowledged: z.array(z.string().trim().min(1, 'Say which gap this acknowledges').max(200)).max(DELIVERY_RECORDS_MAX).default([]),
 })
 
 export type DeliveryPreviewInput = z.output<typeof deliveryPreviewForm>
@@ -572,16 +572,16 @@ export function registerOpenable(heldOn: string, today: string): boolean {
 export const sessionCancelForm = z.object({
   // Mandatory, because a cancellation with no reason is the locked door this story exists to
   // prevent (G-113 criterion 1).
-  reason: z.string().trim().min(1).max(500),
+  reason: z.string().trim().min(1, 'Say why the session is being cancelled').max(500),
 })
 
 export type SessionCancelInput = z.output<typeof sessionCancelForm>
 
 export const markForm = z.object({
   marks: z.array(z.object({
-    userId: z.string().trim().min(1).max(64),
+    userId: z.string().trim().min(1, 'Say which person you mean').max(64),
     mark: z.enum(ATTENDANCE_MARKS),
-  })).min(1).max(120),
+  })).min(1, 'Mark at least one person').max(120),
   // Criterion 2. Everybody absent is a real answer and a suspicious one, so it is confirmed
   // rather than refused.
   confirmedAllAbsent: z.boolean().optional(),
@@ -592,7 +592,7 @@ export type MarkInput = z.output<typeof markForm>
 // A correction is the marks again, with a reason that goes onto every record it revokes so the
 // history says why it moved (G-114 criterion 2, G-122 criterion 2).
 export const correctionForm = markForm.extend({
-  reason: z.string().trim().min(1).max(500).default('The register was corrected inside its edit window'),
+  reason: z.string().trim().min(1, 'Say what the correction changes').max(500).default('The register was corrected inside its edit window'),
 })
 
 export type CorrectionInput = z.output<typeof correctionForm>
