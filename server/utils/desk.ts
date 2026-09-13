@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { doorWordingFor } from './access-profiles'
-import { collectedSeatsSubquery, heldSeatsSubquery, paidSeatsSubquery, unpaidSeatsSubquery } from './capacity'
+import { collectedSeatsSubquery, heldAccessSeatsSubquery, heldSeatsOfKindSubquery, heldSeatsSubquery, paidSeatsSubquery, unpaidSeatsSubquery } from './capacity'
 import { configValue } from './configuration'
 import { pendingTicketCompRequestForReservation } from './ticket-comps'
 import { holdExpiresAt, looksLikeReference, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
@@ -182,12 +182,8 @@ export function deskSummaryQuery(performanceId: string): SQL {
            ${unpaidSeatsSubquery(sql`p.id`)} AS unpaidCount,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t JOIN reservations r ON r.id = t.reservation_id
               WHERE t.performance_id = p.id AND t.refunded_at IS NULL AND r.status = 'PENDING') AS unpaidOwedPence,
-           (SELECT count(*) FROM tickets t JOIN ticket_types tt ON tt.id = t.ticket_type_id JOIN reservations r ON r.id = t.reservation_id
-              WHERE t.performance_id = p.id AND t.refunded_at IS NULL AND r.status IN ('PENDING', 'COLLECTED', 'DOOR')
-                AND tt.access_kind IS NOT NULL) AS accessBookings,
-           (SELECT count(*) FROM tickets t JOIN ticket_types tt ON tt.id = t.ticket_type_id JOIN reservations r ON r.id = t.reservation_id
-              WHERE t.performance_id = p.id AND t.refunded_at IS NULL AND r.status IN ('PENDING', 'COLLECTED', 'DOOR')
-                AND tt.kind = 'PASS_ADMISSION') AS passAdmissions
+           ${heldAccessSeatsSubquery(sql`p.id`)} AS accessBookings,
+           ${heldSeatsOfKindSubquery(sql`p.id`, 'PASS_ADMISSION')} AS passAdmissions
     FROM performances p
     JOIN venues v ON v.id = p.venue_id
     WHERE p.id = ${performanceId}
