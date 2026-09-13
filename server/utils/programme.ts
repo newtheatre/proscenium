@@ -9,7 +9,7 @@ import { showsList } from '#shared/utils/shows-list'
 import { posterUrl } from '#shared/utils/seo'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
-import type { AdminPerformance, AdminShow, ShowStatus } from '#shared/utils/programme'
+import type { AdminPerformance, AdminShow, ShowStatus, ShowsStandingCounts } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 
 // Reading and counting the programme for its administration (D-121, D-112). "Has sold tickets" is
@@ -201,7 +201,13 @@ const SHOW_HOUSE = sql`
     WHERE p.show_id = s.id AND p.status <> 'CANCELLED' AND p.starts_at >= unixepoch()) AS nextPerformanceAt,
   (SELECT v.name FROM performances p JOIN venues v ON v.id = p.venue_id
     WHERE p.show_id = s.id AND p.status <> 'CANCELLED' AND p.starts_at >= unixepoch()
-    ORDER BY p.starts_at LIMIT 1) AS nextPerformanceVenue
+    ORDER BY p.starts_at LIMIT 1) AS nextPerformanceVenue,
+  (SELECT min(p.starts_at) FROM performances p
+    WHERE p.show_id = s.id AND p.status <> 'CANCELLED') AS firstPerformanceAt,
+  (SELECT max(p.starts_at) FROM performances p
+    WHERE p.show_id = s.id AND p.status <> 'CANCELLED') AS lastPerformanceAt,
+  (SELECT group_concat(DISTINCT v.name) FROM performances p JOIN venues v ON v.id = p.venue_id
+    WHERE p.show_id = s.id AND p.status <> 'CANCELLED') AS venueNames
 `
 
 // Counted rather than stored, so the console cannot show a figure the rows disagree with.
@@ -237,6 +243,20 @@ export function showsQuery(clause: ListClause, limit: number, offset: number, re
 
 export async function listShows(clause: ListClause, limit: number, offset: number): Promise<AdminShow[]> {
   return (await db.all<ShowRow>(showsQuery(clause, limit, offset))).map(readShow)
+}
+
+// Counted over the whole filtered set in one statement, because the heading's line describes the
+// filter and not the page of rows underneath it (D-132 criterion 3).
+export async function countShowStandings(clause: ListClause): Promise<ShowsStandingCounts> {
+  const [row] = await db.all<ShowsStandingCounts>(sql`
+    SELECT
+      sum(CASE WHEN s.status = 'PUBLISHED'
+        AND EXISTS (SELECT 1 FROM performances p WHERE p.show_id = s.id AND p.status = 'ON_SALE')
+        THEN 1 ELSE 0 END) AS onSale,
+      sum(CASE WHEN s.status = 'DRAFT' THEN 1 ELSE 0 END) AS drafts
+    FROM shows s${predicate(clause)}
+  `)
+  return { onSale: Number(row?.onSale ?? 0), drafts: Number(row?.drafts ?? 0) }
 }
 
 export async function countShows(clause: ListClause): Promise<number> {

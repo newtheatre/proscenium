@@ -79,6 +79,8 @@ interface ListedShow {
   performanceCount: number
   onSaleCount: number
   soldTickets: number
+  capacity: number
+  posterUrl: string | null
 }
 
 interface ListedPerformance {
@@ -163,9 +165,12 @@ describe.skipIf(skip !== null)('a show is a draft nobody outside can see until i
     expect((await again.json() as { message?: string }).message).toContain(slugged(title))
   })
 
+  // `standings` counts the whole filtered set, which is what the heading's line states: the page
+  // of rows in hand cannot answer it (D-132 criterion 3).
   test('a list endpoint answers with an envelope, never a bare array', async () => {
     const envelope = await (await send('GET', '/api/admin/shows?page=1&pageSize=2')).json() as Record<string, unknown>
-    expect(Object.keys(envelope).sort()).toEqual(['items', 'page', 'pageSize', 'pages', 'total'])
+    expect(Object.keys(envelope).sort()).toEqual(['items', 'page', 'pageSize', 'pages', 'standings', 'total'])
+    expect(Object.keys(envelope.standings as object).sort()).toEqual(['drafts', 'onSale'])
   })
 })
 
@@ -442,6 +447,59 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
     return view
   }
+
+  // D-132 criterion 3, from the committee's `admin-shows` mockup: a row states the run, the venue,
+  // where the show stands and how much of the house is reserved, each in words as well as colour.
+  test('a row states its run, its venue, where it stands and what is reserved', async () => {
+    const title = named('A full row')
+    const id = await newShow({ title })
+    await addPerformance(id, { startsAt: nextWeek() })
+    await addPerformance(id, { startsAt: nextWeek(48) })
+    expect((await send('POST', `/api/admin/shows/${id}/publish`, { published: true, cascadePerformances: true })).status).toBe(200)
+
+    const { show } = await detail(id)
+    const view = await signedIn()
+    await visit(view, `${app.baseURL}/box-office/shows`, '[data-test="shows-table"]')
+    await waitFor(view, `document.querySelector('[data-test="shows-table"]').textContent.includes(${JSON.stringify(title)})`)
+
+    const rows = await textOf(view, '[data-test="shows-table"]')
+    expect(rows).toContain('The Test House')
+    expect(rows).toContain(`0 of ${show.capacity} seats`)
+    expect(await textOf(view, `[data-test="standing-${id}"]`)).toBe('On sale')
+    view.close()
+  }, 120_000)
+
+  // The line under the heading counts the whole filtered set, so it cannot be answered from the
+  // page of rows in hand: a second page of drafts would make the figures lie.
+  test('the heading counts every show the filter describes, not the page of rows', async () => {
+    await newShow({ title: named('Counted') })
+
+    const view = await signedIn()
+    await visit(view, `${app.baseURL}/box-office/shows`, '[data-test="shows-season-line"]')
+    const line = await textOf(view, '[data-test="shows-season-line"]')
+    expect(line.startsWith('Every season:')).toBe(true)
+
+    const listed = await (await send('GET', '/api/admin/shows?page=1&pageSize=1')).json() as {
+      total: number
+      standings: { onSale: number, drafts: number }
+    }
+    expect(line).toContain(`${listed.total} show`)
+    expect(line).toContain(`${listed.standings.onSale} on sale`)
+    expect(line).toContain(`${listed.standings.drafts} draft`)
+    view.close()
+  }, 120_000)
+
+  // A draft with no artwork is named on the one page that can do something about it (D-132
+  // criterion 6): the public frame draws its gradient until a poster exists.
+  test('drafts with no poster are named on the list', async () => {
+    const title = named('No artwork')
+    await newShow({ title })
+
+    const view = await signedIn()
+    await visit(view, `${app.baseURL}/box-office/shows`, '[data-test="shows-artless"]')
+    expect(await textOf(view, '[data-test="shows-artless"]')).toContain('with no poster')
+    view.close()
+  }, 120_000)
 
   test('the box office officer sees a show, its state and its performances', async () => {
     const title = named('On screen')

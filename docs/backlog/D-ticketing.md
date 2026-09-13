@@ -730,7 +730,11 @@ Open questions:
   2. A status strip heads the page: on sale or not, next performance, sold count, unpaid queue,
      each stated in words as well as colour (K-101).
   3. The shows list filters by season and shows status badges with words; it stays a `UTable`
-     paged from the server (0032).
+     paged from the server (0032). A row states the run of dates, the venues it plays, where the
+     show stands (draft, on sale, off sale, completed) and how much of the house is reserved, the
+     figure always beside the bar rather than behind it (K-101). A line under the heading counts
+     the whole filtered set, not the page of rows, and drafts with no poster are named on the page
+     that can do something about it.
   4. The screens stay calm: the `UDashboard*` family and nothing from the expressive kit
      (`docs/design-language.md`).
   5. Before-and-after captures from `bun run shots` are attached to the pull request.

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { formatLondon } from './london'
+import { plural } from './text'
 import { POSTER_PREFIX, posterUrl } from './seo'
 import type { PublicContentWarning, WarningAssessment } from './content-warnings'
 
@@ -170,6 +171,11 @@ export interface AdminShow {
   capacity: number
   nextPerformanceAt: number | null
   nextPerformanceVenue: string | null
+  // The run, and the venues it plays, so the list states both without a second query (D-132
+  // criterion 3). Cancelled performances are left out of all three.
+  firstPerformanceAt: number | null
+  lastPerformanceAt: number | null
+  venueNames: string | null
   // Counted from the junction, so "confirmed clear" and "nobody has looked" stay distinct
   // states rather than one empty list (D-102 criterion 2).
   warningsConfirmedNone: boolean
@@ -330,6 +336,68 @@ export function isPublicPerformance(performance: { status: PerformanceStatus }):
 // A retired season or category still names the shows it holds; the picker says so (D-131).
 export function saysReferenceName(one: { name: string, archived: boolean }): string {
   return one.archived ? `${one.name} (retired)` : one.name
+}
+
+// The run of a show, in the form the list's Dates column shows (D-132 criterion 3). Both ends are
+// London days: a night at 19:30 belongs to the day a booker read on the ticket, not to UTC (0014).
+export function saysShowDates(firstAt: number | null, lastAt: number | null): string {
+  if (firstAt === null || lastAt === null) return 'Not scheduled'
+  const day = (at: number, withMonth: boolean) => formatLondon(new Date(at * 1000), {
+    weekday: 'short',
+    day: 'numeric',
+    ...(withMonth ? { month: 'short' } : {}),
+  }).replace(',', '')
+  if (firstAt === lastAt) return day(firstAt, true)
+  const sameMonth = formatLondon(new Date(firstAt * 1000), { month: 'short' })
+    === formatLondon(new Date(lastAt * 1000), { month: 'short' })
+  return `${day(firstAt, !sameMonth)} to ${day(lastAt, true)}`
+}
+
+// The venues a show plays, from the distinct names the row carries. Three or more are counted:
+// the column is one line, and a list of four names is not a line anybody reads.
+export function saysShowVenues(names: string | null): string {
+  const all = (names ?? '').split(',').map(name => name.trim()).filter(Boolean)
+  if (all.length === 0) return 'None yet'
+  if (all.length === 1) return all[0]!
+  if (all.length === 2) return `${all[0]} and ${all[1]}`
+  return `${all.length} venues`
+}
+
+export interface ShowStanding {
+  key: 'DRAFT' | 'ON_SALE' | 'COMPLETED' | 'PUBLISHED'
+  says: string
+  colour: 'neutral' | 'success' | 'info'
+}
+
+// Where a show stands in one word a reader acts on. A draft is a draft whatever its performances
+// say, because nothing of it is public; a run whose last night has passed is done, not on sale.
+export function saysShowStanding(show: {
+  status: ShowStatus
+  onSaleCount: number
+  performanceCount: number
+  lastPerformanceAt: number | null
+}, at: Date = new Date()): ShowStanding {
+  if (show.status !== 'PUBLISHED') return { key: 'DRAFT', says: 'Draft', colour: 'neutral' }
+  if (show.lastPerformanceAt !== null && show.lastPerformanceAt < Math.floor(at.getTime() / 1000)) {
+    return { key: 'COMPLETED', says: 'Completed', colour: 'info' }
+  }
+  if (show.onSaleCount > 0) return { key: 'ON_SALE', says: 'On sale', colour: 'success' }
+  return { key: 'PUBLISHED', says: 'Off sale', colour: 'neutral' }
+}
+
+// What the heading's line counts, answered by the endpoint over the whole filtered set rather
+// than the page in hand, so the figures cannot disagree with a second page of rows (D-132).
+export interface ShowsStandingCounts {
+  onSale: number
+  drafts: number
+}
+
+// The line under the heading, counting what this page is showing rather than the whole estate:
+// the figures are the filtered total, so they cannot disagree with the rows underneath.
+export function saysShowSeasonLine(total: number, onSale: number, drafts: number, seasonName: string | null): string {
+  const where = seasonName ?? 'Every season'
+  if (total === 0) return `${where}: no shows yet`
+  return `${where}: ${plural(total, 'show')}, ${onSale} on sale, ${plural(drafts, 'draft')}`
 }
 
 export function saysShowStatus(status: string): string {
