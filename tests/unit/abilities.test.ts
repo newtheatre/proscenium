@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { can, member, memberOrGrace } from '#shared/utils/abilities'
+import { can, member, memberOrGrace, viewBarReports } from '#shared/utils/abilities'
 import type { Viewer } from '#shared/utils/abilities'
 import type { MembershipState } from '#shared/utils/membership'
 
@@ -48,5 +48,22 @@ describe('a guest with no account never satisfies either ability', () => {
   test('a null viewer is refused, not thrown at', () => {
     expect(can(null, member)).toBe(false)
     expect(can(null, memberOrGrace)).toBe(false)
+  })
+})
+
+// F-119 criterion 5, #906: the treasurer holds finance.read, not bar.read, and reports must
+// still open without granting the wider bar catalogue or stock screens.
+describe('viewBarReports admits the treasurer alongside the bar manager', () => {
+  const withPermissions = (permissions: Viewer['permissions']): Viewer => ({
+    id: 'someone', permissions, onShiftTonight: false, leadsDepartment: false, isTrainer: false, membershipState: { kind: 'none' },
+  })
+
+  test('bar.read and finance.read each satisfy it', () => {
+    expect(can(withPermissions(['bar.read']), viewBarReports)).toBe(true)
+    expect(can(withPermissions(['finance.read']), viewBarReports)).toBe(true)
+  })
+
+  test('a viewer with neither permission is refused', () => {
+    expect(can(withPermissions([]), viewBarReports)).toBe(false)
   })
 })

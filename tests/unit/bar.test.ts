@@ -15,8 +15,10 @@ import {
   says,
   saysMoney,
   saysQuantity,
+  saysStockStatus,
   priceForm,
   stockItemForm,
+  stockStatus,
   variantEditForm,
   variantForm,
 } from '#shared/utils/bar'
@@ -234,6 +236,26 @@ describe('what a screen shows', () => {
   test('money reads in pounds and is held in pence', () => {
     expect(saysMoney(480)).toBe('£4.80')
     expect(saysMoney(0)).toBe('£0.00')
+  })
+
+  // The par-level status a manager scans the stocked items list for (#907).
+  test('stock status compares on-hand to par, matching the order list\'s own shortfall rule', () => {
+    expect(stockStatus(0, 48)).toBe('OUT')
+    expect(stockStatus(-3, 48)).toBe('OUT')
+    expect(stockStatus(18, 48)).toBe('BELOW_PAR')
+    expect(stockStatus(48, 48)).toBe('OK')
+    expect(stockStatus(60, 48)).toBe('OK')
+  })
+
+  test('an item with no par level carries no status, matching the order list\'s unconfigured row', () => {
+    expect(stockStatus(18, null)).toBeNull()
+    expect(stockStatus(0, null)).toBe('OUT')
+  })
+
+  test('the status has words for the badge', () => {
+    expect(saysStockStatus('OUT')).toBe('Out')
+    expect(saysStockStatus('BELOW_PAR')).toBe('Below par')
+    expect(saysStockStatus('OK')).toBe('OK')
   })
 
   test('every value in the vocabularies has words for it', () => {

@@ -18,6 +18,7 @@ let app: AppUnderTest
 let officer: TestMember
 let barManager: TestMember
 let barStaff: TestMember
+let treasurer: TestMember
 const barManagerPassword = generatePassword()
 
 beforeAll(async () => {
@@ -27,6 +28,8 @@ beforeAll(async () => {
   barManager = await registerMember(app, 'report-bar-manager', barManagerPassword)
   await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
   barStaff = await registerMember(app, 'report-bar-staff', generatePassword())
+  treasurer = await registerMember(app, 'report-treasurer', generatePassword())
+  await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -201,7 +204,7 @@ describe.skipIf(skip !== null)('CSV export is guarded and formatted at display, 
   })
 })
 
-describe.skipIf(skip !== null)('access is limited to the bar manager and administrators (criterion 5)', () => {
+describe.skipIf(skip !== null)('access is limited to the bar manager, the treasurer and administrators (criterion 5, #906)', () => {
   test('ordinary bar staff cannot read the report', async () => {
     const answered = await runReport(barStaff.cookie)
     expect(answered.status).toBe(403)
@@ -209,6 +212,16 @@ describe.skipIf(skip !== null)('access is limited to the bar manager and adminis
 
   test('the bar manager can', async () => {
     const answered = await runReport(barManager.cookie)
+    expect(answered.status).toBe(200)
+  })
+
+  test('the treasurer can, holding finance.read rather than bar.read', async () => {
+    const answered = await runReport(treasurer.cookie)
+    expect(answered.status).toBe(200)
+  })
+
+  test('the treasurer can export a CSV section too', async () => {
+    const answered = await send('GET', `/api/admin/bar/reports/export?${customRange()}&section=sales`, undefined, treasurer.cookie)
     expect(answered.status).toBe(200)
   })
 })

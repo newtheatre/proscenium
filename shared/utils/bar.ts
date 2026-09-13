@@ -440,3 +440,17 @@ export function saysQuantity(qty: number, unit: StockUnit): string {
 export function saysMoney(pence: number): string {
   return `£${(pence / 100).toFixed(2)}`
 }
+
+export type StockStatus = 'OUT' | 'BELOW_PAR' | 'OK'
+
+// The par-comparison signal a manager scans the list for (#907). Par is advisory (F-120): an
+// item with none set carries no status, matching the order list's own "unconfigured" treatment.
+export function stockStatus(onHand: number, parQty: number | null): StockStatus | null {
+  if (onHand <= 0) return 'OUT'
+  if (parQty === null) return null
+  return onHand < parQty ? 'BELOW_PAR' : 'OK'
+}
+
+export function saysStockStatus(status: StockStatus): string {
+  return status === 'OUT' ? 'Out' : status === 'BELOW_PAR' ? 'Below par' : 'OK'
+}

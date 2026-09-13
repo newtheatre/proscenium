@@ -11,6 +11,7 @@ import {
   viewAuditTrail,
   viewBackups,
   viewBarCatalogue,
+  viewBarReports,
   viewBarStock,
   viewBoardConfig,
   viewChecklist,
@@ -117,7 +118,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Stock movements', icon: 'i-lucide-arrow-left-right', to: '/bar/stock/movements', ability: viewBarStock },
       { label: 'Stocktakes', icon: 'i-lucide-clipboard-list', to: '/bar/stock/stocktakes', ability: viewBarStock },
       { label: 'Order list', icon: 'i-lucide-truck', to: '/bar/stock/order-list', ability: viewBarStock },
-      { label: 'Reports', icon: 'i-lucide-bar-chart-3', to: '/bar/reports', ability: viewBarStock },
+      { label: 'Reports', icon: 'i-lucide-bar-chart-3', to: '/bar/reports', ability: viewBarReports },
     ],
   },
 

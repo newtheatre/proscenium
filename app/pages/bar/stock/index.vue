@@ -7,7 +7,9 @@ import {
   movementEntryForm,
   says,
   saysQuantity,
+  saysStockStatus,
   stockItemForm,
+  stockStatus,
 } from '#shared/utils/bar'
 import { barItemsList } from '#shared/utils/bar-items-list'
 import type { MovementReason, StockItem, StockMovementKind, StockUnit } from '#shared/utils/bar'
@@ -248,6 +250,17 @@ const columns: TableColumn<StockItem>[] = [
     id: 'par',
     header: 'Par level',
     cell: ({ row }) => (row.original.parQty === null ? 'Not set' : saysQuantity(row.original.parQty, row.original.unit)),
+  },
+  {
+    id: 'status',
+    header: 'Status',
+    meta: { class: { td: 'whitespace-nowrap' } },
+    cell: ({ row }) => {
+      const status = stockStatus(row.original.onHand, row.original.parQty)
+      if (status === null) return null
+      const color = status === 'OUT' ? 'error' : status === 'BELOW_PAR' ? 'warning' : 'success'
+      return h(UBadge, { 'color': color, 'variant': 'subtle', 'size': 'sm', 'data-test': `status-badge-${row.original.id}` }, () => saysStockStatus(status))
+    },
   },
   {
     id: 'category',

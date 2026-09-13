@@ -9,7 +9,7 @@ const query = reportPeriodForm.and(z.object({ section: z.enum(REPORT_SECTIONS) }
 // One CSV per section, guarded against formula injection by `toCsv` (criterion 2). Money is
 // formatted here, at the point of display; the JSON report above stays integer pence (criterion 3).
 export default defineEventHandler(async (event) => {
-  const resolved = await requirePermission(event, 'bar.read')
+  const resolved = await requireAnyPermission(event, ['bar.read', 'finance.read'])
   const { section, ...period } = await getValidatedQueryOrThrow(event, query)
   const report = await barReport(period)
 
