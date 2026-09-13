@@ -27,7 +27,7 @@ interface Listing { items: Closure[], total: number }
 
 const request = useRequestFetch()
 const rooms = ref<{ id: string, name: string, isActive: boolean }[]>([])
-const failure = ref<string | null>(null)
+const failure = ref<ListFailure | null>(null)
 const toast = useToast()
 
 const writes = computed(() => can(useViewer().value, manageRoomsEstate))
@@ -53,7 +53,7 @@ const { data: listing, status, refresh, error } = await useAsyncData(
 )
 
 watch(error, (raised) => {
-  if (raised) failure.value = refusalText(raised)
+  if (raised) failure.value = listFailureFrom(raised, 'The closures could not be read.')
 })
 
 async function loadRooms(): Promise<void> {
@@ -96,7 +96,7 @@ async function close(): Promise<void> {
     await refresh()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    failure.value = listFailureFrom(error)
   }
   finally {
     working.value = false
@@ -120,7 +120,7 @@ async function remove(): Promise<void> {
     await refresh()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    failure.value = listFailureFrom(error)
   }
   finally {
     working.value = false
@@ -175,7 +175,8 @@ onMounted(loadRooms)
       data-test="failure"
       color="error"
       variant="subtle"
-      :description="failure"
+      :description="failure.message"
+      :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
     />
 
     <UAlert
@@ -223,7 +224,7 @@ onMounted(loadRooms)
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ filtered ? 'No closure matches that.' : 'No rooms are closed.' }}
+          {{ failure ? failure.message : filtered ? 'No closure matches that.' : 'No rooms are closed.' }}
         </p>
       </template>
     </UTable>
