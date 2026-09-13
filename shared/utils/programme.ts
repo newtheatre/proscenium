@@ -35,6 +35,29 @@ export const MAX_EXTERNAL_BOOKING_URL = 500
 // and never derived twice (D-101).
 export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
+// The listing filters by venue name, but a filter control's value becomes a DOM id, and a venue
+// name has spaces in it. The slug is the value, the name is the label and what the listing takes.
+export interface VenueFilter {
+  label: string
+  value: string
+}
+
+export const ALL_VENUES = 'all'
+
+export function venueFilters(names: string[]): VenueFilter[] {
+  return [
+    { label: 'All', value: ALL_VENUES },
+    ...names.map(name => ({ label: name, value: toSlug(name) })),
+  ]
+}
+
+// Null is the absent filter: "all", and equally a slug nobody holds, which lists everything
+// rather than nothing.
+export function venueForFilter(value: string, names: string[]): string | null {
+  if (value === ALL_VENUES) return null
+  return names.find(name => toSlug(name) === value) ?? null
+}
+
 export function toSlug(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, MAX_SHOW_SLUG)
 }

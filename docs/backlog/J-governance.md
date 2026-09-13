@@ -197,9 +197,19 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
      what is due at the theatre on the right, and the reservation as the view's one call to action.
   9. Every public view spends at most one marquee, one sticker and one spotlight, counted by
      `tests/e2e/shells.test.ts` over the public pages this story touches.
+  10. What's on opens on a band rather than a full hero: the season it is listing, the title with
+      "on" in gold, and one sentence saying how paying works. No figure appears in that sentence;
+      the price a visitor acts on is the live cheapest price on each card.
+  11. The venue filter is a row of pills whose values are slugs of the venue names, so no control
+      id carries a space and no filter strip paints a scrollbar. The name stays the label and the
+      listing still filters by it.
+  12. The grid is headed, so a card's heading follows a heading one level above it rather than
+      the page title. The listing is in the axe sweep in `tests/e2e/accessibility.test.ts`.
 - Source: Pre-cutover review, 10 September 2026; the known-issues row on unsigned-off policy
   prose; 0012, 0051. Criteria 6 to 9 added 11 September 2026, after the committee's review of the
   public-site mockups widened the story from the policy wording to the whole public site.
+  Criteria 10 to 12 added 13 September 2026, from the what's-on mockup and the accessibility
+  findings in issues 917 and 920.
 
 ## J-201: The handover run and the atomic access flip
 
