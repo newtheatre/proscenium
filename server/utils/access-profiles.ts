@@ -1,11 +1,12 @@
 import { db, schema } from '@nuxthub/db'
-import { and, eq, like, lte, or, sql } from 'drizzle-orm'
+import { and, eq, lte, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { decryptAccessProfilePayload, encryptAccessProfilePayload } from './access-profile-crypto'
 import { auditedWrite } from './audit'
 import { configValue } from './configuration'
+import { tableColumns, whereFrom } from './list-filters'
 import { auditEntry } from '#shared/utils/audit'
 import {
   ACCESS_FLAGS,
@@ -14,12 +15,15 @@ import {
   doorWording,
   effectiveStatus,
 } from '#shared/utils/access-profiles'
+import { accessProfilesList } from '#shared/utils/access-profiles-list'
+import { conditionsOf } from '#shared/utils/list-filters'
 import type { H3Event } from 'h3'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type {
   AccessFlag,
   AccessProfilePayload,
   AccessProfileStatus,
-  AccessProfileSummary,
   DeclareAccessProfileInput,
   OfficerAccessProfile,
   OwnAccessProfile,
@@ -167,44 +171,18 @@ export async function withdrawAccessProfile(userId: string): Promise<WithdrawOut
   return { withdrawn: true, alreadyWithdrawn: false }
 }
 
-// A typed percent sign is a character somebody is looking for, not a wildcard; good enough for an
-// internal search box, which is the whole of what this predicate is for.
-const contains = (term: string): string => `%${term}%`
-
-function listFilters(status: AccessProfileStatus | undefined, search: string | undefined) {
-  const clauses = []
-  if (status) clauses.push(eq(schema.accessProfiles.status, status))
-  if (search) clauses.push(or(like(schema.users.name, contains(search)), like(schema.users.email, contains(search))))
-  return clauses.length ? and(...clauses) : undefined
-}
-
-export async function countAccessProfiles(status?: AccessProfileStatus, search?: string): Promise<number> {
-  const [row] = await db.select({ count: sql<number>`count(*)` })
-    .from(schema.accessProfiles)
-    .innerJoin(schema.users, eq(schema.users.id, schema.accessProfiles.userId))
-    .where(listFilters(status, search))
-  return row?.count ?? 0
-}
-
-// A light summary only: the officer opens one declaration to read its flags and notes, so the
-// list never carries the encrypted payload at all.
-export async function listAccessProfiles(status: AccessProfileStatus | undefined, search: string | undefined, limit: number, offset: number): Promise<AccessProfileSummary[]> {
-  const found = await db.select({
-    userId: schema.accessProfiles.userId,
-    name: schema.users.name,
-    email: schema.users.email,
-    status: schema.accessProfiles.status,
-    companions: schema.accessProfiles.companions,
-    createdAt: schema.accessProfiles.createdAt,
-    updatedAt: schema.accessProfiles.updatedAt,
+// The officer's queue, read through its own declaration (K-129): pending is the hidden default
+// unless "status" is asked for, "ALL" included, the same shape the register gives "current".
+export function accessProfilesClause(query: ListQuery): ListClause {
+  const clause = whereFrom(accessProfilesList, query, {
+    column: tableColumns(schema.accessProfiles),
+    search: [schema.users.name, schema.users.email],
+    fields: {
+      status: condition => (condition.values[0] === 'ALL' ? undefined : eq(schema.accessProfiles.status, condition.values[0]!)),
+    },
   })
-    .from(schema.accessProfiles)
-    .innerJoin(schema.users, eq(schema.users.id, schema.accessProfiles.userId))
-    .where(listFilters(status, search))
-    .orderBy(schema.accessProfiles.createdAt)
-    .limit(limit)
-    .offset(offset)
-  return found.map(row => ({ ...row, status: asAccessProfileStatus(row.status) }))
+  const asked = conditionsOf(accessProfilesList, query).some(condition => condition.key === 'status')
+  return asked ? clause : { ...clause, where: and(eq(schema.accessProfiles.status, 'PENDING'), clause.where) }
 }
 
 export async function accessProfileForOfficer(userId: string): Promise<OfficerAccessProfile | null> {
