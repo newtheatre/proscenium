@@ -15,6 +15,8 @@ import {
   saysClosingTime,
   showForm,
   toSlug,
+  venueFilters,
+  venueForFilter,
 } from '#shared/utils/programme'
 import type { PerformanceSaleState, PublicShow, ShowStatus } from '#shared/utils/programme'
 
@@ -298,5 +300,30 @@ describe('the desk bypasses the customer window and nothing else (D-112 criterio
     expect(saleRefusal(performance({ status: 'CANCELLED' }), CURTAIN, 'DESK')?.reason).toBe('CANCELLED')
     expect(saleRefusal(performance({ showStatus: 'DRAFT' }), CURTAIN, 'DESK')?.reason).toBe('SHOW_UNPUBLISHED')
     expect(saleRefusal(performance({ externalBookingUrl: 'https://example.org' }), CURTAIN, 'DESK')?.reason).toBe('EXTERNAL')
+  })
+})
+
+// A filter control's value becomes a DOM id, and a venue name has spaces in it (issue 917 item 3).
+describe('the venue filter is keyed on a slug and labelled with the name (J-111)', () => {
+  const names = ['Djanogly Theatre', 'The Nottingham New Theatre']
+
+  test('All comes first and every other value is a slug of the name', () => {
+    expect(venueFilters(names)).toEqual([
+      { label: 'All', value: 'all' },
+      { label: 'Djanogly Theatre', value: 'djanogly-theatre' },
+      { label: 'The Nottingham New Theatre', value: 'the-nottingham-new-theatre' },
+    ])
+  })
+
+  test('no value carries a character an id may not', () => {
+    for (const filter of venueFilters(names)) {
+      expect(`${filter.value}: ${/^[a-z0-9-]+$/.test(filter.value)}`).toBe(`${filter.value}: true`)
+    }
+  })
+
+  test('a slug resolves back to the name the listing filters on', () => {
+    expect(venueForFilter('djanogly-theatre', names)).toBe('Djanogly Theatre')
+    expect(venueForFilter('all', names)).toBeNull()
+    expect(venueForFilter('a-venue-nobody-holds', names)).toBeNull()
   })
 })
