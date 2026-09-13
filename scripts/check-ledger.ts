@@ -2,8 +2,6 @@
 // One writer of the ledger (0004, I-102 criterion 6). A module that takes money without posting
 // is a defect by definition, and the way to keep that true is to leave one door in.
 
-import { join } from 'node:path'
-
 // The one file allowed to build a ledger insert, and the one place the rules live.
 const WRITER = 'server/utils/ledger.ts'
 
@@ -16,8 +14,8 @@ const READS = /\b(?:select|count|sum|from)\b/i
 // imports. Neither runs in a request.
 function serverFiles(): string[] {
   return [...new Bun.Glob('**/*.ts').scanSync({ cwd: 'server', onlyFiles: true })]
-    .map(path => join('server', path))
-    .filter(path => path !== WRITER && !path.startsWith(join('server', 'db')))
+    .map(path => `server/${path.replaceAll('\\', '/')}`)
+    .filter(path => path !== WRITER && !path.startsWith('server/db'))
     .sort()
 }
 
@@ -40,7 +38,7 @@ const SELF = 'check-ledger.ts'
 
 for (const file of [...new Bun.Glob('**/*.ts').scanSync({ cwd: 'scripts', onlyFiles: true })].sort()) {
   if (file === SELF) continue
-  const source = await Bun.file(join('scripts', file)).text()
+  const source = await Bun.file(`scripts/${file}`).text()
   if (/INSERT\s+INTO\s+ledger_(entries|lines)/i.test(source)) {
     problems.push(`scripts/${file}  writes to the ledger directly`)
   }

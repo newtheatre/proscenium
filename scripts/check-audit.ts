@@ -2,7 +2,6 @@
 // Every privileged mutation is answerable for an audit entry (J-101 criterion 5). A route that
 // writes nothing says so in the registry, with a reason somebody can disagree with at review.
 
-import { join } from 'node:path'
 import { AUDIT_COVERAGE } from '../shared/utils/audit-coverage'
 import { isAuditAction } from '../shared/utils/audit-actions'
 
@@ -12,7 +11,7 @@ const MUTATES = /\.(post|put|patch|delete)\.ts$/
 
 function scan(directory: string): string[] {
   return [...new Bun.Glob('**/*.ts').scanSync({ cwd: directory, onlyFiles: true })]
-    .map(path => join(directory, path))
+    .map(path => `${directory}/${path.replaceAll('\\', '/')}`)
     .sort()
 }
 
