@@ -329,17 +329,21 @@ Open questions:
      references, and never before.
   6. Collection clears the hold expiry (D-106) and marks every ticket in the booking collected in
      one atomic write.
-  7. The screen shows five figures for the performance on screen: capacity, reserved, paid
-     (collected or already admitted), collected (still at the desk, not yet admitted) and
-     walk-up headroom (uncapped where the house is). Status pills (all, unpaid, paid, collected)
-     narrow the search results the same way. A side card names tonight's access booking count
-     (with a pointer to the door screen), pass admissions, the reservations release time (D-106,
-     from configuration) and the confirmed duty manager; an unpaid-owed alert quotes the count,
-     the amount and the release time once anything is still unpaid.
+  7. A reservation is pending (reserved and unpaid), collected (reserved in advance and now
+     paid for) or door (a walk-up sale with no reservation); pending moves to collected or to
+     door and nowhere else. The screen shows five figures for the performance on screen:
+     capacity, reserved (pending plus collected), collected, door and walk-up headroom
+     (capacity less reserved and door, uncapped where the house is). Status pills (all,
+     pending, collected, door) narrow the search results the same way. A side card names
+     tonight's access booking count (with a pointer to the door screen), pass admissions, the
+     reservations release time (D-106, from configuration) and the confirmed duty manager; an
+     unpaid-owed alert quotes the count, the amount and the release time once anything is
+     still unpaid.
 - Source: Prompt Book D-2, D-3, D-5, P4; audit PR-5; Get-In constraint 1, part 2 (collection:
-  carry); criterion 7 added from the committee's admin-boxoffice mockup, 13 September 2026: no
-  BOX_OFFICE shift role exists (`NIGHT_ROLES`), so "on shift" reads as the confirmed duty
-  manager rather than a box office roster.
+  carry); criterion 7 added from the committee's admin-boxoffice mockup, 13 September 2026, and
+  restated in Matt's own words on the pull request: no BOX_OFFICE shift role exists
+  (`NIGHT_ROLES`), so "on shift" reads as the confirmed duty manager rather than a box office
+  roster.
 
 ## D-115: Walk-up sales recorded as door source
 

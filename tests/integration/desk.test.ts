@@ -94,37 +94,37 @@ describe('deskSearchQuery scopes to one performance and matches reference or nam
   })
 })
 
-// The pills split the same way `qrStatusDisplay` reads a status (D-132): unpaid, paid
-// whichever way it walked in, and collected narrowed to still-here.
-describe('the desk status pills filter on the pending/paid/collected split', () => {
-  test('UNPAID, PAID and COLLECTED each answer a different subset of ALL', async () => {
+// The pills name the desk's own three states directly (Matt's ruling on #996): pending is
+// reserved and unpaid, collected is reserved and paid, door is a walk-up with no reservation.
+describe('the desk status pills filter on pending, collected and door', () => {
+  test('PENDING, COLLECTED and DOOR each answer a different subset of ALL', async () => {
     await withDatabase((database) => {
       const seeded = tonightsPerformance(database)
       user(database, 'u-1', 'a@example.invalid', 'A Pending')
       user(database, 'u-2', 'b@example.invalid', 'B Collected')
-      user(database, 'u-3', 'c@example.invalid', 'C Admitted')
+      user(database, 'u-3', 'c@example.invalid', 'C Walkup')
       reservation(database, 'r-1', seeded.performanceId, 'u-1', 'PENDING', 'AAA111')
       reservation(database, 'r-2', seeded.performanceId, 'u-2', 'COLLECTED', 'BBB222')
       reservation(database, 'r-3', seeded.performanceId, 'u-3', 'DOOR', 'CCC333')
 
-      const idsFor = (status: 'ALL' | 'UNPAID' | 'PAID' | 'COLLECTED'): string[] =>
+      const idsFor = (status: 'ALL' | 'PENDING' | 'COLLECTED' | 'DOOR'): string[] =>
         read<{ id: string }>(database, deskSearchQuery(seeded.performanceId, undefined, status, 10, 0)).map(row => row.id)
 
       expect(idsFor('ALL').sort()).toEqual(['r-1', 'r-2', 'r-3'])
-      expect(idsFor('UNPAID')).toEqual(['r-1'])
-      expect(idsFor('PAID').sort()).toEqual(['r-2', 'r-3'])
+      expect(idsFor('PENDING')).toEqual(['r-1'])
       expect(idsFor('COLLECTED')).toEqual(['r-2'])
+      expect(idsFor('DOOR')).toEqual(['r-3'])
     })
   })
 })
 
 describe('deskSummaryQuery reads the five KPI tiles for one performance (D-132)', () => {
-  test('reserved, paid and collected split the same way the status pills do, and unpaid owes what is still due', async () => {
+  test('reserved is pending plus collected, door is its own figure, and unpaid owes what is still due', async () => {
     await withDatabase((database) => {
       const seeded = tonightsPerformance(database)
       user(database, 'u-1', 'a@example.invalid', 'A Pending')
       user(database, 'u-2', 'b@example.invalid', 'B Collected')
-      user(database, 'u-3', 'c@example.invalid', 'C Admitted')
+      user(database, 'u-3', 'c@example.invalid', 'C Walkup')
       reservation(database, 'r-1', seeded.performanceId, 'u-1', 'PENDING', 'AAA111')
       reservation(database, 'r-2', seeded.performanceId, 'u-2', 'COLLECTED', 'BBB222')
       reservation(database, 'r-3', seeded.performanceId, 'u-3', 'DOOR', 'CCC333')
@@ -141,21 +141,21 @@ describe('deskSummaryQuery reads the five KPI tiles for one performance (D-132)'
       interface SummaryRow {
         capacity: number
         reserved: number
-        paid: number
         collected: number
+        door: number
         unpaidCount: number
         unpaidOwedPence: number
         accessBookings: number
         passAdmissions: number
       }
       const [row] = read<SummaryRow>(database, deskSummaryQuery(seeded.performanceId))
-      // Reserved and paid count tickets, not reservations: r-3's access and pass admission
-      // tickets both count once each towards paid, since DOOR is money already taken.
+      // Reserved and door count tickets, not reservations: r-3's two tickets both count
+      // towards door, since neither was reserved ahead of the night.
       expect(row).toMatchObject({
         capacity: 120,
-        reserved: 4,
-        paid: 3,
+        reserved: 2,
         collected: 1,
+        door: 2,
         unpaidCount: 1,
         unpaidOwedPence: 900,
         accessBookings: 1,

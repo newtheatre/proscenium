@@ -10,9 +10,9 @@ const tenderOptions = [...DESK_TENDERS]
 
 const STATUS_PILL_LABELS: Record<DeskStatusFilter, string> = {
   ALL: 'All',
-  UNPAID: 'Unpaid',
-  PAID: 'Paid',
+  PENDING: 'Pending',
   COLLECTED: 'Collected',
+  DOOR: 'Door',
 }
 
 definePageMeta({ layout: 'console', title: 'Desk', middleware: 'console' })
@@ -70,8 +70,8 @@ interface ReservationDetail {
 interface DeskSummary {
   capacity: number | null
   reserved: number
-  paid: number
   collected: number
+  door: number
   unpaidCount: number
   unpaidOwedPence: number
   accessBookings: number
@@ -109,10 +109,10 @@ async function loadSummary(): Promise<void> {
 }
 
 // Capacity is uncapped for a general-admission house (D-105): headroom is then unbounded, so
-// there is nothing here to put a number on.
+// there is nothing here to put a number on. Reserved and door between them are every seat taken.
 const walkUpHeadroom = computed(() => {
   if (!summary.value || summary.value.capacity === null) return null
-  return Math.max(summary.value.capacity - summary.value.reserved, 0)
+  return Math.max(summary.value.capacity - summary.value.reserved - summary.value.door, 0)
 })
 
 const releaseTime = computed(() => (summary.value ? formatLondon(new Date(summary.value.reservationsReleaseAt * 1000), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : null))
@@ -125,8 +125,8 @@ const summaryTiles = computed<SummaryTile[]>(() => {
   return [
     { key: 'capacity', label: 'Capacity', value: s.capacity === null ? 'Uncapped' : String(s.capacity) },
     { key: 'reserved', label: 'Reserved', value: String(s.reserved) },
-    { key: 'paid', label: 'Paid', value: String(s.paid) },
     { key: 'collected', label: 'Collected', value: String(s.collected) },
+    { key: 'door', label: 'Door', value: String(s.door) },
     { key: 'walk-up-headroom', label: 'Walk-up headroom', value: walkUpHeadroom.value === null ? 'Uncapped' : String(walkUpHeadroom.value) },
   ]
 })

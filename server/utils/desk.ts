@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { doorWordingFor } from './access-profiles'
-import { collectedSeatsSubquery, heldAccessSeatsSubquery, heldSeatsOfKindSubquery, heldSeatsSubquery, paidSeatsSubquery, unpaidSeatsSubquery } from './capacity'
+import { collectedSeatsSubquery, doorSeatsSubquery, heldAccessSeatsSubquery, heldSeatsOfKindSubquery, reservedSeatsSubquery, unpaidSeatsSubquery } from './capacity'
 import { configValue } from './configuration'
 import { pendingTicketCompRequestForReservation } from './ticket-comps'
 import { holdExpiresAt, looksLikeReference, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
@@ -61,13 +61,13 @@ function searchPredicate(q: string | undefined): SQL {
   return sql` AND u.name LIKE ${contains(trimmed)} ESCAPE '\\'`
 }
 
-// The pills read `qrStatusDisplay`'s own words: unpaid is PENDING, paid is money taken
-// whichever way it walked in (D-114 criterion 2), collected narrows that to still-here.
+// The pills name the desk's own three states directly (Matt's ruling on #996): pending is
+// reserved and unpaid, collected is reserved and paid, door is a walk-up with no reservation.
 function statusPredicate(status: DeskStatusFilter): SQL {
   switch (status) {
-    case 'UNPAID': return sql` AND r.status = 'PENDING'`
-    case 'PAID': return sql` AND r.status IN ('COLLECTED', 'DOOR')`
+    case 'PENDING': return sql` AND r.status = 'PENDING'`
     case 'COLLECTED': return sql` AND r.status = 'COLLECTED'`
+    case 'DOOR': return sql` AND r.status = 'DOOR'`
     default: return sql``
   }
 }
@@ -160,8 +160,8 @@ export function deskTicketsQuery(reservationId: string): SQL {
 export interface DeskSummary {
   capacity: number | null
   reserved: number
-  paid: number
   collected: number
+  door: number
   unpaidCount: number
   unpaidOwedPence: number
   accessBookings: number
@@ -176,9 +176,9 @@ export function deskSummaryQuery(performanceId: string): SQL {
   return sql`
     SELECT p.starts_at AS startsAt, coalesce(p.capacity_override, v.capacity) AS capacity,
            p.hold_release_minutes_before AS holdReleaseMinutesBefore,
-           ${heldSeatsSubquery(sql`p.id`)} AS reserved,
-           ${paidSeatsSubquery(sql`p.id`)} AS paid,
+           ${reservedSeatsSubquery(sql`p.id`)} AS reserved,
            ${collectedSeatsSubquery(sql`p.id`)} AS collected,
+           ${doorSeatsSubquery(sql`p.id`)} AS door,
            ${unpaidSeatsSubquery(sql`p.id`)} AS unpaidCount,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t JOIN reservations r ON r.id = t.reservation_id
               WHERE t.performance_id = p.id AND t.refunded_at IS NULL AND r.status = 'PENDING') AS unpaidOwedPence,

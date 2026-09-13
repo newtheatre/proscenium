@@ -58,19 +58,19 @@ export function unpaidSeatsColumn(alias: string): SQL {
   return unpaidSeatsSubquery(sql`${sql.raw(alias)}.id`)
 }
 
-// Paid: money has been taken, whether or not the seat has been walked in on yet (D-114
-// criterion 2 makes collection the payment moment, so COLLECTED and DOOR both count).
-export function paidSeatsSubquery(performanceId: SQL): SQL {
+// Reserved in advance, paid or not: pending and collected are the two states a reservation
+// made ahead of the night can be in (Matt's ruling on #996). Door is a walk-up, never this.
+export function reservedSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
     SELECT count(*) FROM ${sql.raw(TICKETS)} t
     JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
     WHERE t.performance_id = ${performanceId}
       AND t.refunded_at IS NULL
-      AND r.status IN ('COLLECTED', 'DOOR')
+      AND r.status IN ('PENDING', 'COLLECTED')
   )`
 }
 
-// Collected but not yet walked in: still at the box office, not the door (the desk's own queue).
+// Reserved in advance and paid for at the desk.
 export function collectedSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
     SELECT count(*) FROM ${sql.raw(TICKETS)} t
@@ -78,6 +78,17 @@ export function collectedSeatsSubquery(performanceId: SQL): SQL {
     WHERE t.performance_id = ${performanceId}
       AND t.refunded_at IS NULL
       AND r.status = 'COLLECTED'
+  )`
+}
+
+// A walk-up sale, with no reservation made ahead of the night.
+export function doorSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    WHERE t.performance_id = ${performanceId}
+      AND t.refunded_at IS NULL
+      AND r.status = 'DOOR'
   )`
 }
 
