@@ -2,7 +2,7 @@ import { MAX_VENUE_NAME } from './venues'
 import type { ListSpec } from './list-filters'
 
 // The venues list's declaration (K-129). A venue is retired, never destroyed (D-131 criterion 4),
-// so "retired" is a filter like any other rather than the includeArchived flag it used to be.
+// so "retired" is a filter like any other.
 export const venuesList = {
   key: 'venues',
   search: { placeholder: 'A venue', maxLength: MAX_VENUE_NAME },
