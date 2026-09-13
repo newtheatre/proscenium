@@ -43,6 +43,12 @@ bun install
 bun run dev               # http://localhost:3001
 ```
 
+Fill in every other key `.env.example` lists too: an `.env` written before one of them existed is
+missing it silently, and the first sign is usually a route refusing to work rather than a warning
+at startup. `NUXT_WAITING_LIST_TOKEN_SECRET` (D-113) is the one this has caught most often, with
+the waiting-list join returning a 500. `server/plugins/0.required-env.ts` logs every missing key
+by name to the server console on the first request of a run, so that is the first place to look.
+
 Before opening a pull request, run what CI gates on:
 
 ```bash
