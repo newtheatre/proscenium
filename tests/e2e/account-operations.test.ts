@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { saysRole } from '#shared/utils/roles'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
@@ -47,6 +48,18 @@ function read<T>(sql: string, ...parameters: unknown[]): T | undefined {
   const database = new Database(app.databaseFile, { readonly: true })
   try {
     return (database.query(sql).get(...parameters as never[]) as T | null) ?? undefined
+  }
+  finally {
+    database.close()
+  }
+}
+
+// Setup only, never the behaviour under test: earlier cases in this file grant ADMIN to spare
+// subjects, so this arranges a known single-administrator state directly.
+function run(sql: string, ...parameters: unknown[]): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(sql).run(...parameters as never[])
   }
   finally {
     database.close()
@@ -221,19 +234,23 @@ describe.skipIf(skip !== null)('the account view (A-121 criterion 5)', () => {
   })
 })
 
+async function officerView(): Promise<Bun.WebView> {
+  const view = await openSignedOutView(app.baseURL)
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', officer.email)
+  await fill(view, 'form input[type="password"]', password)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, 'document.querySelectorAll(\'[data-test="mfa-challenge"] input\').length >= 6')
+  await fillPin(view, '[data-test="mfa-challenge"] input', await unusedCode())
+  await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
+  return view
+}
+
 describe.skipIf(skip !== null)('the account screen', () => {
   test('an administrator disables an account from the screen', async () => {
     const person = await subject('onscreen')
-    const view = await openSignedOutView(app.baseURL)
+    const view = await officerView()
     try {
-      await visit(view, `${app.baseURL}/sign-in`)
-      await fill(view, 'form input[type="email"]', officer.email)
-      await fill(view, 'form input[type="password"]', password)
-      await click(view, 'form button[type="submit"]')
-      await waitFor(view, 'document.querySelectorAll(\'[data-test="mfa-challenge"] input\').length >= 6')
-      await fillPin(view, '[data-test="mfa-challenge"] input', await unusedCode())
-      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
-
       await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="account-name"]')
       expect(await textOf(view)).toContain(person.email)
 
@@ -242,6 +259,101 @@ describe.skipIf(skip !== null)('the account screen', () => {
 
       expect(read<{ disabled: number }>('SELECT disabled FROM users WHERE id = ?', person.id)!.disabled).toBe(1)
       expect(await stillSignedIn(person.cookie)).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  // A-118, 0009: the year end is the default, and permanent is an explicit switch, never the fallback.
+  test('an administrator grants a role, and revokes it, from the screen (#929)', async () => {
+    const person = await subject('grantable')
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="grant-role"]')
+
+      await pickOption(view, '[data-test="grant-role"]', saysRole('BOX_OFFICE'))
+      await click(view, '[data-test="grant-submit"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="revoke-BOX_OFFICE"]\')')
+
+      const granted = read<{ expires_at: number | null }>(
+        'SELECT expires_at FROM role_grants WHERE user_id = ? AND role = ?', person.id, 'BOX_OFFICE',
+      )
+      expect(granted?.expires_at).not.toBeNull()
+
+      await click(view, '[data-test="revoke-BOX_OFFICE"]')
+      await waitFor(view, '!document.querySelector(\'[data-test="revoke-BOX_OFFICE"]\')')
+
+      expect(read('SELECT user_id FROM role_grants WHERE user_id = ? AND role = ?', person.id, 'BOX_OFFICE')).toBeUndefined()
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  test('a permanent grant carries no expiry', async () => {
+    const person = await subject('permanent')
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="grant-role"]')
+
+      await pickOption(view, '[data-test="grant-role"]', saysRole('TREASURER'))
+      await click(view, '[data-test="grant-permanent"]')
+      await click(view, '[data-test="grant-submit"]')
+      await waitFor(view, 'document.body.innerText.includes(\'further notice\')')
+
+      expect(read<{ expires_at: number | null }>(
+        'SELECT expires_at FROM role_grants WHERE user_id = ? AND role = ?', person.id, 'TREASURER',
+      )?.expires_at).toBeNull()
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  // The last-administrator guard is proven server-side already (A-120); this proves the screen
+  // surfaces its refusal as copy rather than swallowing it (#929's suggested fix).
+  test('revoking the last administrator refuses with copy on the screen', async () => {
+    const view = await officerView()
+    try {
+      const me = read<{ id: string }>('SELECT id FROM users WHERE email = ?', officer.email)!.id
+
+      // Earlier cases in this file grant ADMIN to spare subjects; only officer's own grant matters here.
+      run('DELETE FROM role_grants WHERE role = ? AND user_id != ?', 'ADMIN', me)
+
+      await visit(view, `${app.baseURL}/people/accounts/${me}`, '[data-test="grants"]')
+
+      await click(view, '[data-test="revoke-ADMIN"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="failure"]\')')
+      expect(await textOf(view, '[data-test="failure"]')).toContain('last administrator')
+
+      expect(read('SELECT user_id FROM role_grants WHERE user_id = ? AND role = ?', me, 'ADMIN')).toBeDefined()
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  test('an administrator erases an account from the screen, after typing the email back', async () => {
+    const person = await subject('erasable')
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="erase-reveal"]')
+
+      await click(view, '[data-test="erase-reveal"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="erase-confirm"]\')')
+
+      // Wrong text leaves the button refused; only the exact address unlocks it.
+      await fill(view, '[data-test="erase-confirm-email"]', 'not-the-right-address@example.com')
+      expect(await view.evaluate<boolean>('document.querySelector(\'[data-test="erase-submit"]\').disabled')).toBe(true)
+
+      await fill(view, '[data-test="erase-confirm-email"]', person.email)
+      await click(view, '[data-test="erase-submit"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="merge"]\') === null')
+
+      expect(read<{ anonymised_at: number | null }>(
+        'SELECT anonymised_at FROM users WHERE id = ?', person.id,
+      )?.anonymised_at).not.toBeNull()
     }
     finally {
       view.close()
