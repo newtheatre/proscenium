@@ -49,11 +49,19 @@ const performanceOptions = computed(() => performances.value.map(one => ({
   value: one.id,
 })))
 
-// The camera is the door's default and the typed field its fallback, so a device with no camera
-// lands on the field rather than on an apology (E-129 criteria 1, 5).
-type Mode = 'CAMERA' | 'TYPING'
-const mode = ref<Mode>('CAMERA')
+// The camera is the door's default, the typed field its fallback for no camera (E-129 1, 5).
+// Pass mode arrives via `?mode=pass` from the hub, or a scanned pass QR (D-126).
+type Mode = 'CAMERA' | 'TYPING' | 'PASS'
+const route = useRoute()
+const mode = ref<Mode>(route.query.mode === 'pass' ? 'PASS' : 'CAMERA')
+const passPrefill = ref('')
 const cameraNote = ref<string | null>(null)
+
+// The hub links straight to `?mode=pass`, and the route is the same one, so the query is watched
+// rather than read once at setup.
+watch(() => route.query.mode, (wanted) => {
+  if (wanted === 'pass') mode.value = 'PASS'
+})
 
 const reference = ref('')
 const scanning = ref(false)
@@ -82,11 +90,18 @@ async function admitScanned(scanned: string): Promise<void> {
   if (scanning.value || !performanceId.value) return
   scanning.value = true
   try {
-    const { reference: resolved } = await $fetch<{ reference: string }>('/api/tonight/door/resolve', {
+    const resolved = await $fetch<{ kind: string, reference: string }>('/api/tonight/door/resolve', {
       method: 'POST',
       body: { scanned, performanceId: performanceId.value },
     })
-    await admit(resolved)
+    // A pass QR opens the holder's own card rather than admitting blind: the volunteer reads what
+    // it covers and what tonight already holds before pressing Admit (D-126 criterion 1).
+    if (resolved.kind === 'PASS_TOKEN') {
+      passPrefill.value = resolved.reference
+      mode.value = 'PASS'
+      return
+    }
+    await admit(resolved.reference)
   }
   catch (refused) {
     show({ state: 'REFUSED', headline: 'NOT OURS', line: refusalText(refused), note: null }, '', null, 0)
@@ -145,6 +160,7 @@ async function scanTyped(): Promise<void> {
 
 function scanNext(): void {
   shown.value = null
+  passPrefill.value = ''
   mode.value = cameraNote.value ? 'TYPING' : 'CAMERA'
 }
 
@@ -152,6 +168,14 @@ function typeInstead(): void {
   shown.value = null
   mode.value = 'TYPING'
 }
+
+function showPassAdmission(result: { reference: string, verdict: DoorVerdict, holderName: string | null, partySize: number }): void {
+  show(result.verdict, result.reference, result.holderName, result.partySize)
+}
+
+const hint = computed(() => mode.value === 'PASS'
+  ? 'Find the holder by name, or by the reference on the pass.'
+  : 'Point the camera at the code, or type the reference.')
 
 const cardClass: Record<DoorVerdict['state'], string> = {
   PAID: 'border-success bg-success/10 text-success',
@@ -168,8 +192,8 @@ const cardIcon: Record<DoorVerdict['state'], string> = {
 
 <template>
   <NightScreen
-    title="Door"
-    :hint="shown ? undefined : 'Point the camera at the code, or type the reference.'"
+    :title="mode === 'PASS' && !shown ? 'Admit pass holder' : 'Door'"
+    :hint="shown ? undefined : hint"
     :stale="syncedAt"
     :busy="busy"
     data-test="door-screen"
@@ -254,8 +278,15 @@ const cardIcon: Record<DoorVerdict['state'], string> = {
         />
       </UFormField>
 
+      <DoorPassMode
+        v-if="mode === 'PASS'"
+        :performance-id="performanceId"
+        :prefill="passPrefill"
+        @admitted="showPassAdmission"
+      />
+
       <QrScanner
-        v-if="mode === 'CAMERA'"
+        v-else-if="mode === 'CAMERA'"
         @decoded="admitScanned"
         @unavailable="fallBackToTyping"
       />

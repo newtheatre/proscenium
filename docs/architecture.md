@@ -768,6 +768,11 @@ whatever the lens or the keyboard produced, and answers with a reference:
 | `/t/<ref>` | The form the show-night design names | the reference itself |
 | `K7M4PQ` | A reference read aloud, or typed by a hardware scanner | itself |
 
+A decoded pass URL opens pass mode rather than admitting blind: `/tonight/door?mode=pass` finds a
+holder by name or reference through `GET /api/tonight/door/passes/search`, and its card carries
+what the pass covers, what tonight already holds, when it was last used, and the refusal the scan
+would give, so the volunteer reads the answer off the card before pressing Admit (D-126).
+
 The reference then goes through `/api/tonight/door/tickets/scan` and `/api/tonight/door/passes/scan`
 as it always did, so a signed token is never unpacked in the browser and there is exactly one
 admission state machine. `shared/utils/door.ts` holds the pure half: `readScannedCode()`,
