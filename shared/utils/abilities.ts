@@ -40,6 +40,9 @@ export const viewMembers = defineAbility((viewer: Viewer) => holds(viewer, 'memb
 export const viewFellows = defineAbility((viewer: Viewer) => holds(viewer, 'fellowships.read'))
 export const viewRooms = defineAbility((viewer: Viewer) => holds(viewer, 'rooms.read'))
 export const decideRoomRequests = defineAbility((viewer: Viewer) => holds(viewer, 'rooms.write'))
+export const manageRoomsEstate = defineAbility((viewer: Viewer) => holds(viewer, 'rooms.write'))
+export const manageFellows = defineAbility((viewer: Viewer) => holds(viewer, 'fellowships.write'))
+export const manageMembers = defineAbility((viewer: Viewer) => holds(viewer, 'members.write'))
 export const viewAuditTrail = defineAbility((viewer: Viewer) => holds(viewer, 'audit.read'))
 export const viewSettings = defineAbility((viewer: Viewer) => holds(viewer, 'config.read'))
 export const editSettings = defineAbility((viewer: Viewer) => holds(viewer, 'config.write'))
@@ -148,9 +151,12 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   grantRoles: 'roles.grant',
   revokeRoles: 'roles.revoke',
   viewMembers: 'members.read',
+  manageMembers: 'members.write',
   viewFellows: 'fellowships.read',
+  manageFellows: 'fellowships.write',
   viewRooms: 'rooms.read',
   decideRoomRequests: 'rooms.write',
+  manageRoomsEstate: 'rooms.write',
   viewAuditTrail: 'audit.read',
   viewSettings: 'config.read',
   editSettings: 'config.write',

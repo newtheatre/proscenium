@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { can, manageMembers } from '#shared/utils/abilities'
 import { recordMembership } from '#shared/utils/admin-forms'
 import { formatLondon } from '#shared/utils/london'
 import { MEMBERSHIP_TERMS, isInGrace, londonDay } from '#shared/utils/membership'
@@ -73,6 +74,7 @@ const waiting = ref<number | null>(null)
 const loading = ref(false)
 const failure = ref<string | null>(null)
 const toast = useToast()
+const writes = computed(() => can(useViewer().value, manageMembers))
 const grantForm = useTemplateRef('grantForm')
 
 const granting = ref(false)
@@ -244,14 +246,16 @@ const columns: TableColumn<Member>[] = [
   {
     id: 'confirmed',
     header: 'Checked',
-    cell: ({ row }) => row.original.confirmedAt
-      ? h(UBadge, { color: 'success', variant: 'subtle', size: 'sm' }, () => 'Yes')
-      : h(UButton, {
-          'variant': 'subtle',
-          'size': 'sm',
-          'data-test': 'confirm',
-          'onClick': () => confirm(row.original),
-        }, () => 'Confirm'),
+    cell: ({ row }) => {
+      if (row.original.confirmedAt) return h(UBadge, { color: 'success', variant: 'subtle', size: 'sm' }, () => 'Yes')
+      if (!writes.value) return h('span', { class: 'text-sm text-muted' }, 'No')
+      return h(UButton, {
+        'variant': 'subtle',
+        'size': 'sm',
+        'data-test': 'confirm',
+        'onClick': () => confirm(row.original),
+      }, () => 'Confirm')
+    },
   },
   {
     id: 'open',
@@ -310,23 +314,25 @@ const claimColumns: TableColumn<Claim>[] = [
     id: 'decide',
     header: '',
     meta: { class: { td: 'text-right whitespace-nowrap' } },
-    cell: ({ row }) => h('div', { class: 'flex justify-end gap-2' }, [
-      h(UButton, {
-        'size': 'sm',
-        'icon': 'i-lucide-check',
-        'data-test': `claim-record-${row.original.id}`,
-        'loading': deciding.value === row.original.id,
-        'onClick': () => recordClaim(row.original),
-      }, () => 'Record'),
-      h(UButton, {
-        'size': 'sm',
-        'color': 'neutral',
-        'variant': 'outline',
-        'data-test': `claim-decline-${row.original.id}`,
-        'disabled': deciding.value === row.original.id,
-        'onClick': () => askWhy(row.original),
-      }, () => 'Decline'),
-    ]),
+    cell: ({ row }) => (writes.value === false
+      ? null
+      : h('div', { class: 'flex justify-end gap-2' }, [
+          h(UButton, {
+            'size': 'sm',
+            'icon': 'i-lucide-check',
+            'data-test': `claim-record-${row.original.id}`,
+            'loading': deciding.value === row.original.id,
+            'onClick': () => recordClaim(row.original),
+          }, () => 'Record'),
+          h(UButton, {
+            'size': 'sm',
+            'color': 'neutral',
+            'variant': 'outline',
+            'data-test': `claim-decline-${row.original.id}`,
+            'disabled': deciding.value === row.original.id,
+            'onClick': () => askWhy(row.original),
+          }, () => 'Decline'),
+        ])),
   },
 ]
 
@@ -374,6 +380,7 @@ onMounted(() => {
 
       <template #actions>
         <UButton
+          v-if="writes"
           data-test="record-membership"
           icon="i-lucide-user-plus"
           @click="granting = true"

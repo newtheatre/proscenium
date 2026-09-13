@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { can, manageRoomsEstate } from '#shared/utils/abilities'
 import { SPACE_NOTE_REASON_LIMIT, VERDICTS, saysVerdict, spaceForm } from '#shared/utils/external-spaces'
 import { externalSpacesList } from '#shared/utils/external-spaces-list'
 import { describePurpose } from '#shared/utils/bookings'
@@ -26,6 +27,7 @@ interface Space {
 const request = useRequestFetch()
 const toast = useToast()
 const failure = ref<string | null>(null)
+const writes = computed(() => can(useViewer().value, manageRoomsEstate))
 
 // Search, filter and sort live in the URL (K-129).
 const { search, conditions, sort, query, active, filtered, set, setSort, clear } = useListQuery(externalSpacesList)
@@ -164,36 +166,40 @@ const columns: TableColumn<Space>[] = [
               size: 'sm',
             }, () => `${saysVerdict(one.verdict)} ${describePurpose(one.purpose).toLowerCase()}`),
             h('span', { class: 'text-muted' }, one.reason),
-            h(UButton, {
-              'icon': 'i-lucide-x',
-              'size': 'xs',
-              'color': 'neutral',
-              'variant': 'ghost',
-              'aria-label': `Forget what we know about ${row.original.name} for ${describePurpose(one.purpose)}`,
-              'data-test': `forget-${row.original.id}-${one.purpose}`,
-              'onClick': () => forget(row.original, one.purpose),
-            }),
+            writes.value === false
+              ? null
+              : h(UButton, {
+                  'icon': 'i-lucide-x',
+                  'size': 'xs',
+                  'color': 'neutral',
+                  'variant': 'ghost',
+                  'aria-label': `Forget what we know about ${row.original.name} for ${describePurpose(one.purpose)}`,
+                  'data-test': `forget-${row.original.id}-${one.purpose}`,
+                  'onClick': () => forget(row.original, one.purpose),
+                }),
           ])))),
   },
   {
     id: 'act',
     header: '',
     meta: { class: { td: 'text-right whitespace-nowrap' } },
-    cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
-      h(UButton, {
-        'size': 'sm',
-        'variant': 'subtle',
-        'data-test': `note-${row.original.id}`,
-        'onClick': () => startNote(row.original),
-      }, () => 'Note something'),
-      h(UButton, {
-        'size': 'sm',
-        'color': 'neutral',
-        'variant': 'ghost',
-        'data-test': `edit-space-${row.original.id}`,
-        'onClick': () => edit(row.original),
-      }, () => 'Edit'),
-    ]),
+    cell: ({ row }) => (writes.value === false
+      ? null
+      : h('div', { class: 'flex justify-end gap-1' }, [
+          h(UButton, {
+            'size': 'sm',
+            'variant': 'subtle',
+            'data-test': `note-${row.original.id}`,
+            'onClick': () => startNote(row.original),
+          }, () => 'Note something'),
+          h(UButton, {
+            'size': 'sm',
+            'color': 'neutral',
+            'variant': 'ghost',
+            'data-test': `edit-space-${row.original.id}`,
+            'onClick': () => edit(row.original),
+          }, () => 'Edit'),
+        ])),
   },
 ]
 </script>
@@ -235,6 +241,7 @@ const columns: TableColumn<Space>[] = [
 
       <template #actions>
         <UButton
+          v-if="writes"
           data-test="add-space"
           icon="i-lucide-plus"
           @click="edit(null)"

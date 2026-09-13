@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can, manageRoomsEstate } from '#shared/utils/abilities'
 import { WEEKDAYS, minutesOpen, roomForm } from '#shared/utils/rooms'
 import { roomsList } from '#shared/utils/rooms-list'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
@@ -48,6 +49,10 @@ const toast = useToast()
 const open = ref(false)
 const editing = ref<Room | null>(null)
 const saving = ref(false)
+
+// Tidiness rather than enforcement: the routes are what refuse, and this is what stops a
+// read-only role seeing three controls that all answer 403 (0040, issue 911).
+const writes = computed(() => can(useViewer().value, manageRoomsEstate))
 
 // useRequestFetch, not $fetch: on the server $fetch sends no cookies, so the render was
 // unauthenticated, came back empty, and hydration had no reason to ask again.
@@ -207,6 +212,7 @@ const columns: TableColumn<Room>[] = [
         </UButton>
 
         <UButton
+          v-if="writes"
           icon="i-lucide-plus"
           data-test="add-room"
           @click="edit(null)"
@@ -272,7 +278,10 @@ const columns: TableColumn<Room>[] = [
       </template>
 
       <template #actions-cell="{ row }">
-        <div class="flex justify-end gap-1">
+        <div
+          v-if="writes"
+          class="flex justify-end gap-1"
+        >
           <UButton
             size="sm"
             color="neutral"
