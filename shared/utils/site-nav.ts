@@ -113,8 +113,10 @@ export const CONSOLE_NAV: NavGroup[] = [
     items: [
       { label: 'Products', icon: 'i-lucide-beer', to: '/bar/products', ability: viewBarCatalogue },
       { label: 'Categories', icon: 'i-lucide-layout-grid', to: '/bar/categories', ability: viewBarCatalogue },
-      { label: 'Stocked items', icon: 'i-lucide-package', to: '/bar/stock', ability: viewBarStock, exact: true },
-      { label: 'Stock movements', icon: 'i-lucide-arrow-left-right', to: '/bar/stock/movements', ability: viewBarStock },
+      // Shortened from "Stocked items" and "Stock movements": both truncated at the sidebar's
+      // default width (issue 921).
+      { label: 'Stock', icon: 'i-lucide-package', to: '/bar/stock', ability: viewBarStock, exact: true },
+      { label: 'Movements', icon: 'i-lucide-arrow-left-right', to: '/bar/stock/movements', ability: viewBarStock },
       { label: 'Stocktakes', icon: 'i-lucide-clipboard-list', to: '/bar/stock/stocktakes', ability: viewBarStock },
       { label: 'Order list', icon: 'i-lucide-truck', to: '/bar/stock/order-list', ability: viewBarStock },
       { label: 'Reports', icon: 'i-lucide-bar-chart-3', to: '/bar/reports', ability: viewBarStock },
@@ -242,7 +244,8 @@ export const MY_NAV: NavEntry[] = [
 // tonight (K-127 criterion 3). `AccountSettings.vue` renders these as the settings side list.
 export const ACCOUNT_NAV: NavEntry[] = [
   { label: 'Profile', icon: 'i-lucide-user', to: '/account/profile', ability: signedIn },
-  { label: 'Sign-in and security', icon: 'i-lucide-shield', to: '/account/security', ability: signedIn },
+  // Shortened from "Sign-in and security": truncated in the settings aside at 1280 (issue 921).
+  { label: 'Security', icon: 'i-lucide-shield', to: '/account/security', ability: signedIn },
   { label: 'Notifications', icon: 'i-lucide-bell', to: '/account/notifications', ability: signedIn },
 ]
 

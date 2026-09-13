@@ -53,12 +53,11 @@ const items = computed<NavigationMenuItem[][]>(() => {
         <span class="font-semibold">NNT</span>
       </template>
       <template #default="{ collapsed }">
-        <!-- A closed group keeps its links in the document, hidden: the whole sidebar is then
-             one thing to read, and what is filtered out is genuinely absent. -->
+        <!-- unmount-on-hide keeps a closed group's accordion trigger ids from colliding with an
+             open one's (issue 896): Reka does not scope them per instance while both stay mounted. -->
         <UNavigationMenu
           orientation="vertical"
           type="single"
-          :unmount-on-hide="false"
           :collapsed="collapsed"
           :popover="collapsed"
           :tooltip="collapsed"

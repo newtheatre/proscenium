@@ -63,6 +63,7 @@ function entriesUrl(source?: string): string {
       <template #actions>
         <USelect
           v-model="kind"
+          aria-label="Period kind"
           data-test="period-kind"
           :items="[...SELECTABLE_PERIOD_KINDS]"
         />
@@ -74,11 +75,13 @@ function entriesUrl(source?: string): string {
         <UInputNumber
           v-if="kind === 'MONTH'"
           v-model="month"
+          aria-label="Month"
           data-test="period-month"
         />
         <UInputNumber
           v-if="kind === 'MONTH' || kind === 'SEASON'"
           v-model="year"
+          aria-label="Year"
           data-test="period-year"
         />
         <UButton

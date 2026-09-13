@@ -42,6 +42,7 @@ const reportFailure = computed(() => (error.value ? refusalText(error.value, 'Th
       <template #actions>
         <USelect
           v-model="scopeKind"
+          aria-label="Scope"
           data-test="scope-kind"
           :items="['SHOW', 'PERIOD']"
         />

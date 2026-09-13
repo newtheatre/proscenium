@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { markVerified } from '#tests/helpers/accounts'
+import { codeForStep, stepFor } from '#shared/utils/totp'
+import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // K-101 criterion 1, over the screens that exist. The booking flow, the door and the till are
@@ -117,6 +118,53 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
     try {
       expect(await violationsOn(view, '/account/profile', '[data-test="profile-form"]')).toEqual([])
       expect(await violationsOn(view, '/account/security', '[data-test="methods"]')).toEqual([])
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // One console screen stands for the shared layout (sidebar, toolbar): issues 896 and 916.
+  test('a console screen has none either', async () => {
+    const email = registrableAddress('a11y-officer')
+    const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
+    await fetch(`${app.baseURL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, name: person.name, password }),
+    })
+    markVerified(app, email)
+
+    const enrolled = await fetch(`${app.baseURL}/api/auth/sign-in`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const cookie = (enrolled.headers.get('set-cookie') ?? '').split(';')[0]!
+    const { secret } = await (await fetch(`${app.baseURL}/api/account/mfa/enrol`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+    })).json() as { secret: string }
+    await fetch(`${app.baseURL}/api/account/mfa/confirm`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ code: await codeForStep(secret, stepFor(new Date())) }),
+    })
+    expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', email, app.databaseFile]).exitCode).toBe(0)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, 'document.querySelectorAll(\'[data-test="mfa-challenge"] input\').length >= 6')
+
+      forgetSpentStep(app, email)
+      await fillPin(view, '[data-test="mfa-challenge"] input', await codeForStep(secret, stepFor(new Date())))
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
+
+      expect(await violationsOn(view, '/rooms/manage', '[data-test="rooms-table"]')).toEqual([])
     }
     finally {
       view.close()

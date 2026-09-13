@@ -26,6 +26,7 @@ const reportFailure = computed(() => (error.value ? refusalText(error.value, 'Th
       <template #actions>
         <UInputNumber
           v-model="year"
+          aria-label="Season year"
           data-test="season-year"
         />
         <UButton
