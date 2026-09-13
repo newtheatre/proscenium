@@ -24,6 +24,11 @@ const { data: policy } = await useAsyncData(
 
 const body = computed(() => resolvePolicyTree(page.value?.body, policy.value?.values ?? {}))
 
+// Two sections is a list, not a map. Below that the aside is an empty column beside the prose.
+const TOC_MINIMUM = 3
+const toc = computed(() => page.value?.body?.toc?.links ?? [])
+const hasToc = computed(() => toc.value.length >= TOC_MINIMUM)
+
 useSeoMeta({
   title: page.value.title,
   description: page.value.description,
@@ -48,14 +53,27 @@ useSchemaOrg([
       :alt="page!.bannerAlt"
       :title="page!.title"
       :description="page!.description"
+      data-test="content-hero"
     />
-    <UPageHero
+    <!-- A page with no photograph still opens on the house rather than on a plain black band:
+         the spotlight and the display face are what the site has instead of a picture. -->
+    <div
       v-else
-      :title="page!.title"
-      :description="page!.description"
-    />
+      class="dark nnt-spotlight"
+      data-test="content-hero"
+    >
+      <UPageHero
+        :title="page!.title"
+        :description="page!.description"
+        :ui="{
+          title: 'nnt-headline text-highlighted',
+          description: 'text-default',
+          container: 'py-12 sm:py-14 lg:py-16',
+        }"
+      />
+    </div>
 
-    <UContainer class="pb-16">
+    <UContainer class="py-12">
       <UAlert
         v-if="page!.placeholder"
         data-test="placeholder-banner"
@@ -67,7 +85,26 @@ useSchemaOrg([
         class="mb-8"
       />
 
-      <ContentRenderer :value="{ ...page!, body }" />
+      <UPage>
+        <UPageBody
+          class="max-w-prose"
+          data-test="content-body"
+        >
+          <ContentRenderer :value="{ ...page!, body }" />
+        </UPageBody>
+
+        <template
+          v-if="hasToc"
+          #right
+        >
+          <UContentToc
+            highlight
+            title="On this page"
+            :links="toc"
+            data-test="content-toc"
+          />
+        </template>
+      </UPage>
     </UContainer>
   </div>
 </template>
