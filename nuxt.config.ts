@@ -188,7 +188,9 @@ export default defineNuxtConfig({
           // No subdomain rules and no preload: the society's other subdomains are not ours
           // to commit until the old estate goes read-only.
           'Strict-Transport-Security': 'max-age=15552000',
-          'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+          // `camera=(self)` and no wider: the door's QR scanner reads the lens from our own
+          // origin (E-129), and nothing embedded in a frame ever may.
+          'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(), payment=()',
           // Deliberately no script-src: Nuxt emits inline hydration scripts, so a script
           // policy needs per-request nonces rather than a static rule.
           'Content-Security-Policy': 'frame-ancestors \'none\'; object-src \'none\'; base-uri \'self\'',

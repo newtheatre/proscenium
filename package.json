@@ -36,6 +36,7 @@
     "@vueuse/core": "^14.4.0",
     "@vueuse/nuxt": "^14.4.0",
     "drizzle-orm": "^0.45.2",
+    "jsqr": "^1.4.0",
     "nuxt": "^4.5.2",
     "nuxt-auth-utils": "0.5.30",
     "nuxt-authorization": "0.3.5",
