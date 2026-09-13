@@ -264,6 +264,9 @@ Open questions for the committee:
   4. The committee can grant membership manually, recording who granted it, when, and the evidence; every grant is audited.
   5. The committee can view and export the membership register for SU returns; the export is column allow-listed and paginated.
   6. Past years' membership states remain queryable; lapse never deletes history.
+  7. Added 13 September 2026: `/account/membership` quotes the SU's annual membership fee
+     (`MEMBERSHIP_FEE_PENCE`) through the placeholder-token mechanism (J-110), marked unenforced
+     since nothing here charges it.
 - Source: Prompt Book A-2; Get-In part 6 (manual grant exists regardless of roster sync).
 
 ## A-118: Grant roles with committee-year expiry

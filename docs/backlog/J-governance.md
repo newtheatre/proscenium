@@ -165,7 +165,7 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
   3. CI validates every token in content against the configuration schema; a token naming an unknown or renamed key fails the build.
   4. At runtime, an unresolvable token renders as a visible error, never as blank or stale text.
   5. A rule the committee has stated but the system does not yet enforce is marked unenforced on the page, from a flag on the configuration key, so honesty about enforcement is part of the rendering.
-- Source: Decision 0012 (mechanism, amended 26 August); audit RM-1 and RM-7 (the unenforced policy document this exists to prevent).
+- Source: Decision 0012 (mechanism, amended 26 August); audit RM-1 and RM-7 (the unenforced policy document this exists to prevent); A-117 criterion 7 (the membership fee quoted this way).
 
 ## J-111: The public pages carry the committee's wording
 
