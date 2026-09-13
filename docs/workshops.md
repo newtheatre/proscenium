@@ -61,6 +61,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Setting | Current folklore | Proposed default | Notes |
 | --- | --- | --- | --- |
 | Membership year and evidence | SU records, manual | Manual grant, plus a hand-uploaded SU export where available (SP-2: no automatic access) | |
+| Annual membership fee | £6, unwritten | £6.00 | A-117. The SU sells membership and we only record it (0005, 0031); `MEMBERSHIP_FEE_PENCE` is quoted for information only and ships unenforced, since nothing here charges it |
 | Notification topics | per-app ad hoc | bookings, shifts, training, rooms, announcements | Fixed in the schema rather than configured; changing the list is a migration (0025) |
 | Notification defaults for a new account | rooms defaulted email on and push off; the other apps had no preferences at all | email on for all five topics, push on for none | New settings, one list of topics per channel (H-102 criterion 2). Push ships empty because nothing delivers it yet and consent is collected when it does (H-204). A member who has never opened the screen holds no rows, so a value changed here still reaches them. Owner: IT Manager |
 | Membership grace window | none: nobody tracked an expiry | 14 days past expiry still counts | Owner: IT Manager. A renewal in hand should not be a refusal at the desk (0031) |
