@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { MAILBOX, writeToMailbox } from '#server/utils/mailbox'
 import { PERSONA_PASSWORD, PERSONA_TOTP_SECRET, PERSONAS } from '#shared/utils/personas'
 import { base32Decode } from '#shared/utils/totp'
 
@@ -24,9 +25,30 @@ describe('the developer tools do not ship', () => {
     const offenders: string[] = []
     for (const chunk of chunks) {
       const source = await Bun.file(`.output/${chunk}`).text()
-      if (source.includes('sign-in-as') || source.includes(PERSONA_PASSWORD) || source.includes(PERSONA_TOTP_SECRET)) offenders.push(chunk)
+      if (source.includes('sign-in-as') || source.includes('No such letter') || source.includes(PERSONA_PASSWORD) || source.includes(PERSONA_TOTP_SECRET)) offenders.push(chunk)
     }
     expect(offenders).toEqual([])
+  })
+})
+
+// The letter's HTML rendering, if it has one, sits beside its text file (K-124 criterion 5).
+describe('the mailbox writes a letter\'s HTML beside its text file', () => {
+  test('writeToMailbox writes both files when the letter carries html', async () => {
+    const to = `responsive-${crypto.randomUUID().slice(0, 8)}@example.com`
+    await writeToMailbox({ to, from: 'no-reply@newtheatre.org.uk', subject: 'Test', text: 'Plain text', html: '<p>Rich text</p>' })
+
+    const { readdir, readFile } = await import('node:fs/promises')
+    const stem = (await readdir(MAILBOX)).find(name => name.endsWith('.txt') && name.includes(to.replace(/[^a-z0-9]+/gi, '-')))!.replace(/\.txt$/, '')
+    expect(await readFile(`${MAILBOX}/${stem}.html`, 'utf8')).toBe('<p>Rich text</p>')
+  })
+
+  test('a letter with no html writes no .html file', async () => {
+    const to = `plain-${crypto.randomUUID().slice(0, 8)}@example.com`
+    await writeToMailbox({ to, from: 'no-reply@newtheatre.org.uk', subject: 'Test', text: 'Plain text' })
+
+    const { access, readdir } = await import('node:fs/promises')
+    const stem = (await readdir(MAILBOX)).find(name => name.endsWith('.txt') && name.includes(to.replace(/[^a-z0-9]+/gi, '-')))!.replace(/\.txt$/, '')
+    await expect(access(`${MAILBOX}/${stem}.html`)).rejects.toThrow()
   })
 })
 

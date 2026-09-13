@@ -8,7 +8,7 @@ definePageMeta({ layout: 'console', title: 'Developer tools' })
 
 interface Seeded { id: string, email: string, name: string, anonymisedAt: number | null }
 interface Row extends Persona { account: Seeded | null }
-interface Letter { name: string, to: string, subject: string, body: string }
+interface Letter { name: string, to: string, subject: string, body: string, html: boolean }
 
 interface Tools {
   session: { id: string, name: string, email: string, roles: string[], permissions: string[], factor: boolean } | null
@@ -22,6 +22,9 @@ const { refresh: refreshAccount } = useAccount()
 const tools = ref<Tools | null>(null)
 const working = ref('')
 const reading = ref<Letter | null>(null)
+
+// The letter's own stem, resolved server-side against the mailbox directory (K-124 criterion 5).
+const htmlUrl = (letter: Letter): string => `/api/dev/mail/${letter.name.replace(/\.txt$/, '.html')}`
 const totpQr = computed(() => tools.value ? `data:image/svg+xml;base64,${btoa(renderSVG(tools.value.totp.uri))}` : '')
 
 async function load(): Promise<void> {
@@ -277,6 +280,17 @@ onMounted(load)
             @click="reading = letter"
           >
             Read
+          </UButton>
+          <UButton
+            v-if="letter.html"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            :to="htmlUrl(letter)"
+            target="_blank"
+            external
+          >
+            View HTML
           </UButton>
         </li>
       </ul>

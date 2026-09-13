@@ -14,15 +14,18 @@ export interface MailboxMessage {
   from: string
   subject: string
   text: string
+  html?: string
   attachments?: { filename: string, contentType: string, content: string }[]
 }
 
-// One plain file per message, named for the moment and the recipient.
+// One plain file per message, named for the moment and the recipient, plus its HTML rendering
+// beside it when the letter carries one (K-124 criterion 5): `/dev`'s View HTML link reads it.
 export async function writeToMailbox(letter: MailboxMessage): Promise<void> {
   const { mkdir, writeFile } = await import('node:fs/promises')
   await mkdir(MAILBOX, { recursive: true })
   const stamp = new Date().toISOString().replaceAll(':', '-')
-  await writeFile(`${MAILBOX}/${stamp}-${letter.to.replace(/[^a-z0-9]+/gi, '-')}.txt`, [
+  const stem = `${stamp}-${letter.to.replace(/[^a-z0-9]+/gi, '-')}`
+  await writeFile(`${MAILBOX}/${stem}.txt`, [
     `To: ${letter.to}`,
     `From: ${letter.from}`,
     `Subject: ${letter.subject}`,
@@ -31,4 +34,5 @@ export async function writeToMailbox(letter: MailboxMessage): Promise<void> {
     letter.text,
     ...(letter.attachments ?? []).flatMap(file => ['', `--- ${file.filename} ---`, file.content]),
   ].join('\n'))
+  if (letter.html) await writeFile(`${MAILBOX}/${stem}.html`, letter.html)
 }
