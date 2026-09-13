@@ -2,6 +2,7 @@
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
 import { CATEGORIES, SEVERITIES, saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { londonClock } from '#shared/utils/london'
+import { saysPerformanceChoice } from '#shared/utils/tonight'
 import type { Category, Severity } from '#shared/utils/incidents'
 
 definePageMeta({ layout: 'tonight' })
@@ -31,8 +32,8 @@ const items = ref<Entry[]>([])
 // What tonight's log is scoped to, resolved once on load: none of BAR, DOOR or DUTY_MANAGER is
 // asked to name a performance, so the first role that resolves says which ones are running.
 const performanceIds = ref<string[]>([])
-// Named where the authority route says what is running, an id where it does not yet: issue 953
-// adds `performances` and a shared label, and this falls back until that lands.
+// Named where the authority route says what is running, an id where it does not yet: a role can
+// resolve a performance the route did not label.
 const performances = ref<{ id: string, showTitle: string, startsAt: number }[]>([])
 const authorityFailure = ref<string | null>(null)
 
@@ -74,7 +75,7 @@ onMounted(async () => {
 
 const performanceOptions = computed(() => performanceIds.value.map((id) => {
   const named = performances.value.find(one => one.id === id)
-  return { label: named ? `${named.showTitle}, ${londonClock(new Date(named.startsAt * 1000))}` : id, value: id }
+  return { label: named ? saysPerformanceChoice(named) : id, value: id }
 }))
 
 interface FormState {
