@@ -7,6 +7,7 @@ import {
   fromLondonWallClock,
   londonParts,
   nextCommitteeYearEnd,
+  saysSeason,
   startOfLondonDay,
 } from '#shared/utils/london'
 
@@ -101,5 +102,18 @@ describe('a date without an instant is refused rather than assumed', () => {
     expect(formatLondon(guyFawkes, { timeStyle: 'short' })).toBe('20:00')
     // The same instant in July is an hour ahead of UTC in London.
     expect(formatLondon(new Date('2026-07-05T20:00:00.000Z'), { timeStyle: 'short' })).toBe('21:00')
+  })
+})
+
+// What the public band calls the season it is listing (J-111 criterion 6).
+describe('a season says the two years it spans', () => {
+  test('September 2026 is in the season that ends in July 2027', () => {
+    expect(saysSeason(new Date('2026-09-13T12:00:00.000Z'))).toBe('26/27')
+  })
+
+  test('the turn is the committee year end, not the calendar year', () => {
+    expect(saysSeason(new Date('2026-07-31T22:00:00.000Z'))).toBe('25/26')
+    expect(saysSeason(new Date('2026-08-01T06:00:00.000Z'))).toBe('26/27')
+    expect(saysSeason(new Date('2027-01-04T12:00:00.000Z'))).toBe('26/27')
   })
 })

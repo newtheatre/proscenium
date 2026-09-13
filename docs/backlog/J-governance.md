@@ -208,9 +208,24 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
      invitation to join. The footer carries the wordmark, the public pages in columns each entry
      declares for itself, and a copyright line. Both colour modes read: the chrome, the hero and
      the centenary band stay stage black while the page between them turns.
+  12. What's on opens on a band rather than a full hero: the season it is listing, the title with
+      "on" in gold, and one sentence saying how paying works. No figure appears in that sentence;
+      the price a visitor acts on is the live cheapest price on each card.
+  13. The venue filter is a row of pills whose values are slugs of the venue names, so no control
+      id carries a space and no filter strip paints a scrollbar. The name stays the label and the
+      listing still filters by it.
+  14. The grid is headed, so a card's heading follows a heading one level above it rather than
+      the page title. The listing is in the axe sweep in `tests/e2e/accessibility.test.ts`.
+  15. Every editorial and policy page sets its prose in a reading column rather than at the
+      container's full width, with a table of contents beside it once the page has three sections
+      or more; on a phone that table of contents is a disclosure above the prose.
+  16. A page with no banner photograph still opens on the house: the spotlight and the display
+      face, rather than a plain black band.
 - Source: Pre-cutover review, 10 September 2026; the known-issues row on unsigned-off policy
   prose; 0012, 0051. Criteria 6 to 9 added 11 September 2026, after the committee's review of the
   public-site mockups widened the story from the policy wording to the whole public site.
+  Criteria 12 to 16 added 13 September 2026, from the what's-on mockup and the
+  findings in issues 917 and 920.
 
 ## J-201: The handover run and the atomic access flip
 

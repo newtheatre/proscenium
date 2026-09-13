@@ -113,6 +113,7 @@ from Nuxt UI's structural components:
 | Surface | Layout | Built from |
 | --- | --- | --- |
 | Public site | `default` | `UHeader`, `UMain`, `UFooter`, `UFooterColumns`, `UNavigationMenu`, the `UPage*` family |
+| Editorial and policy pages | `default`, through `app/pages/[...slug].vue` | A `PhotoHero` where the page has a banner and a spotlight band where it has none, then `UPage` with a prose-width `UPageBody` and `UContentToc` in the right slot from three sections up |
 | A member's own screens | `member` | The site header, a `UNavigationMenu` sub-nav of `MY_NAV`, the shared footer. No sidebar. Account settings pages (`/account/profile`, `/account/security`, `/account/notifications`) additionally wrap in `AccountSettings.vue`, a `UPage` with a `UPageAside` of `ACCOUNT_NAV` |
 | Console: managing rooms, training, the bar, the box office, people, money | `console` | `UDashboardGroup`, `UDashboardSidebar`, `UDashboardPanel`, `UDashboardNavbar`, `UDashboardSearch`, `UTable` |
 | Show night | `tonight` | A plain dark subtree, because a phone held in a foyer is not a dashboard |
@@ -162,7 +163,10 @@ better than any gradient. Two rules:
    ours; what is inside it is theirs.
 
 The house photographs live under `public/images/`, the logos under `public/images/logos/`, and
-`PhotoHero` is the one component that draws a banner, so rule 1 is applied in one place.
+`PhotoHero` is the one component that draws a banner, so rule 1 is applied in one place. It takes
+`compact` where the picture is a band rather than the whole first screen, and its `title` and
+`description` slots take over from the props where the headline carries a word in its own colour,
+as what's on does.
 `PosterFrame` is the matching one place for show artwork: it draws the poster when there is one
 and, when there is not, the show's own two hues under its title in the display face, which is why
 a show with no artwork yet looks deliberate rather than broken, and why real posters will land in
