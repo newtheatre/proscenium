@@ -190,7 +190,9 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
   5. `bun run check` passes: no unknown or sensitive token anywhere under `content/`.
   6. The home page and what's on present the programme as a grid of poster cards: one card per
      show, its dates, its venue, its cheapest price and one booking action, with the no-art state
-     in one component so a poster placeholder replaces it in one place.
+     in one component so a poster placeholder replaces it in one place. The no-art frame carries
+     the title itself, so the card does not print it twice, and is a landscape band below `sm`.
+     A sticker says House full only when every on-sale performance of the run is sold out.
   7. The show page opens on a dark hero band carrying the poster, the practical facts and the one
      booking action, and lists its performances as a ticket stub a visitor picks a night from.
   8. The booking flow reads as an order: the choices on the left, a ticket-stub summary quoting

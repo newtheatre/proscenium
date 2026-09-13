@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { listingFlag } from '#shared/utils/listing'
 import type { ListedShow } from '#shared/utils/programme'
 
 // Deliberately public: what is on is how somebody decides to come, and no account is needed
@@ -38,14 +39,9 @@ watch(venue, () => {
   page.value = 1
 })
 
-// The first card selling fast or already full carries the view's one sticker; the rest say their
-// state in a badge, which is words and colour rather than colour alone (K-101).
-const flagged = computed(() => data.value.items.find(listed =>
-  listed.performances.some(one => !one.cancelled && (one.availability === 'LIMITED' || one.availability === 'SOLD_OUT')))?.show.slug ?? null)
-
-function flagFor(listed: ListedShow): string {
-  return listed.performances.some(one => !one.cancelled && one.availability === 'LIMITED') ? 'Selling fast' : 'House full'
-}
+// The first card with something to say carries the view's one sticker; the rest say their state
+// in a badge, which is words and colour rather than colour alone (K-101).
+const flagged = computed(() => data.value.items.find(listed => listingFlag(listed))?.show.slug ?? null)
 </script>
 
 <template>
@@ -90,7 +86,7 @@ function flagFor(listed: ListedShow): string {
               variant="sticker"
               size="sm"
             >
-              {{ flagFor(listed) }}
+              {{ listingFlag(listed) }}
             </UBadge>
           </template>
         </ShowPosterCard>

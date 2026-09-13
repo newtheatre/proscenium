@@ -59,10 +59,18 @@ const from = computed(() => {
   >
     <template #header>
       <div class="relative">
-        <PosterFrame
-          :title="listed.show.title"
-          :poster-url="listed.show.posterUrl"
-        />
+        <!-- The frame carries the title, so the heading below it is there for structure and not
+             read twice by anybody, sighted or not (J-111 criterion 6). -->
+        <ULink
+          :to="`/shows/${listed.show.slug}`"
+          :aria-label="listed.show.title"
+          class="block"
+        >
+          <PosterFrame
+            :title="listed.show.title"
+            :poster-url="listed.show.posterUrl"
+          />
+        </ULink>
         <div
           v-if="$slots.flag"
           class="absolute end-3 top-3"
@@ -72,20 +80,21 @@ const from = computed(() => {
       </div>
     </template>
 
-    <h3 class="nnt-headline text-xl">
-      <ULink
-        :to="`/shows/${listed.show.slug}`"
-        class="hover:text-primary"
-      >
-        {{ listed.show.title }}
-      </ULink>
+    <h3 class="sr-only">
+      {{ listed.show.title }}
     </h3>
 
-    <p class="mt-1 font-mono text-sm text-muted">
+    <div class="flex flex-wrap items-center gap-2 text-sm text-muted">
       <span v-if="runs">{{ runs }}</span>
-      <span v-if="runs && venue"> · </span>
-      <span v-if="venue">{{ venue }}</span>
-    </p>
+      <UBadge
+        v-if="venue"
+        color="neutral"
+        variant="subtle"
+        size="sm"
+      >
+        {{ venue }}
+      </UBadge>
+    </div>
 
     <p
       v-if="listed.show.description"
