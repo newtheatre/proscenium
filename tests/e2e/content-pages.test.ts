@@ -95,6 +95,47 @@ describe.skipIf(skip !== null)('an editorial page reads as a column, not as a wa
     }
   }, CASE_TIMEOUT_MS)
 
+  // J-111: get-involved is a landing page rather than a reading column, and everything on it is
+  // drawn from the content file rather than written into the Vue.
+  test('get-involved lays out its departments, its steps and its quote', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/get-involved`, '[data-test="get-involved"]')
+      const seen = await view.evaluate<string>(`JSON.stringify({
+        departments: document.querySelectorAll('[data-test="department"]').length,
+        steps: document.querySelectorAll('[data-test="step"]').length,
+        quote: document.querySelectorAll('[data-test="join-quote"]').length,
+        join: document.querySelectorAll('[data-test="join-action"]').length,
+        placeholder: document.querySelectorAll('[data-test="placeholder-banner"]').length,
+        marquee: document.querySelectorAll('.nnt-marquee').length,
+        sticker: document.querySelectorAll('.nnt-sticker').length,
+        spotlight: document.querySelectorAll('.nnt-spotlight').length,
+      })`)
+      const counts = JSON.parse(seen) as Record<string, number>
+
+      expect(counts.departments).toBeGreaterThan(3)
+      expect(counts.steps).toBe(3)
+      expect(counts.quote).toBe(1)
+      expect(counts.join).toBeGreaterThan(0)
+      // The placeholder treatment stays until the committee's words land (D-103 criterion 5).
+      expect(counts.placeholder).toBe(1)
+      for (const element of ['marquee', 'sticker', 'spotlight']) {
+        expect(`${element}: ${counts[element]! <= 1}`).toBe(`${element}: true`)
+      }
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the landing page still renders the sections the committee will fill', async () => {
+    const html = await (await fetch(`${app.baseURL}/get-involved`)).text()
+    for (const heading of ['Joining', 'On stage', 'Off stage', 'Training']) {
+      expect(html).toContain(heading)
+    }
+    expect(html).toContain('Awaiting committee copy')
+  })
+
   test('a long policy page carries a table of contents', async () => {
     const view = await openSignedOutView(app.baseURL)
     try {
