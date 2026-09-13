@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   allCurrentMembersQuery,
+  announceSessionsQuery,
   roleHoldersQuery,
   sessionSignupsQuery,
   tonightsRotaQuery,
@@ -116,6 +117,31 @@ describe('a session\'s sign-ups (criterion 1)', () => {
 
       const ids = read<{ id: string }>(database, sessionSignupsQuery('ts-1')).map(row => row.id)
       expect(ids).toEqual([signedUp])
+    })
+  })
+})
+
+// H-924: the announce composer's session picker searches what a session teaches or its date.
+describe('the announce composer\'s session picker (H-924)', () => {
+  test('finds a session by what it teaches, and by its date, but not by an unrelated term', async () => {
+    await withDatabase(async (database) => {
+      const trainer = person(database)
+      database.batch([
+        ['INSERT INTO departments (code, name) VALUES (?, ?)', 'TECH', 'Technical'],
+        ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'TECH-1', 'TECH', 'MODULE', 'Fire safety orientation'],
+        [`INSERT INTO training_sessions (id, held_on, starts_at, ends_at, capacity, trainer_id)
+          VALUES (?, ?, ?, ?, ?, ?)`, 'ts-2', '2026-03-14', '18:00', '20:00', 10, trainer],
+        ['INSERT INTO session_modules (id, session_id, module_id) VALUES (?, ?, ?)', 'sm-1', 'ts-2', 'TECH-1'],
+      ])
+
+      const byTitle = read<{ id: string, title: string }>(database, announceSessionsQuery('fire safety'))
+      expect(byTitle.map(row => row.id)).toEqual(['ts-2'])
+      expect(byTitle[0]!.title).toBe('Fire safety orientation')
+
+      const byDate = read<{ id: string }>(database, announceSessionsQuery('2026-03-14'))
+      expect(byDate.map(row => row.id)).toEqual(['ts-2'])
+
+      expect(read(database, announceSessionsQuery('rigging'))).toEqual([])
     })
   })
 })

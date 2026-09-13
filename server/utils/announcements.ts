@@ -70,6 +70,35 @@ export function sessionSignupsQuery(sessionId: string): SQL {
   `
 }
 
+export interface AnnounceSessionOption {
+  id: string
+  title: string
+  heldOn: string
+  startsAt: string
+}
+
+const contains = (term: string): string => `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
+
+// H-924: a session is chosen by what it teaches or its date, never typed as an id (0032). Column
+// allow-listed, since a comms.announce holder need not hold training.read.
+export function announceSessionsQuery(term: string): SQL {
+  const like = contains(term)
+  return sql`
+    SELECT s.id AS id, group_concat(m.name, ', ') AS title, s.held_on AS heldOn, s.starts_at AS startsAt
+    FROM training_sessions s
+    JOIN session_modules sm ON sm.session_id = s.id
+    JOIN modules m ON m.id = sm.module_id
+    GROUP BY s.id
+    HAVING title LIKE ${like} ESCAPE '\\' OR s.held_on LIKE ${like} ESCAPE '\\'
+    ORDER BY s.held_on DESC
+    LIMIT 20
+  `
+}
+
+export async function announceSessions(term: string): Promise<AnnounceSessionOption[]> {
+  return db.all<AnnounceSessionOption>(announceSessionsQuery(term))
+}
+
 export interface AudienceContext {
   today: string
   graceDays: number
