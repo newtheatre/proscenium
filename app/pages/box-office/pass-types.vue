@@ -8,7 +8,7 @@ import {
   saysPassTypeStatus,
 } from '#shared/utils/pass-types'
 import { saysPrice } from '#shared/utils/ticket-types'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { passTypesList } from '#shared/utils/pass-types-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { PassType, PassTypeStatus } from '#shared/utils/pass-types'
 
@@ -21,9 +21,6 @@ const UButton = resolveComponent('UButton')
 
 const request = useRequestFetch()
 const toast = useToast()
-const search = ref('')
-const status = ref<PassTypeStatus | 'ALL'>('ALL')
-const page = ref(1)
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
@@ -31,37 +28,24 @@ interface Listing { items: PassType[], total: number, pageSize: number, pages: n
 
 const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
+// Search, filters, sort and page live in the URL (K-129); the list refetches when any changes.
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(passTypesList)
+
 // Searched and paged in SQL, so what the table shows and what the count says are the same
 // question asked once (CONTRIBUTING).
 const { data, status: loading, error, refresh } = await useAsyncData(
   'pass-types',
-  () => request<Listing>('/api/admin/pass-types', {
-    query: {
-      search: search.value.trim() || undefined,
-      status: status.value === 'ALL' ? undefined : status.value,
-      page: page.value,
-    },
-  }),
-  { watch: [page], default: empty },
+  () => request<Listing>('/api/admin/pass-types', { query: query.value }),
+  { watch: [query], default: empty },
 )
 
 const { data: shows } = await useAsyncData('pass-type-shows', () => request<ShowOption[]>('/api/admin/programme/shows'), { default: () => [] })
 const showOptions = computed(() => shows.value.map(one => ({ label: one.title, value: one.id })))
 
-watch([search, status], () => {
-  if (page.value === 1) void refresh()
-  else page.value = 1
-})
-
 async function reload(): Promise<void> {
   await refresh()
   if (page.value > data.value.pages) page.value = data.value.pages
 }
-
-const statusOptions = [
-  { label: 'Any status', value: 'ALL' as const },
-  ...PASS_TYPE_STATUSES.map(one => ({ label: saysPassTypeStatus(one), value: one })),
-]
 
 // A date-only field, midnight London, because a pass's window is a season rather than an instant.
 function isoDate(at: number | null): string {
@@ -222,21 +206,6 @@ async function saveShows(): Promise<void> {
 
 const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The passes could not be read.') : null))
 
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (status.value !== 'ALL') {
-    active.push({ key: 'status', label: saysPassTypeStatus(status.value), icon: 'i-lucide-filter', clear: () => {
-      status.value = 'ALL'
-    } })
-  }
-  return active
-})
-
 const columns: TableColumn<PassType>[] = [
   {
     id: 'name',
@@ -332,21 +301,19 @@ const columns: TableColumn<PassType>[] = [
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A pass"
-      :active="activeFilters"
+      :placeholder="passTypesList.search?.placeholder"
+      :active="active"
       :loading="loading === 'pending'"
-      @clear="search = ''; status = 'ALL'"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Status">
-          <USelect
-            v-model="status"
-            :items="statusOptions"
-            value-key="value"
-            class="w-48"
-            data-test="pass-types-status"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="passTypesList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -368,7 +335,7 @@ const columns: TableColumn<PassType>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ search ? 'No pass matches that.' : 'No passes yet. Add one and it has something to cover.' }}
+          {{ filtered ? 'No pass matches that.' : 'No passes yet. Add one and it has something to cover.' }}
         </p>
       </template>
     </UTable>

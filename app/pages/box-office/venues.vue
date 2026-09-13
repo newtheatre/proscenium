@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { can, viewEmergencyCard } from '#shared/utils/abilities'
 import { venueForm } from '#shared/utils/venues'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { venuesList } from '#shared/utils/venues-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { AdminVenue } from '#shared/utils/venues'
 
@@ -16,9 +16,6 @@ const seeEmergencyCards = computed(() => can(useViewer().value, viewEmergencyCar
 
 const request = useRequestFetch()
 const toast = useToast()
-const search = ref('')
-const includeArchived = ref(true)
-const page = ref(1)
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
@@ -27,14 +24,15 @@ interface RoomOption { id: string, name: string }
 
 const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
+// Search, filters, sort and page live in the URL (K-129); the list refetches when any changes.
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(venuesList)
+
 // Searched and paged in SQL, so what the table shows and what the count says are the same
 // question asked once (CONTRIBUTING).
 const { data, status, error, refresh } = await useAsyncData(
   'venues',
-  () => request<Listing>('/api/admin/reference-data/venues', {
-    query: { includeArchived: includeArchived.value, search: search.value.trim() || undefined, page: page.value },
-  }),
-  { watch: [page], default: empty },
+  () => request<Listing>('/api/admin/reference-data/venues', { query: query.value }),
+  { watch: [query], default: empty },
 )
 
 const { data: rooms } = await useAsyncData(
@@ -42,11 +40,6 @@ const { data: rooms } = await useAsyncData(
   () => request<RoomOption[]>('/api/admin/reference-data/rooms'),
   { default: (): RoomOption[] => [] },
 )
-
-watch([search, includeArchived], () => {
-  if (page.value === 1) void refresh()
-  else page.value = 1
-})
 
 const editing = ref<AdminVenue | null>(null)
 const open = ref(false)
@@ -167,21 +160,6 @@ async function remove(): Promise<void> {
 
 const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The venues could not be read.') : null))
 
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (!includeArchived.value) {
-    active.push({ key: 'archived', label: 'Hiding retired', icon: 'i-lucide-archive', clear: () => {
-      includeArchived.value = true
-    } })
-  }
-  return active
-})
-
 const columns: TableColumn<AdminVenue>[] = [
   {
     id: 'name',
@@ -282,19 +260,19 @@ const columns: TableColumn<AdminVenue>[] = [
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A venue"
-      :active="activeFilters"
+      :placeholder="venuesList.search?.placeholder"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''; includeArchived = true"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Show">
-          <USwitch
-            v-model="includeArchived"
-            label="Including retired venues"
-            data-test="venues-archived"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="venuesList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -316,7 +294,7 @@ const columns: TableColumn<AdminVenue>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ search ? 'No venue matches that.' : 'No venues yet. Add one, and a performance has somewhere to happen.' }}
+          {{ filtered ? 'No venue matches that.' : 'No venues yet. Add one, and a performance has somewhere to happen.' }}
         </p>
       </template>
     </UTable>

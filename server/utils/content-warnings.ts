@@ -1,6 +1,10 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { aliasColumns, whereFrom } from './list-filters'
+import { contentWarningsList } from '#shared/utils/content-warnings-list'
 import type { ContentWarning, ShowContentWarning } from '#shared/utils/content-warnings'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { SQL } from 'drizzle-orm'
 
 // Reading the content-warning vocabulary and what each show carries of it (D-102). The correlation
@@ -30,37 +34,32 @@ const readWarning = (row: WarningRow): ContentWarning => ({ ...row, archived: ro
 // in. Held here as well so the console lists them the way a visitor sees them.
 const ORDER = sql` ORDER BY w.kind = 'GENERAL', w.sort, w.title COLLATE NOCASE`
 
-export interface ContentWarningFilters {
-  includeArchived: boolean
-  search?: string
+export function contentWarningsClause(query: ListQuery): ListClause {
+  return whereFrom(contentWarningsList, query, {
+    column: aliasColumns('w'),
+    search: [sql`w.title`, sql`w.slug`],
+  })
 }
 
-// A typed percent sign is a character somebody is looking for, not a wildcard.
-const contains = (term: string): string => `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
+const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
 
-// Two bound parameters at most, whatever the filters and however many entries there are (0003).
-function predicate(filters: ContentWarningFilters): SQL {
-  const terms: SQL[] = []
-  if (!filters.includeArchived) terms.push(sql`w.archived = 0`)
-  if (filters.search) terms.push(sql`(w.title LIKE ${contains(filters.search)} ESCAPE '\\' OR w.slug LIKE ${contains(filters.search)} ESCAPE '\\')`)
-  return terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``
-}
-
-export function contentWarningsQuery(filters: ContentWarningFilters, limit: number, offset: number): SQL {
+export function contentWarningsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT ${COLUMNS},
            (SELECT count(*) FROM show_content_warnings s WHERE s.warning_id = w.id) AS showCount
-    FROM content_warnings w${predicate(filters)}${ORDER} LIMIT ${limit} OFFSET ${offset}
+    FROM content_warnings w${predicate(clause)}
+    ORDER BY w.kind = 'GENERAL', ${sql.join(clause.orderBy, sql`, `)}
+    LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function listContentWarnings(filters: ContentWarningFilters, limit: number, offset: number): Promise<ContentWarning[]> {
-  return (await db.all<WarningRow>(contentWarningsQuery(filters, limit, offset))).map(readWarning)
+export async function listContentWarnings(clause: ListClause, limit: number, offset: number): Promise<ContentWarning[]> {
+  return (await db.all<WarningRow>(contentWarningsQuery(clause, limit, offset))).map(readWarning)
 }
 
-export async function countContentWarnings(filters: ContentWarningFilters): Promise<number> {
+export async function countContentWarnings(clause: ListClause): Promise<number> {
   const [row] = await db.all<{ total: number }>(sql`
-    SELECT count(*) AS total FROM content_warnings w${predicate(filters)}
+    SELECT count(*) AS total FROM content_warnings w${predicate(clause)}
   `)
   return Number(row?.total ?? 0)
 }

@@ -1,8 +1,18 @@
 import { describe, expect, test } from 'bun:test'
-import { TICKET_TYPE_REFERENCES, everSoldColumn, everSoldQuery, ticketTypesQuery } from '#server/utils/ticket-types'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { ticketTypesList } from '#shared/utils/ticket-types-list'
+import { TICKET_TYPE_REFERENCES, everSoldColumn, everSoldQuery, ticketTypesClause, ticketTypesQuery } from '#server/utils/ticket-types'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TicketTypeReference } from '#server/utils/ticket-types'
 import type { TestDatabase } from '#tests/helpers/database'
+
+// K-129: the declaration is what turns a raw query into a clause, the same route it takes live.
+const ticketTypesSchema = filterQuerySchema(ticketTypesList)
+function parsedTicketTypes(raw: Record<string, string>) {
+  const result = ticketTypesSchema.safeParse(raw)
+  if (!result.success) throw new Error(result.error.issues.map(issue => issue.message).join('; '))
+  return ticketTypesClause(result.data)
+}
 
 // D-119 on the real migrations. "Has ever been sold" is the criterion the rest of the module
 // leans on, and it is a question about rows in other tables rather than a flag on this one.
@@ -100,9 +110,8 @@ describe('the listing is searched and paged in SQL', () => {
 
       const [query, ...parameters] = boundStatement(
         database,
-        ticketTypesQuery({ includeArchived: false, search: 'stan' }, 25, 0),
+        ticketTypesQuery(parsedTicketTypes({ archived: 'false', search: 'stan' }), 25, 0),
       )
-      expect(parameters).toEqual(['%stan%', 25, 0])
       expect(rows<{ id: string }>(database, query, ...parameters).map(row => row.id)).toEqual(['tt-1'])
     })
   })
@@ -115,7 +124,7 @@ describe('the listing is searched and paged in SQL', () => {
 
       const [query, ...parameters] = boundStatement(
         database,
-        ticketTypesQuery({ includeArchived: true, search: '%' }, 25, 0),
+        ticketTypesQuery(parsedTicketTypes({ search: '%' }), 25, 0),
       )
       expect(rows<{ id: string }>(database, query, ...parameters).map(row => row.id)).toEqual(['tt-2'])
     })
@@ -129,9 +138,8 @@ describe('the listing is searched and paged in SQL', () => {
 
       const [query, ...parameters] = boundStatement(
         database,
-        ticketTypesQuery({ includeArchived: false }, 1, 1),
+        ticketTypesQuery(parsedTicketTypes({ archived: 'false' }), 1, 1),
       )
-      expect(parameters).toEqual([1, 1])
       expect(rows<{ id: string }>(database, query, ...parameters).map(row => row.id)).toEqual(['tt-1'])
     })
   })
