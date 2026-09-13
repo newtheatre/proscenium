@@ -129,7 +129,7 @@ const joinTo = computed(() => (account.value.signedIn ? '/account/membership' : 
          the subtree resolves for it (docs/design-language.md, chrome rule 1). -->
     <UContainer>
       <div
-        class="dark nnt-spotlight px-6 py-12 sm:px-12 sm:py-16"
+        class="dark nnt-spotlight rounded-lg ring ring-secondary/40 px-6 py-12 sm:px-12 sm:py-16"
         data-test="home-centenary"
       >
         <p class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">
