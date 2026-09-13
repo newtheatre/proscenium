@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, markVerified } from '#tests/helpers/accounts'
+import { codeForStep, stepFor } from '#shared/utils/totp'
+import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, openView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, openView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-108 and G-103 through the real routes. Direct edges only, a loop refused by naming it, and a
@@ -16,9 +17,11 @@ let cookie = ''
 
 const password = generatePassword()
 const member = { ...syntheticPerson(29), email: registrableAddress('catalogue-member') }
+const officer = { ...syntheticPerson(51), email: registrableAddress('prerequisites-officer') }
 let memberId = ''
 let memberCookie = ''
 let department = ''
+let officerSecret = ''
 
 beforeAll(async () => {
   if (skip) return
@@ -33,7 +36,72 @@ beforeAll(async () => {
 
   department = `PRE${suffix()}`
   await send('POST', '/api/admin/training/departments', { code: department, name: 'Prerequisites' })
+
+  // A second UI session, so the live-update case drives the real screen rather than the API.
+  await send('POST', '/api/auth/register', { email: officer.email, name: officer.name, password }, '')
+  markVerified(app, officer.email)
+  const officerFirst = (await send('POST', '/api/auth/sign-in', { email: officer.email, password }, '')
+    .then(response => response.headers.get('set-cookie') ?? ''))!.split(';')[0]!
+  officerSecret = (await (await send('POST', '/api/account/mfa/enrol', {}, officerFirst)).json() as { secret: string }).secret
+  await send('POST', '/api/account/mfa/confirm', { code: await codeForStep(officerSecret, stepFor(new Date())) }, officerFirst)
+  Bun.spawnSync(['bun', 'scripts/grant-admin.ts', officer.email, app.databaseFile])
 }, BOOT_TIMEOUT_MS)
+
+// One browser session per case: the challenge burns its step, so a fresh code every time.
+async function officerView(): Promise<Bun.WebView> {
+  forgetSpentStep(app, officer.email)
+  const view = await openSignedOutView(app.baseURL)
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', officer.email)
+  await fill(view, 'form input[type="password"]', password)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, `document.querySelectorAll('[data-test="mfa-challenge"] input').length >= 6`)
+
+  const code = await codeForStep(officerSecret, stepFor(new Date()) + 1)
+  for (const [index, digit] of [...code].entries()) {
+    await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
+  }
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+  return view
+}
+
+// The prerequisite picker stays open for a second pick, so the option is taken by the same
+// pointer sequence a real select uses without the "menu closed" check `pickOption` makes.
+async function pickPrerequisite(view: Bun.WebView, label: string): Promise<void> {
+  await waitFor(view, `document.querySelector('[data-test="module-prerequisites"]')`)
+  await view.evaluate(`(() => {
+    const root = document.querySelector('[data-test="module-prerequisites"]')
+    const trigger = root.matches('button,[role="combobox"]') ? root : root.querySelector('button,[role="combobox"]')
+    trigger.click()
+  })()`)
+  await waitFor(view, `document.querySelector('[role="option"]')`, 15_000)
+
+  const panel = `(document.querySelector('[data-reka-popper-content-wrapper]') ?? document.querySelector('[role="listbox"]')?.parentElement)`
+  const typed = await view.evaluate<boolean>(`(() => {
+    const search = ${panel}?.querySelector('input')
+    if (!search) return false
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    setter.call(search, ${JSON.stringify(label)})
+    search.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })()`)
+  if (typed) await Bun.sleep(400)
+
+  await view.evaluate(`(() => {
+    const wanted = ${JSON.stringify(label)}
+    const option = [...document.querySelectorAll('[role="option"]')].find(item => item.innerText.trim() === wanted)
+      ?? [...document.querySelectorAll('[role="option"]')].find(item => item.innerText.trim().startsWith(wanted))
+    const init = { bubbles: true, cancelable: true, button: 0 }
+    for (const type of ['pointermove', 'pointerdown', 'pointerup', 'click']) {
+      option.dispatchEvent(type.startsWith('pointer')
+        ? new PointerEvent(type, { ...init, pointerType: 'mouse', isPrimary: true })
+        : new MouseEvent(type, init))
+    }
+  })()`)
+  await Bun.sleep(300)
+  await view.evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+  await Bun.sleep(200)
+}
 
 afterAll(async () => {
   await app?.stop()
@@ -268,6 +336,34 @@ describe.skipIf(skip !== null)('the catalogue a member browses (G-103)', () => {
     finally {
       view.close()
     }
+  }, CASE_TIMEOUT_MS)
+})
+
+describe.skipIf(skip !== null)('the editor\'s own list, without reopening the modal (G-108)', () => {
+  test('a picked prerequisite appears in the field at once', async () => {
+    const gate = await addModule({ name: 'Induction' })
+    const advanced = await addModule({ name: 'Advanced desk' })
+
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage`, '[data-test="modules-table"]')
+      await click(view, `[data-test="edit-module-${advanced}"]`)
+      await waitFor(view, `document.querySelector('[data-test="no-prerequisites"]')`, 30_000)
+
+      await pickPrerequisite(view, `${gate} Induction`)
+
+      // Still the same modal: no navigation, no reopen, just the response landing.
+      expect(await textOf(view, '[data-test="prerequisite-summary"]')).toContain(gate)
+      expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="prerequisite-summary"]')`))
+        .toBe(true)
+    }
+    finally {
+      view.close()
+    }
+
+    expect(read<{ n: number }>(
+      'SELECT count(*) n FROM module_prerequisites WHERE module_id = ? AND requires_id = ?', advanced, gate,
+    )?.n).toBe(1)
   }, CASE_TIMEOUT_MS)
 })
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { saysGaps } from '#shared/utils/training'
 import { saysClosure, saysPlace } from '#shared/utils/training-signup'
+import { formatLondon, startOfLondonDay } from '#shared/utils/london'
 import type { PrerequisiteGap } from '#shared/utils/training'
 import type { ClosureReason } from '#shared/utils/training-signup'
 
@@ -42,9 +43,20 @@ const mine = computed(() => data.value.items.filter(session => session.myPositio
 const open = computed(() => data.value.items.filter(session => session.myPosition === null))
 
 interface SignUpAnswer {
+  position: number
   placed: boolean
   waitlistPosition: number | null
   warnings: PrerequisiteGap[]
+}
+
+// Patched from the mutation's own response before the background refetch lands, so the move
+// between "Coming up" and "What you are signed up to" never waits on a second round trip.
+function standAt(sessionId: string, standing: { position: number | null, placed: boolean, waitlistPosition: number | null }): void {
+  const item = data.value.items.find(one => one.id === sessionId)
+  if (!item) return
+  item.myPosition = standing.position
+  item.placed = standing.placed
+  item.waitlistPosition = standing.waitlistPosition
 }
 
 async function signUp(session: Session): Promise<void> {
@@ -60,6 +72,7 @@ async function signUp(session: Session): Promise<void> {
       icon: 'i-lucide-check',
       color: answer.placed ? 'success' : 'warning',
     })
+    standAt(session.id, answer)
     await refresh()
   }
   catch (error) {
@@ -81,6 +94,7 @@ async function withdraw(session: Session): Promise<void> {
       icon: 'i-lucide-check',
       color: 'neutral',
     })
+    standAt(session.id, { position: null, placed: false, waitlistPosition: null })
     await refresh()
   }
   catch (error) {
@@ -92,6 +106,9 @@ async function withdraw(session: Session): Promise<void> {
 }
 
 const placesLeft = (session: Session): number => Math.max(0, session.capacity - session.signedUp)
+
+const sessionDay = (session: Session): string =>
+  formatLondon(startOfLondonDay(session.heldOn), { weekday: 'short', day: 'numeric', month: 'short' })
 </script>
 
 <template>
@@ -155,7 +172,7 @@ const placesLeft = (session: Session): number => Math.max(0, session.capacity - 
                 </UBadge>
               </div>
               <p class="mt-1 text-sm text-muted">
-                {{ session.heldOn }}, {{ session.startsAt }} to {{ session.endsAt }}
+                {{ sessionDay(session) }}, {{ session.startsAt }} to {{ session.endsAt }}
                 <template v-if="session.place">
                   · {{ session.place }}
                 </template>
@@ -236,7 +253,7 @@ const placesLeft = (session: Session): number => Math.max(0, session.capacity - 
                 </UBadge>
               </div>
               <p class="mt-1 text-sm text-muted">
-                {{ session.heldOn }}, {{ session.startsAt }} to {{ session.endsAt }}
+                {{ sessionDay(session) }}, {{ session.startsAt }} to {{ session.endsAt }}
                 <template v-if="session.place">
                   · {{ session.place }}
                 </template>

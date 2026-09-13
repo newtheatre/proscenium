@@ -580,9 +580,12 @@ describe.skipIf(skip !== null)('the member screen (G-105)', () => {
       await click(view, `[data-test="signup-${session}"]`)
       await waitFor(view, `document.querySelector('[data-test="standing-${session}"]')`, 30_000)
       expect(await textOf(view, `[data-test="standing-${session}"]`)).toContain('You have a place')
+      // The bug this pins: the session staying under "Coming up" with its Sign up button live.
+      expect(await view.evaluate<boolean>(`!document.querySelector('[data-test="session-${session}"]')`)).toBe(true)
 
       await click(view, `[data-test="withdraw-${session}"]`)
       await waitFor(view, `document.querySelector('[data-test="signup-${session}"]')`, 30_000)
+      expect(await view.evaluate<boolean>(`!document.querySelector('[data-test="mine-${session}"]')`)).toBe(true)
     }
     finally {
       view.close()
