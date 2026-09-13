@@ -428,6 +428,7 @@ useSeoMeta({
                   v-model="quantities[type.id]"
                   :min="0"
                   :max="maxFor(type)"
+                  :aria-label="`${type.name} tickets`"
                   class="w-28"
                   :data-test="`quantity-${type.id}`"
                 />

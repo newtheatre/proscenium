@@ -20,6 +20,8 @@ const glyph = computed(() => posterGlyph(seed.value))
 </script>
 
 <template>
+  <!-- Nothing but whitespace between the two roots: a comment there makes the server render a
+       fragment that drops the caller's class while the client keeps it (issue 1022). -->
   <div
     v-if="posterUrl"
     class="relative aspect-[2/3] overflow-hidden bg-elevated"
@@ -35,14 +37,14 @@ const glyph = computed(() => posterGlyph(seed.value))
     />
   </div>
 
-  <!-- No artwork yet: the show's own two hues and its title in the poster voice, which is a state
-       and not a placeholder graphic. A band on a phone, so three cards are not three screens. -->
   <div
     v-else
     class="nnt-poster-none relative flex aspect-[5/3] items-end overflow-hidden p-5 sm:aspect-[2/3]"
     :style="{ '--poster-from': tint.from, '--poster-to': tint.to }"
     data-test="poster-none"
   >
+    <!-- No artwork yet: the show's own two hues and its title in the poster voice, which is a state
+         and not a placeholder graphic. A band on a phone, so three cards are not three screens. -->
     <UIcon
       :name="glyph"
       class="absolute end-4 top-4 size-8 text-white/60"
