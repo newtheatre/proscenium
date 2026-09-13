@@ -102,18 +102,27 @@ const columns: TableColumn<AdminShow>[] = [
         }, () => saysShowStatus(row.original.status)),
       ]),
       h('div', { class: 'text-xs text-muted' }, `/shows/${row.original.slug}`),
+      // Below sm the season, performances and sold columns are hidden: shown here instead, so a
+      // phone keeps the row actions in view without losing what those columns said (922).
+      h('div', { class: 'sm:hidden mt-1 text-xs text-muted' }, [
+        row.original.seasonName ?? 'No season',
+        row.original.performanceCount === 0
+          ? ', no performances'
+          : `, ${plural(row.original.performanceCount, 'performance', 'performances')}, ${row.original.onSaleCount} on sale`,
+        `, ${plural(row.original.soldTickets, 'ticket')} sold`,
+      ].join('')),
     ]),
   },
   {
     id: 'season',
     header: 'Season',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.seasonName ?? 'None'),
   },
   {
     id: 'performances',
     header: 'Performances',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => h('span', { class: 'text-sm' }, row.original.performanceCount === 0
       ? 'None yet'
       : `${plural(row.original.performanceCount, 'performance', 'performances')}, ${row.original.onSaleCount} on sale`),
@@ -121,7 +130,7 @@ const columns: TableColumn<AdminShow>[] = [
   {
     id: 'sold',
     header: 'Sold',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, plural(row.original.soldTickets, 'ticket')),
   },
   {

@@ -172,11 +172,14 @@ onMounted(load)
       </template>
     </AdminToolbar>
 
+    <!-- A wide read-only history table forces horizontal scroll below sm (922); one card per
+         row there instead, the table above it. -->
     <UTable
       :data="listing?.items ?? []"
       :columns="columns"
       :loading="loading"
       data-test="drills-table"
+      class="hidden sm:block"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
@@ -184,6 +187,46 @@ onMounted(load)
         </p>
       </template>
     </UTable>
+    <p
+      v-if="(listing?.items.length ?? 0) === 0"
+      class="sm:hidden py-6 text-center text-sm text-muted"
+    >
+      No drill has been recorded yet.
+    </p>
+    <ul
+      v-else
+      class="sm:hidden space-y-3"
+      data-test="drills-cards"
+    >
+      <li
+        v-for="drillRow in listing?.items ?? []"
+        :key="drillRow.id"
+        class="rounded-lg border border-default p-3 text-sm"
+      >
+        <div class="flex items-center justify-between gap-2 font-mono">
+          <span>{{ drillRow.ranAt }}</span>
+          <UBadge
+            :color="drillRow.outcome === 'PASS' ? 'success' : 'error'"
+            variant="subtle"
+            size="sm"
+          >
+            {{ drillRow.outcome }}
+          </UBadge>
+        </div>
+        <p class="mt-1 text-muted">
+          {{ drillRow.operatorName }}, {{ plural(drillRow.timeToRestoreMinutes, 'minute') }} to restore
+        </p>
+        <p class="text-muted">
+          {{ [drillRow.rowCountsMatch ? 'Row counts' : null, drillRow.moneyTotalsMatch ? 'Money totals' : null].filter(Boolean).join(', ') || 'Neither' }} reconciled
+        </p>
+        <p
+          v-if="drillRow.notes"
+          class="mt-1 text-muted"
+        >
+          {{ drillRow.notes }}
+        </p>
+      </li>
+    </ul>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p

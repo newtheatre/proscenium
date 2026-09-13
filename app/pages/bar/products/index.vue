@@ -181,17 +181,30 @@ const columns: TableColumn<BarProduct>[] = [
           : null,
       ]),
       h('div', { class: 'text-xs text-muted' }, row.original.categoryName),
+      // Below sm the allergens and sold columns are hidden: their content sits here instead,
+      // so a phone keeps the row actions in view without losing what those columns said (922).
+      h('div', { class: 'sm:hidden mt-1 text-xs text-muted' }, [
+        says(row.original.allergenState),
+        row.original.allergenNote ? `, ${row.original.allergenNote}` : '',
+        row.original.everSold ? ', has been sold' : ', never sold',
+      ].join('')),
     ]),
   },
   {
     id: 'allergens',
     header: 'Allergens',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h('div', {}, [
       h('div', { class: 'text-sm' }, says(row.original.allergenState)),
       row.original.allergenNote ? h('div', { class: 'text-xs text-muted' }, row.original.allergenNote) : null,
     ]),
   },
-  { id: 'sold', header: 'Sold', cell: ({ row }) => (row.original.everSold ? 'Has been sold' : 'Never sold') },
+  {
+    id: 'sold',
+    header: 'Sold',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
+    cell: ({ row }) => (row.original.everSold ? 'Has been sold' : 'Never sold'),
+  },
   {
     id: 'act',
     header: '',

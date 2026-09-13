@@ -238,23 +238,32 @@ const columns: TableColumn<StockItem>[] = [
       h('div', { class: 'text-xs text-muted' }, row.original.containerMl
         ? `${says(row.original.unit)}, ${row.original.containerMl} ml a container`
         : says(row.original.unit)),
+      // Below sm the on hand, par level, status and category columns are hidden: shown here
+      // instead, so a phone keeps the row actions in view without losing what they said (922).
+      h('div', { class: 'sm:hidden mt-1 text-xs text-muted' }, [
+        `${saysQuantity(row.original.onHand, row.original.unit)} on hand`,
+        row.original.parQty === null ? '' : `, par ${saysQuantity(row.original.parQty, row.original.unit)}`,
+        stockStatus(row.original.onHand, row.original.parQty) === null ? '' : `, ${saysStockStatus(stockStatus(row.original.onHand, row.original.parQty)!).toLowerCase()}`,
+        row.original.category ? `, ${row.original.category}` : '',
+      ].join('')),
     ]),
   },
   {
     id: 'onHand',
     header: 'On hand',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => saysQuantity(row.original.onHand, row.original.unit),
   },
   {
     id: 'par',
     header: 'Par level',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => (row.original.parQty === null ? 'Not set' : saysQuantity(row.original.parQty, row.original.unit)),
   },
   {
     id: 'status',
     header: 'Status',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => {
       const status = stockStatus(row.original.onHand, row.original.parQty)
       if (status === null) return null
@@ -265,6 +274,7 @@ const columns: TableColumn<StockItem>[] = [
   {
     id: 'category',
     header: 'Category',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => row.original.category ?? '',
   },
   {
