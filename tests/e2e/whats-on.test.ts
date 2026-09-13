@@ -456,6 +456,36 @@ describe.skipIf(skip !== null)('the pages read without an account', () => {
     }
   }, CASE_TIMEOUT_MS)
 
+  // Issue 917 items 2 and 3: the venue filter's ids were built from the venue name, and the
+  // poster cards' h3 followed the hero's h1 with nothing in between.
+  test('the listing heads its grid and keys its venue filter on slugs', async () => {
+    const show = await publishedShow({ title: named('Antigone') })
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/whats-on`, '[data-test="whats-on-page"]')
+      await waitFor(view, `document.querySelector('[data-test="show-${show.slug}"]') !== null`)
+
+      const seen = await view.evaluate<string>(`JSON.stringify({
+        levels: [...document.querySelectorAll('main h1, main h2, main h3')].map(heading => Number(heading.tagName.slice(1))),
+        ids: [...document.querySelectorAll('[data-test="whats-on-venues"] [id]')].map(control => control.id),
+      })`)
+      const { levels, ids } = JSON.parse(seen) as { levels: number[], ids: string[] }
+
+      expect(levels[0]).toBe(1)
+      // No heading skips a level on the way down, which is what the axe rule measures.
+      for (let at = 1; at < levels.length; at++) {
+        expect(`${at}: ${levels[at]! <= levels[at - 1]! + 1}`).toBe(`${at}: true`)
+      }
+      for (const id of ids) {
+        expect(`${id}: ${/^[A-Za-z][\w-]*$/.test(id)}`).toBe(`${id}: true`)
+      }
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('the show page says which of the three warning states it is in', async () => {
     const show = await publishedShow()
 
