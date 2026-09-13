@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+import { effectScope, nextTick, ref } from 'vue'
 import { NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX, lastSyncedLabel } from '#shared/utils/night-shell'
+import { bindNightEyebrow, bindNightFallbackSubject, bindNightSubject } from '#composables/useNightHeader'
+import type { NightHeaderState } from '#composables/useNightHeader'
 
 // K-102: the shell every show-night screen is built from. The door, the till and the registers
 // inherit these rules by using the primitives, so the primitives are what the tests hold.
@@ -127,5 +130,55 @@ describe('the tonight shell (K-102 criteria 1 and 3)', () => {
     const source = await read(`app/pages/tonight/${THE_HUB}`)
     expect(source).toContain('<NightTile')
     expect(source).toContain('<NightStale')
+  })
+})
+
+// The three bindings share one piece of state across the layout, the screen and the page. A
+// binding that woke the others on every write froze the whole tab in production (issue 1018).
+describe('the show-night header setters settle (E-112 criterion 1)', () => {
+  const blank = (): NightHeaderState => ({ eyebrow: 'Show night', subject: null, fallback: null })
+
+  test('a change to one field settles without waking the others', async () => {
+    const header = ref<NightHeaderState>(blank())
+    const title = ref('Tonight')
+    const running = ref<{ title: string, meta: string | null } | null>(null)
+    let subjectRuns = 0
+    let fallbackRuns = 0
+    const scope = effectScope()
+    scope.run(() => {
+      bindNightEyebrow(header, () => 'Door')
+      bindNightSubject(header, () => {
+        subjectRuns++
+        return { title: title.value, meta: null }
+      })
+      bindNightFallbackSubject(header, () => {
+        fallbackRuns++
+        return running.value
+      })
+    })
+    await nextTick()
+    title.value = 'Machinal'
+    running.value = { title: 'Machinal', meta: '19:30, Main Hall' }
+    // The development build throws "Maximum recursive updates exceeded" here when they loop.
+    await nextTick()
+    expect(header.value).toEqual({ eyebrow: 'Door', subject: { title: 'Machinal', meta: null }, fallback: { title: 'Machinal', meta: '19:30, Main Hall' } })
+    expect(subjectRuns).toBeLessThanOrEqual(3)
+    expect(fallbackRuns).toBeLessThanOrEqual(3)
+    scope.stop()
+  })
+
+  test('a screen tearing down clears only its own half of the header', async () => {
+    const header = ref<NightHeaderState>(blank())
+    const outer = effectScope()
+    outer.run(() => bindNightFallbackSubject(header, () => ({ title: 'Machinal', meta: null })))
+    const inner = effectScope()
+    inner.run(() => {
+      bindNightEyebrow(header, () => 'Door')
+      bindNightSubject(header, () => ({ title: 'The door', meta: null }))
+    })
+    await nextTick()
+    inner.stop()
+    expect(header.value).toEqual({ eyebrow: 'Show night', subject: null, fallback: { title: 'Machinal', meta: null } })
+    outer.stop()
   })
 })

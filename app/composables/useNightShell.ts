@@ -1,17 +1,7 @@
+import { DEFAULT_EYEBROW, bindNightEyebrow, bindNightFallbackSubject, bindNightSubject } from './useNightHeader'
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
+import type { NightHeaderState, NightSubject } from './useNightHeader'
 import type { NightRole } from '#shared/utils/night-authority'
-
-export interface NightSubject { title: string, meta: string | null }
-
-export interface NightHeaderState {
-  eyebrow: string
-  // What the screen itself named, and what the shell knows about tonight when it named nothing.
-  subject: NightSubject | null
-  fallback: NightSubject | null
-}
-
-const DEFAULT_EYEBROW = 'Show night'
-export const DEFAULT_SUBJECT: NightSubject = { title: 'Tonight', meta: null }
 
 // The one show-night header lives in the layout, so every screen carries the same back arrow, the
 // same show title and the same on-shift badge; a screen says what goes in it through this state.
@@ -22,39 +12,19 @@ export function useNightHeader(): Ref<NightHeaderState> {
 // Two setters, not one: `NightScreen` owns the eyebrow and the page owns the show, so neither
 // wipes the other's half as components set up and tear down around a navigation.
 export function setNightEyebrow(eyebrow: () => string): void {
-  const header = useNightHeader()
-  // Eagerly as well as reactively: a watcher does not run during a server render, and a header
-  // filled in only on the client is a hydration mismatch on every show-night screen.
-  header.value = { ...header.value, eyebrow: eyebrow() }
-  watchEffect(() => {
-    header.value = { ...header.value, eyebrow: eyebrow() }
-  })
-  onScopeDispose(() => {
-    header.value = { ...header.value, eyebrow: DEFAULT_EYEBROW }
-  })
+  bindNightEyebrow(useNightHeader(), eyebrow)
 }
 
 // A getter rather than a value: the show title arrives after the first fetch, and the header has
 // to follow it.
 export function setNightSubject(subject: () => NightSubject): void {
-  const header = useNightHeader()
-  // Eagerly as well, for the same reason `setNightEyebrow` is.
-  header.value = { ...header.value, subject: subject() }
-  watchEffect(() => {
-    header.value = { ...header.value, subject: subject() }
-  })
-  onScopeDispose(() => {
-    header.value = { ...header.value, subject: null }
-  })
+  bindNightSubject(useNightHeader(), subject)
 }
 
 // The shell's own answer for a screen that names no show: whichever of tonight's performances is
 // running now, so every show-night screen carries the same header the hub does.
 export function setNightFallbackSubject(fallback: () => NightSubject | null): void {
-  const header = useNightHeader()
-  watchEffect(() => {
-    header.value = { ...header.value, fallback: fallback() }
-  })
+  bindNightFallbackSubject(useNightHeader(), fallback)
 }
 
 export interface NightPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }
