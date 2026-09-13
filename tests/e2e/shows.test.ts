@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, fillDate, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillDate, fillTime, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -481,7 +481,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, '[data-test="add-performance"]')
     await waitFor(view, `document.querySelector('[data-test="performance-form"]')`)
     await fillDate(view, '[data-test="performance-day"]', '2027-03-04')
-    await fill(view, '[data-test="performance-clock"]', '20:15')
+    await fillTime(view, '[data-test="performance-clock"]', '20:15')
     await click(view, '[data-test="performance-submit"]')
 
     await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('4 Mar 2027')`)

@@ -476,10 +476,8 @@ const columns: TableColumn<AdminPerformance>[] = [
               name="clock"
               required
             >
-              <UInput
+              <TimeField
                 v-model="form.clock"
-                type="time"
-                class="w-full"
                 data-test="performance-clock"
               />
             </UFormField>
@@ -489,10 +487,8 @@ const columns: TableColumn<AdminPerformance>[] = [
               name="doorsClock"
               hint="Optional"
             >
-              <UInput
+              <TimeField
                 v-model="form.doorsClock"
-                type="time"
-                class="w-full"
                 data-test="performance-doors"
               />
             </UFormField>
