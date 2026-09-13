@@ -51,7 +51,7 @@ const settings = ref<Setting[]>([])
 const drafts = reactive<Record<string, string>>({})
 const notices = reactive<Record<string, string>>({})
 const saving = ref('')
-const failure = ref<string | null>(null)
+const failure = ref<ListFailure | null>(null)
 
 const grouped = computed(() => Object.keys(WORKSHOPS).map(workshop => ({
   workshop,
@@ -136,7 +136,7 @@ async function save(setting: Setting, value: unknown, confirmation?: string): Pr
     notices[setting.key] = 'Saved'
   }
   catch (error) {
-    failure.value = `${setting.key}: ${refusalText(error)}`
+    failure.value = { message: `${setting.key}: ${refusalText(error)}`, enrolPath: enrolPath(error) }
   }
   finally {
     saving.value = ''
@@ -198,7 +198,7 @@ async function revert(setting: Setting): Promise<void> {
     notices[setting.key] = 'Reverted'
   }
   catch (error) {
-    failure.value = `${setting.key}: ${refusalText(error)}`
+    failure.value = { message: `${setting.key}: ${refusalText(error)}`, enrolPath: enrolPath(error) }
   }
   finally {
     reverting.value = ''
@@ -238,7 +238,8 @@ onMounted(load)
       v-if="failure"
       color="error"
       variant="subtle"
-      :description="failure"
+      :description="failure.message"
+      :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
     />
 
     <UInput

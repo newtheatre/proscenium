@@ -62,11 +62,12 @@ const mine = ref(false)
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
-const { data, status, refresh } = await useAsyncData(
+const { data, status, refresh, error } = await useAsyncData(
   'training-sessions',
   () => request<{ items: Session[] }>('/api/admin/training/sessions', { query: { mine: mine.value } }),
   { watch: [mine], default: (): { items: Session[] } => ({ items: [] }) },
 )
+const listFailure = useListFailure(error, 'The sessions could not be read.')
 
 const { data: catalogue } = await useAsyncData(
   'training-sessions-modules',
@@ -391,6 +392,17 @@ const columns: TableColumn<Session>[] = [
 <template>
   <div class="space-y-6">
     <UAlert
+      v-if="listFailure"
+      data-test="load-failed"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-unplug"
+      :title="listFailure.message"
+      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :actions="listFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listFailure.enrolPath, color: 'error' }] : []"
+    />
+
+    <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"
       color="error"
@@ -453,7 +465,7 @@ const columns: TableColumn<Session>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          Nothing scheduled. A session needs a date, a time, a room's worth of places and something to teach.
+          {{ listFailure ? 'The sessions could not be read.' : 'Nothing scheduled. A session needs a date, a time, a room\'s worth of places and something to teach.' }}
         </p>
       </template>
     </UTable>

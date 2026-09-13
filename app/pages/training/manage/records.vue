@@ -41,13 +41,14 @@ const search = ref('')
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
-const { data, status, refresh } = await useAsyncData(
+const { data, status, refresh, error } = await useAsyncData(
   'admin-training-records',
   () => (person.value
     ? request<{ items: Record[] }>('/api/admin/training/records', { query: { userId: person.value } })
     : Promise.resolve({ items: [] as Record[] })),
   { watch: [person], default: (): { items: Record[] } => ({ items: [] }) },
 )
+const listFailure = useListFailure(error, 'The records could not be read.')
 
 const { data: catalogue } = await useAsyncData(
   'admin-training-records-modules',
@@ -242,6 +243,17 @@ const columns: TableColumn<Record>[] = [
 <template>
   <div class="space-y-6">
     <UAlert
+      v-if="listFailure"
+      data-test="load-failed"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-unplug"
+      :title="listFailure.message"
+      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :actions="listFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listFailure.enrolPath, color: 'error' }] : []"
+    />
+
+    <UAlert
       v-if="failure"
       data-test="failure"
       color="error"
@@ -305,7 +317,7 @@ const columns: TableColumn<Record>[] = [
       >
         <template #empty>
           <p class="py-6 text-center text-sm text-muted">
-            They hold no training records yet.
+            {{ listFailure ? 'The records could not be read.' : 'They hold no training records yet.' }}
           </p>
         </template>
       </UTable>

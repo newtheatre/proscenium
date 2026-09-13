@@ -30,7 +30,6 @@ function yearToDate(): { from: string, to: string } {
 }
 
 const span = reactive(yearToDate())
-const failure = ref<string | null>(null)
 
 // The breakdown, search, sort and page live in the URL (K-129); the span does not, because it is
 // a report parameter rather than a filter over a fixed set of rows.
@@ -46,10 +45,7 @@ const { data: report, status, error } = await useAsyncData(
   () => request<Report>('/api/admin/rooms/reports/utilisation', { query: { ...query.value, from: span.from, to: span.to } }),
   { watch: [query, () => span.from, () => span.to], default: empty },
 )
-
-watch(error, (raised) => {
-  failure.value = raised ? refusalText(raised) : null
-})
+const failure = useListFailure(error, 'The utilisation report could not be read.')
 
 // A span change is not a URL filter, so it resets the page itself.
 watch([() => span.from, () => span.to], () => {
@@ -95,10 +91,13 @@ const columns = computed<TableColumn<UtilisationRow>[]>(() => [
   <div class="space-y-6">
     <UAlert
       v-if="failure"
-      data-test="failure"
+      data-test="load-failed"
       color="error"
       variant="subtle"
-      :description="failure"
+      icon="i-lucide-unplug"
+      :title="failure.message"
+      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
     />
 
     <UAlert
@@ -160,7 +159,7 @@ const columns = computed<TableColumn<UtilisationRow>[]>(() => [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ filtered ? 'Nothing matches that.' : 'Nothing was booked in that span.' }}
+          {{ failure ? 'The utilisation report could not be read.' : filtered ? 'Nothing matches that.' : 'Nothing was booked in that span.' }}
         </p>
       </template>
     </UTable>
