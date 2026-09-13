@@ -2,6 +2,7 @@
 import { saysMoney } from '#shared/utils/bar'
 import { PERIOD_KINDS } from '#shared/utils/season-dashboard'
 import { can, viewFinanceReports } from '#shared/utils/abilities'
+import { currentSeasonYear } from '#shared/utils/season'
 import type { PeriodInput, SeasonSummary } from '#shared/utils/season-dashboard'
 
 definePageMeta({ layout: 'console', title: 'Season dashboard', middleware: 'console' })
@@ -9,7 +10,7 @@ definePageMeta({ layout: 'console', title: 'Season dashboard', middleware: 'cons
 const request = useRequestFetch()
 
 const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
-const currentYear = new Date().getFullYear()
+const currentYear = currentSeasonYear()
 // TERM has a range, not a formula, so it needs its own picker over I-107's defined terms;
 // this screen offers only the kinds a year and a day already answer, until that picker exists.
 const SELECTABLE_PERIOD_KINDS = PERIOD_KINDS.filter(one => one !== 'TERM')
