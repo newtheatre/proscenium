@@ -9,7 +9,7 @@ const toast = useToast()
 
 const kind = ref<AudienceKind>('ALL_CURRENT_MEMBERS')
 const role = ref<(typeof ROLES)[number] | undefined>(undefined)
-const sessionId = ref('')
+const sessionId = ref<string | undefined>(undefined)
 const subject = ref('')
 const body = ref('')
 const safetyNotice = ref(false)
@@ -21,7 +21,7 @@ const preview = ref<{ count: number, rendered: { subject: string, text: string }
 
 const audience = computed(() => {
   if (kind.value === 'ROLE_HOLDERS') return { kind: kind.value, role: role.value }
-  if (kind.value === 'SESSION_SIGNUPS') return { kind: kind.value, sessionId: sessionId.value }
+  if (kind.value === 'SESSION_SIGNUPS') return { kind: kind.value, sessionId: sessionId.value ?? '' }
   return { kind: kind.value }
 })
 
@@ -29,7 +29,7 @@ const ready = computed(() =>
   subject.value.trim().length > 0
   && body.value.trim().length > 0
   && (kind.value !== 'ROLE_HOLDERS' || role.value)
-  && (kind.value !== 'SESSION_SIGNUPS' || sessionId.value.trim().length > 0))
+  && (kind.value !== 'SESSION_SIGNUPS' || Boolean(sessionId.value)))
 
 // A fresh count and rendering every time the message or the audience changes: a stale preview
 // naming yesterday's audience is worse than none (criterion 4).
@@ -115,13 +115,9 @@ async function send(): Promise<void> {
 
     <UFormField
       v-if="kind === 'SESSION_SIGNUPS'"
-      label="Session ID"
-      description="From the training session's own screen."
+      label="Session"
     >
-      <UInput
-        v-model="sessionId"
-        data-test="audience-session"
-      />
+      <SessionPicker v-model="sessionId" />
     </UFormField>
 
     <UFormField label="Subject">
