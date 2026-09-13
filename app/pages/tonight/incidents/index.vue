@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
+import type { NightRole } from '#shared/utils/night-authority'
 import { CATEGORIES, SEVERITIES, saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { londonClock } from '#shared/utils/london'
-import { saysPerformanceChoice } from '#shared/utils/tonight'
+import { saysShiftRole } from '#shared/utils/rota'
+import { contactRoster, saysPerformanceChoice, telHref } from '#shared/utils/tonight'
 import type { Category, Severity } from '#shared/utils/incidents'
 
 definePageMeta({ layout: 'tonight' })
-useSeoMeta({ title: 'Incident log' })
+useSeoMeta({ title: 'Contacts and incidents' })
 
 interface Entry {
   id: string
@@ -52,6 +54,20 @@ async function resolveAuthority(): Promise<void> {
   }
 }
 
+interface TeamSlot { role: NightRole, filled: boolean, name: string | null, phone: string | null }
+
+const team = ref<TeamSlot[]>([])
+
+// Best effort: a roster that will not load is a contacts block that says so, never a screen that
+// refuses to show the log behind it.
+async function loadTeam(): Promise<void> {
+  try {
+    const answered = await request<{ performances: { team: TeamSlot[] }[] }>('/api/tonight/team')
+    team.value = contactRoster(answered.performances.flatMap(performance => performance.team))
+  }
+  catch { team.value = [] }
+}
+
 async function load(): Promise<void> {
   busy.value = true
   failure.value = null
@@ -70,7 +86,7 @@ async function load(): Promise<void> {
 
 onMounted(async () => {
   await resolveAuthority()
-  await load()
+  await Promise.all([load(), loadTeam()])
 })
 
 const performanceOptions = computed(() => performanceIds.value.map((id) => {
@@ -186,79 +202,142 @@ async function submitCorrect(): Promise<void> {
 <template>
   <div>
     <NightScreen
-      title="Incident log"
-      hint="Every entry stays visible once filed. A mistake is corrected with a new entry, never an edit."
+      title="Contacts and incidents"
       :stale="syncedAt"
       :busy="busy"
     >
-      <UAlert
-        v-if="failure"
-        data-test="incidents-failure"
-        color="error"
-        variant="subtle"
-        :description="failure"
-      />
-
-      <UAlert
-        v-else-if="authorityFailure && performanceIds.length === 0"
-        data-test="incidents-authority-failure"
-        color="warning"
-        variant="subtle"
-        :description="authorityFailure"
-      />
-
-      <div
-        v-else
-        class="space-y-3"
-        data-test="incidents-list"
-      >
-        <p
-          v-if="items.length === 0"
-          class="text-muted"
-        >
-          Nothing logged yet tonight.
-        </p>
-
-        <div
-          v-for="entry in items"
-          :key="entry.id"
-          class="space-y-1 rounded-lg border border-default p-3"
-          :data-test="`incident-${entry.id}`"
-        >
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-sm font-semibold">{{ saysCategory(entry.category) }} · {{ saysSeverity(entry.severity) }}</span>
-            <span class="text-xs text-muted">{{ londonClock(new Date(entry.happenedAt * 1000)) }}</span>
-          </div>
-          <p class="text-sm">
-            {{ entry.body }}
-          </p>
-          <p class="text-xs text-muted">
-            Reported by {{ entry.reportedByName }}
-            <span v-if="entry.supersedesId"> · corrects an earlier entry</span>
-            <span v-if="entry.supersededBy"> · superseded</span>
-          </p>
-          <UButton
-            v-if="!entry.supersededBy"
-            size="xs"
-            color="neutral"
-            variant="ghost"
-            :data-test="`correct-${entry.id}`"
-            @click="openCorrect(entry)"
+      <div class="space-y-5">
+        <section>
+          <h2 class="mb-3 font-mono text-xs tracking-[0.2em] text-muted uppercase">
+            On tonight<span v-if="team.some(slot => slot.phone)"> · tap to call</span>
+          </h2>
+          <div
+            class="space-y-2"
+            data-test="tonight-team"
           >
-            Correct this entry
-          </UButton>
-        </div>
+            <p
+              v-if="team.length === 0"
+              class="text-sm text-muted"
+            >
+              Nobody is rostered on tonight yet.
+            </p>
+            <div
+              v-for="slot in team"
+              :key="`${slot.role}-${slot.name ?? 'unfilled'}`"
+              class="flex items-center gap-3 rounded-xl bg-elevated"
+              :class="slot.filled ? 'p-4' : 'px-4 py-2'"
+              :data-test="`team-${slot.role}`"
+            >
+              <span
+                v-if="slot.filled"
+                class="min-w-0 grow"
+              >
+                <span class="block truncate text-lg font-semibold">{{ slot.name }}</span>
+                <span class="block text-sm text-muted">{{ saysShiftRole(slot.role) }}</span>
+              </span>
+              <!-- An unfilled slot stays in the list, one quiet line rather than a card, so it
+                   reads as a gap in the rota and never as somebody to ring. -->
+              <span
+                v-else
+                class="min-w-0 grow text-sm text-muted"
+              >{{ saysShiftRole(slot.role) }} · unfilled</span>
+              <!-- Only where the member's own consent is set: nothing here reveals a number the
+                   roster did not already carry (A-114). -->
+              <UButton
+                v-if="slot.phone"
+                :to="telHref(slot.phone)"
+                external
+                color="secondary"
+                variant="outline"
+                icon="i-lucide-phone"
+                size="xl"
+                :aria-label="`Call ${slot.name}`"
+                class="min-h-12 min-w-12 shrink-0 justify-center"
+                :data-test="`call-${slot.role}`"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <h2 class="font-mono text-xs tracking-[0.2em] text-muted uppercase">
+              Incident log
+            </h2>
+            <UButton
+              color="secondary"
+              icon="i-lucide-plus"
+              class="min-h-12"
+              :disabled="performanceIds.length === 0"
+              data-test="open-log-incident-inline"
+              @click="openLog"
+            >
+              Log incident
+            </UButton>
+          </div>
+
+          <UAlert
+            v-if="failure"
+            data-test="incidents-failure"
+            color="error"
+            variant="subtle"
+            :description="failure"
+          />
+
+          <UAlert
+            v-else-if="authorityFailure && performanceIds.length === 0"
+            data-test="incidents-authority-failure"
+            color="warning"
+            variant="subtle"
+            :description="authorityFailure"
+          />
+
+          <div
+            v-else
+            class="space-y-2"
+            data-test="incidents-list"
+          >
+            <p
+              v-if="items.length === 0"
+              class="text-muted"
+            >
+              Nothing logged yet tonight.
+            </p>
+
+            <div
+              v-for="entry in items"
+              :key="entry.id"
+              class="space-y-1 rounded-xl bg-elevated p-4"
+              :data-test="`incident-${entry.id}`"
+            >
+              <p>{{ entry.body }}</p>
+              <p class="font-mono text-xs text-muted">
+                {{ londonClock(new Date(entry.happenedAt * 1000)) }} · logged by {{ entry.reportedByName }}
+                · {{ saysCategory(entry.category) }}, {{ saysSeverity(entry.severity) }}
+                <span v-if="entry.supersedesId"> · corrects an earlier entry</span>
+                <span v-if="entry.supersededBy"> · superseded</span>
+              </p>
+              <UButton
+                v-if="!entry.supersededBy"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                :data-test="`correct-${entry.id}`"
+                @click="openCorrect(entry)"
+              >
+                Correct this entry
+              </UButton>
+            </div>
+          </div>
+
+          <p class="mt-3 text-center text-sm text-muted">
+            Timestamped and named: entries land in the end-of-night report in full, and a mistake is
+            corrected with a new entry, never an edit.
+          </p>
+        </section>
       </div>
 
       <template #actions>
-        <NightAction
-          label="Log an incident"
-          icon="i-lucide-clipboard-list"
-          color="primary"
-          :disabled="performanceIds.length === 0"
-          data-test="open-log-incident"
-          @press="openLog"
-        />
         <NightAction
           label="Report a near miss"
           icon="i-lucide-triangle-alert"
