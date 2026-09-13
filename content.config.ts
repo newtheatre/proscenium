@@ -16,6 +16,20 @@ export default defineContentConfig({
         // one gets the plain hero.
         banner: z.string().optional(),
         bannerAlt: z.string().optional(),
+        // The landing page's furniture, in front matter so the committee edits words rather than
+        // a Vue file (J-111). Every field is optional: an ordinary content page carries none.
+        headline: z.string().optional(),
+        flash: z.string().optional(),
+        departments: z.array(z.object({
+          title: z.string(),
+          icon: z.string(),
+          blurb: z.string(),
+        })).optional(),
+        steps: z.array(z.object({
+          title: z.string(),
+          blurb: z.string(),
+        })).optional(),
+        quote: z.string().optional(),
       }),
     }),
     // Operator documentation, one page per module (J-109). Edited by editing the file and
