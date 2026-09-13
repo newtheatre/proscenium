@@ -191,7 +191,7 @@ const columns: TableColumn<ContentWarning>[] = [
   },
   {
     id: 'act',
-    header: '',
+    header: () => h('span', { class: 'sr-only' }, 'Actions'),
     meta: { class: { td: 'text-right whitespace-nowrap' } },
     cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
       h(UButton, {

@@ -200,6 +200,7 @@ const uncounted = computed(() => data.value?.lines.filter(line => drafts.value[l
                 :min="0"
                 size="sm"
                 class="w-24"
+                :aria-label="`Counted, ${line.itemName}`"
                 :data-test="`counted-${line.itemId}`"
               />
               <span v-else>

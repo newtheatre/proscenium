@@ -126,7 +126,7 @@ const columns: TableColumn<AdminShow>[] = [
   },
   {
     id: 'act',
-    header: '',
+    header: () => h('span', { class: 'sr-only' }, 'Actions'),
     meta: { class: { td: 'text-right whitespace-nowrap' } },
     cell: ({ row }) => h(resolveComponent('UButton'), {
       'size': 'sm',
