@@ -664,3 +664,25 @@ Stories: 29. Phases: 24 MVP, 0 V2, 0 Later, 5 resolved.
   7. Before-and-after captures from `bun run shots` are attached to each pull request.
 - Source: Pre-cutover review, 10 September 2026. Thirty-three console tables share one toolbar
   and each hand-writes its filters; none keeps its state in the URL.
+
+## K-130: The light-mode ground is paper
+
+- Role: Visitor
+- Phase: MVP
+- Story: As anyone using the system in light mode, I want the page to read as paper with the
+  cards and tables raised off it so that a surface looks like a thing sitting on the page rather
+  than a hole cut in a white box.
+- Depends on: K-101
+- Acceptance criteria:
+  1. In light mode the page ground is `ash-50`, and the muted and accented grounds are `ash-100`
+     and `ash-200`, set once as `--ui-bg`, `--ui-bg-muted` and `--ui-bg-accented` in
+     `app/assets/css/theme.css` rather than per shell.
+  2. A raised surface (`--ui-bg-elevated`) stays white, so a card, a table header and a popover
+     read as lifted off the ground.
+  3. Every shell inherits it: the public site, the member shell and the console all move with the
+     token, and none sets its own light-mode ground.
+  4. Dark mode is untouched: the ash 950/900/800 ladder under `.dark` still stands.
+  5. `docs/design-language.md` records the ground, and `tests/unit/design-language.test.ts` fails
+     if `:root` stops setting it.
+- Source: Matt's ruling of 13 September 2026 over the 11 September audit captures, where every
+  light-mode shell read as a flat white box.
