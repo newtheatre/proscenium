@@ -82,7 +82,7 @@ page load, including the door scanner on a bad foyer connection.
 
 | Utility or variant | What it is for |
 | --- | --- |
-| `nnt-spotlight` | A limelight beam on stage black. Hero bands, the show-night screens, the footer. |
+| `nnt-spotlight` | A limelight beam on stage black. Hero bands, the show-night screens, the footer. Both beams fall off inside the box they are on, so an inset band reads as lit rather than as a clipped trapezoid. |
 | `nnt-headline` | The display face, tight and balanced. Public headlines. |
 | `nnt-shadow-poster`, `-primary`, `-ink` | The hard offset shadow of a hand-printed show poster. Composed through `--tw-shadow` so it stacks with ring utilities. |
 | `nnt-ticket` | Perforated stub edges. Booking summaries, prices, anything that is literally a ticket. |
