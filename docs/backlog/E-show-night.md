@@ -300,6 +300,7 @@ Counts: 28 MVP stories (E-101 to E-128), 4 V2 stories (E-201 to E-204), 1 Later 
   3. The code is valid only for tonight's board at that venue and dies at the 04:00 boundary.
   4. Ten failed join attempts rotate the code automatically.
   5. The duty manager's tonight screen shows the current code on demand; the code never travels by email or notification.
+  6. `/board` wears a shell of its own: stage black, no site header, no footer, and no link off the board at all. A resident device in the wings is one tap from leaving the board mid-show otherwise, and the page must never need a sign-in link.
 - Source: Prompt Book E-4; audit PR-11 (derived-code design carries).
 
 ## E-121: Milestones, presets and acknowledgements
