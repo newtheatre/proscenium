@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { saysReferenceName, saysShowStatus, showForm, toSlug } from '#shared/utils/programme'
+import { saysReferenceName, saysShowDates, saysShowSeasonLine, saysShowStanding, saysShowVenues, showForm, toSlug } from '#shared/utils/programme'
+import { saysHouse, soldShare } from '#shared/utils/show-strip'
 import { showsList } from '#shared/utils/shows-list'
 import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import type { TableColumn } from '@nuxt/ui'
 import type { FilterOption } from '#shared/utils/list-filters'
-import type { AdminShow } from '#shared/utils/programme'
+import type { AdminShow, ShowsStandingCounts } from '#shared/utils/programme'
 
 definePageMeta({ layout: 'console', title: 'Shows', middleware: 'console' })
 
 const UBadge = resolveComponent('UBadge')
+const UButton = resolveComponent('UButton')
+const UProgress = resolveComponent('UProgress')
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -17,10 +20,10 @@ const failure = ref<string | null>(null)
 const saving = ref(false)
 const open = ref(false)
 
-interface Listing { items: AdminShow[], total: number, pageSize: number, pages: number }
+interface Listing { items: AdminShow[], total: number, pageSize: number, pages: number, standings: ShowsStandingCounts }
 interface Named { items: { id: string, name: string, archived: boolean }[] }
 
-const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
+const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1, standings: { onSale: 0, drafts: 0 } })
 
 // The season and category pickers read the reference data once, the largest page of each;
 // the table names a show's own season from its row, so nothing here limits what it can say.
@@ -93,59 +96,86 @@ const columns: TableColumn<AdminShow>[] = [
     id: 'title',
     header: 'Show',
     cell: ({ row }) => h('div', {}, [
-      h('div', { class: 'flex flex-wrap items-center gap-2' }, [
-        h('span', {}, row.original.title),
-        h(UBadge, {
-          color: row.original.status === 'PUBLISHED' ? 'success' : 'neutral',
-          variant: 'subtle',
-          size: 'sm',
-        }, () => saysShowStatus(row.original.status)),
-      ]),
+      h('div', {}, row.original.title),
       h('div', { class: 'text-xs text-muted' }, `/shows/${row.original.slug}`),
-      // Below sm the season, performances and sold columns are hidden: shown here instead, so a
-      // phone keeps the row actions in view without losing what those columns said (922).
-      h('div', { class: 'sm:hidden mt-1 text-xs text-muted' }, [
-        row.original.seasonName ?? 'No season',
-        row.original.performanceCount === 0
-          ? ', no performances'
-          : `, ${plural(row.original.performanceCount, 'performance', 'performances')}, ${row.original.onSaleCount} on sale`,
-        `, ${plural(row.original.soldTickets, 'ticket')} sold`,
-      ].join('')),
+      // Below sm the dates, status and reserved columns are hidden: said here instead, so a phone
+      // keeps the row actions in view (922). The venue is one tap away rather than past the edge.
+      h('div', { class: 'sm:hidden mt-1 max-w-56 text-xs text-muted' }, [
+        saysShowStanding(row.original).says,
+        saysShowDates(row.original.firstPerformanceAt, row.original.lastPerformanceAt),
+        saysHouse(row.original.soldTickets, row.original.capacity),
+      ].join(' \u00b7 ')),
     ]),
   },
   {
-    id: 'season',
-    header: 'Season',
-    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
-    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.seasonName ?? 'None'),
+    id: 'dates',
+    header: 'Dates',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap text-sm` } },
+    cell: ({ row }) => saysShowDates(row.original.firstPerformanceAt, row.original.lastPerformanceAt),
   },
   {
-    id: 'performances',
-    header: 'Performances',
-    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
-    cell: ({ row }) => h('span', { class: 'text-sm' }, row.original.performanceCount === 0
-      ? 'None yet'
-      : `${plural(row.original.performanceCount, 'performance', 'performances')}, ${row.original.onSaleCount} on sale`),
+    id: 'venue',
+    header: 'Venue',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted` } },
+    cell: ({ row }) => saysShowVenues(row.original.venueNames),
   },
   {
-    id: 'sold',
-    header: 'Sold',
+    id: 'status',
+    header: 'Status',
     meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
-    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, plural(row.original.soldTickets, 'ticket')),
+    cell: ({ row }) => {
+      const standing = saysShowStanding(row.original)
+      return h(UBadge, { 'color': standing.colour, 'variant': 'subtle', 'size': 'sm', 'data-test': `standing-${row.original.id}` }, () => standing.says)
+    },
+  },
+  {
+    id: 'reserved',
+    header: 'Reserved',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
+    // The bar is decoration over the figure and never instead of it: a meter with no number is a
+    // colour, and a colour is not a state (K-101).
+    cell: ({ row }) => {
+      const share = soldShare(row.original.soldTickets, row.original.capacity)
+      const says = saysHouse(row.original.soldTickets, row.original.capacity)
+      if (share === null) return h('span', { class: 'text-sm text-muted' }, says)
+      return h('div', { class: 'flex items-center gap-2' }, [
+        h(UProgress, { modelValue: share, size: 'sm', class: 'hidden w-16 lg:block' }),
+        h('span', { class: 'whitespace-nowrap text-sm tabular-nums' }, says),
+      ])
+    },
   },
   {
     id: 'act',
     header: () => h('span', { class: 'sr-only' }, 'Actions'),
     meta: { class: { td: 'text-right whitespace-nowrap' } },
-    cell: ({ row }) => h(resolveComponent('UButton'), {
+    cell: ({ row }) => h(UButton, {
       'size': 'sm',
       'color': 'neutral',
       'variant': 'ghost',
       'to': `/box-office/shows/${row.original.id}`,
       'data-test': `open-${row.original.id}`,
-    }, () => 'Open'),
+    }, () => 'Edit'),
   },
 ]
+
+// The season the filter has been narrowed to, named from the picker's own options so the heading
+// says what the reader chose rather than what one row happens to carry.
+const seasonName = computed(() => {
+  const chosen = conditions.value.find(one => one.key === 'seasonId' && one.operator === 'is')
+  if (chosen?.values.length !== 1) return null
+  return reference.value.seasonId?.find(option => option.value === chosen.values[0])?.label ?? null
+})
+
+const seasonLine = computed(() => saysShowSeasonLine(
+  data.value.total,
+  data.value.standings.onSale,
+  data.value.standings.drafts,
+  seasonName.value,
+))
+
+// Drafts with no artwork, named on the page that can do something about it: a draft going on sale
+// looking like every other show is what the poster card exists to prevent (D-132 criterion 6).
+const artless = computed(() => data.value.items.filter(one => one.status === 'DRAFT' && one.posterUrl === null))
 </script>
 
 <template>
@@ -157,6 +187,18 @@ const columns: TableColumn<AdminShow>[] = [
       variant="subtle"
       :description="listingFailure"
     />
+
+    <div>
+      <h2 class="text-lg font-semibold">
+        Shows
+      </h2>
+      <p
+        class="text-sm text-muted"
+        data-test="shows-season-line"
+      >
+        {{ seasonLine }}
+      </p>
+    </div>
 
     <UAlert
       color="neutral"
@@ -207,6 +249,16 @@ const columns: TableColumn<AdminShow>[] = [
         </p>
       </template>
     </UTable>
+
+    <UAlert
+      v-if="artless.length"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-image-off"
+      data-test="shows-artless"
+      :title="`${plural(artless.length, 'draft')} with no poster`"
+      :description="`${artless.map(one => one.title).join(', ')}. A draft can go on sale without artwork, but it will show its own gradient everywhere until one is uploaded.`"
+    />
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p
