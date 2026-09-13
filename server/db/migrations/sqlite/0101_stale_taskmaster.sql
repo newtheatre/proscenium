@@ -1,0 +1,1 @@
+ALTER TABLE `backstage_devices` ADD `side` text DEFAULT 'BACKSTAGE' NOT NULL;

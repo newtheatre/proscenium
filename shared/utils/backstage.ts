@@ -14,6 +14,13 @@ async function hmacSha256(key: string, message: string): Promise<Uint8Array> {
   return new Uint8Array(await crypto.subtle.sign('HMAC', imported, new TextEncoder().encode(message)))
 }
 
+// Front of house's own end of the board (E-121 criterion 7). Derived and never issued to
+// anybody, so nothing can present it: the row it credentials only owns FOH's calls and ticks.
+export async function deriveFohCredential(secret: string, nightId: string): Promise<string> {
+  const digest = await hmacSha256(secret, `backstage-board-foh-device:${nightId}`)
+  return [...digest].map(byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
 // Domain-separated from every other use of the session password: the message names what this
 // signs, so the same key signing something else can never collide with a board code.
 export async function deriveBoardCode(secret: string, night: string, venueId: string, epoch: number): Promise<string> {
@@ -56,6 +63,43 @@ export const postMessageForm = z.object({
 )
 
 export type PostMessageInput = z.output<typeof postMessageForm>
+
+// Front of house sends a preset or free text, never a milestone: the night report's timeline
+// stays crew-authored, and a call from the foyer is not an event the show passed through.
+export const fohMessageForm = z.object({
+  presetId: z.string().min(1, 'Say which preset you mean').nullable().default(null),
+  body: z.string().trim().min(1, 'Say what the message is').max(FREE_TEXT_LIMIT).nullable().default(null),
+  composedAt: z.number().int().positive(),
+}).refine(
+  data => [data.presetId, data.body].filter(value => value !== null).length === 1,
+  'Send exactly one of a preset or free text',
+)
+
+export type FohMessageInput = z.output<typeof fohMessageForm>
+
+// Which end of the board a message came from, which is the whole of how the FOH screen colours
+// its history: FOH's own calls one way, the wings' the other (criterion 7).
+export type BoardSide = 'FOH' | 'BACKSTAGE'
+
+export function saysBoardSide(side: BoardSide): string {
+  return side === 'FOH' ? 'FOH' : 'Backstage'
+}
+
+// Only the latest event in a supersede chain is ever shown: a corrected milestone reads as
+// itself, not as two rows (criterion 5).
+export function liveBoardMessages<T extends { id: string, supersedesId: string | null }>(messages: T[]): T[] {
+  const superseded = new Set(messages.map(message => message.supersedesId).filter((id): id is string => id !== null))
+  return messages.filter(message => !superseded.has(message.id))
+}
+
+// The two lines the FOH screen leads with: each side's own last call. A night nobody has called
+// yet has neither, which is a state the screen says out loud rather than drawing empty.
+export function currentBoardState<T extends { side: BoardSide, composedAt: number }>(messages: T[]): { foh: T | null, backstage: T | null } {
+  const latestOf = (side: BoardSide): T | null => messages
+    .filter(message => message.side === side)
+    .reduce<T | null>((latest, message) => latest === null || message.composedAt > latest.composedAt ? message : latest, null)
+  return { foh: latestOf('FOH'), backstage: latestOf('BACKSTAGE') }
+}
 
 // A correction names a different milestone; nothing else is ever superseded (criterion 5).
 export const supersedeMessageForm = z.object({

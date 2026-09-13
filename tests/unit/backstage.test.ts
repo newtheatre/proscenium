@@ -5,10 +5,15 @@ import {
   MAX_FAILED_ATTEMPTS,
   MESSAGE_RETENTION_DAYS,
   boardJoinForm,
+  currentBoardState,
   deriveBoardCode,
+  deriveFohCredential,
+  fohMessageForm,
+  liveBoardMessages,
   milestoneTypeForm,
   postMessageForm,
   presetForm,
+  saysBoardSide,
   supersedeMessageForm,
 } from '#shared/utils/backstage'
 
@@ -115,5 +120,75 @@ describe('committee configuration for milestone types and presets (criteria 1, 2
 describe('retention (E-122 criterion 4)', () => {
   test('free text and presets purge at 30 days, stated directly by the story', () => {
     expect(MESSAGE_RETENTION_DAYS).toBe(30)
+  })
+})
+
+// E-121 criterion 7: front of house's own end of the board.
+
+describe('the FOH credential is derived and never issued (criterion 7)', () => {
+  test('the same night always produces the same credential, a different night never does', async () => {
+    const first = await deriveFohCredential(SECRET, 'night-1')
+    expect(await deriveFohCredential(SECRET, 'night-1')).toBe(first)
+    expect(await deriveFohCredential(SECRET, 'night-2')).not.toBe(first)
+    expect(first).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  test('a different secret produces a different credential', async () => {
+    const mine = await deriveFohCredential(SECRET, 'night-1')
+    expect(await deriveFohCredential('another-worker-secret-entirely', 'night-1')).not.toBe(mine)
+  })
+})
+
+describe('front of house sends a preset or free text, never a milestone (criterion 7)', () => {
+  const composedAt = 1_795_000_000
+
+  test('a preset alone, or free text alone, is accepted', () => {
+    expect(fohMessageForm.safeParse({ presetId: 'preset-1', composedAt }).success).toBe(true)
+    expect(fohMessageForm.safeParse({ body: 'Two minutes on the bar queue', composedAt }).success).toBe(true)
+  })
+
+  test('both at once, or neither, is refused', () => {
+    expect(fohMessageForm.safeParse({ presetId: 'preset-1', body: 'And this', composedAt }).success).toBe(false)
+    expect(fohMessageForm.safeParse({ composedAt }).success).toBe(false)
+  })
+
+  test('free text over the limit is refused', () => {
+    expect(fohMessageForm.safeParse({ body: 'x'.repeat(FREE_TEXT_LIMIT + 1), composedAt }).success).toBe(false)
+  })
+})
+
+describe('the current state is each side\'s own last call (criterion 7)', () => {
+  const messages = [
+    { id: 'm1', side: 'FOH' as const, supersedesId: null, composedAt: 100 },
+    { id: 'm2', side: 'BACKSTAGE' as const, supersedesId: null, composedAt: 120 },
+    { id: 'm3', side: 'FOH' as const, supersedesId: null, composedAt: 140 },
+  ]
+
+  test('the latest from each side, not the latest overall', () => {
+    const state = currentBoardState(messages)
+    expect(state.foh?.id).toBe('m3')
+    expect(state.backstage?.id).toBe('m2')
+  })
+
+  test('a side that has said nothing yet has no current call', () => {
+    expect(currentBoardState(messages.filter(message => message.side === 'FOH')).backstage).toBeNull()
+    expect(currentBoardState([]).foh).toBeNull()
+  })
+
+  test('a superseded milestone is never the current state: the correction is', () => {
+    const corrected = [
+      { id: 'm1', side: 'BACKSTAGE' as const, supersedesId: null, composedAt: 200 },
+      { id: 'm2', side: 'BACKSTAGE' as const, supersedesId: 'm1', composedAt: 190 },
+    ]
+    const live = liveBoardMessages(corrected)
+    expect(live.map(message => message.id)).toEqual(['m2'])
+    expect(currentBoardState(live).backstage?.id).toBe('m2')
+  })
+})
+
+describe('each side is named for the reader, not by its code', () => {
+  test('FOH and Backstage', () => {
+    expect(saysBoardSide('FOH')).toBe('FOH')
+    expect(saysBoardSide('BACKSTAGE')).toBe('Backstage')
   })
 })

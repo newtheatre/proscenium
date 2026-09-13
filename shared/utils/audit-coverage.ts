@@ -467,6 +467,16 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['night.officer-bypass'],
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
+  {
+    route: 'server/api/tonight/board/messages.post.ts',
+    actions: ['board.message-posted', 'night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+  {
+    route: 'server/api/tonight/board/seen.post.ts',
+    actions: ['night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
   { route: 'server/api/admin/backstage/milestone-types/index.get.ts', exempt: 'reads every milestone type, including a retired one' },
   { route: 'server/api/admin/backstage/milestone-types/index.post.ts', actions: ['backstage-milestone-type.created'] },
   { route: 'server/api/admin/backstage/milestone-types/[id]/index.put.ts', actions: ['backstage-milestone-type.updated'] },

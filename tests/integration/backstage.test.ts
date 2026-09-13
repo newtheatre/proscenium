@@ -2,7 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import {
   acknowledgeStatement,
   acknowledgementsForNightQuery,
+  activeDevicesQuery,
+  ensureFohDeviceStatement,
   ensureNightStatement,
+  fohDeviceQuery,
   insertMilestoneTypeStatement,
   insertPresetStatement,
   joinDeviceStatement,
@@ -19,6 +22,7 @@ import {
   retireMilestoneTypeStatement,
   retirePresetStatement,
   revokeDevicesStatement,
+  seenAcrossQuery,
   staleDevicesQuery,
   staleMessagesQuery,
   supersedeMessageStatement,
@@ -448,6 +452,69 @@ describe('retention (E-122 criterion 4)', () => {
       run(database, joinDeviceStatement('bn-1', 'Just joined tonight', 'a'.repeat(64), 0, 'bd-1'))
 
       expect(run(database, staleDevicesQuery(1))).toHaveLength(0)
+    })
+  })
+})
+
+// E-121 criterion 7: front of house's own end of the board, against the real migrations.
+
+describe('the FOH device is one row per night (criterion 7)', () => {
+  test('ensuring it twice makes one row, and it is not a joined crew device', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-foh'))
+      const [night] = run(database, nightRowQuery(venue.id, NIGHT)) as { id: string }[]
+
+      run(database, ensureFohDeviceStatement(night!.id, 'credential-1', 0, 'dev-foh-1'))
+      run(database, ensureFohDeviceStatement(night!.id, 'credential-1', 0, 'dev-foh-2'))
+
+      expect(run(database, fohDeviceQuery(night!.id))).toEqual([{ deviceId: 'dev-foh-1' }])
+      expect(run(database, activeDevicesQuery(night!.id))).toEqual([])
+    })
+  })
+
+  test('a reset kicks every crew device and leaves front of house holding the board', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-reset'))
+      const [night] = run(database, nightRowQuery(venue.id, NIGHT)) as { id: string }[]
+
+      run(database, joinDeviceStatement(night!.id, 'Stage left', 'hash-crew', 0, 'dev-crew'))
+      run(database, ensureFohDeviceStatement(night!.id, 'credential-2', 0, 'dev-foh'))
+      run(database, revokeDevicesStatement(night!.id))
+
+      expect(run(database, activeDevicesQuery(night!.id))).toEqual([])
+      expect(run(database, fohDeviceQuery(night!.id))).toEqual([{ deviceId: 'dev-foh' }])
+    })
+  })
+})
+
+describe('a message carries the side it came from, and the other side\'s tick (criteria 4, 7)', () => {
+  test('the side is the poster device\'s own, and only the other side\'s tick counts as seen', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-seen'))
+      const [night] = run(database, nightRowQuery(venue.id, NIGHT)) as { id: string }[]
+
+      run(database, joinDeviceStatement(night!.id, 'Stage left', 'hash-a', 0, 'dev-crew-a'))
+      run(database, joinDeviceStatement(night!.id, 'Stage right', 'hash-b', 0, 'dev-crew-b'))
+      run(database, ensureFohDeviceStatement(night!.id, 'credential-3', 0, 'dev-foh'))
+
+      run(database, postMessageStatement(night!.id, 'dev-foh', null, 'House open', 1000, 'msg-foh'))
+      run(database, postMessageStatement(night!.id, 'dev-crew-a', null, 'Standby', 1100, 'msg-crew'))
+
+      const messages = run(database, messagesForNightQuery(night!.id)) as { id: string, side: string }[]
+      expect(messages.find(message => message.id === 'msg-foh')?.side).toBe('FOH')
+      expect(messages.find(message => message.id === 'msg-crew')?.side).toBe('BACKSTAGE')
+
+      // The other crew device acknowledging a crew call is not front of house having seen it.
+      run(database, acknowledgeStatement('msg-crew', 'dev-crew-b', 'ack-1'))
+      expect(run(database, seenAcrossQuery(night!.id))).toEqual([])
+
+      run(database, acknowledgeStatement('msg-foh', 'dev-crew-a', 'ack-2'))
+      run(database, acknowledgeStatement('msg-crew', 'dev-foh', 'ack-3'))
+      const seen = run(database, seenAcrossQuery(night!.id)) as { messageId: string }[]
+      expect(seen.map(row => row.messageId).sort()).toEqual(['msg-crew', 'msg-foh'])
     })
   })
 })

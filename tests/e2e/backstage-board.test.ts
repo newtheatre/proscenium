@@ -196,3 +196,56 @@ describe.skipIf(skip !== null)('resetting the board (E-122 criteria 1, 2, 3)', (
     expect((await request(app, 'GET', '/api/board/messages', undefined, deviceCookie)).status).toBe(200)
   })
 })
+
+describe.skipIf(skip !== null)('front of house holds the other end of the board (E-121 criterion 7)', () => {
+  test('the duty manager sends a preset, and it reads as FOH with the crew\'s presets beside it', async () => {
+    const created = await send('POST', '/api/admin/backstage/presets', { label: 'Hold', body: 'Hold the house', sort: 1 }, foh.cookie)
+    const { id } = await created.json() as { id: string }
+
+    const sent = await send('POST', '/api/tonight/board/messages', { presetId: id, composedAt: Math.floor(Date.now() / 1000) }, foh.cookie)
+    expect(sent.status).toBe(200)
+
+    const read1 = await send('GET', '/api/tonight/board/messages', undefined, foh.cookie)
+    const answered = await read1.json() as { messages: { id: string, side: string, body: string }[], presets: { id: string }[] }
+    const posted = answered.messages.find(message => message.body === 'Hold the house')
+    expect(posted?.side).toBe('FOH')
+    expect(answered.presets.some(preset => preset.id === id)).toBe(true)
+  })
+
+  test('front of house sends free text but never a milestone', async () => {
+    const composedAt = Math.floor(Date.now() / 1000)
+    expect((await send('POST', '/api/tonight/board/messages', { body: 'Two minutes on the bar queue', composedAt }, foh.cookie)).status).toBe(200)
+
+    const types = await send('GET', '/api/admin/backstage/milestone-types', undefined, foh.cookie)
+    const { types: milestones } = await types.json() as { types: { id: string }[] }
+    expect((await send('POST', '/api/tonight/board/messages', { milestoneTypeId: milestones[0]!.id, composedAt }, foh.cookie)).status).toBe(400)
+  })
+
+  test('a crew tick marks an FOH call seen, and front of house ticks a call from the wings', async () => {
+    const { deviceCookie } = await joinAs('Prompt desk')
+    const composedAt = Math.floor(Date.now() / 1000)
+
+    await send('POST', '/api/tonight/board/messages', { body: 'House open in five', composedAt }, foh.cookie)
+    await request(app, 'POST', '/api/board/messages', { body: 'Standing by', composedAt }, deviceCookie)
+
+    const read1 = await send('GET', '/api/tonight/board/messages', undefined, foh.cookie)
+    const before = await read1.json() as { messages: { id: string, body: string }[], seen: { messageId: string }[] }
+    const mine = before.messages.find(message => message.body === 'House open in five')!
+    const theirs = before.messages.find(message => message.body === 'Standing by')!
+    expect(before.seen.some(row => row.messageId === mine.id)).toBe(false)
+
+    await request(app, 'POST', `/api/board/messages/${mine.id}/acknowledge`, undefined, deviceCookie)
+    expect((await send('POST', '/api/tonight/board/seen', { messageId: theirs.id }, foh.cookie)).status).toBe(200)
+
+    const read2 = await send('GET', '/api/tonight/board/messages', undefined, foh.cookie)
+    const after = await read2.json() as { seen: { messageId: string }[] }
+    expect(after.seen.map(row => row.messageId).sort()).toEqual([mine.id, theirs.id].sort())
+  })
+
+  test('an ordinary member holds neither end', async () => {
+    const member = await registerMember(app, 'board-outsider', generatePassword())
+    const composedAt = Math.floor(Date.now() / 1000)
+    expect((await send('POST', '/api/tonight/board/messages', { body: 'Nope', composedAt }, member.cookie)).status).toBe(403)
+    expect((await send('POST', '/api/tonight/board/seen', { messageId: 'whatever' }, member.cookie)).status).toBe(403)
+  })
+})
