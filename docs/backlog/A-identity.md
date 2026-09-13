@@ -69,6 +69,9 @@ Open questions for the committee:
   3. If the account has any confirmed second factor, no session is created; the response carries an MFA attempt with a 5-minute lifetime instead (A-111).
   4. Rate limits of 20 attempts per 15 minutes per IP and 10 per 15 minutes per account are enforced.
   5. A successful sign-in stamps the last-activity time that the retention sweep (A-126) reads.
+  6. A visitor who already holds a session is sent on rather than shown the form, on both the
+     sign-in and the register screens: to `next` where the query names a path on this site, and
+     to the home page otherwise. Added 13 September 2026, from issue 925.
 - Source: Prompt Book A-1; audit SD-2 (behaviour carries verbatim); Get-In constraint 3.
 
 ## A-104: Sign in with a Workspace Google account
