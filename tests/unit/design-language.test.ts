@@ -34,6 +34,15 @@ describe('design language (0021)', () => {
     }
   })
 
+  test('the light ground is paper and a raised surface is white (K-130)', async () => {
+    const theme = await Bun.file(TOKEN_SOURCE).text()
+    const root = theme.slice(theme.indexOf(':root {'), theme.indexOf('.dark {'))
+    expect(root).toContain('--ui-bg: var(--ui-color-neutral-50)')
+    expect(root).toContain('--ui-bg-muted: var(--ui-color-neutral-100)')
+    expect(root).toContain('--ui-bg-elevated: white')
+    expect(root).toContain('--ui-bg-accented: var(--ui-color-neutral-200)')
+  })
+
   test('the fonts are self-hosted, with no Google Fonts request', async () => {
     const theme = await Bun.file(TOKEN_SOURCE).text()
     expect(theme).toContain('@fontsource-variable/')
