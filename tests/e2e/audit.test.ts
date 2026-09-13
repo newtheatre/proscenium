@@ -351,6 +351,35 @@ describe.skipIf(skip !== null)('the audit screen (J-101 criterion 2, J-103)', ()
       view.close()
     }
   }, CASE_TIMEOUT_MS)
+
+  // Issue 935: a wide diff no longer stretches its row past its neighbours; the rest sits behind
+  // a summary count until the row is expanded.
+  test('a diff past the summary limit reads as a count, with the rest behind the expand toggle', async () => {
+    const id = crypto.randomUUID().replaceAll('-', '')
+    const member = await registerMember(app, 'widerow', password, { signIn: false })
+    write(
+      'INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (?, ?, ?, ?, ?)',
+      id, officerId, 'booking.refunded', `user:${member.id}`,
+      JSON.stringify({ a: 1, b: 2, c: 3, d: 4, e: 5 }),
+    )
+
+    const view = await signedInView()
+    try {
+      await visit(view, `${app.baseURL}/admin/audit`, '[data-test="audit-table"]')
+      await fill(view, 'input[data-test="toolbar-search"]', `user:${member.id}`)
+      await waitFor(view, `document.querySelector('[data-test="audit-table"]').innerText.includes('+2 more')`)
+
+      const collapsed = await textOf(view, '[data-test="audit-table"]')
+      expect(collapsed).not.toContain('e: 5')
+
+      await click(view, `[data-test="audit-expand-${id}"]`)
+      await waitFor(view, 'document.querySelector(\'[data-test="audit-detail-full"]\')')
+      expect(await textOf(view, '[data-test="audit-detail-full"]')).toContain('e: 5')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)

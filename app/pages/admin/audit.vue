@@ -11,6 +11,7 @@ import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 definePageMeta({ layout: 'console', title: 'Audit trail', middleware: 'console' })
 
 const UBadge = resolveComponent('UBadge')
+const UButton = resolveComponent('UButton')
 
 interface Entry {
   id: string
@@ -37,6 +38,11 @@ const { search, conditions, sort, page, query, active, set, setSort, clear } = u
 const listing = ref<Listing | null>(null)
 const loading = ref(false)
 const failure = ref<ListFailure | null>(null)
+
+// A wide diff wrapped one row to several times its neighbours' height (issue 935); past this many
+// badges the rest sit in the row's own expanded detail instead.
+const SUMMARY_BADGE_LIMIT = 3
+const expanded = ref<Record<string, boolean>>({})
 
 const toast = useToast()
 const entryForm = useTemplateRef('entryForm')
@@ -147,6 +153,22 @@ function readable(key: string, value: unknown): string {
 
 const columns: TableColumn<Entry>[] = [
   {
+    id: 'expand',
+    cell: ({ row }) => describeDetail(row.original.detail).length <= SUMMARY_BADGE_LIMIT
+      ? null
+      : h(UButton, {
+          'color': 'neutral',
+          'variant': 'ghost',
+          'icon': 'i-lucide-chevron-down',
+          'square': true,
+          'size': 'xs',
+          'aria-label': 'Show the full diff',
+          'data-test': `audit-expand-${row.original.id}`,
+          'ui': { leadingIcon: ['transition-transform', row.getIsExpanded() ? 'duration-200 rotate-180' : ''] },
+          'onClick': () => row.toggleExpanded(),
+        }),
+  },
+  {
     id: 'createdAt',
     header: 'When',
     cell: ({ row }) => formatLondon(new Date(row.original.createdAt * 1000), { dateStyle: 'medium', timeStyle: 'short' }),
@@ -181,9 +203,15 @@ const columns: TableColumn<Entry>[] = [
   {
     id: 'detail',
     header: 'What changed',
-    meta: { class: { td: 'max-w-xs' } },
-    cell: ({ row }) => h('div', { class: 'flex flex-wrap gap-1' }, describeDetail(row.original.detail).map(part =>
-      h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm', class: 'font-mono' }, () => part))),
+    cell: ({ row }) => {
+      const parts = describeDetail(row.original.detail)
+      const shown = parts.slice(0, SUMMARY_BADGE_LIMIT)
+      const remaining = parts.length - shown.length
+      return h('div', { class: 'flex flex-wrap gap-1' }, [
+        ...shown.map(part => h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm', class: 'font-mono' }, () => part)),
+        remaining > 0 ? h(UBadge, { color: 'neutral', variant: 'soft', size: 'sm' }, () => `+${remaining} more`) : null,
+      ])
+    },
   },
 ]
 
@@ -242,6 +270,7 @@ onMounted(load)
     <!-- A wide read-only history table forces horizontal scroll below sm (922); one card per
          row there instead, the table above it. -->
     <UTable
+      v-model:expanded="expanded"
       :data="listing?.items ?? []"
       :columns="columns"
       :loading="loading"
@@ -254,6 +283,24 @@ onMounted(load)
             ? 'No entry matches that.'
             : 'Nothing on the trail yet. Every privileged action lands here.' }}
         </p>
+      </template>
+
+      <template #expanded="{ row }">
+        <div
+          class="flex flex-wrap gap-1 p-2"
+          data-test="audit-detail-full"
+        >
+          <UBadge
+            v-for="part in describeDetail(row.original.detail)"
+            :key="part"
+            color="neutral"
+            variant="subtle"
+            size="sm"
+            class="font-mono"
+          >
+            {{ part }}
+          </UBadge>
+        </div>
       </template>
     </UTable>
     <p
