@@ -27,14 +27,18 @@ interface Own {
   claim: OwnClaim | null
 }
 
+const request = useRequestFetch()
 const toast = useToast()
 const today = londonDay(new Date())
 
-const { data, refresh } = await useAsyncData<Own>(
+// A bare $fetch here carries no session cookie on a full page load, so a real membership or an
+// open claim read back as the empty default and never refetched (issue 1005, A-117, A-130).
+const { data, refresh, error } = await useAsyncData<Own>(
   'account-membership',
-  () => $fetch<Own>('/api/account/membership'),
+  () => request<Own>('/api/account/membership'),
   { default: (): Own => ({ membership: null, state: { kind: 'none' }, graceDays: 0, claim: null }) },
 )
+const listFailure = useListFailure(error, 'Your membership could not be read.')
 
 const sayDay = (day: string): string =>
   formatLondon(startOfLondonDay(day), { day: 'numeric', month: 'long', year: 'numeric' })
@@ -87,7 +91,7 @@ const declined = computed(() => data.value.claim?.status === 'DECLINED' ? data.v
 // Read from /policies/membership rather than baked in, so a fee change needs no code edit (J-110).
 const { data: fee } = await useAsyncData(
   'membership-fee',
-  () => $fetch<{ values: PolicyValues }>('/api/policies/values', { query: { path: '/policies/membership' } }),
+  () => request<{ values: PolicyValues }>('/api/policies/values', { query: { path: '/policies/membership' } }),
 )
 const feeValue = computed(() => fee.value?.values.MEMBERSHIP_FEE_PENCE ?? null)
 
@@ -105,6 +109,16 @@ useSeoMeta({ title: 'Membership' })
       class="mt-8 space-y-6"
       data-test="account-membership-page"
     >
+      <UAlert
+        v-if="listFailure"
+        data-test="load-failed"
+        color="error"
+        variant="subtle"
+        icon="i-lucide-unplug"
+        :title="listFailure.message"
+        description="This is not the same as nothing being recorded. Reload, and if it keeps happening say so."
+      />
+
       <UAlert
         v-if="failure"
         data-test="failure"

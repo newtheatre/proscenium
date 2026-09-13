@@ -329,4 +329,52 @@ describe.skipIf(skip !== null)('the screens (A-130 criterion 4)', () => {
   }, CASE_TIMEOUT_MS)
 })
 
+describe.skipIf(skip !== null)('a full page load carries the session (issue 1005, same class as #899)', () => {
+  test('a recorded membership shows as current on the very first render, not the empty default', async () => {
+    const member = await registerMember(app, 'ssr-current', password)
+    const { id } = await (await claim(member)).json() as { id: string }
+    expect((await send('POST', `/api/admin/memberships/claims/${id}/record`, {}, cookie)).status).toBe(200)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', member.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+      // A fresh navigation, not a client-side one: this is the request a bare $fetch inside
+      // useAsyncData never carried a cookie on.
+      await visit(view, `${app.baseURL}/account/membership`, '[data-test="membership-state"]')
+      expect(await textOf(view, '[data-test="membership-state"]')).not.toContain('No membership')
+      expect(await textOf(view, '[data-test="membership-state"]')).toContain('Current')
+      expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="load-failed"]')`)).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('an open claim and its Withdraw button render on the very first load', async () => {
+    const member = await registerMember(app, 'ssr-open-claim', password)
+    await claim(member)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', member.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+      await visit(view, `${app.baseURL}/account/membership`, '[data-test="membership-state"]')
+      expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="claim-open"]')`)).toBe(true)
+      expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="claim-withdraw"]')`)).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
