@@ -236,6 +236,11 @@ describe('what a screen shows', () => {
     expect(saysMoney(0)).toBe('£0.00')
   })
 
+  // #908 item 3: a bare hyphen glued to the pound sign read as "£-56.00" on a stocktake's at-cost column.
+  test('negative money reads as a minus sign before the currency, not £-56.00', () => {
+    expect(saysMoney(-5600)).toBe('−£56.00')
+  })
+
   test('every value in the vocabularies has words for it', () => {
     expect(says('OUT_OF_DATE')).toBe('Out of date')
     expect(says('NONE')).toBe('Confirmed no allergens')

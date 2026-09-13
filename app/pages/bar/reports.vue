@@ -50,7 +50,10 @@ function exportUrl(section: ReportSection): string {
 
 <template>
   <div class="space-y-6">
-    <AdminToolbar :filterable="false">
+    <AdminToolbar
+      :filterable="false"
+      :searchable="false"
+    >
       <template #actions>
         <USelect
           v-model="kind"

@@ -437,6 +437,7 @@ export function saysQuantity(qty: number, unit: StockUnit): string {
   return unit === 'ML' ? `${qty} ml` : `${qty}`
 }
 
+// Negative reads as minus-sign-before-currency, never a bare hyphen glued to the pound sign (#908).
 export function saysMoney(pence: number): string {
-  return `£${(pence / 100).toFixed(2)}`
+  return pence < 0 ? `−£${(-pence / 100).toFixed(2)}` : `£${(pence / 100).toFixed(2)}`
 }
