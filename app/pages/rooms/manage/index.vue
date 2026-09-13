@@ -51,7 +51,7 @@ const editing = ref<Room | null>(null)
 const saving = ref(false)
 
 // Tidiness rather than enforcement: the routes are what refuse, and this is what stops a
-// read-only role seeing three controls that all answer 403 (0040, #911).
+// read-only role seeing three controls that all answer 403 (0040, issue 911).
 const writes = computed(() => can(useViewer().value, manageRoomsEstate))
 
 // useRequestFetch, not $fetch: on the server $fetch sends no cookies, so the render was
