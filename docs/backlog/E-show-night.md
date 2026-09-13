@@ -199,10 +199,10 @@ Counts: 28 MVP stories (E-101 to E-128), 4 V2 stories (E-201 to E-204), 1 Later 
 - Story: As front of house, I want the venue's emergency card available with no connection at all so that the worst moment of the night never depends on the Wi-Fi.
 - Depends on: E-112
 - Acceptance criteria:
-  1. Every venue has a committee-editable emergency card (evacuation procedure, assembly point, emergency contacts, key locations); edits are versioned and audited.
+  1. Every venue has a committee-editable emergency card: the full address written to be read aloud to a 999 call handler, the evacuation procedure and assembly point, the first aid kit and defibrillator locations, tonight's first aiders, the isolation points and the fire panel. Edits are versioned and audited, and the address is required, so a venue counts as filed only once its latest version carries one.
   2. Opening any show-night screen caches the current card on the device; it then opens fully offline, including after a device restart. The old estate's localStorage mirror survived a dropped connection but not an offline first load; that gap is closed.
   3. The cached card shows its as-of date and refreshes silently when connectivity returns.
-  4. The card renders with no round-trip, in large type and high contrast, readable in a dark foyer.
+  4. The card renders with no round-trip, in large type and high contrast, readable in a dark foyer: the address and what3words lead in display type on their own block headed "Read to 999", with evacuation, first aid and isolation points below. The current card is server-rendered, so a device opening the screen for the first time with no connectivity still has the address on it.
 - Source: Prompt Book E-2, K-1; audit PR-9 (localStorage mirror, offline first-load gap).
 
 ## E-114: Pre and post-show checklists

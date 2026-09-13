@@ -17,8 +17,15 @@ export interface RecordedCard { id: string, statement: SQL }
 // No predicate: a fresh version never contends, since nothing else can have created it.
 export function recordCardStatement(venueId: string, input: EmergencyCardInput, updatedBy: string, id: string): RecordedCard {
   const statement = sql`
-    INSERT INTO venue_emergency_info (id, venue_id, assembly_point, exits, isolation_points, what3words, notes, updated_by)
-    VALUES (${id}, ${venueId}, ${input.assemblyPoint}, ${input.exits}, ${input.isolationPoints}, ${input.what3words}, ${input.notes}, ${updatedBy})
+    INSERT INTO venue_emergency_info (
+      id, venue_id, address, assembly_point, exits, isolation_points,
+      first_aid_kit, defibrillator, first_aiders, fire_panel, what3words, notes, updated_by
+    )
+    VALUES (
+      ${id}, ${venueId}, ${input.address}, ${input.assemblyPoint}, ${input.exits}, ${input.isolationPoints},
+      ${input.firstAidKit}, ${input.defibrillator}, ${input.firstAiders}, ${input.firePanel},
+      ${input.what3words}, ${input.notes}, ${updatedBy}
+    )
     RETURNING id
   `
   return { id, statement }
@@ -28,9 +35,14 @@ export interface EmergencyCard {
   id: string
   venueId: string
   venueName: string
+  address: string | null
   assemblyPoint: string | null
   exits: string | null
   isolationPoints: string | null
+  firstAidKit: string | null
+  defibrillator: string | null
+  firstAiders: string | null
+  firePanel: string | null
   what3words: string | null
   notes: string | null
   updatedByName: string
@@ -40,8 +52,10 @@ export interface EmergencyCard {
 // `v.id`, never `e.venue_id`: a venue with no card yet still names itself correctly in
 // `currentCardsQuery()`'s outer join, where `e` and its columns are all null.
 const CARD_COLUMNS = sql`
-  e.id AS id, v.id AS venueId, v.name AS venueName,
+  e.id AS id, v.id AS venueId, v.name AS venueName, e.address AS address,
   e.assembly_point AS assemblyPoint, e.exits AS exits, e.isolation_points AS isolationPoints,
+  e.first_aid_kit AS firstAidKit, e.defibrillator AS defibrillator, e.first_aiders AS firstAiders,
+  e.fire_panel AS firePanel,
   e.what3words AS what3words, e.notes AS notes, u.name AS updatedByName, e.updated_at AS updatedAt
 `
 
@@ -78,7 +92,14 @@ export function emergencyCardsClause(query: ListQuery): ListClause {
     column: aliasColumns('vp'),
     search: [sql`vp.name`],
     fields: {
-      filed: yesNo(sql`exists (select 1 from venue_emergency_info ei where ei.venue_id = vp.id)`),
+      // A card with no address is not one anybody can read to a 999 handler, so "filed" means
+      // the latest version carries one (issue 902).
+      filed: yesNo(sql`exists (
+        select 1 from venue_emergency_info ei
+        where ei.venue_id = vp.id
+          and ei.address is not null
+          and ei.updated_at = (select max(updated_at) from venue_emergency_info em where em.venue_id = vp.id)
+      )`),
     },
   })
 }

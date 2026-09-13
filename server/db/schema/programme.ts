@@ -39,9 +39,17 @@ export const venues = sqliteTable('venues', {
 export const venueEmergencyInfo = sqliteTable('venue_emergency_info', {
   id: id(),
   venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),
+  // The line a volunteer reads aloud to a 999 handler. Nullable here and required by the form:
+  // every version already filed predates the column and none of them can be rewritten (0010).
+  address: text('address'),
   assemblyPoint: text('assembly_point'),
   exits: text('exits'),
   isolationPoints: text('isolation_points'),
+  firstAidKit: text('first_aid_kit'),
+  defibrillator: text('defibrillator'),
+  // Free text until a first-aid module exists in the catalogue to derive tonight's from (E-113).
+  firstAiders: text('first_aiders'),
+  firePanel: text('fire_panel'),
   what3words: text('what3words'),
   notes: text('notes'),
   updatedBy: text('updated_by').notNull().references(() => users.id, { onDelete: 'restrict' }),

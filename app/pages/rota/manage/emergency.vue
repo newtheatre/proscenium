@@ -13,9 +13,14 @@ interface VenueCard {
   id: string | null
   venueId: string
   venueName: string
+  address: string | null
   assemblyPoint: string | null
   exits: string | null
   isolationPoints: string | null
+  firstAidKit: string | null
+  defibrillator: string | null
+  firstAiders: string | null
+  firePanel: string | null
   what3words: string | null
   notes: string | null
   updatedByName: string | null
@@ -48,23 +53,36 @@ const { data, status, refresh } = await useAsyncData(
 )
 
 interface FormState {
+  address: string
   assemblyPoint: string
   exits: string
   isolationPoints: string
+  firstAidKit: string
+  defibrillator: string
+  firstAiders: string
+  firePanel: string
   what3words: string
   notes: string
 }
 
 const editing = ref<VenueCard | null>(null)
 const open = ref(false)
-const state = reactive<FormState>({ assemblyPoint: '', exits: '', isolationPoints: '', what3words: '', notes: '' })
+const state = reactive<FormState>({
+  address: '', assemblyPoint: '', exits: '', isolationPoints: '',
+  firstAidKit: '', defibrillator: '', firstAiders: '', firePanel: '', what3words: '', notes: '',
+})
 
 function edit(venue: VenueCard): void {
   editing.value = venue
   Object.assign(state, {
+    address: venue.address ?? '',
     assemblyPoint: venue.assemblyPoint ?? '',
     exits: venue.exits ?? '',
     isolationPoints: venue.isolationPoints ?? '',
+    firstAidKit: venue.firstAidKit ?? '',
+    defibrillator: venue.defibrillator ?? '',
+    firstAiders: venue.firstAiders ?? '',
+    firePanel: venue.firePanel ?? '',
     what3words: venue.what3words ?? '',
     notes: venue.notes ?? '',
   })
@@ -105,6 +123,11 @@ const columns: TableColumn<VenueCard>[] = [
     id: 'venue',
     header: 'Venue',
     cell: ({ row }) => h('span', {}, row.original.venueName),
+  },
+  {
+    id: 'address',
+    header: 'Address',
+    cell: ({ row }) => row.original.address ?? 'Not filed',
   },
   {
     id: 'assembly',
@@ -214,6 +237,18 @@ const columns: TableColumn<VenueCard>[] = [
             :description="failure"
           />
 
+          <UFormField
+            label="Address"
+            description="Written to be read aloud to a 999 call handler, including the postcode."
+          >
+            <UTextarea
+              v-model="state.address"
+              :rows="3"
+              class="w-full"
+              data-test="field-address"
+            />
+          </UFormField>
+
           <UFormField label="Assembly point">
             <UInput
               v-model="state.assemblyPoint"
@@ -237,6 +272,51 @@ const columns: TableColumn<VenueCard>[] = [
               :rows="2"
               class="w-full"
               data-test="field-isolation"
+            />
+          </UFormField>
+
+          <UFormField
+            label="First aid kit"
+            hint="Optional"
+          >
+            <UInput
+              v-model="state.firstAidKit"
+              class="w-full"
+              data-test="field-first-aid-kit"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Defibrillator"
+            hint="Optional"
+          >
+            <UInput
+              v-model="state.defibrillator"
+              class="w-full"
+              data-test="field-defibrillator"
+            />
+          </UFormField>
+
+          <UFormField
+            label="First aiders"
+            hint="Optional"
+            description="Who to find on a normal night. Once the catalogue carries a first-aid module this comes from tonight's training records instead."
+          >
+            <UInput
+              v-model="state.firstAiders"
+              class="w-full"
+              data-test="field-first-aiders"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Fire panel"
+            hint="Optional"
+          >
+            <UInput
+              v-model="state.firePanel"
+              class="w-full"
+              data-test="field-fire-panel"
             />
           </UFormField>
 
