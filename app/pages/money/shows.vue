@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
+import { currentSeasonYear } from '#shared/utils/season'
 import type { RevenueByShowReport } from '#shared/utils/revenue-by-show'
 
 definePageMeta({ layout: 'console', title: 'Revenue by show', middleware: 'console' })
 
 const request = useRequestFetch()
 
-const year = ref(new Date().getFullYear())
+const year = ref(currentSeasonYear())
 
 // The season, always: a treasurer comparing shows reads them within one season at a time.
 const query = computed(() => ({ kind: 'SEASON', year: String(year.value) }))
