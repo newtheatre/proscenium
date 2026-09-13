@@ -135,7 +135,10 @@ Six rules follow:
    for exactly this reason. A hand-written `<table>` in a page is a copy of a decision that has
    already been made. A list long enough to page uses `UPagination` bound to the server's page,
    never a client-side slice of everything: the endpoint pages in SQL and answers with an
-   envelope (CONTRIBUTING), so the browser never holds the whole table.
+   envelope (CONTRIBUTING), so the browser never holds the whole table. A cell whose content
+   varies widely in length (a diff, a free-text detail) shows a fixed number of badges plus a
+   count of the rest, with the whole of it in the row's own expanded detail, rather than growing
+   the row past its neighbours (0027).
 3. **The show-night shell carries one header, and the screens fill it in.** `app/layouts/tonight.vue`
    draws the back arrow, a mono uppercase eyebrow, the show title, the "Thu 5 Nov 19:30 Main Hall"
    line and the on-shift badge. A screen says what goes in it through `setNightEyebrow` (which

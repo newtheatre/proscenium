@@ -664,7 +664,9 @@ Stories: 29. Phases: 24 MVP, 0 V2, 0 Later, 5 resolved.
      statement's parameter count grows with the data (0006); sorting is by a declared field only.
   6. Every console `UTable` page migrates, one module per pull request; when the last lands,
      `tests/unit/admin-conventions.test.ts` fails on a table page without a declaration or with
-     a hand-written chip list.
+     a hand-written chip list. Excluded: a period-scoped aggregate report (`/money`,
+     `/money/shows`, `/money/reports`) with a handful of computed rows and no open-ended count,
+     which keeps `AdminToolbar`'s `:filterable="false" :searchable="false"` (0032, #952, #923).
   7. Before-and-after captures from `bun run shots` are attached to each pull request.
 - Source: Pre-cutover review, 10 September 2026. Thirty-three console tables share one toolbar
   and each hand-writes its filters; none keeps its state in the URL.
