@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, forgetSpentStep, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import { showNightOf } from '#shared/utils/show-night'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -20,6 +20,7 @@ const CASE_TIMEOUT_MS = 120_000
 let app: AppUnderTest
 let officer: TestMember
 let boxOffice: TestMember
+let boxOfficePassword: string
 let manager: TestMember
 let venueId: string
 
@@ -28,7 +29,8 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
 
-  boxOffice = await registerMember(app, 'boxoffice', generatePassword())
+  boxOfficePassword = generatePassword()
+  boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
   await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, officer.cookie)
 
   // Both roles, plus MFA: MANAGER is privileged (0037/A-112). ticketing.manage is now what
@@ -393,5 +395,78 @@ describe.skipIf(skip !== null)('a walk-up sale is one flow, source DOOR from cre
       'SELECT window_bypassed AS windowBypassed FROM reservations WHERE performance_id = ?', performanceId,
     )
     expect(row?.windowBypassed).toBe(1)
+  }, CASE_TIMEOUT_MS)
+})
+
+async function signInAsBoxOffice(baseURL: string): ReturnType<typeof openSignedOutView> {
+  const view = await openSignedOutView(baseURL)
+  await visit(view, `${baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', boxOffice.email)
+  await fill(view, 'form input[type="password"]', boxOfficePassword)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+  return view
+}
+
+// #899: the SSR fetch on a full page load carries no cookie unless it goes through
+// useRequestFetch, and the failed nightly no longer resolves silently as an empty screen.
+describe.skipIf(skip !== null)('opening the desk by a full page load (#899, #940)', () => {
+  test('a bookmark or a refresh still shows tonight\'s night, the picker and its bookings', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow()
+    const { reference } = await bookedReservation(performanceId, ticketTypeId)
+
+    const view = await signInAsBoxOffice(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+      expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
+      await waitFor(view, `document.querySelector('[data-test="desk-night"]')?.innerText.trim().length > 0`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="desk-performance"]')`, 30_000)
+
+      // No search typed and no button pressed: the auto-select of the night's first performance
+      // has to trigger the search on its own (#940 criterion 1).
+      await waitFor(view, `document.querySelector('[data-test="desk-results"]')?.innerText.includes(${JSON.stringify(reference)})`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
+// Choosing COMP left the reservation modal's own backdrop as an overlay that swallowed every
+// further click; a URadioGroup replaces the nested select that caused it.
+describe.skipIf(skip !== null)('raising a comp from the desk with real pointer events (#939)', () => {
+  test('choosing COMP still lets the reason be typed and the request sent', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow(900)
+    const { reference, id } = await bookedReservation(performanceId, ticketTypeId)
+
+    const view = await signInAsBoxOffice(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-results"]')?.innerText.includes(${JSON.stringify(reference)})`, 30_000)
+
+      await click(view, `[data-test="desk-open-${id}"]`)
+      await waitFor(view, `document.querySelector('[data-test="desk-tender"]')`, 15_000)
+
+      // Chosen by what the radio says rather than a value attribute, which is the group's own.
+      await view.evaluate(`[...document.querySelectorAll('[data-test="desk-tender"] *')]
+        .filter(node => node.textContent.trim() === 'Comp')
+        .pop().click()`)
+      await waitFor(view, `document.querySelector('[data-test="desk-comp-reason"]')`, 15_000)
+
+      await fill(view, '[data-test="desk-comp-reason"]', 'Reviewer')
+      await click(view, '[data-test="desk-request-comp"]')
+
+      // The click has to reach the button rather than a leftover overlay: only a live request
+      // proves it did, not the mere presence of the reason field.
+      await waitFor(view, `document.querySelector('[data-test="desk-comp-pending"]')`, 15_000)
+
+      const row = query<{ status: string }>(
+        'SELECT status FROM ticket_comp_requests WHERE reservation_id = ?', id,
+      )
+      expect(row?.status).toBe('PENDING')
+    }
+    finally {
+      view.close()
+    }
   }, CASE_TIMEOUT_MS)
 })

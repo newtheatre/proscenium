@@ -26,19 +26,17 @@ interface PendingRequest {
   createdAt: number
 }
 
-interface Buyer {
-  id: string
-  name: string
-  email: string
-}
-
+const request = useRequestFetch()
 const toast = useToast()
 
-const { data: passTypes, refresh: refreshPassTypes } = await useAsyncData<SellablePassType[]>(
+const { data: passTypes, refresh: refreshPassTypes, error: passTypesError } = await useAsyncData<SellablePassType[]>(
   'desk-sellable-passes',
-  async () => (await $fetch<{ items: SellablePassType[] }>('/api/box-office/desk/passes')).items,
+  async () => (await request<{ items: SellablePassType[] }>('/api/box-office/desk/passes')).items,
   { default: (): SellablePassType[] => [] },
 )
+
+// Shown rather than a bare "Nothing is on sale", which a refused fetch also rendered.
+const passTypesFailure = computed(() => (passTypesError.value ? refusalText(passTypesError.value, 'The sellable passes could not be read.') : null))
 
 const passTypeId = ref<string | undefined>(undefined)
 watch(passTypes, (value) => {
@@ -63,42 +61,23 @@ async function loadRequests(): Promise<void> {
 watch(passTypeId, loadRequests, { immediate: true })
 
 const priceId = ref<string | undefined>(undefined)
+// Immediate: selectedPassType is already set by the time this registers, since the watcher
+// above runs synchronously first, and a price left blank silently zeroes what Issue charges.
 watch(selectedPassType, (type) => {
   priceId.value = type?.prices[0]?.id
-})
+}, { immediate: true })
 
-const buyerSearch = ref('')
-const buyerSearchSettled = useDebounced(buyerSearch, 250)
-const buyerOptions = ref<Buyer[]>([])
-const chosenBuyer = ref<Buyer | null>(null)
 const buyerId = ref<string | undefined>(undefined)
-const searchingBuyers = ref(false)
-
-watch(buyerSearchSettled, async (term) => {
-  if (term.trim().length < 2) {
-    buyerOptions.value = []
-    return
-  }
-  searchingBuyers.value = true
-  try {
-    buyerOptions.value = (await $fetch<{ items: Buyer[] }>('/api/box-office/desk/passes/buyers', { query: { q: term.trim() } })).items
-  }
-  finally {
-    searchingBuyers.value = false
-  }
-})
-
-function chooseBuyer(buyer: Buyer | undefined): void {
-  chosenBuyer.value = buyer ?? null
-  buyerId.value = buyer?.id
-}
+const personPicker = useTemplateRef('personPicker')
 
 const requestId = ref<string | undefined>(undefined)
 
+// A person is chosen, never typed (0032): the picker's own preset shows the requester's name
+// without a search, since fulfilling a request already knows exactly who they are.
 function fulfilRequest(request: PendingRequest): void {
   requestId.value = request.id
   buyerId.value = request.userId
-  chosenBuyer.value = { id: request.userId, name: request.name, email: '' }
+  personPicker.value?.preset({ id: request.userId, name: request.name, email: '' })
 }
 
 const duePence = computed(() => selectedPassType.value?.prices.find(one => one.id === priceId.value)?.price ?? 0)
@@ -122,11 +101,8 @@ async function issue(): Promise<void> {
       },
     })
     toast.add({ title: 'Pass issued', icon: 'i-lucide-check', color: 'success' })
-    chosenBuyer.value = null
     buyerId.value = undefined
     requestId.value = undefined
-    buyerSearch.value = ''
-    buyerOptions.value = []
     await Promise.all([refreshPassTypes(), loadRequests()])
   }
   catch (error) {
@@ -150,8 +126,16 @@ async function issue(): Promise<void> {
         </h1>
       </template>
 
+      <UAlert
+        v-if="passTypesFailure"
+        color="error"
+        variant="subtle"
+        :description="passTypesFailure"
+        data-test="desk-passes-failure"
+      />
+
       <div
-        v-if="passTypes.length === 0"
+        v-else-if="passTypes.length === 0"
         class="py-6 text-center text-sm text-muted"
       >
         Nothing is on sale.
@@ -197,16 +181,16 @@ async function issue(): Promise<void> {
           </p>
           <ul class="space-y-1 text-sm">
             <li
-              v-for="request in requests"
-              :key="request.id"
+              v-for="pending in requests"
+              :key="pending.id"
               class="flex items-center justify-between"
             >
-              <span>{{ request.name }}</span>
+              <span>{{ pending.name }}</span>
               <UButton
                 size="xs"
                 variant="subtle"
-                :data-test="`desk-pass-fulfil-${request.id}`"
-                @click="fulfilRequest(request)"
+                :data-test="`desk-pass-fulfil-${pending.id}`"
+                @click="fulfilRequest(pending)"
               >
                 Choose
               </UButton>
@@ -215,22 +199,13 @@ async function issue(): Promise<void> {
         </div>
 
         <UFormField label="Buyer">
-          <UInputMenu
-            :model-value="chosenBuyer ? { label: chosenBuyer.name, value: chosenBuyer.id, email: chosenBuyer.email } : undefined"
-            :items="buyerOptions.map(buyer => ({ label: buyer.name, value: buyer.id, email: buyer.email }))"
-            :loading="searchingBuyers"
+          <PersonPicker
+            ref="personPicker"
+            v-model="buyerId"
+            endpoint="/api/box-office/desk/passes/buyers"
+            search-param="q"
             placeholder="Search by name or email"
-            ignore-filter
-            data-test="desk-pass-buyer"
-            @update:model-value="item => chooseBuyer(item ? buyerOptions.find(one => one.id === item.value) : undefined)"
-            @update:search-term="value => buyerSearch = value"
-          >
-            <template #empty>
-              <span class="text-sm text-muted">
-                {{ buyerSearch.trim().length < 2 ? 'Type at least two characters' : 'Nobody matches that' }}
-              </span>
-            </template>
-          </UInputMenu>
+          />
         </UFormField>
 
         <UAlert
