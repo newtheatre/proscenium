@@ -70,10 +70,10 @@ const { data: candidateData, status: candidateStatus } = await useAsyncData(
     const term = candidateSettled.value.trim()
     if (term.length < 2) return Promise.resolve({ items: [] as Candidate[] })
     if (assigning.value) {
-      return $fetch<{ items: Candidate[] }>(`/api/admin/rota/shifts/${assigning.value.shiftId}/candidates`, { query: { search: term } })
+      return request<{ items: Candidate[] }>(`/api/admin/rota/shifts/${assigning.value.shiftId}/candidates`, { query: { search: term } })
     }
     if (adding.value?.role) {
-      return $fetch<{ items: Candidate[] }>('/api/admin/rota/candidates', { query: { search: term, role: adding.value.role } })
+      return request<{ items: Candidate[] }>('/api/admin/rota/candidates', { query: { search: term, role: adding.value.role } })
     }
     return Promise.resolve({ items: [] as Candidate[] })
   },

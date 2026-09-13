@@ -34,11 +34,14 @@ const searchTerm = ref('')
 const settled = useDebounced(searchTerm, 250)
 
 const instance = useId()
+// Plain $fetch builds an event with no platform context, so the session password never reaches it
+// and the render is refused (K-131).
+const request = useRequestFetch()
 const { data, status } = await useAsyncData(
   () => `session-picker-${instance}-${settled.value}`,
   () => settled.value.trim().length < 2
     ? Promise.resolve({ items: [] } as Listing)
-    : $fetch<Listing>('/api/admin/comms/announce-sessions', { query: { q: settled.value.trim() } }),
+    : request<Listing>('/api/admin/comms/announce-sessions', { query: { q: settled.value.trim() } }),
   { watch: [settled], default: (): Listing => ({ items: [] }), getCachedData: () => undefined },
 )
 

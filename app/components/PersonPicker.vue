@@ -60,12 +60,15 @@ const settled = useDebounced(searchTerm, 250)
 // The account directory: it already pages and allow-lists its columns. Never cached, because a
 // remembered answer would offer somebody since renamed or erased.
 const instance = useId()
+// Plain $fetch builds an event with no platform context, so the session password never reaches it
+// and the render is refused (K-131).
+const request = useRequestFetch()
 const { data, status } = await useAsyncData(
   () => `person-picker-${instance}-${settled.value}`,
   // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
   () => settled.value.trim().length < 2
     ? Promise.resolve({ items: [] } as Listing)
-    : $fetch<Listing>(props.endpoint, {
+    : request<Listing>(props.endpoint, {
         query: props.endpoint === '/api/admin/accounts'
           ? { [props.searchParam]: settled.value.trim(), pageSize: 10, includeAnonymised: props.includeErased }
           : { [props.searchParam]: settled.value.trim() },
