@@ -21,7 +21,12 @@ const options = computed(() => props.candidates
   .filter(candidate => candidate.id !== props.moduleId && candidate.kind !== 'BRIEF')
   .map(candidate => ({ label: `${candidate.id} ${candidate.name}`, value: candidate.id })))
 
-const held = computed(() => props.prerequisites.map(need => need.requiresId))
+// Own copy, not a read of the prop: the parent's already-fetched module does not change while
+// this modal stays open, so the list would otherwise sit stale until it is closed and reopened.
+const local = ref<Prerequisite[]>([...props.prerequisites])
+watch(() => props.prerequisites, value => local.value = [...value])
+
+const held = computed(() => local.value.map(need => need.requiresId))
 const chosen = ref<string[]>([])
 watch(held, value => chosen.value = [...value], { immediate: true })
 
@@ -29,20 +34,21 @@ watch(held, value => chosen.value = [...value], { immediate: true })
 // what was there and what was picked. A refusal, a loop most likely, puts the control back.
 async function apply(next: string[]): Promise<void> {
   const added = next.filter(id => !held.value.includes(id))
-  const dropped = props.prerequisites.filter(need => !next.includes(need.requiresId))
+  const dropped = local.value.filter(need => !next.includes(need.requiresId))
 
   working.value = true
   try {
     for (const requiresId of added) {
-      // @ts-expect-error an options-carrying call has no working generic form yet (0053).
-      await $fetch<unknown>(`/api/admin/training/modules/${props.moduleId}/prerequisites`, {
-        method: 'POST',
-        body: { requiresId },
-      })
+      const created = await $fetch<{ ok: true, id: string }>(
+        `/api/admin/training/modules/${props.moduleId}/prerequisites`,
+        { method: 'POST', body: { requiresId } },
+      )
+      const candidate = props.candidates.find(one => one.id === requiresId)
+      local.value = [...local.value, { id: created.id, requiresId, requiresName: candidate?.name ?? requiresId }]
     }
     for (const need of dropped) {
-      // @ts-expect-error an options-carrying call has no working generic form yet (0053).
-      await $fetch<unknown>(`/api/admin/training/prerequisites/${need.id}`, { method: 'DELETE' })
+      await $fetch(`/api/admin/training/prerequisites/${need.id}`, { method: 'DELETE' })
+      local.value = local.value.filter(item => item.id !== need.id)
     }
     emit('changed')
   }
@@ -71,7 +77,7 @@ async function apply(next: string[]): Promise<void> {
     />
 
     <p
-      v-if="prerequisites.length === 0"
+      v-if="local.length === 0"
       class="text-sm text-muted"
       data-test="no-prerequisites"
     >
@@ -82,7 +88,7 @@ async function apply(next: string[]): Promise<void> {
       class="text-sm text-muted"
       data-test="prerequisite-summary"
     >
-      Needs {{ prerequisites.map(need => `${need.requiresId} ${need.requiresName}`).join(', ') }} first.
+      Needs {{ local.map(need => `${need.requiresId} ${need.requiresName}`).join(', ') }} first.
     </p>
   </div>
 </template>
