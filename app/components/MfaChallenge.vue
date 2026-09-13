@@ -42,9 +42,11 @@ async function answer(code: string): Promise<void> {
     class="space-y-4"
   >
     <div class="space-y-1">
-      <h2 class="nnt-headline text-xl">
+      <!-- The page heading, not a section one: this stands alone on the sign-in and magic-link
+           screens, and a lone h2 is a heading-order failure (issue 917). -->
+      <h1 class="nnt-headline text-xl">
         Enter your code
-      </h2>
+      </h1>
       <p class="text-sm text-muted">
         Open your authenticator app and type the six digits it shows.
       </p>
