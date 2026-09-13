@@ -157,7 +157,7 @@ const columns: TableColumn<Summary>[] = [
   { accessorKey: 'companions', header: 'Companions' },
   {
     id: 'open',
-    header: '',
+    header: () => h('span', { class: 'sr-only' }, 'Actions'),
     meta: { class: { td: 'text-right' } },
     cell: ({ row }) => h(UButton, {
       'variant': 'subtle',

@@ -54,6 +54,7 @@ function exportUrl(section: ReportSection): string {
       <template #actions>
         <USelect
           v-model="kind"
+          aria-label="Period kind"
           data-test="period-kind"
           :items="[...REPORT_PERIOD_KINDS]"
         />

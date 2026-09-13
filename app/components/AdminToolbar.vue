@@ -34,6 +34,7 @@ const emit = defineEmits<{ clear: [] }>()
         v-model="search"
         icon="i-lucide-search"
         :placeholder="placeholder"
+        :aria-label="placeholder"
         :loading="loading"
         class="w-full sm:w-80"
         data-test="toolbar-search"
