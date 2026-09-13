@@ -32,18 +32,22 @@ interface Listing {
   sellable: SellablePassType[]
 }
 
+const request = useRequestFetch()
 const toast = useToast()
 
-const { data, refresh } = await useAsyncData<Listing>(
+// A bare $fetch here carries no session cookie on a full page load, so a held pass or an open
+// request read back as the empty default and never refetched (issue 1005, same class as #899).
+const { data, refresh, error } = await useAsyncData<Listing>(
   'account-passes',
-  () => $fetch<Listing>('/api/account/passes'),
+  () => request<Listing>('/api/account/passes'),
   { default: (): Listing => ({ passes: [], requests: [], sellable: [] }) },
 )
+const listFailure = useListFailure(error, 'Your passes could not be read.')
 
 const requesting = ref<string | null>(null)
 const requestFailure = ref<string | null>(null)
 
-async function request(passTypeId: string): Promise<void> {
+async function requestPass(passTypeId: string): Promise<void> {
   requesting.value = passTypeId
   requestFailure.value = null
   try {
@@ -77,6 +81,17 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
     <UPageHeader
       title="Passes"
       description="Passes you hold, and any request still with an officer."
+    />
+
+    <UAlert
+      v-if="listFailure"
+      class="mt-6"
+      data-test="load-failed"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-unplug"
+      :title="listFailure.message"
+      description="This is not the same as holding nothing. Reload, and if it keeps happening say so."
     />
 
     <div class="mt-6 space-y-6">
@@ -158,7 +173,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
               variant="subtle"
               :loading="requesting === type.id"
               :data-test="`account-pass-request-${type.id}`"
-              @click="request(type.id)"
+              @click="requestPass(type.id)"
             >
               Request
             </UButton>
