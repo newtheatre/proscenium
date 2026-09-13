@@ -47,6 +47,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "drizzle-orm@0.45.2": "patches/drizzle-orm@0.45.2.patch",
+  },
   "overrides": {
     "@nuxt/schema": "^4.5.2",
     "h3": "^1.15.11",
