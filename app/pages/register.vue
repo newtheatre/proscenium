@@ -3,6 +3,10 @@ import * as z from 'zod'
 import { passwordProblem } from '#shared/utils/auth'
 import type { AuthFormField, FormError, FormSubmitEvent } from '@nuxt/ui'
 
+// Somebody already signed in has nothing to do here, and typing a second set of details would
+// make a second account by mistake (issue 925).
+definePageMeta({ middleware: 'signed-out' })
+
 const policy = usePasswordPolicy()
 
 const schema = z.object({
@@ -50,53 +54,64 @@ useSeoMeta({ title: 'Create an account' })
 </script>
 
 <template>
-  <UContainer class="max-w-md py-16">
-    <UPageCard>
-      <UAlert
-        v-if="notice"
-        class="mb-6"
-        color="error"
-        variant="subtle"
-        :description="notice"
-      />
-
-      <UAuthForm
-        v-if="!done"
-        title="Create an account"
-        description="One account covers tickets, rehearsal rooms, training and shifts."
-        :schema="schema"
-        :fields="fields"
-        :validate="checkPassword"
-        :submit="{ label: 'Create my account' }"
-        @submit="register"
-      >
-        <template #footer>
-          <UButton
-            variant="link"
-            class="px-0"
-            to="/sign-in"
-          >
-            I already have an account
-          </UButton>
-        </template>
-      </UAuthForm>
-
-      <div
-        v-else
-        data-test="check-your-email"
-        class="space-y-3"
-      >
-        <h1 class="nnt-headline text-xl">
-          Check your email
-        </h1>
-        <p class="text-muted">
-          {{ message }}
-        </p>
-        <p class="text-sm text-muted">
-          Registering does not sign you in. Follow the link in the message to confirm your address,
-          and you are done.
-        </p>
+  <div class="nnt-spotlight">
+    <UContainer class="max-w-md py-16">
+      <div class="dark mb-8 flex justify-center text-default">
+        <SiteWordmark gold />
       </div>
-    </UPageCard>
-  </UContainer>
+
+      <UPageCard>
+        <UAlert
+          v-if="notice"
+          class="mb-6"
+          color="error"
+          variant="subtle"
+          :description="notice"
+        />
+
+        <UAuthForm
+          v-if="!done"
+          title="Create an account"
+          description="One account covers tickets, rehearsal rooms, training and shifts."
+          :schema="schema"
+          :fields="fields"
+          :validate="checkPassword"
+          :submit="{ label: 'Create my account' }"
+          @submit="register"
+        >
+          <template #title>
+            <h1 class="nnt-headline text-xl text-highlighted">
+              Create an account
+            </h1>
+          </template>
+          <template #footer>
+            <UButton
+              variant="link"
+              class="px-0"
+              to="/sign-in"
+            >
+              I already have an account
+            </UButton>
+          </template>
+        </UAuthForm>
+
+        <div
+          v-else
+          data-test="check-your-email"
+          class="space-y-3"
+        >
+          <h1 class="nnt-headline text-xl">
+            Check your email
+          </h1>
+          <p class="text-muted">
+            {{ message }}
+          </p>
+          <p class="text-sm text-muted">
+            Registering does not sign you in. Follow the link in the message to confirm your address,
+            and you are done.
+          </p>
+        </div>
+      </UPageCard>
+    </UContainer>
+  </div>
 </template>
