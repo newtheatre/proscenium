@@ -179,7 +179,7 @@ describe.skipIf(skip !== null)('a register opens on the day (G-115 criterion 1)'
     expect(opened?.by).toBe(trainerId)
   })
 
-  // Issue 937: the button used to stay enabled and round-trip to the 422 above.
+  // The button, not only the route: disabled before the day, live on it.
   test('the button itself is disabled before the day, and enabled on it', async () => {
     const module = await addModule()
     award(trainerId, module)
