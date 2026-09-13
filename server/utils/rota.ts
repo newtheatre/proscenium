@@ -380,9 +380,8 @@ export function assignShiftStatement(shiftId: string, userId: string, actorId: s
   `
 }
 
-// An officer's ad hoc shift: the role and slot are theirs to pick, so a repeat entry collides
-// on the same uniqueness a stamped one would (E-107 criterion 5, issue 933). The id is the
-// caller's own, because the write it rides in is audited by `changes()` rather than read back.
+// An officer's ad hoc shift: a repeat entry collides on the same uniqueness a stamped one would
+// (E-107 criterion 5). The id is the caller's own, since this write is audited by `changes()`.
 export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId: string): SQL {
   const confirmed = input.userId !== undefined
   return sql`
