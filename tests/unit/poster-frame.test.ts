@@ -51,4 +51,13 @@ describe('the poster frame is the one place artwork is drawn (J-111)', () => {
     }
     expect(offenders).toEqual([])
   })
+
+  // Vue's client compiler drops a comment between v-if and v-else roots; the server renderer keeps
+  // it and renders a fragment, which takes no fallthrough attributes (issue 1022).
+  test('nothing but whitespace sits between the two roots of the frame', async () => {
+    const source = await Bun.file(FRAME).text()
+    const between = source.match(/<\/div>\s*([\s\S]*?)<div\s+v-else/)
+    expect(between).not.toBeNull()
+    expect(between![1]!.trim()).toBe('')
+  })
 })

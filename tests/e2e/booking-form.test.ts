@@ -111,6 +111,9 @@ describe.skipIf(skip !== null)('a bad detail is refused on its own field, in hou
     const view = await openSignedOutView(app.baseURL)
     try {
       await visit(view, `${app.baseURL}/book/${first}`, '[data-test="book-page"]')
+      // Every quantity field names its ticket type for a screen reader (issue 1023).
+      const unnamed = await view.evaluate<number>(`[...document.querySelectorAll('[data-test^="quantity-"]')].map(node => node.matches('input') ? node : node.querySelector('input')).filter(input => input && !input.labels?.length && !input.getAttribute('aria-label') && !input.getAttribute('aria-labelledby')).length`)
+      expect(unnamed).toBe(0)
       await fillNumber(view, '[data-test^="quantity-"]', '1')
 
       await fill(view, '[data-test="guest-email"]', 'not-an-address')
