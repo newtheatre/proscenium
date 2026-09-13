@@ -30,7 +30,7 @@ interface BookingInfo {
   showId: string
   show: { slug: string, title: string }
   performance: { startsAt: number, venueName: string }
-  refusal: { reason: string, says: string, closedAt?: number, externalBookingUrl?: string } | null
+  refusal: { reason: string, says: string, closedAt?: number, externalBookingUrl?: string, waitingListUrl?: string } | null
   cap: number
   ticketTypes: BookableTicketType[]
   accessEntitlement: AccessEntitlement | null
@@ -235,13 +235,22 @@ useSeoMeta({
         class="mt-8"
         color="neutral"
         variant="subtle"
-        icon="i-lucide-ticket-x"
-        title="Booking is not open"
+        :icon="data!.refusal.waitingListUrl ? 'i-lucide-clock' : 'i-lucide-ticket-x'"
+        :title="data!.refusal.waitingListUrl ? 'Sold out' : 'Booking is not open'"
         :description="data!.refusal.says"
         data-test="booking-refused"
       />
       <UButton
-        v-if="data!.refusal.externalBookingUrl"
+        v-if="data!.refusal.waitingListUrl"
+        class="mt-4"
+        :to="data!.refusal.waitingListUrl"
+        variant="poster"
+        data-test="booking-waiting-list"
+      >
+        Join the waiting list
+      </UButton>
+      <UButton
+        v-else-if="data!.refusal.externalBookingUrl"
         class="mt-4"
         :to="data!.refusal.externalBookingUrl"
         target="_blank"
