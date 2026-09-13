@@ -179,6 +179,37 @@ describe.skipIf(skip !== null)('a register opens on the day (G-115 criterion 1)'
     expect(opened?.by).toBe(trainerId)
   })
 
+  // Issue 937: the button used to stay enabled and round-trip to the 422 above.
+  test('the button itself is disabled before the day, and enabled on it', async () => {
+    const module = await addModule()
+    award(trainerId, module)
+    const answered = await send('POST', '/api/admin/training/sessions', {
+      heldOn: daysFrom(7), startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [module],
+    }, trainerCookie)
+    const { id: future } = await answered.json() as { id: string }
+    const today = await sessionToday([module])
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', trainer.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+
+      await visit(view, `${app.baseURL}/training/sessions/${future}/register`)
+      await waitFor(view, `document.querySelector('[data-test="open-register"]')`, 30_000)
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="open-register"]').disabled`)).toBe(true)
+
+      await visit(view, `${app.baseURL}/training/sessions/${today}/register`)
+      await waitFor(view, `document.querySelector('[data-test="open-register"]')`, 30_000)
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="open-register"]').disabled`)).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('opening it twice is idempotent, not an error', async () => {
     const session = await sessionToday([await addModule()])
     expect((await openRegister(session)).status).toBe(200)

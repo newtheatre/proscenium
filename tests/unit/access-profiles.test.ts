@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   ACCESS_FLAGS,
+  ACCESS_PROFILE_STATUSES,
   MAX_ACCESS_TICKETS_PER_PERFORMANCE,
   MAX_COMPANIONS,
   accessEntitlementRefusal,
@@ -8,6 +9,7 @@ import {
   doorWording,
   effectiveStatus,
   isEntitledToAccessTickets,
+  saysAccessProfileStatus,
 } from '#shared/utils/access-profiles'
 
 const NOW = 1_800_000_000
@@ -145,5 +147,14 @@ describe('exceeding the entitlement names the limit, not the profile (D-128 crit
 
   test('what is already held counts even when nothing new is requested for that kind', () => {
     expect(accessEntitlementRefusal({ access: 0, companion: 0 }, { access: 1, companion: 0 }, 2)).toBeNull()
+  })
+})
+
+describe('a declaration status reads as a sentence, never the raw enum (issue 914)', () => {
+  test('every status has its own reading', () => {
+    for (const status of ACCESS_PROFILE_STATUSES) {
+      expect(saysAccessProfileStatus(status)).not.toBe(status)
+      expect(saysAccessProfileStatus(status).length).toBeGreaterThan(0)
+    }
   })
 })

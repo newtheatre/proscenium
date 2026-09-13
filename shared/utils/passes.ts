@@ -20,6 +20,17 @@ export type PassStatus = (typeof PASS_STATUSES)[number]
 export const PASS_REQUEST_STATUSES = ['PENDING', 'FULFILLED', 'DECLINED', 'EXPIRED'] as const
 export type PassRequestStatus = (typeof PASS_REQUEST_STATUSES)[number]
 
+// One sentence-case reading for a pass or a request for one: the enum is the storage, never the
+// screen (compare `saysShiftStatus`).
+export function saysPassStatus(status: PassStatus | PassRequestStatus): string {
+  if (status === 'ACTIVE') return 'Active'
+  if (status === 'PENDING') return 'Pending'
+  if (status === 'FULFILLED') return 'Fulfilled'
+  if (status === 'DECLINED') return 'Declined'
+  if (status === 'EXPIRED') return 'Expired'
+  return 'Cancelled'
+}
+
 // Criterion 1: sold on the reader under the same cross-check D-114 collection uses. `userId` is
 // the buyer's own account, chosen at the desk, never typed as an id (K-123 criterion 1).
 export const issuePassForm = z.strictObject({
