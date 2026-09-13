@@ -58,6 +58,29 @@ export function unpaidSeatsColumn(alias: string): SQL {
   return unpaidSeatsSubquery(sql`${sql.raw(alias)}.id`)
 }
 
+// Paid: money has been taken, whether or not the seat has been walked in on yet (D-114
+// criterion 2 makes collection the payment moment, so COLLECTED and DOOR both count).
+export function paidSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    WHERE t.performance_id = ${performanceId}
+      AND t.refunded_at IS NULL
+      AND r.status IN ('COLLECTED', 'DOOR')
+  )`
+}
+
+// Collected but not yet walked in: still at the box office, not the door (the desk's own queue).
+export function collectedSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    WHERE t.performance_id = ${performanceId}
+      AND t.refunded_at IS NULL
+      AND r.status = 'COLLECTED'
+  )`
+}
+
 // The same count for a whole show, scoped through its performances by subquery rather than by an
 // id list read back from a result set (0006).
 export function showUnpaidSeatsColumn(alias: string): SQL {

@@ -3,7 +3,9 @@ import {
   countDeskSearchQuery,
   deskReservationQuery,
   deskSearchQuery,
+  deskSummaryQuery,
   deskTicketsQuery,
+  onShiftQuery,
   performancesForNightQuery,
 } from '#server/utils/desk'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
@@ -63,7 +65,7 @@ describe('deskSearchQuery scopes to one performance and matches reference or nam
       user(database, 'u-1', 'alex@example.invalid', 'Alex Booker')
       reservation(database, 'r-1', seeded.performanceId, 'u-1')
 
-      const [found] = read<{ id: string }>(database, deskSearchQuery(seeded.performanceId, 'ABCDEF', 10, 0))
+      const [found] = read<{ id: string }>(database, deskSearchQuery(seeded.performanceId, 'ABCDEF', 'ALL', 10, 0))
       expect(found?.id).toBe('r-1')
     })
   })
@@ -74,7 +76,7 @@ describe('deskSearchQuery scopes to one performance and matches reference or nam
       user(database, 'u-1', 'alex@example.invalid', 'Alex Booker')
       reservation(database, 'r-1', seeded.performanceId, 'u-1')
 
-      const found = read<{ id: string }>(database, deskSearchQuery(seeded.performanceId, 'booker', 10, 0))
+      const found = read<{ id: string }>(database, deskSearchQuery(seeded.performanceId, 'booker', 'ALL', 10, 0))
       expect(found.map(row => row.id)).toEqual(['r-1'])
     })
   })
@@ -86,8 +88,98 @@ describe('deskSearchQuery scopes to one performance and matches reference or nam
       user(database, 'u-1', 'alex@example.invalid', 'Alex Booker')
       reservation(database, 'r-1', first.performanceId, 'u-1')
 
-      expect(read(database, deskSearchQuery(second.performanceId, undefined, 10, 0))).toEqual([])
-      expect(read<{ total: number }>(database, countDeskSearchQuery(second.performanceId, undefined))[0]?.total).toBe(0)
+      expect(read(database, deskSearchQuery(second.performanceId, undefined, 'ALL', 10, 0))).toEqual([])
+      expect(read<{ total: number }>(database, countDeskSearchQuery(second.performanceId, undefined, 'ALL'))[0]?.total).toBe(0)
+    })
+  })
+})
+
+// The pills split the same way `qrStatusDisplay` reads a status (D-132): unpaid, paid
+// whichever way it walked in, and collected narrowed to still-here.
+describe('the desk status pills filter on the pending/paid/collected split', () => {
+  test('UNPAID, PAID and COLLECTED each answer a different subset of ALL', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'a@example.invalid', 'A Pending')
+      user(database, 'u-2', 'b@example.invalid', 'B Collected')
+      user(database, 'u-3', 'c@example.invalid', 'C Admitted')
+      reservation(database, 'r-1', seeded.performanceId, 'u-1', 'PENDING', 'AAA111')
+      reservation(database, 'r-2', seeded.performanceId, 'u-2', 'COLLECTED', 'BBB222')
+      reservation(database, 'r-3', seeded.performanceId, 'u-3', 'DOOR', 'CCC333')
+
+      const idsFor = (status: 'ALL' | 'UNPAID' | 'PAID' | 'COLLECTED'): string[] =>
+        read<{ id: string }>(database, deskSearchQuery(seeded.performanceId, undefined, status, 10, 0)).map(row => row.id)
+
+      expect(idsFor('ALL').sort()).toEqual(['r-1', 'r-2', 'r-3'])
+      expect(idsFor('UNPAID')).toEqual(['r-1'])
+      expect(idsFor('PAID').sort()).toEqual(['r-2', 'r-3'])
+      expect(idsFor('COLLECTED')).toEqual(['r-2'])
+    })
+  })
+})
+
+describe('deskSummaryQuery reads the five KPI tiles for one performance (D-132)', () => {
+  test('reserved, paid and collected split the same way the status pills do, and unpaid owes what is still due', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'a@example.invalid', 'A Pending')
+      user(database, 'u-2', 'b@example.invalid', 'B Collected')
+      user(database, 'u-3', 'c@example.invalid', 'C Admitted')
+      reservation(database, 'r-1', seeded.performanceId, 'u-1', 'PENDING', 'AAA111')
+      reservation(database, 'r-2', seeded.performanceId, 'u-2', 'COLLECTED', 'BBB222')
+      reservation(database, 'r-3', seeded.performanceId, 'u-3', 'DOOR', 'CCC333')
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
+        ['INSERT INTO ticket_types (id, name, price, kind, access_kind) VALUES (?, ?, ?, ?, ?)', 'tt-access', 'Access', 0, 'SINGLE', 'ACCESS'],
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-pass', 'Pass admission', 0, 'PASS_ADMISSION'],
+      ])
+      ticket(database, 't-1', 'r-1', seeded.performanceId, 'tt-standard', 900)
+      ticket(database, 't-2', 'r-2', seeded.performanceId, 'tt-standard', 900)
+      ticket(database, 't-3', 'r-3', seeded.performanceId, 'tt-access', 0)
+      ticket(database, 't-4', 'r-3', seeded.performanceId, 'tt-pass', 0)
+
+      interface SummaryRow {
+        capacity: number
+        reserved: number
+        paid: number
+        collected: number
+        unpaidCount: number
+        unpaidOwedPence: number
+        accessBookings: number
+        passAdmissions: number
+      }
+      const [row] = read<SummaryRow>(database, deskSummaryQuery(seeded.performanceId))
+      // Reserved and paid count tickets, not reservations: r-3's access and pass admission
+      // tickets both count once each towards paid, since DOOR is money already taken.
+      expect(row).toMatchObject({
+        capacity: 120,
+        reserved: 4,
+        paid: 3,
+        collected: 1,
+        unpaidCount: 1,
+        unpaidOwedPence: 900,
+        accessBookings: 1,
+        passAdmissions: 1,
+      })
+    })
+  })
+})
+
+describe('onShiftQuery names the confirmed duty manager for the performance (D-132)', () => {
+  test('only a CONFIRMED duty manager on this performance is named', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'marian@example.invalid', 'Marian')
+      user(database, 'u-2', 'declined@example.invalid', 'Declined Dan')
+      database.batch([
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)',
+          'shift-1', seeded.performanceId, 'DUTY_MANAGER', 1, 'u-1', 'CONFIRMED'],
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)',
+          'shift-2', seeded.performanceId, 'DUTY_MANAGER', 2, 'u-2', 'CLAIMED'],
+      ])
+
+      const found = read<{ name: string }>(database, onShiftQuery(seeded.performanceId))
+      expect(found.map(row => row.name)).toEqual(['Marian'])
     })
   })
 })
