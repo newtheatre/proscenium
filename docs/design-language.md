@@ -140,7 +140,9 @@ Six rules follow:
    draws the back arrow, a mono uppercase eyebrow, the show title, the "Thu 5 Nov 19:30 Main Hall"
    line and the on-shift badge. A screen says what goes in it through `setNightEyebrow` (which
    `NightScreen` calls with its own title) and `setNightSubject` (which the screens that know
-   tonight's show call), so no page draws a heading of its own. The hub at `/tonight` is six
+   tonight's show call), and a screen that names nothing still sits under the running house: the
+shell fills the title and the line in from the performance `/api/tonight/authority` marks active,
+so no page draws a heading of its own. The hub at `/tonight` is six
    `NightTile` cards, a titled block is `NightBlock` and a single number is `NightKpi`; none of
    the three is in the expressive kit, and all three are show-night only.
 4. **The show-night screens are phone-first and work offline.** They cache their night on open

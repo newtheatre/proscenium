@@ -175,11 +175,11 @@ async function reset(): Promise<void> {
 
       <NightBlock title="Current state">
         <div
-          class="grid gap-4 sm:grid-cols-2"
+          class="grid gap-4 sm:grid-cols-[3fr_2fr]"
           data-test="board-current"
         >
           <div>
-            <p class="nnt-headline text-2xl font-bold uppercase">
+            <p class="nnt-headline text-2xl font-bold">
               {{ state.foh ? saysMessage(state.foh) : 'Nothing called yet' }}
             </p>
             <p

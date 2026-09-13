@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nightCacheKey } from '#shared/utils/night-cache'
-import { onShiftLabel } from '#shared/utils/night-hub'
+import { nightHeaderLine, onShiftLabel } from '#shared/utils/night-hub'
 import { currentShowNight } from '#shared/utils/show-night'
 
 // A phone held in a foyer is not a dashboard: a plain dark subtree, big targets, nothing that
@@ -16,6 +16,16 @@ const authority = useNightAuthority()
 const badge = computed(() => onShiftLabel(authority.value.via, account.value.user?.name))
 
 resolveNightAuthority()
+
+// A screen that names no show still sits on one: whichever house is running now fills the header
+// in, and a screen that knows better (the hub, the glance) overrides it.
+setNightFallbackSubject(() => {
+  const running = authority.value.performances.find(performance => performance.active)
+  if (!running) return null
+  return { title: running.showTitle, meta: nightHeaderLine(running.startsAt, running.venueName) }
+})
+
+const subject = computed(() => header.value.subject ?? header.value.fallback ?? DEFAULT_SUBJECT)
 
 // Opening any show-night screen caches the emergency card, whole-night rather than venue-scoped
 // since a shift holder resolves only one (0044). Best effort: no shift, nothing to prime.
@@ -63,14 +73,14 @@ onMounted(async () => {
             class="nnt-headline truncate text-xl font-bold"
             data-test="night-title"
           >
-            {{ header.title }}
+            {{ subject.title }}
           </h1>
           <p
-            v-if="header.meta"
+            v-if="subject.meta"
             class="truncate text-sm text-muted"
             data-test="night-meta"
           >
-            {{ header.meta }}
+            {{ subject.meta }}
           </p>
         </div>
         <UBadge
