@@ -184,7 +184,8 @@ The house photographs live under `public/images/`, the logos under `public/image
 `PhotoHero` is the one component that draws a banner, so rule 1 is applied in one place. It takes
 `compact` where the picture is a band rather than the whole first screen, and its `title` and
 `description` slots take over from the props where the headline carries a word in its own colour,
-as what's on does.
+as what's on does. `align="start"` caps the words at a reading width inside the site column, never
+the column itself, so a wide screen keeps the hero's left edge where every other section's is.
 `PosterFrame` is the matching one place for show artwork: it draws the poster when there is one
 and, when there is not, the show's own two hues under its title in the display face, which is why
 a show with no artwork yet looks deliberate rather than broken, and why real posters will land in

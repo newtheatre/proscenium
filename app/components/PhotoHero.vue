@@ -22,18 +22,16 @@ const SIZES = 'xs:100vw sm:100vw md:100vw lg:100vw xl:100vw 2xl:100vw'
 
 const PADDING = 'py-10 sm:py-12 lg:py-14'
 
-const heroUi = computed(() => {
-  const container = [props.align === 'start' ? 'max-w-2xl me-auto ms-0' : '', props.compact ? PADDING : '']
-    .filter(Boolean).join(' ')
-  return {
-    title: 'nnt-headline text-highlighted',
-    description: 'text-default',
-    ...(props.align === 'start'
-      ? { wrapper: 'text-left items-start', header: 'text-left', links: 'justify-start' }
-      : {}),
-    ...(container ? { container } : {}),
-  }
-})
+// The width cap goes on the wrapper, never the container: a cap on the container replaces the
+// site's own, so on a wide screen the words leave the column the rest of the page keeps.
+const heroUi = computed(() => ({
+  title: 'nnt-headline text-highlighted',
+  description: 'text-default',
+  ...(props.align === 'start'
+    ? { wrapper: 'max-w-2xl text-left items-start', header: 'text-left', links: 'justify-start' }
+    : {}),
+  ...(props.compact ? { container: PADDING } : {}),
+}))
 </script>
 
 <template>
