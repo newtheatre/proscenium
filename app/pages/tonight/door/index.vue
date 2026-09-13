@@ -49,9 +49,8 @@ const performanceOptions = computed(() => performances.value.map(one => ({
   value: one.id,
 })))
 
-// The camera is the door's default and the typed field its fallback, so a device with no camera
-// lands on the field rather than on an apology (E-129 criteria 1, 5). Pass mode is its own arrival
-// from the hub, `?mode=pass`, and a scanned pass QR lands there too (D-126).
+// The camera is the door's default, the typed field its fallback for no camera (E-129 1, 5).
+// Pass mode arrives via `?mode=pass` from the hub, or a scanned pass QR (D-126).
 type Mode = 'CAMERA' | 'TYPING' | 'PASS'
 const route = useRoute()
 const mode = ref<Mode>(route.query.mode === 'pass' ? 'PASS' : 'CAMERA')
