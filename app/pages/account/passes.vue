@@ -36,7 +36,7 @@ const request = useRequestFetch()
 const toast = useToast()
 
 // A bare $fetch here carries no session cookie on a full page load, so a held pass or an open
-// request read back as the empty default and never refetched (issue 1005, same class as #899).
+// request read back as the empty default and never refetched (issue 1005, same class as issue 899).
 const { data, refresh, error } = await useAsyncData<Listing>(
   'account-passes',
   () => request<Listing>('/api/account/passes'),
