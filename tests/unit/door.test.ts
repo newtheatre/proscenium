@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'bun:test'
-import { doorVerdict, isRepeatScan, readScannedCode, saysDoorParty, SCAN_REPEAT_WINDOW_MS } from '#shared/utils/door'
+import {
+  doorVerdict,
+  isRepeatScan,
+  readScannedCode,
+  saysDoorParty,
+  saysPassCoverage,
+  saysPassTonight,
+  SCAN_REPEAT_WINDOW_MS,
+} from '#shared/utils/door'
 
 // E-129 criteria 2 and 3: what a decoded QR resolves to, and why one code held in front of the
 // lens admits once. The camera itself is not here; this is the pure half.
@@ -124,5 +132,39 @@ describe('the verdict card names a first name and a count, and nothing else abou
   test('a booking with no name behind it still says how many to expect', () => {
     expect(saysDoorParty(null, 2)).toBe('Party of 2')
     expect(saysDoorParty('   ', 2)).toBe('Party of 2')
+  })
+})
+
+describe('what the pass card says a pass covers (D-126)', () => {
+  test('a fellowship covers everything the theatre puts on, and carries no rows of its own', () => {
+    expect(saysPassCoverage('fellowship', 0)).toBe('All in-house shows')
+  })
+
+  test('an ordinary pass counts the shows named on it', () => {
+    expect(saysPassCoverage('season-26-27', 1)).toBe('1 show')
+    expect(saysPassCoverage('season-26-27', 6)).toBe('6 shows')
+  })
+
+  test('a product with nothing named on it yet says so rather than claiming everything', () => {
+    expect(saysPassCoverage('season-26-27', 0)).toBe('No shows yet')
+  })
+})
+
+describe('what the card says about tonight, which is what the volunteer reads before admitting', () => {
+  test('never redeemed for this performance', () => {
+    expect(saysPassTonight(null, null)).toEqual({ line: 'Not yet redeemed', admitted: false })
+  })
+
+  test('redeemed and already through the door: admitting again is refused (criterion 4)', () => {
+    expect(saysPassTonight(1000, 'DOOR')).toEqual({ line: 'Already admitted tonight', admitted: true })
+  })
+
+  test('redeemed but not yet arrived: the seat exists and the door still has a job', () => {
+    expect(saysPassTonight(1000, 'PENDING').admitted).toBe(false)
+    expect(saysPassTonight(1000, 'COLLECTED').admitted).toBe(false)
+  })
+
+  test('an admission cancelled since is named, not silently treated as free', () => {
+    expect(saysPassTonight(1000, 'CANCELLED')).toEqual({ line: 'Tonight\'s admission was cancelled', admitted: true })
   })
 })

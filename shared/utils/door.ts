@@ -90,6 +90,29 @@ export function doorVerdict(
   return { state: 'REFUSED', headline: outcome.headline.toUpperCase(), line: outcome.detail ?? outcome.headline, note: null }
 }
 
+// A pass admits its holder and nobody else (D-126 criterion 4), so the card's own button says so
+// rather than offering a number to change.
+export const PASS_ADMISSION_PARTY_SIZE = 1
+
+export const PASS_ADMISSION_CAPTION = 'Creates tonight\'s £0 pass-admission ticket.'
+
+// What the card says a pass covers. A fellowship covers everything the theatre puts on, which is
+// why it carries no rows of its own (D-130, 0023).
+export function saysPassCoverage(passTypeSlug: string, coveredCount: number): string {
+  if (passTypeSlug === 'fellowship') return 'All in-house shows'
+  if (coveredCount === 0) return 'No shows yet'
+  return coveredCount === 1 ? '1 show' : `${coveredCount} shows`
+}
+
+// Tonight's own line, which is the one the volunteer reads before pressing Admit. `DOOR` is the
+// status an admitted seat carries, so a redeemed-but-not-arrived pass reads differently.
+export function saysPassTonight(tonightAt: number | null, tonightStatus: string | null): { line: string, admitted: boolean } {
+  if (tonightAt === null) return { line: 'Not yet redeemed', admitted: false }
+  if (tonightStatus === 'DOOR') return { line: 'Already admitted tonight', admitted: true }
+  if (tonightStatus === 'PENDING' || tonightStatus === 'COLLECTED') return { line: 'Redeemed, not yet through the door', admitted: false }
+  return { line: 'Tonight\'s admission was cancelled', admitted: true }
+}
+
 // A pass admits its holder and nobody else, and costs nothing, so its admitted verdict has one
 // shape. The holder's own name belongs to pass mode's card, not to this one (D-126).
 export function admittedPassVerdict(reference: string): {
