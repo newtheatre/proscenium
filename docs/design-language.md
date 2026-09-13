@@ -49,6 +49,15 @@ Three contrast floors are set in `:root` and must not be undone:
 Under `.dark` all three brighten to their 400s and the surfaces drop to the ash 950/900/800 ladder,
 which is what "stage black" means in practice.
 
+## The ground is paper
+
+In light mode the page ground is `ash-50` and a raised surface is white: `--ui-bg` is `ash-50`,
+`--ui-bg-muted` is `ash-100`, `--ui-bg-accented` is `ash-200`, and `--ui-bg-elevated` stays white
+(K-130). Nuxt UI's default puts white on white, which makes a card read as a hole cut in the page
+rather than a thing sitting on it. Every shell inherits this from the tokens; no screen sets its
+own light-mode ground, and a screen that wants to lift something reaches for `bg-elevated` rather
+than painting white itself.
+
 ## Focus
 
 Keyboard focus is never removed, only restyled. `--nnt-focus-ring` is a two-pixel outline with a
