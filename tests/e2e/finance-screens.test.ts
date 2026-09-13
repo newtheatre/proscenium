@@ -6,9 +6,8 @@ import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// /money/periods and /money/exports (I-107, I-108): the routes were already tested, but no
-// screen reached them. This pins what each screen's own flow does: preview before close, a
-// typed confirmation before reopen, and editing a mapping before the CSV reads it.
+// /money/periods and /money/exports (I-107, I-108): pins each screen's own flow, preview
+// before close, a typed confirmation before reopen, and editing a mapping before the CSV reads it.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
