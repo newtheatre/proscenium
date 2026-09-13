@@ -125,7 +125,7 @@ decision record rather than a habit (`decisions/0040-navigation-is-shaped-by-pos
 `UDashboardSearch` is in the matrix above and is not built yet: it is the answer once the sidebar
 passes roughly forty items.
 
-Six rules follow:
+Seven rules follow:
 
 1. **A permanently dark region is marked `dark`.** The public header and footer are stage black
    in both colour modes. That is one class on the subtree, after which every semantic token
@@ -154,7 +154,12 @@ so no page draws a heading of its own. The hub at `/tonight` is six
    `shared/utils/site-nav.ts`, and the console middleware guards a route from the same entry the
    sidebar renders. A screen added to a layout and not to the declaration fails
    `tests/unit/site-nav.test.ts` (0040).
-6. **A shell's title is not a link inside a link.** `UHeader` wraps its `#title` slot in its own
+6. **A `UTable` stays usable below `sm`.** A secondary column carries `app/utils/responsive-table.ts`'s
+   `HIDE_BELOW_SM` class on both its header and cell, and its content moves into the primary
+   column's own cell as an `sm:hidden` line, so nothing a phone reads is lost, only where it sits;
+   the row's actions never move. A read-only history table with no primary column instead renders
+   as one card per row below `sm`, the table itself hidden there (issue 922).
+7. **A shell's title is not a link inside a link.** `UHeader` wraps its `#title` slot in its own
    anchor, so the slot holds `SiteWordmark`, not a `NuxtLink`, and the destination is the `to`
    prop. `UHeader` does not carry its default slot into the mobile panel either, so a header with
    links gives the `#body` slot the same navigation.

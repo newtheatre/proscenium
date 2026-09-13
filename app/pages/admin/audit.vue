@@ -239,11 +239,14 @@ onMounted(load)
       </template>
     </AdminToolbar>
 
+    <!-- A wide read-only history table forces horizontal scroll below sm (922); one card per
+         row there instead, the table above it. -->
     <UTable
       :data="listing?.items ?? []"
       :columns="columns"
       :loading="loading"
       data-test="audit-table"
+      class="hidden sm:block"
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
@@ -253,6 +256,63 @@ onMounted(load)
         </p>
       </template>
     </UTable>
+    <p
+      v-if="(listing?.items.length ?? 0) === 0"
+      class="sm:hidden py-6 text-center text-sm text-muted"
+    >
+      {{ active.length
+        ? 'No entry matches that.'
+        : 'Nothing on the trail yet. Every privileged action lands here.' }}
+    </p>
+    <ul
+      v-else
+      class="sm:hidden space-y-3"
+      data-test="audit-cards"
+    >
+      <li
+        v-for="logEntry in listing?.items ?? []"
+        :key="logEntry.id"
+        class="rounded-lg border border-default p-3 text-sm"
+      >
+        <div class="flex items-center justify-between gap-2 text-xs text-muted">
+          <span>{{ formatLondon(new Date(logEntry.createdAt * 1000), { dateStyle: 'medium', timeStyle: 'short' }) }}</span>
+          <span v-if="logEntry.actorId === null">System</span>
+          <span v-else>{{ logEntry.actorName ?? logEntry.actorId }}</span>
+        </div>
+        <div class="mt-1 flex flex-wrap items-center gap-2">
+          <span>{{ describeAction(logEntry.action).label }}</span>
+          <UBadge
+            v-if="describeAction(logEntry.action).manual"
+            color="warning"
+            variant="subtle"
+            size="sm"
+          >
+            Recorded by hand
+          </UBadge>
+        </div>
+        <p
+          v-if="logEntry.targetName ?? logEntry.target"
+          class="text-muted"
+        >
+          {{ logEntry.targetName ?? logEntry.target }}
+        </p>
+        <div
+          v-if="describeDetail(logEntry.detail).length"
+          class="mt-1 flex flex-wrap gap-1"
+        >
+          <UBadge
+            v-for="part in describeDetail(logEntry.detail)"
+            :key="part"
+            color="neutral"
+            variant="subtle"
+            size="sm"
+            class="font-mono"
+          >
+            {{ part }}
+          </UBadge>
+        </div>
+      </li>
+    </ul>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p
