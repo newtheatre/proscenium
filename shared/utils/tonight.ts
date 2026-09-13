@@ -1,3 +1,5 @@
+import { londonClock } from './london'
+
 // Which of tonight's performances a duty manager covering more than one is looking at right now
 // (E-127 criterion 2). A venue running two performances needs one one-tap answer to "which".
 
@@ -16,4 +18,12 @@ export function activePerformanceId<T extends RunningPerformance>(performances: 
     active = performance
   }
   return active.performanceId
+}
+
+// What a show-night picker puts on a performance. A database id tells a volunteer at the door
+// nothing about which house they are admitting into (issue 901).
+export interface PerformanceChoice { showTitle: string, startsAt: number }
+
+export function saysPerformanceChoice(performance: PerformanceChoice): string {
+  return `${performance.showTitle}, ${londonClock(new Date(performance.startsAt * 1000))}`
 }
