@@ -1218,8 +1218,16 @@ night, venue_id, epoch)` (`shared/utils/backstage.ts`) recomputes it from a work
 ### backstage_devices
 `id` PK · `night_id` → backstage_nights cascade · `label` (whatever the crew member typed, never
 validated as a name) · `token_hash` UNIQUE · `joined_epoch` · `joined_at` · `last_seen_at` NULL ·
-`revoked_at` NULL. No account and no personal data (E-120 criterion 1): there is no `user_id`
-column at all. The failed-attempt rotation moves `backstage_nights.epoch` and stops a new join
+`revoked_at` NULL · `side` `BACKSTAGE|FOH`, default `BACKSTAGE`, typed in the schema rather than
+checked in the database, since adding a CHECK to a live table is a rebuild (0010). No account and no personal
+data (E-120 criterion 1): there is no `user_id` column at all. `side` is which end of the board
+a row is: every joined crew device is `BACKSTAGE`, and one derived `FOH` row per night owns the
+duty manager's own calls and ticks (E-121 criterion 7). That row is never joined and never
+issued a token: its `token_hash` is `deriveFohCredential(secret, night_id)`, an HMAC nobody can
+present, so the only way to post as front of house is to hold shift authority on the route. It
+is not part of the crew roster either: `activeDevicesQuery()` and the reset's own
+`revokeDevicesStatement()` both read `side = 'BACKSTAGE'`, so a reset kicks every crew device
+and leaves front of house holding the board. The failed-attempt rotation moves `backstage_nights.epoch` and stops a new join
 with the old code; it revokes nothing already joined, since `joined_epoch` is a record of when,
 not a live check on how (E-120 criterion 4). A manual reset is the only thing that sets
 `revoked_at`, and it does so for every currently-connected device in the same batch the epoch
@@ -1261,7 +1269,10 @@ delete a row naming a milestone type, not only by the sweep's own predicate (E-1
 ### backstage_acknowledgements
 `id` PK · `message_id` → backstage_messages restrict · `device_id` → backstage_devices restrict ·
 `acknowledged_at`. UNIQUE (`message_id`, `device_id`): one acknowledgement per device per
-message, `ON CONFLICT DO NOTHING` makes a repeat harmless (E-121 criterion 4).
+message, `ON CONFLICT DO NOTHING` makes a repeat harmless (E-121 criterion 4). `seenAcrossQuery()`
+reads the same rows from the other direction for the FOH screen's ticks: the first tick on a
+message from a device on the opposite `side`, which is what "seen by backstage" means and what
+front of house's own tick on a call from the wings means (criterion 7).
 
 ### foh_contacts
 `id` PK · `kind` CHECK `COMMITTEE|VENUE|SECURITY|TAXI|OTHER` · `label` · `phone` · `note` ·

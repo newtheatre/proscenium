@@ -5,7 +5,8 @@ import { createError, getCookie } from 'h3'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { newId } from './accounts'
 import { performancesOnNight } from './performances'
-import { MAX_FAILED_ATTEMPTS, MESSAGE_RETENTION_DAYS, deriveBoardCode } from '#shared/utils/backstage'
+import { MAX_FAILED_ATTEMPTS, MESSAGE_RETENTION_DAYS, deriveBoardCode, deriveFohCredential } from '#shared/utils/backstage'
+import type { BoardSide } from '#shared/utils/backstage'
 import { PERMISSION_MAP, ROLES } from '#shared/utils/roles'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
@@ -134,10 +135,31 @@ export async function requireDevice(event: H3Event): Promise<DeviceHolder> {
   return device
 }
 
-// Every non-revoked device on tonight's board at this venue, so a message poster's presence
-// list and a reset's own count both read the same roster.
+// Front of house's own end of the board (E-121 criterion 7). One row per night, kept by the
+// unique credential rather than a count, so two duty managers opening at once still make one.
+export function ensureFohDeviceStatement(nightId: string, credential: string, epoch: number, id: string): SQL {
+  return sql`
+    INSERT INTO backstage_devices (id, night_id, label, token_hash, joined_epoch, side)
+    VALUES (${id}, ${nightId}, 'Front of house', ${credential}, ${epoch}, 'FOH')
+    ON CONFLICT (token_hash) DO NOTHING
+  `
+}
+
+export function fohDeviceQuery(nightId: string): SQL {
+  return sql`SELECT id AS deviceId FROM backstage_devices WHERE night_id = ${nightId} AND side = 'FOH'`
+}
+
+export async function fohDevice(secret: string, night: NightRow): Promise<string> {
+  await db.run(ensureFohDeviceStatement(night.id, await deriveFohCredential(secret, night.id), night.epoch, newId()))
+  const [row] = await db.all<{ deviceId: string }>(fohDeviceQuery(night.id))
+  if (!row) throw new Error('the front of house board device is missing immediately after ensuring it')
+  return row.deviceId
+}
+
+// Every joined crew device on tonight's board, so a presence list and a reset's own count read
+// one roster. FOH is not one: it joined nothing, and a reset never kicks it.
 export function activeDevicesQuery(nightId: string): SQL {
-  return sql`SELECT id AS deviceId, label AS label FROM backstage_devices WHERE night_id = ${nightId} AND revoked_at IS NULL`
+  return sql`SELECT id AS deviceId, label AS label FROM backstage_devices WHERE night_id = ${nightId} AND revoked_at IS NULL AND side = 'BACKSTAGE'`
 }
 
 export async function activeDevices(nightId: string): Promise<{ deviceId: string, label: string }[]> {
@@ -147,7 +169,7 @@ export async function activeDevices(nightId: string): Promise<{ deviceId: string
 // A reset: every currently-connected device is revoked in the same batch the epoch moves in,
 // so nothing observes a moved epoch next to a still-valid device (E-122 criterion 1).
 export function revokeDevicesStatement(nightId: string): SQL {
-  return sql`UPDATE backstage_devices SET revoked_at = unixepoch() WHERE night_id = ${nightId} AND revoked_at IS NULL`
+  return sql`UPDATE backstage_devices SET revoked_at = unixepoch() WHERE night_id = ${nightId} AND revoked_at IS NULL AND side = 'BACKSTAGE'`
 }
 
 export function resetNightStatement(nightId: string): SQL {
@@ -177,7 +199,7 @@ export async function boardResetRecipients(): Promise<{ id: string }[]> {
 }
 
 const MESSAGE_COLUMNS = sql`
-  m.id AS id, m.night_id AS nightId, m.device_id AS deviceId, d.label AS posterLabel,
+  m.id AS id, m.night_id AS nightId, m.device_id AS deviceId, d.label AS posterLabel, d.side AS side,
   m.milestone_type_id AS milestoneTypeId, mt.label AS milestoneLabel, m.body AS body,
   m.supersedes_id AS supersedesId, m.composed_at AS composedAt, m.created_at AS createdAt
 `
@@ -187,6 +209,7 @@ export interface MessageRow {
   nightId: string
   deviceId: string
   posterLabel: string
+  side: BoardSide
   milestoneTypeId: string | null
   milestoneLabel: string | null
   body: string
@@ -248,6 +271,26 @@ export function acknowledgementsForNightQuery(nightId: string): SQL {
 }
 
 export interface AcknowledgementRow { messageId: string, deviceId: string, acknowledgedAt: number }
+
+// When the other end of the board first saw each message: the crew's tick on an FOH call, and
+// FOH's own tick on a call from the wings (criteria 4, 7).
+export function seenAcrossQuery(nightId: string): SQL {
+  return sql`
+    SELECT m.id AS messageId, MIN(a.acknowledged_at) AS seenAt
+    FROM backstage_messages m
+    JOIN backstage_devices poster ON poster.id = m.device_id
+    JOIN backstage_acknowledgements a ON a.message_id = m.id
+    JOIN backstage_devices seer ON seer.id = a.device_id
+    WHERE m.night_id = ${nightId} AND seer.side <> poster.side
+    GROUP BY m.id
+  `
+}
+
+export interface SeenRow { messageId: string, seenAt: number }
+
+export async function seenAcross(nightId: string): Promise<SeenRow[]> {
+  return db.all(seenAcrossQuery(nightId))
+}
 
 export async function acknowledgementsForNight(nightId: string): Promise<AcknowledgementRow[]> {
   return db.all(acknowledgementsForNightQuery(nightId))

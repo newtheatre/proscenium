@@ -41,6 +41,9 @@ export const backstageDevices = sqliteTable('backstage_devices', {
   // Set by a manual reset (E-122 criterion 1), never by the failed-attempt rotation: a reset
   // disconnects everyone immediately, a rotation only stops a new join with the old code.
   revokedAt: integer('revoked_at'),
+  // Which end of the board this is. One derived FOH row per night owns the duty manager's own
+  // calls and ticks; every joined crew device is BACKSTAGE (E-121 criterion 7).
+  side: text('side', { enum: ['BACKSTAGE', 'FOH'] }).notNull().default('BACKSTAGE'),
 }, table => [
   unique('backstage_devices_token_hash').on(table.tokenHash),
   index('backstage_devices_night').on(table.nightId),

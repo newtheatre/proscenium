@@ -1,19 +1,22 @@
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
 import type { NightRole } from '#shared/utils/night-authority'
 
+export interface NightSubject { title: string, meta: string | null }
+
 export interface NightHeaderState {
   eyebrow: string
-  title: string
-  meta: string | null
+  // What the screen itself named, and what the shell knows about tonight when it named nothing.
+  subject: NightSubject | null
+  fallback: NightSubject | null
 }
 
 const DEFAULT_EYEBROW = 'Show night'
-const DEFAULT_SUBJECT = { title: 'Tonight', meta: null }
+export const DEFAULT_SUBJECT: NightSubject = { title: 'Tonight', meta: null }
 
 // The one show-night header lives in the layout, so every screen carries the same back arrow, the
 // same show title and the same on-shift badge; a screen says what goes in it through this state.
 export function useNightHeader(): Ref<NightHeaderState> {
-  return useState<NightHeaderState>('nnt-night-header', () => ({ eyebrow: DEFAULT_EYEBROW, ...DEFAULT_SUBJECT }))
+  return useState<NightHeaderState>('nnt-night-header', () => ({ eyebrow: DEFAULT_EYEBROW, subject: null, fallback: null }))
 }
 
 // Two setters, not one: `NightScreen` owns the eyebrow and the page owns the show, so neither
@@ -33,25 +36,37 @@ export function setNightEyebrow(eyebrow: () => string): void {
 
 // A getter rather than a value: the show title arrives after the first fetch, and the header has
 // to follow it.
-export function setNightSubject(subject: () => { title: string, meta: string | null }): void {
+export function setNightSubject(subject: () => NightSubject): void {
   const header = useNightHeader()
   // Eagerly as well, for the same reason `setNightEyebrow` is.
-  header.value = { ...header.value, ...subject() }
+  header.value = { ...header.value, subject: subject() }
   watchEffect(() => {
-    header.value = { ...header.value, ...subject() }
+    header.value = { ...header.value, subject: subject() }
   })
   onScopeDispose(() => {
-    header.value = { ...header.value, ...DEFAULT_SUBJECT }
+    header.value = { ...header.value, subject: null }
   })
 }
+
+// The shell's own answer for a screen that names no show: whichever of tonight's performances is
+// running now, so every show-night screen carries the same header the hub does.
+export function setNightFallbackSubject(fallback: () => NightSubject | null): void {
+  const header = useNightHeader()
+  watchEffect(() => {
+    header.value = { ...header.value, fallback: fallback() }
+  })
+}
+
+export interface NightPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }
 
 export interface NightAuthority {
   roles: NightRole[]
   via: 'SHIFT' | 'OFFICER' | null
+  performances: NightPerformance[]
 }
 
 export function useNightAuthority(): Ref<NightAuthority> {
-  return useState<NightAuthority>('nnt-night-authority', () => ({ roles: [], via: null }))
+  return useState<NightAuthority>('nnt-night-authority', () => ({ roles: [], via: null, performances: [] }))
 }
 
 // Which of tonight's roles the viewer actually holds, asked of the server rather than read from a
@@ -63,14 +78,17 @@ export function resolveNightAuthority(): void {
   // On mount and not during setup: an officer's resolution writes a bypass audit row, and a
   // server render would write one for a page nobody ever acted on (0044).
   onMounted(async () => {
-    const answers = await Promise.allSettled(NIGHT_ROLES.map(async role =>
-      ({ role, via: (await request<{ via: 'SHIFT' | 'OFFICER' }>('/api/tonight/authority', { query: { role } })).via })))
+    const answers = await Promise.allSettled(NIGHT_ROLES.map(async (role) => {
+      const answered = await request<{ via: 'SHIFT' | 'OFFICER', performances: NightPerformance[] }>('/api/tonight/authority', { query: { role } })
+      return { role, via: answered.via, performances: answered.performances }
+    }))
 
     const held = answers.flatMap(answer => answer.status === 'fulfilled' ? [answer.value] : [])
     // A shift is the ordinary way in, so it wins the badge wherever the viewer holds both.
     resolved.value = {
       roles: held.map(one => one.role),
       via: held.some(one => one.via === 'SHIFT') ? 'SHIFT' : (held.length > 0 ? 'OFFICER' : null),
+      performances: held[0]?.performances ?? [],
     }
   })
 }
