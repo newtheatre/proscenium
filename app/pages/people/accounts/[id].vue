@@ -82,7 +82,8 @@ async function revokeRole(role: string): Promise<void> {
   working.value = `revoke-${role}`
   failure.value = null
   try {
-    await $fetch('/api/admin/roles', { method: 'DELETE', body: { userId: route.params.id, role } })
+    // Query, not body: a DELETE carrying a body hangs the Workers runtime when read (0068).
+    await $fetch('/api/admin/roles', { method: 'DELETE', query: { userId: route.params.id, role } })
     await load()
   }
   catch (error) {

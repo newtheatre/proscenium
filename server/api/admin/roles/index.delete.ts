@@ -2,7 +2,8 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ROLES } from '#shared/utils/roles'
 
-const body = z.object({
+// Query, not body: a DELETE carrying a body hangs the Workers runtime when read (0068).
+const query = z.object({
   userId: z.string().min(1).max(64),
   role: z.enum(ROLES),
 })
@@ -10,7 +11,7 @@ const body = z.object({
 // Revoke a role. The last administrator cannot be revoked (A-120).
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'roles.revoke')
-  const input = await readValidatedBodyOrThrow(event, body)
+  const input = await getValidatedQueryOrThrow(event, query)
 
   // Removing a factor is refused while the account holds a role that requires one (A-112
   // criterion 3); removing the role itself is the way out.

@@ -723,3 +723,31 @@ Stories: 29. Phases: 24 MVP, 0 V2, 0 Later, 5 resolved.
   and `GET /box-office/shows/<id>?tab=performances` intermittently bounced to sign-in behind a
   `[secrets-store] no SESSION_PASSWORD binding on this isolate` line. The Secrets Store read was
   never the thing failing.
+
+## K-132: A lane in CI runs against the Workers runtime
+
+- Role: Committee member
+- Phase: MVP
+- Story: As whoever holds the committee's systems, I want the test suite to exercise the runtime
+  the site actually runs on so that a defect which exists only on Cloudflare is found by a job
+  rather than by somebody trying to do their job.
+- Depends on: K-107
+- Acceptance criteria:
+  1. A CI job builds the worker with `NODE_ENV=production` and serves it with
+     `wrangler dev --local`, against a local D1 carrying every migration, and fails if the worker
+     does not answer its health endpoint.
+  2. The migrations reach that local D1 without a manual correction. The `migrations_dir` the
+     build writes into `.output/server/wrangler.json` resolves from that file's own location
+     (issue #1013), or the job applies them by a route that does not depend on it.
+  3. The lane calls every `*.post.ts`, `*.put.ts` and `*.delete.ts` route under `server/api` at
+     least once, as an account holding the permission each needs, and fails on any 500 and on any
+     request the runtime cancels. An empty body is enough for a route whose own validation
+     refuses it: what is being proved is that the handler is reachable and returns.
+  4. The conditional writes are each driven twice, concurrently, and exactly one attempt wins:
+     a shift claimed, the last seat booked, a pass redeemed. A second winner is a failure.
+  5. The lane seeds through the real create routes rather than by writing rows, so the seed is
+     itself covered, and it runs against a throwaway database each time. A sweep that reuses one
+     database mutates its own fixture: the first run of this found a template deleted underneath it.
+- Source: Decisions 0067 and 0068, two defects in two days that every existing suite passed and
+  that only the deployed worker exhibited. The first broke every create route in the application
+  for a day; the second made revoking a role impossible. Both were found by hand.
