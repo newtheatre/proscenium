@@ -37,4 +37,18 @@ describe('the poster frame is the one place artwork is drawn (J-111)', () => {
     }
     expect(users.length).toBeGreaterThan(0)
   })
+
+  // The artless frame seeds its two hues from the slug, so a caller passing the title instead
+  // would give one show different colours on the listing and on its own page.
+  test('every caller seeds the frame from the slug', async () => {
+    const offenders: string[] = []
+    for (const file of await appVueFiles()) {
+      if (file === FRAME) continue
+      const source = await Bun.file(file).text()
+      for (const use of source.matchAll(/<PosterFrame\b([\s\S]*?)\/>/g)) {
+        if (!/:slug=/.test(use[1] ?? '')) offenders.push(file)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
 })

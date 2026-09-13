@@ -132,15 +132,22 @@ function saysInterval(performance: ListedPerformance): string {
          rather than being overridden slot by slot (docs/design-language.md, chrome rule 1). -->
     <div class="dark nnt-spotlight">
       <UContainer class="grid gap-8 py-12 lg:grid-cols-[320px_1fr] lg:gap-12 lg:py-16">
+        <!-- Untitled: the show's name is the h1 beside this frame, so the frame drawing it too
+             would say it twice. Seeded on the slug, as the listing's frames are. -->
         <PosterFrame
           :title="show.title"
+          :slug="show.slug"
+          :titled="false"
           :poster-url="show.posterUrl"
           sizes="xs:90vw sm:60vw md:40vw lg:320px xl:320px 2xl:320px"
           class="ring-2 ring-gold-400"
         />
 
         <div>
-          <p class="font-mono text-sm uppercase tracking-wide text-muted">
+          <p
+            class="text-sm uppercase tracking-wide text-muted"
+            data-test="show-kicker"
+          >
             <span v-if="data.categoryName">{{ data.categoryName }}</span>
             <span v-if="data.categoryName && venues.length === 1"> · </span>
             <span v-if="venues.length === 1">{{ venues[0] }}</span>
@@ -336,7 +343,7 @@ function saysInterval(performance: ListedPerformance): string {
             </h2>
             <span
               v-if="venues.length === 1"
-              class="font-mono text-xs uppercase tracking-wide text-muted"
+              class="text-xs uppercase tracking-wide text-muted"
             >{{ venues[0] }}</span>
           </div>
         </template>

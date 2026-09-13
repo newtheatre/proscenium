@@ -68,6 +68,7 @@ const from = computed(() => {
         >
           <PosterFrame
             :title="listed.show.title"
+            :slug="listed.show.slug"
             :poster-url="listed.show.posterUrl"
           />
         </ULink>

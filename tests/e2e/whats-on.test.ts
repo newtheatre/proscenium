@@ -486,6 +486,36 @@ describe.skipIf(skip !== null)('the pages read without an account', () => {
     }
   }, CASE_TIMEOUT_MS)
 
+  // Issue 920: mono is for references, counts, times and prices in tables. Dates and venue are
+  // prose, and the show page set them in it.
+  test('the show page sets its dates and venue in the body face and its prices in mono', async () => {
+    const show = await publishedShow({ title: named('Hedda Gabler') })
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/shows/${show.slug}`, '[data-test="show-page"]')
+      const seen = await view.evaluate<string>(`JSON.stringify((() => {
+        const family = selector => {
+          const found = document.querySelector(selector)
+          return found ? getComputedStyle(found).fontFamily.toLowerCase() : null
+        }
+        return {
+          dates: family('[data-test="show-dates"]'),
+          kicker: family('[data-test="show-kicker"]'),
+          prices: family('[data-test="prices-${show.performanceId}"]'),
+        }
+      })())`)
+      const { dates, kicker, prices } = JSON.parse(seen) as Record<string, string | null>
+
+      expect(dates).not.toContain('jetbrains')
+      expect(kicker).not.toContain('jetbrains')
+      expect(prices).toContain('jetbrains')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('the show page says which of the three warning states it is in', async () => {
     const show = await publishedShow()
 
