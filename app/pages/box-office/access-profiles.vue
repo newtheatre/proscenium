@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { ACCESS_FLAGS, ACCESS_FLAG_LABELS, ACCESS_PROFILE_STATUSES, verifyAccessProfileForm } from '#shared/utils/access-profiles'
+import { ACCESS_FLAGS, ACCESS_FLAG_LABELS, saysAccessProfileStatus, verifyAccessProfileForm } from '#shared/utils/access-profiles'
+import { accessProfilesList } from '#shared/utils/access-profiles-list'
 import type { AccessProfileStatus, OfficerAccessProfile } from '#shared/utils/access-profiles'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Access profiles', middleware: 'console' })
@@ -30,54 +30,28 @@ const STATUS_COLOURS: Record<AccessProfileStatus, 'neutral' | 'success' | 'error
   WITHDRAWN: 'neutral',
 }
 
-const listing = ref<Listing | null>(null)
-const status = ref<AccessProfileStatus | 'ALL'>('PENDING')
-const search = ref('')
-const page = ref(1)
-const loading = ref(false)
+const request = useRequestFetch()
 const failure = ref<string | null>(null)
 const toast = useToast()
 
+const empty = (): Listing => ({ items: [], page: 1, pageSize: 0, total: 0, pages: 1 })
+
+// Search, the status filter, sort and page live in the URL (K-129); pending is the hidden
+// default, the same shape the register gives "current".
+const { search, conditions, sort, page, query, active, set, setSort, clear } = useListQuery(accessProfilesList)
+
+const { data: listing, status: fetchStatus, error, refresh } = await useAsyncData(
+  'access-profiles',
+  () => request<Listing>('/api/admin/access-profiles', { query: query.value }),
+  { watch: [query], default: empty },
+)
+
+const loading = computed(() => fetchStatus.value === 'pending')
+const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The declarations could not be read.') : null))
+
 async function load(): Promise<void> {
-  loading.value = true
-  failure.value = null
-  try {
-    listing.value = await $fetch<Listing>('/api/admin/access-profiles', {
-      query: { status: status.value === 'ALL' ? undefined : status.value, search: search.value.trim() || undefined, page: page.value },
-    })
-  }
-  catch (error) {
-    failure.value = refusalText(error)
-  }
-  finally {
-    loading.value = false
-  }
+  await refresh()
 }
-
-function sentenceCase(value: string): string {
-  return value.charAt(0) + value.slice(1).toLowerCase()
-}
-
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (status.value !== 'PENDING') {
-    active.push({ key: 'status', label: sentenceCase(status.value), icon: 'i-lucide-list-filter', clear: () => {
-      status.value = 'PENDING'
-    } })
-  }
-  return active
-})
-
-function clearFilters(): void {
-  status.value = 'PENDING'
-}
-
-watch([status, search], () => {
-  page.value = 1
-  void load()
-})
-watch(page, load)
-onMounted(load)
 
 const reviewing = ref<Summary | null>(null)
 const detail = ref<OfficerAccessProfile | null>(null)
@@ -152,7 +126,7 @@ const columns: TableColumn<Summary>[] = [
   {
     id: 'status',
     header: 'Status',
-    cell: ({ row }) => h(UBadge, { color: STATUS_COLOURS[row.original.status], variant: 'subtle', size: 'sm' }, () => sentenceCase(row.original.status)),
+    cell: ({ row }) => h(UBadge, { color: STATUS_COLOURS[row.original.status], variant: 'subtle', size: 'sm' }, () => saysAccessProfileStatus(row.original.status)),
   },
   { accessorKey: 'companions', header: 'Companions' },
   {
@@ -172,6 +146,14 @@ const columns: TableColumn<Summary>[] = [
 <template>
   <div class="space-y-6">
     <UAlert
+      v-if="listingFailure"
+      data-test="listing-failure"
+      color="error"
+      variant="subtle"
+      :description="listingFailure"
+    />
+
+    <UAlert
       v-if="failure"
       data-test="failure"
       color="error"
@@ -189,26 +171,24 @@ const columns: TableColumn<Summary>[] = [
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A name or an address"
-      :active="activeFilters"
+      :placeholder="accessProfilesList.search?.placeholder"
+      :active="active"
       :loading="loading"
-      @clear="clearFilters"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Show">
-          <USelect
-            v-model="status"
-            data-test="access-profiles-filter"
-            :items="[{ label: 'Everyone', value: 'ALL' }, ...ACCESS_PROFILE_STATUSES.map(value => ({ label: sentenceCase(value), value }))]"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="accessProfilesList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
     </AdminToolbar>
 
     <UTable
-      :data="listing?.items ?? []"
+      :data="listing.items"
       :columns="columns"
       :loading="loading"
       data-test="access-profiles-table"
@@ -219,6 +199,21 @@ const columns: TableColumn<Summary>[] = [
         </p>
       </template>
     </UTable>
+
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p
+        data-test="access-profiles-total"
+        class="text-sm text-muted"
+      >
+        {{ plural(listing.total, 'declaration') }}
+      </p>
+      <UPagination
+        v-if="listing.pages > 1"
+        v-model:page="page"
+        :total="listing.total"
+        :items-per-page="listing.pageSize"
+      />
+    </div>
 
     <UModal
       :open="reviewing !== null"
