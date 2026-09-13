@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { can, manageRoomsEstate } from '#shared/utils/abilities'
 import { BLACKOUT_REASON_LIMIT } from '#shared/utils/blackouts'
 import { blackoutsList } from '#shared/utils/blackouts-list'
 import { formatLondon, fromLondonWallClock } from '#shared/utils/london'
@@ -28,6 +29,8 @@ const request = useRequestFetch()
 const rooms = ref<{ id: string, name: string, isActive: boolean }[]>([])
 const failure = ref<string | null>(null)
 const toast = useToast()
+
+const writes = computed(() => can(useViewer().value, manageRoomsEstate))
 
 const closing = ref(false)
 const removing = ref<Closure | null>(null)
@@ -150,13 +153,15 @@ const columns: TableColumn<Closure>[] = [
     id: 'remove',
     header: '',
     meta: { class: { td: 'text-right' } },
-    cell: ({ row }) => h(UButton, {
-      'size': 'sm',
-      'color': 'neutral',
-      'variant': 'ghost',
-      'data-test': `reopen-${row.original.id}`,
-      'onClick': () => (removing.value = row.original),
-    }, () => 'Reopen'),
+    cell: ({ row }) => (writes.value === false
+      ? null
+      : h(UButton, {
+          'size': 'sm',
+          'color': 'neutral',
+          'variant': 'ghost',
+          'data-test': `reopen-${row.original.id}`,
+          'onClick': () => (removing.value = row.original),
+        }, () => 'Reopen')),
   },
 ]
 
@@ -200,6 +205,7 @@ onMounted(loadRooms)
 
       <template #actions>
         <UButton
+          v-if="writes"
           data-test="close-room"
           icon="i-lucide-construction"
           @click="closing = true"
