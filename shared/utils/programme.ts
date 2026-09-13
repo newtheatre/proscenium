@@ -59,8 +59,8 @@ export const showForm = z.object({
   longDescription: optionalText(20_000),
   ageGuidance: optionalText(120),
   latecomerPolicy: z.enum(LATECOMER_POLICIES).nullish(),
-  categoryId: z.string().trim().min(1).nullish(),
-  seasonId: z.string().trim().min(1).nullish(),
+  categoryId: z.string().trim().min(1, 'Say which category you mean').nullish(),
+  seasonId: z.string().trim().min(1, 'Say which season you mean').nullish(),
   // The default every performance of this show inherits when it states none of its own (D-112).
   bookingClosesHoursBefore: hoursBefore.nullish(),
 })

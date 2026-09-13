@@ -7,7 +7,7 @@ import type { TicketTypeAccessKind } from './ticket-types'
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A date is YYYY-MM-DD')
 
 export const financeScopeForm = z.discriminatedUnion('scope', [
-  z.object({ scope: z.literal('SHOW'), showId: z.string().trim().min(1) }),
+  z.object({ scope: z.literal('SHOW'), showId: z.string().trim().min(1, 'Say which show you mean') }),
   z.object({ scope: z.literal('PERIOD'), from: isoDate, to: isoDate }),
 ])
 

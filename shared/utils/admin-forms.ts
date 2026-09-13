@@ -6,7 +6,7 @@ import type { AuditActionName } from './audit-actions'
 // One schema per admin form, validating the request and driving the form that sends it (0032).
 // Two definitions drift; this one cannot.
 
-const accountId = z.string().min(1).max(64)
+const accountId = z.string().min(1, 'Say which account you mean').max(64)
 
 export const awardFellowship = z.object({
   userId: accountId,

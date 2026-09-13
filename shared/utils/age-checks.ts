@@ -53,7 +53,7 @@ const acceptedHasNoReason = (input: OutcomeShape): boolean => input.outcome !== 
 const refusedHasNoIdType = (input: OutcomeShape): boolean => input.outcome !== 'REFUSED' || input.idType === null
 
 export const ageCheckForm = z.object({
-  performanceId: z.string().min(1).nullish().transform(value => value ?? null),
+  performanceId: z.string().min(1, 'Say which performance you mean').nullish().transform(value => value ?? null),
   ...outcomeFields,
   product: z.string().trim().max(200).nullish().transform(value => (value ?? '').trim() || null),
 }).refine(acceptedNeedsIdType, { path: ['idType'], message: 'Say what ID was shown' })

@@ -81,8 +81,8 @@ export function expand(recurrence: Recurrence): Occurrence[] {
 }
 
 export const seriesForm = z.object({
-  roomId: z.string().min(1).max(64),
-  title: z.string().trim().min(1).max(200),
+  roomId: z.string().min(1, 'Say which room you mean').max(64),
+  title: z.string().trim().min(1, 'Give the booking a title').max(200),
   attendees: z.number().int().positive().nullish().transform(value => value ?? null),
   tier: z.enum(['PRODUCTION', 'COMMITTEE', 'REHEARSAL', 'GENERAL']).default('GENERAL'),
   purpose: z.string().trim().min(1, 'Say what the room is for').max(32),

@@ -6,7 +6,7 @@ import { isWorkspaceEmail, normaliseEmail } from './auth'
 
 export const emailChangeForm = z.object({
   // 320 is the longest address RFC 5321 permits: 64 local, an @, 255 domain.
-  email: z.string().email().max(320),
+  email: z.string().email('Enter a real email address').max(320),
 })
 
 export interface EmailChangeSubject {

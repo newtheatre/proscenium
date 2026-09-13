@@ -33,7 +33,7 @@ export const nominalMappingForm = z.object({
   kind: z.enum(LINE_KINDS.map(one => one.name) as [LineKind, ...LineKind[]]),
   source: z.enum(ENTRY_SOURCES),
   // Cleared back to unmapped with an explicit null, never an empty string (criterion 3).
-  nominalCode: z.string().trim().min(1).max(50).nullable(),
+  nominalCode: z.string().trim().min(1, 'Give it a nominal code').max(50).nullable(),
 }).refine(input => isKnownPair(input.kind, input.source), {
   path: ['source'], message: 'No ledger line ever posts under that kind and source together',
 })

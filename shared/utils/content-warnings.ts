@@ -34,7 +34,7 @@ export const contentWarningForm = z.object({
 export const showWarningsForm = z.object({
   confirmedNone: z.boolean(),
   warnings: z.array(z.strictObject({
-    warningId: z.string().trim().min(1),
+    warningId: z.string().trim().min(1, 'Say which content warning you mean'),
     level: z.enum(CONTENT_WARNING_LEVELS).nullable(),
   })).max(50)
     .refine(

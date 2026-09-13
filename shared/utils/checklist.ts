@@ -27,9 +27,9 @@ export function saysSystemCheck(check: SystemCheck): string {
 const LABEL_LIMIT = 200
 
 export const checklistItemForm = z.object({
-  venueId: z.string().min(1),
+  venueId: z.string().min(1, 'Say which venue you mean'),
   phase: z.enum(PHASES),
-  label: z.string().trim().min(1).max(LABEL_LIMIT),
+  label: z.string().trim().min(1, 'Give the checklist item a label').max(LABEL_LIMIT),
   sort: z.number().int(),
   required: z.boolean(),
   systemCheck: z.enum(SYSTEM_CHECKS).nullish().transform(value => value ?? null),
@@ -40,7 +40,7 @@ export type ChecklistItemInput = z.output<typeof checklistItemForm>
 // Optional: the common case is tonight's one performance, resolved the same way
 // `POST /api/tonight/report/sign-off` resolves it, and named only to disambiguate a matinee day.
 export const checklistScopeForm = z.object({
-  performanceId: z.string().min(1).optional(),
+  performanceId: z.string().min(1, 'Say which performance you mean').optional(),
 })
 
 export type ChecklistScopeInput = z.output<typeof checklistScopeForm>

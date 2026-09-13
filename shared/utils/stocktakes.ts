@@ -34,13 +34,13 @@ export interface StocktakeLine {
 }
 
 export const stocktakeCountForm = z.object({
-  itemId: z.string().trim().min(1),
+  itemId: z.string().trim().min(1, 'A stocktake line is about a stocked item'),
   // Null clears a count back to blank; a negative count does not exist to enter.
   counted: z.number().int().nonnegative().max(MAX_MOVEMENT_QTY).nullable(),
 })
 
 export const stocktakeCountsForm = z.object({
-  counts: z.array(stocktakeCountForm).min(1).max(200),
+  counts: z.array(stocktakeCountForm).min(1, 'A stocktake needs at least one line').max(200),
 }).refine(
   value => new Set(value.counts.map(count => count.itemId)).size === value.counts.length,
   { message: 'A stocked item appears once per submission', path: ['counts'] },

@@ -12,7 +12,7 @@ const MAX_PARTY_SIZE = 10
 const MAX_CLAIM_LINES = 20
 
 export const joinWaitingListForm = z.strictObject({
-  performanceId: z.string().trim().min(1),
+  performanceId: z.string().trim().min(1, 'Say which performance you mean'),
   partySize: z.number().int().positive().max(MAX_PARTY_SIZE),
   // Ignored when the request carries a session; required otherwise, exactly as booking is (D-104).
   guest: guestDetailsForm.optional(),
@@ -22,7 +22,7 @@ export type JoinWaitingListInput = z.output<typeof joinWaitingListForm>
 
 // The offer's own booking step: which types, how many, the same shape a fresh reservation uses.
 export const claimWaitingListOfferForm = z.strictObject({
-  lines: z.array(reservationLineForm).min(1).max(MAX_CLAIM_LINES)
+  lines: z.array(reservationLineForm).min(1, 'A claim needs at least one line').max(MAX_CLAIM_LINES)
     .refine(
       lines => new Set(lines.map(line => line.ticketTypeId)).size === lines.length,
       'A ticket type appears once; add to its quantity instead of a second line',

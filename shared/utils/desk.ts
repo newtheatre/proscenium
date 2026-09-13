@@ -12,7 +12,7 @@ export const DESK_TENDERS = ['CARD', 'COMP'] as const
 export type DeskTender = (typeof DESK_TENDERS)[number]
 
 export const deskSearchForm = pageQuery.extend({
-  performanceId: z.string().trim().min(1),
+  performanceId: z.string().trim().min(1, 'Say which performance you mean'),
   q: z.string().trim().max(200).optional(),
 })
 
@@ -26,7 +26,7 @@ export const collectForm = z.object({
   expectedTotalPence: z.number().int().min(0),
   tender: z.enum(DESK_TENDERS),
   // Names an approved request (D-117); the reason lives there, never typed here.
-  compRequestId: z.string().trim().min(1).optional(),
+  compRequestId: z.string().trim().min(1, 'Say which comp request you mean').optional(),
 }).refine(
   input => input.tender !== 'COMP' || input.compRequestId !== undefined,
   { path: ['compRequestId'], message: 'A comp needs an approved request' },
@@ -61,15 +61,15 @@ export const DESK_SALE_LINE_QUANTITY_CAP = 20
 const MAX_DESK_SALE_LINES = 20
 
 export const deskSaleLineForm = z.object({
-  ticketTypeId: z.string().trim().min(1),
+  ticketTypeId: z.string().trim().min(1, 'Say which ticket type you mean'),
   quantity: z.number().int().positive().max(DESK_SALE_LINE_QUANTITY_CAP),
 })
 
 // A name and an email, the same two fields D-104's guest checkout takes: nothing about a walk-up
 // needs to be anonymous, and it is what keeps this reservation findable by search like any other.
 export const deskSaleForm = z.strictObject({
-  performanceId: z.string().trim().min(1),
-  lines: z.array(deskSaleLineForm).min(1).max(MAX_DESK_SALE_LINES)
+  performanceId: z.string().trim().min(1, 'Say which performance you mean'),
+  lines: z.array(deskSaleLineForm).min(1, 'A sale needs at least one line').max(MAX_DESK_SALE_LINES)
     .refine(
       lines => new Set(lines.map(line => line.ticketTypeId)).size === lines.length,
       'A ticket type appears once; add to its quantity instead of a second line',

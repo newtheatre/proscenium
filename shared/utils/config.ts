@@ -147,7 +147,7 @@ export const CONFIG_KEYS = {
   // Empty is the honest starting state, not a guess: who qualifies is still open (F-bar.md), so
   // nobody is authorised until a committee decision adds them (F-108 criterion 1).
   BAR_AUTHORISED_TAB_HOLDERS: {
-    schema: z.array(z.string().trim().min(1)),
+    schema: z.array(z.string().trim().min(1, 'Say which person you mean')),
     default: [],
     workshop: 'money-and-box-office',
     sensitive: true,
@@ -647,7 +647,7 @@ export const CONFIG_KEYS = {
   // Module E: show night
 
   NIGHT_REPORT_RECIPIENTS: {
-    schema: z.array(z.string().email()),
+    schema: z.array(z.string().email('Enter a real email address')),
     workshop: 'people-and-communications',
     sensitive: true,
     describes: 'Standing recipients of the end-of-night report. The list is confirmed in the workshop.',

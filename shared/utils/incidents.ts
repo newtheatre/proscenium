@@ -34,10 +34,10 @@ const NEAR_MISS_LIMIT = 280
 // Timestamp, category, severity and a free-text account (E-115 criterion 1). `happenedAt` is
 // validated against tonight's own bounds at the write path, not here: this file reads no clock.
 export const incidentForm = z.object({
-  performanceId: z.string().min(1),
+  performanceId: z.string().min(1, 'Say which performance you mean'),
   category: z.enum(CATEGORIES),
   severity: z.enum(SEVERITIES),
-  body: z.string().trim().min(1).max(BODY_LIMIT),
+  body: z.string().trim().min(1, 'Say what happened').max(BODY_LIMIT),
   happenedAt: z.number().int().positive().nullish().transform(value => value ?? null),
 })
 
@@ -49,9 +49,9 @@ export const supersedeIncidentForm = incidentForm.omit({ performanceId: true })
 // No severity triage, no further mandatory fields: one tap to pick a category and one sentence
 // (E-117 criterion 1). `severity` is fixed to NEAR_MISS by the route, never asked for here.
 export const nearMissForm = z.object({
-  performanceId: z.string().min(1),
+  performanceId: z.string().min(1, 'Say which performance you mean'),
   category: z.enum(CATEGORIES),
-  body: z.string().trim().min(1).max(NEAR_MISS_LIMIT),
+  body: z.string().trim().min(1, 'Say what almost happened').max(NEAR_MISS_LIMIT),
 })
 
 export type NearMissInput = z.output<typeof nearMissForm>

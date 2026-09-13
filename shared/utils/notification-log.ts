@@ -29,7 +29,7 @@ export interface PersonHistoryRow {
 }
 
 export const personHistoryFilters = pageQuery.extend({
-  type: z.string().trim().min(1).max(100).optional(),
+  type: z.string().trim().min(1, 'Choose a type').max(100).optional(),
 })
 
 export type PersonHistoryFilters = z.output<typeof personHistoryFilters>

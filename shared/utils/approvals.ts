@@ -39,11 +39,11 @@ export function refusalToDecide(booking: { status: string }): string | null {
 }
 
 export const decisionForm = z.object({
-  ids: z.array(z.string().min(1).max(64)).min(1).max(BULK_LIMIT),
+  ids: z.array(z.string().min(1, 'Say which one you mean').max(64)).min(1, 'Choose at least one').max(BULK_LIMIT),
   action: z.enum(DECISIONS),
   reason: z.string().trim().max(REJECTION_REASON_LIMIT).nullish().transform(value => (value ?? '').trim() || null),
   // Approve into a room other than the one asked for (criterion 1).
-  roomId: z.string().min(1).max(64).nullish().transform(value => value ?? null),
+  roomId: z.string().min(1, 'Say which room you mean').max(64).nullish().transform(value => value ?? null),
 })
   .refine(input => input.action !== 'REJECT' || input.reason !== null, {
     path: ['reason'],
@@ -68,6 +68,6 @@ export const unlistForm = z.object({
 })
 
 export const relistForm = z.object({
-  roomId: z.string().min(1).max(64),
+  roomId: z.string().min(1, 'Say which room you mean').max(64),
   reason: z.string().trim().min(1, 'Say why, because the member is shown it').max(REJECTION_REASON_LIMIT),
 })

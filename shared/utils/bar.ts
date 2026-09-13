@@ -154,7 +154,7 @@ export const movementForm = z.object({
     .refine(value => Math.abs(value) <= MAX_MOVEMENT_QTY, 'That quantity is larger than the bar holds'),
   reason: z.enum(MOVEMENT_REASONS).nullish(),
   unitCostPence: z.number().int().nonnegative().max(MAX_UNIT_COST_PENCE).nullish(),
-  reversesId: z.string().trim().min(1).nullish(),
+  reversesId: z.string().trim().min(1, 'Say which movement it reverses').nullish(),
 })
 
 // What the stock screen's own modal holds. A form validates its whole state, so a screen that is
@@ -180,7 +180,7 @@ export const variantStatusForm = z.object({ status: z.enum(VARIANT_STATUSES) })
 // What pouring one of these consumes, stated in the stocked item's own units and validated
 // positive. Quantity is independent of price (F-112 criterion 2).
 export const componentForm = z.object({
-  itemId: z.string().trim().min(1),
+  itemId: z.string().trim().min(1, 'A recipe line is about a stocked item'),
   qty: z.number().int().positive('A depletion is a quantity of something').max(MAX_MOVEMENT_QTY),
 })
 
@@ -194,7 +194,7 @@ export const componentsForm = z.object({
 // A choice's own option: a stocked item at its own quantity, same shape as a recipe line
 // (F-113 criterion 2).
 export const choiceGroupOptionForm = z.object({
-  itemId: z.string().trim().min(1),
+  itemId: z.string().trim().min(1, 'An option is about a stocked item'),
   qty: z.number().int().positive('An option is a quantity of something').max(MAX_MOVEMENT_QTY),
 })
 
@@ -209,7 +209,7 @@ export const choiceGroupForm = z.object({
 // Attaches or clears a variant's one choice group. `includedInPrice` is the free mixer (0017):
 // meaningless with no group attached, so it is dropped rather than validated when clearing.
 export const variantChoiceForm = z.object({
-  choiceGroupId: z.string().trim().min(1).nullable(),
+  choiceGroupId: z.string().trim().min(1, 'Say which choice group you mean').nullable(),
   qty: z.number().int().positive('A depletion is a quantity of something').max(MAX_MOVEMENT_QTY).default(1),
   includedInPrice: z.boolean().default(false),
 })

@@ -31,7 +31,7 @@ const LABEL_LIMIT = 50
 
 export const boardJoinForm = z.object({
   code: z.string().trim().regex(/^\d{6}$/, 'Enter the six-digit code'),
-  label: z.string().trim().min(1).max(LABEL_LIMIT),
+  label: z.string().trim().min(1, 'Give it a label').max(LABEL_LIMIT),
 })
 
 export type BoardJoinInput = z.output<typeof boardJoinForm>
@@ -42,9 +42,9 @@ export type BoardJoinInput = z.output<typeof boardJoinForm>
 export const FREE_TEXT_LIMIT = 500
 
 export const postMessageForm = z.object({
-  milestoneTypeId: z.string().min(1).nullable().default(null),
-  presetId: z.string().min(1).nullable().default(null),
-  body: z.string().trim().min(1).max(FREE_TEXT_LIMIT).nullable().default(null),
+  milestoneTypeId: z.string().min(1, 'Say which milestone you mean').nullable().default(null),
+  presetId: z.string().min(1, 'Say which preset you mean').nullable().default(null),
+  body: z.string().trim().min(1, 'Say what the message is').max(FREE_TEXT_LIMIT).nullable().default(null),
   // The device's own clock at the moment of composing, carried through an offline queue
   // unchanged (criterion 6); never trusted for ordering, only for display.
   composedAt: z.number().int().positive(),
@@ -59,7 +59,7 @@ export type PostMessageInput = z.output<typeof postMessageForm>
 
 // A correction names a different milestone; nothing else is ever superseded (criterion 5).
 export const supersedeMessageForm = z.object({
-  milestoneTypeId: z.string().min(1),
+  milestoneTypeId: z.string().min(1, 'Say which milestone you mean'),
   composedAt: z.number().int().positive(),
 })
 
@@ -69,15 +69,15 @@ const CONFIG_LABEL_LIMIT = 100
 const PRESET_BODY_LIMIT = 200
 
 export const milestoneTypeForm = z.object({
-  label: z.string().trim().min(1).max(CONFIG_LABEL_LIMIT),
+  label: z.string().trim().min(1, 'Give it a label').max(CONFIG_LABEL_LIMIT),
   sort: z.number().int(),
 })
 
 export type MilestoneTypeInput = z.output<typeof milestoneTypeForm>
 
 export const presetForm = z.object({
-  label: z.string().trim().min(1).max(CONFIG_LABEL_LIMIT),
-  body: z.string().trim().min(1).max(PRESET_BODY_LIMIT),
+  label: z.string().trim().min(1, 'Give it a label').max(CONFIG_LABEL_LIMIT),
+  body: z.string().trim().min(1, 'Say what the preset sends').max(PRESET_BODY_LIMIT),
   sort: z.number().int(),
 })
 

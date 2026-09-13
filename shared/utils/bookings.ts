@@ -119,8 +119,8 @@ export function maskConflicts(conflicts: Conflict[], canSeeDetail: boolean): Con
 const instant = z.string().datetime()
 
 export const bookingForm = z.object({
-  roomId: z.string().min(1).max(64),
-  title: z.string().trim().min(1).max(200),
+  roomId: z.string().min(1, 'Say which room you mean').max(64),
+  title: z.string().trim().min(1, 'Give the booking a title').max(200),
   startsAt: instant,
   endsAt: instant,
   attendees: z.number().int().positive().nullish().transform(value => value ?? null),
