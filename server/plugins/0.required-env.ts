@@ -5,6 +5,8 @@ let checked = false
 
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('request', (event) => {
+    // Prerendering runs with no secrets set at all, so every key would be named for nothing.
+    if (import.meta.prerender) return
     if (checked) return
     checked = true
 

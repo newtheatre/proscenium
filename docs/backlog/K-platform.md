@@ -692,3 +692,34 @@ Stories: 29. Phases: 24 MVP, 0 V2, 0 Later, 5 resolved.
      if `:root` stops setting it.
 - Source: Matt's ruling of 13 September 2026 over the 11 September audit captures, where every
   light-mode shell read as a flat white box.
+
+## K-131: An internal render-time request carries the isolate's session password
+
+- Role: Visitor
+- Phase: MVP
+- Story: As anyone using the system, I want a page that loads its data on the server to come back
+  with me still signed in so that a screen never bounces me to sign-in because of how its own data
+  was fetched.
+- Depends on: K-107
+- Acceptance criteria:
+  1. Nitro builds `runtimeConfig` per event, so `server/plugins/0.secrets-store.ts` sets the
+     session password on each event it sees. Once a password has been read on an isolate it is
+     applied to every later event, whether or not that event carries a `SESSION_PASSWORD` binding,
+     because an internally created event has no Cloudflare platform context and so no binding.
+  2. The fail-closed rule stands: an event with no binding, on an isolate that has read no
+     password yet, gets none, and the "no binding" line is logged once. That line says an internal
+     request reaching the isolate before the first external one is one of its two causes.
+  3. `0.secrets-store.ts` and `0.required-env.ts` both return immediately under
+     `import.meta.prerender`. The build prerenders routes with nothing bound and no secrets set,
+     where both checks are noise rather than signal.
+  4. The plugin's hook logic is a function of its inputs, resolved outside the Bun graph and
+     threaded in (0057), with unit coverage: a binding resolves and yields the password; a
+     following call with no Cloudflare context yields the same password; a first call with no
+     context yields none and logs once; a prerender call does nothing at all.
+  5. No screen loads data on the server through a bare global `$fetch`. Every `useAsyncData`,
+     `useLazyAsyncData` and `callOnce` fetcher under `app/` uses `useRequestFetch()`, which
+     forwards the incoming request and its platform context.
+- Source: Production Workers Logs, 13 September 2026 (#318), where `GET /tonight`, `GET /sign-in`
+  and `GET /box-office/shows/<id>?tab=performances` intermittently bounced to sign-in behind a
+  `[secrets-store] no SESSION_PASSWORD binding on this isolate` line. The Secrets Store read was
+  never the thing failing.

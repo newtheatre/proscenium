@@ -5,6 +5,9 @@ import type { PolicyValues } from '#shared/utils/policy-tokens'
 // The one route every editorial and policy page renders through (D-103, J-110): a markdown file
 // under content/ at this path is a page, and a path with none is a 404, not a blank screen.
 const route = useRoute()
+// Plain $fetch builds an event with no platform context, so the session password never reaches it
+// and the render is refused (K-131).
+const request = useRequestFetch()
 
 const { data: page } = await useAsyncData(`content:${route.path}`, () => queryCollection('content').path(route.path).first())
 
@@ -18,7 +21,7 @@ const { data: policy } = await useAsyncData(
   `policy:${route.path}`,
   () => tokensInTree(page.value?.body).length === 0
     ? Promise.resolve({ values: {} as PolicyValues })
-    : $fetch<{ values: PolicyValues }, string>(`/api/policies/values?path=${encodeURIComponent(route.path)}`),
+    : request<{ values: PolicyValues }, string>(`/api/policies/values?path=${encodeURIComponent(route.path)}`),
   { watch: [page] },
 )
 

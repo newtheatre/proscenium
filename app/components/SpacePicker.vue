@@ -29,11 +29,14 @@ const searchTerm = ref('')
 const settled = useDebounced(searchTerm, 250)
 const chosen = ref<Space | null>(null)
 
+// Plain $fetch builds an event with no platform context, so the session password never reaches it
+// and the render is refused (K-131).
+const request = useRequestFetch()
 const { data, status } = await useAsyncData(
   () => `space-picker-${instance}-${settled.value}-${props.purpose ?? ''}`,
   () => (settled.value.trim().length < 2
     ? Promise.resolve({ items: [] as Space[] })
-    : $fetch<{ items: Space[] }>('/api/rooms/external-spaces', {
+    : request<{ items: Space[] }>('/api/rooms/external-spaces', {
         query: { search: settled.value, purpose: props.purpose ?? undefined },
       })),
   {
