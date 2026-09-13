@@ -1,11 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 import {
   PASS_REFERENCE_LENGTH,
+  PASS_REQUEST_STATUSES,
+  PASS_STATUSES,
   generatePassReference,
   issuePassForm,
   passCapReason,
   passSaleRefusal,
   requestPassForm,
+  saysPassStatus,
 } from '#shared/utils/passes'
 
 // D-124 as pure rules. The database enforcement (the cap, the race) is in
@@ -89,5 +92,20 @@ describe('a request names only which product (criterion 3)', () => {
 
   test('a price or a buyer would be a different shape entirely, and is refused', () => {
     expect(requestPassForm.safeParse({ passTypeId: 'pt-1', userId: 'u-1' }).success).toBe(false)
+  })
+})
+
+describe('a pass or a request status reads as a sentence, never the raw enum (issue 914)', () => {
+  test('every pass status has its own reading', () => {
+    for (const status of PASS_STATUSES) {
+      expect(saysPassStatus(status)).not.toBe(status)
+      expect(saysPassStatus(status).length).toBeGreaterThan(0)
+    }
+  })
+
+  test('every request status has its own reading', () => {
+    for (const status of PASS_REQUEST_STATUSES) {
+      expect(saysPassStatus(status)).not.toBe(status)
+    }
   })
 })

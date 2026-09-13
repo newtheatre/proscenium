@@ -32,6 +32,15 @@ export const ACCESS_FLAG_LABELS: Record<AccessFlag, string> = {
 export const ACCESS_PROFILE_STATUSES = ['PENDING', 'VERIFIED', 'EXPIRED', 'DECLINED', 'WITHDRAWN'] as const
 export type AccessProfileStatus = (typeof ACCESS_PROFILE_STATUSES)[number]
 
+// One sentence-case reading for a declaration's status badge, the enum kept for storage only.
+export function saysAccessProfileStatus(status: AccessProfileStatus): string {
+  if (status === 'PENDING') return 'Pending'
+  if (status === 'VERIFIED') return 'Verified'
+  if (status === 'EXPIRED') return 'Expired'
+  if (status === 'DECLINED') return 'Declined'
+  return 'Withdrawn'
+}
+
 export const MAX_COMPANIONS = 2
 export const MAX_NOTE_LENGTH = 500
 export const MAX_CARD_NUMBER_LENGTH = 40

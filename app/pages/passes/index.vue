@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { saysPassStatus } from '#shared/utils/passes'
+import type { PassStatus } from '#shared/utils/passes'
+
 type Outcome = 'working' | 'found' | 'refused'
 
 interface Pass {
@@ -6,7 +9,7 @@ interface Pass {
   passType: string
   priceLabel: string
   pricePaid: string
-  status: string
+  status: PassStatus
   qrSvg: string
 }
 
@@ -68,7 +71,7 @@ useSeoMeta({
           size="lg"
           :color="statusColor[pass.status] ?? 'neutral'"
         >
-          {{ pass.status }}
+          {{ saysPassStatus(pass.status) }}
         </UBadge>
         <img
           :src="`data:image/svg+xml;base64,${pass.qrSvg}`"

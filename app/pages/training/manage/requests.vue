@@ -183,6 +183,7 @@ async function answer(): Promise<void> {
         <UFormField
           class="mt-4"
           label="What to tell them"
+          hint="Say why: nothing sends until you do"
           required
         >
           <UTextarea

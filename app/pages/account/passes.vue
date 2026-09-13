@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { saysPrice } from '#shared/utils/ticket-types'
+import { saysPassStatus } from '#shared/utils/passes'
+import type { PassRequestStatus, PassStatus } from '#shared/utils/passes'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in' })
 
@@ -15,13 +17,13 @@ interface HeldPass {
   passTypeName: string
   priceLabel: string
   pricePaid: number
-  status: string
+  status: PassStatus
 }
 
 interface OwnRequest {
   id: string
   passTypeName: string
-  status: string
+  status: PassRequestStatus
 }
 
 interface Listing {
@@ -96,7 +98,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
           >
             <span>{{ pass.passTypeName }} ({{ pass.priceLabel }}, {{ saysPrice(pass.pricePaid) }}), reference {{ pass.reference }}</span>
             <UBadge :color="statusColor[pass.status] ?? 'neutral'">
-              {{ pass.status }}
+              {{ saysPassStatus(pass.status) }}
             </UBadge>
           </li>
         </ul>
@@ -123,7 +125,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
           >
             <span>{{ req.passTypeName }}</span>
             <UBadge :color="statusColor[req.status] ?? 'neutral'">
-              {{ req.status }}
+              {{ saysPassStatus(req.status) }}
             </UBadge>
           </li>
         </ul>
