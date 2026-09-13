@@ -10,6 +10,24 @@ export const TENDERS = ['CARD', 'COMP', 'TAB', 'NONE'] as const
 export type EntrySource = (typeof ENTRY_SOURCES)[number]
 export type Tender = (typeof TENDERS)[number]
 
+const ENTRY_SOURCE_LABELS: Record<EntrySource, string> = {
+  DESK: 'Desk',
+  TILL: 'Till',
+  SELF_SERVE: 'Self-serve',
+  IMPORT: 'Import',
+  SYSTEM: 'System',
+}
+
+const TENDER_LABELS: Record<Tender, string> = {
+  CARD: 'Card',
+  COMP: 'Comp',
+  TAB: 'Tab',
+  NONE: 'None',
+}
+
+export const saysEntrySource = (source: EntrySource): string => ENTRY_SOURCE_LABELS[source]
+export const saysTender = (tender: Tender): string => TENDER_LABELS[tender]
+
 // The (source, tender, kind) triple each of these posts under is fixed in architecture.md, and a
 // unit test reads that table: a kind here and nowhere there is a path nobody agreed.
 export const LINE_KINDS = [
