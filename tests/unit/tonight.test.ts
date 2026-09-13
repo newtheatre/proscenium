@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { readTeamRow } from '#server/utils/tonight'
-import { activePerformanceId, saysPerformanceChoice } from '#shared/utils/tonight'
+import { activePerformanceId, contactRoster, saysPerformanceChoice, telHref } from '#shared/utils/tonight'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
 // The duty manager's tonight screen (E-112). What the database returns is proved against the
@@ -92,5 +92,36 @@ describe('a picker names the performance rather than its id (issue 901)', () => 
   test('a winter curtain reads in GMT, not in the summer offset', () => {
     const winter = Math.floor(Date.UTC(2026, 11, 5, 19, 30) / 1000)
     expect(saysPerformanceChoice({ showTitle: 'Machinal', startsAt: winter })).toBe('Machinal, 19:30')
+  })
+})
+
+describe('who is on tonight, for the contacts block (E-112 criterion 2)', () => {
+  const slot = (role: 'DUTY_MANAGER' | 'DOOR' | 'BAR', name: string | null, phone: string | null) =>
+    ({ role, filled: name !== null, name, phone })
+
+  test('the duty manager leads, then the door, then the bar', () => {
+    const listed = contactRoster([slot('BAR', 'Friar Tuck', null), slot('DOOR', 'Little John', null), slot('DUTY_MANAGER', 'Maid Marian', null)])
+    expect(listed.map(one => one.role)).toEqual(['DUTY_MANAGER', 'DOOR', 'BAR'])
+  })
+
+  test('the same person on two performances is one row', () => {
+    const listed = contactRoster([slot('DOOR', 'Little John', null), slot('DOOR', 'Little John', null)])
+    expect(listed).toHaveLength(1)
+  })
+
+  test('a row carrying the consented number wins over one that does not', () => {
+    const listed = contactRoster([slot('DOOR', 'Little John', null), slot('DOOR', 'Little John', '07700 900123')])
+    expect(listed[0]?.phone).toBe('07700 900123')
+  })
+
+  test('an unfilled slot stays in the list as unfilled, never as a blank name', () => {
+    const listed = contactRoster([slot('BAR', null, null), slot('DUTY_MANAGER', 'Maid Marian', null)])
+    expect(listed.map(one => one.filled)).toEqual([true, false])
+    expect(listed[1]?.name).toBeNull()
+  })
+
+  test('a number dials without its spacing', () => {
+    expect(telHref('07700 900 123')).toBe('tel:07700900123')
+    expect(telHref('+44 7700 900123')).toBe('tel:+447700900123')
   })
 })

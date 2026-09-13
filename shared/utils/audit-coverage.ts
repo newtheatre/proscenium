@@ -454,6 +454,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/reports/performances/export.get.ts', actions: ['reports.exported'] },
   { route: 'server/api/admin/night-reports/addenda.post.ts', actions: ['night-report.addendum'] },
   {
+    route: 'server/api/tonight/team.get.ts',
+    actions: ['night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+  {
     route: 'server/api/tonight/board/code.get.ts',
     actions: ['night.officer-bypass'],
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],

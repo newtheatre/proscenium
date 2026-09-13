@@ -161,3 +161,34 @@ describe.skipIf(skip !== null)('what the screen shows about the show (E-112 crit
     if (warningId) expect(seen!.warnings.length).toBeGreaterThan(0)
   })
 })
+
+describe.skipIf(skip !== null)('the contacts block every role reaches (E-112 criterion 2)', () => {
+  test('a door shift holder reads tonight\'s team, and a consented number comes with it', async () => {
+    const door = await registerMember(app, 'door-contacts', generatePassword())
+    const dutyManager = await registerMember(app, 'dm-contacts', generatePassword())
+    const house = performance('contacts')
+    shift(house.performanceId, 'DOOR', door.id)
+    shift(house.performanceId, 'DUTY_MANAGER', dutyManager.id)
+
+    const answered = await send('GET', '/api/tonight/team', undefined, door.cookie)
+    expect(answered.status).toBe(200)
+
+    const body = await answered.json() as { performances: { performanceId: string, team: { role: string, filled: boolean, name: string | null, phone: string | null }[] }[] }
+    const seen = body.performances.find(one => one.performanceId === house.performanceId)
+    const managerRow = seen!.team.find(member => member.role === 'DUTY_MANAGER')
+    expect(managerRow).toMatchObject({ filled: true, name: dutyManager.name, phone: null })
+
+    const { profile } = await (await send('GET', '/api/account/profile', undefined, dutyManager.cookie)).json() as { profile: Record<string, unknown> }
+    await send('PUT', '/api/account/profile', { ...profile, phone: '07700 900222', shiftContactVisible: true }, dutyManager.cookie)
+
+    const after = await (await send('GET', '/api/tonight/team', undefined, door.cookie)).json() as
+      { performances: { performanceId: string, team: { role: string, phone: string | null }[] }[] }
+    const afterRow = after.performances.find(one => one.performanceId === house.performanceId)!.team.find(member => member.role === 'DUTY_MANAGER')
+    expect(afterRow?.phone).toBe('07700 900222')
+  })
+
+  test('a member with no shift tonight reaches nobody', async () => {
+    const member = await registerMember(app, 'no-shift-contacts', generatePassword())
+    expect((await send('GET', '/api/tonight/team', undefined, member.cookie)).status).toBe(403)
+  })
+})
