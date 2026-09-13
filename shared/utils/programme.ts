@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { formatLondon } from './london'
-import { posterUrl } from './seo'
+import { POSTER_PREFIX, posterUrl } from './seo'
 import type { PublicContentWarning, WarningAssessment } from './content-warnings'
 
 // The publish flow and the booking window (D-121, D-112). A show is draft until somebody
@@ -151,6 +151,71 @@ export interface AdminShow {
   // states rather than one empty list (D-102 criterion 2).
   warningsConfirmedNone: boolean
   warningCount: number
+  // Where the poster is served from, or null. The blob key itself never leaves the server, on
+  // the console as on the public site (D-132 criterion 6).
+  posterUrl: string | null
+  // Ticket types this show actually offers, which is what the checklist reads as pricing set.
+  activePriceCount: number
+}
+
+// What may be attached as a show's artwork (D-132 criterion 6). Stated here rather than beside the
+// upload, so the card offers exactly the types and the size the route will take.
+export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+export type ImageType = (typeof IMAGE_TYPES)[number]
+
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+}
+
+// Why this file may not be stored, or null when it may. The limit is quoted rather than left for
+// the reader to discover by halving the picture until it fits.
+export function imageRefusal(type: string, bytes: number): string | null {
+  if (!IMAGE_TYPES.includes(type as ImageType)) {
+    return 'That is not an image we can take. Posters are JPEG, PNG or WebP.'
+  }
+  if (bytes > MAX_IMAGE_BYTES) {
+    return `That poster is over the ${MAX_IMAGE_BYTES / (1024 * 1024)} MB limit. Export it smaller and try again.`
+  }
+  return null
+}
+
+// One segment per show, so `isPosterKey` accepts it and a show's artwork stays under its own
+// prefix. The suffix makes a replacement a new blob, never an overwrite of the one being served.
+export function posterKeyFor(showId: string, type: string): string {
+  return `${POSTER_PREFIX}${showId}/${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}.${IMAGE_EXTENSIONS[type] ?? 'jpg'}`
+}
+
+// What the publish checklist turns on (D-132 criterion 7). Every field is already counted for the
+// console, so the checklist cannot state a readiness the rows disagree with.
+export interface PublishReadiness {
+  posterUrl: string | null
+  performanceCount: number
+  activePriceCount: number
+}
+
+export interface PublishCheck {
+  key: 'poster' | 'performances' | 'pricing'
+  says: string
+  done: boolean
+}
+
+// Readiness reported in words, never a gate: publishing stays D-121's own action, and a committee
+// that wants to publish without artwork may. Cast list and rights have no schema, so neither is here.
+export function publishChecklist(show: PublishReadiness): PublishCheck[] {
+  return [
+    { key: 'poster', says: 'Poster uploaded', done: show.posterUrl !== null },
+    { key: 'performances', says: 'Performances scheduled', done: show.performanceCount > 0 },
+    { key: 'pricing', says: 'Pricing set', done: show.activePriceCount > 0 },
+  ]
+}
+
+export function saysPublishCheck(check: PublishCheck): string {
+  return check.done ? check.says : `${check.says}: not yet`
 }
 
 // A season, a category or a venue as a picker sees it: named, and retired ones still shown where

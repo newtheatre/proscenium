@@ -709,8 +709,25 @@ Open questions:
   4. The screens stay calm: the `UDashboard*` family and nothing from the expressive kit
      (`docs/design-language.md`).
   5. Before-and-after captures from `bun run shots` are attached to the pull request.
+  6. A poster card on the show screen uploads artwork to the blob store under `posters/<show id>/`
+     and writes `shows.poster_key`: JPEG, PNG or WebP only, 5 MB at most, anything else refused by
+     type and by size with the limit quoted. Replacing repoints the row before the previous blob
+     is removed, removing clears the key and the blob, and each of the three is audited. The card
+     previews the artwork through `PosterFrame`, which is also what tells the reader that a show
+     with no poster keeps its gradient on the public site.
+  7. A publish checklist beside the editor states, in words, whether the poster is uploaded, the
+     performances are scheduled and the pricing is set. It reports readiness and gates nothing:
+     publishing is still D-121's own action. Cast list and rights are not on it, having no schema
+     behind them yet.
+  8. The editor's copy is grouped as the mockup groups it: a basics card (title, address, tagline
+     with its helper line, category, season), a show info card (age guidance, latecomer policy,
+     booking window, and what the content warnings say with a link to assess them), a pricing card
+     carrying the reservation-only note (0005), and a danger zone holding the actions that take a
+     show away from the public. The poster, the checklist and the danger zone sit in a rail beside
+     the sections, in view whichever section is open.
 - Source: Pre-cutover review, 10 September 2026. The detail page is the largest in the app at
-  over a thousand lines.
+  over a thousand lines. Criteria 6 to 8 added 13 September 2026 from the committee's
+  `admin-show-editor` mockup.
 
 ## D-201: Named allocations reserve capacity without tickets
 

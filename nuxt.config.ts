@@ -6,6 +6,10 @@ import { PRODUCTION_SITE_URL, ROBOTS_DISALLOW, SITE_ADDRESS, SITE_NAME } from '.
 // and NUXT_PUBLIC_BASE_URL onto the two keys at request time, so nothing is read here (K-125).
 const SITE_URL = PRODUCTION_SITE_URL
 
+// Named once: the local database and the local blob store have to land in the same throwaway
+// directory, or an end-to-end run reads a database from one place and its pictures from another.
+const HUB_DIR = process.env.NUXT_HUB_DIR ?? '.data'
+
 export default defineNuxtConfig({
 
   modules: [
@@ -206,11 +210,13 @@ export default defineNuxtConfig({
   hub: {
     // The end-to-end suite points this at a throwaway directory so a run cannot depend on, or
     // disturb, whatever is in a developer's local database.
-    dir: process.env.NUXT_HUB_DIR ?? '.data',
+    dir: HUB_DIR,
     db: 'sqlite',
     kv: false,
     cache: false,
-    blob: true,
+    // The Cloudflare preset would take the R2 driver everywhere, and `nuxt dev` has no binding to
+    // take it from: development and the end-to-end suite store blobs on the filesystem (D-132).
+    blob: process.env.NODE_ENV === 'production' ? true : { driver: 'fs', dir: `${HUB_DIR}/blob` },
   },
 
   // Adds the WebAuthn ceremony handlers and useWebAuthn, which do not exist without it (A-105).

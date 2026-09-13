@@ -6,6 +6,7 @@ import { heldSeatsSubquery, showUnpaidSeatsColumn, unpaidSeatsColumn } from './c
 import { aliasColumns, whereFrom, yesNo } from './list-filters'
 import { performancesList } from '#shared/utils/performances-list'
 import { showsList } from '#shared/utils/shows-list'
+import { posterUrl } from '#shared/utils/seo'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { AdminPerformance, AdminShow, ShowStatus } from '#shared/utils/programme'
@@ -144,11 +145,18 @@ export function performanceSoldQuery(performanceId: string, references = soldRef
   return sql`SELECT ${sql.join(references.map(reference => heldTerm(reference, sql`${performanceId}`)), sql` + `)} AS sold`
 }
 
-interface ShowRow extends Omit<AdminShow, 'warningsConfirmedNone'> {
+interface ShowRow extends Omit<AdminShow, 'warningsConfirmedNone' | 'posterUrl'> {
   warningsConfirmedNone: number
+  posterKey: string | null
 }
 
-const readShow = (row: ShowRow): AdminShow => ({ ...row, warningsConfirmedNone: row.warningsConfirmedNone === 1 })
+// The blob key is mapped to its public address here and never carried further: the console reads
+// the same URL the public site does, and nothing outside this file holds the key (D-132).
+const readShow = ({ posterKey, ...row }: ShowRow): AdminShow => ({
+  ...row,
+  warningsConfirmedNone: row.warningsConfirmedNone === 1,
+  posterUrl: posterUrl(posterKey),
+})
 
 // The declaration's predicates and order, bound through the `s` alias the raw SQL below uses
 // (K-129). "Unassessed" and "on sale" are questions about other rows, answered here.
@@ -179,6 +187,7 @@ const SHOW_COLUMNS = sql`
   (SELECT se.name FROM seasons se WHERE se.id = s.season_id) AS seasonName,
   s.booking_closes_hours_before AS bookingClosesHoursBefore,
   s.warnings_confirmed_none AS warningsConfirmedNone,
+  s.poster_key AS posterKey,
   s.status AS status
 `
 
@@ -200,6 +209,9 @@ const SHOW_COUNTS = sql`
   (SELECT count(*) FROM performances p WHERE p.show_id = s.id) AS performanceCount,
   (SELECT count(*) FROM performances p WHERE p.show_id = s.id AND p.status = 'ON_SALE') AS onSaleCount,
   (SELECT count(*) FROM show_content_warnings w WHERE w.show_id = s.id) AS warningCount,
+  (SELECT count(*) FROM ticket_types t
+     LEFT JOIN show_ticket_overrides so ON so.show_id = s.id AND so.ticket_type_id = t.id
+    WHERE t.archived = 0 AND coalesce(so.active, t.active_by_default) = 1) AS activePriceCount,
   ${SHOW_HOUSE}
 `
 
@@ -239,6 +251,13 @@ export async function showById(id: string): Promise<AdminShow | undefined> {
     FROM shows s WHERE s.id = ${id}
   `)
   return row ? readShow(row) : undefined
+}
+
+// The blob key, which no payload carries: the poster routes need the key itself to replace or
+// forget the blob behind it.
+export async function posterKeyOf(id: string): Promise<string | null> {
+  const [row] = await db.all<{ posterKey: string | null }>(sql`SELECT poster_key AS posterKey FROM shows WHERE id = ${id}`)
+  return row?.posterKey ?? null
 }
 
 // The slug is the public URL, so it is held once across draft and published shows alike.
