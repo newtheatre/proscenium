@@ -33,13 +33,14 @@ const includeInactive = ref(false)
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
-const { data, status, refresh } = await useAsyncData(
+const { data, status, refresh, error } = await useAsyncData(
   'training-departments',
   () => request<{ items: Department[], total: number }>('/api/admin/training/departments', {
     query: { includeInactive: includeInactive.value },
   }),
   { watch: [includeInactive], default: (): { items: Department[], total: number } => ({ items: [], total: 0 }) },
 )
+const listFailure = useListFailure(error, 'The departments could not be read.')
 
 // Searched in the browser: a department vocabulary is tens of rows, and a round trip to filter
 // them would be slower than the typing.
@@ -215,6 +216,17 @@ const columns: TableColumn<Department>[] = [
 <template>
   <div class="space-y-6">
     <UAlert
+      v-if="listFailure"
+      data-test="load-failed"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-unplug"
+      :title="listFailure.message"
+      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :actions="listFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listFailure.enrolPath, color: 'error' }] : []"
+    />
+
+    <UAlert
       v-if="failure"
       data-test="failure"
       color="error"
@@ -266,7 +278,7 @@ const columns: TableColumn<Department>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          No departments yet. Add one and modules can be scoped to it.
+          {{ listFailure ? 'The departments could not be read.' : 'No departments yet. Add one and modules can be scoped to it.' }}
         </p>
       </template>
     </UTable>
