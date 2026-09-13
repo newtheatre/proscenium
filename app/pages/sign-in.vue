@@ -2,6 +2,10 @@
 import * as z from 'zod'
 import type { AuthFormField, ButtonProps, FormSubmitEvent } from '@nuxt/ui'
 
+// Somebody already signed in has nothing to do here, and typing a second set of details would
+// make a second account by mistake (issue 925).
+definePageMeta({ middleware: 'signed-out' })
+
 const route = useRoute()
 const { refresh } = useAccount()
 
@@ -116,93 +120,134 @@ useSeoMeta({ title: 'Sign in' })
 </script>
 
 <template>
-  <UContainer class="max-w-md py-16">
-    <UPageCard>
-      <UAlert
-        v-if="refusal"
-        class="mb-6"
-        color="error"
-        variant="subtle"
-        title="Not signed in"
-        :description="refusal"
-      />
+  <div class="nnt-spotlight">
+    <UContainer class="max-w-md py-16">
+      <div class="dark mb-8 flex justify-center text-default">
+        <SiteWordmark gold />
+      </div>
 
-      <UAlert
-        v-if="notice"
-        class="mb-6"
-        color="error"
-        variant="subtle"
-        :description="notice"
-      />
+      <UPageCard>
+        <UAlert
+          v-if="refusal"
+          class="mb-6"
+          color="error"
+          variant="subtle"
+          title="Not signed in"
+          :description="refusal"
+        />
 
-      <UAuthForm
-        v-if="step === 'credentials'"
-        title="Sign in"
-        description="Committee accounts on @newtheatre.org.uk sign in with Google. Everyone else uses an email address and a password."
-        :schema="credentials"
-        :fields="credentialFields"
-        :providers="providers"
-        :submit="{ label: 'Sign in' }"
-        @submit="signIn"
-      >
-        <template #footer>
-          <div class="flex flex-col items-start gap-1">
-            <UButton
-              v-if="isSupported"
-              icon="i-lucide-fingerprint"
-              color="neutral"
-              variant="subtle"
-              class="mb-3 self-stretch justify-center"
-              :loading="passkeyWorking"
-              data-test="passkey-sign-in"
-              @click="signInWithPasskey"
-            >
-              Use a passkey
-            </UButton>
-            <UButton
-              variant="link"
-              class="px-0"
-              @click="step = 'forgot'"
-            >
-              I have forgotten my password
-            </UButton>
-            <UButton
-              variant="link"
-              class="px-0"
-              data-test="resend-verification"
-              @click="step = 'resend'"
-            >
-              I did not get my confirmation email
-            </UButton>
-            <UButton
-              variant="link"
-              class="px-0"
-              to="/register"
-            >
-              I do not have an account yet
-            </UButton>
-          </div>
-        </template>
-      </UAuthForm>
+        <UAlert
+          v-if="notice"
+          class="mb-6"
+          color="error"
+          variant="subtle"
+          :description="notice"
+        />
 
-      <UAuthForm
-        v-else-if="step === 'forgot'"
-        title="Forgotten password"
-        description="We will send a link to set a new one."
-        :schema="addressOnly"
-        :fields="addressField"
-        :submit="{ label: 'Send a reset link' }"
-        @submit="ask('/api/auth/password/forgot', $event)"
-      >
-        <template #footer>
-          <div class="flex flex-col items-start gap-1">
-            <UButton
-              variant="link"
-              class="px-0"
-              @click="step = 'link'"
-            >
-              Email me a sign-in link instead
-            </UButton>
+        <UAuthForm
+          v-if="step === 'credentials'"
+          title="Sign in"
+          description="Committee accounts on @newtheatre.org.uk sign in with Google. Everyone else uses an email address and a password."
+          :schema="credentials"
+          :fields="credentialFields"
+          :providers="providers"
+          :submit="{ label: 'Sign in' }"
+          @submit="signIn"
+        >
+          <template #title>
+            <h1 class="nnt-headline text-xl text-highlighted">
+              Sign in
+            </h1>
+          </template>
+          <template #footer>
+            <div class="flex flex-col items-start gap-1">
+              <UButton
+                v-if="isSupported"
+                icon="i-lucide-fingerprint"
+                color="neutral"
+                variant="subtle"
+                class="mb-3 self-stretch justify-center"
+                :loading="passkeyWorking"
+                data-test="passkey-sign-in"
+                @click="signInWithPasskey"
+              >
+                Use a passkey
+              </UButton>
+              <UButton
+                variant="link"
+                class="px-0"
+                @click="step = 'forgot'"
+              >
+                I have forgotten my password
+              </UButton>
+              <UButton
+                variant="link"
+                class="px-0"
+                data-test="resend-verification"
+                @click="step = 'resend'"
+              >
+                I did not get my confirmation email
+              </UButton>
+              <UButton
+                variant="link"
+                class="px-0"
+                to="/register"
+              >
+                I do not have an account yet
+              </UButton>
+            </div>
+          </template>
+        </UAuthForm>
+
+        <UAuthForm
+          v-else-if="step === 'forgot'"
+          title="Forgotten password"
+          description="We will send a link to set a new one."
+          :schema="addressOnly"
+          :fields="addressField"
+          :submit="{ label: 'Send a reset link' }"
+          @submit="ask('/api/auth/password/forgot', $event)"
+        >
+          <template #title>
+            <h1 class="nnt-headline text-xl text-highlighted">
+              Forgotten password
+            </h1>
+          </template>
+          <template #footer>
+            <div class="flex flex-col items-start gap-1">
+              <UButton
+                variant="link"
+                class="px-0"
+                @click="step = 'link'"
+              >
+                Email me a sign-in link instead
+              </UButton>
+              <UButton
+                variant="link"
+                class="px-0"
+                @click="step = 'credentials'"
+              >
+                Back to signing in
+              </UButton>
+            </div>
+          </template>
+        </UAuthForm>
+
+        <UAuthForm
+          v-else-if="step === 'link'"
+          title="Sign-in link"
+          description="We will email a link that signs you in without a password."
+          :schema="addressOnly"
+          :fields="addressField"
+          :submit="{ label: 'Send a sign-in link' }"
+          @submit="ask('/api/auth/magic-link/request', $event)"
+        >
+          <template #title>
+            <h1 class="nnt-headline text-xl text-highlighted">
+              Sign-in link
+            </h1>
+          </template>
+          <template #footer>
             <UButton
               variant="link"
               class="px-0"
@@ -210,68 +255,53 @@ useSeoMeta({ title: 'Sign in' })
             >
               Back to signing in
             </UButton>
-          </div>
-        </template>
-      </UAuthForm>
+          </template>
+        </UAuthForm>
 
-      <UAuthForm
-        v-else-if="step === 'link'"
-        title="Sign-in link"
-        description="We will email a link that signs you in without a password."
-        :schema="addressOnly"
-        :fields="addressField"
-        :submit="{ label: 'Send a sign-in link' }"
-        @submit="ask('/api/auth/magic-link/request', $event)"
-      >
-        <template #footer>
-          <UButton
-            variant="link"
-            class="px-0"
-            @click="step = 'credentials'"
-          >
-            Back to signing in
-          </UButton>
-        </template>
-      </UAuthForm>
+        <UAuthForm
+          v-else-if="step === 'resend'"
+          title="Confirm your address"
+          description="An account cannot be signed into until its address is confirmed. We will send the link again."
+          :schema="addressOnly"
+          :fields="addressField"
+          :submit="{ label: 'Send the link again' }"
+          @submit="ask('/api/auth/verify/resend', $event)"
+        >
+          <template #title>
+            <h1 class="nnt-headline text-xl text-highlighted">
+              Confirm your address
+            </h1>
+          </template>
+          <template #footer>
+            <UButton
+              variant="link"
+              class="px-0"
+              @click="step = 'credentials'"
+            >
+              Back to signing in
+            </UButton>
+          </template>
+        </UAuthForm>
 
-      <UAuthForm
-        v-else-if="step === 'resend'"
-        title="Confirm your address"
-        description="An account cannot be signed into until its address is confirmed. We will send the link again."
-        :schema="addressOnly"
-        :fields="addressField"
-        :submit="{ label: 'Send the link again' }"
-        @submit="ask('/api/auth/verify/resend', $event)"
-      >
-        <template #footer>
-          <UButton
-            variant="link"
-            class="px-0"
-            @click="step = 'credentials'"
-          >
-            Back to signing in
-          </UButton>
-        </template>
-      </UAuthForm>
+        <MfaChallenge
+          v-else-if="step === 'challenge'"
+          :attempt-id="attemptId"
+          @answered="signedIn"
+        />
 
-      <MfaChallenge
-        v-else-if="step === 'challenge'"
-        :attempt-id="attemptId"
-        @answered="signedIn"
-      />
-
-      <div
-        v-else
-        data-test="check-your-email"
-        class="space-y-2"
-      >
-        <h1 class="nnt-headline text-xl">
-          Check your email
-        </h1>
-        <p class="text-muted">
-          {{ sent }}
-        </p>
-      </div>
-    </UPageCard>
-  </UContainer>
+        <div
+          v-else
+          data-test="check-your-email"
+          class="space-y-2"
+        >
+          <h1 class="nnt-headline text-xl">
+            Check your email
+          </h1>
+          <p class="text-muted">
+            {{ sent }}
+          </p>
+        </div>
+      </UPageCard>
+    </UContainer>
+  </div>
 </template>

@@ -340,4 +340,65 @@ describe.skipIf(skip !== null)('the links that arrive by email (A-107, A-108)', 
   }, CASE_TIMEOUT_MS)
 })
 
+// Issue 925: signed in, both pages rendered their full form under the signed-in header, inviting
+// a second account by mistake. Issue 917 item 4: neither page had a heading at all.
+describe.skipIf(skip !== null)('the two ways in are headed, and closed to somebody already through', () => {
+  for (const path of ['/sign-in', '/register']) {
+    test(`${path} carries exactly one h1`, async () => {
+      const view = await open(path)
+      try {
+        await waitFor(view, 'document.querySelector(\'form\')')
+        const headings = await view.evaluate<string>(`JSON.stringify(
+          [...document.querySelectorAll('main h1')].map(heading => heading.innerText.trim()))`)
+        const found = JSON.parse(headings) as string[]
+        expect(found.length).toBe(1)
+        expect(found[0]!.length).toBeGreaterThan(2)
+      }
+      finally {
+        view.close()
+      }
+    }, CASE_TIMEOUT_MS)
+  }
+
+  test('a signed-in visitor opening either page is sent on rather than shown the form', async () => {
+    const email = await registerFresh('already-in')
+    const view = await open('/sign-in')
+    try {
+      await fill(view, SIGN_IN_FORM, email)
+      await fill(view, PASSWORD_FIELD, password)
+      await click(view, SUBMIT)
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
+
+      for (const path of ['/sign-in', '/register']) {
+        await visit(view, `${app.baseURL}${path}`)
+        await waitFor(view, `!location.pathname.startsWith(${JSON.stringify(path)})`)
+        expect(await view.evaluate<number>('document.querySelectorAll(\'form input[type="password"]\').length')).toBe(0)
+      }
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the redirect honours a next path, and refuses one pointing off this site', async () => {
+    const email = await registerFresh('already-in-next')
+    const view = await open('/sign-in')
+    try {
+      await fill(view, SIGN_IN_FORM, email)
+      await fill(view, PASSWORD_FIELD, password)
+      await click(view, SUBMIT)
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
+
+      await visit(view, `${app.baseURL}/sign-in?next=%2Fwhats-on`)
+      await waitFor(view, 'location.pathname === "/whats-on"')
+
+      await visit(view, `${app.baseURL}/sign-in?next=https%3A%2F%2Fexample.org%2F`)
+      await waitFor(view, 'location.pathname === "/"')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
