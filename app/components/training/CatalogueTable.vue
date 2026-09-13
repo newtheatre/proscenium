@@ -60,12 +60,13 @@ const { search, conditions, sort, page, query, active, filtered, set, setSort, c
 const holder = { refresh: async () => {} }
 defineExpose({ refresh: () => holder.refresh() })
 
-const { data, status: loading, refresh } = await useAsyncData(
+const { data, status: loading, refresh, error } = await useAsyncData(
   'training-modules',
   () => request<Listing>('/api/admin/training/modules', { query: query.value }),
   { watch: [query], default: empty },
 )
 holder.refresh = refresh
+const failure = useListFailure(error, 'The catalogue could not be read.')
 
 const columns: TableColumn<CatalogueModule>[] = [
   {
@@ -137,6 +138,17 @@ const columns: TableColumn<CatalogueModule>[] = [
 
 <template>
   <div class="space-y-6">
+    <UAlert
+      v-if="failure"
+      data-test="load-failed"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-unplug"
+      :title="failure.message"
+      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
+    />
+
     <AdminToolbar
       v-model:search="search"
       :placeholder="trainingModulesList.search?.placeholder"
@@ -175,9 +187,11 @@ const columns: TableColumn<CatalogueModule>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ departments.length === 0
-            ? 'Add a department first: every module belongs to one.'
-            : filtered ? 'No module matches that.' : 'Nothing in the catalogue yet. Add a module and it starts as a draft.' }}
+          {{ failure
+            ? 'The catalogue could not be read.'
+            : departments.length === 0
+              ? 'Add a department first: every module belongs to one.'
+              : filtered ? 'No module matches that.' : 'Nothing in the catalogue yet. Add a module and it starts as a draft.' }}
         </p>
       </template>
     </UTable>

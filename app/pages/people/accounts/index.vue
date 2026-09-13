@@ -50,7 +50,7 @@ const { data: listing, status, error, refresh } = await useAsyncData(
 )
 
 const failure = ref<string | null>(null)
-const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The accounts could not be read.') : null))
+const listingFailure = useListFailure(error, 'The accounts could not be read.')
 
 // A banner's "show them" is the same question as the filter it names, asked through the URL.
 const show = (key: FieldKey<typeof accountsList>): void => set(key, { key, operator: 'is', values: ['true'] })
@@ -124,7 +124,8 @@ const columns: TableColumn<Account>[] = [
       data-test="listing-failure"
       color="error"
       variant="subtle"
-      :description="listingFailure"
+      :description="listingFailure.message"
+      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
     />
 
     <div
@@ -189,7 +190,7 @@ const columns: TableColumn<Account>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ filtered ? 'Nobody matches that.' : 'No accounts yet.' }}
+          {{ listingFailure ? listingFailure.message : filtered ? 'Nobody matches that.' : 'No accounts yet.' }}
         </p>
       </template>
     </UTable>

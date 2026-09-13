@@ -30,11 +30,12 @@ const failure = ref<string | null>(null)
 // Search, filter and sort live in the URL (K-129).
 const { search, conditions, sort, query, active, filtered, set, setSort, clear } = useListQuery(externalSpacesList)
 
-const { data, status, refresh } = await useAsyncData(
+const { data, status, refresh, error } = await useAsyncData(
   'other-rooms',
   () => request<{ items: Space[], total: number }>('/api/admin/rooms/external-spaces', { query: query.value }),
   { watch: [query], default: (): { items: Space[], total: number } => ({ items: [], total: 0 }) },
 )
+const listFailure = useListFailure(error, 'The rooms could not be read.')
 
 const { data: rules } = await useAsyncData(
   'other-rooms-purposes',
@@ -201,6 +202,17 @@ const columns: TableColumn<Space>[] = [
 <template>
   <div class="space-y-6">
     <UAlert
+      v-if="listFailure"
+      data-test="load-failed"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-unplug"
+      :title="listFailure.message"
+      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :actions="listFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listFailure.enrolPath, color: 'error' }] : []"
+    />
+
+    <UAlert
       v-if="failure"
       data-test="failure"
       color="error"
@@ -252,7 +264,7 @@ const columns: TableColumn<Space>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ filtered ? 'No room matches that.' : 'No rooms are listed here yet. Add one and members can ask for it by name.' }}
+          {{ listFailure ? 'The rooms could not be read.' : filtered ? 'No room matches that.' : 'No rooms are listed here yet. Add one and members can ask for it by name.' }}
         </p>
       </template>
     </UTable>

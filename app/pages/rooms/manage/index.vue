@@ -56,11 +56,12 @@ const request = useRequestFetch()
 // Search, filter and sort live in the URL (K-129).
 const { search, conditions, sort, query, active, filtered, set, setSort, clear } = useListQuery(roomsList)
 
-const { data: listing, status, refresh } = await useAsyncData(
+const { data: listing, status, refresh, error } = await useAsyncData(
   'rooms',
   () => request<Listing>('/api/admin/rooms', { query: query.value }),
   { watch: [query], default: (): Listing => ({ items: [], total: 0, estate: BLANK_ESTATE }) },
 )
+const failure = useListFailure(error, 'The rooms could not be read.')
 
 const estate = computed(() => listing.value.estate)
 
@@ -171,6 +172,17 @@ const columns: TableColumn<Room>[] = [
 <template>
   <div class="space-y-6">
     <UAlert
+      v-if="failure"
+      data-test="load-failed"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-unplug"
+      :title="failure.message"
+      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
+    />
+
+    <UAlert
       color="neutral"
       variant="subtle"
       icon="i-lucide-door-open"
@@ -224,7 +236,7 @@ const columns: TableColumn<Room>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ filtered ? 'No room matches that.' : 'No rooms yet. Add the first one and it appears on the calendar.' }}
+          {{ failure ? 'The rooms could not be read.' : filtered ? 'No room matches that.' : 'No rooms yet. Add the first one and it appears on the calendar.' }}
         </p>
       </template>
 

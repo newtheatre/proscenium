@@ -20,3 +20,9 @@ export function refusalStatus(error: unknown): number | undefined {
 export function needsReauthentication(error: unknown): boolean {
   return refusalData<{ reauthenticate?: boolean }>(error)?.reauthenticate === true
 }
+
+// Where to send a role that holds the permission but lacks the second factor it needs (A-112),
+// so that refusal reads as an enrolment step rather than a permission the officer never had (issue 897).
+export function enrolPath(error: unknown): string | null {
+  return refusalData<{ enrol?: string }>(error)?.enrol ?? null
+}
