@@ -95,159 +95,215 @@ function pickerOptions(all: ShowReference[], current: string | null): { label: s
 
 const categoryOptions = computed(() => pickerOptions(props.categories, copy.categoryId))
 const seasonOptions = computed(() => pickerOptions(props.seasons, copy.seasonId))
+
+// "Confirmed clear" and "nobody has looked" are two states, so the card never reads as nought
+// warnings when the truth is that nobody has assessed it (D-102 criterion 2).
+const saysWarnings = computed(() => {
+  if (props.show.warningCount > 0) return plural(props.show.warningCount, 'warning')
+  return props.show.warningsConfirmedNone ? 'Confirmed clear' : 'Not yet assessed'
+})
 </script>
 
 <template>
-  <UCard>
-    <UForm
-      :schema="showForm"
-      :state="copy"
-      class="space-y-4"
-      data-test="show-copy"
-      @submit="saveCopy"
-    >
-      <UAlert
-        v-if="failure"
-        data-test="failure"
-        color="error"
-        variant="subtle"
-        :description="failure"
-      />
+  <UForm
+    :schema="showForm"
+    :state="copy"
+    class="space-y-6"
+    data-test="show-copy"
+    @submit="saveCopy"
+  >
+    <UAlert
+      v-if="failure"
+      data-test="failure"
+      color="error"
+      variant="subtle"
+      :description="failure"
+    />
 
-      <div class="grid gap-4 sm:grid-cols-2">
+    <UCard data-test="basics-card">
+      <template #header>
+        <h3 class="font-semibold">
+          Basics
+        </h3>
+      </template>
+
+      <div class="space-y-4">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <UFormField
+            label="Title"
+            name="title"
+            required
+          >
+            <UInput
+              v-model="copy.title"
+              class="w-full"
+              data-test="copy-title"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Address"
+            name="slug"
+            required
+            description="The public page is /shows/ and this."
+          >
+            <UInput
+              v-model="copy.slug"
+              class="w-full"
+              data-test="copy-slug"
+            />
+          </UFormField>
+        </div>
+
         <UFormField
-          label="Title"
-          name="title"
-          required
+          label="Tagline"
+          name="subtitle"
+          hint="Optional"
+          description="One line, appears everywhere, so make it earn its place."
         >
           <UInput
-            v-model="copy.title"
+            v-model="copy.subtitle"
             class="w-full"
-            data-test="copy-title"
+            data-test="copy-tagline"
           />
         </UFormField>
 
         <UFormField
-          label="Address"
-          name="slug"
-          required
-          description="The public page is /shows/ and this."
+          label="Short description"
+          name="description"
+          hint="Optional"
+          description="What the listing shows beside the poster."
         >
-          <UInput
-            v-model="copy.slug"
+          <UTextarea
+            v-model="copy.description"
+            :rows="2"
             class="w-full"
-            data-test="copy-slug"
           />
         </UFormField>
-      </div>
 
-      <UFormField
-        label="Subtitle"
-        name="subtitle"
-        hint="Optional"
-      >
-        <UInput
-          v-model="copy.subtitle"
-          class="w-full"
-        />
-      </UFormField>
-
-      <UFormField
-        label="Short description"
-        name="description"
-        hint="Optional"
-        description="What the listing shows beside the poster."
-      >
-        <UTextarea
-          v-model="copy.description"
-          :rows="2"
-          class="w-full"
-        />
-      </UFormField>
-
-      <UFormField
-        label="Full description"
-        name="longDescription"
-        hint="Optional"
-      >
-        <UTextarea
-          v-model="copy.longDescription"
-          :rows="5"
-          class="w-full"
-        />
-      </UFormField>
-
-      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <UFormField
-          label="Age guidance"
-          name="ageGuidance"
+          label="Full description"
+          name="longDescription"
           hint="Optional"
         >
-          <UInput
-            v-model="copy.ageGuidance"
+          <UTextarea
+            v-model="copy.longDescription"
+            :rows="5"
             class="w-full"
-            data-test="copy-age"
           />
         </UFormField>
 
-        <UFormField
-          label="Latecomers"
-          name="latecomerPolicy"
-        >
-          <USelect
-            v-model="copy.latecomerPolicy"
-            :items="policyOptions"
-            class="w-full"
-            data-test="copy-latecomers"
-          />
-        </UFormField>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <UFormField
+            label="Category"
+            name="categoryId"
+          >
+            <USelect
+              v-model="copy.categoryId"
+              :items="categoryOptions"
+              class="w-full"
+              data-test="copy-category"
+            />
+          </UFormField>
 
-        <UFormField
-          label="Online booking closes"
-          name="bookingClosesHoursBefore"
-          description="Hours before curtain. Every performance inherits this unless it states its own. Leave it empty for curtain-up."
-        >
-          <UInputNumber
-            v-model="copy.bookingClosesHoursBefore"
-            :min="0"
-            :max="720"
-            class="w-full"
-            data-test="copy-window"
-          />
-        </UFormField>
-
-        <UFormField
-          label="Category"
-          name="categoryId"
-        >
-          <USelect
-            v-model="copy.categoryId"
-            :items="categoryOptions"
-            class="w-full"
-            data-test="copy-category"
-          />
-        </UFormField>
-
-        <UFormField
-          label="Season"
-          name="seasonId"
-        >
-          <USelect
-            v-model="copy.seasonId"
-            :items="seasonOptions"
-            class="w-full"
-            data-test="copy-season"
-          />
-        </UFormField>
+          <UFormField
+            label="Season"
+            name="seasonId"
+          >
+            <USelect
+              v-model="copy.seasonId"
+              :items="seasonOptions"
+              class="w-full"
+              data-test="copy-season"
+            />
+          </UFormField>
+        </div>
       </div>
+    </UCard>
 
-      <UButton
-        type="submit"
-        :loading="saving"
-        data-test="copy-submit"
-      >
-        Save the show
-      </UButton>
-    </UForm>
-  </UCard>
+    <UCard data-test="show-info-card">
+      <template #header>
+        <h3 class="font-semibold">
+          Show info card
+        </h3>
+        <p class="mt-1 text-sm text-muted">
+          Feeds the public page and the front of house screen. Fill it once, answer the questions never.
+        </p>
+      </template>
+
+      <div class="space-y-4">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <UFormField
+            label="Age guidance"
+            name="ageGuidance"
+            hint="Optional"
+          >
+            <UInput
+              v-model="copy.ageGuidance"
+              class="w-full"
+              data-test="copy-age"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Latecomers"
+            name="latecomerPolicy"
+          >
+            <USelect
+              v-model="copy.latecomerPolicy"
+              :items="policyOptions"
+              class="w-full"
+              data-test="copy-latecomers"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Online booking closes"
+            name="bookingClosesHoursBefore"
+            description="Hours before curtain. Every performance inherits this unless it states its own. Leave it empty for curtain-up."
+          >
+            <UInputNumber
+              v-model="copy.bookingClosesHoursBefore"
+              :min="0"
+              :max="720"
+              class="w-full"
+              data-test="copy-window"
+            />
+          </UFormField>
+
+          <UFormField label="Content warnings">
+            <div class="flex items-center gap-3">
+              <p
+                class="text-sm text-muted"
+                data-test="copy-warnings"
+              >
+                {{ saysWarnings }}
+              </p>
+              <UButton
+                color="neutral"
+                variant="link"
+                size="sm"
+                :to="{ query: { tab: 'warnings' } }"
+                data-test="copy-warnings-link"
+              >
+                Assess them
+              </UButton>
+            </div>
+          </UFormField>
+        </div>
+
+        <p class="text-sm text-muted">
+          Running time is stated per performance, beside the performance it belongs to.
+        </p>
+      </div>
+    </UCard>
+
+    <UButton
+      type="submit"
+      :loading="saving"
+      data-test="copy-submit"
+    >
+      Save the show
+    </UButton>
+  </UForm>
 </template>

@@ -135,6 +135,8 @@ const CATALOGUE = {
   'show.published': { label: 'Show published', module: 'ticketing' },
   'show.unpublished': { label: 'Show taken off the public site', module: 'ticketing' },
   'show.deleted': { label: 'Show deleted', module: 'ticketing' },
+  'show.poster.uploaded': { label: 'Show poster uploaded', module: 'ticketing' },
+  'show.poster.removed': { label: 'Show poster removed', module: 'ticketing' },
   'performance.created': { label: 'Performance added', module: 'ticketing' },
   'performance.updated': { label: 'Performance changed', module: 'ticketing' },
   'performance.on-sale': { label: 'Performance put on sale', module: 'ticketing' },

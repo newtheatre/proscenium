@@ -8,10 +8,29 @@ const props = defineProps<{ show: AdminShow }>()
 </script>
 
 <template>
-  <div data-test="show-prices">
-    <TicketPrices
-      level="show"
-      :endpoint="`/api/admin/shows/${props.show.id}/prices`"
-    />
-  </div>
+  <UCard data-test="pricing-card">
+    <template #header>
+      <h3 class="font-semibold">
+        Pricing
+      </h3>
+    </template>
+
+    <div
+      class="space-y-4"
+      data-test="show-prices"
+    >
+      <TicketPrices
+        level="show"
+        :endpoint="`/api/admin/shows/${props.show.id}/prices`"
+      />
+
+      <UAlert
+        icon="i-lucide-hand-coins"
+        color="info"
+        variant="subtle"
+        data-test="reservation-only"
+        description="Reservation only: patrons pay at the box office or the bar, on the Students' Union card reader. No online payment is configured anywhere."
+      />
+    </div>
+  </UCard>
 </template>

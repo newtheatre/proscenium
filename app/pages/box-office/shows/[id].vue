@@ -134,6 +134,17 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
             {{ saysShowStatus(show.status) }}
           </UBadge>
           <UButton
+            v-if="show.status === 'PUBLISHED'"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-external-link"
+            :to="`/shows/${show.slug}`"
+            target="_blank"
+            data-test="preview-public"
+          >
+            Preview public page
+          </UButton>
+          <UButton
             v-if="show.status === 'DRAFT'"
             data-test="publish"
             icon="i-lucide-globe"
@@ -141,71 +152,73 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
           >
             Publish
           </UButton>
-          <UButton
-            v-else
-            color="neutral"
-            variant="outline"
-            data-test="unpublish"
-            @click="setPublished(false)"
-          >
-            Take off the site
-          </UButton>
-          <UButton
-            v-if="show.soldTickets === 0"
-            color="error"
-            variant="ghost"
-            data-test="delete-show"
-            @click="removingShow = true"
-          >
-            Delete
-          </UButton>
         </div>
       </div>
 
       <BoxOfficeShowStatusStrip :show="show" />
 
-      <UTabs
-        v-model="active"
-        :content="false"
-        :items="SHOW_TABS"
-        :ui="{ label: 'hidden sm:inline' }"
-        class="w-full"
-        data-test="show-tabs"
-      />
+      <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div class="space-y-6">
+          <UTabs
+            v-model="active"
+            :content="false"
+            :items="SHOW_TABS"
+            :ui="{ label: 'hidden sm:inline' }"
+            class="w-full"
+            data-test="show-tabs"
+          />
 
-      <BoxOfficeShowDetails
-        v-if="active === 'details'"
-        :show="show"
-        :categories="categories"
-        :seasons="seasons"
-        @saved="refresh()"
-      />
+          <BoxOfficeShowDetails
+            v-if="active === 'details'"
+            :show="show"
+            :categories="categories"
+            :seasons="seasons"
+            @saved="refresh()"
+          />
 
-      <BoxOfficeShowPerformances
-        v-else-if="active === 'performances'"
-        :show="show"
-        :venues="venues"
-        @changed="refresh()"
-      />
+          <BoxOfficeShowPerformances
+            v-else-if="active === 'performances'"
+            :show="show"
+            :venues="venues"
+            @changed="refresh()"
+          />
 
-      <BoxOfficeShowTicketTypes
-        v-else-if="active === 'ticket-types'"
-        :show="show"
-      />
+          <BoxOfficeShowTicketTypes
+            v-else-if="active === 'ticket-types'"
+            :show="show"
+          />
 
-      <BoxOfficeShowWarnings
-        v-else-if="active === 'warnings'"
-        :show-id="show.id"
-        :warnings="warnings"
-        :vocabulary="vocabulary"
-        :confirmed-none="show.warningsConfirmedNone"
-        @saved="refresh()"
-      />
+          <BoxOfficeShowWarnings
+            v-else-if="active === 'warnings'"
+            :show-id="show.id"
+            :warnings="warnings"
+            :vocabulary="vocabulary"
+            :confirmed-none="show.warningsConfirmedNone"
+            @saved="refresh()"
+          />
 
-      <BoxOfficeShowSales
-        v-else
-        :performances="performances"
-      />
+          <BoxOfficeShowSales
+            v-else
+            :performances="performances"
+          />
+        </div>
+
+        <!-- Always in view whichever section is open: the poster, what is still outstanding and
+             the two actions that take a show away from the public (D-132 criteria 6 to 8). -->
+        <div class="space-y-6">
+          <BoxOfficeShowPoster
+            :show="show"
+            @changed="refresh()"
+          />
+          <BoxOfficeShowChecklist :show="show" />
+          <BoxOfficeShowDangerZone
+            :show="show"
+            :busy="saving"
+            @unpublish="setPublished(false)"
+            @remove="removingShow = true"
+          />
+        </div>
+      </div>
     </template>
 
     <UModal
