@@ -92,6 +92,7 @@ async function signedInView(): Promise<Bun.WebView> {
 describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
   const PUBLIC = [
     { name: 'the home page', path: '/', marker: 'main' },
+    { name: 'the listing', path: '/whats-on', marker: '[data-test="whats-on-page"]' },
     { name: 'signing in', path: '/sign-in', marker: 'form' },
     { name: 'registering', path: '/register', marker: 'form' },
     // K-102 criterion 3: the show-night shell is dark by default and still clears AA contrast.
