@@ -162,9 +162,9 @@ export default defineNuxtConfig({
             binding: 'DB',
             database_name: 'unified',
             database_id: '02c35a27-b6dc-47b0-8d9b-7a526324aca1',
-            // NuxtHub's default resolves to a directory with no `.sql` files, so wrangler
-            // reports "No migrations to apply!" and exits 0. Set it explicitly.
-            migrations_dir: 'server/db/migrations/sqlite',
+            // NuxtHub's default has no SQL; Wrangler resolves this from .output/server,
+            // where the build copies db/migrations/sqlite.
+            migrations_dir: 'db/migrations/sqlite',
           },
         ],
         observability: {

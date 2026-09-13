@@ -63,6 +63,10 @@ The job, in order:
 4. **Re-reads `_hub_migrations` and fails if anything is still pending.** Whatever the CLI
    claimed, the ledger is the truth.
 
+For a local Workers-runtime reproduction, `bun run build` emits `.output/server/wrangler.json`.
+Its D1 migration path is `db/migrations/sqlite`, resolved from `.output/server`, where the build
+copies the SQL that Wrangler applies under `--local`.
+
 ### When it fails
 
 The run summary carries the restore command, of the form:
