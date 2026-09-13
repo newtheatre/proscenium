@@ -1,7 +1,10 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { containsPattern } from './list-filters'
+import { aliasColumns, whereFrom } from './list-filters'
+import { seasonsList } from '#shared/utils/seasons-list'
 import type { SQL } from 'drizzle-orm'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { AdminSeason } from '#shared/utils/seasons'
 
 // Reading seasons. "In use" is a show naming this season, never a flag on the row (D-131
@@ -35,33 +38,30 @@ interface SeasonRow extends Omit<AdminSeason, 'archived' | 'inUse'> {
 
 const read = (row: SeasonRow): AdminSeason => ({ ...row, archived: row.archived === 1, inUse: row.inUse === 1 })
 
-export interface SeasonFilters {
-  includeArchived: boolean
-  search?: string
+export function seasonsClause(query: ListQuery): ListClause {
+  return whereFrom(seasonsList, query, {
+    column: aliasColumns('s'),
+    search: [sql`s.name`],
+  })
 }
 
-function predicate(filters: SeasonFilters): SQL {
-  const terms: SQL[] = []
-  if (!filters.includeArchived) terms.push(sql`archived = 0`)
-  if (filters.search) terms.push(sql`name LIKE ${containsPattern(filters.search)} ESCAPE '\\'`)
-  return terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``
-}
+const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
 
-export function seasonsQuery(filters: SeasonFilters, limit: number, offset: number): SQL {
+export function seasonsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT ${COLUMNS}, ${inUseColumn('s')} AS inUse
-    FROM seasons s${predicate(filters)}
-    ORDER BY s.archived, s.sort, s.name COLLATE NOCASE
+    FROM seasons s${predicate(clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function listSeasonsAdmin(filters: SeasonFilters, limit: number, offset: number): Promise<AdminSeason[]> {
-  return (await db.all<SeasonRow>(seasonsQuery(filters, limit, offset))).map(read)
+export async function listSeasonsAdmin(clause: ListClause, limit: number, offset: number): Promise<AdminSeason[]> {
+  return (await db.all<SeasonRow>(seasonsQuery(clause, limit, offset))).map(read)
 }
 
-export async function countSeasonsAdmin(filters: SeasonFilters): Promise<number> {
-  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM seasons${predicate(filters)}`)
+export async function countSeasonsAdmin(clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM seasons s${predicate(clause)}`)
   return Number(row?.total ?? 0)
 }
 

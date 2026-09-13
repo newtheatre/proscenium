@@ -1,6 +1,10 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { aliasColumns, whereFrom } from './list-filters'
+import { passTypesList } from '#shared/utils/pass-types-list'
 import type { SQL } from 'drizzle-orm'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { PassType, PassTypeStatus } from '#shared/utils/pass-types'
 
 // "Ever issued" and "live coverage" (D-123 criteria 3 and 4) have no real answer until D-124
@@ -136,38 +140,33 @@ const COLUMNS = sql`
   ), '[]') AS showIdsJson
 `
 
-export interface PassTypeFilters {
-  status?: PassTypeStatus
-  search?: string
+export function passTypesClause(query: ListQuery): ListClause {
+  return whereFrom(passTypesList, query, {
+    column: aliasColumns('t'),
+    search: [sql`t.name`],
+  })
 }
 
-const contains = (term: string): string => `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
+// The reserved slug D-130's committee-awarded entitlement uses is nobody's to browse to and put
+// on sale from this screen: excluded from the listing, not protected against a direct id.
+const predicate = (clause: ListClause): SQL =>
+  sql` WHERE ${sql.join([sql`t.slug != 'fellowship'`, ...(clause.where ? [clause.where] : [])], sql` AND `)}`
 
-// Two bound parameters at most, whatever the filters and however many pass types there are (0003).
-function predicate(filters: PassTypeFilters): SQL {
-  // The reserved slug D-130's committee-awarded entitlement uses is nobody's to browse to and
-  // put on sale from this screen: excluded from the listing, not protected against a direct id.
-  const terms: SQL[] = [sql`t.slug != 'fellowship'`]
-  if (filters.status) terms.push(sql`t.status = ${filters.status}`)
-  if (filters.search) terms.push(sql`t.name LIKE ${contains(filters.search)} ESCAPE '\\'`)
-  return sql` WHERE ${sql.join(terms, sql` AND `)}`
-}
-
-export function passTypesQuery(filters: PassTypeFilters, limit: number, offset: number, references = issuedReferences()): SQL {
+export function passTypesQuery(clause: ListClause, limit: number, offset: number, references = issuedReferences()): SQL {
   return sql`
     SELECT ${COLUMNS}, ${everIssuedColumn('t', references)} AS everIssued
-    FROM pass_types t${predicate(filters)}
-    ORDER BY t.status, t.name COLLATE NOCASE
+    FROM pass_types t${predicate(clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function listPassTypes(filters: PassTypeFilters, limit: number, offset: number): Promise<PassType[]> {
-  return (await db.all<PassTypeRow>(passTypesQuery(filters, limit, offset))).map(read)
+export async function listPassTypes(clause: ListClause, limit: number, offset: number): Promise<PassType[]> {
+  return (await db.all<PassTypeRow>(passTypesQuery(clause, limit, offset))).map(read)
 }
 
-export async function countPassTypes(filters: PassTypeFilters): Promise<number> {
-  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM pass_types t${predicate(filters)}`)
+export async function countPassTypes(clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM pass_types t${predicate(clause)}`)
   return Number(row?.total ?? 0)
 }
 

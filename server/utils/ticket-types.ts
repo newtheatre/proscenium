@@ -3,8 +3,11 @@ import { sql } from 'drizzle-orm'
 // Safe to import at runtime: `capacity.ts` only imports types from this file, so no cycle exists
 // the way one would if this pulled a constant back from `programme.ts` (see that file's note).
 import { TICKETS_ARE_A_SALE } from './capacity'
-import { containsPattern } from './list-filters'
+import { aliasColumns, whereFrom } from './list-filters'
+import { ticketTypesList } from '#shared/utils/ticket-types-list'
 import type { SQL } from 'drizzle-orm'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { TicketType } from '#shared/utils/ticket-types'
 
 // Reading ticket types, and the one predicate D-119 criterion 2 turns on. "Has ever been sold" is
@@ -84,38 +87,33 @@ const read = (row: TicketTypeRow): TicketType => ({
   everSold: row.everSold === 1,
 })
 
-export interface TicketTypeFilters {
-  includeArchived: boolean
-  search?: string
+export function ticketTypesClause(query: ListQuery): ListClause {
+  return whereFrom(ticketTypesList, query, {
+    column: aliasColumns('t'),
+    search: [sql`t.name`],
+  })
 }
 
-// Two bound parameters at most, whatever the filters and however many types there are (0003).
-function predicate(filters: TicketTypeFilters): SQL {
-  // The system row D-125's redemption ensures the first time any pass is redeemed is nobody's
-  // to administer: this screen sells and archives SINGLE rows, never a pass's own admission type.
-  const terms: SQL[] = [sql`kind = 'SINGLE'`]
-  if (!filters.includeArchived) terms.push(sql`archived = 0`)
-  // SQLite's LIKE is case-insensitive over ASCII already, and a COLLATE here would bind to the
-  // escape character rather than to the comparison.
-  if (filters.search) terms.push(sql`name LIKE ${containsPattern(filters.search)} ESCAPE '\\'`)
-  return terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``
-}
+// The system row D-125's redemption ensures the first time any pass is redeemed is nobody's to
+// administer: this screen sells and archives SINGLE rows, never a pass's own admission type.
+const predicate = (clause: ListClause): SQL =>
+  sql` WHERE ${sql.join([sql`kind = 'SINGLE'`, ...(clause.where ? [clause.where] : [])], sql` AND `)}`
 
-export function ticketTypesQuery(filters: TicketTypeFilters, limit: number, offset: number): SQL {
+export function ticketTypesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT ${COLUMNS}, ${everSoldColumn('t')} AS everSold
-    FROM ticket_types t${predicate(filters)}
-    ORDER BY t.archived, t.name COLLATE NOCASE
+    FROM ticket_types t${predicate(clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function listTicketTypes(filters: TicketTypeFilters, limit: number, offset: number): Promise<TicketType[]> {
-  return (await db.all<TicketTypeRow>(ticketTypesQuery(filters, limit, offset))).map(read)
+export async function listTicketTypes(clause: ListClause, limit: number, offset: number): Promise<TicketType[]> {
+  return (await db.all<TicketTypeRow>(ticketTypesQuery(clause, limit, offset))).map(read)
 }
 
-export async function countTicketTypes(filters: TicketTypeFilters): Promise<number> {
-  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM ticket_types${predicate(filters)}`)
+export async function countTicketTypes(clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM ticket_types t${predicate(clause)}`)
   return Number(row?.total ?? 0)
 }
 

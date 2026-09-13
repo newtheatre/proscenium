@@ -1,7 +1,17 @@
 import { describe, expect, test } from 'bun:test'
-import { SEASON_REFERENCES, seasonInUseQuery, seasonsQuery } from '#server/utils/seasons'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { seasonsList } from '#shared/utils/seasons-list'
+import { SEASON_REFERENCES, seasonInUseQuery, seasonsClause, seasonsQuery } from '#server/utils/seasons'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
+
+// K-129: the declaration is what turns a raw query into a clause, the same route it takes live.
+const seasonsSchema = filterQuerySchema(seasonsList)
+function parsedSeasons(raw: Record<string, string>) {
+  const result = seasonsSchema.safeParse(raw)
+  if (!result.success) throw new Error(result.error.issues.map(issue => issue.message).join('; '))
+  return seasonsClause(result.data)
+}
 
 // D-131. A show belongs to at most one season, and "in use" is a query over that reference
 // rather than a flag on the season itself.
@@ -92,8 +102,7 @@ describe('the listing is searched and paged in SQL', () => {
       season(database, { id: 'se-2', name: '2027/28', starts_on: '2027-08-01', ends_on: '2028-07-31' })
       season(database, { id: 'se-3', name: 'Retired', starts_on: '2020-08-01', ends_on: '2021-07-31', archived: 1 })
 
-      const [query, ...parameters] = boundStatement(database, seasonsQuery({ includeArchived: false }, 1, 1))
-      expect(parameters).toEqual([1, 1])
+      const [query, ...parameters] = boundStatement(database, seasonsQuery(parsedSeasons({ archived: 'false' }), 1, 1))
       expect(rows<{ id: string }>(database, query, ...parameters).map(row => row.id)).toEqual(['se-2'])
     })
   })

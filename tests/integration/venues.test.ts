@@ -1,7 +1,17 @@
 import { describe, expect, test } from 'bun:test'
-import { VENUE_REFERENCES, venueInUseQuery, venuesQuery } from '#server/utils/venues'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { venuesList } from '#shared/utils/venues-list'
+import { VENUE_REFERENCES, venueInUseQuery, venuesClause, venuesQuery } from '#server/utils/venues'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
+
+// K-129: the declaration is what turns a raw query into a clause, the same route it takes live.
+const venuesSchema = filterQuerySchema(venuesList)
+function parsedVenues(raw: Record<string, string>) {
+  const result = venuesSchema.safeParse(raw)
+  if (!result.success) throw new Error(result.error.issues.map(issue => issue.message).join('; '))
+  return venuesClause(result.data)
+}
 
 // D-131. "In use" is the criterion the retire-versus-delete distinction turns on, and it is a
 // question about rows in other tables rather than a flag on this one (echoing D-119).
@@ -111,15 +121,14 @@ describe('"in use" is a query over rows, never a flag (criterion 4)', () => {
   })
 })
 
-describe('the listing is searched and paged in SQL', () => {
-  test('a search matches without regard to capitals and binds two parameters', async () => {
+describe('the listing is searched, filtered and paged in SQL', () => {
+  test('a search matches without regard to capitals, combined with the retired filter by AND', async () => {
     await withDatabase((database) => {
       venue(database)
       venue(database, { id: 'v-2', name: 'The Studio' })
       venue(database, { id: 'v-3', name: 'Retired room', archived: 1 })
 
-      const [query, ...parameters] = boundStatement(database, venuesQuery({ includeArchived: false, search: 'the' }, 25, 0))
-      expect(parameters).toEqual(['%the%', 25, 0])
+      const [query, ...parameters] = boundStatement(database, venuesQuery(parsedVenues({ archived: 'false', search: 'the' }), 25, 0))
       expect(rows<{ id: string }>(database, query, ...parameters).map(row => row.id).sort()).toEqual(['v-1', 'v-2'])
     })
   })
@@ -131,9 +140,18 @@ describe('the listing is searched and paged in SQL', () => {
       venue(database, { id: 'v-3', name: 'Retired room', archived: 1 })
 
       // Ordered by name: "The Studio" sorts before "The Theatre", so offset 1 lands on the latter.
-      const [query, ...parameters] = boundStatement(database, venuesQuery({ includeArchived: false }, 1, 1))
-      expect(parameters).toEqual([1, 1])
+      const [query, ...parameters] = boundStatement(database, venuesQuery(parsedVenues({ archived: 'false' }), 1, 1))
       expect(rows<{ id: string }>(database, query, ...parameters).map(row => row.id)).toEqual(['v-1'])
+    })
+  })
+
+  test('no filter shows every venue, retired included', async () => {
+    await withDatabase((database) => {
+      venue(database)
+      venue(database, { id: 'v-2', name: 'Retired room', archived: 1 })
+
+      const [query, ...parameters] = boundStatement(database, venuesQuery(parsedVenues({}), 25, 0))
+      expect(rows<{ id: string }>(database, query, ...parameters).map(row => row.id).sort()).toEqual(['v-1', 'v-2'])
     })
   })
 })
@@ -146,7 +164,7 @@ describe('the listing column agrees with the single-row question', () => {
       insert(database, 'shows', { id: 's-1', slug: 'the-seagull', title: 'The Seagull' })
       insert(database, 'performances', { id: 'p-1', show_id: 's-1', venue_id: held, starts_at: 0 })
 
-      const [query, ...parameters] = boundStatement(database, venuesQuery({ includeArchived: true }, 25, 0))
+      const [query, ...parameters] = boundStatement(database, venuesQuery(parsedVenues({}), 25, 0))
       const listed = rows<{ id: string, inUse: number }>(database, query, ...parameters)
       expect(listed.find(row => row.id === free)?.inUse).toBe(0)
       expect(listed.find(row => row.id === held)?.inUse).toBe(1)

@@ -1,7 +1,10 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { containsPattern } from './list-filters'
+import { aliasColumns, whereFrom } from './list-filters'
+import { venuesList } from '#shared/utils/venues-list'
 import type { SQL } from 'drizzle-orm'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { AdminVenue } from '#shared/utils/venues'
 
 // Reading venues, and the one predicate D-131 criterion 4 turns on. "In use" is a question about
@@ -81,34 +84,30 @@ const read = (row: VenueRow): AdminVenue => ({
   inUse: row.inUse === 1,
 })
 
-export interface VenueFilters {
-  includeArchived: boolean
-  search?: string
+export function venuesClause(query: ListQuery): ListClause {
+  return whereFrom(venuesList, query, {
+    column: aliasColumns('v'),
+    search: [sql`v.name`],
+  })
 }
 
-// Two bound parameters at most, whatever the filters and however many venues there are (0003).
-function predicate(filters: VenueFilters): SQL {
-  const terms: SQL[] = []
-  if (!filters.includeArchived) terms.push(sql`archived = 0`)
-  if (filters.search) terms.push(sql`name LIKE ${containsPattern(filters.search)} ESCAPE '\\'`)
-  return terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``
-}
+const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
 
-export function venuesQuery(filters: VenueFilters, limit: number, offset: number): SQL {
+export function venuesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT ${COLUMNS}, ${venueInUseColumn('v')} AS inUse
-    FROM venues v${predicate(filters)}
-    ORDER BY v.archived, v.name COLLATE NOCASE
+    FROM venues v${predicate(clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function listVenuesAdmin(filters: VenueFilters, limit: number, offset: number): Promise<AdminVenue[]> {
-  return (await db.all<VenueRow>(venuesQuery(filters, limit, offset))).map(read)
+export async function listVenuesAdmin(clause: ListClause, limit: number, offset: number): Promise<AdminVenue[]> {
+  return (await db.all<VenueRow>(venuesQuery(clause, limit, offset))).map(read)
 }
 
-export async function countVenuesAdmin(filters: VenueFilters): Promise<number> {
-  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM venues${predicate(filters)}`)
+export async function countVenuesAdmin(clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM venues v${predicate(clause)}`)
   return Number(row?.total ?? 0)
 }
 

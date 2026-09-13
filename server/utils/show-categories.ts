@@ -1,7 +1,10 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { containsPattern } from './list-filters'
+import { aliasColumns, whereFrom } from './list-filters'
+import { showCategoriesList } from '#shared/utils/show-categories-list'
 import type { SQL } from 'drizzle-orm'
+import type { ListClause } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
 import type { AdminShowCategory } from '#shared/utils/show-categories'
 
 // Reading show categories. "In use" is a show naming this category, never a flag on the row
@@ -33,33 +36,30 @@ interface ShowCategoryRow extends Omit<AdminShowCategory, 'archived' | 'inUse'> 
 
 const read = (row: ShowCategoryRow): AdminShowCategory => ({ ...row, archived: row.archived === 1, inUse: row.inUse === 1 })
 
-export interface ShowCategoryFilters {
-  includeArchived: boolean
-  search?: string
+export function showCategoriesClause(query: ListQuery): ListClause {
+  return whereFrom(showCategoriesList, query, {
+    column: aliasColumns('c'),
+    search: [sql`c.name`],
+  })
 }
 
-function predicate(filters: ShowCategoryFilters): SQL {
-  const terms: SQL[] = []
-  if (!filters.includeArchived) terms.push(sql`archived = 0`)
-  if (filters.search) terms.push(sql`name LIKE ${containsPattern(filters.search)} ESCAPE '\\'`)
-  return terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``
-}
+const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
 
-export function showCategoriesQuery(filters: ShowCategoryFilters, limit: number, offset: number): SQL {
+export function showCategoriesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT ${COLUMNS}, ${inUseColumn('c')} AS inUse
-    FROM show_categories c${predicate(filters)}
-    ORDER BY c.archived, c.sort, c.name COLLATE NOCASE
+    FROM show_categories c${predicate(clause)}
+    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function listShowCategoriesAdmin(filters: ShowCategoryFilters, limit: number, offset: number): Promise<AdminShowCategory[]> {
-  return (await db.all<ShowCategoryRow>(showCategoriesQuery(filters, limit, offset))).map(read)
+export async function listShowCategoriesAdmin(clause: ListClause, limit: number, offset: number): Promise<AdminShowCategory[]> {
+  return (await db.all<ShowCategoryRow>(showCategoriesQuery(clause, limit, offset))).map(read)
 }
 
-export async function countShowCategoriesAdmin(filters: ShowCategoryFilters): Promise<number> {
-  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM show_categories${predicate(filters)}`)
+export async function countShowCategoriesAdmin(clause: ListClause): Promise<number> {
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM show_categories c${predicate(clause)}`)
   return Number(row?.total ?? 0)
 }
 

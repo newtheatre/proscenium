@@ -1,19 +1,16 @@
-import { z } from 'zod'
-import { MAX_SEASON_NAME } from '#shared/utils/seasons'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { seasonsList } from '#shared/utils/seasons-list'
 
-const query = pageQuery.extend({
-  includeArchived: yesOrNo.default(true),
-  search: z.string().trim().max(MAX_SEASON_NAME).optional(),
-})
+const query = filterQuerySchema(seasonsList)
 
-// Every season, with whether a show belongs to it.
+// Every season, with whether a show belongs to it, filtered and ordered by its declaration (K-129).
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'ticketing.read')
-  const { page, pageSize, includeArchived, search } = await getValidatedQueryOrThrow(event, query)
-  const filters = { includeArchived, search: search || undefined }
+  const input = await getValidatedQueryOrThrow(event, query)
+  const clause = seasonsClause(input)
 
-  const total = await countSeasonsAdmin(filters)
-  const items = await listSeasonsAdmin(filters, pageSize, offsetFor(page, pageSize))
+  const total = await countSeasonsAdmin(clause)
+  const items = await listSeasonsAdmin(clause, input.pageSize, offsetFor(input.page, input.pageSize))
 
-  return envelope(items, total, page, pageSize)
+  return envelope(items, total, input.page, input.pageSize)
 })

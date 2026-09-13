@@ -5,7 +5,7 @@ import {
   contentWarningForm,
   saysWarningKind,
 } from '#shared/utils/content-warnings'
-import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import { contentWarningsList } from '#shared/utils/content-warnings-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { ContentWarning, ContentWarningKind } from '#shared/utils/content-warnings'
 
@@ -16,9 +16,6 @@ const UButton = resolveComponent('UButton')
 
 const request = useRequestFetch()
 const toast = useToast()
-const search = ref('')
-const includeArchived = ref(true)
-const page = ref(1)
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
@@ -26,18 +23,14 @@ interface Listing { items: ContentWarning[], total: number, pageSize: number, pa
 
 const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
+// Search, filters, sort and page live in the URL (K-129); the list refetches when any changes.
+const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(contentWarningsList)
+
 const { data, status, error, refresh } = await useAsyncData(
   'content-warnings',
-  () => request<Listing>('/api/admin/content-warnings', {
-    query: { includeArchived: includeArchived.value, search: search.value.trim() || undefined, page: page.value },
-  }),
-  { watch: [page], default: empty },
+  () => request<Listing>('/api/admin/content-warnings', { query: query.value }),
+  { watch: [query], default: empty },
 )
-
-watch([search, includeArchived], () => {
-  if (page.value === 1) void refresh()
-  else page.value = 1
-})
 
 const editing = ref<ContentWarning | null>(null)
 const open = ref(false)
@@ -144,21 +137,6 @@ async function remove(): Promise<void> {
 
 const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The vocabulary could not be read.') : null))
 
-const activeFilters = computed<ActiveFilter[]>(() => {
-  const active: ActiveFilter[] = []
-  if (search.value) {
-    active.push({ key: 'search', label: `Matching ${search.value}`, icon: 'i-lucide-search', clear: () => {
-      search.value = ''
-    } })
-  }
-  if (!includeArchived.value) {
-    active.push({ key: 'archived', label: 'Hiding archived', icon: 'i-lucide-archive', clear: () => {
-      includeArchived.value = true
-    } })
-  }
-  return active
-})
-
 const columns: TableColumn<ContentWarning>[] = [
   {
     id: 'title',
@@ -246,19 +224,19 @@ const columns: TableColumn<ContentWarning>[] = [
 
     <AdminToolbar
       v-model:search="search"
-      placeholder="A warning"
-      :active="activeFilters"
+      :placeholder="contentWarningsList.search?.placeholder"
+      :active="active"
       :loading="status === 'pending'"
-      @clear="search = ''; includeArchived = true"
+      @clear="clear"
     >
       <template #filters>
-        <UFormField label="Show">
-          <USwitch
-            v-model="includeArchived"
-            label="Including archived warnings"
-            data-test="warnings-archived"
-          />
-        </UFormField>
+        <ConsoleFilters
+          :spec="contentWarningsList"
+          :conditions="conditions"
+          :sort="sort"
+          @set="set"
+          @sort="setSort"
+        />
       </template>
 
       <template #actions>
@@ -280,7 +258,7 @@ const columns: TableColumn<ContentWarning>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ search ? 'No warning matches that.' : 'Nothing in the vocabulary yet. Add a warning and a show has something to choose from.' }}
+          {{ filtered ? 'No warning matches that.' : 'Nothing in the vocabulary yet. Add a warning and a show has something to choose from.' }}
         </p>
       </template>
     </UTable>
