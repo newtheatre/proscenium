@@ -211,6 +211,10 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/pass-redemption.ts'],
   },
   {
+    route: 'server/api/tonight/door/resolve.post.ts',
+    exempt: 'turns a decoded code into the reference the scan routes take; nothing is admitted here',
+  },
+  {
     route: 'server/api/tonight/door/passes/scan.post.ts',
     actions: ['pass.redeemed', 'reservation.admitted'],
     via: ['server/utils/pass-redemption.ts', 'server/utils/door.ts'],

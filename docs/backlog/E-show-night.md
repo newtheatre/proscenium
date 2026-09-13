@@ -7,8 +7,8 @@ auto-closing night reports), while the fail-open eligibility seam to the trainin
 into internal queries that fail closed. Show night is hostile territory: every screen here is
 phone-first, one-handed, and degrades to cached read-only rather than a spinner.
 
-Counts: 28 MVP stories (E-101 to E-128), 4 V2 stories (E-201 to E-204), 1 Later epic stub (E-301).
-31 total.
+Counts: 29 MVP stories (E-101 to E-129), 4 V2 stories (E-201 to E-204), 1 Later epic stub (E-301).
+34 total.
 
 ## Open questions
 
@@ -413,6 +413,24 @@ Counts: 28 MVP stories (E-101 to E-128), 4 V2 stories (E-201 to E-204), 1 Later 
   5. The describe block in `tests/integration/night-keying.test.ts` that pins the current behaviour is replaced by one asserting the new keying, and the matinee-and-evening fixture covers two checklists closing independently.
   6. The known-issue row recording the gap is removed in the same pull request.
 - Source: E-127 criterion 4, deferred at merge and scheduled separately.
+
+## E-129: The door reads a QR with the camera
+
+- Role: Shift authority
+- Phase: MVP
+- Story: As door staff, I want to point the phone's camera at a booking's QR so that the queue moves at the speed of a scan rather than of six characters typed into a phone in a dark foyer.
+- Depends on: D-108, D-126, E-127
+- Context: D-108 put a QR in every confirmation email and on every booking page, and D-126 built the door's admission routes, but nothing in this build has ever read a camera. `/tonight/door` takes a reference typed or entered by a hardware scanner acting as a keyboard, which `docs/known-issues.md` recorded as the gap. The committee's show-night design (section 2.1, section 3) has always specified a camera scanner; this story builds it.
+- Acceptance criteria:
+  1. The door opens the rear camera with `getUserMedia` (`facingMode: 'environment'`) and decodes with the `BarcodeDetector` API where the browser has it, falling back to a JavaScript decoder everywhere else. The fallback is one small, maintained dependency, chosen and justified in the pull request that lands it.
+  2. A decoded value resolves to the same lookup the typed reference uses, whatever form the code carries: the `/qr/<token>` and `/passes/<token>` URLs this build actually issues (D-108 criterion 4), the `/t/<ref>` form the design document names, and a bare reference. `POST /api/tonight/door/resolve`, under the same DOOR authority a scan carries, verifies a signed token server-side and answers with the reference, which then goes through the existing scan routes: the token is never unpacked in the browser, and nothing admits through a second state machine. The typed field takes the same four forms, since a hardware scanner acting as a keyboard types out the whole URL a QR carries.
+  3. A second decode of the same value within a few seconds is ignored, so one code held in front of the lens admits once rather than repeatedly.
+  4. The camera stops when the screen is left: every track is stopped when the component unmounts or the tab is hidden, so the indicator light goes out rather than staying on all evening.
+  5. A device with no camera, or a permission the volunteer refuses, falls back to the typed reference field with one clear line saying which happened. The screen never dead-ends on a spinner or fails silently.
+  6. The application's `Permissions-Policy` allows `camera=(self)`. It denies the camera outright today, which would fail the first attempt with no visible cause (issue 928).
+  7. The verdict is what door mode shows and nothing more (design document section 2.1): the reference in the mono face, PAID or UNPAID or a named refusal, the party it admits, and the two ways on. No price, no email address, no booking history.
+  8. The whole flow is testable without a camera: the decode-to-reference parsing and the repeat suppression are unit tested, and an end-to-end test feeds a decoded value through the screen.
+- Source: Show-night screen design sections 2.1 and 3; issues 928 and the camera row in `docs/known-issues.md`; committee direction (camera scanning is a core feature, not a later refinement).
 
 ## E-201: Door offline queue refinements
 
