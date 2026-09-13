@@ -196,7 +196,11 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
   8. The booking flow reads as an order: the choices on the left, a ticket-stub summary quoting
      what is due at the theatre on the right, and the reservation as the view's one call to action.
   9. Every public view spends at most one marquee, one sticker and one spotlight, counted by
-     `tests/e2e/shells.test.ts` over the public pages this story touches.
+     `tests/e2e/shells.test.ts` over the public pages this story touches. The header's booking
+     button is therefore the poster variant: the marquee stays with the page's own call to action.
+  10. The public header carries the wordmark, the visitor's few destinations (declared once in
+     `HEADER_NAV`, the rest of the public nav staying in the footer) and a booking button, and
+     the same links reach a phone through the header menu rather than a panel that opens empty.
 - Source: Pre-cutover review, 10 September 2026; the known-issues row on unsigned-off policy
   prose; 0012, 0051. Criteria 6 to 9 added 11 September 2026, after the committee's review of the
   public-site mockups widened the story from the policy wording to the whole public site.

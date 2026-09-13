@@ -112,7 +112,7 @@ decision record rather than a habit (`decisions/0040-navigation-is-shaped-by-pos
 `UDashboardSearch` is in the matrix above and is not built yet: it is the answer once the sidebar
 passes roughly forty items.
 
-Four rules follow:
+Five rules follow:
 
 1. **A permanently dark region is marked `dark`.** The public header and footer are stage black
    in both colour modes. That is one class on the subtree, after which every semantic token
@@ -127,10 +127,15 @@ Four rules follow:
    and render from cache when the network drops (`architecture.md`, module K). Anything that only
    looks right on a desk monitor is wrong for the surface it is on.
 4. **Navigation is declared once and filtered by ability.** Every destination in the console
-   sidebar, the member sub-nav (`MY_NAV`), account settings (`ACCOUNT_NAV`), the account menu and
-   the footer comes from `shared/utils/site-nav.ts`, and the console middleware guards a route
-   from the same entry the sidebar renders. A screen added to a layout and not to the declaration
-   fails `tests/unit/site-nav.test.ts` (0040).
+   sidebar, the member sub-nav (`MY_NAV`), account settings (`ACCOUNT_NAV`), the account menu, the
+   public header (`HEADER_NAV`, a derived slice of `PUBLIC_NAV`) and the footer comes from
+   `shared/utils/site-nav.ts`, and the console middleware guards a route from the same entry the
+   sidebar renders. A screen added to a layout and not to the declaration fails
+   `tests/unit/site-nav.test.ts` (0040).
+5. **A shell's title is not a link inside a link.** `UHeader` wraps its `#title` slot in its own
+   anchor, so the slot holds `SiteWordmark`, not a `NuxtLink`, and the destination is the `to`
+   prop. `UHeader` does not carry its default slot into the mobile panel either, so a header with
+   links gives the `#body` slot the same navigation.
 
 ## Photography and show artwork
 
