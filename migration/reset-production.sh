@@ -15,15 +15,20 @@ DB="$2"
 PUBLISH=migration/out/publish
 DONE="$PUBLISH/DONE"
 export CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-3d250a94794003bd921b7f0379de7f00}"
-: "${NUXT_HUB_CLOUDFLARE_ACCOUNT_ID:?set the NUXT_HUB_* triplet for nuxt-db migrate (docs/operations.md)}"
-: "${NUXT_HUB_CLOUDFLARE_API_TOKEN:?set the NUXT_HUB_* triplet for nuxt-db migrate (docs/operations.md)}"
-: "${NUXT_HUB_CLOUDFLARE_DATABASE_ID:?set the NUXT_HUB_* triplet for nuxt-db migrate (docs/operations.md)}"
+
+# The migrations apply through nuxt-db when the NUXT_HUB_* triplet is set, and otherwise through
+# wrangler's own applier against the built config, which records the same _hub_migrations table.
+WRANGLER_CONFIG=.output/server/wrangler.json
+if [ -z "${NUXT_HUB_CLOUDFLARE_API_TOKEN:-}" ] && [ ! -f "$WRANGLER_CONFIG" ]; then
+  echo "No NUXT_HUB_* triplet and no $WRANGLER_CONFIG: run bun run build first." >&2
+  exit 1
+fi
 
 WRANGLER=./node_modules/.bin/wrangler
 [ -x "$WRANGLER" ] || WRANGLER="bunx wrangler"
 
 if [ ! -f "$PUBLISH/counts.json" ]; then
-  echo "No $PUBLISH/counts.json: run bun migration/build.ts, then bun migration/dump-data.ts --skip-ledger." >&2
+  echo "No $PUBLISH/counts.json: run bun migration/build.ts, then bun migration/dump-data.ts." >&2
   exit 1
 fi
 
@@ -38,19 +43,30 @@ echo "$BOOKMARK" > "$PUBLISH/BOOKMARK"
 
 if [ ! -f "$DONE" ]; then
   echo "== Dropping every application table in $DB"
+  # dump-data.ts wrote 000-drop.sql children first from the build's own schema; anything the
+  # remote holds beyond that (an older table) is dropped after it; D1's own _cf tables are never touched.
   RAW=$($WRANGLER d1 execute "$DB" --remote --json --command "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '\\_content%' ESCAPE '\\'")
   printf '%s' "$RAW" | grep -oE '"name": *"[^"]+"' | sed 's/.*: *"//; s/"$//' | sort > "$PUBLISH/tables-before.txt"
-  {
-    echo "PRAGMA defer_foreign_keys = true;"
-    while read -r table; do echo "DROP TABLE IF EXISTS \"$table\";"; done < "$PUBLISH/tables-before.txt"
-  } > "$PUBLISH/000-drop.sql"
-  $WRANGLER d1 execute "$DB" --remote --yes --file "$PUBLISH/000-drop.sql"
+  cp "$PUBLISH/000-drop.sql" "$PUBLISH/000-drop-remote.sql"
+  while read -r table; do
+    case "$table" in _cf*) continue ;; esac
+    grep -q "\"$table\"" "$PUBLISH/000-drop.sql" || echo "DROP TABLE IF EXISTS \"$table\";" >> "$PUBLISH/000-drop-remote.sql"
+  done < "$PUBLISH/tables-before.txt"
+  $WRANGLER d1 execute "$DB" --remote --yes --file "$PUBLISH/000-drop-remote.sql"
 
-  echo "== Applying the migrations with nuxt-db"
-  NODE_ENV=production ./node_modules/.bin/nuxt-db migrate --verbose
+  if [ -n "${NUXT_HUB_CLOUDFLARE_API_TOKEN:-}" ]; then
+    echo "== Applying the migrations with nuxt-db"
+    NODE_ENV=production ./node_modules/.bin/nuxt-db migrate --verbose
+  else
+    echo "== Applying the migrations with wrangler"
+    # wrangler resolves migrations_dir against the config file's own folder, so a copy of the
+    # built config lives beside the publish files pointing back at the real directory.
+    bun -e "const w = require('./$WRANGLER_CONFIG'); w.d1_databases = w.d1_databases.map(d => ({ ...d, migrations_dir: '../../../server/db/migrations/sqlite' })); require('fs').writeFileSync('$PUBLISH/wrangler.json', JSON.stringify({ name: w.name, compatibility_date: w.compatibility_date, d1_databases: w.d1_databases }, null, 2))"
+    $WRANGLER d1 migrations apply "$DB" --remote -c "$PUBLISH/wrangler.json"
+  fi
   PENDING=$(D1_DATABASE_NAME="$DB" ./.github/scripts/pending-migrations.sh)
   if [ -n "$PENDING" ]; then
-    echo "Migrations still pending after nuxt-db migrate:" >&2
+    echo "Migrations still pending after applying:" >&2
     echo "$PENDING" >&2
     exit 1
   fi

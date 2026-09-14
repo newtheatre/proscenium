@@ -19,7 +19,8 @@ function literal(value: unknown): string {
   return `'${String(value).replaceAll('\'', '\'\'')}'`
 }
 
-// Parents first: a child's foreign key must find its row even where D1 does not defer the check.
+// Parents first, and no PRAGMA anywhere: D1's file import refuses one outright (SQLITE_AUTH),
+// so the order of the files is the only thing keeping every foreign key satisfied.
 export function orderTables(db: Database, names: readonly string[]): string[] {
   const parents = new Map<string, Set<string>>()
   for (const name of names) {
@@ -79,7 +80,7 @@ export function dumpData(db: Database, dir: string, options: DumpOptions): { fil
   const flush = () => {
     if (!batch.length) return
     const file = `${String(files.length + 1).padStart(3, '0')}-data.sql`
-    writeFileSync(join(dir, file), ['PRAGMA defer_foreign_keys = true;', ...batch, ''].join('\n'))
+    writeFileSync(join(dir, file), [...batch, ''].join('\n'))
     files.push(file)
     batch = []
   }
@@ -108,6 +109,10 @@ export function dumpData(db: Database, dir: string, options: DumpOptions): { fil
     }
   }
   flush()
+  // Children first, so a DROP never trips a foreign key on the remote; the ledger goes too, so
+  // the migrations rebuild it from nothing.
+  const drops = [...names.filter(name => name !== '_hub_migrations')].reverse().concat('_hub_migrations')
+  writeFileSync(join(dir, '000-drop.sql'), drops.map(name => `DROP TABLE IF EXISTS "${name}";`).concat('').join('\n'))
   return { files, statements, counts, seededSkipped }
 }
 

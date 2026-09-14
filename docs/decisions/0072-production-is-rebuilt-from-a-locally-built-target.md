@@ -27,14 +27,18 @@ a failure stops the build with its exit code. The dumps are loaded statement by 
 one transaction (`execDump`), which is the difference between a second and never.
 
 `migration/dump-data.ts` turns the built target into plain INSERT files under `out/publish/`,
-parents before children, twenty thousand statements a file, with `PRAGMA defer_foreign_keys` at
-the head of each. Rows the migrations themselves seed are left out, recognised by any unique key,
-because on production they will already exist by the time the files run.
+parents before children, twenty thousand statements a file, and no `PRAGMA` anywhere, because
+D1's file import refuses one outright (`SQLITE_AUTH`, found on the night). Rows the migrations
+themselves seed are left out, recognised by any unique key, because on production they will
+already exist by the time the files run. A children-first `000-drop.sql` is written beside them.
 
 `migration/reset-production.sh` is the only script in the directory that writes to a remote
 database. It refuses without `--i-mean-it <database>`, refuses without a Time Travel bookmark,
-and then: drops every application table (never Nuxt Content's), runs `nuxt-db migrate` and
-checks the ledger with `pending-migrations.sh`, executes the data files in order recording each
+and then: drops every application table (never Nuxt Content's, never D1's own `_cf` tables),
+applies the migrations through `wrangler d1 migrations apply` against a copy of the built config
+(or `nuxt-db migrate` when the `NUXT_HUB_*` triplet is set, so no API token has to leave the
+password manager for a wrangler login that already exists), checks the ledger with
+`pending-migrations.sh`, executes the data files in order recording each
 in `out/publish/DONE` so a rerun resumes, and compares every table's row count with the build's
 `counts.json`. A mismatch is a non-zero exit with the bookmark printed again.
 

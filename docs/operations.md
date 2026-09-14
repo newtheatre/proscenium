@@ -223,25 +223,34 @@ rehearsal.
 By hand, like everything else destructive, and only after a green build:
 
 ```bash
-export NUXT_HUB_CLOUDFLARE_ACCOUNT_ID=... NUXT_HUB_CLOUDFLARE_API_TOKEN=... \
-       NUXT_HUB_CLOUDFLARE_DATABASE_ID=02c35a27-b6dc-47b0-8d9b-7a526324aca1
-./migration/reset-production.sh --i-mean-it unified
+bun run build                                      # the built wrangler config is what applies the migrations
+bash ./migration/reset-production.sh --i-mean-it unified
 ```
 
+It needs only the wrangler login the export used: with no `NUXT_HUB_*` triplet in the
+environment the migrations apply through `wrangler d1 migrations apply` against a copy of the
+built config, into the same `_hub_migrations` table (`.sql` spelling, which the health check
+folds); with the triplet set it uses `nuxt-db migrate` instead. On Windows run it through `bash`,
+since PowerShell hands a `.sh` file to the editor.
+
 The script takes the Time Travel bookmark and refuses without one, drops every application table
-(never Nuxt Content's), runs `nuxt-db migrate` and checks the ledger with
-`.github/scripts/pending-migrations.sh`, executes `out/publish/*.sql` in order recording each
-file in `out/publish/DONE`, and compares every table's row count with the build's. It is not one
-transaction: D1 executes each file statement by statement, which is why the bookmark comes first
-and why running it again after a partial failure resumes rather than repeats. The restore, if it
-comes to that:
+children first (never Nuxt Content's, never D1's own `_cf` tables), applies the migrations and
+checks the ledger with `.github/scripts/pending-migrations.sh`, executes `out/publish/*.sql` in
+order recording each file in `out/publish/DONE`, and compares every table's row count with the
+build's. It is not one transaction: D1 executes each file statement by statement, which is why
+the bookmark comes first and why running it again after a partial failure resumes rather than
+repeats. D1's file import refuses any `PRAGMA` (`SQLITE_AUTH`), so the files carry none and the
+order of the files is what keeps every foreign key satisfied. The restore, if it comes to that:
 
 ```bash
 bunx wrangler d1 time-travel restore unified --bookmark=<bookmark>
 ```
 
 The rows the migrations seed (`incident_severity_config`, `su_nominal_mappings`,
-`backstage_milestone_types`) are left to `nuxt-db migrate` and are not in the data files.
+`backstage_milestone_types`) are left to the migrations and are not in the data files.
+
+Run on 14 September 2026 against the dumps of 13 September: 107 tables, every count matching the
+build, `/api/health` green afterwards.
 
 Keep `out/id-map.tsv` and the other maps until cutover is complete. After that they are the key
 to an estate that no longer exists, and they go with the archive rather than staying on anybody's
