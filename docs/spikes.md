@@ -58,7 +58,8 @@ All five spikes were answered by the committee on the day the package was circul
 - **SP-1: refused.** The SU's SumUp merchant account does not grant the society developer
   toolkit access. Reader-initiated checkout will not be built; the typed expected-total
   cross-check is the permanent flow (decision 0005 amended; D-205 and F-201 resolved as
-  won't-build).
+  won't-build). Amended 14 September: the SumUp app's Payment Switch hand-off, which needs the
+  merchant dashboard and no toolkit, is built on the till as F-124 (decision 0069).
 - **SP-2: no direct or automatic access.** Membership is maintained by manual grant, with a
   periodic manual import of any list the SU can export on request (A-201 amended accordingly).
 - **SP-3: confirmed as build work.** No off-the-shelf path exists; the export, transform and

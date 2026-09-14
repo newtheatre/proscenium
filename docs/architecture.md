@@ -383,6 +383,8 @@ never from `london_day`; the ledger holds no night column and gains none.
 | Comp given | Requires a prior request with a reason, approved by tonight's duty manager or the bar manager, never the requester (F-110); the same policy D-117 states for a comp admission, that giving away value takes more than the operational access that lets you sell. `amount_pence` is zero and `unit_price_pence` stays the retail price, so the foregone value is queryable | bar | `TILL` | `COMP` | `BAR_ITEM` |
 | Tab settlement | A tab is settled on the reader, bounded to the charges it covers (F-109); the settlement's own calendar day, not the charges' | bar | `TILL` | `CARD` | `TAB_SETTLEMENT` |
 | Void of a tab charge | An unsettled charge is voided with a reason (F-109); the calendar day of the void, not of the charge | bar | `TILL` | `TAB` | `BAR_ITEM` |
+| Ticket collection at the bar | A pending booking's money taken on the bar's reader, in the same entry and batch as the drinks beside it and the booking's move to `COLLECTED` (F-122); the door then reads PAID | bar | `TILL` | `CARD` | `TICKET_COLLECTION` |
+| Walk-up at the bar | A reservation written `DOOR` and paid for in one till request (F-123), with or without an account behind it; the same line the desk's own walk-up posts, from the bar's reader | bar | `TILL` | `CARD` | `WALK_UP` |
 | Imported history | Six years of the old estate load as opening history (I-109, K-114) | finance | `IMPORT` | `CARD`, `NONE` | `IMPORT` |
 
 Reading the table:

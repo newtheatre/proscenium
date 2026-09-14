@@ -1,6 +1,6 @@
 # 0005: Payment stays on the SU's SumUp flows
 
-- Status: Accepted (external constraint; SP-1 outcome folded in, 26 August 2026)
+- Status: Accepted (external constraint; SP-1 outcome folded in, 26 August 2026). The clause "no reader integration is built" is superseded by 0069 for the SumUp app's own Payment Switch hand-off, 14 September 2026; the rest stands.
 - Date: 2026-08-26
 
 ## Context

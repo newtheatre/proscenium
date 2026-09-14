@@ -7,12 +7,15 @@ computes, cross-checks and records; it never initiates an online charge and neve
 data. Every sale, tab charge, comp and settlement posts to the unified ledger in integer pence, and
 on-hand stock is always the sum of movements, never a stored figure.
 
-Counts: 26 stories (21 MVP, 3 V2, 1 Later, 1 resolved won't-build).
+Counts: 29 stories (24 MVP, 3 V2, 1 Later, 1 resolved won't-build).
 
 Open questions:
 
 - Answered 26 August: SP-1 was refused access to the SumUp developer toolkit. F-201 is resolved
-  as won't-build and the typed cross-check is the permanent till flow.
+  as won't-build and the typed cross-check is the permanent till flow. Amended 14 September: the
+  toolkit refusal covers the reader API and SDK; SumUp's Payment Switch is the SumUp app itself
+  on the volunteer's phone, configured from the merchant dashboard, and F-124 builds on it
+  (decision 0069). The typed cross-check stays as the laptop's flow and the fallback.
 - Who qualifies as an authorised tab holder in the unified system (committee only, as today, or a
   treasurer-approved list), and what is the default hard cap? The old estate's £20 was a soft nag.
 - For the migration: is the imported stock-movement history authoritative for opening on-hand, or
@@ -452,6 +455,111 @@ Open questions:
      variant override hiding a category change is visible at a glance.
 - Source: Decision 0017 (amended 26 August); Prompt Book F-1, F-2.
 
+## F-122: Tickets on the till
+
+- Role: Bar staff
+- Phase: MVP
+- Story: As tonight's bar staff, I want to take a booking's ticket money in the same basket as the
+  drinks so that a customer the door sent to the bar pays once, on one reader transaction, and
+  walks back to a green scan.
+- Depends on: F-103, F-104, F-105, D-108, D-114, E-129
+- Context: The door never sells: unpaid and walk-up customers are sent to the bar
+  (`/tonight/index.vue`). Until now the bar had nowhere to take that money, so the customer was
+  sent on again to the desk. The old estate's bar design settled that the counter is the one
+  money-taking point on a show night, with two tabs over one basket; this story is the tickets
+  tab. The till takes money; the desk changes bookings.
+- Acceptance criteria:
+  1. The till has a Tickets tab beside the bar grid. It finds a booking by scanning its QR with
+     the camera (the same `QrScanner` component and code forms as the door, E-129 criterion 2),
+     by reference, or by name across tonight's performances at this venue.
+  2. A found booking shows the party, the performance (flagged when it is not tonight's), its
+     status and what is owed. A pending booking offers one action, adding what is owed to the
+     basket; a collected, door, cancelled, expired or no-show booking says so and offers nothing.
+     The till never edits a booking: swaps, refunds and comps stay on the desk.
+  3. The basket lists ticket lines and bar lines together and the total is the one figure the
+     reader takes. The sale posts one ledger entry, source `TILL` and tender `CARD`, carrying the
+     bar lines as `BAR_ITEM` and each ticket as `TICKET_COLLECTION`, in the same batch as the
+     booking's move to `COLLECTED` and the stock movements (F-105, D-114 criterion 6). Nothing is
+     written on a refusal.
+  4. The expected-total cross-check (F-104) covers the whole basket; a mismatch refuses quoting
+     both figures. A discount applies to the bar subtotal only, never to a ticket line.
+  5. A tab tender refuses a basket holding a ticket line: credit never marks a booking paid.
+  6. Once collected at the bar the door reads PAID for that booking (D-108 criterion 5), and the
+     ticket money appears in the till's reconciliation as tickets taken at the bar, inside the
+     figure the reader is expected to show (F-118).
+- Source: Old-estate bar design (13-bar-design, sections 2.1 and 4.1); committee mockup
+  (Proscenium Bar, August 2026); Matt's direction, 13 September 2026.
+
+## F-123: Walk-ups on the till
+
+- Role: Bar staff
+- Phase: MVP
+- Story: As tonight's bar staff, I want to sell a walk-up ticket from the till so that somebody
+  with no booking buys a seat and a drink in one go, without a second queue at the desk.
+- Depends on: F-122, D-115
+- Acceptance criteria:
+  1. The Tickets tab sells a walk-up for one of tonight's performances at this venue: ticket type
+     and quantity, priced from the performance's own bookable types, with the same per-line cap
+     as the desk (D-115 criterion 3). Access ticket types are not sold here.
+  2. A name and an email are asked for and encouraged, so the booker gets the confirmation with
+     its QR (D-108); they are optional. A walk-up with neither is a reservation with no account
+     behind it, findable by its reference and nothing else.
+  3. The reservation is written with source `DOOR` and collected in the same request that takes
+     the money (D-115 criterion 1); a walk-up line posts as `WALK_UP` on the till's ledger entry,
+     source `TILL`. A basket abandoned before payment leaves no reservation behind.
+  4. After the sale the screen shows a door pass for each walk-up: the reference in the mono face,
+     the booking's QR and the party size, to photograph or to print from the counter laptop. The
+     door scans or types it exactly as it does an emailed one.
+  5. Capacity is enforced by the database as for every reservation (D-105); a performance with no
+     room refuses the whole basket and nothing is charged.
+- Source: Old-estate bar design (13-bar-design, section 4.1); D-115; Matt's direction, 13 and
+  14 September 2026 (optional identity; the door pass).
+
+## F-124: The phone hands the amount to SumUp
+
+- Role: Bar staff
+- Phase: MVP
+- Story: As tonight's bar staff on my own phone, I want the till to open the SumUp app with the
+  amount already keyed so that nobody types £45.00 for a £4.50 round, and the sale is recorded
+  only once the reader has actually taken the money.
+- Depends on: F-104, F-105, F-122, F-123
+- Context: SP-1 was refused the SumUp developer toolkit, so the reader API and SDK stay out
+  (0005). SumUp's Payment Switch is a different thing: an app-to-app link (`sumupmerchant://pay/1.0`)
+  that opens the SumUp app already installed on the volunteer's phone, with an affiliate key
+  generated from the merchant dashboard and no developer access. The app takes the payment on
+  the SU's reader as it always has and returns to a URL of ours with the outcome. Decision 0069
+  records why this is inside the SU's rule rather than around it.
+- Acceptance criteria:
+  1. With the affiliate key configured and on a handheld device, the charge action opens the SumUp
+     app with the basket's total, a title, a unique foreign transaction id and a return URL of
+     ours. Without the key, or on the counter laptop, the till behaves exactly as before: the
+     figure is keyed into the reader by hand.
+  2. Every hand-off is a `sumup_attempts` row holding the basket exactly as priced. Nothing posts
+     to the ledger and no booking is collected until the SumUp app reports success, or until
+     staff explicitly resolve the attempt as paid.
+  3. The return URL carries a signed key for that attempt, so the outcome is accepted from a
+     browser with no session (the SumUp app may return to a different browser than the one the
+     till was open in); the outcome is otherwise accepted from anyone holding bar authority
+     tonight. The outcome is a claim, exactly as trustworthy as a tap on "charged" today, and the
+     SumUp transaction code it carries is recorded so a fabricated one shows at reconciliation.
+  4. A success re-runs the whole cross-check against the database as it stands and posts the sale
+     as F-122 and F-123 describe. If the basket can no longer be sold (the booking was collected
+     at the desk meanwhile, the house filled), the attempt is marked mismatched with the reason,
+     nothing is written, and staff are told the reader has money the ledger does not.
+  5. A failure or cancellation reported by the app restores the basket. An attempt with no answer
+     shows "did it go through?" on the till with three answers: it did (optionally with the code
+     from the SumUp app), it did not, check again. An unanswered attempt is abandoned by a sweep
+     after `SUMUP_ATTEMPT_TIMEOUT_MINUTES`; a stuck completion is marked mismatched after ten
+     minutes. Every transition is a conditional write, so two answers cannot both land.
+  6. The till lists tonight's open attempts so the laptop can resolve one a phone left behind;
+     closing the till is refused while any attempt is still open (mismatched ones do not block,
+     they are reconciliation facts).
+  7. A ticket line inside an open attempt cannot be charged again by hand until the attempt is
+     resolved, so the phone and the laptop cannot both record one customer.
+- Source: SumUp Payment Switch (developer.sumup.com/terminal-payments/payment-switch, and the
+  sumup-android-url-scheme and sumup-ios-url-scheme references); decision 0069; Matt's
+  direction, 13 September 2026.
+
 ## F-201: Reader-initiated checkout
 
 - Role: Bar staff
@@ -462,7 +570,10 @@ Open questions:
   1. The typed expected-total cross-check (F-104) is the permanent till flow, not a fallback.
   2. Decision 0005 records the refusal; revisit only via a superseding decision record if the SU
      changes its position.
-- Source: SP-1 outcome in `../spikes.md`; decision 0005; Get-In constraint 1.
+  3. Amended 14 September 2026: the refusal stands for the reader API and SDK. The SumUp app's own
+     Payment Switch hand-off needs neither and is built as F-124 under decision 0069; the typed
+     cross-check remains the laptop's flow and the fallback everywhere.
+- Source: SP-1 outcome in `../spikes.md`; decisions 0005 and 0069; Get-In constraint 1.
 
 ## F-202: Multi-venue bars
 

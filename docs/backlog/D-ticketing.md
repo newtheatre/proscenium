@@ -16,7 +16,9 @@ Open questions:
   high-demand performances release earlier? Enters the Phase 0 committee workshop as a
   configuration default to confirm.
 - Answered 26 August: SP-1 was refused access to the SumUp developer toolkit, so D-205 is
-  resolved as won't-build and the typed cross-check is permanent.
+  resolved as won't-build and the typed cross-check is permanent. Amended 14 September: the SumUp
+  app's Payment Switch hand-off needs no toolkit and is built on the till as F-124 (decision
+  0069); the desk keeps the typed cross-check.
 - Historical pass revenue: the old estate issued passes without writing ledger rows. Does the
   committee want a one-off backfill of pre-migration pass sales, or a dated note in the data
   dictionary that pass revenue starts at cutover?
@@ -375,8 +377,12 @@ Open questions:
   4. The expected-total cross-check (D-114) applies to walk-up payment exactly as to collection.
   5. Pre-migration reservations keep their known source blur, documented in the data dictionary;
      no historical reclassification is attempted.
+  6. Amended 14 September 2026 (Matt): a walk-up's name and email are encouraged, so the booker
+     gets the confirmation and its QR, and optional. A walk-up sold with neither is a reservation
+     with no account behind it, findable by reference alone; the till sells them that way from
+     F-123 and the desk's own form is unchanged until it is next touched.
 - Source: Prompt Book D-5; audit PR-5 (defect: walk-ins written as PENDING/WEB); Get-In part 2
-  (walk-ins: rebuild, fixed by construction)
+  (walk-ins: rebuild, fixed by construction); Matt's direction, 14 September 2026 (criterion 6)
 
 ## D-116: Refunds, in person, per ticket, race-safe
 
@@ -845,7 +851,10 @@ Open questions:
      wording and training material state it as such.
   2. Decision 0005 records the refusal. Revisit only if the SU changes its position, via a
      superseding decision record.
-- Source: SP-1 outcome in `../spikes.md`; decision 0005; Get-In constraint 1.
+  3. Amended 14 September 2026: decision 0069 supersedes the "no reader integration" clause for
+     the SumUp app's Payment Switch hand-off, built on the till as F-124. The API and SDK stay
+     refused; this story stays withdrawn.
+- Source: SP-1 outcome in `../spikes.md`; decisions 0005 and 0069; Get-In constraint 1.
 
 ## D-206: Sales, no-show and utilisation reporting exports
 

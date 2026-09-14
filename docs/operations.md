@@ -562,7 +562,8 @@ Registered in `nuxt.config.ts` and mirrored in the wrangler cron triggers; the t
 agree, and `tests/unit/tasks.test.ts` fails if they drift or if a name has no handler.
 
 **`daily:sweeps`, `training:expiry-sweep`, `shifts:escalate`, `rooms:sweep`, `rooms:remind`,
-`shifts:remind`, `backup`, `health:watch`, `holds:release` and `retention:sweep` do work today.**
+`shifts:remind`, `backup`, `health:watch`, `holds:release`, `payments:sweep` and `retention:sweep`
+do work today.**
 The other two (`sessions:sweep`, `nights:close`) are stubs that report the story they are waiting
 for, and exist so their cron trigger has something to call: a cron pointing at a missing handler
 errors on every firing.
@@ -799,6 +800,7 @@ Anyone holding a privileged role must set up an authenticator app before the rol
 | `NUXT_QR_TOKEN_SECRET` | worker secret | Signs a reservation's QR token (D-108). Rotating it invalidates every QR already sent. |
 | `NUXT_BACKSTAGE_BOARD_SECRET` | worker secret | HMAC key material for the backstage board's join code (E-120). Never read outside this app; rotating it invalidates every code and every joined device in one step. |
 | `NUXT_WAITING_LIST_TOKEN_SECRET` | worker secret | HMAC key signing a waiting-list entry's claim and removal token (D-113). Never read outside this app; rotating it invalidates every offer and removal link already sent. |
+| `NUXT_SUMUP_AFFILIATE_KEY`, `NUXT_SUMUP_APP_ID` | worker secrets | The SumUp app hand-off on the till (F-124, 0069). Both come from the SU's SumUp merchant dashboard; see "The SumUp hand-off" below. Unset, the till keys the figure into the reader by hand and nothing else changes. |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | repository secrets | Read by the migrate workflow. Needs D1 edit. |
 
 Everything is mirrored in the committee password manager, which is the only place a value can be
@@ -806,6 +808,40 @@ read back. The `NUXT_` prefix is load-bearing: Nuxt maps only `NUXT_*` onto `run
 worker secret without it is silently ignored. `0.required-env.ts` names, on the first request an
 isolate serves, any of the three above (and anything shaped like them) that resolved empty; it
 never blocks the request and never logs a value, only which keys are missing.
+
+## The SumUp hand-off (F-124)
+
+On a phone, the till opens the SumUp app with the basket's total already keyed; on the counter
+laptop, and wherever the two secrets above are unset, the figure is keyed into the reader by hand
+as before (decision 0069). Nothing is charged online and no card data is touched: the app takes
+the payment on the SU's reader and returns to `/pay/return/<key>` with the outcome.
+
+**Switching it on.** Sign in to the SU's SumUp merchant dashboard at `me.sumup.com`, open
+Developers, and under Payment Switch generate an affiliate key against an application id of your
+choosing (`uk.org.newtheatre.unified` is the one to use; it must match `NUXT_SUMUP_APP_ID`
+exactly). Set both as worker secrets with `bunx wrangler secret put`, mirror them in the password
+manager, and redeploy. The till shows "Charge on SumUp" on a handheld from the next request. The
+SumUp app on each volunteer's phone must be signed in to the SU's account and paired with the
+reader, exactly as it is for a hand-keyed payment.
+
+**A hand-off nobody answered.** The till shows "Did it go through?" with three answers: it did
+(type the transaction code from the SumUp app if you have it), it did not, or check again. Any
+open hand-off from tonight is also listed on the till, so the laptop can answer for a phone that
+left one behind. After `SUMUP_ATTEMPT_TIMEOUT_MINUTES` with no answer the sweep abandons it;
+nothing was recorded, so if the reader did take the money the sale is rung up again by hand.
+
+**"Taken on the reader, not recorded" (a mismatch).** The app reported success but the basket
+could no longer be sold: the booking had been collected at the desk meanwhile, or the house had
+filled. The reader holds money the ledger does not. Either fix the cause and press "It went
+through" again, which replays the same cross-check, or refund the customer on the reader and
+abandon the attempt with a note saying so. A mismatch does not block closing the till; an
+unanswered hand-off does, so the Z cannot be reconciled around money still arriving.
+
+**iOS.** SumUp documents an `https` return only for Android's mobile web case. Whether the iOS
+SumUp app opens ours in Safari is unverified until a real handset has tried it
+(`docs/known-issues.md`); the keyed return route accepts the answer from a browser with no
+session for exactly that case, and "It went through" on the till covers an answer that never
+arrives.
 
 ## Seeding a development database
 

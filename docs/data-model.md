@@ -1457,6 +1457,25 @@ claim has already won, so an immediate foreign key would refuse the very stateme
 claim atomic. Do not add one back; the fix for a stale reference is a read-time check, not a
 constraint SQLite cannot enforce at the moment it is written.
 
+### sumup_attempts
+`id` PK, also the `foreign-tx-id` the SumUp app is given · `till_session_id` → till_sessions
+restrict · `venue_id` → venues restrict · `night` · `created_by` → users restrict · `created_at` ·
+`basket` JSON, the sale exactly as submitted plus the scope it resolved under, replayed at the
+answer and never resubmitted · `expected_total_pence` · `status` CHECK
+`STARTED|COMPLETING|SUCCEEDED|FAILED|ABANDONED|MISMATCH` · `smp_status`, `smp_tx_code`,
+`smp_message`, `smp_failure_cause`, `callback_at`, what the app sent back · `resolution` CHECK NULL
+or `CALLBACK|KEY|STAFF|SWEEP`, who answered · `resolved_by` NULL → users restrict · `resolved_at` ·
+`resolution_note`, required when a mismatch is abandoned · `entry_id`, the ledger entry a success
+posted, no foreign key for the same reason `comp_requests.entry_id` has none, and a CHECK that it
+is set only on `SUCCEEDED` · `error`, why a mismatch could not be recorded (F-124, 0069).
+
+One row per hand-off of a basket to the SumUp app. Nothing posts to the ledger and no booking
+moves until a row reaches `SUCCEEDED`; every transition is a conditional `UPDATE ... WHERE status
+= <from>`, so a callback and a staff answer racing each other advance the row once. `STARTED` and
+`COMPLETING` are open and refuse the till's close; `MISMATCH` is the reader holding money the ledger
+could not record, for a person to resolve, and does not. Indexes on (`night`, `status`) and
+`till_session_id`.
+
 ### stock_movements  APPEND-ONLY
 `id` PK · `item_id` → bar_items restrict · `qty` signed integer, whole units of the item's own
 counting unit · `kind` CHECK `DELIVERY|SALE|COMP|STOCKTAKE|WASTAGE|TRANSFER|ADJUST|REVERSAL` ·
