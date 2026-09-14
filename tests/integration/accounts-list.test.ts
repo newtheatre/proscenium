@@ -30,14 +30,14 @@ const context: AccountsContext = { now: NOW, graceDays: 30, privilegedRoles: ['A
 
 const schema = filterQuerySchema(accountsList)
 
-function query(raw: Record<string, string>, includeAnonymised = false) {
+function query(raw: Record<string, string>, includeAnonymised = false, includeShadow = false) {
   const result = schema.safeParse(raw)
   if (!result.success) throw new Error(result.error.issues.map(issue => issue.message).join('; '))
-  return { ...result.data, includeAnonymised }
+  return { ...result.data, includeAnonymised, includeShadow }
 }
 
-function ids(database: TestDatabase, raw: Record<string, string>, includeAnonymised = false): string[] {
-  const clause = accountsClause(query(raw, includeAnonymised), context)
+function ids(database: TestDatabase, raw: Record<string, string>, includeAnonymised = false, includeShadow = false): string[] {
+  const clause = accountsClause(query(raw, includeAnonymised, includeShadow), context)
   const statement = sql`SELECT id FROM users WHERE ${clause.where} ORDER BY ${sql.join(clause.orderBy, sql`, `)}`
   const [text, ...parameters] = boundStatement(database, statement)
   return rows<{ id: string }>(database, text, ...parameters).map(row => row.id)
@@ -67,9 +67,11 @@ describe('a role is a filter though it is not a column (criterion 1)', () => {
       seed(database)
       expect(ids(database, { role: 'is:ADMIN' })).toEqual(['admin'])
       expect(ids(database, { role: 'is:TREASURER' })).toEqual(['treasurer'])
-      expect(ids(database, { role: 'not:ADMIN' })).toEqual(['guest', 'lapsed', 'member', 'treasurer'])
+      // The guest is a shadow account and stays hidden until asked for (0071).
+      expect(ids(database, { role: 'not:ADMIN' })).toEqual(['lapsed', 'member', 'treasurer'])
+      expect(ids(database, { role: 'not:ADMIN' }, false, true)).toEqual(['guest', 'lapsed', 'member', 'treasurer'])
       expect(ids(database, { role: 'any:ADMIN,TREASURER' })).toEqual(['admin', 'treasurer'])
-      expect(ids(database, { holdsRole: 'false' })).toEqual(['guest', 'lapsed', 'member'])
+      expect(ids(database, { holdsRole: 'false' })).toEqual(['lapsed', 'member'])
       expect(ids(database, { holdsRole: 'true' })).toEqual(['admin', 'treasurer'])
       expect(ids(database, { holdsRole: 'true', role: 'not:ADMIN' })).toEqual(['treasurer'])
     })
@@ -89,7 +91,7 @@ describe('a membership is a dated state read at query time (0009, 0031)', () => 
       seed(database)
       expect(ids(database, { membership: 'is:current' })).toEqual(['member'])
       expect(ids(database, { membership: 'is:lapsed' })).toEqual(['lapsed'])
-      expect(ids(database, { membership: 'is:none' })).toEqual(['admin', 'guest', 'treasurer'])
+      expect(ids(database, { membership: 'is:none' })).toEqual(['admin', 'treasurer'])
     })
   })
 })
@@ -102,7 +104,10 @@ describe('the triage questions the directory is asked', () => {
       expect(ids(database, { privilegedWithoutFactor: 'true' })).toEqual(['admin'])
       expect(ids(database, { approachingRetention: 'true' })).toEqual(['lapsed'])
       expect(ids(database, { neverSignedIn: 'true' })).toEqual(['guest'])
-      expect(ids(database, { verified: 'false' })).toEqual(['guest'])
+      expect(ids(database, { shadow: 'true' })).toEqual(['guest'])
+      // Unverified means a registration whose address is unproven; a shadow account is not one (0071).
+      expect(ids(database, { verified: 'false' })).toEqual([])
+      expect(ids(database, { verified: 'false' }, false, true)).toEqual(['guest'])
     })
   })
 

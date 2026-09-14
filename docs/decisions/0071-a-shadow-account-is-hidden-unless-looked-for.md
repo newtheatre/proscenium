@@ -29,7 +29,9 @@ it is written, with nothing to keep in step (0009 makes the same argument for ro
 
 **A shadow account is hidden from the directory unless looked for, exactly the way an anonymised
 row is (A-121 criterion 4).** Looking for one means any of: a non-empty search string, a `shadow`
-condition, a `neverSignedIn` condition, or the `includeShadow` flag on the query. A search
+condition, a `neverSignedIn` condition, the `includeShadow` flag on the query, or asking for
+anonymised rows at all (a tombstone has no way to sign in either, so it would otherwise never
+list). A search
 shows them because somebody typing an address wants that address, whoever holds it; the
 `PersonPicker` always searches, so a guest can still be chosen as the holder of a booking or a
 pass. Any other filter hides them, so that "role holders" or "unverified addresses" answer the
