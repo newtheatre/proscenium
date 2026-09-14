@@ -142,7 +142,8 @@ export function accountsClause(query: AccountsQuery, context: AccountsContext): 
   // the same way: a search, their own filter or the flag is asking (0071).
   const conditions = conditionsOf(accountsList, query)
   const askedAnonymised = query.includeAnonymised || conditions.some(condition => condition.key === 'anonymised')
-  const askedShadow = Boolean(query.includeShadow || query.search)
+  // A tombstone has no way to sign in either, so asking for anonymised rows asks for shadows too.
+  const askedShadow = Boolean(query.includeShadow || query.search) || askedAnonymised
     || conditions.some(condition => condition.key === 'shadow' || condition.key === 'neverSignedIn')
 
   const notAnonymised = askedAnonymised ? undefined : isNull(schema.users.anonymisedAt)
