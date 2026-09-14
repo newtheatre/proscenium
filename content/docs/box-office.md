@@ -2,14 +2,17 @@
 title: Box office
 description: Running the desk, the programme and season reporting.
 module: Ticketing
-updatedOn: 2026-09-10
+updatedOn: 2026-09-14
 updatedBy: The seed and tooling stream
 ---
 
 ## The desk
 
 `/box-office/desk` finds a booking by reference, a QR scan or a name search, scoped to today's
-performance with previous and next either side. Collection is the payment boundary: before it a
+performance with previous and next either side. "Scan with the camera" opens the phone's or
+laptop's camera, the same scanner the door uses; a scanned pass is refused and sent to the
+door. Where there is no camera, or the browser refuses it, the screen says so and the scan field
+still takes a hardware scanner's keystrokes or a typed reference. Collection is the payment boundary: before it a
 booking is editable, after it changes are refunds, never both. The desk always sends the total it
 believes the booking costs; if that disagrees with what the server computes, collection is
 refused and both figures are shown, because a human is about to type the smaller one into the

@@ -3,6 +3,7 @@ import { DESK_STATUS_FILTERS, DESK_TENDERS } from '#shared/utils/desk'
 import { formatLondon } from '#shared/utils/london'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { DeskStatusFilter, DeskTender } from '#shared/utils/desk'
+import type { ScannerFailure } from '~/composables/useQrScanner'
 
 // Comp authority is the request and its approval now, not a permission the desk screen checks
 // itself (D-117): every tender is always offered, and the route is what actually decides.
@@ -88,6 +89,9 @@ const q = ref('')
 const statusFilter = ref<DeskStatusFilter>('ALL')
 const scanned = ref('')
 const scanning = ref(false)
+// The camera is mounted only while open, so closing it is what stops the lens (criterion 8).
+const cameraOpen = ref(false)
+const cameraNote = ref<string | null>(null)
 const searchFailure = ref<string | null>(null)
 const scanFailure = ref<string | null>(null)
 
@@ -206,14 +210,15 @@ async function open2(id: string): Promise<void> {
   open.value = true
 }
 
-async function scan(): Promise<void> {
-  if (!scanned.value.trim()) return
+// One path for the camera and the typed field both: the route reads every form a code takes,
+// so nothing here decides what a value means (criterion 8).
+async function resolveScan(raw: string): Promise<void> {
   scanning.value = true
   scanFailure.value = null
   try {
     selected.value = await $fetch<ReservationDetail>('/api/box-office/desk/scan', {
       method: 'POST',
-      body: { scanned: scanned.value.trim() },
+      body: { scanned: raw },
     })
     tender.value = 'CARD'
     compRequestReason.value = ''
@@ -228,6 +233,34 @@ async function scan(): Promise<void> {
   finally {
     scanning.value = false
   }
+}
+
+async function scan(): Promise<void> {
+  if (!scanned.value.trim() || scanning.value) return
+  await resolveScan(scanned.value.trim())
+}
+
+async function scanDecoded(value: string): Promise<void> {
+  if (scanning.value) return
+  cameraOpen.value = false
+  await resolveScan(value.trim())
+}
+
+const cameraSays: Record<ScannerFailure, string> = {
+  NO_CAMERA: 'No camera on this device, so scan into the field or type the reference.',
+  REFUSED: 'Camera access refused, so scan into the field or type the reference. Allow it in the site settings to use it.',
+  BROKEN: 'The camera would not start, so scan into the field or type the reference.',
+}
+
+function fallBackToTyping(failure: ScannerFailure): void {
+  cameraOpen.value = false
+  cameraNote.value = cameraSays[failure]
+}
+
+function openCamera(): void {
+  cameraNote.value = null
+  scanFailure.value = null
+  cameraOpen.value = true
 }
 
 async function requestComp(): Promise<void> {
@@ -451,6 +484,26 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
             >
               Open
             </UButton>
+            <UButton
+              v-if="cameraOpen"
+              color="neutral"
+              variant="subtle"
+              icon="i-lucide-camera-off"
+              data-test="desk-scan-camera-close"
+              @click="cameraOpen = false"
+            >
+              Close the camera
+            </UButton>
+            <UButton
+              v-else
+              color="neutral"
+              variant="subtle"
+              icon="i-lucide-camera"
+              data-test="desk-scan-camera"
+              @click="openCamera"
+            >
+              Scan with the camera
+            </UButton>
             <UInput
               v-model="q"
               placeholder="Reference or name"
@@ -468,6 +521,19 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
               Search
             </UButton>
           </div>
+          <p
+            v-if="cameraNote"
+            class="mt-2 text-sm text-muted"
+            data-test="desk-scan-camera-note"
+          >
+            {{ cameraNote }}
+          </p>
+          <QrScanner
+            v-if="cameraOpen"
+            class="mt-3 w-full max-w-sm"
+            @decoded="scanDecoded"
+            @unavailable="fallBackToTyping"
+          />
           <div class="mt-3 flex flex-wrap gap-2">
             <UButton
               v-for="pill in DESK_STATUS_FILTERS"

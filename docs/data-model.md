@@ -707,8 +707,13 @@ QR still renders as an image on the confirmation email and `/qr`, which can be s
 screenshotted (`docs/known-issues.md`).
 
 **Collection at the desk (D-114).** `/box-office/desk` finds today's performance (with the
-adjacent nights to browse to), then a booking against it by reference, a scanned QR (a USB or
-Bluetooth scanner types the decoded payload like a keyboard) or the booker's name.
+adjacent nights to browse to), then a booking against it by reference, a scanned QR or the
+booker's name. The scan is the device's own camera through the door's `QrScanner` component
+(E-129), or a USB or Bluetooth scanner typing the decoded payload like a keyboard; either way
+`POST /api/box-office/desk/scan` reads the same forms `readScannedCode()` does (`/qr/<token>`,
+`/t/<ref>`, a bare reference, plus the bare token a wedge scanner types), looks a reference up
+by `deskReservationByReference()`, and refuses a pass with the door named, since the desk
+collects bookings (criterion 8).
 `POST /api/box-office/desk/reservations/[id]/collect` is the payment boundary: it recomputes
 the amount due server-side (the ticket total for `CARD`, zero for `COMP`) and refuses a mismatch
 quoting both figures, exactly the shape F-104's till cross-check uses. Collection writes the

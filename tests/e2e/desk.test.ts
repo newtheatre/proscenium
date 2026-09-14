@@ -169,6 +169,40 @@ describe.skipIf(skip !== null)('finding a booking by reference, name or a scanne
     const scanned = await send('POST', '/api/box-office/desk/scan', { scanned: 'not-a-real-token' })
     expect(scanned.status).toBe(404)
   }, CASE_TIMEOUT_MS)
+
+  test('the /t/<ref> form a camera decodes resolves to that booking (criterion 8)', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow()
+    const { reference } = await bookedReservation(performanceId, ticketTypeId)
+
+    const scanned = await send('POST', '/api/box-office/desk/scan', { scanned: `https://newtheatre.org.uk/t/${reference}` })
+    expect(scanned.status).toBe(200)
+    expect((await scanned.json() as { reference: string }).reference).toBe(reference)
+  }, CASE_TIMEOUT_MS)
+
+  test('a bare reference resolves to itself, so a hardware scanner keeps working (criterion 8)', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow()
+    const { reference } = await bookedReservation(performanceId, ticketTypeId)
+
+    const scanned = await send('POST', '/api/box-office/desk/scan', { scanned: reference.toLowerCase() })
+    expect(scanned.status).toBe(200)
+    expect((await scanned.json() as { reference: string }).reference).toBe(reference)
+  }, CASE_TIMEOUT_MS)
+
+  test('a reference nobody holds is an unknown booking, in the same words as before', async () => {
+    const scanned = await send('POST', '/api/box-office/desk/scan', { scanned: 'K7M4PQ' })
+    expect(scanned.status).toBe(404)
+  }, CASE_TIMEOUT_MS)
+
+  test('a pass is refused with the door named, since the desk collects bookings (criterion 8)', async () => {
+    const scanned = await send('POST', '/api/box-office/desk/scan', { scanned: 'https://newtheatre.org.uk/passes/pass-1.c2ln' })
+    expect(scanned.status).toBe(422)
+    expect(await scanned.text()).toContain('door')
+  }, CASE_TIMEOUT_MS)
+
+  test('a code that is none of ours is refused as such, not as a missing booking (criterion 8)', async () => {
+    const scanned = await send('POST', '/api/box-office/desk/scan', { scanned: 'https://example.com/somewhere-else' })
+    expect(scanned.status).toBe(422)
+  }, CASE_TIMEOUT_MS)
 })
 
 describe.skipIf(skip !== null)('collection is the payment boundary (criteria 2, 3, 5, 6)', () => {
@@ -464,6 +498,34 @@ describe.skipIf(skip !== null)('raising a comp from the desk with real pointer e
         'SELECT status FROM ticket_comp_requests WHERE reservation_id = ?', id,
       )
       expect(row?.status).toBe('PENDING')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
+// No camera opens headlessly, which is criterion 8's own fallback: the screen says so, and the
+// typed field takes the decoded value the way tests/e2e/door-camera-scan.test.ts feeds it.
+describe.skipIf(skip !== null)('scanning with the camera, with no camera to open (criterion 8)', () => {
+  test('the desk names the failure, then opens the collect modal for a decoded value typed in', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow()
+    const { reference } = await bookedReservation(performanceId, ticketTypeId)
+
+    const view = await signInAsBoxOffice(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-performance"]')`, 30_000)
+
+      await click(view, '[data-test="desk-scan-camera"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-scan-camera-note"]')`, 15_000)
+      expect(await textOf(view, '[data-test="desk-scan-camera-note"]')).toContain('camera')
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="qr-scanner"]'))`)).toBe(false)
+
+      await fill(view, '[data-test="desk-scan"]', `${app.baseURL}/t/${reference}`)
+      await click(view, '[data-test="desk-scan-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-tender"]')`, 15_000)
+      expect(await textOf(view, 'body')).toContain(`Reference ${reference}`)
     }
     finally {
       view.close()

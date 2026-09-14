@@ -217,6 +217,17 @@ export async function deskSummary(event: H3Event | undefined, performanceId: str
   }
 }
 
+// The reference is unique across every performance (`reservations_reference`), so a scanned
+// `/t/<ref>` needs no performance to scope it, the same as a signed token (criterion 8).
+export function deskReservationIdByReferenceQuery(reference: string): SQL {
+  return sql`SELECT r.id AS id FROM reservations r WHERE r.reference = ${reference.toUpperCase()}`
+}
+
+export async function deskReservationByReference(reference: string): Promise<DeskReservationDetail | undefined> {
+  const [row] = await db.all<{ id: string }>(deskReservationIdByReferenceQuery(reference))
+  return row ? deskReservation(row.id) : undefined
+}
+
 export async function deskReservation(id: string): Promise<DeskReservationDetail | undefined> {
   const [row] = await db.all<Omit<DeskReservationDetail, 'tickets' | 'doorWording' | 'compRequest'> & { bookerUserId: string }>(deskReservationQuery(id))
   if (!row) return undefined

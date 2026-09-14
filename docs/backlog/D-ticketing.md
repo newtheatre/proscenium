@@ -345,11 +345,20 @@ Open questions:
      reservations release time (D-106, from configuration) and the confirmed duty manager; an
      unpaid-owed alert quotes the count, the amount and the release time once anything is
      still unpaid.
+  8. The QR scan in criterion 1 opens the phone's or laptop's camera through the same
+     `QrScanner` component the door uses (E-129), decoding with `BarcodeDetector` where the
+     browser has it and jsQR everywhere else, and resolves every form `readScannedCode()`
+     accepts: this build's `/qr/<token>` URL, the `/t/<ref>` form, a bare reference, and the
+     bare token a hardware scanner types. A scanned pass is refused with the door named, since
+     the desk collects bookings. Where there is no camera, or its permission is refused, the
+     screen names the failure and falls back to the typed field, which keeps accepting the same
+     forms.
 - Source: Prompt Book D-2, D-3, D-5, P4; audit PR-5; Get-In constraint 1, part 2 (collection:
   carry); criterion 7 added from the committee's admin-boxoffice mockup, 13 September 2026, and
   restated in Matt's own words on the pull request: no BOX_OFFICE shift role exists
   (`NIGHT_ROLES`), so "on shift" reads as the confirmed duty manager rather than a box office
-  roster.
+  roster; criterion 8 added at Matt's direction, 14 September 2026, because the desk's scan
+  field only ever worked with a keyboard-wedge scanner while the door already had a camera.
 
 ## D-115: Walk-up sales recorded as door source
 
